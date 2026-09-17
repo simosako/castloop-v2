@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+
+    "lib": ["ESNext"],
+
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+
+    "types": ["./worker-configuration.d.ts"]
+  },
+  "include": ["src/**/*.ts"]
+}

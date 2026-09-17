@@ -1,0 +1,18 @@
+{
+  "name": "castloop-v2",
+  "version": "1.0.0",
+  "description": "castloop is a serverless podcast hosting program. Once deployed, it runs with minimal ops.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.131.2"
+  }
+}
