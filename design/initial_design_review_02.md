@@ -194,6 +194,8 @@ Wranglerの`r2 object put`は現行ドキュメントで**315 MBまで、同時�
 
 **決定:** 案A。最大300 MB（300,000,000 bytes）をMVPの入力制限とし、Wrangler subprocessでuploadする。上限までのuploadと失敗時の再試行をM0で検証する。S3 credentialの追加はMVPでは不要。
 
+**M0の認証経路（2026-09-23）:** 開発用VPSはSSHで利用するブラウザのない環境のため、Wranglerは環境変数のAPI tokenで認証し、resource作成・upload・Worker deployを実機確認した。OAuthでの`wrangler login`はVPSのM0完了条件から外し、ブラウザを利用するクライアントPCで対話運用するときに確認する。Workers Freeプランは管理者がDashboardで確認済み。
+
 ## R2-08: init設定、名前付け、Show IDの予約
 
 **問い:** M1時点のローカル設定とR2の予約記録をどこに置き、再度`init`/`create-show`した時どう扱うか。

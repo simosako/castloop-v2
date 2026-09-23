@@ -7,7 +7,7 @@
 
 | 順 | 検証 | 合格条件（観測するもの） |
 | --- | --- | --- |
-| 1 | **実環境・認証**: 専用のprivate R2 bucket、公開用Worker、通知先QueueとDLQを準備。Wrangler OAuthと環境変数のAPI tokenをそれぞれ使い、CLI相当の操作・必要な権限を確認 | 両認証経路から必要な操作が成功し、秘密情報をTOML・ログに残さない。作成済みリソースは識別・後片付けできる |
+| 1 | **実環境・認証**: 専用のprivate R2 bucket、公開用Worker、通知先QueueとDLQを準備。VPSでは環境変数のAPI tokenでWranglerの管理・転送操作と必要な権限を確認する | API token経路から必要な操作が成功し、秘密情報をTOML・ログに残さない。Workers Freeプランは管理者がDashboardで確認する。作成済み検証用リソースは識別・後片付けできる。ブラウザを利用するWrangler OAuthはクライアントPCで対話運用するときに別途確認し、VPSのM0完了条件にはしない |
 | 2 | **受付方式の成立性（最優先）**: `publish-show`と`publish-episode`が同じShowの受付枠を使う最小プロトタイプを作る。第一候補としてWorkerのR2 bindingによる単一オブジェクトの条件付き書き込みを試し、CLI→認証付き管理操作への経路も確認する | 別端末相当の並行要求（Show対Episode、Episode対Episode）で**勝者は常に1件**。敗者はcommit markerを作らず競合を返す。同じjobIdの再送・応答喪失後の再試行で二重受付しない。別Showの受付は妨げない。単なる「空き確認→通常PUT」やQueueの1並列設定には依存しない |
 | 3 | **停止・解放・古い実行**: 予約直後／marker書き込み前、marker後／consumer処理中、公開反映後／purge前、完了直後の各点で停止させる。古い通知やDLQからの再投入を模擬する | 予約だけ残る場合もcommit・status・受付記録から管理者が現状を特定できる。`reserved`の取消しとconsumer開始が競合しても片方だけ成功し、`processing`以降は完了前に予約を解放できず、そのShowの次の公開をエラーにする。同じjobの再実行で完了・purgeへ収束するか、修復できなければ予約を残して止める。旧jobの通知は別jobの受付後に公開しない。期限だけで自動解放しない。条件付きDELETE等、利用可否を未確認の操作を前提にしない |
 | 4 | **通知・失敗処理**: `staging/shows/.../commit.json`と`staging/episodes/.../commit.json`を最後に書く。`staging/` prefix・`commit.json` suffixのR2通知から同じmanaged Queueへ送り、1並列・1件batchのconsumerを使う | TOML/画像/MP3の個別uploadでは起動せず、両commitだけで起動する。重複配送でも同じjobを二重公開しない。一時的失敗は有限回retry後に単一DLQへ入り、恒久的失敗は理由をR2 statusへ残して無駄にretryしない。DLQ到達とstatusが自動同期しない場合の照合・回復手順が説明できる |
@@ -24,7 +24,7 @@
 
 実験ごとに[`m0_verification_log.md`](./m0_verification_log.md)へ使用したCloudflare account/plan・Wrangler version・Worker設定（秘密情報を除く）、操作・同時実行数、期待値/実測値、jobId・commit・受付記録・status・DLQの突き合わせ、HTTP status/header、失敗時の回復操作を記録する。課題は「再現条件／影響／採る案」を添えて[`initial_design_review_02.md`](./initial_design_review_02.md)の未決定事項へ反映する。
 
-**M0完了:** 1〜6が合格し、特に2〜3の原子的受付・安全な回復経路が実証され、M1/M2で使う方式が文章化されていること。未合格時は代替案と追加検証を記録してM0継続とする。retry回数・保持期間などの運用値は実測結果を踏まえてM2までに確定する。
+**M0完了:** 1〜6の技術的な成立性が実機で確認され、特に2〜3の原子的受付・失敗時に同じShowを止める回復方式が文章化されていること。2026-09-23の実測結果と管理者によるWorkers Free確認を[`m0_verification_log.md`](./m0_verification_log.md)に記録し、M0のアーキテクチャ検証を完了とする。VPSで不要なWrangler OAuthの対話ログイン、製品CLI・本番metadata/RSS生成の実装、例外的なQueue停止と手動強制中断、retry回数・保持期間の運用値はM0完了条件から分離する。検証用リソースは後続の作業で再利用する間保持し、使用終了時に片付ける。
 
 ## 実装時の参照
 

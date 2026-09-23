@@ -38,7 +38,7 @@
 
 ### Cloudflare認証とR2へのアップロード
 
-- 対話的な管理作業にはCloudflare標準の`wrangler login`による認証を、自動化には環境変数のCloudflare API tokenを使用する。認証情報はcastloopのTOMLやGit管理対象には保存しない
+- ブラウザを利用できる端末での対話的な管理作業にはCloudflare標準の`wrangler login`による認証を、自動化やブラウザのないVPSでの開発には環境変数のCloudflare API tokenを使用する。VPS上でのOAuthログインはM0の前提としない。認証情報はcastloopのTOMLやGit管理対象には保存しない
 - CLIはWranglerをsubprocessとして呼び出し、Cloudflareの初期化・R2操作を行う。M0でエラー処理と認証の動作を確認する。Show ID予約と同一Showの公開受付予約には原子的な操作が必要であり、Wranglerの通常のobject putだけで安全に実現できるとは限らない。必要な管理操作の認証と別経路はM0で検証する
 - MVPのMP3入力ファイル上限は**300 MB（300,000,000 bytes）**。CLIはファイルサイズを調べ、超過するファイルをアップロード前に拒否し、上限以内をWranglerの`r2 object put`で送る。M0では上限ちょうどのupload・downloadと内容一致を実測し、超過ファイルの実際のuploadは試さない
 
@@ -243,7 +243,7 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 
 検証の実行順・合格条件は[`m0_verification_plan.md`](./m0_verification_plan.md)にまとめる。
 
-- Wranglerの対話的ログインと自動化用API token、必要なCloudflareリソースの作成・アクセスを確認する
+- VPSでは環境変数のAPI tokenを使い、Wranglerによる必要なCloudflareリソースの作成・アクセスを確認する。対話的なOAuthログインはブラウザのあるクライアントPCで実際に利用するときに確認する
 - private R2からWorker経由でGET/HEAD/Range配信できることを確認する
 - Workers Cachingのcache hit、feedのtag purge、音源配信時のRange処理を確認する
 - MVP上限300 MB（300,000,000 bytes）のファイルをWranglerでupload・downloadでき、内容が一致することを確認する。超過時の拒否はCLIのファイルサイズ判定で実装し、M0での超過ファイルのupload試験は行わない
