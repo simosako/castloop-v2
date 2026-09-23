@@ -22,6 +22,35 @@ function validJob(value: unknown): value is string {
   return typeof value === "string" && /^[a-z0-9-]{1,80}$/.test(value);
 }
 
+function validEpisode(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 80 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+}
+
+type FlowMarker = {
+  show: string;
+  jobId: string;
+  kind: "show" | "episode";
+  episodeId?: string;
+  prefix: string;
+};
+
+function parseFlowMarker(key: string): FlowMarker | null {
+  const parts = key.split("/");
+  if (parts[0] !== "staging" || parts.at(-1) !== "commit.json") return null;
+  if (parts[1] === "shows" && parts.length === 5 && validShow(parts[2]) &&
+    parts[2].startsWith("m0-flow-") && validJob(parts[3])) {
+    return { show: parts[2], jobId: parts[3], kind: "show", prefix: parts.slice(0, -1).join("/") };
+  }
+  if (parts[1] === "episodes" && parts.length === 6 && validShow(parts[2]) &&
+    parts[2].startsWith("m0-flow-") && validEpisode(parts[3]) && validJob(parts[4])) {
+    return {
+      show: parts[2], episodeId: parts[3], jobId: parts[4], kind: "episode",
+      prefix: parts.slice(0, -1).join("/"),
+    };
+  }
+  return null;
+}
+
 async function readReservation(env: Env, key: string): Promise<{ value: Reservation; etag: string } | null> {
   const object = await env.M0_BUCKET.get(key);
   if (!object) return null;
@@ -88,6 +117,53 @@ async function processGateMarker(env: Env, key: string, attempt: number): Promis
     onlyIf: { etagMatches: final.etag },
   });
   if (!released) throw new Error("M0 reservation release conflicted");
+}
+
+async function processFlowMarker(env: Env, key: string): Promise<void> {
+  const marker = parseFlowMarker(key);
+  if (!marker) return;
+  const { show, jobId, kind, prefix } = marker;
+  const reservationKey = `m0/reservations/${show}`;
+  const statusKey = `m0/flow/${show}/${jobId}/status`;
+  const current = await readReservation(env, reservationKey);
+  if (!current || current.value.jobId !== jobId || current.value.state === "free") {
+    await env.M0_BUCKET.put(`m0/flow/${show}/${jobId}/rejected`, "not-owner");
+    return;
+  }
+
+  const commit = await env.M0_BUCKET.get(key);
+  const metadata = await env.M0_BUCKET.get(`${prefix}/${kind === "show" ? "show.toml" : "episode.toml"}`);
+  if (!commit || !metadata) throw new Error("M0 flow staged input missing");
+  const data: unknown = await commit.json();
+  if (!data || typeof data !== "object" || !("show" in data) || data.show !== show ||
+    !("jobId" in data) || data.jobId !== jobId || !("kind" in data) || data.kind !== kind ||
+    (kind === "episode" && (!("episodeId" in data) || data.episodeId !== marker.episodeId))) {
+    throw new Error("M0 flow marker does not match staged job");
+  }
+  if (current.value.state === "held") {
+    const begun = await env.M0_BUCKET.put(reservationKey, JSON.stringify({ state: "processing", jobId }), {
+      onlyIf: { etagMatches: current.etag },
+    });
+    if (!begun) {
+      const updated = await readReservation(env, reservationKey);
+      if (updated?.value.jobId !== jobId || updated.value.state !== "processing") {
+        await env.M0_BUCKET.put(`m0/flow/${show}/${jobId}/rejected`, "lost-begin-race");
+        return;
+      }
+    }
+  }
+
+  await env.M0_BUCKET.put(`m0/flow/${show}/${jobId}/kind`, kind);
+  await env.M0_BUCKET.put(`m0/flow/${show}/visible`, jobId);
+  await env.M0_BUCKET.put(statusKey, "published");
+  const final = await readReservation(env, reservationKey);
+  if (!final || final.value.state !== "processing" || final.value.jobId !== jobId) {
+    throw new Error("M0 flow reservation changed before release");
+  }
+  const released = await env.M0_BUCKET.put(reservationKey, JSON.stringify({ state: "free", jobId }), {
+    onlyIf: { etagMatches: final.etag },
+  });
+  if (!released) throw new Error("M0 flow reservation release conflicted");
 }
 
 function adminJson(value: unknown, status = 200): Response {
@@ -170,6 +246,27 @@ export default {
         attempts: attempts.objects.map((object) => object.key),
       });
     }
+    if (request.method === "GET" && url.pathname === "/flow") {
+      const show = url.searchParams.get("show");
+      const jobId = url.searchParams.get("job");
+      const kind = url.searchParams.get("kind");
+      const episodeId = url.searchParams.get("episode");
+      if (!validShow(show) || !show.startsWith("m0-flow-") || !validJob(jobId) ||
+        (kind !== "show" && kind !== "episode") || (kind === "episode" && !validEpisode(episodeId))) {
+        return adminJson({ error: "invalid flow identifiers" }, 400);
+      }
+      const prefix = kind === "show"
+        ? `staging/shows/${show}/${jobId}`
+        : `staging/episodes/${show}/${episodeId}/${jobId}`;
+      return adminJson({
+        owner: (await readReservation(env, `m0/reservations/${show}`))?.value ?? null,
+        markerExists: Boolean(await env.M0_BUCKET.head(`${prefix}/commit.json`)),
+        metadataExists: Boolean(await env.M0_BUCKET.head(`${prefix}/${kind === "show" ? "show.toml" : "episode.toml"}`)),
+        status: await readText(env, `m0/flow/${show}/${jobId}/status`),
+        visible: await readText(env, `m0/flow/${show}/visible`),
+        processedKind: await readText(env, `m0/flow/${show}/${jobId}/kind`),
+      });
+    }
     if (request.method !== "POST" || !["/claim", "/begin", "/finish", "/simulate-write"].includes(url.pathname)) {
       return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
     }
@@ -247,6 +344,11 @@ export default {
               parts[4] === "commit.json") {
               await env.M0_BUCKET.put(`m0/gate/${parts[2]}/${parts[3]}/dlq`, "delivered");
             }
+            continue;
+          }
+          if (detail.key.startsWith("staging/shows/m0-flow-") ||
+            detail.key.startsWith("staging/episodes/m0-flow-")) {
+            await processFlowMarker(env, detail.key);
             continue;
           }
           if (detail.key.startsWith("staging/shows/m0-gate-")) {

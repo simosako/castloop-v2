@@ -89,3 +89,15 @@ purge失敗時の再試行も、**初回だけpurge結果を人工的に失敗�
 同じ専用R2 bucketの`m0/size/`に、ローカルでランダムバイトを**正確に300,000,000 bytes**書き出したダミーファイルをWrangler 4.131.2の`r2 object put --remote --file`でuploadした。所要時間は**21.5秒**。`r2 object get --remote --file`で別のローカルファイルとしてdownloadし、所要時間は**14.3秒**。ダウンロード後のサイズは300,000,000 bytesで、元ファイルとの**全バイト比較が一致**し、双方のSHA-256も`a50f014a1accbf7e11112008584425347497d8eb3b9f02df2ac1d94a3a6698a6`で一致した。検証後は専用R2 objectとローカルの両ファイルを削除した。
 
 **項目6の上限転送について合格:** ダミーデータの完全なファイル往復と、先に確認した同サイズの有効MP3の転送・duration解析の両方を実測した。300,000,000 bytesを超えるファイルは送っていない。製品CLIではファイルサイズをupload前に判定して超過をエラーにする仕様とし、Cloudflareが超過ファイルを受け付けるかは保証対象にしない。
+
+## 2026-09-23: Show/Episode共通受付から通知まで（項目2・4の接続）
+
+検証専用Worker・R2・同じQueueを使い、[`../experiments/m0/verify_admission_flow.py`](../experiments/m0/verify_admission_flow.py)で実施。最終実行IDは`cba4e2bf`。ShowとEpisodeの両要求は認証付きの同じShow単位のR2受付記録へ条件付きPUTを行い、勝者のみWranglerでTOMLをstagingし、最後に`commit.json`をアップロードした。検証用consumerはmarkerの種類・jobIdとstagingの存在を確認し、**模擬公開キー**へ反映して予約を解放する。Queue設定は1並列・1件batch。
+
+| 検証 | 実測 |
+| --- | --- |
+| Show対Episode（両順序）・Episode対Episode | 3組の並行受付で毎回`201`が1件・`409`が1件。勝者の同jobId再送は`200`。勝者の完了前は敗者の再要求も`409`。Showが先に受付済みのケースでもEpisodeは`409` |
+| 敗者がmarkerを作らない | 競合直後に敗者の`show.toml`または`episode.toml`と`commit.json`がR2に**存在しない**ことを確認。勝者についてもmetadataのみstagingした時点ではmarker・公開statusは存在しなかった |
+| 通知から完了まで | 勝者のcommit upload後、R2通知→Queue consumerでShow/Episodeそれぞれのmarkerを処理し、該当kind、jobId、模擬公開状態と`free`への予約解放を確認。次に敗者jobIdを改めて受付すると`201`で、staging・commit・consumer処理が完了した |
+
+**判定:** 同一ShowのShow/Episode公開受付を1枠にする最小フローは合格。Episode対Episodeも同じ結果。CLIそのもの、実際のShow/Episode TOMLのschema、公開feed、画像・音源の更新、`system/jobs/`の本番statusは今回の検証対象外。次の項目2（公開途中の失敗とpurgeをジョブ完了条件へ結ぶ検証）とは区別する。
