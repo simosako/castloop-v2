@@ -8,4 +8,5 @@
 - 既存の検証専用リソースを使う場合、`python3 experiments/m0/verify_recovery.py`で条件付き受付とQueue再試行・DLQ・旧通知を検証できる。デフォルトでは`/tmp/opencode/castloop-m0-resources.json`のリソース名と`/tmp/opencode/castloop-m0/secrets.json`の管理secretを読む。専用リソース以外は拒否し、secretは標準出力に表示しない。模擬公開データと停止中Showの実験データは専用bucketに残る。
 - `python3 experiments/m0/verify_admission_flow.py`は同じ専用リソースでShow対Episode／Episode対Episodeの並行受付を試す。勝者だけがTOMLをstagingし`commit.json`を最後にアップロードし、R2通知からQueueを経て模擬公開状態になる。敗者にはmarkerとTOMLが残らず、勝者の完了後に新たな受付を試せる。`/flow`は認証付きのR2確認用経路で、実際のfeedは更新しない。
 - `python3 experiments/m0/verify_release_purge.py`は専用Showの実際のTOML・feed・JPEGを`m0/`配下のR2へ公開し、Show更新時のpurge失敗とEpisode metadata更新後の途中失敗を注入する。同jobのQueue再試行でfeed・画像のcache tagをpurgeするまで`processing`の予約を保持し、GETの`MISS → HIT`と現在のmetadataを確認する。`/release`は認証付きの確認用経路。実験には`ffmpeg`が必要。
+- `python3 experiments/m0/verify_job_diagnostics.py`は検証専用の`system/jobs/<jobId>/status.toml`、受付記録、commit marker、DLQ記録を照合する。commit前の停止、恒久的な入力エラー、retry超過とstatusの欠落、正常完了を区別する。`/diagnose`は認証付きの診断経路で、問題が未解決のShowは自動解放しない。
 - 完了した実機検証では専用Worker・通知rule・Queue/DLQ・bucketを識別して片付ける。300 MBの実験MP3は検証後にR2から削除済み。実験用の`max_retries: 2`は本番設定ではない。

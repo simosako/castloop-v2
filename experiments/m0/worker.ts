@@ -248,6 +248,56 @@ async function processReleaseMarker(env: Env, ctx: ExecutionContext, key: string
   if (!released) throw new Error("M0 release completion conflicted");
 }
 
+function parseDiagMarker(key: string): { show: string; jobId: string } | null {
+  const parts = key.split("/");
+  if (parts.length !== 5 || parts[0] !== "staging" || parts[1] !== "shows" ||
+    !validShow(parts[2]) || !parts[2].startsWith("m0-diag-") ||
+    !validJob(parts[3]) || parts[4] !== "commit.json") return null;
+  return { show: parts[2], jobId: parts[3] };
+}
+
+async function processDiagMarker(env: Env, key: string, attempt: number): Promise<void> {
+  const marker = parseDiagMarker(key);
+  if (!marker) return;
+  const { show, jobId } = marker;
+  const reservationKey = `m0/reservations/${show}`;
+  const statusKey = `system/jobs/${jobId}/status.toml`;
+  const current = await readReservation(env, reservationKey);
+  if (!current || current.value.jobId !== jobId || current.value.state === "free") {
+    await env.M0_BUCKET.put(`m0/diag/${show}/${jobId}/rejected`, "not-owner");
+    return;
+  }
+  if (jobId.startsWith("invalid-")) {
+    await env.M0_BUCKET.put(statusKey,
+      `job_id = "${jobId}"\nstate = "failed"\nreason = "invalid staged input"\n`);
+    return;
+  }
+  if (current.value.state === "held") {
+    const begun = await env.M0_BUCKET.put(reservationKey, JSON.stringify({ state: "processing", jobId }), {
+      onlyIf: { etagMatches: current.etag },
+    });
+    if (!begun) throw new Error("M0 diagnostic admission changed before processing");
+  }
+  await env.M0_BUCKET.put(`m0/diag/${show}/${jobId}/attempt-${attempt}`, "started");
+  if (jobId.startsWith("fail-with-status-")) {
+    await env.M0_BUCKET.put(statusKey,
+      `job_id = "${jobId}"\nstate = "retrying"\nreason = "injected R2 failure"\n`);
+    throw new Error("M0 diagnostic injected transient failure");
+  }
+  if (jobId.startsWith("fail-no-status-")) {
+    throw new Error("M0 diagnostic injected failure before status write");
+  }
+  await env.M0_BUCKET.put(statusKey, `job_id = "${jobId}"\nstate = "published"\n`);
+  const final = await readReservation(env, reservationKey);
+  if (!final || final.value.jobId !== jobId || final.value.state !== "processing") {
+    throw new Error("M0 diagnostic reservation changed before completion");
+  }
+  const released = await env.M0_BUCKET.put(reservationKey, JSON.stringify({ state: "free", jobId }), {
+    onlyIf: { etagMatches: final.etag },
+  });
+  if (!released) throw new Error("M0 diagnostic release conflicted");
+}
+
 function adminJson(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -388,6 +438,42 @@ export default {
         attempts: records,
       });
     }
+    if (request.method === "GET" && url.pathname === "/diagnose") {
+      const show = url.searchParams.get("show");
+      const jobId = url.searchParams.get("job");
+      if (!validShow(show) || !show.startsWith("m0-diag-") || !validJob(jobId)) {
+        return adminJson({ error: "invalid diagnostic identifiers" }, 400);
+      }
+      const prefix = `m0/diag/${show}/${jobId}`;
+      const [owner, marker, status, dlq, attempts] = await Promise.all([
+        readReservation(env, `m0/reservations/${show}`),
+        env.M0_BUCKET.head(`staging/shows/${show}/${jobId}/commit.json`),
+        readText(env, `system/jobs/${jobId}/status.toml`),
+        readText(env, `${prefix}/dlq`),
+        env.M0_BUCKET.list({ prefix: `${prefix}/attempt-` }),
+      ]);
+      const state = /^state = "([a-z]+)"$/m.exec(status ?? "")?.[1] ?? null;
+      let diagnosis = "unknown";
+      if (owner?.value.jobId === jobId && owner.value.state === "free" && state === "published") {
+        diagnosis = "published";
+      } else if (owner?.value.jobId === jobId && owner.value.state === "held" && !marker) {
+        diagnosis = "reserved-no-commit";
+      } else if (owner?.value.jobId === jobId && owner.value.state === "held" && state === "failed") {
+        diagnosis = "failed-before-processing";
+      } else if (owner?.value.jobId === jobId && owner.value.state === "processing" && dlq) {
+        diagnosis = status ? "blocked-dlq" : "blocked-dlq-status-missing";
+      } else if (owner?.value.jobId === jobId && owner.value.state === "processing") {
+        diagnosis = "processing-or-retrying";
+      } else if (owner?.value.jobId === jobId && owner.value.state === "held" && marker) {
+        diagnosis = "queued-or-unknown";
+      } else if (owner && owner.value.jobId !== jobId) {
+        diagnosis = "not-current-job";
+      }
+      return adminJson({
+        owner: owner?.value ?? null, commitExists: Boolean(marker), status,
+        dlq, attempts: attempts.objects.length, diagnosis,
+      });
+    }
     if (request.method !== "POST" || !["/claim", "/begin", "/finish", "/simulate-write"].includes(url.pathname)) {
       return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
     }
@@ -459,12 +545,20 @@ export default {
         if (detail && typeof detail === "object" && "key" in detail && typeof detail.key === "string") {
           if (batch.queue === env.M0_DLQ) {
             await env.M0_BUCKET.put(`m0/dlq/${message.id}`, detail.key);
+            const diag = parseDiagMarker(detail.key);
+            if (diag) {
+              await env.M0_BUCKET.put(`m0/diag/${diag.show}/${diag.jobId}/dlq`, detail.key);
+            }
             const parts = detail.key.split("/");
             if (parts.length === 5 && parts[0] === "staging" && parts[1] === "shows" &&
               parts[2].startsWith("m0-gate-") && validShow(parts[2]) && validJob(parts[3]) &&
               parts[4] === "commit.json") {
               await env.M0_BUCKET.put(`m0/gate/${parts[2]}/${parts[3]}/dlq`, "delivered");
             }
+            continue;
+          }
+          if (detail.key.startsWith("staging/shows/m0-diag-")) {
+            await processDiagMarker(env, detail.key, message.attempts);
             continue;
           }
           if (detail.key.startsWith("staging/shows/m0-release-") ||

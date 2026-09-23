@@ -113,3 +113,17 @@ purge失敗時の再試行も、**初回だけpurge結果を人工的に失敗�
 | Episode公開・途中停止 | Episode TOMLと更新feedをstagingし、最後にcommit。初回はcurrent metadataを書いた直後に人工的に失敗（`phase=after-metadata`・受付=`processing`・status=`processing`）。同jobの2回目でfeed更新とtag purgeに成功してからstatus=`published`・予約=`free`。feedは新本文の`MISS → HIT`、画像は更新されず`HIT`のまま |
 
 **項目2の判定:** 検証用の実R2 metadata・feed・固定キー画像で、途中失敗時に同じjobを再実行し、必要なpurgeまで済んでから公開完了・予約解放する動作を確認した。Cloudflareのpurge API自体が実際に失敗したわけではなく、故障注入はpurge前で行った。音源・immutable revision・本番schemaを含む製品のend-to-end公開はM2で実装・確認する。次はR2 status・commit・DLQの照合による管理者の失敗診断（項目3）。
+
+## 2026-09-23: job status・commit・受付・DLQの照合（項目3）
+
+検証専用bucketとQueueを使い[`../experiments/m0/verify_job_diagnostics.py`](../experiments/m0/verify_job_diagnostics.py)を実行（ID `c0369105`）。認証付き`/diagnose`から、Showの受付記録、`staging/shows/<showId>/<jobId>/commit.json`の有無、R2の`system/jobs/<jobId>/status.toml`、DLQ consumerの記録を読む。consumerは検証用の故障注入を行い、**DLQ配送だけでstatusを更新しない**。
+
+| ケース | 実測 |
+| --- | --- |
+| 受付後にCLI停止 | 予約=`held`、commitなし、statusなし、DLQなし。`reserved-no-commit`と診断し、同Showの別jobは`409` |
+| 入力不正 | commitあり、失敗理由付きstatus=`failed`、予約=`held`、DLQなし。恒久エラーは再試行せず、`failed-before-processing`と診断。所有jobIdを指定した管理取消し後は新しいjobを受付できた |
+| 一時的失敗のretry超過 | 初回＋2回の計3配送、DLQへ到着。statusは最後に記録された`retrying`と失敗理由のまま、予約=`processing`。`blocked-dlq`と診断して次jobを`409`にし、**DLQ到達を公開完了や予約解放と誤認しない** |
+| status書き込み前の失敗 | commitと予約=`processing`、DLQは存在するがstatusは存在しない。`blocked-dlq-status-missing`と診断し、管理取消しは`409`。status不在を「job不在」と扱わない |
+| 正常完了 | commit、status=`published`、予約=`free`、DLQなしが一致し、`published`と診断 |
+
+**項目3の判定:** 管理者が失敗状態をR2に残る情報から識別し、安全に再開できない場合は同Showを停止させる診断経路の最小実機検証は合格。例外的な`processing`強制中断やQueue全体の一時停止・再開は試していない。これは通常運用の自動回復ではなく、手動修復時に状態を確認するための方式である。
