@@ -1,4 +1,13 @@
-# episode.toml
-episode_id = "2026-01-02-hello"           # 必須: slug
-title = "はじめまして"                   # 必須
-published_at = "2026-01-02T10:00:00+09:00" # 必須: RFC3339
+# Draft template for episode-<episodeId>.toml. The CLI generates a stable GUID.
+schema_version = 1
+episode_id = "2026-01-02-hello"
+guid = "550e8400-e29b-41d4-a716-446655440000"
+title = "はじめまして"
+description = "番組の最初のエピソード"
+published_at = "2026-01-02T10:00:00+09:00" # Provisional RFC 3339 input; format decision pending.
+episode_type = "full"
+
+# Optional fields
+# explicit = false
+# season_number = 1
+# episode_number = 1

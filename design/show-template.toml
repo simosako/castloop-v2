@@ -1,19 +1,19 @@
-# show.toml template (draft)
-show_id = "samplepodcast"                 # 必須: slug（小文字英数と-推奨）
-title = "Sample Podcast"          # 必須
-summary = "サンプルのポッドキャスト"        # 必須（RSSのdescription/summaryに使用）
-language = "ja"                          # 必須（例: ja / en / ja-JP など）
-author = "Taro Yamada"                         # 必須
-
-# 必須: R2 bucket の base URL
-# 例: https://pub-xxxx.r2.dev
-media_base_url = "https://<YOUR_R2_PUBLIC_BASE>"
-
-# 任意: PodcastのWebサイト（無ければ空でOK）
-site_url = ""
-
-# 任意: cover画像（ <showId>/cover.jpg が推奨）
+# Draft template for <showId>/show.toml. The CLI replaces example values.
+schema_version = 1
+show_id = "samplepodcast"
+title = "Sample Podcast"
+description = "サンプルのポッドキャスト"
+language = "ja"
+author = "Taro Yamada"
+owner_name = "Taro Yamada"
+owner_email = "owner@example.com"
+categories = ["Technology"]
+explicit = false
+site_url = "https://example.com/samplepodcast"
 image_path = "cover.jpg"
 
-# 任意: 独自ドメインを利用する場合に指定
-# canonical_host = "podcast.example.com"
+# Optional fields
+# copyright = "Copyright 2026 Taro Yamada"
+# show_type = "episodic"
+
+# public_base_url belongs in the service config, not in this file.

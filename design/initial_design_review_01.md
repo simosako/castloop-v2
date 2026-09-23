@@ -4,11 +4,93 @@
 - 対象: [`initial_design.md`](./initial_design.md)、[`show-template.toml`](./show-template.toml)、[`episode-template.toml`](./episode-template.toml)、リポジトリ設定・規約
 - 目的: 実装開始前に、矛盾、未決定事項、依存関係、選択可能な解決案を整理する
 
-## 1. 結論
+## 決定記録（2026-09-23）
+
+以下はユーザーの選択を受けて確定した。第1サイクル時点の比較・指摘は後段に履歴として残す。正式なMVP方針は[`initial_design.md`](./initial_design.md)にも反映した。
+
+| 項目 | 決定 |
+| --- | --- |
+| D-01 | A: 1サービスにつきprivate R2バケット1つと公開用Worker1つ。Showをキーで分離 |
+| D-02 | A: Worker URLを標準、独自ドメインは任意。公開URLの基点`public_base_url`はサービス設定に置く |
+| D-03 | A: ローカルTOMLが編集元。R2は公開済みsnapshotとjob statusの置き場 |
+| D-04 | A: commit marker → R2 Event Notification → managed Cloudflare Queue → Worker consumer。簡素で運用しやすい構成にする |
+| D-05 | B: サービス全体で1並列、逐次処理。Durable Objectによる並列化は行わない |
+| D-06 | 提示した`system/`、`temp/episodes/<showId>/<episodeId>/<jobId>/`、`public/podcasts/<showId>/`、`public/episodes/<showId>/<episodeId>/`の全キー配置を採用。revision履歴を保持し、current metadataのみ上書き |
+| D-07 | A: RSS 2.0 + Apple Podcasts互換をMVP基準とし、最小schema候補を採用。ただし`published_at`のTOML入力形式のみ保留 |
+| D-08 | A: CLIでMP3妥当性・durationを解析し、WorkerでR2 size等を再確認 |
+| D-09 | 2026-09-23確定: `create-episode` → ローカルTOML編集 → `update-episode`（下書きメタデータをR2へ）→ `update-episode-audio`（下書き音源をR2へ）→ `publish-episode`（公開ジョブを起動）。更新2コマンドでは公開せず、初回も更新時も明示的にpublishする |
+| D-10 | A: 対話利用は`wrangler login`、自動化は環境変数のCloudflare API tokenを第一候補とする。実装量や大容量アップロード上の制約が大きい場合は代案を再検討 |
+| D-11 | A: Workers Cachingを採用。feedのtag purgeとMP3のRange配信をM0で検証 |
+| D-12 | A: MVPではR2の`system/jobs/<jobId>/status.toml`へjob statusを保存。必要になった場合にD1等を検討 |
+| D-13 | A: 人間可読slugを使用。`serviceId`最大20文字、`showId`最大32文字、`episodeId`最大80文字、基本形`[a-z0-9]+(?:-[a-z0-9]+)*`。Showはサービス内、EpisodeはShow内で一意。IDは作成後不変 |
+| D-14 | A: vertical slice型のM0〜M4を採用。D-09の下書き/公開分離をM1〜M3の完了条件にも反映 |
+| 命名・削除 | `show.toml` / `episode-<episodeId>.toml` に統一。Episode削除はMVP非対応。誤記を修正 |
+
+### D-10〜D-14採用時の補足（2026-09-23）
+
+- D-10: 認証はWrangler標準のOAuth/API tokenを優先するが、「CLIがWranglerをsubprocessとして利用するか、Cloudflare APIを利用するか」「MP3をどの経路でR2へ直接アップロードするか」はまだ決めていない。tokenやOAuth認証情報をcastloopのTOMLへ書かない
+- D-10: 現行Wranglerの`r2 object put`は単一オブジェクトのアップロード上限が315 MB。M0で想定音源サイズと実装負荷を検証し、満たせない場合はS3互換APIのmultipart upload等を再検討する。認証方針の採用だけでアップロード手段まで確定したわけではない
+- D-11: `wrangler.jsonc`で`cache.enabled`を使用する。feed更新後のtag purgeと、完全な`200` responseをもとにWorkers CachingがRangeに応じる方式を検証する。cache失効時の再試行と料金・サイズ上限は実装前に確認する
+- D-12: R2をjob statusの正とし、CLIから状態・失敗理由を確認できるようにする。statusの状態遷移、DLQからの回復、再試行の詳細は未決定。MVPでD1は導入しない
+- D-13: IDの基本形式と上限を採用する。単一R2バケットを採用したため、Show IDの長さはバケット名との結合を理由にしていない。バケット自体の命名規則は別途決める
+- D-14: 後段のM0〜M4案を採用するが、M2の公開フローはD-09の`update-episode`、`update-episode-audio`、`publish-episode`と一致させる。初回公開の動作確認をM2、音源のみ・メタデータのみの更新をM3に置く
+
+### D-09の整合性確認（2026-09-23）
+
+ユーザー確認済み: 「音源だけをアップロードしたときも自動公開しない」。採用するCLI操作は以下の通り。
+
+| 操作 | ローカル/R2への効果 | RSS・公開済みEpisodeへの効果 |
+| --- | --- | --- |
+| `create-episode <episodeId>` | ローカルTOML生成、GUID発行 | なし |
+| `update-episode <episodeId>` | ローカルTOMLを検証し、現在の未公開jobIdの`episode.toml`へupload | なし |
+| `update-episode-audio <episodeId> <音源.mp3>` | CLIでMP3検証・duration算出後、同じ未公開jobIdの`audio.mp3`へupload。検証結果を音源に紐付ける | なし |
+| `publish-episode <episodeId>` | 入力一式を検証し、固定したsnapshotを指す`commit.json`を最後に作成 | Queue経由で非同期公開。結果はjobIdで確認 |
+
+既存のD-06キーをそのまま使える。初回の`update-episode`または`update-episode-audio`で未公開のjobIdを確保し、後続の更新は同じ`temp/episodes/<showId>/<episodeId>/<jobId>/`へ書く。`commit.json`がない間はQueue通知の対象外。commit後はこのjobを変更せず、次の編集には新しいjobIdを割り当てる。`commit.json`にはステージ済みTOML・MP3のobject version確認情報（ETagや検証済みdigest等）と、既存公開データを使う場合の参照先を記録し、consumer側でも検証する。こうしないと、確認後に入力が書き換わるraceを防げない。
+
+| 公開パターン | 公開時に必要な入力 | 公開結果 |
+| --- | --- | --- |
+| 新規Episode | 下書きTOML + 下書きMP3 | 両方の新revisionを公開 |
+| 既存Episode: メタデータのみ変更 | 下書きTOML + 現在の公開済みMP3 | enclosure URL/byte length/durationを維持し、GUIDも維持 |
+| 既存Episode: 音源のみ変更 | 下書きMP3 + 現在の公開済みメタデータ | 新しいenclosure URL。GUIDは維持 |
+| 既存Episode: 両方変更 | 下書きTOML + 下書きMP3 | 新しいenclosure URL。GUIDは維持 |
+
+- ローカルTOMLは編集元なので、メタデータをステージした後にローカルTOMLを変更したら`publish-episode`は止めて`update-episode`を要求する。音源のみ更新の場合も、ローカルTOMLが前回公開版と異なるなら暗黙に古いメタデータを再利用しない
+- 音源のみの更新は`update-episode-audio` → `publish-episode`で足りる。メタデータのみの更新は`update-episode` → `publish-episode`で足りる。新規公開だけは両方を必須とする
+- 「updateした順序」ではなく「publishを確定した順序」で同一Episodeの新旧を比較する。QueueはFIFOではないので、単一並列でも古いcommitの後着で公開版を巻き戻してはならない。全順序の実装方法はD-05/D-12の詳細で決める
+- 公開開始は`commit.json`配置のみ。アップロード操作の再実行や失敗では公開を発火させない。CLIの成功はjob受付であって公開完了ではない
+- 別端末・並行CLIで同じ下書きを触る場合の競合防止、jobIdのローカル保持、再試行、staleな下書きの掃除は次の詳細設計で定める
+
+**結果:** 採用済みD-01〜D-08と両立するため、D-09はこの操作体系で決定する。下書きの保持方法と同一Episodeのcommit順序の実装は引き続き未決定であり、FIFOを仮定して実装してよいという意味ではない。
+
+### D-04・D-05の最小実装指針
+
+- Queueのデータ構造やpollerは自作しない。R2 Event Notificationをproducerとし、Workerの`queue()` handlerをconsumerとする
+- R2の`temp/episodes/.../commit.json`のobject-createイベントだけをQueueに送る。MP3・TOMLの個別uploadでは発火させない
+- consumerは`max_concurrency: 1`、`max_batch_size: 1`とする。これは同時実行を1つにする設定であり、FIFO保証ではない
+- Cloudflare Queuesは順序保証なし・at-least-once配送。同じjobの再配送と、同じEpisodeに対する新旧jobの順序逆転を扱う。`jobId`の冪等性と、既に公開済みの新しいrevisionを古いjobで戻さない規則が必要
+- 当面はサービス全体の1consumerで十分。job状態の永続化と再試行・恒久的失敗時の扱いはD-12で詳細化する
+
+### `published_at` の入力形式は保留
+
+RSSの`pubDate`はRFC 2822形式で出力する。一方、TOML内は次のどちらも選択できる。
+
+| 入力案 | TOMLの例 | 長所 | 注意点 |
+| --- | --- | --- | --- |
+| A: RFC 3339文字列（従来の推奨） | `published_at = "2026-01-02T10:00:00+09:00"` | 曜日を書かずに済む、機械的に検証しやすい。TOMLのoffset date-time形式にも近い | RSS出力でRFC 2822への変換が必要 |
+| B: RFC 2822文字列 | `published_at = "Fri, 2 Jan 2026 10:00:00 +0900"` | RSSに近い表記を入力できる | 曜日と日付の不一致を検証する必要がある。TOMLの日時型ではないため引用符が必須。タイムゾーン表記やパーサー許容範囲を制限する必要がある |
+
+上記2案のどちらでも日時の妥当性確認とRSS用の出力処理は必要であり、「RFC 2822で入力すれば変換処理が全く不要」とはならない。日時そのものはISO風の表記の方が入力しやすい場合が多いが、RSSに馴染んだ管理者には案Bも自然である。現時点の`episode-template.toml`は既存例のRFC 3339文字列を暫定的に残しており、選択後に確定させる。
+
+なお、TOMLの日時型を使う別案 `published_at = 2026-01-02T10:00:00+09:00` もあるが、TOMLパーサーが日時として返す値と元のoffsetの保持方法を確認してから採用すべきである。
+
+残る優先課題は、`published_at`形式、ShowのRSS channel link (`site_url`省略時の扱い)、Show情報と画像の公開操作、同一Episodeの新旧job判定、job statusの状態遷移・失敗回復、CLIのCloudflare認証への接続と大容量アップロード方法、サービス/バケットの命名と初期化（D-09〜D-13の実装詳細）である。
+
+## 1. 第1サイクル時点の結論（検討履歴）
 
 「private R2 に音源を保存し、Worker 経由で配信する」「音源更新時は URL を変え、Episode GUID は維持する」「CLI を主な管理インターフェースにする」という基本方針は妥当である。
 
-一方、現状のままでは次の5点が実装全体を左右するため、先に決定する必要がある。
+レビュー時点では、次の5点が実装全体を左右する未決定事項だった。現在は冒頭の決定記録で確定済み。
 
 1. 1サービス1バケットか、Showごとのバケットか
 2. 公開URLを Worker URL、独自ドメイン、R2公開URLのどれにするか
@@ -16,9 +98,9 @@
 4. Episode更新を何が開始し、どのように完了・失敗を管理するか
 5. 同時更新、再試行、重複イベントに対してどう整合性を守るか
 
-特に、初期設計の「単一R2バケット」と、リポジトリ規約の「systemバケット + Showごとのバケット」は両立しない。ここを決めないままオブジェクトキー、Worker binding、`showId` の長さ、デプロイ単位を決めることはできない。
+レビュー時点では、初期設計の「単一R2バケット」と、旧リポジトリ規約の「systemバケット + Showごとのバケット」は両立していなかった。単一バケットを採用し、`AGENTS.md`を更新済み。
 
-### 推奨するMVPの全体像
+### レビュー時点で提案したMVPの全体像
 
 本レビュー時点では、次の構成を推奨する。
 
@@ -27,11 +109,11 @@
 - ローカルTOMLを編集元、R2を公開済みスナップショットと実行状態の保存先にする
 - CLIは音源とメタデータを一意なjob領域へアップロードし、最後にcommit markerを置く
 - R2 Event Notificationでcommit markerだけをQueueへ送り、consumerが冪等に公開処理を行う
-- 同一Showの直列化にはDurable Objectを使う。より小さく始める場合は、MVP期間だけ全Showを直列処理する
+- 全Showのジョブを単一並列のQueue consumerで逐次処理する
 - 音源はimmutable、`feed.xml` とcurrent metadataだけを更新可能なオブジェクトとする
 - 配信にはWorkers Cachingを使い、GET/HEAD・Range・条件付き取得をM0で実機検証する
 
-これは提案であり、以下の選択肢を決定した後に正式設計へ反映する。
+上記のうち採用された項目は冒頭の決定記録と`initial_design.md`に反映済み。以下の比較はレビュー当時の検討履歴である。
 
 ## 2. 現在のプロジェクト状態
 
@@ -47,7 +129,7 @@
 
 実装が未着手であること自体は問題ではない。ただし、モノレポ構成を採用するか、単一packageから始めるかは実装開始時に設定と規約を一致させる必要がある。
 
-## 3. 明確な矛盾・不足
+## 3. レビュー時点の矛盾・不足（採用済み項目は冒頭参照）
 
 ### 3.1 ストレージ構成が一致していない
 
@@ -201,9 +283,9 @@ D-04 + D-05 + D-08 MP3処理
   └─> D-14 マイルストーン
 ```
 
-最初の回答では、少なくともD-01からD-05を決めることを推奨する。D-06以降は、その回答を反映した次回レビューで詳細化できる。
+D-01〜D-08の選択結果は冒頭の決定記録を参照。残る依存事項は次回レビューで詳細化する。
 
-## 5. 決めるべき項目と選択肢
+## 5. 検討した項目と選択肢（採用結果は冒頭参照）
 
 ### D-01: ストレージとデプロイの単位【最優先】
 
@@ -451,6 +533,8 @@ public/episodes/<showId>/<episodeId>/revisions/<revisionId>.toml
 
 ### D-09: CLI commandと公開状態
 
+**採用結果（2026-09-23）:** 上記「D-09の整合性確認」の操作体系を採用。以下の案A〜Cは当初レビューの比較履歴。
+
 #### 案A: draft作成、初回公開、更新を分ける（推奨）
 
 ```text
@@ -479,6 +563,8 @@ castloop status <jobId>
 MVPで予約公開を実装しない場合、未来の `published_at` は拒否する案を推奨する。未来日時のitemをfeedへ入れるだけでは、Podcast clientごとに挙動が異なり、確実な予約公開にはならない。
 
 ### D-10: Cloudflare認証と秘密情報
+
+**採用結果（2026-09-23）:** 案Aを第一候補として採用。上記の補足に記したアップロード経路の制約はM0で検証する。
 
 #### 案A: 対話利用は `wrangler login`、自動化は環境変数のAPI token（推奨）
 
@@ -509,6 +595,8 @@ AIエージェントからの利用を重視するなら、すべての質問に
 
 ### D-11: 配信とcache方式
 
+**採用結果（2026-09-23）:** 案Aを採用。
+
 #### 案A: Workers Cachingを使用する（推奨）
 
 - 現在のWrangler versionで `cache.enabled` を利用できる
@@ -538,6 +626,8 @@ M0では、実際の公開hostnameに対して以下を自動確認する。
 
 ### D-12: job status、失敗回復、cleanup
 
+**採用結果（2026-09-23）:** 案AをMVPで採用。状態遷移と障害回復の詳細は継続検討。
+
 #### 案A: R2にjob statusを保存する（MVP推奨）
 
 - `uploaded`、`queued`、`processing`、`published`、`failed` を記録する
@@ -564,6 +654,8 @@ M0では、実際の公開hostnameに対して以下を自動確認する。
 
 ### D-13: ID形式と一意性scope【D-01に依存】
 
+**採用結果（2026-09-23）:** 案Aを採用。単一バケットへの変更後も、ここに示したIDの文字種・上限・一意性scope・不変性を採用する。
+
 #### 案A: 人間可読slug（推奨）
 
 - 基本形: `[a-z0-9]+(?:-[a-z0-9]+)*`
@@ -573,7 +665,7 @@ M0では、実際の公開hostnameに対して以下を自動確認する。
 - `showId` はservice内、`episodeId` はShow内で一意
 - IDは作成後に変更不可
 
-上記の短い上限は、`castloop-<serviceId>-<showId>` をバケット名にする案にも収めやすい。R2バケット名自体は3〜63文字、小文字英数字とhyphenのみ、先頭末尾hyphen不可である。
+レビュー時点ではShow別バケット案も検討していたため、この短い上限を候補とした。現在は単一バケットに決定したが、ユーザーが案Aの上限を採用した。R2バケット名自体は3〜63文字、小文字英数字とhyphenのみ、先頭末尾hyphen不可である。
 
 #### 案B: UUIDを内部ID、slugを変更可能な表示IDにする
 
@@ -588,6 +680,8 @@ M0では、実際の公開hostnameに対して以下を自動確認する。
 MVPでは案Aが適する。`serviceId` を設計へ追加し、同一Cloudflare account全体ではなく同一castloop service内を一意性scopeとする。
 
 ### D-14: マイルストーン再構成
+
+**採用結果（2026-09-23）:** 案Aを採用。以下の案Aは当初レビュー時の提案であり、正式版は`initial_design.md`にD-09を織り込んで記載する。
 
 #### 案A: vertical sliceで区切る（推奨）
 
@@ -611,7 +705,7 @@ MVPでは案Aが適する。`serviceId` を設計へ追加し、同一Cloudflare
 
 **M2: 1 Episodeのend-to-end公開**
 
-- upload、job、非同期処理、status
+- metadata/audioの個別upload、`publish-episode`、job、非同期処理、status
 - feed生成
 - media配信
 - cache purge
@@ -654,27 +748,25 @@ MVPでは案Aが適する。`serviceId` を設計へ追加し、同一Cloudflare
 
 ## 7. 次のレビューサイクルで先に回答してほしい項目
 
-最初は次の形式でD-01〜D-05を選択すれば、その選択に基づいてobject key、CLI、schemaを絞り込める。
-
-```text
-D-01: A / B / C
-D-02: A / B / C
-D-03: A / B / C
-D-04: A / B / C
-D-05: A / B / C
-```
-
-推奨セットは次のとおりである。
+以下のD-01〜D-05は2026-09-23に選択済み。
 
 ```text
 D-01: A
-D-02: A（Podcastディレクトリ登録前の独自ドメイン確定を推奨）
+D-02: A
 D-03: A
 D-04: A
-D-05: A（実装量を優先するならB）
+D-05: B
 ```
 
-その後、D-06〜D-14を確定し、`initial_design.md`、TOMLテンプレート、`AGENTS.md` の規約を同時に更新する。
+採用済みの追加項目は次のとおりである。
+
+```text
+D-06: 記載のオブジェクトキー構成 + 案A（revision履歴）
+D-07: A（published_atの入力形式のみ保留）
+D-08: A
+```
+
+次回は上記の保留事項とD-09〜D-13の実装詳細を検討する。D-01〜D-14の採否はすべて決定済み。`initial_design.md`、TOMLテンプレート、`AGENTS.md`の採用済み規約は更新済み。
 
 ## 8. 参照資料
 
@@ -684,6 +776,8 @@ Cloudflareの仕様は変更されるため、以下は2026-09-19時点で確認
 - [Cloudflare Workers Caching limitations](https://developers.cloudflare.com/workers/cache/limitations/)
 - [Cloudflare R2 Event notifications](https://developers.cloudflare.com/r2/buckets/event-notifications/)
 - [Cloudflare R2 Workers API usage](https://developers.cloudflare.com/r2/api/workers/workers-api-usage/)
+- [Cloudflare R2 Upload objects（Wranglerの単一ファイル上限）](https://developers.cloudflare.com/r2/objects/upload-objects/)
+- [Cloudflare Wrangler login](https://developers.cloudflare.com/workers/wrangler/commands/general/#login)
 - [Cloudflare R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/)
 - [Cloudflare R2 public buckets](https://developers.cloudflare.com/r2/buckets/public-buckets/)
 - [Apple Podcasts RSS feed requirements](https://podcasters.apple.com/support/823-podcast-requirements)

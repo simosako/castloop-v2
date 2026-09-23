@@ -17,21 +17,41 @@ Follow the commands and conventions below.
 - No automated tests are configured yet.
 
 ## Runtime targets
-- Not decided yet.
+- The CLI targets a Bun single executable; the public service runs on Cloudflare Workers.
 
 ## Data & storage conventions
-- System bucket: `castloop-<serviceId>-system`.
-- Show bucket: `castloop-<serviceId>-<showId>`.
-- All S3 buckets are non-public; access via CloudFront OAC.
-- Draft assets live under `temp/episodes/<episodeId>/`.
-- Published assets live under `public/podcasts/<showId>/`.
-- Published episode metadata is `public/episodes/<episodeId>/metadata.toml`.
+- Each service has one private R2 bucket and one public Worker; shows share the bucket and are separated by show ID in object keys.
+- The bucket name is configured at initialization. Its exact naming convention is not yet decided.
+- The public URL is a Worker URL; a custom domain is optional. Store `public_base_url` in the service config, never an R2 public URL in show metadata.
+- Local TOML files are the editable source; R2 stores published snapshots and job status.
+- Service and show metadata: `system/service.toml` and `system/shows/<showId>/show.toml`.
+- Job status: `system/jobs/<jobId>/status.toml`.
+- Draft assets: `temp/episodes/<showId>/<episodeId>/<jobId>/episode.toml`, `audio.mp3`, and `commit.json`. On an existing episode, the unchanged metadata or audio may be reused from the published revision.
+- `create-episode` creates a local TOML draft. `update-episode` stages only metadata, and `update-episode-audio` stages only MP3 audio in R2. Neither update command publishes. Only `publish-episode` validates the staged inputs and writes `commit.json` last; initial and subsequent publications both require an explicit publish command.
+- Keep one job ID for an unpublished draft. After writing `commit.json`, freeze that draft; use a new job ID for later edits. Reject stale local metadata rather than silently publishing an older staged copy.
+- Published feeds and media: `public/podcasts/<showId>/feed.xml`, `cover.<ext>`, and `episodes/<episodeId>/<revisionId>.mp3`.
+- Current episode metadata: `public/episodes/<showId>/<episodeId>/metadata.toml`.
+- Episode revision history: `public/episodes/<showId>/<episodeId>/revisions/<revisionId>.toml`.
+- Deliver only approved public paths through the Worker; never expose `system/` or `temp/`.
+- R2 commit-marker event notifications feed a managed Cloudflare Queue. Use one sequential consumer invocation at a time; do not assume FIFO delivery or exactly-once processing. Compare publication order, not upload order, when handling competing episode updates.
+- Store MVP job status at `system/jobs/<jobId>/status.toml` in R2. Consider D1 only if later requirements justify it.
+- Preserve immutable media and revision history when updating current metadata. Episode deletion is outside the MVP.
+- Use readable immutable slugs matching `[a-z0-9]+(?:-[a-z0-9]+)*`; service IDs are at most 20 characters, show IDs at most 32, and episode IDs at most 80. Show IDs are unique within a service; episode IDs are unique within a show.
+- Prefer Wrangler OAuth login for interactive Cloudflare access and an API token supplied by environment variable for automation. Do not store credentials in service TOML or Git. Select the CLI upload mechanism separately; verify the expected MP3 size against Wrangler's object upload limit before relying on it.
+- Use Workers Caching for the public Worker. Validate cache-tag feed purging and GET/HEAD/Range delivery before the end-to-end MVP release.
+
+## Milestones
+- M0 validates Cloudflare authentication, resource creation, R2 media delivery, Workers Caching, MP3 upload/analysis, and the R2 event-to-Queue path.
+- M1 delivers service initialization, local metadata models, ID validation, and show reservation.
+- M2 publishes one episode end-to-end using separate metadata/audio staging, explicit publish, job status, feed generation, and media delivery.
+- M3 supports multiple episodes, metadata-only and audio-only revisions, concurrency/retry handling, and cleanup.
+- M4 delivers the Bun executable and usage documentation.
 
 ## TOML and schema conventions
 - TOML keys are snake_case to match metadata definitions.
 - Parse TOML with `@iarna/toml` and validate with Zod.
 - Use `parseServiceConfig`, `parseShowMetadata`, `parseEpisodeDraft`.
-- Use `stringifyToml` for writing TOML back to S3.
+- Use `stringifyToml` for writing TOML back to R2.
 - Keep metadata validations strict (`.strict()` in Zod schemas).
 
 ## Code style: general
@@ -67,7 +87,7 @@ Follow the commands and conventions below.
 ## Error handling
 - Throw `Error` with clear messages in helpers.
 - CLI should catch and print errors, set `process.exitCode = 1`.
-- Lambda should return `{ status: "error", message }` and log errors.
+- Worker handlers should report errors clearly and log failures; Queue handlers must distinguish retryable failures from permanent ones.
 - Avoid swallowing errors silently.
 
 ## File placement guidelines
