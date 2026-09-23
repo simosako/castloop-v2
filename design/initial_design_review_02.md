@@ -210,7 +210,9 @@ Wranglerの`r2 object put`は現行ドキュメントで**315 MBまで、同時�
 
 Show IDの予約は「listで空き確認→通常のput」では同時実行に弱い。**予約記録の条件付き作成**が可能な経路を採用し、`system/shows/<showId>/show.toml`を予約兼Show metadata snapshotとする案、別の予約キーを追加して公開snapshotを分ける案を比較する。R2 bindingには単一objectの条件付きputがあるが、R2-07案AのWrangler subprocessだけで同じ原子的な予約を表現できるとは限らない。M0で利用可能な経路を確認し、必要なら予約操作だけWorker/APIへ任せる。ローカルフォルダ作成に失敗した場合の予約解除/回復、予約済みだが未公開のShowがRSSで露出しないことも必要。
 
-**決定:** 設定ファイルは案Aの`castloop.toml`。**要確認:** Show IDをCLIで自動生成するか（上記の検討を参照）、バケット名入力/自動候補、Show予約キーを既存キーと兼用するか分離するか。
+**決定:** 設定ファイルは案Aの`castloop.toml`。Show IDの生成、bucket名の入力方法、Show予約キーの分離はM1実装時の決定に従う。
+
+**M1実装時の決定（2026-09-23）:** M1ではShow IDとbucket名を管理者が指定する。Worker/Queue/DLQ名にはservice IDとランダムなsuffixを付ける。Show予約は公開snapshotとは別の`system/show-reservations/<showId>.json`へ認証付きWorkerから条件付きPUTし、既存IDを上書きしない。同じ予約IDの再送だけを冪等に成功扱いとする。ローカルの`.castloop/`（Git対象外）に管理key、予約ID、初期化の進捗を記録する。初期化の途中失敗時はリソースを自動削除せず、記録済みのステップから再開する。
 
 ## R2-09: Workers Cachingでの公開完了とpurgeの検証
 

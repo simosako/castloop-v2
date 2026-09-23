@@ -1,0 +1,12 @@
+{
+  "name": "@castloop/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "castloop": "./src/index.ts"
+  },
+  "dependencies": {
+    "@castloop/shared": "0.1.0"
+  }
+}

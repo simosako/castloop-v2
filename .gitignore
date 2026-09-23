@@ -19,6 +19,9 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# Local castloop runtime credentials and draft state
+.castloop/
+
 # AWS SAM
 .aws-sam/
 samconfig.toml

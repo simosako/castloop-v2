@@ -61,10 +61,10 @@ castloop init .
 ``castloop init``では、castloopが、初期化に必要な情報をユーザーに質問して、それにユーザーが答える形で初期化を進める。
 
 質問内容：
-- サービスID（IDの入力方法は未決定）
+- サービスID（管理者指定のslug）
 - Cloudflare アカウントID
-- R2バケット名 (この単一バケット内に各Show、Episode関連データを格納する）
-- 独自ドメインを使うかどうか（任意。Workerの公開URLが確定したら`public_base_url`としてサービス設定に保存）
+- R2バケット名 (管理者指定。この単一バケット内に各Show、Episode関連データを格納する）
+- workers.devのアカウントsubdomain（M1ではWorkerの公開URLを生成。独自ドメインへの変更は後続段階で対応）
 
 質問が終わるとその内容を作業ディレクトリ直下の`castloop.toml`として保存。その後Cloudflareに接続し、R2バケット、公開用Worker、公開ジョブ用Queue、R2 Event Notificationの準備を行う。認証情報と未公開jobIdはTOMLに保存しない。Queueの作成・更新方法と初期化の詳細は別途決める。
 
@@ -74,10 +74,10 @@ castloop init .
 castloop create-show <showId>
 ```
 
-- castloop cliはshowIDが適切な文字列か（showIdに使って良い文字のみで構成されているか）を確認し、showIdの被りがないか（同じshowIdがすでに本サービスに存在しないか)をCloudflare側にアクセスして確認する
-- showIdは人間可読slugの`[a-z0-9]+(?:-[a-z0-9]+)*`、最大32文字とする。ID自動生成の要否と生成方法は検討中。
-- 現在、どういったshowIdがあるかといったことを管理するためのデータベースは用意しない。R2バケットをチェックすることで既存showId一覧を取得する。ただし一覧による重複確認だけでは競合を防げないため、原子的な予約方法は別途決める。
-- 問題なければ、<showId>フォルダを作成し、その中にshow.tomlファイルをtemplate(show-template.toml)をベースに作成して保存。CLIはShowのWebサイトURLを管理者から入力（対話時の質問または非対話時の引数）として受け取り、必須の`site_url`を初期値として自動記入する。公開URLから実在するWebサイトを推測しない。リモート側のID予約方法は別途決める
+- CLIはShow IDのslugを検証し、認証付きWorkerのR2条件付きPUTで`system/show-reservations/<showId>.json`を原子的に作成する。既存IDは競合エラーにする。同じローカル予約IDによる再送は成功扱いとする
+- Show IDは人間可読slugの`[a-z0-9]+(?:-[a-z0-9]+)*`、最大32文字とし、M1では管理者が指定する。自動生成は必須としない
+- 予約記録は公開済みShow metadataの`system/shows/<showId>/show.toml`と分離する。予約だけではfeed等の公開パスにShowを出さない
+- <showId>フォルダと`show.toml`を作る。CLIはShowのWebサイトURLを管理者から入力（対話時の質問または非対話時の引数）として受け取り、必須の`site_url`を初期値として記入する。公開URLから実在するWebサイトURLを推測しない。通信失敗時はローカル下書きと予約IDを残して同コマンドで再送する
 
 管理者は ``cd <showId>``でフォルダに移動し、その中でShowの作業を行う。最初はshow.tomlを編集してshowの設定を行う。
 
