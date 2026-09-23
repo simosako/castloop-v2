@@ -241,6 +241,8 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 
 ### M0: アーキテクチャ検証
 
+検証の実行順・合格条件は[`m0_verification_plan.md`](./m0_verification_plan.md)にまとめる。
+
 - Wranglerの対話的ログインと自動化用API token、必要なCloudflareリソースの作成・アクセスを確認する
 - private R2からWorker経由でGET/HEAD/Range配信できることを確認する
 - Workers Cachingのcache hit、feedのtag purge、音源配信時のRange処理を確認する
