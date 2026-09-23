@@ -1,4 +1,4 @@
-# Draft template for <showId>/show.toml. The CLI replaces example values.
+# Draft template for <showId>/show.toml. The CLI replaces example values and asks for site_url.
 schema_version = 1
 show_id = "samplepodcast"
 title = "Sample Podcast"

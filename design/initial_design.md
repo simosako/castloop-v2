@@ -30,17 +30,17 @@
 - 公開はWorkerのURLを標準とし、独自ドメインは任意とする。R2の公開URLは使わない
 - 公開URLの基点 `public_base_url` はサービス設定で管理し、Showごとの `media_base_url` は設けない
 - ローカルTOMLを編集元とし、R2には検証済みの公開スナップショットとジョブの状態を置く
-- `update-episode`と`update-episode-audio`はR2の下書き領域へそれぞれメタデータと音源をアップロードするだけとし、公開しない。`publish-episode`だけが検証済みの下書きにcommit markerを配置し、R2 Event NotificationからCloudflare Queuesへ通知する。Queue consumerのWorkerが後続処理を行う
-- Queue consumerはサービス全体で同時実行を1つに制限し、ジョブを逐次処理する。Cloudflare QueuesはFIFOやexactly-onceを保証しないため、jobIdによる冪等性と同一Episodeの更新順判定を設ける。判定規則の詳細は未決定
-- RSS 2.0とApple Podcasts互換をMVP基準とし、入力schemaは下記の最小schema候補を採用する。`published_at` のTOML入力形式だけは検討中
+- `update-show`はShow情報・カバー画像、`update-episode`と`update-episode-audio`はそれぞれEpisodeのメタデータと音源をR2の`staging/`へ置くだけで公開しない。`publish-show`または`publish-episode`だけが検証済みの下書きにcommit markerを配置し、R2 Event Notificationから同じmanaged Cloudflare Queueへ通知する。Queue consumerのWorkerが後続処理を行う
+- Queue consumerはサービス全体で同時実行を1つに制限し、ジョブを逐次処理する。Cloudflare QueuesはFIFOやexactly-onceを保証しない。同一Show内のShow/Episode公開ジョブは未完了のものを1件までとし、次の公開受付を保留または拒否する。原子的な受付予約、障害後の回復、重複配送の冪等性を設ける。順序制御の実装詳細は未決定
+- RSS 2.0とApple Podcasts互換をMVP基準とし、入力schemaは下記の最小schema候補を採用する。`published_at`は引用符付きRFC 3339文字列とし、RSS出力時にRFC 2822へ変換する
 - MP3の妥当性と再生時間はCLIで解析する。WorkerではR2 object size等を再確認する
 - 人間可読なslugをIDとして使う。`serviceId`は最大20文字、`showId`は最大32文字、`episodeId`は最大80文字。基本形は`[a-z0-9]+(?:-[a-z0-9]+)*`とし、作成後は変更しない。Show IDは同一サービス内、Episode IDは同一Show内で一意とする
 
 ### Cloudflare認証とR2へのアップロード
 
-- 対話的な管理作業にはCloudflare標準の`wrangler login`による認証を、自動化には環境変数のCloudflare API tokenを第一候補とする。認証情報はcastloopのTOMLやGit管理対象には保存しない
-- CLIからWranglerを呼び出すかCloudflare APIを利用するかは実装前に比較する。標準の認証を利用するための実装量や運用上の負担が大きい場合は別方式を検討する
-- MP3アップロード経路は未決定。Wranglerの`r2 object put`には現行の単一オブジェクト315 MB上限があるため、M0で想定音源サイズと照合する。上限を超える場合はmultipart uploadなどを検討する。この判断と認証方式を混同しない
+- 対話的な管理作業にはCloudflare標準の`wrangler login`による認証を、自動化には環境変数のCloudflare API tokenを使用する。認証情報はcastloopのTOMLやGit管理対象には保存しない
+- CLIはWranglerをsubprocessとして呼び出し、Cloudflareの初期化・R2操作を行う。M0でエラー処理と認証の動作を確認する。Show ID予約と同一Showの公開受付予約には原子的な操作が必要であり、Wranglerの通常のobject putだけで安全に実現できるとは限らない。必要な管理操作の認証と別経路はM0で検証する
+- MVPのMP3入力ファイル上限は**300 MB（300,000,000 bytes）**。超過するファイルはアップロード前に拒否し、Wranglerの`r2 object put`を使用する。現行のWrangler単一オブジェクト上限315 MBとの整合、最大サイズのuploadと再試行をM0で実測する
 
 ## 利用シナリオ（概要）
 
@@ -61,11 +61,12 @@ castloop init .
 ``castloop init``では、castloopが、初期化に必要な情報をユーザーに質問して、それにユーザーが答える形で初期化を進める。
 
 質問内容：
+- サービスID（IDの入力方法は未決定）
 - Cloudflare アカウントID
 - R2バケット名 (この単一バケット内に各Show、Episode関連データを格納する）
 - 独自ドメインを使うかどうか（任意。Workerの公開URLが確定したら`public_base_url`としてサービス設定に保存）
 
-質問が終わるとその内容を``castloop-init.toml``として保存。その後Cloudflareに接続し、R2バケット、公開用Worker、公開ジョブ用Queue、R2 Event Notificationの準備を行う。認証情報はTOMLに保存しない。設定ファイル名、Queueの作成・更新方法と初期化の詳細は別途決める。
+質問が終わるとその内容を作業ディレクトリ直下の`castloop.toml`として保存。その後Cloudflareに接続し、R2バケット、公開用Worker、公開ジョブ用Queue、R2 Event Notificationの準備を行う。認証情報と未公開jobIdはTOMLに保存しない。Queueの作成・更新方法と初期化の詳細は別途決める。
 
 ### Show作成
 
@@ -74,13 +75,27 @@ castloop create-show <showId>
 ```
 
 - castloop cliはshowIDが適切な文字列か（showIdに使って良い文字のみで構成されているか）を確認し、showIdの被りがないか（同じshowIdがすでに本サービスに存在しないか)をCloudflare側にアクセスして確認する
-- showIdに使って良い文字や最大長は未決定。基本的にはshowIdがURLの一部に含まれる可能性を考慮してルールを決める。
-- 現在、どういったshowIdがあるかといったことを管理するためのデータベースは用意しない。R2バケットをチェックすることで、既存showId一覧を取得する。
-- 問題なければ、<showId>フォルダを作成し、その中にshow.tomlファイルをtemplate(show-template.toml)をベースに作成して保存。リモート側のID予約方法は別途決める
+- showIdは人間可読slugの`[a-z0-9]+(?:-[a-z0-9]+)*`、最大32文字とする。ID自動生成の要否と生成方法は検討中。
+- 現在、どういったshowIdがあるかといったことを管理するためのデータベースは用意しない。R2バケットをチェックすることで既存showId一覧を取得する。ただし一覧による重複確認だけでは競合を防げないため、原子的な予約方法は別途決める。
+- 問題なければ、<showId>フォルダを作成し、その中にshow.tomlファイルをtemplate(show-template.toml)をベースに作成して保存。CLIはShowのWebサイトURLを管理者から入力（対話時の質問または非対話時の引数）として受け取り、必須の`site_url`を初期値として自動記入する。公開URLから実在するWebサイトを推測しない。リモート側のID予約方法は別途決める
 
 管理者は ``cd <showId>``でフォルダに移動し、その中でShowの作業を行う。最初はshow.tomlを編集してshowの設定を行う。
 
 注： show-template.toml (draft)は design/ 以下にある
+
+### Showの下書き更新と公開
+
+```text
+castloop create-show <showId>
+# 管理者がshow.tomlとカバー画像を編集
+castloop update-show <showId>
+castloop publish-show <showId>
+```
+
+- `create-show`はIDを予約し、ローカルの`show.toml`を作成する。予約だけでは公開しない
+- `update-show`はローカルのShow情報と`image_path`が指すカバー画像を検証し、同じ未公開jobIdの`staging/shows/<showId>/<jobId>/`にアップロードする。公開中のShow、feed、画像は変更しない。管理者がその後ローカルTOML・画像を変更した場合、古い下書きの公開は拒否して再度`update-show`を求める
+- `publish-show`は下書きの入力を固定して最後に`commit.json`を置き、Queue経由で公開処理を起動する。初回公開も更新も同じ操作とし、このコマンドを実行するまでは外部に反映しない。Show情報の公開snapshot、固定キー`public/podcasts/<showId>/cover.<ext>`の画像上書き、feed更新、画像とfeedのcache tag purgeを行う。purgeに失敗した場合は公開完了とせず再試行する
+- ShowとそのEpisodeの公開ジョブは同一Showの受付枠を共有する。先のジョブが未完了なら次の`publish-show`/`publish-episode`は受付しない。管理者はstaging操作を続けられる。予約・失敗時の再開と固定キーの画像拡張子変更時の扱いは別途決める
 
 ### Episode作成
 
@@ -88,7 +103,7 @@ castloop create-show <showId>
 castloop create-episode <episodeId>
 ```
 
-引数のepisodeIdが決められた文字列だけで構成されているかを確認し、重複したepisodeIdが同一show内に存在しないことを確認し、問題なければ``episode-<episodeId>.toml``が ``episode-template.toml`` ベースで作成される。（例えば create-episode 001 とした場合、 episode-001.tomlが作成される）この際、後の音源更新でも変わらないGUIDを発行する。
+引数のepisodeIdが決められた文字列だけで構成されているかを確認し、重複したepisodeIdが同一show内に存在しないことを確認し、問題なければ``episode-<episodeId>.toml``が ``episode-template.toml`` ベースで作成される。（例えば create-episode 001 とした場合、 episode-001.tomlが作成される）この際、後の音源更新でも変わらないGUIDを発行し、`published_at`へ作成時の現在日時を秒・offset付きのRFC 3339文字列として初期記入する。管理者は公開前に値を確認・編集できる。
 
 注： episode-template.toml (draft)は design/ 以下にある
 
@@ -109,6 +124,7 @@ castloop publish-episode <episodeId>
 - `create-episode`はローカルのTOMLを作る。公開済みデータは変更しない
 - `update-episode`はローカルの`episode-<episodeId>.toml`を検証し、R2の下書き領域へメタデータだけをアップロードする。公開済みデータやRSSは変更しない
 - `update-episode-audio`はCLIでMP3の妥当性・再生時間・byte lengthを確認し、音源だけを下書き領域へアップロードする。音源の検証結果も下書きに紐付ける。公開済みデータやRSSは変更しない
+- CLIはgit管理外のローカル状態ファイルでEpisodeごとの未公開jobIdを保持し、`update-episode`と`update-episode-audio`を同じjobに紐付ける。保存場所・別端末との競合処理・回復方法は別途決める
 - `publish-episode`は必要な入力が揃っていることを確認し、下書きの内容を固定したうえで最後に`commit.json`を配置する。ここで初めて公開ジョブが受け付けられる。CLIはjobIdを返し、実際の公開完了・失敗は別途確認できるようにする。状態確認・回復のコマンドは未決定
 - `publish-episode`前にローカルTOMLを変更した場合は、下書きのメタデータとの差異を検出し、`update-episode`の再実行を求める。誤って古いTOMLを公開しない
 - 新規公開には下書きのメタデータと音源の両方が必要。既存Episodeの音源だけの更新では、ローカルTOMLが前回公開時と同じであることを確認したうえで公開済みメタデータを再利用できる。メタデータだけの更新では、前回公開済み音源を再利用できる。音源の再利用時は新たなMP3オブジェクトやenclosure URLを発行しない
@@ -118,14 +134,14 @@ castloop publish-episode <episodeId>
 
 ### Episodeの更新(サーバー側)
 
-R2 Event Notificationは`publish-episode`によるcommit.jsonの作成だけをCloudflare Queueへ通知する。単一並列のQueue consumerが以下の後続処理を行う。Queueは順序と重複なしの配送を保証しないため、同じjobIdの再実行に対して冪等とし、古い更新が新しい更新を上書きしないようにする。更新順は音源やTOMLのアップロード時刻ではなく、公開の確定順を基準にする。確定順の記録方法と、複数端末からの同時公開時の扱いは別途決める。
+R2 Event Notificationは`staging/.../commit.json`の作成だけを同じmanaged Cloudflare Queueへ通知する。Show/Episodeの個別アップロードでは起動しない。単一並列のQueue consumerがShowの公開処理と以下のEpisode後続処理を行う。Queueは順序と重複なしの配送を保証しないため、同じjobIdの再実行に対して冪等とし、同一Showの公開受付は未完了1件に制限する。受付予約の原子性・途中停止からの回復・古い処理による予約の誤解放を防ぐ具体的な方式はM0で検証する。
 
 - CLIが求めたdurationとR2が保持する音源のbyte length等を確認し、公開用metadataに記録する。durationはRSSのitunes:duration、lengthはenclosureのlengthへ使う
 - 新音源がある場合だけ、音源をrevisionIdを含む新しいオブジェクトキーで保存し、上書きしない。音源未変更なら既存の公開済み音源を参照する。EpisodeのGUIDは更新前後で維持する
 - revision metadataを履歴として保存し、Episodeのcurrent metadataだけを更新する。古いrevisionはMVPでは保持する
 - 公開領域に保存されたMP3には、公開用Worker経由でインターネットからアクセス可能になる
 - RSSの再構築を行う。feed.xmlを全体作り直し、必要なキャッシュパージを行う
-- Workerの処理開始・完了・エラーをログに記録し、ジョブ状態をR2の`system/jobs/<jobId>/status.toml`に永続化する。CLIから公開完了・失敗理由を確認できるようにする。状態遷移、再試行・失敗ジョブの保持と、一連のR2書き込み途中の回復規則は今後詳細化する。MVPではD1等のDBを導入しない
+- Workerの処理開始・完了・エラーをログに記録し、ジョブ状態をR2の`system/jobs/<jobId>/status.toml`に永続化する。CLIから公開完了・失敗理由を確認できるようにする。対象のcache purgeが成功するまで公開完了とはしない。一時的な失敗は同じjobIdをCloudflare Queuesで有限回数自動再試行し、尽きたメッセージは1つのDLQに隔離して管理者が状態を確認し明示的に回復する。恒久的な失敗は理由を記録し無用な再試行をしない。Queue/DLQだけに長期の履歴を依存せず、R2のjob statusと凍結snapshotを保持する。状態遷移、retry回数、statusとDLQの照合、公開受付予約の安全な解放、下書きの保持期間と途中書き込みからの回復規則は別途詳細化する。MVPではD1等のDBや自作のR2 queueを導入しない
 
 ### R2オブジェクトキー（採用済み）
 
@@ -134,9 +150,13 @@ system/service.toml
 system/shows/<showId>/show.toml
 system/jobs/<jobId>/status.toml
 
-temp/episodes/<showId>/<episodeId>/<jobId>/episode.toml
-temp/episodes/<showId>/<episodeId>/<jobId>/audio.mp3
-temp/episodes/<showId>/<episodeId>/<jobId>/commit.json
+staging/shows/<showId>/<jobId>/show.toml
+staging/shows/<showId>/<jobId>/cover.<ext>
+staging/shows/<showId>/<jobId>/commit.json
+
+staging/episodes/<showId>/<episodeId>/<jobId>/episode.toml
+staging/episodes/<showId>/<episodeId>/<jobId>/audio.mp3
+staging/episodes/<showId>/<episodeId>/<jobId>/commit.json
 
 public/podcasts/<showId>/feed.xml
 public/podcasts/<showId>/cover.<ext>
@@ -145,8 +165,8 @@ public/episodes/<showId>/<episodeId>/metadata.toml
 public/episodes/<showId>/<episodeId>/revisions/<revisionId>.toml
 ```
 
-公開Workerは許可された公開URLだけをこれらのpublic keyへ対応付ける。system/とtemp/は配信しない。Show metadataとカバー画像を反映する操作、公開URL pathの詳細は今後決める。
-下書きの`episode.toml`と`audio.mp3`は変更があったものだけ配置し、既存公開版を再利用する場合は`commit.json`に参照元を固定する。音源の検証結果は音源オブジェクトのメタデータ等に保持する（具体的な形式は未決定）。`commit.json`は`publish-episode`以外のコマンドから書き込まない。
+公開Workerは許可された公開URLだけをこれらのpublic keyへ対応付ける。`system/`と`staging/`は配信しない。Show情報とカバー画像は明示的な`publish-show`までは公開しない。公開URL pathとShowのID予約記録・公開snapshotの区別は検討中。R2 Event Notificationは`staging/` prefix・`commit.json` suffixのobject-createだけを対象にし、consumerがShow/Episodeそれぞれのpathとjob内容を検証する。
+Episode下書きの`episode.toml`と`audio.mp3`は変更があったものだけ配置し、既存公開版を再利用する場合は`commit.json`に参照元を固定する。音源の検証結果は音源オブジェクトのメタデータ等に保持する（具体的な形式は未決定）。ShowとEpisodeの`commit.json`はそれぞれの`publish-*`以外のコマンドから書き込まない。
 
 ## サービス・ツールの構成
 
@@ -182,7 +202,7 @@ RSS feed (feed.xml)は、以下のようなキャッシュ設定にする。
 
 - Podcastクライアント側：5分
 - Workers Caching側：1時間
-- エピソード公開・変更時：feed-<showId> を 即purge
+- ShowまたはEpisodeの公開・変更時：feed-<showId> をpurge。固定キーで上書きするカバー画像もcache tagでpurge
 
 ```
 Content-Type: application/rss+xml; charset=utf-8
@@ -191,7 +211,7 @@ Cloudflare-CDN-Cache-Control: public, max-age=3600
 Cache-Tag: feed-<showId>
 ```
 
-これらのキャッシュ時間はサービス設定ファイルで上書き設定できるようにする。`workers.dev`のURLを標準とし、独自ドメインは任意。公開URLはサービス設定の`public_base_url`を基点として生成する。R2の公開URLは使用しない。Range/HEADとcache tagによるpurgeをM0で検証し、purge失敗時の再試行方法は実装前に決める。Rangeへの応答はWorkers Cachingが完全な`200` responseから切り出す方式を基本とする。
+これらのキャッシュ時間はサービス設定ファイルで上書き設定できるようにする。`workers.dev`のURLを標準とし、独自ドメインは任意。公開URLはサービス設定の`public_base_url`を基点として生成する。R2の公開URLは使用しない。Range/HEADとfeed・画像のcache tagによるpurgeをM0で検証し、purge失敗時は公開を完了扱いにせず冪等に再試行する。固定URLの画像については利用者側のcacheをtag purgeで消せないため、画像のクライアント向けcache期間を別途定める。Rangeへの応答はWorkers Cachingが完全な`200` responseから切り出す方式を基本とする。
 
 ## MVPの入力メタデータとRSS
 
@@ -201,18 +221,18 @@ RSS 2.0およびApple Podcastsの配信要件をMVPの基準とする。ロー�
 | --- | --- |
 | `schema_version`, `show_id`, `title`, `description`, `language`, `author` | Showの識別と基本情報 |
 | `owner_name`, `owner_email`, `categories`, `explicit` | Podcastディレクトリ向け情報 |
-| `site_url`, `image_path` | RSS channelのlinkとカバー画像。`site_url`を省略する場合の代替URLは未決定 |
+| `site_url`, `image_path` | RSS channelのlinkとカバー画像。`site_url`は必須で、`create-show`が管理者の入力から初期記入する |
 | `copyright`, `show_type` | 任意項目。`show_type` は `episodic` または `serial` |
 
 | Episode入力項目 | 用途 |
 | --- | --- |
 | `schema_version`, `episode_id`, `guid`, `title`, `description` | 話の識別と説明。GUIDは作成時に生成して不変とする |
-| `published_at` | 公開日時。入力形式は検討中。RSS出力はRFC 2822 |
+| `published_at` | 引用符付きRFC 3339文字列。`create-episode`が現在日時を初期記入する。RSS出力はRFC 2822 |
 | `explicit`, `episode_type`, `season_number`, `episode_number` | `explicit`はShow設定を継承可能。後二者は任意 |
 
 公開時の生成項目は`revision_id`、`enclosure_url`、`content_type`（`audio/mpeg`）、`length_bytes`、`duration_seconds`、`sha256`、`published_at`、`updated_at`とする。TOMLの入力値と生成値の配置、enumや任意項目の省略方法はschema詳細で定める。
 
-日時について、RSSの`pubDate`はRFC 2822形式が必要だが、TOMLの入力にはRFC 3339日時または引用符付きRFC 2822文字列のいずれも使用できる。入力形式が確定するまでは`episode-template.toml`のRFC 3339表記を暫定とする。
+日時について、TOMLの`published_at`は秒とoffsetを含む引用符付きRFC 3339文字列に限定する。`episode-template.toml`の固定の値は例示であり、実際の`create-episode`は実行時の現在日時に置き換える。RSSの`pubDate`にはRFC 2822形式で出力する。未来日時を拒否するか、公開後の手動修正を認めるかは検討中。
 
 
 ## 開発の進め方とマイルストーン
@@ -224,28 +244,30 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 - Wranglerの対話的ログインと自動化用API token、必要なCloudflareリソースの作成・アクセスを確認する
 - private R2からWorker経由でGET/HEAD/Range配信できることを確認する
 - Workers Cachingのcache hit、feedのtag purge、音源配信時のRange処理を確認する
-- 想定する最大MP3のアップロードを実測し、Wranglerの単一オブジェクト上限で足りるか検証する。必要ならmultipart等の方式を比較する
+- MVP上限300 MBのMP3をWranglerでアップロードできること、超過時にupload前に拒否することを確認する
 - CLIでMP3のdurationを正確に取得できるか実測する
-- R2 Event Notification → Queue → 単一並列consumerを確認し、重複配送・順不同に対する冪等処理を検証する
+- `staging/`のShow/Episode commit markerだけをR2 Event Notification → managed Queue → 単一並列consumerへ届けることを確認する。重複・順不同、同一Showの原子的な公開受付と障害回復に必要な操作を検証する。Queueの自動retryとDLQ、恒久的失敗を無駄にretryしない処理を確認する
 
 ### M1: ローカルモデルと初期化
 
 - 作業ディレクトリとCloudflareリソースの初期化、secretを含まないサービス設定
 - `create-show` / `create-episode` によるローカルTOMLの生成、Show IDの予約
 - strictなShow/Episode TOML schemaとslugの検証
+- 確定した設定ファイル名、日時・`site_url`の初期記入、設計とWorker/CLIの配置・module方式の整合を確認する
 
 ### M2: 1 Episodeのend-to-end公開
 
-- Show metadataとカバー画像を公開用に反映する
+- `update-show`で情報・画像をstagingし、`publish-show`で公開する。画像更新では固定キーを上書きし画像とfeedのcache tagをpurgeする
 - `update-episode` と `update-episode-audio` で個別に下書きをR2へアップロードし、`publish-episode`で初めて公開ジョブを開始する
-- Queue処理、R2 job status、RSS生成、音源配信、cache purge、失敗の検出・回復を通して1 Episodeを公開する
+- Queue処理、R2 job status、RSS生成、音源配信、cache purge、一時的失敗のretry・DLQへの隔離と失敗理由の確認を通して1 Episodeを公開する
+- purgeに失敗したjobを完了扱いにせず、再試行して配信状態へ収束させる
 - CLIから公開ジョブの受付と、公開完了/失敗を区別して確認できる
 
 ### M3: 複数Episode・更新運用
 
 - メタデータのみの更新と音源のみの更新をそれぞれ`publish-episode`で公開できる
 - 音源revision更新時にGUIDを維持し、古いrevision履歴を保持する
-- 重複・順不同ジョブ、同時更新、temp領域のcleanupを扱う
+- 重複・順不同ジョブ、同時更新、staging領域のcleanupを扱う
 - RSS validatorおよびApple Podcastsの配信要件で成果物を検証する
 
 ### M4: 配布と利用文書

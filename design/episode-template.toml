@@ -1,10 +1,10 @@
-# Draft template for episode-<episodeId>.toml. The CLI generates a stable GUID.
+# Draft template for episode-<episodeId>.toml. The CLI generates a stable GUID and sets the current published_at.
 schema_version = 1
 episode_id = "2026-01-02-hello"
 guid = "550e8400-e29b-41d4-a716-446655440000"
 title = "はじめまして"
 description = "番組の最初のエピソード"
-published_at = "2026-01-02T10:00:00+09:00" # Provisional RFC 3339 input; format decision pending.
+published_at = "2026-01-02T10:00:00+09:00" # Example only; the CLI writes the current time as a quoted RFC 3339 string.
 episode_type = "full"
 
 # Optional fields

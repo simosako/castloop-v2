@@ -6,7 +6,7 @@
 
 ## 決定記録（2026-09-23）
 
-以下はユーザーの選択を受けて確定した。第1サイクル時点の比較・指摘は後段に履歴として残す。正式なMVP方針は[`initial_design.md`](./initial_design.md)にも反映した。
+以下は第1サイクルでユーザーの選択を受けて確定した記録。後続の第2サイクルで`temp/`を`staging/`へ改名し、Show用下書きキーとShow公開処理を追加した。入力形式・CLI設定等も含めた後続の採用結果は[`initial_design_review_02.md`](./initial_design_review_02.md)の決定記録を参照。第1サイクル時点の比較・指摘は後段に履歴として残す。正式なMVP方針は[`initial_design.md`](./initial_design.md)にも反映した。
 
 | 項目 | 決定 |
 | --- | --- |
@@ -15,7 +15,7 @@
 | D-03 | A: ローカルTOMLが編集元。R2は公開済みsnapshotとjob statusの置き場 |
 | D-04 | A: commit marker → R2 Event Notification → managed Cloudflare Queue → Worker consumer。簡素で運用しやすい構成にする |
 | D-05 | B: サービス全体で1並列、逐次処理。Durable Objectによる並列化は行わない |
-| D-06 | 提示した`system/`、`temp/episodes/<showId>/<episodeId>/<jobId>/`、`public/podcasts/<showId>/`、`public/episodes/<showId>/<episodeId>/`の全キー配置を採用。revision履歴を保持し、current metadataのみ上書き |
+| D-06 | 当初は提示した`system/`、`temp/episodes/<showId>/<episodeId>/<jobId>/`、`public/podcasts/<showId>/`、`public/episodes/<showId>/<episodeId>/`のキー配置を採用。第2サイクルで`temp/`を`staging/`へ改名し、Show用下書きキーを追加。revision履歴を保持し、current metadataのみ上書き |
 | D-07 | A: RSS 2.0 + Apple Podcasts互換をMVP基準とし、最小schema候補を採用。ただし`published_at`のTOML入力形式のみ保留 |
 | D-08 | A: CLIでMP3妥当性・durationを解析し、WorkerでR2 size等を再確認 |
 | D-09 | 2026-09-23確定: `create-episode` → ローカルTOML編集 → `update-episode`（下書きメタデータをR2へ）→ `update-episode-audio`（下書き音源をR2へ）→ `publish-episode`（公開ジョブを起動）。更新2コマンドでは公開せず、初回も更新時も明示的にpublishする |
@@ -46,7 +46,7 @@
 | `update-episode-audio <episodeId> <音源.mp3>` | CLIでMP3検証・duration算出後、同じ未公開jobIdの`audio.mp3`へupload。検証結果を音源に紐付ける | なし |
 | `publish-episode <episodeId>` | 入力一式を検証し、固定したsnapshotを指す`commit.json`を最後に作成 | Queue経由で非同期公開。結果はjobIdで確認 |
 
-既存のD-06キーをそのまま使える。初回の`update-episode`または`update-episode-audio`で未公開のjobIdを確保し、後続の更新は同じ`temp/episodes/<showId>/<episodeId>/<jobId>/`へ書く。`commit.json`がない間はQueue通知の対象外。commit後はこのjobを変更せず、次の編集には新しいjobIdを割り当てる。`commit.json`にはステージ済みTOML・MP3のobject version確認情報（ETagや検証済みdigest等）と、既存公開データを使う場合の参照先を記録し、consumer側でも検証する。こうしないと、確認後に入力が書き換わるraceを防げない。
+第1サイクル時点では既存のD-06キーをそのまま使う想定だった。第2サイクルでそのprefixを`staging/`へ変更した。初回の`update-episode`または`update-episode-audio`で未公開のjobIdを確保し、後続の更新は同じ`staging/episodes/<showId>/<episodeId>/<jobId>/`へ書く。`commit.json`がない間はQueue通知の対象外。commit後はこのjobを変更せず、次の編集には新しいjobIdを割り当てる。`commit.json`にはステージ済みTOML・MP3のobject version確認情報（ETagや検証済みdigest等）と、既存公開データを使う場合の参照先を記録し、consumer側でも検証する。こうしないと、確認後に入力が書き換わるraceを防げない。
 
 | 公開パターン | 公開時に必要な入力 | 公開結果 |
 | --- | --- | --- |
@@ -66,14 +66,14 @@
 ### D-04・D-05の最小実装指針
 
 - Queueのデータ構造やpollerは自作しない。R2 Event Notificationをproducerとし、Workerの`queue()` handlerをconsumerとする
-- R2の`temp/episodes/.../commit.json`のobject-createイベントだけをQueueに送る。MP3・TOMLの個別uploadでは発火させない
+- 第2サイクルで`staging/episodes/.../commit.json`と`staging/shows/.../commit.json`のobject-createイベントのみを同じQueueに送ることにした。個別uploadでは発火させない
 - consumerは`max_concurrency: 1`、`max_batch_size: 1`とする。これは同時実行を1つにする設定であり、FIFO保証ではない
 - Cloudflare Queuesは順序保証なし・at-least-once配送。同じjobの再配送と、同じEpisodeに対する新旧jobの順序逆転を扱う。`jobId`の冪等性と、既に公開済みの新しいrevisionを古いjobで戻さない規則が必要
 - 当面はサービス全体の1consumerで十分。job状態の永続化と再試行・恒久的失敗時の扱いはD-12で詳細化する
 
-### `published_at` の入力形式は保留
+### `published_at` の入力形式（第1サイクル時点では保留、第2サイクルで決定）
 
-RSSの`pubDate`はRFC 2822形式で出力する。一方、TOML内は次のどちらも選択できる。
+RSSの`pubDate`はRFC 2822形式で出力する。第2サイクルではTOML入力として案A（引用符付きRFC 3339）を採用し、`create-episode`が実行時の現在日時を初期記入することを決定した。以下は第1サイクル時点の比較履歴。
 
 | 入力案 | TOMLの例 | 長所 | 注意点 |
 | --- | --- | --- | --- |
@@ -626,7 +626,7 @@ M0では、実際の公開hostnameに対して以下を自動確認する。
 
 ### D-12: job status、失敗回復、cleanup
 
-**採用結果（2026-09-23）:** 案AをMVPで採用。状態遷移と障害回復の詳細は継続検討。
+**採用結果（2026-09-23）:** 案AをMVPで採用。第2サイクルでmanaged Queueと同一Show未完了publish 1件まで、Queueによる一時的失敗の自動retryとDLQ隔離を確定した。状態遷移と障害回復の詳細は継続検討。
 
 #### 案A: R2にjob statusを保存する（MVP推奨）
 
@@ -644,7 +644,7 @@ M0では、実際の公開hostnameに対して以下を自動確認する。
 - D-05案Aとの整合がよい
 - CLIが読むための管理APIが必要
 
-共通方針として次を追加する。
+以下は第1サイクル時点の提案であり、`temp/`一律の期限切れと旧公開音源の削除は**現行MVPで採用していない**。`staging/`の未公開・回復可能jobと、履歴から参照される公開済み音源は保護する。具体的な保持期間は第2サイクルR2-06で決める。
 
 - `temp/` にはlifecycle expirationを設定する
 - 失敗jobは診断に必要な期間だけ保持する
