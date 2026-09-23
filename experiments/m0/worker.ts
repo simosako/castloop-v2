@@ -166,6 +166,88 @@ async function processFlowMarker(env: Env, key: string): Promise<void> {
   if (!released) throw new Error("M0 flow reservation release conflicted");
 }
 
+async function processReleaseMarker(env: Env, ctx: ExecutionContext, key: string, attempt: number): Promise<void> {
+  const parts = key.split("/");
+  const kind = parts[1] === "shows" ? "show" : "episode";
+  const show = parts[2];
+  const jobId = kind === "show" ? parts[3] : parts[4];
+  const episodeId = kind === "episode" ? parts[3] : undefined;
+  if (parts[0] !== "staging" || (parts[1] !== "shows" && parts[1] !== "episodes") ||
+    parts.at(-1) !== "commit.json" || parts.length !== (kind === "show" ? 5 : 6) ||
+    !validShow(show) || !show.startsWith("m0-release-") || !validJob(jobId) ||
+    (kind === "episode" && !validEpisode(episodeId))) return;
+
+  const reservationKey = `m0/reservations/${show}`;
+  const prefix = `m0/release/${show}/${jobId}`;
+  const statusKey = `${prefix}/status`;
+  const current = await readReservation(env, reservationKey);
+  if (!current || current.value.jobId !== jobId || current.value.state === "free") {
+    await env.M0_BUCKET.put(`${prefix}/rejected`, "not-owner");
+    return;
+  }
+
+  const stagedPrefix = parts.slice(0, -1).join("/");
+  const commit = await env.M0_BUCKET.get(key);
+  const metadata = await env.M0_BUCKET.get(`${stagedPrefix}/${kind === "show" ? "show.toml" : "episode.toml"}`);
+  const feed = await env.M0_BUCKET.get(`${stagedPrefix}/feed.xml`);
+  const cover = kind === "show" ? await env.M0_BUCKET.get(`${stagedPrefix}/cover.jpg`) : null;
+  if (!commit || !metadata || !feed || (kind === "show" && !cover)) {
+    throw new Error("M0 release staged input missing");
+  }
+  const data: unknown = await commit.json();
+  if (!data || typeof data !== "object" || !("show" in data) || data.show !== show ||
+    !("jobId" in data) || data.jobId !== jobId || !("kind" in data) || data.kind !== kind ||
+    (kind === "episode" && (!("episodeId" in data) || data.episodeId !== episodeId))) {
+    throw new Error("M0 release commit marker mismatch");
+  }
+  if (current.value.state === "held") {
+    const begun = await env.M0_BUCKET.put(reservationKey, JSON.stringify({ state: "processing", jobId }), {
+      onlyIf: { etagMatches: current.etag },
+    });
+    if (!begun) throw new Error("M0 release admission changed before processing");
+  }
+
+  if (await readText(env, statusKey) !== "published") {
+    await env.M0_BUCKET.put(statusKey, "processing");
+    if (kind === "show") {
+      await env.M0_BUCKET.put(`m0/system/shows/${show}/show.toml`, await metadata.arrayBuffer());
+      await env.M0_BUCKET.put(`m0/public/podcasts/${show}/feed.xml`, await feed.arrayBuffer());
+      if (!cover) throw new Error("M0 release cover missing");
+      await env.M0_BUCKET.put(`m0/public/podcasts/${show}/cover.jpg`, await cover.arrayBuffer());
+    } else {
+      await env.M0_BUCKET.put(`m0/public/episodes/${show}/${episodeId}/metadata.toml`, await metadata.arrayBuffer());
+      if (jobId.startsWith("partial-once-") && attempt === 1) {
+        await env.M0_BUCKET.put(`${prefix}/attempt-${attempt}.json`,
+          JSON.stringify({ phase: "after-metadata", owner: "processing", status: "processing" }));
+        throw new Error("M0 injected failure after episode metadata");
+      }
+      await env.M0_BUCKET.put(`m0/public/podcasts/${show}/feed.xml`, await feed.arrayBuffer());
+    }
+
+    if (!ctx.cache) throw new Error("M0 Workers Caching unavailable");
+    if (kind === "show" && jobId.startsWith("purge-once-") && attempt === 1) {
+      await env.M0_BUCKET.put(`${prefix}/attempt-${attempt}.json`,
+        JSON.stringify({ phase: "before-purge", owner: "processing", status: "processing" }));
+      throw new Error("M0 injected purge failure");
+    }
+    const tags = kind === "show" ? [`m0-feed-${show}`, `m0-cover-${show}`] : [`m0-feed-${show}`];
+    const purge = await ctx.cache.purge({ tags });
+    if (!purge.success) throw new Error("M0 release cache purge failed");
+    await env.M0_BUCKET.put(`${prefix}/attempt-${attempt}.json`,
+      JSON.stringify({ phase: "purged", owner: "processing", status: "processing" }));
+    await env.M0_BUCKET.put(statusKey, "published");
+  }
+
+  const final = await readReservation(env, reservationKey);
+  if (!final || final.value.state !== "processing" || final.value.jobId !== jobId) {
+    throw new Error("M0 release reservation changed before completion");
+  }
+  const released = await env.M0_BUCKET.put(reservationKey, JSON.stringify({ state: "free", jobId }), {
+    onlyIf: { etagMatches: final.etag },
+  });
+  if (!released) throw new Error("M0 release completion conflicted");
+}
+
 function adminJson(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -173,6 +255,21 @@ function adminJson(value: unknown, status = 200): Response {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const publicPath = /^\/m0\/podcasts\/(m0-release-[a-z0-9-]+)\/(feed\.xml|cover\.jpg)$/.exec(url.pathname);
+    if (publicPath && validShow(publicPath[1]) && (request.method === "GET" || request.method === "HEAD")) {
+      const show = publicPath[1];
+      const name = publicPath[2];
+      const object = await env.M0_BUCKET.get(`m0/public/podcasts/${show}/${name}`);
+      if (!object) return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
+      return new Response(request.method === "HEAD" ? null : object.body, {
+        headers: {
+          "Content-Type": name === "feed.xml" ? "application/rss+xml" : "image/jpeg",
+          "Cache-Control": "public, max-age=300",
+          "Cloudflare-CDN-Cache-Control": "public, max-age=3600",
+          "Cache-Tag": name === "feed.xml" ? `m0-feed-${show}` : `m0-cover-${show}`,
+        },
+      });
+    }
     const media = {
       "/m0/feed.xml": { key: "m0/public/feed.xml", contentType: "application/rss+xml", tag: "m0-feed" },
       "/m0/cover.jpg": { key: "m0/public/cover.jpg", contentType: "image/jpeg", tag: "m0-cover" },
@@ -267,6 +364,30 @@ export default {
         processedKind: await readText(env, `m0/flow/${show}/${jobId}/kind`),
       });
     }
+    if (request.method === "GET" && url.pathname === "/release") {
+      const show = url.searchParams.get("show");
+      const jobId = url.searchParams.get("job");
+      const episodeId = url.searchParams.get("episode");
+      if (!validShow(show) || !show.startsWith("m0-release-") || !validJob(jobId) ||
+        (episodeId !== null && !validEpisode(episodeId))) {
+        return adminJson({ error: "invalid release identifiers" }, 400);
+      }
+      const prefix = `m0/release/${show}/${jobId}`;
+      const attempts = await env.M0_BUCKET.list({ prefix: `${prefix}/attempt-` });
+      const records = await Promise.all(attempts.objects.map(async (object) => {
+        const stored = await env.M0_BUCKET.get(object.key);
+        return stored?.json();
+      }));
+      return adminJson({
+        owner: (await readReservation(env, `m0/reservations/${show}`))?.value ?? null,
+        status: await readText(env, `${prefix}/status`),
+        rejected: await readText(env, `${prefix}/rejected`),
+        showMetadata: await readText(env, `m0/system/shows/${show}/show.toml`),
+        episodeMetadata: episodeId ? await readText(env, `m0/public/episodes/${show}/${episodeId}/metadata.toml`) : null,
+        feed: await readText(env, `m0/public/podcasts/${show}/feed.xml`),
+        attempts: records,
+      });
+    }
     if (request.method !== "POST" || !["/claim", "/begin", "/finish", "/simulate-write"].includes(url.pathname)) {
       return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
     }
@@ -344,6 +465,11 @@ export default {
               parts[4] === "commit.json") {
               await env.M0_BUCKET.put(`m0/gate/${parts[2]}/${parts[3]}/dlq`, "delivered");
             }
+            continue;
+          }
+          if (detail.key.startsWith("staging/shows/m0-release-") ||
+            detail.key.startsWith("staging/episodes/m0-release-")) {
+            await processReleaseMarker(env, ctx, detail.key, message.attempts);
             continue;
           }
           if (detail.key.startsWith("staging/shows/m0-flow-") ||

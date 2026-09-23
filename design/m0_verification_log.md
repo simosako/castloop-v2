@@ -101,3 +101,15 @@ purge失敗時の再試行も、**初回だけpurge結果を人工的に失敗�
 | 通知から完了まで | 勝者のcommit upload後、R2通知→Queue consumerでShow/Episodeそれぞれのmarkerを処理し、該当kind、jobId、模擬公開状態と`free`への予約解放を確認。次に敗者jobIdを改めて受付すると`201`で、staging・commit・consumer処理が完了した |
 
 **判定:** 同一ShowのShow/Episode公開受付を1枠にする最小フローは合格。Episode対Episodeも同じ結果。CLIそのもの、実際のShow/Episode TOMLのschema、公開feed、画像・音源の更新、`system/jobs/`の本番statusは今回の検証対象外。次の項目2（公開途中の失敗とpurgeをジョブ完了条件へ結ぶ検証）とは区別する。
+
+## 2026-09-23: 実R2公開キーの途中失敗とcache purge（項目2）
+
+検証専用リソースで[`../experiments/m0/verify_release_purge.py`](../experiments/m0/verify_release_purge.py)を実行（ID `dc982242`）。専用Showの`m0/system/shows/<showId>/show.toml`、`m0/public/podcasts/<showId>/feed.xml`と固定キー`cover.jpg`、`m0/public/episodes/<showId>/<episodeId>/metadata.toml`を使った。JPEGは`ffmpeg`で生成し、feedは小さなRSS XMLをstaging。既存の共通Queue consumer（1並列・1件batch）でShowとEpisodeを順に更新した。メタデータは検証用の最小TOMLであり、本番schema/RSS生成の検証ではない。
+
+| ケース | 実測 |
+| --- | --- |
+| 初期状態 | feedと画像は両方とも初回GET=`MISS`、次のGET=`HIT`。本文が元のR2 objectと一致 |
+| Show公開・purge失敗 | Show TOML・新feed・新JPEGをstagingし、最後にcommit。Queue処理で公開キーを更新した後、**初回だけpurge前の失敗を人工的に注入**。1回目の記録は`phase=before-purge`・受付=`processing`・status=`processing`。2回目にfeed/画像のcache tag purgeが成功してからstatus=`published`、予約=`free`。両URLは新しい本文の`MISS → HIT` |
+| Episode公開・途中停止 | Episode TOMLと更新feedをstagingし、最後にcommit。初回はcurrent metadataを書いた直後に人工的に失敗（`phase=after-metadata`・受付=`processing`・status=`processing`）。同jobの2回目でfeed更新とtag purgeに成功してからstatus=`published`・予約=`free`。feedは新本文の`MISS → HIT`、画像は更新されず`HIT`のまま |
+
+**項目2の判定:** 検証用の実R2 metadata・feed・固定キー画像で、途中失敗時に同じjobを再実行し、必要なpurgeまで済んでから公開完了・予約解放する動作を確認した。Cloudflareのpurge API自体が実際に失敗したわけではなく、故障注入はpurge前で行った。音源・immutable revision・本番schemaを含む製品のend-to-end公開はM2で実装・確認する。次はR2 status・commit・DLQの照合による管理者の失敗診断（項目3）。
