@@ -12,7 +12,7 @@
 | 3 | **停止・解放・古い実行**: 予約直後／marker書き込み前、marker後／consumer処理中、公開反映後／purge前、完了直後の各点で停止させる。古い通知やDLQからの再投入を模擬する | 予約だけ残る場合もcommit・status・受付記録から管理者が現状を特定できる。`reserved`の取消しとconsumer開始が競合しても片方だけ成功し、`processing`以降は完了前に予約を解放できず、そのShowの次の公開をエラーにする。同じjobの再実行で完了・purgeへ収束するか、修復できなければ予約を残して止める。旧jobの通知は別jobの受付後に公開しない。期限だけで自動解放しない。条件付きDELETE等、利用可否を未確認の操作を前提にしない |
 | 4 | **通知・失敗処理**: `staging/shows/.../commit.json`と`staging/episodes/.../commit.json`を最後に書く。`staging/` prefix・`commit.json` suffixのR2通知から同じmanaged Queueへ送り、1並列・1件batchのconsumerを使う | TOML/画像/MP3の個別uploadでは起動せず、両commitだけで起動する。重複配送でも同じjobを二重公開しない。一時的失敗は有限回retry後に単一DLQへ入り、恒久的失敗は理由をR2 statusへ残して無駄にretryしない。DLQ到達とstatusが自動同期しない場合の照合・回復手順が説明できる |
 | 5 | **公開経路・cache**: 実際の`workers.dev` URLとprivate R2で小さなfeed・画像・MP3を配信。cache warm後にfeed/固定キー画像を更新し、Queue側からtag purgeを試す | GET/HEADと有効Rangeの`206`・無効Rangeの`416`、長さ・内容が一致する。warm時にcache hitを観測でき、purge後はfeed/画像が新内容になる。purge失敗時はjobを完了にせず、再試行で新内容に収束する。Queue handlerから対象entrypointをpurgeできないなら、その結果と成立する別経路を記録する |
-| 6 | **音源・CLI**: Wranglerで300,000,000 bytesのMP3をuploadして読み戻し、失敗後の再実行を試す。CLIでMP3妥当性・durationを解析する | 上限サイズの一致（bytes/検証用digest）とdurationが確認でき、超過ファイルはupload前に拒否される。途中失敗後も下書きを壊さず再試行できる。Wranglerのversion、所要時間、失敗内容を記録する |
+| 6 | **上限サイズの転送・音源解析**: Wranglerで正確に300,000,000 bytesのダミーファイルと有効MP3をupload・downloadする。MP3のdurationを解析し、必要に応じて失敗後の再実行を確認する | 上限ちょうどのuploadとdownloadが成功し、ダウンロード先のサイズ・内容が元ファイルと一致する（全バイト比較またはdigest）。MP3のdurationも確認する。300,000,000 bytesを超えるファイルのCloudflareへのuploadは試さない。超過時にCLIがファイルサイズを調べてupload前に拒否する仕様は、CLI実装時に適用する。Wranglerのversion、所要時間、失敗内容を記録する |
 
 ## 最優先検証の判定方法
 

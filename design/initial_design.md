@@ -40,7 +40,7 @@
 
 - 対話的な管理作業にはCloudflare標準の`wrangler login`による認証を、自動化には環境変数のCloudflare API tokenを使用する。認証情報はcastloopのTOMLやGit管理対象には保存しない
 - CLIはWranglerをsubprocessとして呼び出し、Cloudflareの初期化・R2操作を行う。M0でエラー処理と認証の動作を確認する。Show ID予約と同一Showの公開受付予約には原子的な操作が必要であり、Wranglerの通常のobject putだけで安全に実現できるとは限らない。必要な管理操作の認証と別経路はM0で検証する
-- MVPのMP3入力ファイル上限は**300 MB（300,000,000 bytes）**。超過するファイルはアップロード前に拒否し、Wranglerの`r2 object put`を使用する。現行のWrangler単一オブジェクト上限315 MBとの整合、最大サイズのuploadと再試行をM0で実測する
+- MVPのMP3入力ファイル上限は**300 MB（300,000,000 bytes）**。CLIはファイルサイズを調べ、超過するファイルをアップロード前に拒否し、上限以内をWranglerの`r2 object put`で送る。M0では上限ちょうどのupload・downloadと内容一致を実測し、超過ファイルの実際のuploadは試さない
 
 ## 利用シナリオ（概要）
 
@@ -246,7 +246,7 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 - Wranglerの対話的ログインと自動化用API token、必要なCloudflareリソースの作成・アクセスを確認する
 - private R2からWorker経由でGET/HEAD/Range配信できることを確認する
 - Workers Cachingのcache hit、feedのtag purge、音源配信時のRange処理を確認する
-- MVP上限300 MBのMP3をWranglerでアップロードできること、超過時にupload前に拒否することを確認する
+- MVP上限300 MB（300,000,000 bytes）のファイルをWranglerでupload・downloadでき、内容が一致することを確認する。超過時の拒否はCLIのファイルサイズ判定で実装し、M0での超過ファイルのupload試験は行わない
 - CLIでMP3のdurationを正確に取得できるか実測する
 - `staging/`のShow/Episode commit markerだけをR2 Event Notification → managed Queue → 単一並列consumerへ届けることを確認する。重複・順不同、同一Showの原子的な公開受付と障害回復に必要な操作を検証する。Queueの自動retryとDLQ、恒久的失敗を無駄にretryしない処理を確認する
 
