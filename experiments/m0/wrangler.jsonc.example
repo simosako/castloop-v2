@@ -1,0 +1,28 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "<dedicated-m0-worker>",
+  "main": "./worker.ts",
+  "compatibility_date": "2026-09-23",
+  "workers_dev": true,
+  "cache": { "enabled": true },
+  "r2_buckets": [{ "binding": "M0_BUCKET", "bucket_name": "<dedicated-m0-bucket>" }],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "<dedicated-m0-queue>",
+        "max_batch_size": 1,
+        "max_concurrency": 1,
+        "max_retries": 2,
+        "dead_letter_queue": "<dedicated-m0-dlq>"
+      },
+      { "queue": "<dedicated-m0-dlq>", "max_batch_size": 1, "max_concurrency": 1 }
+    ]
+  },
+  "vars": { "M0_DLQ": "<dedicated-m0-dlq>" },
+  "secrets": { "required": ["M0_SECRET"] },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  }
+}

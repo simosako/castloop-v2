@@ -158,6 +158,8 @@ D-13で決めたShow IDは人間可読slug、最大32文字、作成後不変。
 
 **決定:** 案Aの受付制限＋managed Cloudflare Queueを維持する。ShowとEpisodeを区別せず同一Showに未完了publishは1件まで。**保留:** 予約・解放の原子的な操作方法、認証経路、失敗時の回復とfencing。重複配送と異なるShowの順不同処理は想定内とする。
 
+**M0検証からの簡素化案（未確定）:** R2条件付きPUTで受付は実証したが、処理中の予約を強制解除すると旧jobが新jobを巻き戻す事例も再現した。MVPでは強制解除を通常操作として提供せず、`processing`中は同じShowの次のpublishをエラーにして同jobの再試行・管理者の修復を優先する。詳細と検証待ちは[`m0_failure_recovery_proposal.md`](./m0_failure_recovery_proposal.md)を参照。
+
 ## R2-06: job status、再試行、保持期間
 
 **問い（基本方式は決定済み）:** `system/jobs/<jobId>/status.toml`を利用者がどう読み、障害後にどうやり直すか。R2へ保存すること自体はD-12で確定済み。
