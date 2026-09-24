@@ -6,6 +6,7 @@ import {
   serviceConfigSchema, showCommitSchema, showMetadataSchema, stringifyToml, validateId,
 } from "@castloop/shared";
 import type { EpisodeCommit, EpisodeRevision, ServiceConfig, ShowCommit } from "@castloop/shared";
+import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync,
@@ -40,7 +41,14 @@ type LocalState = {
   episodes: Record<string, EpisodeStage>;
 };
 const SOURCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const WRANGLER = join(SOURCE_ROOT, "node_modules/.bin/wrangler");
+const WRANGLER = process.env.CASTLOOP_WRANGLER || (Bun.isStandaloneExecutable
+  ? "wrangler" : join(SOURCE_ROOT, "node_modules/.bin/wrangler"));
+const CLI_VERSION = "0.1.0";
+const USAGE = "Usage: castloop init [dir] --service-id ID --bucket-name NAME --workers-subdomain NAME | " +
+  "create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | " +
+  "update-episode ID | update-episode-audio ID MP3 | publish-episode ID | " +
+  "job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | " +
+  "cleanup-job JOB --show ID --episode ID | deploy";
 
 function argsOf(values: string[]): { positional: string[]; flags: Record<string, string> } {
   const positional: string[] = [];
@@ -112,16 +120,29 @@ function wrangler(root: string, ...command: string[]): void {
     execFileSync(WRANGLER, [...command, "--config", config], {
       cwd: root, env: process.env, stdio: "pipe", timeout: 120000,
     });
-  } catch {
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      throw new Error("Wrangler CLI is missing; install Wrangler 4.x and set CASTLOOP_WRANGLER to its executable path");
+    }
     throw new Error(`Wrangler ${command.slice(0, 3).join(" ")} failed; check account permissions and .castloop/state.json before retrying`);
   }
+}
+
+function workerEntry(root: string): string {
+  if (!Bun.isStandaloneExecutable) return join(SOURCE_ROOT, "src/index.ts");
+  if (!embeddedWorkerSource) throw new Error("The executable does not contain a Worker bundle");
+  const file = join(root, ".castloop", "worker.mjs");
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(`${file}.tmp`, embeddedWorkerSource, { mode: 0o600 });
+  renameSync(`${file}.tmp`, file);
+  return file;
 }
 
 function createWranglerConfig(root: string, config: ServiceConfig): void {
   const contents = {
     name: config.worker_name,
-    main: join(SOURCE_ROOT, "src/index.ts"),
-    compatibility_date: "2026-09-23",
+    main: workerEntry(root),
+    compatibility_date: WORKER_COMPATIBILITY_DATE,
     observability: { enabled: true, traces: { enabled: true } },
     cache: { enabled: true },
     vars: { CASTLOOP_DLQ_NAME: config.dlq_name },
@@ -139,6 +160,19 @@ function createWranglerConfig(root: string, config: ServiceConfig): void {
   writeFileSync(file, JSON.stringify(contents, null, 2) + "\n", { mode: 0o600 });
 }
 
+function prepareDeployment(root: string): void {
+  const file = join(root, ".castloop", "wrangler.jsonc");
+  const config: unknown = JSON.parse(readFileSync(file, "utf8"));
+  if (!config || typeof config !== "object" || Array.isArray(config) ||
+    !("main" in config) || typeof config.main !== "string") {
+    throw new Error("Invalid local Wrangler configuration");
+  }
+  const main = workerEntry(root);
+  if (config.main !== main) {
+    writeFileSync(file, JSON.stringify({ ...config, main }, null, 2) + "\n", { mode: 0o600 });
+  }
+}
+
 async function provision(root: string, config: ServiceConfig, state: LocalState): Promise<void> {
   mkdirSync(join(root, ".castloop"), { recursive: true, mode: 0o700 });
   const keyFile = join(root, ".castloop", "secrets.json");
@@ -146,7 +180,11 @@ async function provision(root: string, config: ServiceConfig, state: LocalState)
     writeFileSync(keyFile, JSON.stringify({ CASTLOOP_ADMIN_KEY: randomBytes(32).toString("hex") }) + "\n",
       { flag: "wx", mode: 0o600 });
   }
-  createWranglerConfig(root, config);
+  if (existsSync(join(root, ".castloop", "wrangler.jsonc"))) {
+    prepareDeployment(root);
+  } else {
+    createWranglerConfig(root, config);
+  }
   const steps: Array<[string, () => void]> = [
     ["bucket", () => wrangler(root, "r2", "bucket", "create", config.bucket_name)],
     ["queue", () => wrangler(root, "queues", "create", config.queue_name)],
@@ -404,6 +442,7 @@ async function cleanupJob(jobId: string, flags: Record<string, string>): Promise
 function deployService(): void {
   const root = process.cwd();
   loadConfig(root);
+  prepareDeployment(root);
   wrangler(root, "deploy", "--secrets-file", join(root, ".castloop", "secrets.json"));
   console.log("Worker deployed");
 }
@@ -657,6 +696,14 @@ function createEpisode(episodeArg: string): void {
 
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
+  if ((command === "help" || command === "--help") && rest.length === 0) {
+    console.log(USAGE);
+    return;
+  }
+  if ((command === "version" || command === "--version") && rest.length === 0) {
+    console.log(CLI_VERSION);
+    return;
+  }
   const { positional, flags } = argsOf(rest);
   if (command === "init" && positional.length <= 1) return init(positional[0] ?? ".", flags);
   if (command === "create-show" && positional.length === 1) return createShow(positional[0], flags);
@@ -691,7 +738,7 @@ async function main(): Promise<void> {
     allowedFlags(flags, []);
     return deployService();
   }
-  throw new Error("Usage: castloop init [dir] | create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | update-episode ID | update-episode-audio ID MP3 | publish-episode ID | job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | cleanup-job JOB --show ID --episode ID | deploy");
+  throw new Error(USAGE);
 }
 
 try {

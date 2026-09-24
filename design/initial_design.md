@@ -279,6 +279,8 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 - Bunのsingle executableを作成し、インストールと更新手順を整える
 - README、サンプルファイル、トラブルシュートを提供する
 
+単一実行ファイルへCLIと公開Worker bundleを同梱する。Cloudflare管理・R2 uploadには別途Wrangler CLI（Node.js/npm）、音源解析には`ffprobe`を使用する。実測は`design/m4_implementation_log.md`に記録する。
+
 ### MVP実装後の構想
 
 - 予告配信(これはMVPに入れても良いかもしれない）

@@ -15,5 +15,5 @@
 
     "types": ["./worker-configuration.d.ts", "node", "bun"]
   },
-  "include": ["packages/**/*.ts", "src/**/*.ts"]
+  "include": ["packages/**/*.ts", "src/**/*.ts", "scripts/**/*.ts"]
 }

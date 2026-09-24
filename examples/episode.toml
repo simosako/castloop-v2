@@ -1,0 +1,6 @@
+schema_version = 1
+episode_id = "first-episode"
+guid = "ff39c154-d2a7-47b4-97b0-5c7d3f74a3a1"
+title = "Your first episode"
+description = "Replace this description with your episode summary."
+published_at = "2026-09-24T12:00:00+09:00"

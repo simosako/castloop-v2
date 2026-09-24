@@ -9,7 +9,8 @@
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit",
-    "cli": "bun packages/cli/src/index.ts"
+    "cli": "bun packages/cli/src/index.ts",
+    "build:cli": "bun scripts/build-cli.ts"
   },
   "keywords": [],
   "author": "",

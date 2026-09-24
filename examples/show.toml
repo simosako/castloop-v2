@@ -1,0 +1,12 @@
+schema_version = 1
+show_id = "sample-show"
+title = "Sample Podcast"
+description = "Replace this description with your podcast description."
+language = "en"
+author = "Your name"
+owner_name = "Your name"
+owner_email = "podcast@example.com"
+categories = ["Technology"]
+explicit = false
+site_url = "https://example.com/your-podcast"
+image_path = "cover.jpg"
