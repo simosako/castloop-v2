@@ -7,6 +7,7 @@ import {
 } from "@castloop/shared";
 import type { EpisodeCommit, EpisodeRevision, ServiceConfig, ShowCommit } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
+import { waitForWorkerHealth } from "./health";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -201,11 +202,7 @@ async function provision(root: string, config: ServiceConfig, state: LocalState)
   const key: unknown = JSON.parse(readFileSync(keyFile, "utf8"));
   if (!key || typeof key !== "object" || !("CASTLOOP_ADMIN_KEY" in key) ||
     typeof key.CASTLOOP_ADMIN_KEY !== "string") throw new Error("Local administrator key is missing");
-  const health = await fetch(new URL("/admin/health", config.public_base_url), {
-    headers: { "X-Castloop-Key": key.CASTLOOP_ADMIN_KEY, "User-Agent": "castloop-cli/0.1" },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (health.status !== 200) throw new Error(`Worker URL or administrator key is incorrect (HTTP ${health.status})`);
+  await waitForWorkerHealth(config.public_base_url, key.CASTLOOP_ADMIN_KEY);
   if (!state.init_steps.includes("service")) {
     const file = join(root, "castloop.toml");
     wrangler(root, "r2", "object", "put", `${config.bucket_name}/system/service.toml`,

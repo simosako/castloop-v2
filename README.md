@@ -77,7 +77,7 @@ Back up `castloop.toml` and the private `.castloop/` directory before moving a w
 | Symptom | Action |
 | --- | --- |
 | `Wrangler CLI is missing` | Install Wrangler 4.x with Node.js/npm; set `CASTLOOP_WRANGLER` to its executable path or put it on `PATH`. |
-| `init` stopped partway | Keep the workspace and run `castloop init /path/to/workspace` again. Inspect `.castloop/state.json` and Cloudflare resources if it still fails; `init` does not automatically delete resources. |
+| `init` stopped partway | After deployment, `init` retries a temporarily unavailable Worker health endpoint up to six times. If it still fails, keep the workspace and run `castloop init /path/to/workspace` again. Inspect `.castloop/state.json` and Cloudflare resources if it still fails; `init` does not automatically delete resources. |
 | Show ID already reserved | Use a new Show ID or inspect the existing reservation. A reservation alone does not publish a Show. |
 | Local TOML or MP3 changed after staging | Re-run the corresponding `update-*` command before `publish-*`. A committed job is frozen; later edits need a new job. |
 | `retrying` with `dlq: true` | Inspect `job-status` and the Show admission; after resolving the transient issue, use `castloop retry-job JOB_ID --show my-show [--episode ID]` to resume the **same** job. A DLQ record remains as history even after recovery. |
