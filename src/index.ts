@@ -1,5 +1,5 @@
 import { validateId } from "../packages/shared/src/ids";
-import { parseJobStatus } from "../packages/shared/src/index";
+import { episodeCommitSchema, parseEpisodeRevision, parseJobStatus } from "../packages/shared/src/index";
 import { publishEpisode, publishShow, readAdmission } from "./publication";
 import type { Admission } from "./publication";
 
@@ -50,6 +50,7 @@ async function publicAsset(request: Request, env: Env, pathname: string): Promis
     headers: {
       "Content-Type": feed ? "application/rss+xml; charset=utf-8" : name.endsWith("png") ? "image/png" : "image/jpeg",
       "Content-Length": String(object.size),
+      ...(feed ? {} : { "Accept-Ranges": "bytes" }),
       "Cache-Control": "public, max-age=300",
       "Cloudflare-CDN-Cache-Control": "public, max-age=3600",
       "Cache-Tag": `${feed ? "feed" : "cover"}-${show}`,
@@ -69,6 +70,9 @@ async function claimPublication(env: Env, showId: string, jobId: string): Promis
       : json({ error: "Show has an unfinished job", job_id: current.value.job_id }, 409);
   }
   if (current?.value.job_id === jobId) return json({ error: "Completed job ID cannot be reused" }, 409);
+  if (await env.CASTLOOP_BUCKET.head(`system/jobs/${jobId}/status.toml`)) {
+    return json({ error: "Job ID has already been used" }, 409);
+  }
   const value: Admission = { job_id: jobId, state: "reserved" };
   const written = await env.CASTLOOP_BUCKET.put(key, JSON.stringify(value), {
     onlyIf: current ? { etagMatches: current.etag } : new Headers({ "If-None-Match": "*" }),
@@ -93,6 +97,21 @@ export default {
       return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
     }
     if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return json({ error: "unauthorized" }, 401);
+    if (request.method === "GET" && pathname.startsWith("/admin/episodes/") &&
+      pathname.endsWith("/current")) {
+      const parts = pathname.split("/");
+      if (parts.length !== 6) return json({ error: "not found" }, 404);
+      let showId: string;
+      let episodeId: string;
+      try {
+        showId = validateId(parts[3], "show");
+        episodeId = validateId(parts[4], "episode");
+      } catch {
+        return json({ error: "invalid Episode path" }, 400);
+      }
+      const current = await env.CASTLOOP_BUCKET.get(`public/episodes/${showId}/${episodeId}/metadata.toml`);
+      return json({ revision: current ? parseEpisodeRevision(await current.text()) : null }, 200);
+    }
     if (request.method === "GET" && pathname.startsWith("/admin/jobs/")) {
       const jobId = pathname.slice("/admin/jobs/".length);
       const url = new URL(request.url);
@@ -125,7 +144,8 @@ export default {
         status: status ? parseJobStatus(await status.text()) : null, dlq: Boolean(dlq) }, 200);
     }
     if (request.method !== "POST" ||
-      !["/admin/shows/reserve", "/admin/publications/claim", "/admin/jobs/retry"].includes(pathname)) {
+      !["/admin/shows/reserve", "/admin/publications/claim", "/admin/jobs/retry",
+        "/admin/jobs/cleanup"].includes(pathname)) {
       return json({ error: "not found" }, 404);
     }
     if (Number(request.headers.get("Content-Length")) > 1024) return json({ error: "too large" }, 413);
@@ -144,6 +164,45 @@ export default {
       showId = validateId(show_id, "show");
     } catch {
       return json({ error: "invalid show ID" }, 400);
+    }
+    if (pathname === "/admin/jobs/cleanup") {
+      if (typeof job_id !== "string" || !JOB_ID.test(job_id)) return json({ error: "invalid job ID" }, 400);
+      let episodeId: string;
+      try {
+        episodeId = validateId(episode_id, "episode");
+      } catch {
+        return json({ error: "invalid Episode ID" }, 400);
+      }
+      const prefix = `staging/episodes/${showId}/${episodeId}/${job_id}`;
+      const [statusObject, admission, markerObject, revisionObject] = await Promise.all([
+        env.CASTLOOP_BUCKET.get(`system/jobs/${job_id}/status.toml`),
+        readAdmission(env, showId),
+        env.CASTLOOP_BUCKET.get(`${prefix}/commit.json`),
+        env.CASTLOOP_BUCKET.get(`public/episodes/${showId}/${episodeId}/revisions/${job_id}.toml`),
+      ]);
+      const status = statusObject ? parseJobStatus(await statusObject.text()) : null;
+      const marker = markerObject ? episodeCommitSchema.safeParse(await markerObject.json()) : null;
+      if (status?.state !== "published" || status.kind !== "episode" || status.job_id !== job_id ||
+        status.show_id !== showId || status.episode_id !== episodeId ||
+        !admission || admission.value.job_id === job_id && admission.value.state !== "free" ||
+        !marker?.success || marker.data.job_id !== job_id || marker.data.show_id !== showId ||
+        marker.data.episode_id !== episodeId || !revisionObject) {
+        return json({ error: "Only a completed Episode job with intact history can be cleaned" }, 409);
+      }
+      const revision = parseEpisodeRevision(await revisionObject.text());
+      if (revision.revision_id !== job_id || revision.episode_id !== episodeId ||
+        revision.sha256 !== (marker.data.audio_sha256 ?? revision.sha256)) {
+        return json({ error: "Published revision does not match this job" }, 409);
+      }
+      if (!marker.data.audio_sha256) return json({ result: "no staged audio" }, 200);
+      const media = await env.CASTLOOP_BUCKET.head(
+        `public/podcasts/${showId}/episodes/${episodeId}/${job_id}.mp3`);
+      if (!media || media.size !== marker.data.audio_length_bytes ||
+        media.customMetadata?.sha256 !== marker.data.audio_sha256) {
+        return json({ error: "Published media could not be verified" }, 409);
+      }
+      await env.CASTLOOP_BUCKET.delete(`${prefix}/audio.mp3`);
+      return json({ result: "staged audio removed; immutable media and metadata retained" }, 200);
     }
     if (pathname === "/admin/jobs/retry") {
       if (typeof job_id !== "string" || !JOB_ID.test(job_id) ||

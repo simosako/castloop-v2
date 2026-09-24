@@ -28,9 +28,13 @@ function renderItem(episode: EpisodeRevision): string {
 export function renderFeed(show: ShowMetadata, episodes: EpisodeRevision[],
   baseUrl: string, coverExtension: string): string {
   const coverUrl = `${baseUrl.replace(/\/$/, "")}/podcasts/${show.show_id}/cover.${coverExtension}`;
+  const feedUrl = `${baseUrl.replace(/\/$/, "")}/podcasts/${show.show_id}/feed.xml`;
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">\n` +
+    `<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" ` +
+    `xmlns:content="http://purl.org/rss/1.0/modules/content/" ` +
+    `xmlns:atom="http://www.w3.org/2005/Atom">\n` +
     `  <channel>\n` +
+    `    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />\n` +
     `    <title>${escapeXml(show.title)}</title>\n` +
     `    <link>${escapeXml(show.site_url)}</link>\n` +
     `    <description>${escapeXml(show.description)}</description>\n` +

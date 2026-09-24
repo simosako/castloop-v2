@@ -80,12 +80,25 @@ export const episodeCommitSchema = z.object({
   show_id: ID(32),
   episode_id: ID(80),
   job_id: z.uuid(),
-  metadata_sha256: z.string().regex(/^[a-f0-9]{64}$/),
-  audio_sha256: z.string().regex(/^[a-f0-9]{64}$/),
-  audio_length_bytes: z.number().int().positive().max(300_000_000),
-  duration_seconds: z.number().int().positive(),
+  base_revision_id: z.uuid().optional(),
+  metadata_sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  audio_sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  audio_length_bytes: z.number().int().positive().max(300_000_000).optional(),
+  duration_seconds: z.number().int().positive().optional(),
   committed_at: publishedAt,
-}).strict();
+}).strict().superRefine((value, context) => {
+  const hasAudio = value.audio_sha256 !== undefined;
+  if (hasAudio !== (value.audio_length_bytes !== undefined) ||
+    hasAudio !== (value.duration_seconds !== undefined)) {
+    context.addIssue({ code: "custom", message: "Audio checksum, length and duration must be provided together" });
+  }
+  if (!value.base_revision_id && (!value.metadata_sha256 || !hasAudio)) {
+    context.addIssue({ code: "custom", message: "Initial publication requires both metadata and audio" });
+  }
+  if (value.base_revision_id && !value.metadata_sha256 && !hasAudio) {
+    context.addIssue({ code: "custom", message: "An update must change metadata or audio" });
+  }
+});
 
 export const episodeRevisionSchema = episodeDraftSchema.extend({
   revision_id: z.uuid(),
@@ -114,6 +127,13 @@ export type ShowCommit = z.infer<typeof showCommitSchema>;
 export type EpisodeCommit = z.infer<typeof episodeCommitSchema>;
 export type EpisodeRevision = z.infer<typeof episodeRevisionSchema>;
 export type JobStatus = z.infer<typeof jobStatusSchema>;
+
+export function episodeDraftFromRevision(revision: EpisodeRevision): EpisodeDraft {
+  return episodeDraftSchema.parse(Object.fromEntries(
+    Object.keys(episodeDraftSchema.shape).filter((key) => key in revision)
+      .map((key) => [key, revision[key as keyof EpisodeDraft]]),
+  ));
+}
 
 function parseToml(source: string): unknown {
   return TOML.parse(source);

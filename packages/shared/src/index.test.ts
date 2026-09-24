@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { parseEpisodeDraft, parseServiceConfig, parseShowMetadata, stringifyToml, validateId } from "./index";
+import { episodeCommitSchema, parseEpisodeDraft, parseServiceConfig, parseShowMetadata,
+  stringifyToml, validateId } from "./index";
 
 const show = {
   schema_version: 1 as const, show_id: "daily-show", title: "Daily", description: "Description",
@@ -35,4 +36,20 @@ describe("M1 TOML metadata", () => {
     expect(() => validateId("a".repeat(33), "show")).toThrow();
     expect(() => validateId("a--b", "show")).toThrow();
   });
+});
+
+test("Episode commits require both inputs initially and at least one input for revisions", () => {
+  const base = { schema_version: 1, kind: "episode", show_id: "daily-show", episode_id: "first",
+    job_id: crypto.randomUUID(), committed_at: "2026-09-24T01:05:00Z" };
+  const metadata_sha256 = "a".repeat(64);
+  const audio = { audio_sha256: "b".repeat(64), audio_length_bytes: 123, duration_seconds: 5 };
+  expect(episodeCommitSchema.safeParse({ ...base, metadata_sha256, ...audio }).success).toBe(true);
+  expect(episodeCommitSchema.safeParse({ ...base, metadata_sha256 }).success).toBe(false);
+  expect(episodeCommitSchema.safeParse({ ...base, ...audio }).success).toBe(false);
+  const base_revision_id = crypto.randomUUID();
+  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id, metadata_sha256 }).success).toBe(true);
+  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id, ...audio }).success).toBe(true);
+  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id }).success).toBe(false);
+  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id, audio_sha256: "b".repeat(64) }).success)
+    .toBe(false);
 });

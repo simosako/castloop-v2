@@ -49,4 +49,30 @@ test("Show and Episode publication requests share one admission slot", async () 
   expect((await post("/admin/publications/claim", { show_id: "daily", job_id: showJob })).status).toBe(201);
   expect((await post("/admin/publications/claim", { show_id: "daily", job_id: episodeJob })).status).toBe(409);
   expect((await post("/admin/publications/claim", { show_id: "daily", job_id: showJob })).status).toBe(200);
+  storage.entries.set("system/show-publications/daily.json", JSON.stringify({ job_id: episodeJob, state: "free" }));
+  storage.entries.set(`system/jobs/${showJob}/status.toml`, "used");
+  expect((await post("/admin/publications/claim", { show_id: "daily", job_id: showJob })).status).toBe(409);
+});
+
+test("concurrent Show-level publication claims admit exactly one job", async () => {
+  const storage = bucket();
+  const env = { CASTLOOP_BUCKET: storage, CASTLOOP_ADMIN_KEY: "test-secret" } as never;
+  const post = (path: string, body: object) => worker.fetch(new Request(`https://example.workers.dev${path}`, {
+    method: "POST", headers: { "X-Castloop-Key": "test-secret" }, body: JSON.stringify(body),
+  }), env);
+  await post("/admin/shows/reserve", { show_id: "daily", reservation_id: crypto.randomUUID() });
+  const responses = await Promise.all(Array.from({ length: 10 }, () =>
+    post("/admin/publications/claim", { show_id: "daily", job_id: crypto.randomUUID() })));
+  expect(responses.filter((response) => response.status === 201)).toHaveLength(1);
+  expect(responses.filter((response) => response.status === 409)).toHaveLength(9);
+});
+
+test("public cover response advertises byte ranges with a known length", async () => {
+  const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+  const bucket = { get: async () => ({ size: bytes.length, body: new Blob([bytes]).stream() }) };
+  const response = await worker.fetch(new Request("https://example.workers.dev/podcasts/daily/cover.jpg"),
+    { CASTLOOP_BUCKET: bucket, CASTLOOP_ADMIN_KEY: "test-secret" } as never);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Accept-Ranges")).toBe("bytes");
+  expect(response.headers.get("Content-Length")).toBe(String(bytes.length));
 });

@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 
 import {
-  episodeCommitSchema, jobStatusSchema, parseEpisodeDraft, parseServiceConfig, parseShowMetadata,
+  episodeCommitSchema, episodeDraftFromRevision, episodeRevisionSchema, jobStatusSchema,
+  parseEpisodeDraft, parseServiceConfig, parseShowMetadata,
   serviceConfigSchema, showCommitSchema, showMetadataSchema, stringifyToml, validateId,
 } from "@castloop/shared";
-import type { EpisodeCommit, ServiceConfig, ShowCommit } from "@castloop/shared";
+import type { EpisodeCommit, EpisodeRevision, ServiceConfig, ShowCommit } from "@castloop/shared";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, renameSync,
@@ -23,6 +24,7 @@ type ShowDraft = {
 };
 type EpisodeStage = {
   job_id: string;
+  base_revision_id?: string;
   metadata_sha256?: string;
   audio_sha256?: string;
   audio_length_bytes?: number;
@@ -388,6 +390,17 @@ async function retryJob(jobId: string, flags: Record<string, string>): Promise<v
   console.log(`Job requeued: ${jobId}`);
 }
 
+async function cleanupJob(jobId: string, flags: Record<string, string>): Promise<void> {
+  allowedFlags(flags, ["show", "episode"]);
+  const showId = validateId(required(flags.show, "show"), "show");
+  const episodeId = validateId(required(flags.episode, "episode"), "episode");
+  const { response, data } = await adminCall(process.cwd(), "/admin/jobs/cleanup", {
+    show_id: showId, episode_id: episodeId, job_id: jobId,
+  });
+  if (response.status !== 200) throw new Error(`Staging cleanup refused (HTTP ${response.status})`);
+  console.log(JSON.stringify(data));
+}
+
 function deployService(): void {
   const root = process.cwd();
   loadConfig(root);
@@ -413,6 +426,7 @@ async function editableEpisodeStage(root: string, showId: string, episodeId: str
   key: string): Promise<{ state: LocalState; stage: EpisodeStage }> {
   const state = loadState(root);
   let stage = state.episodes[key];
+  const current = await currentEpisode(root, showId, episodeId);
   if (stage && !stage.committed) {
     const remote = await inspectJob(root, showId, stage.job_id, episodeId);
     if (remote.marker) {
@@ -423,11 +437,22 @@ async function editableEpisodeStage(root: string, showId: string, episodeId: str
     }
   }
   if (!stage || stage.committed) {
-    stage = { job_id: randomUUID(), committed: false };
+    stage = { job_id: randomUUID(), committed: false,
+      ...(current ? { base_revision_id: current.revision_id } : {}) };
     state.episodes[key] = stage;
     saveState(root, state);
+  } else if (stage.base_revision_id !== current?.revision_id) {
+    throw new Error("Episode changed since this draft was created; inspect the current revision before editing");
   }
   return { state, stage };
+}
+
+async function currentEpisode(root: string, showId: string, episodeId: string): Promise<EpisodeRevision | null> {
+  const { response, data } = await adminCall(root, `/admin/episodes/${showId}/${episodeId}/current`);
+  if (response.status !== 200 || !data || typeof data !== "object" || !("revision" in data)) {
+    throw new Error("Cannot read current Episode revision");
+  }
+  return data.revision === null ? null : episodeRevisionSchema.parse(data.revision);
 }
 
 async function hashFile(file: string): Promise<string> {
@@ -463,8 +488,13 @@ function analyzeAudio(file: string): { length: number; duration: number } {
 async function updateEpisode(episodeArg: string): Promise<void> {
   const context = episodeContext(episodeArg);
   const source = readFileSync(context.file, "utf8");
-  if (parseEpisodeDraft(source).episode_id !== context.episodeId) throw new Error("Episode ID does not match filename");
+  const draft = parseEpisodeDraft(source);
+  if (draft.episode_id !== context.episodeId) throw new Error("Episode ID does not match filename");
   const { state, stage } = await editableEpisodeStage(context.root, context.showId, context.episodeId, context.key);
+  const current = await currentEpisode(context.root, context.showId, context.episodeId);
+  if (current && (draft.guid !== current.guid || draft.published_at !== current.published_at)) {
+    throw new Error("Episode GUID and published_at must remain unchanged");
+  }
   wrangler(context.root, "r2", "object", "put",
     `${context.config.bucket_name}/staging/episodes/${context.showId}/${context.episodeId}/${stage.job_id}/episode.toml`,
     "--remote", "--file", context.file, "--content-type", "application/toml");
@@ -494,25 +524,46 @@ async function publishEpisode(episodeArg: string): Promise<void> {
   const { root, showId, episodeId, config, file, key } = episodeContext(episodeArg);
   const state = loadState(root);
   const stage = state.episodes[key];
-  if (!stage?.metadata_sha256 || !stage.audio_sha256 || !stage.audio_path ||
-    !stage.audio_length_bytes || !stage.duration_seconds) {
-    throw new Error("Stage Episode metadata and audio before publishing");
+  if (!stage || (!stage.metadata_sha256 && !stage.audio_sha256) ||
+    (!stage.base_revision_id && (!stage.metadata_sha256 || !stage.audio_sha256))) {
+    throw new Error("Stage Episode changes (both metadata and audio for an initial publication)");
   }
-  const metadata = readFileSync(file, "utf8");
-  if (parseEpisodeDraft(metadata).episode_id !== episodeId || digest(metadata) !== stage.metadata_sha256) {
-    throw new Error("Local Episode metadata changed after staging; run update-episode again");
+  const current = await currentEpisode(root, showId, episodeId);
+  if (current?.revision_id !== stage.base_revision_id && current?.revision_id !== stage.job_id) {
+    throw new Error("Episode revision changed since staging; publish is stale");
   }
-  const info = analyzeAudio(stage.audio_path);
-  if (info.length !== stage.audio_length_bytes || info.duration !== stage.duration_seconds ||
-    await hashFile(stage.audio_path) !== stage.audio_sha256) {
-    throw new Error("Local MP3 changed after staging; run update-episode-audio again");
+  if (stage.metadata_sha256) {
+    const metadata = readFileSync(file, "utf8");
+    const draft = parseEpisodeDraft(metadata);
+    if (draft.episode_id !== episodeId || digest(metadata) !== stage.metadata_sha256) {
+      throw new Error("Local Episode metadata changed after staging; run update-episode again");
+    }
+    if (current && (draft.guid !== current.guid || draft.published_at !== current.published_at)) {
+      throw new Error("Episode GUID and published_at must match the published revision");
+    }
+  } else if (current && existsSync(file) &&
+    JSON.stringify(parseEpisodeDraft(readFileSync(file, "utf8"))) !==
+      JSON.stringify(episodeDraftFromRevision(current))) {
+    throw new Error("Local Episode metadata differs from published metadata; stage it with update-episode");
+  }
+  if (stage.audio_sha256) {
+    if (!stage.audio_path || !stage.audio_length_bytes || !stage.duration_seconds) {
+      throw new Error("Staged Episode audio is incomplete");
+    }
+    const info = analyzeAudio(stage.audio_path);
+    if (info.length !== stage.audio_length_bytes || info.duration !== stage.duration_seconds ||
+      await hashFile(stage.audio_path) !== stage.audio_sha256) {
+      throw new Error("Local MP3 changed after staging; run update-episode-audio again");
+    }
   }
   stage.committed_at ??= new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   saveState(root, state);
   const commit: EpisodeCommit = episodeCommitSchema.parse({ schema_version: 1, kind: "episode",
     show_id: showId, episode_id: episodeId, job_id: stage.job_id,
-    metadata_sha256: stage.metadata_sha256, audio_sha256: stage.audio_sha256,
-    audio_length_bytes: stage.audio_length_bytes, duration_seconds: stage.duration_seconds,
+    ...(stage.base_revision_id ? { base_revision_id: stage.base_revision_id } : {}),
+    ...(stage.metadata_sha256 ? { metadata_sha256: stage.metadata_sha256 } : {}),
+    ...(stage.audio_sha256 ? { audio_sha256: stage.audio_sha256,
+      audio_length_bytes: stage.audio_length_bytes, duration_seconds: stage.duration_seconds } : {}),
     committed_at: stage.committed_at });
   const previous = await inspectJob(root, showId, stage.job_id, episodeId);
   if (previous.marker) {
@@ -623,6 +674,7 @@ async function main(): Promise<void> {
   }
   if (command === "job-status" && positional.length === 1) return jobStatus(positional[0], flags);
   if (command === "retry-job" && positional.length === 1) return retryJob(positional[0], flags);
+  if (command === "cleanup-job" && positional.length === 1) return cleanupJob(positional[0], flags);
   if (command === "update-episode" && positional.length === 1) {
     allowedFlags(flags, []);
     return updateEpisode(positional[0]);
@@ -639,7 +691,7 @@ async function main(): Promise<void> {
     allowedFlags(flags, []);
     return deployService();
   }
-  throw new Error("Usage: castloop init [dir] | create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | update-episode ID | update-episode-audio ID MP3 | publish-episode ID | job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | deploy");
+  throw new Error("Usage: castloop init [dir] | create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | update-episode ID | update-episode-audio ID MP3 | publish-episode ID | job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | cleanup-job JOB --show ID --episode ID | deploy");
 }
 
 try {

@@ -272,6 +272,8 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 - 重複・順不同ジョブ、同時更新、staging領域のcleanupを扱う
 - RSS validatorおよびApple Podcastsの配信要件で成果物を検証する
 
+実装上は`base_revision_id`を公開commitに記録し、未変更のmetadataまたは音源はそのimmutable revisionを参照する。再配送時に現行revisionが同jobへ進んでいる場合も同じbaseから再構築する。完了したEpisode jobのstaging音源だけを明示的な`cleanup-job`で削除できる。実測と検証範囲は`design/m3_implementation_log.md`に記録する。
+
 ### M4: 配布と利用文書
 
 - Bunのsingle executableを作成し、インストールと更新手順を整える

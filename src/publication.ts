@@ -1,4 +1,4 @@
-import { episodeCommitSchema, parseEpisodeDraft, parseEpisodeRevision, parseJobStatus,
+import { episodeCommitSchema, episodeDraftFromRevision, parseEpisodeDraft, parseEpisodeRevision, parseJobStatus,
   parseServiceConfig, parseShowMetadata, showCommitSchema, stringifyToml } from "../packages/shared/src/index";
 import type { EpisodeCommit, EpisodeRevision, JobStatus, ShowCommit } from "../packages/shared/src/index";
 import { renderFeed } from "./feed";
@@ -174,40 +174,59 @@ export async function publishShow(env: PublicationEnv, ctx: ExecutionContext, ke
 
 async function episodeInputs(env: PublicationEnv, commit: EpisodeCommit): Promise<{
   revision: EpisodeRevision;
+  newAudio: boolean;
   show: ReturnType<typeof parseShowMetadata>;
   coverExtension: "jpg" | "png";
   baseUrl: string;
 }> {
   const bucket = env.CASTLOOP_BUCKET;
   const prefix = `staging/episodes/${commit.show_id}/${commit.episode_id}/${commit.job_id}`;
-  const [metadata, audio, showObject, serviceObject, previous] = await Promise.all([
-    bucket.get(`${prefix}/episode.toml`), bucket.head(`${prefix}/audio.mp3`),
+  const [metadata, audio, showObject, serviceObject, previous, baseObject] = await Promise.all([
+    commit.metadata_sha256 ? bucket.get(`${prefix}/episode.toml`) : null,
+    commit.audio_sha256 ? bucket.head(`${prefix}/audio.mp3`) : null,
     bucket.get(`system/shows/${commit.show_id}/show.toml`), bucket.get("system/service.toml"),
     bucket.get(`public/episodes/${commit.show_id}/${commit.episode_id}/metadata.toml`),
+    commit.base_revision_id ? bucket.get(`public/episodes/${commit.show_id}/${commit.episode_id}/revisions/${commit.base_revision_id}.toml`) : null,
   ]);
-  if (!metadata || !audio || !showObject || !serviceObject) {
+  if ((commit.metadata_sha256 && !metadata) || (commit.audio_sha256 && !audio) ||
+    !showObject || !serviceObject || (commit.base_revision_id && !baseObject)) {
     throw new InvalidPublication("Episode staging, published Show or service settings are missing");
   }
-  if (audio.size !== commit.audio_length_bytes || audio.size > 300_000_000) {
+  if (audio && (audio.size !== commit.audio_length_bytes || audio.size > 300_000_000)) {
     throw new InvalidPublication("Staged audio size does not match the committed input");
   }
+  let base: EpisodeRevision | null = null;
+  if (baseObject) base = parseEpisodeRevision(await baseObject.text());
   if (previous) {
     const current = parseEpisodeRevision(await previous.text());
-    if (current.revision_id !== commit.job_id) {
-      throw new InvalidPublication("Episode ID has already been published");
+    if (current.revision_id !== commit.base_revision_id && current.revision_id !== commit.job_id) {
+      throw new InvalidPublication("Episode was changed after this draft was staged");
+    }
+  } else if (commit.base_revision_id) {
+    throw new InvalidPublication("Published Episode disappeared after staging");
+  }
+  if (!previous && base) throw new InvalidPublication("Published Episode is missing");
+  let episode = base ? episodeDraftFromRevision(base) : null;
+  if (metadata) {
+    const source = await metadata.text();
+    if (await sha256(new TextEncoder().encode(source).buffer as ArrayBuffer) !== commit.metadata_sha256) {
+      throw new InvalidPublication("Staged Episode metadata differs from committed input");
+    }
+    try {
+      episode = parseEpisodeDraft(source);
+    } catch {
+      throw new InvalidPublication("Invalid staged Episode metadata");
     }
   }
-  const source = await metadata.text();
-  if (await sha256(new TextEncoder().encode(source).buffer as ArrayBuffer) !== commit.metadata_sha256) {
-    throw new InvalidPublication("Staged Episode metadata differs from committed input");
+  if (!episode) throw new InvalidPublication("Episode metadata is missing");
+  if (base && (episode.guid !== base.guid || episode.published_at !== base.published_at)) {
+    throw new InvalidPublication("Episode GUID and published_at must remain unchanged");
   }
-  let episode: ReturnType<typeof parseEpisodeDraft>;
   let show: ReturnType<typeof parseShowMetadata>;
   let baseUrl: string;
   const showText = await showObject.text();
   const serviceText = await serviceObject.text();
   try {
-    episode = parseEpisodeDraft(source);
     show = parseShowMetadata(showText);
     baseUrl = parseServiceConfig(serviceText).public_base_url.replace(/\/$/, "");
   } catch {
@@ -216,18 +235,39 @@ async function episodeInputs(env: PublicationEnv, commit: EpisodeCommit): Promis
   if (show.show_id !== commit.show_id || episode.episode_id !== commit.episode_id) {
     throw new InvalidPublication("Episode identifiers do not match the committed job");
   }
+  const episodes = await publishedEpisodes(env, commit.show_id);
+  if (episodes.some((other) => other.episode_id !== episode.episode_id && other.guid === episode.guid)) {
+    throw new InvalidPublication("Episode GUID is already used by another Episode in this Show");
+  }
   const coverExtension = show.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg";
   const revision: EpisodeRevision = {
     ...episode, revision_id: commit.job_id,
-    enclosure_url: `${baseUrl}/podcasts/${commit.show_id}/episodes/${commit.episode_id}/${commit.job_id}.mp3`,
-    content_type: "audio/mpeg", length_bytes: commit.audio_length_bytes,
-    duration_seconds: commit.duration_seconds, sha256: commit.audio_sha256,
+    enclosure_url: commit.audio_sha256
+      ? `${baseUrl}/podcasts/${commit.show_id}/episodes/${commit.episode_id}/${commit.job_id}.mp3`
+      : base!.enclosure_url,
+    content_type: "audio/mpeg", length_bytes: commit.audio_length_bytes ?? base!.length_bytes,
+    duration_seconds: commit.duration_seconds ?? base!.duration_seconds,
+    sha256: commit.audio_sha256 ?? base!.sha256,
     updated_at: commit.committed_at,
   };
-  return { revision, show, coverExtension, baseUrl };
+  if (!commit.audio_sha256 && base) {
+    const mediaPath = new URL(base.enclosure_url).pathname;
+    const prefix = `/podcasts/${commit.show_id}/episodes/${commit.episode_id}/`;
+    if (!mediaPath.startsWith(prefix) || !/^[a-f0-9-]{36}\.mp3$/.test(mediaPath.slice(prefix.length))) {
+      throw new InvalidPublication("Base revision has an invalid audio reference");
+    }
+    const publishedAudio = await bucket.head(`public${mediaPath}`);
+    if (!publishedAudio || publishedAudio.size !== base.length_bytes ||
+      publishedAudio.customMetadata?.sha256 !== base.sha256) {
+      throw new InvalidPublication("Published audio for the base revision is missing or inconsistent");
+    }
+  }
+  return { revision, newAudio: Boolean(commit.audio_sha256), show, coverExtension, baseUrl };
 }
 
-async function publishMedia(env: PublicationEnv, commit: EpisodeCommit): Promise<void> {
+async function publishMedia(env: PublicationEnv, commit: EpisodeCommit & {
+  audio_sha256: string; audio_length_bytes: number;
+}): Promise<void> {
   const bucket = env.CASTLOOP_BUCKET;
   const key = `public/podcasts/${commit.show_id}/episodes/${commit.episode_id}/${commit.job_id}.mp3`;
   const existing = await bucket.head(key);
@@ -285,6 +325,13 @@ export async function publishEpisode(env: PublicationEnv, ctx: ExecutionContext,
   if (!owner || owner.value.job_id !== commit.job_id || owner.value.state === "free") return;
   const statusObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${commit.job_id}/status.toml`);
   const status = statusObject ? parseJobStatus(await statusObject.text()) : null;
+  if (status?.state === "published") {
+    const current = await env.CASTLOOP_BUCKET.get(
+      `public/episodes/${commit.show_id}/${commit.episode_id}/metadata.toml`);
+    if (!current || parseEpisodeRevision(await current.text()).revision_id !== commit.job_id) {
+      throw new Error("Completed Episode job does not match current metadata");
+    }
+  }
   if (status?.job_id !== commit.job_id || status.state !== "published") {
     let input: Awaited<ReturnType<typeof episodeInputs>>;
     try {
@@ -305,7 +352,9 @@ export async function publishEpisode(env: PublicationEnv, ctx: ExecutionContext,
     }
     try {
       await writeStatus(env, commit, "processing");
-      await publishMedia(env, commit);
+      if (input.newAudio) {
+        await publishMedia(env, commit as EpisodeCommit & { audio_sha256: string; audio_length_bytes: number });
+      }
       const prefix = `public/episodes/${commit.show_id}/${commit.episode_id}`;
       const revisionKey = `${prefix}/revisions/${commit.job_id}.toml`;
       const revisionText = stringifyToml(input.revision);
