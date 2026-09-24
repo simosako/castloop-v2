@@ -20,10 +20,18 @@ M1で作成した検証専用サービス（`/tmp/opencode/castloop-m1-smoke/`�
 | Show再更新 | Episode公開後のShow更新でfeedのShowタイトルが変わり、既存Episode itemは残った |
 | 上限前拒否 | 300,000,001 bytesの疎なMP3をCLIがアップロード前のサイズ確認で拒否。R2へは送っていない |
 
-**現状:** 初回Show＋Episodeの製品経路は実機で通った。metadataのみ・audioのみの更新、複数Episodeの競合、cleanupはM3の範囲。実公開jobのretry超過からDLQ記録までの一連の状態照合は追加の障害注入で確認する。
+**当時の現状:** 初回Show＋Episodeの製品経路は実機で通った。metadataのみ・audioのみの更新、複数Episodeの競合、cleanupはM3の範囲。実公開jobのretry超過からDLQ記録までの一連の状態照合は追加の障害注入で確認する（下記のMVP公開前検証で完了）。
 
 ### 実Queueのretry超過からDLQ記録まで（2026-09-24）
 
 検証専用Workerを**一時的に**診断ラッパーへ切り替え、特定の未登録jobId（`fe4253ab-9708-4806-a908-6186ec211051`）へのQueue通知だけを失敗させた。該当する公開job・commit marker・Show予約は作らず、既存のShowとEpisodeは変更していない。主Queueへテスト通知を送り、`max_retries: 2`による失敗を経て同じDLQに届いたメッセージを、製品のDLQ consumerがR2の`system/jobs/<jobId>/dlq.json`へ記録し、管理用status照会で`dlq: true`になるまでを確認した。終了時に**通常のM2 Workerへ戻した**。
 
 このテストはQueueとDLQ consumerの接続・R2記録を実測したもの。実公開jobの途中失敗、purge失敗、statusと同時に発生したDLQ配送ではない。先の実公開jobでDLQ記録が欠けた理由を、存在しない記録で埋めたものとしては扱わない。M2の公開経路・管理者の同job回復は成立しており、実公開jobのretry超過とDLQ記録の組合せは後続の障害注入で継続確認する。
+
+### MVP公開前の実公開job回復検証（2026-09-24）
+
+専用サービスの新しいShow `dlq-check-7dbf5450`、job `8f63c83b-e043-4cbe-95ac-269ab9099b54`を使った。CLIでShow ID予約、TOMLとJPEGのstagingまで行い、対象Showのcommit通知**だけ**cache purgeを失敗扱いにする一時的なWorkerをdeployした。通常の`publish-show`で本物の`commit.json`を最後にアップロードし、R2 Event Notificationから主Queue、製品の公開consumerへ配送した。consumerは公開処理を実行してstatus=`retrying`、受付=`processing`をR2へ記録した後、purge失敗で再試行された。`max_retries: 2`の上限後、製品のDLQ consumerが同jobの`system/jobs/<jobId>/dlq.json`を記録し、`job-status`で`dlq: true`を確認した。処理中に別jobの同Show公開受付はHTTP `409`だった。
+
+通常のWorkerへ戻し、`retry-job`で**同じ凍結済みcommit**を再投入した結果、status=`published`、受付=`free`へ収束した。公開feedは期待したShow titleを持つXML、coverのSHA-256はローカル入力と一致した。完了後の再実行要求はHTTP `409`で拒否され、DLQ記録は障害履歴として残る。検証用の障害注入ファイルと管理用keyはGit管理外（`/tmp/opencode/`）に置き、通常版Workerを再deploy済み。
+
+これにより、MVP公開前に必要としていた**実公開jobでのretry上限→DLQ記録→管理者による同job回復**の一連の確認は完了した。上記の初期不具合（DLQ consumer導入前の記録欠落）の原因は断定せず、当時の履歴として残す。検証用Showと専用サービスは後続の配布検証に備えて保持し、使用終了時に片付ける。
