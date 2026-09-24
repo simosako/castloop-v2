@@ -13,6 +13,7 @@ function bucket() {
       return { key };
     },
     get: async (key: string) => entries.has(key) ? { json: async () => JSON.parse(entries.get(key)!) as RecordValue } : null,
+    head: async (key: string) => entries.has(key) ? { key } : null,
   };
 }
 
@@ -34,4 +35,18 @@ describe("Show ID reservation", () => {
     expect((await claim(crypto.randomUUID())).status).toBe(409);
     expect((await claim(owner.reservation_id, "wrong-secret")).status).toBe(401);
   });
+});
+
+test("Show and Episode publication requests share one admission slot", async () => {
+  const storage = bucket();
+  const env = { CASTLOOP_BUCKET: storage, CASTLOOP_ADMIN_KEY: "test-secret" };
+  const post = (path: string, body: object) => worker.fetch(new Request(`https://example.workers.dev${path}`, {
+    method: "POST", headers: { "X-Castloop-Key": "test-secret" }, body: JSON.stringify(body),
+  }), env as never);
+  expect((await post("/admin/shows/reserve", { show_id: "daily", reservation_id: crypto.randomUUID() })).status).toBe(201);
+  const showJob = crypto.randomUUID();
+  const episodeJob = crypto.randomUUID();
+  expect((await post("/admin/publications/claim", { show_id: "daily", job_id: showJob })).status).toBe(201);
+  expect((await post("/admin/publications/claim", { show_id: "daily", job_id: episodeJob })).status).toBe(409);
+  expect((await post("/admin/publications/claim", { show_id: "daily", job_id: showJob })).status).toBe(200);
 });

@@ -64,9 +64,56 @@ export const episodeDraftSchema = z.object({
   episode_number: z.number().int().positive().optional(),
 }).strict();
 
+export const showCommitSchema = z.object({
+  schema_version: z.literal(1),
+  kind: z.literal("show"),
+  show_id: ID(32),
+  job_id: z.uuid(),
+  metadata_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  cover_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  cover_extension: z.enum(["jpg", "png"]),
+}).strict();
+
+export const episodeCommitSchema = z.object({
+  schema_version: z.literal(1),
+  kind: z.literal("episode"),
+  show_id: ID(32),
+  episode_id: ID(80),
+  job_id: z.uuid(),
+  metadata_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  audio_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  audio_length_bytes: z.number().int().positive().max(300_000_000),
+  duration_seconds: z.number().int().positive(),
+  committed_at: publishedAt,
+}).strict();
+
+export const episodeRevisionSchema = episodeDraftSchema.extend({
+  revision_id: z.uuid(),
+  enclosure_url: webUrl,
+  content_type: z.literal("audio/mpeg"),
+  length_bytes: z.number().int().positive().max(300_000_000),
+  duration_seconds: z.number().int().positive(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  updated_at: publishedAt,
+}).strict();
+
+export const jobStatusSchema = z.object({
+  schema_version: z.literal(1),
+  job_id: z.uuid(),
+  show_id: ID(32),
+  kind: z.enum(["show", "episode"]),
+  episode_id: ID(80).optional(),
+  state: z.enum(["processing", "retrying", "failed", "published"]),
+  reason: z.string().optional(),
+}).strict();
+
 export type ServiceConfig = z.infer<typeof serviceConfigSchema>;
 export type ShowMetadata = z.infer<typeof showMetadataSchema>;
 export type EpisodeDraft = z.infer<typeof episodeDraftSchema>;
+export type ShowCommit = z.infer<typeof showCommitSchema>;
+export type EpisodeCommit = z.infer<typeof episodeCommitSchema>;
+export type EpisodeRevision = z.infer<typeof episodeRevisionSchema>;
+export type JobStatus = z.infer<typeof jobStatusSchema>;
 
 function parseToml(source: string): unknown {
   return TOML.parse(source);
@@ -84,6 +131,14 @@ export function parseEpisodeDraft(source: string): EpisodeDraft {
   return episodeDraftSchema.parse(parseToml(source));
 }
 
-export function stringifyToml(value: ServiceConfig | ShowMetadata | EpisodeDraft): string {
+export function parseJobStatus(source: string): JobStatus {
+  return jobStatusSchema.parse(parseToml(source));
+}
+
+export function parseEpisodeRevision(source: string): EpisodeRevision {
+  return episodeRevisionSchema.parse(parseToml(source));
+}
+
+export function stringifyToml(value: ServiceConfig | ShowMetadata | EpisodeDraft | EpisodeRevision | JobStatus): string {
   return TOML.stringify(value as TOML.JsonMap);
 }

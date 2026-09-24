@@ -91,4 +91,25 @@ cd my-show
 bun /path/to/castloop-v2/packages/cli/src/index.ts create-episode first-episode
 ```
 
-Missing arguments are prompted for on an interactive terminal. Initialization creates a private R2 bucket, Queue, DLQ, Worker and commit-marker notification. It stores non-secret service settings in `castloop.toml`; `.castloop/` contains the local admin key and retry state and must remain private. The Worker only handles Show ID reservations during M1; publication commands and public feeds arrive in M2. An incomplete `init` or `create-show` can be rerun with the same workspace and ID. For details and verification, see [`design/m1_implementation_log.md`](design/m1_implementation_log.md).
+Missing arguments are prompted for on an interactive terminal. Initialization creates a private R2 bucket, Queue, DLQ, Worker and commit-marker notification. It stores non-secret service settings in `castloop.toml`; `.castloop/` contains the local admin key and retry state and must remain private. An incomplete `init` or `create-show` can be rerun with the same workspace and ID. For details and verification, see [`design/m1_implementation_log.md`](design/m1_implementation_log.md).
+
+## M2 publication development
+
+Run `deploy` from the workspace root after updating the Worker source. Edit the local Show TOML and cover first. The update commands only stage inputs; publication always requires an explicit publish command.
+
+```sh
+cd /path/to/workspace
+bun /path/to/castloop-v2/packages/cli/src/index.ts deploy
+bun /path/to/castloop-v2/packages/cli/src/index.ts update-show my-show
+bun /path/to/castloop-v2/packages/cli/src/index.ts publish-show my-show
+cd my-show
+bun /path/to/castloop-v2/packages/cli/src/index.ts create-episode first-episode
+# Edit episode-first-episode.toml and prepare an MP3.
+bun /path/to/castloop-v2/packages/cli/src/index.ts update-episode first-episode
+bun /path/to/castloop-v2/packages/cli/src/index.ts update-episode-audio first-episode audio.mp3
+bun /path/to/castloop-v2/packages/cli/src/index.ts publish-episode first-episode
+cd ..
+bun /path/to/castloop-v2/packages/cli/src/index.ts job-status JOB_ID --show my-show --episode first-episode
+```
+
+`ffprobe` must be installed for Episode audio analysis. A job showing `retrying` and `dlq: true` can be explicitly requeued with `retry-job JOB_ID --show my-show --episode first-episode`. Show jobs omit `--episode`. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) for the verified scope and recovery details.
