@@ -29,7 +29,7 @@ export CASTLOOP_WRANGLER="$HOME/.local/share/castloop-tools/node_modules/.bin/wr
 "$CASTLOOP_WRANGLER" --version
 ```
 
-Keep `CASTLOOP_WRANGLER` in the administrator's shell configuration (or put a compatible `wrangler` on `PATH`). Install `ffprobe` for MP3 analysis before uploading Episode audio. On a headless VPS, set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in the environment. The API token needs permissions to manage Workers, Queues, R2 buckets/objects, and R2 notifications. Do not put the token in `castloop.toml` or Git. On a machine with a browser, Wrangler OAuth login can be used for interactive Cloudflare access.
+Keep `CASTLOOP_WRANGLER` in the administrator's shell configuration (or put a compatible `wrangler` on `PATH`). MP3 duration analysis is included in the executable; `ffprobe` is not required. On a headless VPS, set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in the environment. The API token needs permissions to manage Workers, Queues, R2 buckets/objects, and R2 notifications. Do not put the token in `castloop.toml` or Git. On a machine with a browser, Wrangler OAuth login can be used for interactive Cloudflare access.
 
 ### Initialize and publish
 
@@ -191,6 +191,6 @@ cd ..
 bun /path/to/castloop-v2/packages/cli/src/index.ts job-status JOB_ID --show my-show --episode first-episode
 ```
 
-`ffprobe` must be installed for Episode audio analysis. A job showing `retrying` and `dlq: true` can be explicitly requeued with `retry-job JOB_ID --show my-show --episode first-episode`. Show jobs omit `--episode`. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) for the verified scope and recovery details.
+MP3 duration is analyzed by the CLI before upload; unreadable or unsupported input is rejected. A job showing `retrying` and `dlq: true` can be explicitly requeued with `retry-job JOB_ID --show my-show --episode first-episode`. Show jobs omit `--episode`. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) for the verified scope and recovery details.
 
 For subsequent Episode revisions, run `update-episode ID` only when TOML changed, or `update-episode-audio ID file.mp3` only when audio changed, then `publish-episode ID`. Unchanged published inputs are reused; GUID and the original `published_at` must stay the same. A stale base revision is rejected. To remove only the redundant staged MP3 after a job is published, use `cleanup-job JOB_ID --show my-show --episode ID` from the workspace root. Published media, revision metadata, and commit markers remain available. See [`design/m3_implementation_log.md`](design/m3_implementation_log.md).

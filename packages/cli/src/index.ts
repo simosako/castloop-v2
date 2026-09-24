@@ -6,6 +6,7 @@ import {
   serviceConfigSchema, showCommitSchema, showMetadataSchema, stringifyToml, validateId,
 } from "@castloop/shared";
 import type { EpisodeCommit, EpisodeRevision, ServiceConfig, ShowCommit } from "@castloop/shared";
+import { analyzeAudio } from "./audio";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -500,30 +501,6 @@ async function hashFile(file: string): Promise<string> {
   return hash.digest("hex");
 }
 
-function analyzeAudio(file: string): { length: number; duration: number } {
-  if (!file.toLowerCase().endsWith(".mp3")) throw new Error("Audio input must be an MP3 file");
-  const length = statSync(file).size;
-  if (length === 0 || length > 300_000_000) {
-    throw new Error("MP3 must be nonempty and at most 300,000,000 bytes (rejected before upload)");
-  }
-  let output: string;
-  try {
-    output = execFileSync("ffprobe", ["-v", "error", "-select_streams", "a:0",
-      "-show_entries", "stream=codec_name", "-show_entries", "format=duration", "-of", "json", file],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30000 });
-  } catch {
-    throw new Error("ffprobe could not parse the MP3 file");
-  }
-  const info: unknown = JSON.parse(output);
-  if (!info || typeof info !== "object" || !("streams" in info) ||
-    !Array.isArray(info.streams) || info.streams[0]?.codec_name !== "mp3" ||
-    !("format" in info) || !info.format || typeof info.format !== "object" ||
-    !("duration" in info.format)) throw new Error("Audio stream must use MP3 encoding");
-  const seconds = Number(info.format.duration);
-  if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("Invalid MP3 duration");
-  return { length, duration: Math.max(1, Math.round(seconds)) };
-}
-
 async function updateEpisode(episodeArg: string): Promise<void> {
   const context = episodeContext(episodeArg);
   const source = readFileSync(context.file, "utf8");
@@ -545,7 +522,7 @@ async function updateEpisode(episodeArg: string): Promise<void> {
 async function updateEpisodeAudio(episodeArg: string, audioArg: string): Promise<void> {
   const context = episodeContext(episodeArg);
   const audio = resolve(process.cwd(), audioArg);
-  const { length, duration } = analyzeAudio(audio);
+  const { length, duration } = await analyzeAudio(audio);
   const checksum = await hashFile(audio);
   const { state, stage } = await editableEpisodeStage(context.root, context.showId, context.episodeId, context.key);
   wrangler(context.root, "r2", "object", "put",
@@ -589,7 +566,7 @@ async function publishEpisode(episodeArg: string): Promise<void> {
     if (!stage.audio_path || !stage.audio_length_bytes || !stage.duration_seconds) {
       throw new Error("Staged Episode audio is incomplete");
     }
-    const info = analyzeAudio(stage.audio_path);
+    const info = await analyzeAudio(stage.audio_path);
     if (info.length !== stage.audio_length_bytes || info.duration !== stage.duration_seconds ||
       await hashFile(stage.audio_path) !== stage.audio_sha256) {
       throw new Error("Local MP3 changed after staging; run update-episode-audio again");

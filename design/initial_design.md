@@ -279,7 +279,9 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 - Bunのsingle executableを作成し、インストールと更新手順を整える
 - README、サンプルファイル、トラブルシュートを提供する
 
-単一実行ファイルへCLIと公開Worker bundleを同梱する。Cloudflare管理・R2 uploadには別途Wrangler CLI（Node.js/npm）、音源解析には`ffprobe`を使用する。実測は`design/m4_implementation_log.md`に記録する。
+単一実行ファイルへCLIと公開Worker bundleを同梱する。Cloudflare管理・R2 uploadには別途Wrangler CLI（Node.js/npm）を使用する。M4完了時点の音源解析は`ffprobe`に依存していた。実測は`design/m4_implementation_log.md`に記録する。
+
+MVP公開前の追加マイルストーンM4.5で、CLIのMP3解析に純JSライブラリを採用し、配布先の`ffprobe`依存をなくした。Workerでの解析・従来の`ffprobe`へのフォールバックを含む判断と検証結果は[`pre_mvp_mp3_analysis_proposal.md`](./pre_mvp_mp3_analysis_proposal.md)に記録する。
 
 ### MVP実装後の構想
 
