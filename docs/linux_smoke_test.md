@@ -134,3 +134,42 @@ cmp "$COVER_FILE" "$WORKSPACE/downloaded-cover.jpg"
 feedにShow/Episodeのタイトル、`itunes:duration`、enclosure URLがあり、各`cmp`が何も表示せず終了コード0、音源の両SHA-256が一致すれば基本動作の確認は完了です。PNGを選んだ場合は画像のURLと保存先の拡張子を`cover.png`・`downloaded-cover.png`に変えてください。
 
 終了後は`SERVICE_ID`、workspaceのパス、Show/Episode job ID、`job-status`の状態、feed URL、確認結果を控えてください。**API tokenと`.castloop/secrets.json`は共有しないでください。** 検証用Cloudflareリソースは自動削除されません。確認後に片付けるまでworkspaceを保持してください。
+
+## 実施記録（2026-09-25）
+
+### 実施環境
+
+- OS / architecture: Linux x86-64
+- Node.js `v24.21.0`、npm `11.19.0`、Bun `1.4.2`、Wrangler `4.131.2`
+- `npm ci`、`npm run check`、`npm run build:cli`は成功。`npm ci`では`esbuild`と`workerd`のinstall scriptに関する警告が出たが、型チェックとビルドは完了した。
+- `dist/castloop --version`: `0.1.0`
+- `dist/castloop` SHA-256: `03d3bc2fe888b7223df8fd088bc37e28ba6e394a69dc31fd1bccf6bc61197da3`
+- ビルド済み実行ファイルを同じLinux環境で実行した。ソースコードのない別マシンへのコピー・実行は未確認。
+- Cloudflare API tokenの値と`.castloop/secrets.json`の内容は記録しない。
+
+### 使用した値と作成リソース
+
+- `SITE_URL`: `https://www.otftalk.com/`（事前のHTTP HEAD応答は200）
+- Service ID: `smoke-20260924`
+- R2 bucket: `castloop-smoke-20260924`
+- Show / Episode: `smoke-show` / `first-episode`
+- `workers.dev` subdomain: `simosako`
+- Worker: `castloop-smoke-20260924-2afc5f48`
+- Queue: `castloop-smoke-20260924-2afc5f48`
+- DLQ: `castloop-smoke-20260924-dlq-2afc5f48`
+- workspace: `~/castloop-smoke-workspace`（リポジトリ外）
+- 公開Worker URL: `https://castloop-smoke-20260924-2afc5f48.simosako.workers.dev`
+- ローカルの合成テスト素材は`tmp/linux-smoke/`に置き、Git管理対象外とした。JPEGは1400×1400・41,261 bytes、MP3は8秒・129,287 bytes。
+
+### 結果
+
+- `init`はWorkerデプロイ直後のヘルスチェックでHTTP 500となった。その後同じWorkerの`/admin/health`がHTTP 200になったことを確認し、同じworkspaceでフラグなしの`init`を再実行して完了した。
+- 最初の`update-show`は、workspaceがmiseプロジェクト外にありWrangler shimを解決できず失敗した。`CASTLOOP_WRANGLER`にWranglerの絶対パスを設定して再実行し、同じ下書きを正常にステージした。
+- Show job `cf14b630-728b-4385-9b0d-e5c0bafaa5de`: `status.state = published`、`owner.state = free`。
+- Episode job `5ae2873a-7739-4578-b1d3-17c08c7d4934`: `status.state = published`、`owner.state = free`、DLQなし。
+- 公開Feed: `https://castloop-smoke-20260924-2afc5f48.simosako.workers.dev/podcasts/smoke-show/feed.xml`
+- FeedにShow/Episodeのtitle、enclosure URL、`itunes:duration`（`00:00:08`）があることを確認した。
+- 公開URLからMP3とカバーを取得し、両方とも元ファイルとの`cmp`が成功。SHA-256も一致した。
+  - MP3: `583cdd6736c1b69dd1605b9f8303a148db14cf0f585d9f8cb2d71b6f90a2cda8`
+  - Cover: `f712c1adaa0ec85a9160a527cfad239987481208fbb12be31546b76249871bbc`
+- 検証用Cloudflareリソースとworkspaceは削除せず保持中。別マシンでの再確認とリソースの後片付けは未実施。

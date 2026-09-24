@@ -2,3 +2,4 @@
 bun = "1.4.2"
 node = "24"
 "npm:@colbymchenry/codegraph" = "1.6.0"
+"npm:wrangler" = "4.131.2"
