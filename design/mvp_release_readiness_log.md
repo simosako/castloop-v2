@@ -8,6 +8,8 @@ v0.1.0の配布対象をLinux x86-64に限定する。GitHub ActionsはLinuxバ�
 
 `v0.1.0`タグの[GitHub Actions run 36130474117](https://github.com/simosako/castloop-v2/actions/runs/36130474117)はbuild・Linux smoke・Releaseの3 jobすべて成功。[Release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.0)はdraft/prereleaseではなく、Linuxバイナリ・SHA256SUMS・LICENSE・THIRD_PARTY_NOTICES.mdの4ファイルを添付。Releaseから再ダウンロードしたバイナリの`sha256sum --check`は成功し、`--version`は`0.1.0`。SHA-256は`7a89bec2f3086bd3d552bcf47a8af930a8849e4d1a2a44b58fef4513d68303dd`。この時点でGitHub repositoryは**private**のため、Release URLはアクセス権のあるユーザーに限られる。一般公開するには別途visibilityの判断が必要。
 
+その後、管理者の承認によりrepositoryを**public**に変更。変更前に全581件のGit履歴objectを対象に、現在のAPI token・旧サービスの管理用keyとの一致、秘密ファイルのパス、GitHub token・AWS key・秘密鍵の形式を検索し、該当なし。認証なしのHTTPでReleaseページ、`SHA256SUMS`、Linuxバイナリのいずれも200を確認した。v0.1.0は一般にダウンロード可能。
+
 ## 2026-09-24: 新規`init`後のWorker URL反映待ち
 
 M4.5の新規サービス作成ではWranglerのdeploy自体が成功した直後、Workerのhealth URLが一時的にHTTP 404を返した。既存の`init`は一度のhealth確認で終了し、同一workspaceからの再実行で成功した。
