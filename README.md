@@ -23,7 +23,7 @@ castloop --version
 
 The target Linux machine needs **Node.js/npm and Wrangler 4.x** for Cloudflare administration and R2 uploads. Bun and this source tree are not needed to run the executable. Install Wrangler outside the service workspace and point the CLI at it:
 
-For a step-by-step check on a separate Linux x86-64 machine, see the [smoke test guide](docs/linux_smoke_test.md).
+For an optional check on a separate Linux x86-64 machine before broader distribution, see the [smoke test guide](docs/linux_smoke_test.md).
 
 ```sh
 npm install --prefix "$HOME/.local/share/castloop-tools" wrangler@4.131.2

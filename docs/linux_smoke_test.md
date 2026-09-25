@@ -2,6 +2,8 @@
 
 この手順では、ソースコードのない別のLinuxマシンに`castloop`実行ファイルをコピーし、専用の検証サービス・Show・Episodeを新規作成します。**Cloudflare上にWorker、R2 bucket、Queue、DLQと公開コンテンツが作成されます。** 通常運用中のworkspaceや既存のShow IDは使わないでください。
 
+別マシンでの試験は、現在の管理者運用向けMVP公開の必須条件ではありません。今後、実行ファイルを不特定の利用者へ配布する場合や対応環境を増やす場合の検証手順として残します。下の実施記録は同じLinux環境の新規workspaceでの結果です。
+
 対象はLinux x86-64（`uname -s`が`Linux`、`uname -m`が`x86_64`）です。現時点でmacOS・Windows用の実行ファイルは配布・検証していません。別マシンにBun、ソースコード、`ffprobe`は不要です。Wranglerの実行にはNode.js/npmが必要です。
 
 ## 1. 事前に用意するもの
@@ -172,4 +174,4 @@ feedにShow/Episodeのタイトル、`itunes:duration`、enclosure URLがあり�
 - 公開URLからMP3とカバーを取得し、両方とも元ファイルとの`cmp`が成功。SHA-256も一致した。
   - MP3: `583cdd6736c1b69dd1605b9f8303a148db14cf0f585d9f8cb2d71b6f90a2cda8`
   - Cover: `f712c1adaa0ec85a9160a527cfad239987481208fbb12be31546b76249871bbc`
-- 検証用Cloudflareリソースとworkspaceは削除せず保持中。別マシンでの再確認とリソースの後片付けは未実施。
+- 検証用Cloudflareリソースとworkspaceは削除せず保持中。別マシンでの再確認とリソースの後片付けは未実施。別マシン試験は、このMVPの公開ブロッカーではない。
