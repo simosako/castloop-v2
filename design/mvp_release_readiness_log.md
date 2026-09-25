@@ -6,6 +6,8 @@ Wrangler/Node.jsを使う旧検証の後、API tokenと配布用バイナリに�
 
 v0.1.0の配布対象をLinux x86-64に限定する。GitHub ActionsはLinuxバイナリのみchecksumと起動を検証し、tag push時は成功後にGitHub Releaseへ添付する。macOS/Windowsの旧smoke jobは管理操作の受け入れ条件を満たさないため、リリースフローから除いた。リリース公開時はtag workflowの成功・添付ファイルとSHA256SUMSの確認を行う。
 
+`v0.1.0`タグの[GitHub Actions run 36130474117](https://github.com/simosako/castloop-v2/actions/runs/36130474117)はbuild・Linux smoke・Releaseの3 jobすべて成功。[Release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.0)はdraft/prereleaseではなく、Linuxバイナリ・SHA256SUMS・LICENSE・THIRD_PARTY_NOTICES.mdの4ファイルを添付。Releaseから再ダウンロードしたバイナリの`sha256sum --check`は成功し、`--version`は`0.1.0`。SHA-256は`7a89bec2f3086bd3d552bcf47a8af930a8849e4d1a2a44b58fef4513d68303dd`。この時点でGitHub repositoryは**private**のため、Release URLはアクセス権のあるユーザーに限られる。一般公開するには別途visibilityの判断が必要。
+
 ## 2026-09-24: 新規`init`後のWorker URL反映待ち
 
 M4.5の新規サービス作成ではWranglerのdeploy自体が成功した直後、Workerのhealth URLが一時的にHTTP 404を返した。既存の`init`は一度のhealth確認で終了し、同一workspaceからの再実行で成功した。
