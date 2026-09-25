@@ -10,7 +10,8 @@ function memoryBucket() {
   return {
     entries,
     async put(key: string, value: string | ArrayBuffer | ReadableStream,
-      options?: { onlyIf?: Headers | { etagMatches: string }; customMetadata?: Record<string, string> }) {
+      options?: { onlyIf?: Headers | { etagMatches: string }; customMetadata?: Record<string, string>;
+        sha256?: string }) {
       const previous = entries.get(key);
       if (options?.onlyIf instanceof Headers && previous) return null;
       if (options?.onlyIf && !(options.onlyIf instanceof Headers) &&
@@ -18,8 +19,12 @@ function memoryBucket() {
       const data = typeof value === "string" ? new TextEncoder().encode(value)
         : value instanceof ReadableStream ? new Uint8Array(await new Response(value).arrayBuffer())
           : new Uint8Array(value);
+      if (options?.sha256 && createHash("sha256").update(data).digest("hex") !== options.sha256) {
+        throw new Error("R2 checksum mismatch");
+      }
       entries.set(key, { data, etag: String(++revision), customMetadata: options?.customMetadata });
-      return { key, size: data.byteLength };
+      return { key, size: data.byteLength,
+        checksums: { sha256: options?.sha256 ? Uint8Array.from(Buffer.from(options.sha256, "hex")).buffer : undefined } };
     },
     async get(key: string) {
       const stored = entries.get(key);

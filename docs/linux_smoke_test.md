@@ -4,12 +4,12 @@
 
 別マシンでの試験は、現在の管理者運用向けMVP公開の必須条件ではありません。今後、実行ファイルを不特定の利用者へ配布する場合や対応環境を増やす場合の検証手順として残します。下の実施記録は同じLinux環境の新規workspaceでの結果です。
 
-対象はLinux x86-64（`uname -s`が`Linux`、`uname -m`が`x86_64`）です。現時点でmacOS・Windows用の実行ファイルは配布・検証していません。別マシンにBun、ソースコード、`ffprobe`は不要です。Wranglerの実行にはNode.js/npmが必要です。
+対象はLinux x86-64（`uname -s`が`Linux`、`uname -m`が`x86_64`）です。macOS・Windows用バイナリの起動確認とCloudflare上の管理操作の検証は別に扱います。検証先にNode.js/npm、Wrangler、Bun、ソースコード、`ffprobe`は不要です。
 
 ## 1. 事前に用意するもの
 
 - ビルド元: このリポジトリ、Bun 1.4.2、Node.js/npm。`dist/castloop`はGit管理外の成果物です。
-- 検証先: Linux x86-64、Node.js 22以上とnpm、`curl`、`sha256sum`。Wrangler対応のLinux環境を使用してください。
+- 検証先: Linux x86-64、`curl`、`sha256sum`。管理操作は配布バイナリから行います。
 - CloudflareアカウントID、API token、利用可能な`workers.dev`サブドメイン。tokenにはWorkers、R2、QueuesおよびR2通知の作成・利用権限が必要です。R2とQueuesを利用できるアカウントで実施してください。
 - 検証先に置いた**実在するサイトURL**、正方形のJPEGカバー画像（5 MB以下、推奨1400×1400ピクセル以上）、短いMP3音源（300,000,000 bytes以下）。検証用のShowも公開URLからアクセスできます。カバーとMP3のパスは、検証先マシン上の絶対パスにします。
 - アカウント内で未使用のサービスID（20文字以内）、R2 bucket名、検証用workspaceのパス。サービスID、Show ID、Episode IDには英小文字・数字・区切りのハイフンを使います。
@@ -33,20 +33,15 @@ scp dist/castloop USER@HOST:/tmp/castloop
 ```sh
 uname -s
 uname -m
-node --version
-npm --version
 sha256sum /tmp/castloop
 mkdir -p "$HOME/.local/bin"
 install -m 0755 /tmp/castloop "$HOME/.local/bin/castloop"
 export PATH="$HOME/.local/bin:$PATH"
 castloop --version
 
-npm install --prefix "$HOME/.local/share/castloop-tools" wrangler@4.131.2
-export CASTLOOP_WRANGLER="$HOME/.local/share/castloop-tools/node_modules/.bin/wrangler"
-"$CASTLOOP_WRANGLER" --version
 ```
 
-`castloop --version`とWranglerのバージョンが表示されることを確認します。`ffprobe`をインストールする必要はありません。
+`castloop --version`で`0.1.0`が表示されることを確認します。検証先に`ffprobe`などの解析ツールをインストールする必要はありません。
 
 ## 3. Cloudflare認証とサービス作成
 
@@ -137,7 +132,7 @@ feedにShow/Episodeのタイトル、`itunes:duration`、enclosure URLがあり�
 
 終了後は`SERVICE_ID`、workspaceのパス、Show/Episode job ID、`job-status`の状態、feed URL、確認結果を控えてください。**API tokenと`.castloop/secrets.json`は共有しないでください。** 検証用Cloudflareリソースは自動削除されません。確認後に片付けるまでworkspaceを保持してください。
 
-## 実施記録（2026-09-25）
+## 実施記録（2026-09-25、Wranglerを使用した旧実装）
 
 ### 実施環境
 

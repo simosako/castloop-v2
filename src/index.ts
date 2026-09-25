@@ -224,7 +224,9 @@ export default {
         env.CASTLOOP_BUCKET.head(markerKey), env.CASTLOOP_BUCKET.head(`system/jobs/${job_id}/dlq.json`),
       ]);
       if (admission?.value.job_id !== job_id || admission.value.state === "free" ||
-        job?.state !== "retrying" || job.kind !== kind || !marker || !dlq) {
+        (job?.state !== "retrying" && job?.state !== "processing") ||
+        job.kind !== kind || job.job_id !== job_id || job.show_id !== showId ||
+        (kind === "episode" && job.episode_id !== episodeId) || !marker || !dlq) {
         return json({ error: "Only an unfinished job in the DLQ can be retried" }, 409);
       }
       await env.CASTLOOP_QUEUE.send({ object: { key: markerKey } });

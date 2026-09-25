@@ -1,0 +1,89 @@
+name: Build and release Linux CLI
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: npm ci
+      - run: npm run check
+      - run: bun test
+      - name: Verify tag version
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "v$version"
+      - name: Build Linux x86-64 release binary
+        shell: bash
+        run: |
+          npm run build:cli -- linux-x64
+          cp THIRD_PARTY_NOTICES.md dist/
+          cp LICENSE dist/
+          cd dist
+          sha256sum castloop-linux-x64 > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: castloop-linux-x64
+          path: |
+            dist/castloop-linux-x64
+            dist/SHA256SUMS
+            dist/THIRD_PARTY_NOTICES.md
+            dist/LICENSE
+          if-no-files-found: error
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: castloop-linux-x64
+          path: dist
+      - name: Verify binary and CLI entrypoint
+        shell: bash
+        run: |
+          cd dist
+          sha256sum --check SHA256SUMS
+          chmod +x castloop-linux-x64
+          test "$(./castloop-linux-x64 --version)" = "0.1.0"
+          ./castloop-linux-x64 --help | grep -F 'Usage: castloop'
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [build, smoke]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: castloop-linux-x64
+          path: dist
+      - name: Publish Linux release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum --check SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" castloop-linux-x64 SHA256SUMS THIRD_PARTY_NOTICES.md LICENSE \
+            --repo "$GITHUB_REPOSITORY" --title "castloop $GITHUB_REF_NAME" \
+            --notes-file ../docs/release-v0.1.0.md

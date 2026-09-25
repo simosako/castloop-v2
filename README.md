@@ -7,31 +7,24 @@ castloop is a serverless podcast hosting program. Once deployed, it runs with mi
 - One deployment can host multiple shows.
 - A CLI (`castloop`) manages shows and episodes.
 
-## Install the CLI (Linux)
+## Install the CLI (Linux x86-64)
 
-The release artifact is a Bun single-file executable. It includes the CLI, shared metadata models, and a deployable Worker bundle. Building it from a checkout requires Bun 1.4.2, Node.js/npm, and the project's lockfile:
+Download `castloop-linux-x64`, `SHA256SUMS`, `THIRD_PARTY_NOTICES.md`, and `LICENSE` from the [v0.1.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.0). Verify the checksum in the download directory and install the binary:
 
 ```sh
-npm ci
-npm run check
-npm run build:cli
-sha256sum dist/castloop
+sha256sum --check SHA256SUMS
 mkdir -p "$HOME/.local/bin"
-install -m 0755 dist/castloop "$HOME/.local/bin/castloop"
+install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop"
 castloop --version
 ```
 
-The target Linux machine needs **Node.js/npm and Wrangler 4.x** for Cloudflare administration and R2 uploads. Bun and this source tree are not needed to run the executable. Install Wrangler outside the service workspace and point the CLI at it:
+The binary includes the CLI and deployable Worker. The target machine needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in its environment; it needs no Node.js/npm, Wrangler, Bun, `ffprobe`, R2 S3 credentials, or source tree. Enable R2 and create the API token in the Cloudflare Dashboard before running `init`. Give the token account-level Workers Scripts Write, Workers R2 Storage Write, and Queues Write permissions (and the corresponding read permissions for account resources). Do not put the token in `castloop.toml` or Git. For an optional check on a separate Linux x86-64 machine, see the [smoke test guide](docs/linux_smoke_test.md).
 
-For an optional check on a separate Linux x86-64 machine before broader distribution, see the [smoke test guide](docs/linux_smoke_test.md).
+### Building from source
 
-```sh
-npm install --prefix "$HOME/.local/share/castloop-tools" wrangler@4.131.2
-export CASTLOOP_WRANGLER="$HOME/.local/share/castloop-tools/node_modules/.bin/wrangler"
-"$CASTLOOP_WRANGLER" --version
-```
+The build machine needs Bun 1.4.2 and Node.js/npm for dependency installation and checks. Build from this checkout with `npm ci`, `npm run check`, `bun test`, and `npm run build:cli -- linux-x64`. The Worker bundle and CLI are built without Wrangler. The build script also supports experimental `macos-x64`, `macos-arm64`, and `windows-x64` cross-compilation, but those targets are not distributed as v0.1.0.
 
-Keep `CASTLOOP_WRANGLER` in the administrator's shell configuration (or put a compatible `wrangler` on `PATH`). MP3 duration analysis is included in the executable; `ffprobe` is not required. On a headless VPS, set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in the environment. The API token needs permissions to manage Workers, Queues, R2 buckets/objects, and R2 notifications. Do not put the token in `castloop.toml` or Git. On a machine with a browser, Wrangler OAuth login can be used for interactive Cloudflare access.
+The [release workflow](.github/workflows/build-binaries.yml) checks the code, builds a Linux x86-64 binary, runs an on-runner smoke check, and attaches the executable, checksum, and [third-party notices](THIRD_PARTY_NOTICES.md) to a GitHub Release on a `v*` tag. Include the notices with redistributed binaries.
 
 ### Initialize and publish
 
@@ -62,7 +55,7 @@ For a metadata-only Episode revision, edit the local Episode TOML and run `updat
 
 ### Update the executable and Worker
 
-Install the new binary to a temporary path first, then replace the old binary and deploy the embedded Worker **for each service workspace**:
+Install the new binary to a temporary path first, then replace the old binary and deploy the embedded Worker **for each service workspace**. When building from source:
 
 ```sh
 npm run build:cli
@@ -72,17 +65,17 @@ cd /path/to/workspace
 castloop deploy
 ```
 
-Back up `castloop.toml` and the private `.castloop/` directory before moving a workspace. Do not replace `.castloop/secrets.json` or `.castloop/state.json` when updating. `castloop deploy` extracts the Worker bundled with the current binary into `.castloop/worker.mjs` and deploys that version with Wrangler. Re-running `init` in an existing workspace resumes unfinished initialization without recreating resources.
+Back up `castloop.toml` and the private `.castloop/` directory before moving a workspace. Do not replace `.castloop/secrets.json` or `.castloop/state.json` when updating. `castloop deploy` deploys the Worker bundled with the current binary through Cloudflare's API, preserving existing secret bindings. Re-running `init` in an existing workspace resumes unfinished initialization without recreating resources.
 
 ### Troubleshooting
 
 | Symptom | Action |
 | --- | --- |
-| `Wrangler CLI is missing` | Install Wrangler 4.x with Node.js/npm; set `CASTLOOP_WRANGLER` to its executable path or put it on `PATH`. |
+| Cloudflare API returns HTTP 403 | Check the API token's account scope and Workers Scripts, Workers R2 Storage, and Queues permissions. |
 | `init` stopped partway | After deployment, `init` retries a temporarily unavailable Worker health endpoint up to six times. If it still fails, keep the workspace and run `castloop init /path/to/workspace` again. Inspect `.castloop/state.json` and Cloudflare resources if it still fails; `init` does not automatically delete resources. |
 | Show ID already reserved | Use a new Show ID or inspect the existing reservation. A reservation alone does not publish a Show. |
 | Local TOML or MP3 changed after staging | Re-run the corresponding `update-*` command before `publish-*`. A committed job is frozen; later edits need a new job. |
-| `retrying` with `dlq: true` | Inspect `job-status` and the Show admission; after resolving the transient issue, use `castloop retry-job JOB_ID --show my-show [--episode ID]` to resume the **same** job. A DLQ record remains as history even after recovery. |
+| `retrying` or `processing` with `dlq: true` | Inspect `job-status` and the Show admission; after resolving the transient issue, use `castloop retry-job JOB_ID --show my-show [--episode ID]` to resume the **same** job. A DLQ record remains as history even after recovery. |
 | `failed` or admission still held | Inspect job status, frozen commit, and published keys before intervening. Do not start another job for the same Show or delete its reservation while a partial publication may exist. |
 
 The CLI reports Cloudflare failures without printing API credentials. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) and [`design/m3_implementation_log.md`](design/m3_implementation_log.md) for publication and recovery behavior.
@@ -158,7 +151,7 @@ you need to set ``CLOUDFLARE_ACCOUNT_ID`` and ``CLOUDFLARE_API_TOKEN`` environme
 
 ## Source CLI (development)
 
-The source CLI runs with Bun. From this repository, use `bun packages/cli/src/index.ts` (or `npm run cli --`). Source mode deploys `src/index.ts` from this checkout; the compiled executable deploys its embedded Worker instead.
+The source CLI runs with Bun. From this repository, use `bun packages/cli/src/index.ts` (or `npm run cli --`). Source mode bundles `src/index.ts` from this checkout; the compiled executable deploys its embedded Worker instead.
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...

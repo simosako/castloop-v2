@@ -2,7 +2,6 @@ import { episodeCommitSchema, episodeDraftFromRevision, parseEpisodeDraft, parse
   parseServiceConfig, parseShowMetadata, showCommitSchema, stringifyToml } from "../packages/shared/src/index";
 import type { EpisodeCommit, EpisodeRevision, JobStatus, ShowCommit } from "../packages/shared/src/index";
 import { renderFeed } from "./feed";
-import { createHash } from "node:crypto";
 
 export type PublicationEnv = { CASTLOOP_BUCKET: R2Bucket };
 export type Admission = { job_id: string; state: "reserved" | "processing" | "free" };
@@ -279,27 +278,21 @@ async function publishMedia(env: PublicationEnv, commit: EpisodeCommit & {
   }
   const staged = await bucket.get(`staging/episodes/${commit.show_id}/${commit.episode_id}/${commit.job_id}/audio.mp3`);
   if (!staged || staged.size !== commit.audio_length_bytes) throw new Error("Staged audio changed before copying");
-  const hash = createHash("sha256");
-  const verifying = staged.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      hash.update(chunk);
-      controller.enqueue(chunk);
-    },
-    flush() {
-      if (hash.digest("hex") !== commit.audio_sha256) throw new InvalidPublication("Staged audio checksum mismatch");
-    },
-  }));
   const output = typeof FixedLengthStream === "undefined"
     ? new TransformStream<Uint8Array, Uint8Array>() : new FixedLengthStream(commit.audio_length_bytes);
-  const transfer = verifying.pipeTo(output.writable);
+  const transfer = staged.body.pipeTo(output.writable);
   const copying = bucket.put(key, output.readable, {
     onlyIf: new Headers({ "If-None-Match": "*" }),
     httpMetadata: { contentType: "audio/mpeg" },
     customMetadata: { sha256: commit.audio_sha256 },
+    sha256: commit.audio_sha256,
   });
   const [copied] = await Promise.all([copying, transfer]);
   if (!copied) throw new Error("Published media key was claimed concurrently");
   if (copied.size !== commit.audio_length_bytes) throw new Error("Published media size mismatch");
+  const checksum = copied.checksums.sha256;
+  if (!checksum || [...new Uint8Array(checksum)].map((byte) => byte.toString(16).padStart(2, "0")).join("")
+    !== commit.audio_sha256) throw new Error("Published media checksum mismatch");
 }
 
 export async function publishEpisode(env: PublicationEnv, ctx: ExecutionContext, key: string): Promise<void> {

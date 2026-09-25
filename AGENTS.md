@@ -42,7 +42,7 @@ Follow the commands and conventions below.
 - Retry transient consumer failures through Cloudflare Queues for a finite number of attempts and route exhausted messages to one dead-letter queue. Record permanent failure reasons without pointless retries. Administrators inspect R2 job status and recover failed jobs explicitly. Reconcile DLQ entries with status; DLQ delivery does not update R2 status automatically. Keep recovery data in R2 rather than relying on Queue retention. Retry limits, retention periods, and safe release of per-show admission are still to be defined.
 - Preserve immutable media and revision history when updating current metadata. Episode deletion is outside the MVP.
 - Use readable immutable slugs matching `[a-z0-9]+(?:-[a-z0-9]+)*`; service IDs are at most 20 characters, show IDs at most 32, and episode IDs at most 80. Show IDs are unique within a service; episode IDs are unique within a show. Auto-generated IDs do not eliminate the need to prevent collisions.
-- Use Wrangler OAuth login for interactive Cloudflare access and an API token supplied by environment variable for automation. Invoke Wrangler as a CLI subprocess for Cloudflare administration and R2 uploads. Do not store credentials in service TOML or Git. Limit MVP MP3 uploads to 300,000,000 bytes; reject larger files before uploading and verify the maximum supported upload in M0.
+- Use CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for administration from the standalone CLI. Call Cloudflare's REST API directly for resources, Worker deployment, and R2 uploads; do not require Wrangler, Node.js, or separate R2 credentials on the administrator's machine. Do not store the API token in service TOML or Git. Limit MVP MP3 uploads to 300,000,000 bytes; reject larger files before uploading and verify the uploaded size and contents.
 - Use Workers Caching for the public Worker. Validate cache-tag feed purging and GET/HEAD/Range delivery before the end-to-end MVP release.
 - Overwrite the Show cover art at the approved `public/podcasts/<showId>/cover.<ext>` key on image updates and purge its cache tag. Do not mark a publication job as complete until feed and applicable cover-art Workers Cache purges succeed. Retry purge failures without duplicating published media.
 
@@ -52,6 +52,7 @@ Follow the commands and conventions below.
 - M2 publishes a show through `update-show`/`publish-show` and one episode end-to-end using separate metadata/audio staging, explicit publish, job status, feed generation, and media delivery.
 - M3 supports multiple episodes, metadata-only and audio-only revisions, concurrency/retry handling, and cleanup.
 - M4 delivers the Bun executable and usage documentation.
+- M5 removes Wrangler from the build and administrator workflows and verifies binary-only publication and recovery. See design/initial_design.md and design/m5_implementation_log.md.
 
 ## TOML and schema conventions
 - TOML keys are snake_case to match metadata definitions.

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { stringifyToml } from "../packages/shared/src/index";
 import worker from "./index";
 
 type RecordValue = { show_id: string; reservation_id: string };
@@ -75,4 +76,32 @@ test("public cover response advertises byte ranges with a known length", async (
   expect(response.status).toBe(200);
   expect(response.headers.get("Accept-Ranges")).toBe("bytes");
   expect(response.headers.get("Content-Length")).toBe(String(bytes.length));
+});
+
+test("a DLQ job left processing after a terminated invocation can be retried", async () => {
+  const storage = bucket();
+  const showId = "daily";
+  const jobId = crypto.randomUUID();
+  const markerKey = `staging/episodes/${showId}/large/${jobId}/commit.json`;
+  storage.entries.set(`system/show-publications/${showId}.json`, JSON.stringify({ job_id: jobId, state: "processing" }));
+  storage.entries.set(markerKey, "{}");
+  storage.entries.set(`system/jobs/${jobId}/dlq.json`, "{}");
+  storage.entries.set(`system/jobs/${jobId}/status.toml`, stringifyToml({ schema_version: 1,
+    job_id: jobId, show_id: showId, episode_id: "large", kind: "episode", state: "processing" }));
+  const sent: unknown[] = [];
+  const env = { CASTLOOP_BUCKET: { ...storage, get: async (key: string) => {
+    const value = storage.entries.get(key);
+    return value === undefined ? null : {
+      etag: "test-etag", json: async () => JSON.parse(value), text: async () => value,
+    };
+  } }, CASTLOOP_QUEUE: { send: async (message: unknown) => { sent.push(message); } },
+  CASTLOOP_ADMIN_KEY: "test-secret" } as never;
+  const retry = () => worker.fetch(new Request("https://example.workers.dev/admin/jobs/retry", {
+    method: "POST", headers: { "X-Castloop-Key": "test-secret" },
+    body: JSON.stringify({ show_id: showId, episode_id: "large", kind: "episode", job_id: jobId }),
+  }), env);
+  expect((await retry()).status).toBe(202);
+  expect(sent).toEqual([{ object: { key: markerKey } }]);
+  storage.entries.delete(`system/jobs/${jobId}/dlq.json`);
+  expect((await retry()).status).toBe(409);
 });

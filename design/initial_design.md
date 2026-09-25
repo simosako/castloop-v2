@@ -2,6 +2,8 @@
 
 この資料は castloop (v2) のデザインドキュメントである。
 
+M0〜M4.5の完了時点ではWranglerを使用していた。MVP公開前に追加したM5で、管理者の実行環境と配布ビルドからWrangler依存を取り除く。過去の検証結果・当時の採用判断は履歴として残し、今後の実装・MVP受け入れ条件は[「M5: Wrangler不要の管理CLI」](#m5-wrangler不要の管理cli)を優先する。
+
 ## プロジェクト概要
 
 - castloop (v2) は、Podcastをホスティングする機能を提供する
@@ -38,9 +40,9 @@
 
 ### Cloudflare認証とR2へのアップロード
 
-- ブラウザを利用できる端末での対話的な管理作業にはCloudflare標準の`wrangler login`による認証を、自動化やブラウザのないVPSでの開発には環境変数のCloudflare API tokenを使用する。VPS上でのOAuthログインはM0の前提としない。認証情報はcastloopのTOMLやGit管理対象には保存しない
-- CLIはWranglerをsubprocessとして呼び出し、Cloudflareの初期化・R2操作を行う。M0でエラー処理と認証の動作を確認する。Show ID予約と同一Showの公開受付予約には原子的な操作が必要であり、Wranglerの通常のobject putだけで安全に実現できるとは限らない。必要な管理操作の認証と別経路はM0で検証する
-- MVPのMP3入力ファイル上限は**300 MB（300,000,000 bytes）**。CLIはファイルサイズを調べ、超過するファイルをアップロード前に拒否し、上限以内をWranglerの`r2 object put`で送る。M0では上限ちょうどのupload・downloadと内容一致を実測し、超過ファイルの実際のuploadは試さない
+- 管理者はCloudflare Dashboardでアカウント・R2の利用準備を行い、必要な権限を持つCloudflare API tokenとアカウントIDを取得する。MVPの管理CLIは環境変数からこれらを読み、WranglerのOAuth認証や別のR2 S3 access keyを必須にしない。tokenをサービスTOMLやGit、公開Workerへ保存・転送しない
+- M0〜M4.5ではWrangler subprocessでリソース作成・Worker deploy・R2 uploadを実装・検証した。M5でこれをバイナリ内のAPIクライアントへ移行する。Show ID予約と同一Showの公開受付は引き続き認証付きWorkerの原子的なR2 binding操作を使う
+- MVPのMP3入力上限は**300 MB（300,000,000 bytes）**を維持する。Cloudflare REST APIのR2 object uploadには文書上の300 MB上限があるため、M5の最初に上限ちょうどの実upload・内容照合を確認する。満たせない場合は上限を黙って下げたり、追加のS3 credentialを暗黙に要求したりせず、方式を再検討する
 
 ## 利用シナリオ（概要）
 
@@ -176,7 +178,7 @@ MP3を想定。MVPでは、
 管理者がアップロードしたMP3ファイルをそのままprivate R2バケットに保存してCloudflare Worker経由で配信する。CLIでMP3と再生時間を解析し、WorkerではR2上のbyte length等を再確認する。
 
 ### ファイル配布とキャッシュ
-feed.xmlや、Episodeの音源ファイル(mp3を想定)をprivate R2に置き、公開Worker経由で配信する。MVPではWorkers Cachingを採用する。`wrangler.jsonc` では以下を有効にする。
+feed.xmlや、Episodeの音源ファイル(mp3を想定)をprivate R2に置き、公開Worker経由で配信する。MVPではWorkers Cachingを採用する。現行の`wrangler.jsonc`では以下を有効にしている。M5のAPI deployでも同等のキャッシュ動作を検証する。
 
 ```jsonc
 {
@@ -237,7 +239,7 @@ RSS 2.0およびApple Podcastsの配信要件をMVPの基準とする。ロー�
 
 ## 開発の進め方とマイルストーン
 
-MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順に進める。
+M0〜M4.5で機能を端から端まで動かすvertical sliceを実装・検証した。MVP公開条件を追加したため、M5を完了してからMVPとして配布する。
 
 ### M0: アーキテクチャ検証
 
@@ -283,6 +285,18 @@ MVPは機能を端から端まで動かすvertical sliceとしてM0〜M4を順�
 
 MVP公開前の追加マイルストーンM4.5で、CLIのMP3解析に純JSライブラリを採用し、配布先の`ffprobe`依存をなくした。Workerでの解析・従来の`ffprobe`へのフォールバックを含む判断と検証結果は[`pre_mvp_mp3_analysis_proposal.md`](./pre_mvp_mp3_analysis_proposal.md)に記録する。
 
+### M5: Wrangler不要の管理CLI
+
+**MVP公開前の追加計画。ゴール:** 管理者は対象OS向けの配布済み`castloop`バイナリとCloudflareアカウントID/API tokenを用意すれば、新規サービス作成から通常のShow/Episode公開・更新・状態確認・回復・Worker更新まで操作できる。実行先にNode.js/npm、Bun、Wrangler、`ffprobe`、ソースコード、R2 S3 access key/secret keyを要求しない。DashboardでのAPI token取得、R2の利用有効化、アカウント設定は事前準備として許容する。既存のR2・Queue・Worker構成、ローカルTOML、公開ジョブの順序と回復規則、300,000,000 bytesの上限は維持する。Worker bundleの作成もWranglerに依存しないビルド工程へ移し、配布物に同梱する。
+
+1. **M5.0 API経路の実証（実装方式の確定ゲート）:** Cloudflare API tokenだけで、R2 bucket、Queue/DLQ、R2 Event Notification、Workerのscript・R2/Queue binding・consumer・secret・公開URLを作成/更新できることを専用リソースで確認する。特に300,000,000 bytesのMP3をR2 REST object uploadで転送し、取得したサイズ・SHA-256と通知発火を照合する。APIの文書上限「300 MB」の境界、upload時のメタデータ/Content-Type、通信中断と再送、Worker deploy時のsecretや既存設定の保持、Workers Freeでの動作を検証する。必要権限とAPI契約を記録する。単一tokenで成立しない操作があれば実装前に代替案と管理者に必要な準備を再提案する。
+2. **M5.1 リソース管理・deployの移行:** `init`と`deploy`からWrangler subprocessを取り除き、バイナリ内の認証付きCloudflare APIクライアントでリソース作成、Worker bundleの配置、binding・Queue consumer/DLQ・通知rule・secretの設定を行う。既存workspaceと作成済みサービスの設定/データを保持し、失敗後は同一workspaceで再開可能にする。既存の任意設定・secretを意図せず消さない更新手順、認証エラーと一時的な障害の区別を確認する。
+3. **M5.2 R2 staging/commitの移行:** `init`の`system/service.toml`書き込み、Show/Episodeの`update-*`と`publish-*`で行うR2 uploadをバイナリ内のAPIクライアントへ移す。MP3はストリーミングで転送し、上限超過を送信前に拒否する。送信後のサイズ・ハッシュ、同一jobの再試行と入力照合を確認し、`commit.json`がすべてのstaging入力の後にのみ書かれる契約を守る。`create-show`の予約、`job-status`、`retry-job`、`cleanup-job`等の既存Worker管理APIは引き続き利用する。
+4. **M5.3 ビルド・配布物の移行:** Worker bundleをWranglerなしで生成し、Cloudflare Workers向けの成果物と実際のdeploy APIの互換性を検証する。GitHub ActionsからWranglerのインストール/呼び出しを除き、対象OS別のバイナリとchecksumを作る。CLI・Workerのバージョン、ライセンス表記、導入/更新/復旧手順を配布物とREADMEに反映する。過去のWranglerを使った検証ログは書き換えない。
+5. **M5.4 受け入れ・公開判定:** Wrangler/Node.js/npm/Bun/`ffprobe`のない管理者環境で、配布済みバイナリと環境変数のAPI tokenだけを使用し、新規`init`→Show初回公開/更新→Episode初回公開/メタデータのみ・音源のみの更新→`job-status`/失敗jobの`retry-job`/`cleanup-job`→`deploy`を確認する。feed、カバー、MP3の取得・内容一致、300,000,000 bytesの転送、通知→Queue→公開完了/失敗回復、既存サービスの移行後の操作を実機で検証する。少なくとも現在のLinux x86-64をMVP受け入れ対象とし、macOS/Windowsを配布対象と表示する場合は各OSで必要な管理操作まで検証する。`--version`/`--help`だけでは公開フローの合格としない。
+
+M5.0の参考API: [R2 REST object upload（文書上限300 MB）](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/upload/)、[Worker module upload](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/)、[R2 Event Notifications](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/event_notifications/)。これらの存在は現在のcastloopでの実行成功を意味しないため、M5.0の実測を合格条件とする。
+
 ### MVP実装後の構想
 
 - 予告配信(これはMVPに入れても良いかもしれない）
@@ -298,7 +312,7 @@ MVP公開前の追加マイルストーンM4.5で、CLIのMP3解析に純JSラ�
 - bun (javascript runtime) : cloudflare上のランタイムは別途検討
 - npm : モジュール管理
 - mise : ツール管理
-- wrangler (cloudflare cli) : npmにより管理されている
+- wrangler (cloudflare cli) : M0〜M4.5ではnpmで管理。M5でビルド・管理者の実行環境の両方から依存を取り除く
 
 
 詳細バージョンなどはプロジェクトルートの ``.mise.toml`` や、 ``package-lock.json`` , ``package.json`` で管理。
