@@ -9,7 +9,7 @@ castloop is a serverless podcast hosting program. Once deployed, it runs with mi
 
 ## Install the CLI (Linux x86-64)
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `THIRD_PARTY_NOTICES.md`, and `LICENSE` from the [v0.1.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.0). Verify the checksum in the download directory and install the binary:
+Download `castloop-linux-x64`, `SHA256SUMS`, `THIRD_PARTY_NOTICES.md`, and `LICENSE` from the [v0.1.1 release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.1). Verify the checksum in the download directory and install the binary:
 
 ```sh
 sha256sum --check SHA256SUMS
@@ -18,13 +18,13 @@ install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop"
 castloop --version
 ```
 
-The binary includes the CLI and deployable Worker. The target machine needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in its environment; it needs no Node.js/npm, Wrangler, Bun, `ffprobe`, R2 S3 credentials, or source tree. Enable R2 and create the API token in the Cloudflare Dashboard before running `init`. Give the token account-level Workers Scripts Write, Workers R2 Storage Write, and Queues Write permissions (and the corresponding read permissions for account resources). Do not put the token in `castloop.toml` or Git. For an optional check on a separate Linux x86-64 machine, see the [smoke test guide](docs/linux_smoke_test.md).
+The binary includes the CLI and deployable Worker. **v0.1.1 is distributed for Linux x86-64 only.** The target machine needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in its environment; it needs no Node.js/npm, Wrangler, Bun, `ffprobe`, R2 S3 credentials, or source tree. Enable R2 and create an account-scoped API token in the Cloudflare Dashboard before running `init`. The tested management operations require Workers Scripts, Workers R2 Storage, and Queues permissions. Do not put the token in `castloop.toml` or Git. For an optional check on a separate Linux x86-64 machine, see the [smoke test guide](docs/linux_smoke_test.md).
 
 ### Building from source
 
-The build machine needs Bun 1.4.2 and Node.js/npm for dependency installation and checks. Build from this checkout with `npm ci`, `npm run check`, `bun test`, and `npm run build:cli -- linux-x64`. The Worker bundle and CLI are built without Wrangler. The build script also supports experimental `macos-x64`, `macos-arm64`, and `windows-x64` cross-compilation, but those targets are not distributed as v0.1.0.
+The build machine needs Bun 1.4.2 and Node.js/npm for dependency installation and checks. Build from this checkout with `npm ci`, `npm run check`, `bun test`, and `npm run build:cli -- linux-x64`. The Worker bundle and CLI are built without Wrangler. The build script also supports experimental `macos-x64`, `macos-arm64`, and `windows-x64` cross-compilation, but those targets are not distributed.
 
-The [release workflow](.github/workflows/build-binaries.yml) checks the code, builds a Linux x86-64 binary, runs an on-runner smoke check, and attaches the executable, checksum, and [third-party notices](THIRD_PARTY_NOTICES.md) to a GitHub Release on a `v*` tag. Include the notices with redistributed binaries.
+The [release workflow](.github/workflows/build-binaries.yml) checks the code, builds a Linux x86-64 binary, runs an on-runner smoke check, and attaches the executable, checksum, [LICENSE](LICENSE), and [third-party notices](THIRD_PARTY_NOTICES.md) to a GitHub Release on a `v*` tag. Include both license files with redistributed binaries.
 
 castloop is distributed under the [MIT License](LICENSE). Third-party dependency licenses are listed separately in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
@@ -57,17 +57,21 @@ For a metadata-only Episode revision, edit the local Episode TOML and run `updat
 
 ### Update the executable and Worker
 
-Install the new binary to a temporary path first, then replace the old binary and deploy the embedded Worker **for each service workspace**. When building from source:
+Download the new release binary and its checksum to a temporary directory, verify it, then replace the old binary and deploy the embedded Worker **for each service workspace**:
 
 ```sh
-npm run build:cli
-install -m 0755 dist/castloop "$HOME/.local/bin/castloop.next"
+mkdir -p /tmp/castloop-update
+cd /tmp/castloop-update
+curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.1/castloop-linux-x64
+curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.1/SHA256SUMS
+sha256sum --check SHA256SUMS
+install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop.next"
 mv "$HOME/.local/bin/castloop.next" "$HOME/.local/bin/castloop"
 cd /path/to/workspace
 castloop deploy
 ```
 
-Back up `castloop.toml` and the private `.castloop/` directory before moving a workspace. Do not replace `.castloop/secrets.json` or `.castloop/state.json` when updating. `castloop deploy` deploys the Worker bundled with the current binary through Cloudflare's API, preserving existing secret bindings. Re-running `init` in an existing workspace resumes unfinished initialization without recreating resources.
+For source builds, use the commands in [Building from source](#building-from-source). Back up `castloop.toml` and the private `.castloop/` directory before moving a workspace. Do not replace `.castloop/secrets.json` or `.castloop/state.json` when updating. `castloop deploy` deploys the Worker bundled with the current binary through Cloudflare's API, preserving existing secret bindings. Re-running `init` in an existing workspace resumes unfinished initialization without recreating resources when the resource-creation steps have been recorded in `.castloop/state.json`.
 
 ### Troubleshooting
 
@@ -78,78 +82,25 @@ Back up `castloop.toml` and the private `.castloop/` directory before moving a w
 | Show ID already reserved | Use a new Show ID or inspect the existing reservation. A reservation alone does not publish a Show. |
 | Local TOML or MP3 changed after staging | Re-run the corresponding `update-*` command before `publish-*`. A committed job is frozen; later edits need a new job. |
 | `retrying` or `processing` with `dlq: true` | Inspect `job-status` and the Show admission; after resolving the transient issue, use `castloop retry-job JOB_ID --show my-show [--episode ID]` to resume the **same** job. A DLQ record remains as history even after recovery. |
-| `failed` or admission still held | Inspect job status, frozen commit, and published keys before intervening. Do not start another job for the same Show or delete its reservation while a partial publication may exist. |
+| `failed` or admission still held | `retry-job` only requeues a job whose status is `retrying` or `processing` and whose DLQ record exists. A permanent `failed` job cannot currently be repaired with that command. Preserve the workspace and inspect status, frozen commit, and published keys; do not start another job for the Show or delete its reservation while a partial publication may exist. Recovery may require manual R2 repair. |
+
+If a resource-creation request in `init` reaches Cloudflare but its response is lost before `.castloop/state.json` records completion, retrying may report that the bucket or Queue already exists. Keep the same workspace and inspect Cloudflare resources before attempting manual recovery; automatic reconciliation of this ambiguous case is not yet implemented.
 
 The CLI reports Cloudflare failures without printing API credentials. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) and [`design/m3_implementation_log.md`](design/m3_implementation_log.md) for publication and recovery behavior.
 
-## Development environment
+## Development
 
-- use mise to install development environment. (see .mise.toml)
+The build machine needs Bun 1.4.2 and Node.js/npm. Wrangler is not a project dependency. From a checkout:
 
-```
+```sh
 mise install
-```
-- use npm to install node/javascript/typescript related packages. (see packages.json)
-
-```
 npm ci
+npm run check
+bun test
+npm run build:cli -- linux-x64
 ```
-- use codegraph to search codebase. codegraph cli itself is installed by mise.
 
-```
-codegraph init      # create index
-```
-you may need to create a sym-link from ~/.local/share/mise/shims/codegraph to ~/.local/bin to allow opencode use codegraph cli.
-
-you don't need to run ``codegraph installl``, because this repo's AGENTS.md and opencode.jsonc contain settings for codegraph.
-
-- use opencode v2 , MCP and skills
-
-``.mise.toml`` doesn't contain opencode v2. you should install it manually.
-``opencode.jsonc`` contains MCP settings.
-``.agents/skills`` directory contains skills.
-
-you need to set ``CLOUDFLARE_ACCOUNT_ID`` and ``CLOUDFLARE_API_TOKEN`` environment variable to use cloudflare MCP.
-
-| Scope   | Permission         | Access |
-| ------- | ------------------ | ------ |
-| Account | Workers            | Admin  |
-| Account | Workers R2 Storage | Edit   |
-| Account | Queues             | Edit   |
-| Account | Account Settings   | Read   |
-| Domain  | Workers Routes     | Edit   |
-
-
-```
-{
-  "name": "castloop-v2-dev",
-  "policies": [
-    {
-      "effect": "allow",
-      "permission_groups": [
-        {
-          "id": "98d78cd2433d4c3687191bc0244ef948"
-        },
-        {
-          "id": "bf7481a1826f439697cb59a20b22293e"
-        },
-        {
-          "id": "c1fde68c7bcc44588cbb6ddbc16d6480"
-        },
-        {
-          "id": "28f4b596e7d643029c524985477ae49a"
-        }
-      ],
-      "resources": {
-        "com.cloudflare.api.account.YOUR_ACCOUNT_ID": {
-          "com.cloudflare.api.account.zone.*": "*"
-        }
-      }
-    }
-  ],
-  "condition": {}
-}
-```
+Do not commit credentials, `.castloop/`, or unpublished media.
 
 ## Source CLI (development)
 

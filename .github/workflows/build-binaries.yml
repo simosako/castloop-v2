@@ -59,10 +59,11 @@ jobs:
       - name: Verify binary and CLI entrypoint
         shell: bash
         run: |
+          expected_version="$(node -p "require('./package.json').version")"
           cd dist
           sha256sum --check SHA256SUMS
           chmod +x castloop-linux-x64
-          test "$(./castloop-linux-x64 --version)" = "0.1.0"
+          test "$(./castloop-linux-x64 --version)" = "$expected_version"
           ./castloop-linux-x64 --help | grep -F 'Usage: castloop'
 
   release:
@@ -86,4 +87,4 @@ jobs:
           sha256sum --check SHA256SUMS
           gh release create "$GITHUB_REF_NAME" castloop-linux-x64 SHA256SUMS THIRD_PARTY_NOTICES.md LICENSE \
             --repo "$GITHUB_REPOSITORY" --title "castloop $GITHUB_REF_NAME" \
-            --notes-file ../docs/release-v0.1.0.md
+            --notes-file "../docs/release-${GITHUB_REF_NAME}.md"

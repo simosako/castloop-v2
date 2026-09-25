@@ -26,7 +26,7 @@ sha256sum dist/castloop
 scp dist/castloop USER@HOST:/tmp/castloop
 ```
 
-`USER@HOST`を検証先のSSH接続先に置き換えます。`sha256sum`の値を控え、検証先で**同じ値**になることを確認してください。バージョン付きの配布アーカイブやダウンロードURLはまだありません。
+`USER@HOST`を検証先のSSH接続先に置き換えます。`sha256sum`の値を控え、検証先で**同じ値**になることを確認してください。一般利用では、ソースからビルドしてコピーする代わりに[GitHub Release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.1)からLinux x86-64バイナリと`SHA256SUMS`を取得できます。
 
 以下は検証先の**Bash**ターミナルで実行します。
 
@@ -41,7 +41,7 @@ castloop --version
 
 ```
 
-`castloop --version`で`0.1.0`が表示されることを確認します。検証先に`ffprobe`などの解析ツールをインストールする必要はありません。
+`castloop --version`で`0.1.1`が表示されることを確認します。検証先に`ffprobe`などの解析ツールをインストールする必要はありません。
 
 ## 3. Cloudflare認証とサービス作成
 
@@ -139,7 +139,7 @@ feedにShow/Episodeのタイトル、`itunes:duration`、enclosure URLがあり�
 - OS / architecture: Linux x86-64
 - Node.js `v24.21.0`、npm `11.19.0`、Bun `1.4.2`、Wrangler `4.131.2`
 - `npm ci`、`npm run check`、`npm run build:cli`は成功。`npm ci`では`esbuild`と`workerd`のinstall scriptに関する警告が出たが、型チェックとビルドは完了した。
-- `dist/castloop --version`: `0.1.0`
+- `dist/castloop --version`: `0.1.1`
 - `dist/castloop` SHA-256: `03d3bc2fe888b7223df8fd088bc37e28ba6e394a69dc31fd1bccf6bc61197da3`
 - ビルド済み実行ファイルを同じLinux環境で実行した。ソースコードのない別マシンへのコピー・実行は未確認。
 - Cloudflare API tokenの値と`.castloop/secrets.json`の内容は記録しない。

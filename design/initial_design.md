@@ -295,6 +295,8 @@ MVP公開前の追加マイルストーンM4.5で、CLIのMP3解析に純JSラ�
 4. **M5.3 ビルド・配布物の移行:** Worker bundleをWranglerなしで生成し、Cloudflare Workers向けの成果物と実際のdeploy APIの互換性を検証する。GitHub ActionsからWranglerのインストール/呼び出しを除き、対象OS別のバイナリとchecksumを作る。CLI・Workerのバージョン、ライセンス表記、導入/更新/復旧手順を配布物とREADMEに反映する。過去のWranglerを使った検証ログは書き換えない。
 5. **M5.4 受け入れ・公開判定:** Wrangler/Node.js/npm/Bun/`ffprobe`のない管理者環境で、配布済みバイナリと環境変数のAPI tokenだけを使用し、新規`init`→Show初回公開/更新→Episode初回公開/メタデータのみ・音源のみの更新→`job-status`/失敗jobの`retry-job`/`cleanup-job`→`deploy`を確認する。feed、カバー、MP3の取得・内容一致、300,000,000 bytesの転送、通知→Queue→公開完了/失敗回復、既存サービスの移行後の操作を実機で検証する。少なくとも現在のLinux x86-64をMVP受け入れ対象とし、macOS/Windowsを配布対象と表示する場合は各OSで必要な管理操作まで検証する。`--version`/`--help`だけでは公開フローの合格としない。
 
+**実施状況（2026-09-25）:** Linux x86-64向けv0.1.0を[公開](https://github.com/simosako/castloop-v2/releases/tag/v0.1.0)し、M5.0とLinuxのM5.1〜M5.4受け入れを実測した。詳細は[`m5_implementation_log.md`](./m5_implementation_log.md)と[`mvp_release_readiness_log.md`](./mvp_release_readiness_log.md)を参照。公開後の監査では、`init`のリソース作成がCloudflare側で成功して応答だけ失われたケースの再調整、および恒久的`failed` jobで`reserved`受付を安全に明け渡す運用コマンドが未実装と確認した。通常の公開フローが合格したことと、これら例外回復が揃ったことは区別する。
+
 M5.0の参考API: [R2 REST object upload（文書上限300 MB）](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/upload/)、[Worker module upload](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/)、[R2 Event Notifications](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/event_notifications/)。これらの存在は現在のcastloopでの実行成功を意味しないため、M5.0の実測を合格条件とする。
 
 ### MVP実装後の構想

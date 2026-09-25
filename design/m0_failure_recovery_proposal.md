@@ -37,6 +37,6 @@ job B:                                     予約取得 → 新しいfeedを書�
 
 **ミニ検証済み:** `reserved`の取消しと開始の競合、`processing`中の取消し拒否、同jobの模擬公開キーへの途中書き込み・status記録後の停止からのQueue再試行、DLQ到達後のShow停止、他Showの処理、B完了後の旧job拒否。実測は[`m0_verification_log.md`](./m0_verification_log.md)に記録した。
 
-**本番フローで確認が必要:** 手動再投入は旧consumerと並走しないことを確認してから行う。Queue停止中の保留配送と再開、実際のfeed・current metadata・固定キー画像の部分公開からの再実行・手動修復は未検証。`processing`中の強制解除を許さないので、「旧consumerが生きたまま新jobを公開しても安全」という仕組みはMVPには求めない。代わりに**誤って解放できないこと**を合格条件にする。
+**未検証の例外経路:** 手動再投入は旧consumerと並走しないことを確認してから行う。Queue停止中の保留配送と再開、実際のfeed・current metadata・固定キー画像の部分公開からの手動修復は未検証。`processing`中の強制解除を許さないので、「旧consumerが生きたまま新jobを公開しても安全」という仕組みはMVPには求めない。代わりに**誤って解放できないこと**を合格条件にする。実公開jobのretry→DLQ→同job再開は[`m2_implementation_log.md`](./m2_implementation_log.md)で別途確認済み。恒久`failed`で`reserved`のjobを安全に放棄する製品コマンドは未実装。
 
 参考: [Queuesの一時停止と再開](https://developers.cloudflare.com/queues/configuration/pause-purge/)、[Queuesの実行時間・Free保持期間](https://developers.cloudflare.com/queues/platform/limits/)。

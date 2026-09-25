@@ -1,5 +1,18 @@
 # MVP公開前の受け入れ準備
 
+## マイルストーン監査サマリー（2026-09-25）
+
+| Milestone | 判定 | 現状と残件 |
+| --- | --- | --- |
+| M0 | 製品に必要な主要経路は後続M2/M5で受け入れ。計画上の全停止点は未実施 | 実公開jobのretry→DLQ→同job回復、公開feed/media/cache、300,000,000 bytes転送を後続で確認。Queue pause中の配送やfeed/metadata/cover部分書き込みからの手動修復は未検証。 |
+| M1 | 完了 | strict metadata、init、Show予約、下書き生成を実測。Cloudflare resource create成功後の応答喪失を自動reconcileする処理は未実装。 |
+| M2 | 完了 | ShowとEpisode公開、RSS、GET/HEAD/Range、purge、status、retry/DLQ回復を専用環境で確認。 |
+| M3 | 完了 | 複数Episode、metadata/audio片側更新、immutable revision、GUID、cleanupを検証。Apple Podcasts Connectでの実番組登録・審査は未実施。 |
+| M4 | 完了（M5で方式更新） | 当初の配布・利用文書は提供済み。Wrangler/`ffprobe`依存はM5で除去。v0.1.0の配布対象はLinux x86-64。 |
+| M5 | Linux x86-64公開ゲート完了、例外回復に残件 | v0.1.0を公開し、token-onlyでの新規作成・運用・移行を受け入れ。initの曖昧なresource作成結果のreconcile、恒久failed/reserved jobの安全なabandonは未実装。v0.1.1ではMIT表記のsource treeとRelease assetを同一tag/commitから配布する。 |
+
+M0の「全条件合格」とMVPに必要な後続のend-to-end受け入れは区別する。製品公開フローは確認済みだが、例外的な停止・手動修復まで完全自動化されたという判定ではない。各実測は下記および各 milestone implementation log を参照。
+
 ## 2026-09-25: M5 Linux x86-64受け入れ
 
 Wrangler/Node.jsを使う旧検証の後、API tokenと配布用バイナリによる新規サービス・Show/Episode公開、更新、DLQ回復、Worker再deploy、カバー/feedキャッシュpurge、300,000,000 bytesのMP3公開・全量ハッシュ照合を専用サービスで検証した。空の`PATH`でコピーしたバイナリから`deploy`とEpisode metadataのstaging/commitを実行した。詳細は[`m5_implementation_log.md`](./m5_implementation_log.md)に記録する。
@@ -30,12 +43,10 @@ M4ではリポジトリ外にコピーした実行ファイルと別置きWrangl
 
 ## リリース候補の複数OSビルド
 
-`scripts/build-cli.ts`は従来の無指定ビルドに加え、Linux x64、macOS x64/arm64、Windows x64を明示的に選べる。WranglerによるWorker bundle生成はNode.jsからWranglerのJS entrypointを実行し、WindowsでCLIが管理操作を行う際も`CASTLOOP_WRANGLER`に同entrypointを指定してNode.jsから起動する。`.cmd`を`execFileSync`へ渡さない。
+以下はM5前の候補ビルド計画を記した履歴であり、**現在の配布状況ではない**。v0.1.0ではWranglerを使わないLinux x86-64バイナリだけをGitHub Releaseに添付した。macOS/Windowsはビルドスクリプトに実験用targetがあるが、配布していない。
 
-GitHub Actionsの`build-binaries.yml`は手動または`v*`タグでビルドし、workflow artifactへ保存した後、各OSのrunnerでchecksumと`--version`/`--help`を確認する。macOSではチェック後に検証用コピーをad-hoc署名して実行し、artifact自体は未署名。成功したrunのartifactだけを使用する。GitHub Releaseへの自動添付は別途整備する。CLI起動の確認はCloudflare上での`init`・公開やmacOS/Windows向けの配布保証を意味しない。
+## MVP公開条件の追加: 管理CLIのWrangler依存解消（完了・監査事項あり）
 
-## MVP公開条件の追加: 管理CLIのWrangler依存解消（レビュー用計画）
+M5のLinux x86-64公開ゲートは達成し、v0.1.0を公開した。Cloudflare API tokenと配布バイナリでの新規初期化、Show/Episodeの初回公開・更新、上限MP3、回復、旧サービス移行、Releaseの検証は[`m5_implementation_log.md`](./m5_implementation_log.md)に記録する。
 
-管理者の日常的なShow/Episode配信だけでなく、初回`init`、更新後の`deploy`、失敗jobの回復まで、配布済みバイナリとCloudflareアカウントID/API tokenだけで完結させる。管理者の端末でWrangler・Node.js/npm・Bun・`ffprobe`を必要としない。ビルド工程のWorker bundle生成についてもWranglerを取り除く。詳細な作業順・検証ゲートは[`initial_design.md`のM5](./initial_design.md#m5-wrangler不要の管理cli)を参照する。
-
-従来のM0〜M4.5の実機検証は当時の実装の結果として有効だが、Wrangler不要で動くことの証明にはならない。M5.0のAPI経路と300,000,000 bytesの実証、およびM5.4のバイナリ単体のend-to-end検証を新しいMVP公開ブロッカーとする。別マシンへのコピー試験を必須にしないという既存判断は維持し、対応を表明するOSごとの管理操作の実証とは区別する。計画承認後、実装に合わせて`AGENTS.md`、`README.md`、`docs/linux_smoke_test.md`の古いWrangler必須の説明を更新する。
+リリース後の監査で、resource createの応答喪失時に`init`を自動照合する処理、および恒久`failed` jobの安全な`reserved`受付解除CLIが未実装と分かった。再現/影響とMVPでの制約は同実装ログ末尾に記録。別マシンのコピー試験は従来判断どおり公開ブロッカーにしない。Apple Podcasts Connectでの実登録審査も未実施で、RSS validatorとfeed要件の検証範囲を超える確認はフォローアップとする。

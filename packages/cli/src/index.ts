@@ -43,7 +43,7 @@ type LocalState = {
   episodes: Record<string, EpisodeStage>;
 };
 const SOURCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const CLI_VERSION = "0.1.0";
+const CLI_VERSION = "0.1.1";
 const USAGE = "Usage: castloop init [dir] --service-id ID --bucket-name NAME --workers-subdomain NAME | " +
   "create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | " +
   "update-episode ID | update-episode-audio ID MP3 | publish-episode ID | " +

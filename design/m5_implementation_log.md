@@ -35,3 +35,11 @@
 **公開対象:** Linux x86-64のみ。macOS/Windowsのcross compileは実装しているが、各OSからCloudflare管理操作を完走していないため、v0.1.0のRelease配布対象には含めない。別マシンへのコピーは初回リリースの受け入れ条件ではない。
 
 検証完了後に専用サービスの通知rule、主/DLQ consumer、Worker、両Queue、bucket内70 object（合計約900 MB）、bucketを削除した。公開音源の恒久保存規則は通常サービスの挙動として検証し、この検証専用サービスだけを終了した。
+
+## 2026-09-25: リリース後のマイルストーン監査
+
+- `init`はCloudflare resource作成成功後にAPI responseが失われ、ローカルの`init_steps`が進まなかった場合、bucket/Queueを存在確認して採用する処理がない。再実行時に重複作成エラーになる可能性があり、同一workspaceで常に安全に再開するというM5.1条件はこの異常経路まで実証/実装されていない。
+- 恒久的なpublication validation errorは`status=failed`を記録するが、`retry-job`はDLQ記録のある`retrying`/`processing`のみを受け付ける。`reserved`のまま失敗したjobを安全に放棄して受付を解放するCLI/APIがなく、そのShowは人手でのR2修復を要する。`processing`を通常操作から強制解放しない方針は維持し、安全な`reserved → free`操作を別途設計・検証する。
+- Retry設定は主Queueの`max_retries: 2`。Queue/失敗記録の保持とstaging下書きの削除時期は未確定で、staging音源は完了jobに対する明示cleanupのみ実装。未公開・回復可能データへTTLを一律適用しない。
+- RSS Feed ValidatorはM3で合格済み。Apple Podcasts Connectへの実際の番組登録/審査は未実施であり、ディレクトリ側の受け入れ確認は公開後のフォローアップ。
+- v0.1.0のtagged sourceはMIT変更前のISC表記を含む。監査修正を含むMIT表記のsource treeをv0.1.1としてtagし、Release workflowで同一commitからバイナリ・LICENSE・checksumを再生成する。
