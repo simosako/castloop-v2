@@ -10,6 +10,8 @@ v0.1.0の配布対象をLinux x86-64に限定する。GitHub ActionsはLinuxバ�
 
 その後、管理者の承認によりrepositoryを**public**に変更。変更前に全581件のGit履歴objectを対象に、現在のAPI token・旧サービスの管理用keyとの一致、秘密ファイルのパス、GitHub token・AWS key・秘密鍵の形式を検索し、該当なし。認証なしのHTTPでReleaseページ、`SHA256SUMS`、Linuxバイナリのいずれも200を確認した。v0.1.0は一般にダウンロード可能。
 
+公開後、管理者の選択によりプロジェクトライセンスをISCからMITに変更し、著作権表示を`Copyright (c) 2026 Akira Shimosako`に統一。`package.json`/lockfileもMITに更新した。v0.1.0のReleaseに添付したLICENSEも差し替え、公開assetを再取得して内容が一致することを確認した。配布バイナリ本体とchecksumは変更なし。
+
 ## 2026-09-24: 新規`init`後のWorker URL反映待ち
 
 M4.5の新規サービス作成ではWranglerのdeploy自体が成功した直後、Workerのhealth URLが一時的にHTTP 404を返した。既存の`init`は一度のhealth確認で終了し、同一workspaceからの再実行で成功した。

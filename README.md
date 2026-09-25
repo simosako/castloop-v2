@@ -26,6 +26,8 @@ The build machine needs Bun 1.4.2 and Node.js/npm for dependency installation an
 
 The [release workflow](.github/workflows/build-binaries.yml) checks the code, builds a Linux x86-64 binary, runs an on-runner smoke check, and attaches the executable, checksum, and [third-party notices](THIRD_PARTY_NOTICES.md) to a GitHub Release on a `v*` tag. Include the notices with redistributed binaries.
 
+castloop is distributed under the [MIT License](LICENSE). Third-party dependency licenses are listed separately in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ### Initialize and publish
 
 ```sh
