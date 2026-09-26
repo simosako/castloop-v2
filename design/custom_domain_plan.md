@@ -1,147 +1,115 @@
-# 独自ドメイン対応計画（レビュー用）
+# 独自ドメイン対応計画
 
-作成日: 2026-09-25  
-状態: 実装前・レビュー待ち
+作成日: 2026-09-25
+方針確定: 2026-09-26
+状態: 設計方針承認・実装前
 
-## 目的
+## 目的と初期スコープ
 
-管理者がcastloopサービスの公開Workerを、自身のCloudflare管理下にある独自ホスト名から利用できるようにする。Podcast feed、カバー画像、Episode音源のURLを独自ドメインにし、配信基点をサービス単位で管理する。
+管理者自身のCloudflareアカウント内の公開Workerを、任意の独自ホスト名から配信できるようにする。**独自ドメインは1サービスにつき1つのホスト名だけ**とし、サービス内の全Showに共通で適用する。Showごとの独自ドメインや複数ドメイン対応は対象外とし、必要になったときに改めて検討する。既存の`workers.dev`は引き続き利用可能にする。
 
-本計画は、既存のサービス構成（1サービスにつき1つの公開Worker、private R2、複数Show）を維持する。Cloudflare for SaaSを使って一般ユーザーのドメインを受け入れる機能や、castloopが共有ホスティングを提供する機能は対象外とする。
+**R2は常にprivateとし、feed・画像・MP3を含む公開配信は必ずcastloop Workerを経由する。** 1サービスにつき1 Worker/1 private R2 bucketで複数Showを扱う現行構成は維持する。R2 Custom Domainやpublic bucketは利用しない。Cloudflare for SaaSによる、外部顧客のドメインを受け入れるサービスではない。
 
-## 現状と影響範囲
+## 現状と影響
 
-- `init`で`workers.dev` URLを`castloop.toml`の`public_base_url`に設定する。
-- Show/Episodeの公開Workerは同じWorker URL上でfeed、cover、audioを配信し、`system/`と`staging/`を外部公開しない。
-- Episode公開時に`public_base_url`を使ってenclosure URLを生成し、Show/Episodeの公開処理でfeed XMLをR2へ保存する。feed URL、画像URL、音源URLはPodcast directoryやクライアントに長期間保持される。
-- したがって、独自ホスト名をWorkerへ接続するだけでは既存feedのURLは切り替わらない。正規URL切替では、既存Showすべてのfeedを新しい基点で再生成し、旧URLの扱いを明示する必要がある。
+- `init`が`workers.dev` URLをサービス設定`public_base_url`へ書き、`system/service.toml`にも保存する。CLI管理APIの接続先もローカル`public_base_url`である。
+- WorkerのShow/Episode公開処理はR2の`system/service.toml`から同じURLを読み、feedを生成する。Episodeの現行metadataとimmutableなrevision metadataは絶対URLの`enclosure_url`を持つ。
+- Feedの`atom:link`、カバーURL、enclosure URLは公開先が変わる。**channelの`link`と画像要素内の`link`はShowの`site_url`であり、ドメイン切替だけでは変えない。** Episode GUID、公開日時、音源のR2 keyも変えない。
+- 現状の`src/feed.ts`はrevisionに保存されたenclosure URLをそのまま出力する。単純に`public_base_url`を変更してfeedを再生成するだけでは既存Episodeのenclosureは旧ホスト名のまま残る。音源未変更のEpisode改訂も旧URLを継承する。この点を解消する移行・feed生成設計が必要。
+- Workerは現在公開パスをhostnameでは区別しない。独自ドメインでも全Showの公開パスが開くことを初期スコープの仕様とする（他のShowの独自ドメインとしては扱わない）。`system/`と`staging/`は引き続き非公開。
 
-## 提案する最初のスコープ
+## スコープの判断
 
-1. **サービス単位の独自ホスト名を1つ**登録できる。
-2. ホスト名は、サービス管理者が所有または管理権限を持つCloudflareアカウント内のActive Zoneに属する。
-3. Cloudflare Workers **Custom Domains**をREST APIで設定する。Custom Domainが指定ホスト名の全pathをWorkerへルーティングし、CloudflareがDNS recordとTLS証明書を設定する機能を利用する。
-4. R2はprivateのままとし、公開配信は引き続きcastloop Workerを通す。
-5. `workers.dev`は常時有効な代替・回復URLとして残す。
-6. ドメインをWorkerへ接続する操作と、`public_base_url`をそのドメインへ切り替える操作を分離する。
-7. 一度切替後も、管理者が明示的に元へ戻せるようにする。削除・切替手順で既存Showのfeedを途中のままにしない回復方法を設ける。
+Cloudflareは同一Workerへの複数ホスト名の接続を許すが、現行の公開URLとEpisode revisionの`enclosure_url`はサービス単位であり、WorkerはhostnameごとにShowを区別しない。Show別ドメインにはURL移行とhostname別の配信制御が追加で必要になる。今回の実装では扱わず、Show別URLの設定項目も追加しない。
 
-### 対象外
+## DNS、zone、TLSの前提
 
-- 外部顧客が自己所有ドメインを登録するマルチテナント型Custom Hostnames / Cloudflare for SaaS。
-- 1サービスで複数の独自ホスト名を正規配信先として同時に維持する機能。
-- `www`/apex間の自動redirect、DNS providerがCloudflare以外のドメインへの対応。
-- R2のpublic bucketやR2 Custom DomainによるWorkerを介さない配信。
-- Apple Podcasts等のdirectoryへ登録済みfeed URLを自動変更する機能。
+- Workers Custom Domainには、対象ホスト名を含む**ActiveなCloudflare Zone**と対象Workerが必要。登録したホスト名の全パスをWorkerへ接続し、CloudflareがDNS recordとTLS証明書を用意する。既存のCNAME recordや他サービスとの競合を勝手に上書きしない。
+- **独自ドメイン利用の必須条件は、対象zoneの権威DNSがCloudflareであり、zoneがActiveであること。** ドメイン登録事業者そのものをCloudflareへ移管する必要はない。現在Route 53を権威DNSとして使っている場合は、zoneのネームサーバーをCloudflareへ切り替え、既存DNS recordを移行・確認してから利用する。
+- Route 53等を権威DNSとして維持するpartial (CNAME) setupは本機能の対象外。CloudflareにはBusiness/Enterprise向けのpartial setupも存在するが、castloopではプランにかかわらずこの方式を扱わない。Freeプランで「Route 53のまま指定ホストだけCNAMEを追加すれば動く」とは案内しない。
+- `www.example.com`だけを登録した場合、`example.com`のDNS、HTTP、redirectには**関与しない**。逆も同様。複数aliasや自動redirectは対象外。
+- 本機能のtokenに必要な権限、DNS/TLSが利用可能になるまでの時間、FreeプランでのWorker Custom Domain利用条件・追加料金は、実装前のAPI調査と実機検証で確定しREADMEに記載する。
 
-## Cloudflare上の前提
-
-- Cloudflare Custom DomainsにはActive ZoneとWorkerが必要。ホスト名はzone apexまたはそのsubdomainとし、既存DNS状態との競合がないことを確認する。
-- Custom Domainは指定ホスト名のすべてのpathを対象にする。`example.com`と`www.example.com`は別hostnameとして扱う。
-- ドメイン追加時にCloudflareがDNS recordとTLS証明書を設定する。証明書が利用可能になるまで公開先として案内しない。
-- Cloudflare APIのWorker Domains機能はWorkers ScriptsのRead/Write権限を必要とする。実際のtoken権限、作成・削除API、証明書反映時間、zone ownership/record conflict時の応答は実機で確認してから実装を確定する。
-- 独自ドメイン機能がCloudflare Freeプランを含む対象プランで利用できること、および追加課金の有無を、公開前にCloudflareの最新プラン情報と対象アカウントで確認する。利用可能性を未確認のままREADMEで保証しない。
-
-## CLIと設定の案
-
-以下はレビュー用のCLI案。名称とサブコマンド構成は確定前。
+## 管理操作
 
 ```text
 castloop domain add <hostname>
 castloop domain list
-castloop domain set-primary <hostname|workers.dev>
-castloop domain remove <hostname>
+castloop domain remove
 ```
 
-- `domain add`はhostnameを正規化・検証し、現在のCloudflare API状態を確認してからWorker Custom Domainを作成する。これは接続操作であり、`public_base_url`や既存feedを変更しない。
-- `domain list`はCloudflare上のhostnameとWorkerの関連付け、およびローカル設定上の正規URLを区別して表示する。
-- `domain set-primary`はサービス設定の`public_base_url`を変更し、全公開Showのfeedを新しい基点で再生成する。対象Show、進行状況、失敗Show、再実行方法を表示する。
-- `domain set-primary workers.dev`は独自ドメインから元に戻す操作として扱う。変更前の独自ドメイン接続は、切替成功後も自動削除しない。
-- `domain remove`は正規URLに設定中のhostnameを削除できないようにする。先に別の正規URLへ切り替え、feedの再生成が完了した後に実行する。Cloudflare側のdomainを削除しても関連するAdvanced Certificateが自動削除されない可能性があるため、結果と必要な手動後片付けを案内する。
-- 非対話利用を優先し、必要な値は引数で渡せるようにする。API token、account ID、証明書秘密情報はTOMLやログへ保存しない。
+- **`domain add`の成功時に独自ドメインをprimaryにする。** 内部では「Workerへの接続→DNS/TLS/health確認→全Show feedと公開設定の移行」を順に行う。別の`set-primary`コマンドは公開しない。途中で処理が止まった場合はprimary化完了を報告せず、**同じ`domain add <hostname>`を再実行して再開**できるようにする。hostnameはHTTPSのhostだけ（パス・portなし）を受け付ける。
+- すでに別の独自ホスト名がprimaryの場合は新規`add`を拒否する。変更したい場合は`remove`で`workers.dev`へ安全に戻してから追加する。
+- `domain list`はWorkerへの接続状況、公開設定上のprimary、移行中/要再試行の状態を区別して表示する。Cloudflare APIのhostname一覧だけを移行完了の根拠にしない。
+- **`domain remove`は全Showとサービス設定を`workers.dev`に戻してcache purgeした後でのみ**Custom Domainを切断する。途中失敗時はドメインを接続したまま、同じ`domain remove`で再開できるようにする。対象hostnameは現在のサービスに登録されたものに限り、他Workerの設定を消さない。
+- **`domain add`と`domain remove`を同じ公開ゲートに含める。** `remove`の安全な実装が間に合わない場合は`add`も公開しない。公開後に戻す手段のない片道移行にはしない。CloudflareのAdvanced CertificateはCustom Domain削除後も残ることがあるため、後片付け方法を案内する。
+- `deploy`/既存workspaceでの`init`再実行でも既存のCustom Domainと正規URLを保持し、Workerの`workers.dev`を無効にしない。管理APIは回復できるよう`workers.dev`からも利用可能とし、token/秘密鍵はサービスTOMLに置かない。
 
-### `castloop.toml`の案
+### 設定と互換性
 
-- `public_base_url`を引き続き正規配信URLの唯一の値として使う。
-- Cloudflare Custom Domainの接続状態と、正規URLの指定を混同しない。永続化が必要な情報は最小限にし、hostname/zone/Workerの関連付けはCloudflare APIから再取得できる形を優先する。
-- ローカル設定とCloudflare API状態が食い違う場合に備え、変更前の値を安全に保持し、操作を再実行できる手順を設計する。
-- 新しい設定項目を追加する場合はstrict Zod schemaと`parseServiceConfig`を更新し、既存v0.1.1の`castloop.toml`をそのまま読める後方互換を保つ。
+`public_base_url`を唯一の**サービス正規URL**として保持する。ただしCloudflare側の接続状態とR2/ローカルの公開設定は別々に変わるため、移行対象URL・元のURL・進捗を耐久的に記録する必要がある。具体的な状態形式・原子的更新順は設計ゲートで決める。未公開job IDや管理鍵は引き続きgit管理外、公開済みShowと移行進捗はローカル状態だけに依存させない。新しいTOML項目を追加する場合はstrictなZod schemaを維持し、v0.1.1の設定をそのまま読み取れるようにする。
 
-## 正規URL切替とfeed移行
+## `domain add`/`domain remove`のURL移行
 
-独自ホスト名へ正規URLを切り替えると、Show feed内のchannel link、feed URL、cover URL、およびEpisode enclosure URLが影響を受ける。
+1. Cloudflare上のhostname所有、Active Zone、競合状態、既存サービスとの衝突を調べる。`add`ではCustom Domainを接続してTLS/公開HTTPを確認する。ここまでは既存feedとprimaryを変更しない。
+2. 現在の公開Show一覧をR2から列挙し、公開中Showに未完了のShow/Episode jobがないことを確認する。**移行中は新規publicationの受付を止め、進行中のconsumerが書き終わるまで待つ。** 単にCLIでチェックするだけでなく、Workerの受付とconsumer側でも移行状態を尊重する。`processing`の受付を強制解放しない。staging自体は妨げない。
+3. 移行の対象URLとShowごとの進捗を耐久化する。Show metadata/current Episode metadataから各feedを再生成し、feedに載せるenclosure URLは検証済みの**既存音源pathを新しいbase URLに結合して**出力する。既存のimmutable revision metadata/MP3は書き換えず、GUID/公開日時も変えない。移行後の音源なし改訂・新規公開も必ず新URLでfeedを出す。既存revision metadataの`enclosure_url`は履歴として旧URLのまま残り得ることを明記する。
+4. ShowごとにfeedのR2書き込みとtag purgeを実施し、完了を記録する。部分失敗時には公開済みのfeedが一時的に新旧混在し得るため、操作を完了扱いにせず同じコマンドで再試行する。全feedとcacheの収束を検証後、R2 `system/service.toml`とローカル`castloop.toml`をprimary URLへ揃え、受付を再開する。順序と再実行判定は、設定の片方だけ更新された場合も検出・復旧できるように実装前に確定する。
+5. `remove`では逆向きに同じ手順を行い、**`workers.dev`でのfeed/音源の応答とpurge成功を確認してから**独自ドメインを切断する。切断要求の応答を失った場合はCloudflare側を照会して再開する。
 
-### 提案する移行手順
+対象Showが0件の場合も設定移行を行う。多数Showの一括処理は進捗と再開可能性を備えるが、全Showを単一の原子的更新として見せることは約束しない。部分移行中に旧URLのfeedが読まれても音源が再生できるよう、`workers.dev`は維持する。
 
-1. hostnameをWorkerへ追加し、TLS/HTTPの準備完了とGET/HEAD配信を確認する。既存feedと`public_base_url`は変更しない。
-2. 現行の全Show一覧を取得し、Showごとの現行feed/metadataを検証する。未公開Showや不完全な公開状態があれば切替を中断する。
-3. 新しい基点のfeedをShowごとに再生成する。Episode GUID、公開日時、immutable MP3 object key、revision履歴は維持し、enclosure URLのhostnameだけを新基点へ変える。
-4. 各feedのR2書き込み後、既存のfeed cache tag purgeを行う。Showごとの成功・失敗を追跡し、失敗時に同じ切替を再実行して収束させる。
-5. 全Showのfeed更新とpurgeが確認できた時点で`public_base_url`を新しいURLとして確定する。途中で失敗した場合の旧URLへのrollbackまたは再試行を可能にする。
-6. 完了後に新feedのURL、RSS内の画像/enclosure URL、HTTP GET/HEAD/Range、Cloudflare Cache purge後の新内容を検査する。
+## 旧URL・Podcast directoryとredirectの意味
 
-この順序の具体的実現方法は未確定。現在のWorkerがfeed再生成に使う`system/service.toml`と、CLIのローカル`castloop.toml`の更新タイミングを調査し、部分成功時に不整合が残らないプロトコルを実装前に決める。
+例えば既存の`https://worker.subdomain.workers.dev/podcasts/a/feed.xml`を購読中のアプリは、ドメイン追加後もそのURLを取得しに来る。**redirectなし**とは、その要求に対して`301/302`を返さず、同じWorkerが同じR2 feedを`200`で返し続けること。feed内の`atom:link`・画像・enclosureは新しい`https://podcasts.example.com/...`へ切り替わる。管理者はPodcast directory側のfeed登録URLも、新URLへ変更が必要かサービスごとの手続きに従って確認する。castloopはその登録を自動変更しない。既存クライアントが旧feed URLから自動的に新URLへ購読先を変更することは保証しない。
 
-### 旧URL
-
-- 初期案では`workers.dev`を有効なまま維持し、旧URLへのアクセスが継続できるようにする。
-- Feedが新しい正規URLへ切り替わった後、Podcast directory側の再クロール・更新は管理者が行う。feed内のEpisode GUIDは変えない。
-- Workerは旧hostnameからの要求も同じR2 public keysへ応答する。旧URLから新URLへのHTTP redirectは第一段階では行わない。Podcast appのURL変更挙動やCacheへの影響を実機確認後、将来の選択肢とする。
-- 独自domain切断はfeedの正規URL切替とは別操作にし、切断によって公開中feedのURLを壊さない。
+この方式なら旧URLからの取得は続くが、旧hostnameへのアクセスを新hostnameへ**強制的に転送する機能はない**。directory上の登録URL変更は管理者の作業とする。HTTP redirectや`itunes:new-feed-url`等の移転通知は今回実装しない。逆向きの`remove`後も接続が残る`workers.dev`を公開URLとして維持する。
 
 ## 実装マイルストーン案
 
-### D0: API/プラン実証
+### D0: 制約と移行プロトコルの確定
 
-- Workers Custom Domainsの作成・一覧・削除APIとレスポンス形状を確認する。
-- 専用Workerと検証用zone/hostnameを使い、成功、既存DNS record競合、別Workerへの既登録、証明書待ち、API応答喪失後の再実行を試す。
-- 現在のMVP tokenを拡張する場合の最小権限、必要なzone権限、Freeプランでの利用条件と料金を記録する。
-- 管理用CLIからCloudflare API tokenのみで完結し、Dashboardでの手動DNS編集が必要なケースを明確化する。
+- APIのAttach/List/Detach Worker Domainと権限・zone参照、TLS準備確認方法、Freeプランの条件を調査する。検証専用のCloudflare Zone/WorkerでAPI tokenのみから動作を実測する。
+- 正常作成、既存DNS/CNAME、別Worker接続、証明書待ち、API応答喪失を検証する。Route 53等を権威DNSとするzoneは対象外として拒否する。
+- 公開ジョブとドメイン移行を衝突させない耐久的な受付制御、設定の同期、途中失敗と復帰のプロトコルを決める。既存の`processing` jobは安全に収束させ、無理に解放しない。
 
-### D1: 独自hostnameの管理
+### D1: Worker domain接続と接続確認
 
-- CLIでCustom Domain追加・一覧・削除を実装する。
-- 入力hostname、API取得値、zone ownership、既存recordの競合、別サービスWorkerとの重複を検証する。
-- API通信の一時失敗と恒久失敗を区別し、作成成功後に応答を失った場合も一覧取得から安全に再開できるようにする。
-- TLS準備完了を待つhealth checkの上限と、再試行方法を実装・文書化する。
+- `domain add`の前半、`domain list`、同一hostnameの再実行時のCloudflare側reconcile、TLS/HTTPS確認を実装する。
+- 登録済みhostnameの競合、zone不在、DNS衝突を明瞭に報告し、既存recordを勝手に置換しない。
 
-### D2: 正規URL切替とfeed再生成
+### D2: URL切替と安全な復帰
 
-- `public_base_url`変更と全Show feed再生成を安全に実施するCLIフローを実装する。
-- Episode GUID、音源URL path、revision履歴を維持したままhostだけを切り替える。
-- 途中失敗のstatus、再実行、旧正規URLへのrollback、cache tag purgeを検証する。
-- 新規Show/Episodeを独自domain有効化後に公開する場合にも正規hostnameが一貫することを確認する。
+- `domain add`成功時のprimary化・全Show feed再生成、同じ操作の再開を実装する。
+- `domain remove`による`workers.dev`への復帰と安全なDetachを実装する。安全な復帰手段を完成できなければ、`domain add`を含めて公開を保留する。
+- 既存Episode・音源未変更改訂・新しいEpisodeでのURL一貫性、cache purge失敗後の回復、CLI設定とR2設定の差異検出を検証する。
 
-### D3: 受け入れ・配布
+### D3: 受け入れと文書化
 
-- API mock test、設定schema/後方互換test、feed移行testを追加する。
-- Cloudflare専用zoneでcreate → TLS ready → publish → URL切替 → 更新 → rollbackまたはdomain removeを端から端まで検証する。
-- v0.1.1バイナリの運用要件を維持し、Linux x86-64の配布バイナリで全管理操作を確認する。
-- README、CLI help、トラブルシュート、必要なAPI token権限、zone/DNS前提を更新する。
+- API mock、既存設定の後方互換、複数ShowのURL移行・同時publication、feed生成の自動テストを追加する。
+- 専用ZoneでCloudflare API tokenとLinux x86-64配布バイナリからadd→TLS→既存feed切替→追加公開→remove→旧URL復帰まで確認する。GET/HEAD/Range、feed/cover cache purge、MP3の内容一致、private R2を確認する。
+- READMEにDNS切替の影響（Route 53既存recordの移行を含む）、必要なtoken権限、証明書待ち、途中失敗時の再開方法を明記する。管理端末にNode.js/npm、Bun、Wrangler、`ffprobe`、R2 S3 credentialsを要求しない。
 
 ## 受け入れ条件
 
-- 独自domainを追加しても既存`workers.dev` URL、Show/Episode、private R2、Worker cache、Queue publicationの挙動が壊れない。
-- 正常なCustom Domain作成後、Cloudflareが証明書を準備できるまで状態を区別して表示し、準備完了後にfeed/cover/audioがGET/HEAD/Rangeで配信できる。
-- 別zone、非Active zone、既存CNAME/競合DNS record、既に別Workerへ接続されたhostnameを安全に拒否し、既存DNS設定を勝手に置換しない。
-- 正規URL切替で公開中すべてのfeed内URLが独自domainに切り替わり、GUID、`published_at`、immutable音源key、revision履歴は不変である。
-- Feed cache purgeの失敗時に移行完了を報告せず、同じ操作の再実行で完了できる。
-- 部分失敗時に、処理済みShow、未処理Show、ローカル設定、R2設定の状態を明瞭にし、重複公開やEpisode再アップロードなしで再試行またはrollbackできる。
-- `workers.dev`へ戻す操作で、全feedが旧hostnameへ戻り、公開素材が失われない。
-- 既存v0.1.1サービス設定の後方互換を保ち、管理端末にNode.js/npm、Bun、Wrangler、ffprobe、R2 S3 credentialsを要求しない。
+- Custom Domain追加後も`workers.dev`が応答し、他Showの公開やprivate R2の隔離を壊さない。
+- `domain add`が成功を返す時点でTLS/HTTP、すべての公開Showのfeed、ローカル/R2のprimary設定とcache purgeが新ホスト名へ収束している。`domain remove`成功時はその逆になっている。
+- Feedの`atom:link`、cover、enclosureは正規ホスト名に揃い、Showの`site_url`、GUID、公開日時、immutable MP3/revisionは変わらない。旧revisionにある絶対URLが残っていても、新規publicationのfeedに旧URLを混入させない。
+- feed/cover/audioのGET/HEAD、画像と音源のRange、cache purge、音源の内容一致を確認する。
+- DNS衝突、TLS未準備、途中失敗、API応答喪失、公開ジョブ実行中の移行は安全に停止・再開できる。公開中の古いconsumerと競合したまま受付を再開しない。
+- v0.1.1サービスの設定・公開済みShow/Episodeは後方互換。管理用の外部ツールや追加のR2認証情報を要求しない。
 
-## レビューで決めたいこと
+## 承認済みの方針
 
-1. 初期スコープは「1サービスにつき独自hostname 1つ」でよいか。複数のalias（www/apex両方など）を初期から扱う必要があるか。
-2. hostnameのCloudflare zoneは、castloopのWorkerと同じCloudflareアカウントに必須とするか。別アカウントや外部DNSは初期対象外でよいか。
-3. Custom Domain接続後も`workers.dev`を残し続ける方針でよいか。
-4. ドメイン接続コマンドと正規URL切替コマンドを分離する方針でよいか。
-5. 正規URL切替時に既存Show全feedを一括再生成する方式でよいか。Show数が多い場合の進捗表示・再開要件はどの程度必要か。
-6. 初期リリースではHTTP redirectを設けず旧hostnameを並行稼働させ、directory移行を管理者操作とする方針でよいか。
-7. `domain remove`を初期リリースに含めるか、まず追加・一覧・正規URL切替・workers.devへの復帰までに絞るか。
+1. 独自ドメインは1サービスにつき1ホスト名。Showごと・複数ドメインは今回検討・実装しない。
+2. 対象zoneの権威DNSはCloudflare必須。外部権威DNSを維持する方式は今回扱わない。
+3. `workers.dev`はredirectせず`200`で配信を続け、Podcast directoryの登録URL変更は管理者が行う。
+4. `domain add`と、`workers.dev`へ安全に復帰する`domain remove`を同じ公開ゲートに含める。
 
 ## Cloudflare一次資料
 
-- [Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) — Active Zone、hostname単位の全path routing、DNS/TLS自動設定、既存CNAME等の注意事項。
-- [List Worker Domains API](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/list/) — account-scoped `GET /accounts/{account_id}/workers/domains` とWorkers Scripts Read/Write権限。
-- [Cloudflare for SaaS](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/) — 外部顧客の独自hostnameを提供する用途。本計画の管理者自身のzoneでのCustom Domainとは対象が異なる。
+- [Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) — 同一Workerへの複数domain、hostname全pathへの適用、DNS/TLSと既存CNAMEの注意。
+- [Workers Domains API](https://developers.cloudflare.com/api/resources/workers/subresources/domains/) — account-scoped Attach/List/Detach。
+- [Cloudflare DNS primary (full) setup](https://developers.cloudflare.com/dns/zone-setups/full-setup/) — Free/Proを含む権威DNS構成。
+- [Cloudflare DNS partial (CNAME) setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/) — 外部権威DNSを維持するBusiness/Enterprise向け構成。
+- [Cloudflare DNS subdomain setup](https://developers.cloudflare.com/dns/zone-setups/subdomain-setup/) — Cloudflareの独立subdomain zoneはEnterprise向け。
