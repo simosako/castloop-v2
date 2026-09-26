@@ -16,9 +16,26 @@ type WorkerSettings = {
   tags?: string[];
   tail_consumers?: object[];
 };
+type WorkerDomain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
+type ZoneRecord = { id: string; name: string; status: string; type: string;
+  account?: { id?: string }; paused?: boolean };
+type DnsRecord = { name: string; type: string };
+type PaginatedResult<T> = ApiResult<T[]> & { result_info?: { total_pages?: number } };
+
+export function normalizeHostname(value: string): string {
+  const hostname = value.toLowerCase();
+  const labels = hostname.split(".");
+  if (hostname.length > 253 || labels.length < 2 || labels.some((label) =>
+    label.length === 0 || label.length > 63 || !/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/.test(label)) ||
+    !/[a-z]/.test(labels.at(-1)!)) {
+    throw new Error("Expected a DNS hostname without a URL scheme, path, or port");
+  }
+  return hostname;
+}
 
 export class CloudflareApi {
   private readonly base: string;
+  private readonly accountId: string;
   private readonly token: string;
 
   constructor(config: ServiceConfig) {
@@ -26,14 +43,15 @@ export class CloudflareApi {
       throw new Error("Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for this service");
     }
     this.base = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.account_id)}`;
+    this.accountId = config.account_id;
     this.token = process.env.CLOUDFLARE_API_TOKEN;
   }
 
   private async request(method: string, path: string, body?: BodyInit, contentType?: string,
-    timeout = 30000): Promise<Response> {
+    timeout = 30000, global = false): Promise<Response> {
     let response: Response;
     try {
-      response = await fetch(`${this.base}${path}`, {
+      response = await fetch(`${global ? "https://api.cloudflare.com/client/v4" : this.base}${path}`, {
         method, headers: { Authorization: `Bearer ${this.token}`,
           ...(contentType ? { "Content-Type": contentType } : {}) },
         ...(body === undefined ? {} : { body }), signal: AbortSignal.timeout(timeout),
@@ -53,9 +71,9 @@ export class CloudflareApi {
     return response;
   }
 
-  private async json<T>(method: string, path: string, value?: object): Promise<T> {
+  private async json<T>(method: string, path: string, value?: object, global = false): Promise<T> {
     const response = await this.request(method, path,
-      value ? JSON.stringify(value) : undefined, value ? "application/json" : undefined);
+      value ? JSON.stringify(value) : undefined, value ? "application/json" : undefined, 30000, global);
     const data: ApiResult<T> = await response.json();
     if (!data.success) throw new Error(`Cloudflare ${method} ${path} did not succeed`);
     return data.result;
@@ -67,6 +85,81 @@ export class CloudflareApi {
 
   async createQueue(name: string): Promise<void> {
     await this.json("POST", "/queues", { queue_name: name });
+  }
+
+  private async page<T>(path: string, global = false): Promise<PaginatedResult<T>> {
+    const response = await this.request("GET", path, undefined, undefined, 30000, global);
+    const data: PaginatedResult<T> = await response.json();
+    if (!data.success || !Array.isArray(data.result)) {
+      throw new Error(`Cloudflare GET ${path} did not return a list`);
+    }
+    return data;
+  }
+
+  async zoneForHostname(hostname: string): Promise<{ id: string; name: string }> {
+    const zones: ZoneRecord[] = [];
+    for (let page = 1; ; page += 1) {
+      const path = `/zones?account.id=${encodeURIComponent(this.accountId)}&page=${page}&per_page=50`;
+      const data = await this.page<ZoneRecord>(path, true);
+      zones.push(...data.result);
+      if (page >= (data.result_info?.total_pages ?? 1)) break;
+    }
+    const zone = zones.filter((item) => hostname === item.name || hostname.endsWith(`.${item.name}`))
+      .sort((left, right) => right.name.length - left.name.length)[0];
+    if (!zone) throw new Error(`No Cloudflare zone in this account contains ${hostname}`);
+    if (zone.account?.id !== this.accountId || zone.status !== "active" || zone.type !== "full" || zone.paused) {
+      throw new Error(`Zone ${zone.name} must be active with Cloudflare authoritative DNS`);
+    }
+    return { id: zone.id, name: zone.name };
+  }
+
+  async workerDomains(filter: "hostname" | "service", value: string): Promise<WorkerDomain[]> {
+    const path = `/workers/domains?${filter}=${encodeURIComponent(value)}`;
+    const data = await this.page<WorkerDomain>(path);
+    if ((data.result_info?.total_pages ?? 1) > 1) {
+      throw new Error("Worker Domains response is incomplete; refusing to change a domain");
+    }
+    return data.result;
+  }
+
+  async ensureWorkerDomain(hostname: string, service: string): Promise<WorkerDomain> {
+    hostname = normalizeHostname(hostname);
+    const [existing, forService] = await Promise.all([
+      this.workerDomains("hostname", hostname), this.workerDomains("service", service),
+    ]);
+    if (existing.some((domain) => domain.hostname !== hostname) ||
+      forService.some((domain) => domain.service !== service)) {
+      throw new Error("Worker Domain lookup returned unexpected records");
+    }
+    if (forService.some((domain) => domain.hostname !== hostname) || existing.some((domain) => domain.service !== service)) {
+      throw new Error("The hostname or Worker already has a different Custom Domain");
+    }
+    const zone = await this.zoneForHostname(hostname);
+    if (existing.length) {
+      if (existing.length !== 1 || existing[0].zone_id !== zone.id) {
+        throw new Error("The Custom Domain is attached to a different zone");
+      }
+      return existing[0];
+    }
+    const path = `/zones/${encodeURIComponent(zone.id)}/dns_records?name.exact=${encodeURIComponent(hostname)}&per_page=100`;
+    const records = await this.page<DnsRecord>(path, true);
+    if ((records.result_info?.total_pages ?? 1) > 1 || records.result.some((record) =>
+      record.name === hostname && ["A", "AAAA", "CNAME", "NS"].includes(record.type))) {
+      throw new Error(`DNS records for ${hostname} conflict with a new Custom Domain`);
+    }
+    return this.json<WorkerDomain>("PUT", "/workers/domains", {
+      hostname, service, zone_id: zone.id,
+    });
+  }
+
+  async removeWorkerDomain(hostname: string, service: string): Promise<void> {
+    hostname = normalizeHostname(hostname);
+    const domains = await this.workerDomains("hostname", hostname);
+    if (!domains.length) return;
+    if (domains.length !== 1 || domains[0].hostname !== hostname || domains[0].service !== service) {
+      throw new Error(`Custom Domain ${hostname} is not owned by this Worker`);
+    }
+    await this.json("DELETE", `/workers/domains/${encodeURIComponent(domains[0].id)}`);
   }
 
   async queueId(name: string): Promise<string> {

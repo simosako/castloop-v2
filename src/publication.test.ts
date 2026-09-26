@@ -192,9 +192,14 @@ test("multiple Episodes, metadata-only and audio-only revisions preserve GUID an
   expect(bucket.entries.has(`${metadataPrefix}/audio.mp3`)).toBe(false);
   expect(bucket.entries.has(`public/podcasts/${showId}/episodes/first/${metadataJob}.mp3`)).toBe(false);
   const secondMetadataJob = crypto.randomUUID();
+  await bucket.put("system/service.toml", service.replace("https://example.workers.dev", "https://podcasts.example.com"));
   await submit("first", secondMetadataJob, metadataJob, metadata("first", "Final title", guid));
   expect(parseEpisodeRevision(await (await bucket.get(
-    `public/episodes/${showId}/first/metadata.toml`))!.text()).enclosure_url).toEndWith(`/${first}.mp3`);
+    `public/episodes/${showId}/first/metadata.toml`))!.text()).enclosure_url)
+    .toBe(`https://podcasts.example.com/podcasts/${showId}/episodes/first/${first}.mp3`);
+  expect(parseEpisodeRevision(await (await bucket.get(
+    `public/episodes/${showId}/first/revisions/${metadataJob}.toml`))!.text()).enclosure_url)
+    .toBe(`https://example.workers.dev/podcasts/${showId}/episodes/first/${first}.mp3`);
   const audioJob = crypto.randomUUID();
   const audio3 = Uint8Array.from([0x49, 0x44, 0x33, 3]);
   await submit("first", audioJob, secondMetadataJob, undefined, audio3);
@@ -209,6 +214,8 @@ test("multiple Episodes, metadata-only and audio-only revisions preserve GUID an
   expect(feed.match(/<item>/g)).toHaveLength(2);
   expect(feed).toContain("Final title");
   expect(feed).toContain("Other");
+  expect(feed).toContain(`https://podcasts.example.com/podcasts/${showId}/episodes/second/${second}.mp3`);
+  expect(feed).not.toContain("example.workers.dev");
   await publishEpisode(env, ctx, `${metadataPrefix}/commit.json`);
   expect(parseEpisodeRevision(await (await bucket.get(
     `public/episodes/${showId}/first/metadata.toml`))!.text()).revision_id).toBe(audioJob);

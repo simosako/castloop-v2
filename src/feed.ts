@@ -1,4 +1,5 @@
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
+import { canonicalEnclosureUrl } from "./media-url";
 
 function escapeXml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -6,7 +7,7 @@ function escapeXml(value: string): string {
   })[character] ?? character);
 }
 
-function renderItem(episode: EpisodeRevision): string {
+function renderItem(episode: EpisodeRevision, showId: string, baseUrl: string): string {
   const hours = Math.floor(episode.duration_seconds / 3600);
   const minutes = Math.floor(episode.duration_seconds % 3600 / 60);
   const seconds = episode.duration_seconds % 60;
@@ -16,7 +17,7 @@ function renderItem(episode: EpisodeRevision): string {
     `      <description>${escapeXml(episode.description)}</description>\n` +
     `      <guid isPermaLink="false">${escapeXml(episode.guid)}</guid>\n` +
     `      <pubDate>${new Date(episode.published_at).toUTCString()}</pubDate>\n` +
-    `      <enclosure url="${escapeXml(episode.enclosure_url)}" length="${episode.length_bytes}" type="audio/mpeg" />\n` +
+    `      <enclosure url="${escapeXml(canonicalEnclosureUrl(episode, showId, baseUrl))}" length="${episode.length_bytes}" type="audio/mpeg" />\n` +
     `      <itunes:duration>${duration}</itunes:duration>\n` +
     (episode.episode_type ? `      <itunes:episodeType>${episode.episode_type}</itunes:episodeType>\n` : "") +
     (episode.season_number ? `      <itunes:season>${episode.season_number}</itunes:season>\n` : "") +
@@ -50,6 +51,7 @@ export function renderFeed(show: ShowMetadata, episodes: EpisodeRevision[],
     `<link>${escapeXml(show.site_url)}</link></image>\n` +
     `    <itunes:image href="${escapeXml(coverUrl)}" />\n` +
     episodes.toSorted((left, right) => Date.parse(right.published_at) - Date.parse(left.published_at) ||
-      left.episode_id.localeCompare(right.episode_id)).map(renderItem).join("") +
+      left.episode_id.localeCompare(right.episode_id)).map((episode) =>
+        renderItem(episode, show.show_id, baseUrl)).join("") +
     `  </channel>\n</rss>\n`;
 }

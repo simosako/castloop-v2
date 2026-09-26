@@ -2,6 +2,7 @@ import { episodeCommitSchema, episodeDraftFromRevision, parseEpisodeDraft, parse
   parseServiceConfig, parseShowMetadata, showCommitSchema, stringifyToml } from "../packages/shared/src/index";
 import type { EpisodeCommit, EpisodeRevision, JobStatus, ShowCommit } from "../packages/shared/src/index";
 import { renderFeed } from "./feed";
+import { canonicalEnclosureUrl } from "./media-url";
 
 export type PublicationEnv = { CASTLOOP_BUCKET: R2Bucket };
 export type Admission = { job_id: string; state: "reserved" | "processing" | "free" };
@@ -239,11 +240,17 @@ async function episodeInputs(env: PublicationEnv, commit: EpisodeCommit): Promis
     throw new InvalidPublication("Episode GUID is already used by another Episode in this Show");
   }
   const coverExtension = show.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg";
+  let enclosureUrl: string;
+  try {
+    enclosureUrl = commit.audio_sha256
+      ? `${baseUrl}/podcasts/${commit.show_id}/episodes/${commit.episode_id}/${commit.job_id}.mp3`
+      : canonicalEnclosureUrl(base!, commit.show_id, baseUrl);
+  } catch {
+    throw new InvalidPublication("Base revision has an invalid audio reference");
+  }
   const revision: EpisodeRevision = {
     ...episode, revision_id: commit.job_id,
-    enclosure_url: commit.audio_sha256
-      ? `${baseUrl}/podcasts/${commit.show_id}/episodes/${commit.episode_id}/${commit.job_id}.mp3`
-      : base!.enclosure_url,
+    enclosure_url: enclosureUrl,
     content_type: "audio/mpeg", length_bytes: commit.audio_length_bytes ?? base!.length_bytes,
     duration_seconds: commit.duration_seconds ?? base!.duration_seconds,
     sha256: commit.audio_sha256 ?? base!.sha256,
