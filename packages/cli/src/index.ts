@@ -9,6 +9,7 @@ import type { EpisodeCommit, EpisodeRevision, ServiceConfig, ShowCommit } from "
 import { analyzeAudio } from "./audio";
 import { CloudflareApi, hashFile } from "./cloudflare-api";
 import { waitForWorkerHealth } from "./health";
+import { commandHelp } from "./help";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync,
@@ -613,8 +614,16 @@ function createEpisode(episodeArg: string): void {
 
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
-  if ((command === "help" || command === "--help") && rest.length === 0) {
+  if ((command === "help" || command === "--help" || command === "-h") && rest.length === 0) {
     console.log(USAGE);
+    return;
+  }
+  if (command === "help" && rest.length === 1) {
+    console.log(commandHelp(rest[0]));
+    return;
+  }
+  if (command && (rest.includes("--help") || rest.includes("-h"))) {
+    console.log(commandHelp(command));
     return;
   }
   if ((command === "version" || command === "--version") && rest.length === 0) {
