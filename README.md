@@ -9,7 +9,7 @@ castloop is a serverless podcast hosting program. Once deployed, it runs with mi
 
 ## Install the CLI (Linux x86-64)
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `THIRD_PARTY_NOTICES.md`, and `LICENSE` from the [v0.1.1 release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.1). Verify the checksum in the download directory and install the binary:
+Download `castloop-linux-x64`, `SHA256SUMS`, `THIRD_PARTY_NOTICES.md`, and `LICENSE` from the [v0.1.2 release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2). Verify the checksum in the download directory and install the binary:
 
 ```sh
 sha256sum --check SHA256SUMS
@@ -18,7 +18,7 @@ install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop"
 castloop --version
 ```
 
-The binary includes the CLI and deployable Worker. **v0.1.1 is distributed for Linux x86-64 only.** The target machine needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in its environment; it needs no Node.js/npm, Wrangler, Bun, `ffprobe`, R2 S3 credentials, or source tree. Enable R2 and create an account-scoped API token in the Cloudflare Dashboard before running `init`. The tested management operations require Workers Scripts, Workers R2 Storage, and Queues permissions. Do not put the token in `castloop.toml` or Git. For an optional check on a separate Linux x86-64 machine, see the [smoke test guide](docs/linux_smoke_test.md).
+The binary includes the CLI and deployable Worker. **v0.1.2 is distributed for Linux x86-64 only.** The target machine needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in its environment; it needs no Node.js/npm, Wrangler, Bun, `ffprobe`, R2 S3 credentials, or source tree. Enable R2 and create an account-scoped API token in the Cloudflare Dashboard before running `init`. The tested management operations require Workers Scripts, Workers R2 Storage, and Queues permissions. Do not put the token in `castloop.toml` or Git. For an optional check on a separate Linux x86-64 machine, see the [smoke test guide](docs/linux_smoke_test.md).
 
 ### Building from source
 
@@ -62,8 +62,8 @@ Download the new release binary and its checksum to a temporary directory, verif
 ```sh
 mkdir -p /tmp/castloop-update
 cd /tmp/castloop-update
-curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.1/castloop-linux-x64
-curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.1/SHA256SUMS
+curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.2/castloop-linux-x64
+curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.2/SHA256SUMS
 sha256sum --check SHA256SUMS
 install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop.next"
 mv "$HOME/.local/bin/castloop.next" "$HOME/.local/bin/castloop"

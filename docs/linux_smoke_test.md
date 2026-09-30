@@ -2,7 +2,7 @@
 
 この手順では、ソースコードのない別のLinuxマシンで配布バイナリを実行します。**第1段階**で`workers.dev`を使って専用の検証サービス・Show・Episodeを公開し、**第2段階**で同じworkspaceを独自ドメインへ移行して戻します。Cloudflare上にWorker、private R2 bucket、Queue、DLQと公開コンテンツが作成されます。通常運用中のworkspaceや既存のShow IDは使わないでください。
 
-**現在の状態:** 公開済みv0.1.1で実施できるのは第1段階までです。独自ドメインの`domain add/list/remove`はまだCLIに公開されていません。第2段階は両コマンドと安全な復帰が実装・受け入れ済みの**将来の配布版**を入手してから実施してください。現時点で手動でWorkerにCustom Domainを付けたり、`castloop.toml`の`public_base_url`だけを書き換えたりしても、feedの移行試験にはなりません。
+**現在の状態:** v0.1.2で実施できるのは第1段階までです。独自ドメインの`domain add/list/remove`はまだCLIに公開されていません。第2段階は両コマンドと安全な復帰が実装・受け入れ済みの**将来の配布版**を入手してから実施してください。現時点で手動でWorkerにCustom Domainを付けたり、`castloop.toml`の`public_base_url`だけを書き換えたりしても、feedの移行試験にはなりません。
 
 下の実施記録は過去に同じLinux環境の新規workspaceで行った旧実装の結果です。別マシンでの検証済み結果ではありません。
 
@@ -15,7 +15,7 @@
 - 検証先に置いた**実在するサイトURL**、正方形のJPEGカバー画像（5 MB以下、推奨1400×1400ピクセル以上）、短いMP3音源（300,000,000 bytes以下）。検証用のShowも公開URLからアクセスできます。カバーとMP3のパスは、検証先マシン上の絶対パスにします。
 - アカウント内で未使用のサービスID（20文字以内）、R2 bucket名、検証用workspaceのパス。サービスID、Show ID、Episode IDには英小文字・数字・区切りのハイフンを使います。
 
-## 2. v0.1.1の実行ファイルを検証先に入れる
+## 2. v0.1.2の実行ファイルを検証先に入れる
 
 以下は検証先の**Bash**ターミナルで実行します。まず配布済みのLinux x86-64バイナリを入手します。`SHA256SUMS`が参照するファイル名のまま同じディレクトリに保存してください。
 
@@ -24,8 +24,8 @@ uname -s
 uname -m
 mkdir -p "$HOME/castloop-smoke-download"
 cd "$HOME/castloop-smoke-download"
-curl -fL https://github.com/simosako/castloop-v2/releases/download/v0.1.1/castloop-linux-x64 -o castloop-linux-x64
-curl -fL https://github.com/simosako/castloop-v2/releases/download/v0.1.1/SHA256SUMS -o SHA256SUMS
+curl -fL https://github.com/simosako/castloop-v2/releases/download/v0.1.2/castloop-linux-x64 -o castloop-linux-x64
+curl -fL https://github.com/simosako/castloop-v2/releases/download/v0.1.2/SHA256SUMS -o SHA256SUMS
 sha256sum --check SHA256SUMS
 mkdir -p "$HOME/.local/bin"
 install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop"
@@ -33,7 +33,7 @@ export PATH="$HOME/.local/bin:$PATH"
 castloop --version
 ```
 
-`uname -s`が`Linux`、`uname -m`が`x86_64`、`castloop --version`が`0.1.1`であることを確認します。検証先に`ffprobe`などの解析ツールをインストールする必要はありません。配布物のライセンス情報は同じ[Release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.1)の`LICENSE`と`THIRD_PARTY_NOTICES.md`を参照してください。
+`uname -s`が`Linux`、`uname -m`が`x86_64`、`castloop --version`が`0.1.2`であることを確認します。検証先に`ffprobe`などの解析ツールをインストールする必要はありません。`castloop init --help`、`castloop create-show --help`、`castloop create-episode --help`が終了コード0で説明を表示することも確認してください。配布物のライセンス情報は同じ[Release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2)の`LICENSE`と`THIRD_PARTY_NOTICES.md`を参照してください。
 
 ソースから試す場合のみ、**ビルド元**でBun 1.4.2とNode.js/npmを使って以下を実行し、バイナリとSHA-256値を検証先へ転送してください。ソースビルドは検証先には不要です。
 
@@ -48,7 +48,7 @@ scp dist/castloop-linux-x64 USER@HOST:/tmp/castloop-linux-x64
 
 この場合は検証先で`sha256sum /tmp/castloop-linux-x64`がビルド元と同じ値になることを確認してから、上と同じように`install -m 0755 /tmp/castloop-linux-x64 "$HOME/.local/bin/castloop"`で配置してください。ソースビルドとReleaseのchecksumは混用しないでください。
 
-## 第1段階: `workers.dev`で公開する（v0.1.1で実施可能）
+## 第1段階: `workers.dev`で公開する（v0.1.2で実施可能）
 
 ### 3. Cloudflare認証とサービス作成
 
@@ -74,7 +74,7 @@ castloop init "$WORKSPACE" \
   --workers-subdomain "$WORKERS_SUBDOMAIN"
 ```
 
-`test -s`が失敗した場合は、カバーとMP3のパスを直してから進めてください。`Initialized ...`と表示されれば成功です。`WORKERS_SUBDOMAIN`には`foo.workers.dev`全体ではなく**`foo`の部分だけ**を指定します。v0.1.1 Releaseの`init`は一時的な404等を最大6回再試行します。開発中の修正版では、通信時間を含む最大2分間、5秒間隔で再試行して待機状況を表示します（認証エラーは即時停止）。途中で止まった場合はworkspaceを残し、**フラグなし**で`castloop init "$WORKSPACE"`を再実行してください。完了済みの作成手順は保持されます。API tokenを`castloop.toml`やGitへ保存しないでください。
+`test -s`が失敗した場合は、カバーとMP3のパスを直してから進めてください。`Initialized ...`と表示されれば成功です。`WORKERS_SUBDOMAIN`には`foo.workers.dev`全体ではなく**`foo`の部分だけ**を指定します。v0.1.2の`init`は通信時間を含む最大2分間、5秒間隔で一時的な404等を再試行して待機状況を表示します（認証エラーは即時停止）。v0.1.1 Releaseは従来の最大6回の待機です。途中で止まった場合はworkspaceを残し、**フラグなし**で`castloop init "$WORKSPACE"`を再実行してください。完了済みの作成手順は保持されます。API tokenを`castloop.toml`やGitへ保存しないでください。
 
 ### 4. Showを公開する
 
@@ -152,7 +152,7 @@ feedにShow/Episodeのタイトル、`itunes:duration`、`workers.dev`上の`ato
 
 ## 第2段階: 独自ドメインへ移行して戻す（機能公開後のみ）
 
-**ここから先はv0.1.1では実行できません。** `domain add/list/remove`と安全な復帰が実装・検証されたLinux x86-64配布版の公開後、その版のRelease notesと`castloop --help`を確認してから実施します。手順は承認済みの[独自ドメイン計画](../design/custom_domain_plan.md)に基づく**予定の受け入れ手順**です。コマンドや必要権限が公開版で変わった場合は、この文書を先に更新してください。
+**ここから先はv0.1.2でも実行できません。** `domain add/list/remove`と安全な復帰が実装・検証されたLinux x86-64配布版の公開後、その版のRelease notesと`castloop --help`を確認してから実施します。手順は承認済みの[独自ドメイン計画](../design/custom_domain_plan.md)に基づく**予定の受け入れ手順**です。コマンドや必要権限が公開版で変わった場合は、この文書を先に更新してください。
 
 ### 7. ドメインと新しいバイナリを準備する
 
@@ -160,7 +160,7 @@ feedにShow/Episodeのタイトル、`itunes:duration`、`workers.dev`上の`ato
 - 対象Cloudflareアカウント内で、権威DNSをCloudflareに移した**Activeなfull zone**と未使用のホスト名（例: `podcasts.example.com`）を用意します。Route 53など外部の権威DNSを維持する方式は対象外です。Cloudflareが既存のWebサイトやメールのDNSをホストしている場合、そのレコードを移行・確認してから行ってください。
 - `www`とapexは別物です。例の`podcasts.example.com`のみを登録しても`example.com`や`www.example.com`の転送は設定されません。既存のA/AAAA/CNAME/NSレコードや別のWorkerが使っているホスト名は選ばず、検証用の**新しい名前**を使ってください。独自ドメインは1サービスに1つのみです。
 - Cloudflare API tokenに、既存のサービス管理権限に加えてWorkers Scripts Write、Zone Zone Read、DNS Readなど公開版のRelease notesで指定された権限を持たせます。tokenをTOMLやGitに保存しないでください。
-- 新Releaseの`castloop-linux-x64`と`SHA256SUMS`を第2節と同様に**別のダウンロードディレクトリ**で取得し、`sha256sum --check SHA256SUMS`の後で検証先のバイナリを更新します。**v0.1.1のchecksumを新バイナリに流用しないでください。** 既存の`castloop.toml`と`.castloop/`をバックアップし、`.castloop/secrets.json`や`.castloop/state.json`は新規生成で置き換えないでください。
+- 新Releaseの`castloop-linux-x64`と`SHA256SUMS`を第2節と同様に**別のダウンロードディレクトリ**で取得し、`sha256sum --check SHA256SUMS`の後で検証先のバイナリを更新します。**旧Releaseのchecksumを新バイナリに流用しないでください。** 既存の`castloop.toml`と`.castloop/`をバックアップし、`.castloop/secrets.json`や`.castloop/state.json`は新規生成で置き換えないでください。
 
 同じ検証先のBashで、記録しておいた値を設定し直します。新しいバイナリを配置した後、バージョンと`domain`コマンドを確認してから、**同じworkspace**へ新しいWorkerをデプロイします。
 
