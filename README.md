@@ -142,3 +142,11 @@ bun /path/to/castloop-v2/packages/cli/src/index.ts job-status JOB_ID --show my-s
 MP3 duration is analyzed by the CLI before upload; unreadable or unsupported input is rejected. A job showing `retrying` and `dlq: true` can be explicitly requeued with `retry-job JOB_ID --show my-show --episode first-episode`. Show jobs omit `--episode`. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) for the verified scope and recovery details.
 
 For subsequent Episode revisions, run `update-episode ID` only when TOML changed, or `update-episode-audio ID file.mp3` only when audio changed, then `publish-episode ID`. Unchanged published inputs are reused; GUID and the original `published_at` must stay the same. A stale base revision is rejected. To remove only the redundant staged MP3 after a job is published, use `cleanup-job JOB_ID --show my-show --episode ID` from the workspace root. Published media, revision metadata, and commit markers remain available. See [`design/m3_implementation_log.md`](design/m3_implementation_log.md).
+
+## Next milestone: M6 content lifecycle
+
+**v0.1.2 does not support Episode or Show deletion, unpublishing, or restoration.** Removing local files does not stop public delivery. `cleanup-job` only removes redundant staged audio, not published content.
+
+The next milestone is [M6: Episode and Show unpublishing and deletion](design/m6_content_lifecycle_plan.md). The R2 control-record approach is decided and foundational implementation has started: strict state schemas, atomic admission, and public-visibility checks. These primitives are not connected to live routes yet. The design includes reversible unpublishing, explicit restoration, and separately confirmed irreversible R2 content deletion. Cache-safe delivery, upload coordination, migration and recovery gates must pass before the proposed commands become available. Progress is recorded in the [M6 implementation log](design/m6_implementation_log.md).
+
+Custom-domain work retains its approved plan and groundwork but follows M6. `domain add/list/remove` remain unavailable.

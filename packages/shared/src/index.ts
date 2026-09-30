@@ -1,6 +1,10 @@
 import * as TOML from "@iarna/toml";
 import { z } from "zod";
 export { validateId } from "./ids";
+export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,
+  parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
+  showControlSchema, stringifyLifecycleToml } from "./lifecycle";
+export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

@@ -4,6 +4,8 @@
 
 M0〜M4.5の完了時点ではWranglerを使用していた。MVP公開前に追加したM5で、管理者の実行環境と配布ビルドからWrangler依存を取り除く。過去の検証結果・当時の採用判断は履歴として残し、今後の実装・MVP受け入れ条件は[「M5: Wrangler不要の管理CLI」](#m5-wrangler不要の管理cli)を優先する。
 
+**2026-09-30の開発順:** v0.1.2公開後の次マイルストーンは[「M6: Episode・Showの公開停止と削除」](./m6_content_lifecycle_plan.md)。独自ドメイン対応は承認済み方針・基礎コードを保持し、M6の後続へ回す。MVP時点の削除非対応という記述は履歴であり、M6が実装済みという意味ではない。
+
 ## プロジェクト概要
 
 - castloop (v2) は、Podcastをホスティングする機能を提供する
@@ -19,7 +21,7 @@ M0〜M4.5の完了時点ではWranglerを使用していた。MVP公開前に追
 
 - 管理者 : castloopを使ってPodcastをホスティングする人（Podcastを運営している人）
 - Show : Podcast番組そのもの。管理者はcastloopを使って複数のShowを管理できる
-- Episode : 番組の1話。Showの中に複数のEpisodeが存在する。MVPでは管理者がEpisodeを作成・更新できる。Episodeの削除はMVPでは非対応とする
+- Episode : 番組の1話。Showの中に複数のEpisodeが存在する。MVPでは管理者がEpisodeを作成・更新できる。公開済みv0.1.2までの削除・公開停止は非対応。M6でEpisodeとShowの公開停止・削除を追加する計画
 
 ## 作成するツール/サービス
 
@@ -299,13 +301,24 @@ MVP公開前の追加マイルストーンM4.5で、CLIのMP3解析に純JSラ�
 
 M5.0の参考API: [R2 REST object upload（文書上限300 MB）](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/upload/)、[Worker module upload](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/)、[R2 Event Notifications](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/event_notifications/)。これらの存在は現在のcastloopでの実行成功を意味しないため、M5.0の実測を合格条件とする。
 
+### M6: Episode・Showの公開停止と削除
+
+**次のマイルストーン（2026-09-30設定）。R2制御record方式を決定し、基礎実装に着手。公開停止・削除・再開のCLIは未提供。** [設計](./m6_content_lifecycle_plan.md)と[実装ログ](./m6_implementation_log.md)を参照する。cache/API・移行・回復の検証ゲートは未通過。
+
+- 可逆な公開停止（データ保持）と不可逆な削除（R2の全対象revision・下書きpayloadを物理削除）を別操作にする案。停止したsnapshotの明示的再開も含める。
+- Episode停止はfeedから対象を除外し、全revisionのMP3を遮断する。Show停止はfeed・カバー・全Episodeの配信を遮断し、子の個別状態は保持する。他Showとサービスリソースは維持する。
+- 同じShowのpublication・staging upload・lifecycleを原子的に排他する。processingを強制解放せず、古いcommitや旧下書きによる復活を防ぐ。
+- 同一Worker内のuncached gatewayで毎要求の公開状態を確認し、cached inner entrypointでWorkers Cacheを維持する。REST deployとGET/HEAD/Range・purgeの実証を先に行う。
+- 操作ID・tombstone・phaseをR2へ保存し、削除batch・purgeの部分失敗を同じjobで再開する。ローカル元ファイルと最小運用記録は自動削除しない案。
+- M6.0は詳細承認・技術実証、M6.1は状態/排他/gateway、M6.2はEpisode、M6.3はShow、M6.4は回帰・実機・文書・公開判定とする。番号だけで次Releaseのバージョンを決めない。
+
 ### MVP実装後の構想
 
 - 予告配信(これはMVPに入れても良いかもしれない）
 - アクセス統計情報の計測と出力(どのepisodeがどれぐらいアクセスされているか）
-- 独自ドメインの設定支援・移行支援（MVPでも既存の独自ドメインを任意で利用できる）
+- 独自ドメインの設定支援・移行支援（[計画](./custom_domain_plan.md)の基礎実装まで着手済み。公開CLIは未提供で、M6の後続へ回す）
 - MP3ビットレート変更や音源フォーマット変換
-- Episodeの削除機能
+- Episode/Showの公開停止・削除は上記M6へ昇格（詳細設計の承認・実装はこれから）
 - エピソード音源更新時の古いバージョンの削除
 
 ## 開発環境

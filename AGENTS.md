@@ -14,7 +14,7 @@ Follow the commands and conventions below.
 - Do not add new tooling without explicit request.
 
 ## Test commands
-- No automated tests are configured yet.
+- Run `bun test` for the automated test suite and `npm run check` for TypeScript validation.
 
 ## Runtime targets
 - The CLI targets a Bun single executable; the public service runs on Cloudflare Workers.
@@ -32,7 +32,7 @@ Follow the commands and conventions below.
 - Show drafts: `staging/shows/<showId>/<jobId>/show.toml`, `cover.<ext>`, and `commit.json`. Episode drafts: `staging/episodes/<showId>/<episodeId>/<jobId>/episode.toml`, `audio.mp3`, and `commit.json`. On an existing episode, the unchanged metadata or audio may be reused from the published revision.
 - `create-episode` creates a local TOML draft. `update-episode` stages only metadata, and `update-episode-audio` stages only MP3 audio in R2. Neither update command publishes. Only `publish-episode` validates the staged inputs and writes `commit.json` last; initial and subsequent publications both require an explicit publish command.
 - Keep one job ID for an unpublished draft. After writing `commit.json`, freeze that draft; use a new job ID for later edits. Reject stale local metadata rather than silently publishing an older staged copy.
-- Keep the immutable published audio and revision history. Decide staging audio retention separately from published media; do not apply a blanket expiration rule to active or recoverable drafts.
+- Keep the immutable published audio and revision history during normal publication. The proposed M6 explicit deletion workflow is the only planned exception; it is not implemented or approved in detail yet. Decide staging audio retention separately from published media; do not apply a blanket expiration rule to active or recoverable drafts.
 - Published feeds and media: `public/podcasts/<showId>/feed.xml`, `cover.<ext>`, and `episodes/<episodeId>/<revisionId>.mp3`.
 - Current episode metadata: `public/episodes/<showId>/<episodeId>/metadata.toml`.
 - Episode revision history: `public/episodes/<showId>/<episodeId>/revisions/<revisionId>.toml`.
@@ -40,7 +40,7 @@ Follow the commands and conventions below.
 - R2 notifications for Show and Episode commit markers in `staging/` feed the same managed Cloudflare Queue. Use one sequential consumer invocation at a time; do not assume FIFO delivery or exactly-once processing. Permit only one unfinished publication per show across Show and Episode jobs, with an atomic admission check and failure recovery; concurrency limiting alone is insufficient. Do not infer publication order from upload timestamps.
 - Store MVP job status at `system/jobs/<jobId>/status.toml` in R2. Consider D1 only if later requirements justify it.
 - Retry transient consumer failures through Cloudflare Queues for a finite number of attempts and route exhausted messages to one dead-letter queue. The current main consumer uses `max_retries: 2`, one-message batches, and concurrency one. Record permanent failure reasons without pointless retries. DLQ delivery does not update R2 status automatically; administrators inspect R2 status and DLQ markers and explicitly retry the same job. Preserve recovery data in R2 rather than relying on Queue retention. Published media and revision history are immutable; staging audio is removed only by explicit cleanup after a successful Episode publication. Queue retention defaults, broader staging/status retention policy, and a safe CLI operation to abandon permanently failed `reserved` jobs remain undefined. Never release a `processing` admission while an old consumer may still write.
-- Preserve immutable media and revision history when updating current metadata. Episode deletion is outside the MVP.
+- Preserve immutable media and revision history when updating current metadata. Episode and Show deletion/unpublishing are not supported through v0.1.2; they are the next milestone, M6. See design/m6_content_lifecycle_plan.md before implementing lifecycle changes. The R2 control-record approach is decided and foundational implementation has started; input Show/Episode TOML must not control publication state. Other policy and runtime gates remain documented in the plan. Do not implement deletion as direct prefix removal or as a separate marker check without atomic admission and cache-safe delivery gates.
 - Use readable immutable slugs matching `[a-z0-9]+(?:-[a-z0-9]+)*`; service IDs are at most 20 characters, show IDs at most 32, and episode IDs at most 80. Show IDs are unique within a service; episode IDs are unique within a show. Auto-generated IDs do not eliminate the need to prevent collisions.
 - Use CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for administration from the standalone CLI. Call Cloudflare's REST API directly for resources, Worker deployment, and R2 uploads; do not require Wrangler, Node.js, or separate R2 credentials on the administrator's machine. Do not store the API token in service TOML or Git. Limit MVP MP3 uploads to 300,000,000 bytes; reject larger files before uploading and verify the uploaded size and contents.
 - Use Workers Caching for the public Worker. Validate cache-tag feed purging and GET/HEAD/Range delivery before the end-to-end MVP release.
@@ -53,6 +53,8 @@ Follow the commands and conventions below.
 - M3 supports multiple episodes, metadata-only and audio-only revisions, concurrency/retry handling, and cleanup.
 - M4 delivers the Bun executable and usage documentation.
 - M5 removes Wrangler from the build and administrator workflows and verifies binary-only publication and recovery. See design/initial_design.md and design/m5_implementation_log.md.
+- M6 is the next milestone after v0.1.2: Episode and Show unpublishing/deletion, with explicit restoration proposed as the reversible counterpart. See design/m6_content_lifecycle_plan.md and design/m6_implementation_log.md. The R2 control-record approach is decided; strict schemas and atomic-admission/public-visibility primitives are implemented but not connected to live routes. Complete the cache/REST/upload/migration gates before exposing lifecycle commands.
+- Custom-domain work retains its approved plan and existing groundwork but follows M6. Do not expose domain add/remove before their existing migration and recovery gates pass. Lifecycle state must also be respected by future domain migration.
 
 ## TOML and schema conventions
 - TOML keys are snake_case to match metadata definitions.

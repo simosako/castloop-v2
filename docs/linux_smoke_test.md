@@ -6,6 +6,8 @@
 
 下の実施記録は過去に同じLinux環境の新規workspaceで行った旧実装の結果です。別マシンでの検証済み結果ではありません。
 
+**次の開発予定:** [M6: Episode・Showの公開停止と削除](../design/m6_content_lifecycle_plan.md)を独自ドメイン対応より先に実装する予定です。v0.1.2には停止・削除・再開はありません。M6の受け入れ手順は対応版の完成後に追加します。ローカルTOMLやworkspaceの削除、`cleanup-job`では公開を停止できません。以下の独自ドメイン試験はM6とは別の後続試験として保持します。
+
 対象はLinux x86-64（`uname -s`が`Linux`、`uname -m`が`x86_64`）です。macOS・Windows用バイナリの起動確認とCloudflare上の管理操作の検証は別に扱います。検証先にNode.js/npm、Wrangler、Bun、ソースコード、`ffprobe`は不要です。
 
 ## 1. 事前に用意するもの
