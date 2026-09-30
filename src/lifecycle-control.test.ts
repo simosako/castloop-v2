@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { episodeLifecycleSchema, parseShowControl, stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { ControlRequest, LifecycleState } from "../packages/shared/src/index";
 import { abandonReservedShowOperation, beginShowOperation, claimShowOperation, readEpisodeLifecycle, readPublicVisibility,
-  readShowControl } from "./lifecycle-control";
+  readPublicVisibilitySnapshot, readShowControl } from "./lifecycle-control";
 
 function memoryBucket() {
   const entries = new Map<string, { data: string; etag: string }>();
@@ -300,6 +300,31 @@ describe("M6 lifecycle admission policies", () => {
 });
 
 describe("M6 uncached public visibility policy", () => {
+  test("public decisions carry cache generations from the same reads without a second Show lookup", async () => {
+    const { bucket, env: original } = await fixture();
+    const control = (await readShowControl(original, "daily"))!.value;
+    await bucket.put("system/show-publications/daily.json", JSON.stringify({ ...control, generation: 7, feed_generation: 4 }));
+    const episode = (await readEpisodeLifecycle(original, "daily", "first"))!;
+    await bucket.put("system/episode-lifecycle/daily/first.toml", stringifyLifecycleToml({ ...episode, generation: 3 }));
+    const reads: string[] = [];
+    const env = { CASTLOOP_BUCKET: { ...bucket, async get(key: string) { reads.push(key); return bucket.get(key); } } } as never;
+    expect(await readPublicVisibilitySnapshot(env, "daily")).toEqual({ visibility: "public", showId: "daily",
+      showGeneration: 7, feedGeneration: 4 });
+    expect(reads).toEqual(["system/show-publications/daily.json"]);
+    reads.length = 0;
+    expect(await readPublicVisibilitySnapshot(env, "daily", "first")).toEqual({ visibility: "public", showId: "daily",
+      episodeId: "first", showGeneration: 7, feedGeneration: 4, episodeGeneration: 3 });
+    expect(reads).toEqual(["system/show-publications/daily.json", "system/episode-lifecycle/daily/first.toml"]);
+  });
+
+  test("non-public snapshots contain no public generation token; an empty Episode ID is not a Show lookup", async () => {
+    const { env } = await fixture("unpublished");
+    expect(await readPublicVisibilitySnapshot(env, "daily")).toEqual({ visibility: "not_found" });
+    await expect(readPublicVisibilitySnapshot(env, "daily", "")).rejects.toThrow();
+    const deleted = await fixture("deleted");
+    expect(await readPublicVisibilitySnapshot(deleted.env, "daily")).toEqual({ visibility: "gone" });
+  });
+
   test("Show state gates every asset and preserves independent child state", async () => {
     for (const [state, result] of [["draft", "not_found"], ["active", "public"],
       ["unpublished", "not_found"], ["deleting", "gone"], ["deleted", "gone"]] as const) {

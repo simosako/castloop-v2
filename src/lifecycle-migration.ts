@@ -2,6 +2,7 @@ import { z } from "zod";
 import { episodeCommitSchema, parseEpisodeLifecycle, parseEpisodeRevision, parseJobStatus, parseServiceConfig,
   parseShowControl, parseShowMetadata, showCommitSchema, validateId } from "../packages/shared/src/index";
 import type { EpisodeLifecycle, ShowControl } from "../packages/shared/src/index";
+import { parsePublicAssetPath } from "./public-assets";
 
 export type MigrationSource = { key: string; etag: string; size: number };
 export type MigrationBlocker = { code: string; key: string; message: string };
@@ -190,9 +191,10 @@ export async function planLifecycleMigration(env: MigrationReadEnv,
         if (!metadata) block("orphan_episode", metadataKey, "Published Episode has no valid published parent Show");
         if (revision.episode_id !== episodeId) block("target_mismatch", metadataKey, "Episode metadata does not match its key");
         const url = new URL(revision.enclosure_url);
-        const path = new RegExp(`^/podcasts/${showId}/episodes/${episodeId}/([a-f0-9-]{36})\\.mp3$`).exec(url.pathname);
-        const audio = path && !url.search ? objects.get(`public${url.pathname}`) : undefined;
-        if (!audio || audio.size !== revision.length_bytes || !path || !z.uuid().safeParse(path[1]).success) {
+        const asset = parsePublicAssetPath(url.pathname);
+        const audio = asset?.kind === "audio" && asset.showId === showId && asset.episodeId === episodeId && !url.search
+          ? objects.get(asset.key) : undefined;
+        if (!audio || audio.size !== revision.length_bytes) {
           block("missing_audio", metadataKey, "Episode enclosure path or audio size does not match published metadata");
         }
         const historyKey = `public/episodes/${showId}/${episodeId}/revisions/${revision.revision_id}.toml`;

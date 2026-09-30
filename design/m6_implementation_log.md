@@ -143,3 +143,15 @@ CAS実証と限定abandonを`0523af1`でcommit/pushした後、upload protocol�
 - `inventory_compatible=true`でも、旧CLI停止・継続HTTP PUTの収束・atomic migration受付・移行完了を意味しない。常に`requires_quiescence=true`を返す。一覧全体のtransaction snapshotやpayload SHA-256実測ではない。適用時の再照合・耐久progress・旧cache purge・capability切替は未実装。
 - Cloudflareの運用サービスでは実行していない。単体テストで不変性、1,000件超/短いページ、既存停止状態の保持、部分初期化拒否、source変化/障害、上限/不正cursorを確認する。
 - `npm run check`、専用実証tsconfig、`bun test`（77件、485 assertions）、`git diff --check`に合格。
+
+## 2026-10-01: 公開snapshot・path/cache identityの共通処理
+
+読み取り専用migration planを`76447f2`でcommit/pushし、未接続の公開ゲート基礎を続けた。
+
+- `readPublicVisibilitySnapshot`は公開可否とShow/feed/Episode generation、対象IDを同じ状態readから返す。Show assetはShow 1 read、音源はShow/Episode 2 reads。公開判定後に別のShow readでcache generationを拾い直す必要をなくした。従来の`readPublicVisibility`はsnapshotのvisibilityだけを返す互換wrapperとして維持する。
+- 親子の2 keyをtransaction snapshotで読むわけではない。停止前に開始済み要求の転送保証も変えていない。非公開snapshotからはpublic cache tokenを返さず、空Episode IDをShow lookup扱いしない。
+- `src/public-assets.ts`: v0.1.2と同じ公開path/ID/UUID/媒体keyを解析するpure helperを追加。Show/Episode対象が一致するpublic snapshotだけからcache propsを作り、feed/cover tagを維持しつつshow/episode階層tagを追加。Episodeタグはslug結合が曖昧にならない区切りにする。
+- migration planのenclosure path検証も同じparserを使用。既存`src/index.ts`やconsumer/CLIへはまだ接続せず、v0.1.2の公開応答/headerは変更していない。cache実証fixtureや既存JSON証拠を新snapshotの本番回帰結果と扱わない。
+- 新たな8テストでread回数、snapshot世代/対象照合、非公開/不正generationのcache key拒否、private/encoded/不正ID path拒否、tag衝突防止を確認。`npm run check`、専用実証tsconfig、`bun test`（85件、532 assertions）に合格。
+- [upload方式の選択肢](./m6_upload_recovery_options.md)を追加。既存REST直PUTを条件付きwriteで取消できないことが現在の主要ゲート。同じWorkerを介する分割sessionを推奨候補として整理したが、方式変更は未承認・未実装。CLI/公開入口の接続とdelete公開は引き続き保留する。
+- Linux x86-64 build、既存version/init help、文書リンク/コードフェンス/空白、英語AGENTS.md、`git diff --check`にも合格。今回のCAS試験で作成した4組のWorker/bucketすべてがREST GETで404であることを最終確認した。

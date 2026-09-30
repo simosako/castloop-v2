@@ -3,8 +3,17 @@ import { controlRequestSchema, parseControlRequest, parseEpisodeLifecycle, parse
 import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/shared/src/index";
 
 export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head"> };
+export type LifecycleReadEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head"> };
 export type ShowControlSnapshot = { value: ShowControl; etag: string };
 export type PublicVisibility = "public" | "not_found" | "gone";
+export type PublicVisibilitySnapshot = { visibility: "not_found" | "gone" } | {
+  visibility: "public";
+  showId: string;
+  episodeId?: string;
+  showGeneration: number;
+  feedGeneration: number;
+  episodeGeneration?: number;
+};
 
 const MAX_CONTROL_BYTES = 16384;
 
@@ -20,7 +29,7 @@ function checkRecordSize(object: R2Object): void {
   if (object.size > MAX_CONTROL_BYTES) throw new Error("Lifecycle control record exceeds the size limit");
 }
 
-export async function readShowControl(env: LifecycleControlEnv, showId: string): Promise<ShowControlSnapshot | null> {
+export async function readShowControl(env: LifecycleReadEnv, showId: string): Promise<ShowControlSnapshot | null> {
   const object = await env.CASTLOOP_BUCKET.get(showControlKey(showId));
   if (!object) return null;
   checkRecordSize(object);
@@ -29,7 +38,7 @@ export async function readShowControl(env: LifecycleControlEnv, showId: string):
   return { value, etag: object.etag };
 }
 
-export async function readEpisodeLifecycle(env: LifecycleControlEnv, showId: string,
+export async function readEpisodeLifecycle(env: LifecycleReadEnv, showId: string,
   episodeId: string): Promise<EpisodeLifecycle | null> {
   const object = await env.CASTLOOP_BUCKET.get(episodeLifecycleKey(showId, episodeId));
   if (!object) return null;
@@ -183,26 +192,35 @@ export async function abandonReservedShowOperation(env: LifecycleControlEnv, sho
   throw new Error("Show control changed before the reserved operation was abandoned");
 }
 
-export async function readPublicVisibility(env: LifecycleControlEnv, showId: string,
-  episodeId?: string): Promise<PublicVisibility> {
+export async function readPublicVisibilitySnapshot(env: LifecycleReadEnv, showId: string,
+  episodeId?: string): Promise<PublicVisibilitySnapshot> {
+  if (episodeId !== undefined) validateId(episodeId, "episode");
   const control = await readShowControl(env, showId);
   if (!control) {
     if (await env.CASTLOOP_BUCKET.head(`system/show-reservations/${validateId(showId, "show")}.json`)) {
       throw new Error("Reserved Show has no lifecycle control record");
     }
-    return "not_found";
+    return { visibility: "not_found" };
   }
-  if (control.value.lifecycle === "deleting" || control.value.lifecycle === "deleted") return "gone";
-  if (control.value.lifecycle !== "active") return "not_found";
-  if (!episodeId) return "public";
+  if (control.value.lifecycle === "deleting" || control.value.lifecycle === "deleted") return { visibility: "gone" };
+  if (control.value.lifecycle !== "active") return { visibility: "not_found" };
+  const snapshot = { visibility: "public" as const, showId,
+    showGeneration: control.value.generation, feedGeneration: control.value.feed_generation };
+  if (episodeId === undefined) return snapshot;
   const episode = await readEpisodeLifecycle(env, showId, episodeId);
   if (!episode) {
     if (await env.CASTLOOP_BUCKET.head(
       `public/episodes/${validateId(showId, "show")}/${validateId(episodeId, "episode")}/metadata.toml`)) {
       throw new Error("Published Episode has no lifecycle control record");
     }
-    return "not_found";
+    return { visibility: "not_found" };
   }
-  if (episode.lifecycle === "deleting" || episode.lifecycle === "deleted") return "gone";
-  return episode.lifecycle === "active" ? "public" : "not_found";
+  if (episode.lifecycle === "deleting" || episode.lifecycle === "deleted") return { visibility: "gone" };
+  return episode.lifecycle === "active" ? { ...snapshot, episodeId, episodeGeneration: episode.generation }
+    : { visibility: "not_found" };
+}
+
+export async function readPublicVisibility(env: LifecycleReadEnv, showId: string,
+  episodeId?: string): Promise<PublicVisibility> {
+  return (await readPublicVisibilitySnapshot(env, showId, episodeId)).visibility;
 }
