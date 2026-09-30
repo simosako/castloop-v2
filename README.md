@@ -78,7 +78,7 @@ For source builds, use the commands in [Building from source](#building-from-sou
 | Symptom | Action |
 | --- | --- |
 | Cloudflare API returns HTTP 403 | Check the API token's account scope and Workers Scripts, Workers R2 Storage, and Queues permissions. |
-| `init` stopped partway | After deployment, `init` retries a temporarily unavailable Worker health endpoint up to six times. If it still fails, keep the workspace and run `castloop init /path/to/workspace` again. Inspect `.castloop/state.json` and Cloudflare resources if it still fails; `init` does not automatically delete resources. |
+| `init` stopped partway | After deployment, `init` waits up to two minutes for Worker health, retrying temporary failures every five seconds and printing progress. Bad credentials fail immediately. If it still fails, keep the workspace and run `castloop init /path/to/workspace` again without flags. Completed initialization steps are retained; resources are not automatically deleted. Inspect `.castloop/state.json` and Cloudflare resources if it still fails. The v0.1.1 Release binary uses the older six-attempt wait. |
 | Show ID already reserved | Use a new Show ID or inspect the existing reservation. A reservation alone does not publish a Show. |
 | Local TOML or MP3 changed after staging | Re-run the corresponding `update-*` command before `publish-*`. A committed job is frozen; later edits need a new job. |
 | `retrying` or `processing` with `dlq: true` | Inspect `job-status` and the Show admission; after resolving the transient issue, use `castloop retry-job JOB_ID --show my-show [--episode ID]` to resume the **same** job. A DLQ record remains as history even after recovery. |

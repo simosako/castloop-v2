@@ -1,20 +1,33 @@
 type HealthRequest = (url: URL, init: RequestInit) => Promise<Response>;
 type Wait = (milliseconds: number) => Promise<void>;
+type HealthWaitOptions = {
+  now?: () => number;
+  report?: (message: string) => void;
+};
 
-const HEALTH_ATTEMPTS = 6;
-const HEALTH_DELAY_MS = 2000;
+const HEALTH_TIMEOUT_MS = 120000;
+const HEALTH_DELAY_MS = 5000;
+const HEALTH_REQUEST_TIMEOUT_MS = 5000;
 
 export async function waitForWorkerHealth(baseUrl: string, adminKey: string,
   request: HealthRequest = fetch,
-  wait: Wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))): Promise<void> {
+  wait: Wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  options: HealthWaitOptions = {}): Promise<void> {
+  const now = options.now ?? (() => performance.now());
+  const report = options.report ?? ((message: string) => console.error(message));
   const url = new URL("/admin/health", baseUrl);
+  const deadline = now() + HEALTH_TIMEOUT_MS;
+  let attempts = 0;
   let lastResult = "network request failed";
-  for (let attempt = 1; attempt <= HEALTH_ATTEMPTS; attempt += 1) {
+  while (now() < deadline) {
+    attempts += 1;
     let status: number | null = null;
     try {
       status = (await request(url, {
         headers: { "X-Castloop-Key": adminKey, "User-Agent": "castloop-cli/0.1" },
-        signal: AbortSignal.timeout(5000),
+        redirect: "manual",
+        signal: AbortSignal.timeout(Math.max(1,
+          Math.ceil(Math.min(HEALTH_REQUEST_TIMEOUT_MS, deadline - now())))),
       })).status;
     } catch {
       lastResult = "network request failed";
@@ -26,8 +39,14 @@ export async function waitForWorkerHealth(baseUrl: string, adminKey: string,
       }
       lastResult = `HTTP ${status}`;
     }
-    if (attempt < HEALTH_ATTEMPTS) await wait(HEALTH_DELAY_MS);
+    const remaining = deadline - now();
+    if (remaining <= 0) break;
+    const delay = Math.min(HEALTH_DELAY_MS, remaining);
+    report(`Waiting for Worker health (${lastResult}, attempt ${attempts}); ` +
+      `up to ${Math.ceil(remaining / 1000)}s remaining`);
+    await wait(delay);
   }
-  throw new Error(`Worker health unavailable after ${HEALTH_ATTEMPTS} attempts (${lastResult}); ` +
+  throw new Error(`Worker health unavailable after ${HEALTH_TIMEOUT_MS / 1000}s and ` +
+    `${attempts} attempt${attempts === 1 ? "" : "s"} (${lastResult}); ` +
     "check public_base_url and Worker deployment, then rerun init in the same workspace");
 }

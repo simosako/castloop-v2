@@ -74,7 +74,7 @@ castloop init "$WORKSPACE" \
   --workers-subdomain "$WORKERS_SUBDOMAIN"
 ```
 
-`test -s`が失敗した場合は、カバーとMP3のパスを直してから進めてください。`Initialized ...`と表示されれば成功です。`WORKERS_SUBDOMAIN`には`foo.workers.dev`全体ではなく**`foo`の部分だけ**を指定します。`init`はWorkerのURLが反映されるまで一時的な404等を最大6回再試行します。途中で止まった場合はworkspaceを残し、**フラグなし**で`castloop init "$WORKSPACE"`を再実行してください。API tokenを`castloop.toml`やGitへ保存しないでください。
+`test -s`が失敗した場合は、カバーとMP3のパスを直してから進めてください。`Initialized ...`と表示されれば成功です。`WORKERS_SUBDOMAIN`には`foo.workers.dev`全体ではなく**`foo`の部分だけ**を指定します。v0.1.1 Releaseの`init`は一時的な404等を最大6回再試行します。開発中の修正版では、通信時間を含む最大2分間、5秒間隔で再試行して待機状況を表示します（認証エラーは即時停止）。途中で止まった場合はworkspaceを残し、**フラグなし**で`castloop init "$WORKSPACE"`を再実行してください。完了済みの作成手順は保持されます。API tokenを`castloop.toml`やGitへ保存しないでください。
 
 ### 4. Showを公開する
 
