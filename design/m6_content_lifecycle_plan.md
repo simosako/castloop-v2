@@ -273,6 +273,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 - 既存Show/Episode入力schema、GUID、公開日時、音源キー、public URLは変更しない。制御情報・job schemaだけをversion付きで拡張する。
 - 移行は管理者が公開/更新/uploadを止め、進行中jobを安全に収束させた状態で実施する。Show予約・公開snapshot・current Episode metadata・下書きを列挙し、従来公開済みをactive、未公開をdraftとして初期化する。既存recordは上書きしない。初期化途中はlifecycle受付を開けず、移行進捗を保存する。
+- 読み取り専用の`planLifecycleMigration`を追加した。list/getだけでsource ETag/sizeと初期状態案を返し、予約欠落、未完了owner/commit、公開metadataと媒体/履歴の不整合、部分的なv2初期化等をblockerにする。既存v2の停止状態・generation・tombstoneは推論でactiveへ戻さない。`inventory_compatible`は構造確認の結果であって受付停止・旧HTTP収束・移行実行の許可ではなく、`requires_quiescence=true`を常に返す。apply/API/CLIはまだ実装していない。
 - 不完全な旧公開jobがある場合は移行を保留する。unknown/missingな制御recordを何でもactive扱いする後方互換は不可。移行済みサービスでの状態record欠落はfail closedする。
 - 停止判定とcache構成に対応したWorkerへ100%切り替え、旧consumer/uploadの収束を確認してから新コマンドを利用可能にする。旧versionの段階的配信が残ったまま停止/削除を始めない。
 - health/管理APIからlifecycle capability・schema version・移行状態を返し、新CLIは対応確認後に操作する。旧CLIは新job statusを読めない場合があるので全管理端末を更新する。

@@ -131,3 +131,15 @@ R2 REST object PUTへ既存ETagと一致しない`If-Match`を付けたが、**H
 - 最終実行はpayload/Worker/bucketのcleanupと不在確認に成功。途中失敗の3組も専用resourceだけを清掃済み。Queue・DNS・既存サービス・Releaseは変更していない。
 - `npm run check`、専用tsconfig、`bun test`に合格（62件、428 assertions）。単体テストでも応答喪失、取消/開始競合、staging拒否、receipt更新後の旧job拒否を追加した。
 - 次は破壊的操作と独立した、既存サービス移行の読み取り専用inventory/planを実装する。upload収束ゲートと本番consumer/CLI接続は引き続き未完了。
+
+## 2026-10-01: 読み取り専用の既存サービス移行plan
+
+CAS実証と限定abandonを`0523af1`でcommit/pushした後、upload protocolの未解決事項と独立した移行準備を進めた。
+
+- `src/lifecycle-migration.ts`に`planLifecycleMigration`を追加。受け取れるbucket操作はlist/getだけで、R2の更新/削除・owner解放・legacy record変換は実行しない。CLI/管理APIにもまだ接続しない。
+- 予約・公開snapshot・current Episode・revision history・draft keyをページ終端まで列挙し、source ETag/sizeと初期状態案を返す。既存公開をactive、未公開の予約/draftをdraftへ分類し、metadata-only改訂で古い音源revisionを再利用するpathも検証する。
+- legacy reserved/processing、未完了commit、失われたfree-ownerのpublished status、予約/metadata/controlのID不一致、feed/cover/media/history欠落、破損record、orphan media、未完了deletion、deleted stateの残存payloadをblockerにする。すでにv2のrecordは状態/generationをそのまま保持し、部分初期化やlifecycle stagingは自動補完せず要調査とする。
+- メタデータread時にlistのETag/sizeとの一致を確認し、変化・R2障害・不正なpaginationはplan生成自体を中止する。読取recordは1MB、inventoryは既定10,000 objectsの上限を設け、超過はbatch設計を要求する。上限を理由に一部だけを合格扱いしない。
+- `inventory_compatible=true`でも、旧CLI停止・継続HTTP PUTの収束・atomic migration受付・移行完了を意味しない。常に`requires_quiescence=true`を返す。一覧全体のtransaction snapshotやpayload SHA-256実測ではない。適用時の再照合・耐久progress・旧cache purge・capability切替は未実装。
+- Cloudflareの運用サービスでは実行していない。単体テストで不変性、1,000件超/短いページ、既存停止状態の保持、部分初期化拒否、source変化/障害、上限/不正cursorを確認する。
+- `npm run check`、専用実証tsconfig、`bun test`（77件、485 assertions）、`git diff --check`に合格。
