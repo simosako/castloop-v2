@@ -31,10 +31,20 @@ export const showControlSchema = z.object({
   generation,
   feed_generation: generation,
   owner: operationOwnerSchema.optional(),
+  last_abandoned_operation: z.object({
+    job_id: z.uuid(),
+    generation,
+    request_sha256: checksum,
+  }).strict().optional(),
 }).strict().superRefine((value, context) => {
   if ((value.lifecycle === "deleting" || value.lifecycle === "deleted") &&
     value.owner && value.owner.action !== "delete") {
     context.addIssue({ code: "custom", message: "A deleting or deleted Show cannot own another operation" });
+  }
+  if (value.last_abandoned_operation &&
+    (value.last_abandoned_operation.generation >= value.generation ||
+      value.last_abandoned_operation.job_id === value.owner?.job_id)) {
+    context.addIssue({ code: "custom", message: "An abandoned operation must be older than the current generation and owner" });
   }
 });
 

@@ -97,3 +97,37 @@
 ### ローカル回帰
 
 `npm run check`、専用tsconfigの型チェック、`bun test`（56件）、文書リンク/コードフェンス/空白確認、`git diff --check`に合格。Cloudflare REST GETでも今回作成した2組のWorker/bucketが404であることを再確認した。
+
+## 2026-09-30: CAS競合・限定reserved abandon・REST条件付きuploadの実測
+
+キャッシュ実証を`16b900f`でcommit/pushした後、管理者の継続開発指示に従って次の安全性ゲートを進めた。
+
+### 実装
+
+- Show v2 schemaへstrictな`last_abandoned_operation` receiptを追加。取消対象job・受付後generation・request hashを保存し、現ownerや現generationと同一のreceiptは拒否する。
+- `abandonReservedShowOperation`: frozen request・owner・generationを確認し、**reservedに限り**同じShow keyのCASでowner除去/generation更新/receipt保存。processingとuploading、legacy/missing/mismatched recordは解放しない。CAS後の応答喪失はreceiptで回復できる。
+- 取消前にprocessingへ進んだconsumerと競合した場合はabandonが失敗する。逆に取消CASが勝った場合、古いbegin CASは失敗する。各jobの凍結requestも保持し、同じjob IDを新しいgenerationへ書き換えて再claimできない。
+- これは新v2経路の未接続基礎関数。既存v1 admissionや旧consumerには適用せず、HTTP管理からのprocessing解放やCLIのabandonコマンドは追加していない。
+
+### 実機結果
+
+最終環境`castloop-m6-admission-89e9794f-07f`、Standard、完了`2026-09-30T14:43:23.015Z`。[専用runner](../experiments/m6/verify-admission.ts)の5チェック合格。[JSON証拠](../experiments/m6/admission-results-20260930.json)を保存する。
+
+1. publish/stage/unpublish/deleteの16同時claimは1件だけ成功、15件拒否。
+2. 同一requestの6同時claimは冪等、generationは1だけ進む。processingはabandon不可。
+3. abandon成功後の503を注入し、同じ要求の再実行で取消を確認。旧begin、旧claim、同jobのgeneration書換claimは拒否。別jobの次受付は成功。
+4. beginとabandonの実R2競合を8回実行し、各回で1つだけ成功。
+5. uploading ownerはdeleteを拒否し、abandonでも解放されない。
+
+### uploadゲートの不成立
+
+R2 REST object PUTへ既存ETagと一致しない`If-Match`を付けたが、**HTTP 200で既存bodyが上書きされた**。`barrier`（7 bytes）→`wrong`（5 bytes）、ETagも変わった。bindingのonlyIf/CASが成立しても、CLIが使うREST object PUTのfenceにはできない。試験fixtureだけの上書きで、運用コンテンツには触れていない。
+
+この結果を受け、条件付きREST PUTのsafe cancellationは不採用。uploadingを時間切れ/HEAD不在だけで解放しない。未解決のままdeleteを先行公開しない。現行直PUTの明確な収束証拠、またはサーバー管理の分割upload sessionなど、別の安全なプロトコルを検討する必要がある。管理端末の追加依存・別productを無断で増やさない。
+
+### 試験環境と回帰
+
+- 初回配備直後に一部要求が500/HTMLの`Script not found`となるケースを観測。runnerは非JSON応答もstatus/titleで記録し、同一要求の有限retry、全同時要求のsettle後cleanupを追加した。これはCASの二重成功とは別のfront-end反映問題。
+- 最終実行はpayload/Worker/bucketのcleanupと不在確認に成功。途中失敗の3組も専用resourceだけを清掃済み。Queue・DNS・既存サービス・Releaseは変更していない。
+- `npm run check`、専用tsconfig、`bun test`に合格（62件、428 assertions）。単体テストでも応答喪失、取消/開始競合、staging拒否、receipt更新後の旧job拒否を追加した。
+- 次は破壊的操作と独立した、既存サービス移行の読み取り専用inventory/planを実装する。upload収束ゲートと本番consumer/CLI接続は引き続き未完了。

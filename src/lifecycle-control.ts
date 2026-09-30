@@ -145,6 +145,44 @@ export async function beginShowOperation(env: LifecycleControlEnv, showId: strin
   return { value, etag: written.etag };
 }
 
+export async function abandonReservedShowOperation(env: LifecycleControlEnv, showId: string,
+  jobId: string, expectedGeneration: number): Promise<ShowControlSnapshot> {
+  const current = await readShowControl(env, showId);
+  if (!current) throw new Error("Show lifecycle control is not initialized");
+  const frozen = await env.CASTLOOP_BUCKET.get(`system/jobs/${jobId}/request.toml`);
+  if (!frozen) throw new Error("Frozen control request is missing");
+  checkRecordSize(frozen);
+  const request = parseControlRequest(await frozen.text());
+  const hash = await requestHash(request);
+  if (request.show_id !== showId || request.job_id !== jobId ||
+    request.expected_show_generation + 1 !== expectedGeneration) {
+    throw new Error("Frozen control request does not match the abandoned operation");
+  }
+  const abandoned = current.value.last_abandoned_operation;
+  if (abandoned?.job_id === jobId && abandoned.generation === expectedGeneration && abandoned.request_sha256 === hash) {
+    return current;
+  }
+  if (current.value.generation !== expectedGeneration || !ownsRequest(current.value, request, hash)) {
+    throw new Error("Operation no longer owns the Show");
+  }
+  if (current.value.owner?.state !== "reserved") {
+    throw new Error("Only an unstarted reserved operation can be abandoned");
+  }
+  if (current.value.generation === Number.MAX_SAFE_INTEGER) throw new Error("Show generation is exhausted");
+  const { owner: _owner, ...withoutOwner } = current.value;
+  const value = parseShowControl({ ...withoutOwner, generation: current.value.generation + 1,
+    last_abandoned_operation: { job_id: jobId, generation: expectedGeneration, request_sha256: hash } });
+  const written = await env.CASTLOOP_BUCKET.put(showControlKey(showId), JSON.stringify(value), {
+    onlyIf: { etagMatches: current.etag },
+  });
+  if (written) return { value, etag: written.etag };
+  const updated = await readShowControl(env, showId);
+  if (updated?.value.last_abandoned_operation?.job_id === jobId &&
+    updated.value.last_abandoned_operation.generation === expectedGeneration &&
+    updated.value.last_abandoned_operation.request_sha256 === hash) return updated;
+  throw new Error("Show control changed before the reserved operation was abandoned");
+}
+
 export async function readPublicVisibility(env: LifecycleControlEnv, showId: string,
   episodeId?: string): Promise<PublicVisibility> {
   const control = await readShowControl(env, showId);

@@ -38,3 +38,16 @@ bun experiments/m6/verify-cache.ts
 最終実行は10項目すべて合格。Standard usage model、観測したHTTP応答50件のcoloはNRT。[`cache-results-20260930.json`](./cache-results-20260930.json)にsecretを含まない観測記録を保存し、判断と残件は[実装ログ](../../design/m6_implementation_log.md)へ記録した。作成したWorker/bucketは削除済み。
 
 これはM6.0のcache/REST/Range構成実証であり、M6全体やFree対応、300MB音源、本番への移行、upload収束、削除consumerの合格ではない。複数colo・別hostname・負荷・実請求額の検証も含まない。
+
+## CAS受付・限定abandon・REST uploadの追加実証
+
+```sh
+bun node_modules/typescript/bin/tsc -p experiments/m6/tsconfig.json
+bun experiments/m6/verify-admission.ts
+```
+
+[`admission-worker.ts`](./admission-worker.ts)と[`probe-harness.ts`](./probe-harness.ts)を使い、別の新規Worker/private R2だけで実行する。検証用seed/cleanupは本番で使わない。作成したresourceは終了時に削除・不在確認し、途中のHTTP要求もすべてsettleしてから後片付けする。初回配備の一時的な500/Script not found等は、同一要求を有限回再送する。
+
+2026-09-30、CAS/abandonの5チェックに合格。[`admission-results-20260930.json`](./admission-results-20260930.json)に記録する。ただしuploadゲートは**未通過**。既存objectへの不一致`If-Match`付きREST PUTが200で上書きされ、binding側CASと同じ条件付きwrite保証を使えなかった。runnerの終了コード0は「測定が完了しcleanupに成功」の意味であり、`uploadEvidence.conditionalRestSupported=false`をupload安全性の合格と扱わない。
+
+`abandonReservedShowOperation`は凍結requestとreserved ownerを同じCASで失効させる基礎関数だけ。processing/uploadingは拒否し、CLI/管理APIにはまだ接続していない。bindingでのCAS成功をREST object PUTの条件付き動作の根拠として流用しない。

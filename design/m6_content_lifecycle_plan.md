@@ -183,8 +183,10 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 - 公開jobがreserved/processing/retryingの間は停止・削除を受け付けない。単一並列consumerだけに安全性を依存させない。**processingを強制解放せず、経過時間だけでownerを取り上げない。** 緊急停止が公開jobを割り込む機能は今回対象外。
 - 現行CLIのREST直PUTは公開停止とは独立してstorageへ書ける。物理削除との競合を防ぐため、M6対応CLIの`update-*`はupload前に同じShow制御keyで短期のstaging受付を取得し、PUTと照合終了後に解放する。upload操作IDと継続するdraft job IDは分ける。
 - uploadが途中終了した場合の再照会・解放は、旧HTTP PUTが今後完了しないと確認できる手順が必要。タイムアウトだけで強制解放する案は採用しない。この実機検証をM6.0のゲートにする。
+- 2026-09-30の専用実測では、R2 REST object PUTは不一致`If-Match`でも200で上書きした。R2 bindingのCAS保証をこのREST経路へ流用できず、条件付きPUT fenceによるupload取消・安全解放は採用しない。現行直PUTの収束確認、またはサーバー管理のupload session等の別プロトコルを成立させるまで、uploadingの取消や削除CLIを公開しない。
 - M6移行時は旧CLIによる書き込みを止める。Cloudflare tokenを持つ旧CLIや手動REST PUTをWorkerだけで禁止できるとは説明しない。保証範囲はM6対応の管理経路と、移行後に収束済みの旧uploadに限る。
 - 恒久failed/reservedの旧公開jobで停止・削除も塞がるケースを扱う必要がある。M6.0で限定的な安全abandon手順を設計する。reservedを同じCASで失効させ、旧commitの再配送・再claimを耐久的に拒否できることを条件とする。processing、書き込みが始まったjob、状態不明jobは対象外。安全性が確認できるまではブロックを保持し、手動でrecordを消さない。
+- 新v2制御record用の限定abandon基礎関数を実装・実測した。凍結requestを照合し、reservedだけをCASで失効、generationを進め、同じrecordへ直近の取消receiptを残す。応答喪失の再実行はreceiptで確認できる。immutable requestと旧generationはその後も保持し、後続操作がreceiptを置換しても旧jobの再claim/beginを許さない。新consumerが**processing CAS成功前に書かない**ことが前提。旧v1 jobの取消・CLI/API公開・status/progressへの接続は別のゲートであり、旧recordをこの関数で取消しない。
 - 後続の独自ドメイン移行も同じ制御recordを使う。M6はShow単位の排他であり、全Showのサービス移行を原子的に止める方式まで解決したとは扱わない。
 
 ## 7. 配信ゲートとキャッシュ（最重要の検証ゲート）

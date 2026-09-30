@@ -1,0 +1,953 @@
+{
+  "name": "castloop-m6-admission-89e9794f-07f",
+  "settings": {
+    "usage_model": "standard",
+    "cache_options": {
+      "enabled": false,
+      "cross_version_cache": false
+    }
+  },
+  "checks": [
+    "R2 CAS admits exactly one of 16 publication/staging/lifecycle contenders",
+    "same-request CAS retries are idempotent; processing cannot be abandoned",
+    "lost abandon response recovers; stale begin, same job reclaim and generation rewrite are rejected",
+    "begin versus abandon CAS has one winner across eight real R2 races",
+    "uploading ownership blocks deletion and cannot be force released"
+  ],
+  "uploadEvidence": {
+    "mismatchedIfMatchStatus": 200,
+    "before": {
+      "etag": "fa9c8ab925b4a1cd4c75b1886fac8f61",
+      "size": 7,
+      "text": "barrier"
+    },
+    "after": {
+      "etag": "2bda2998d9b0ee197da142a0447f6725",
+      "size": 5,
+      "text": "wrong"
+    },
+    "conditionalRestSupported": false
+  },
+  "cleanupErrors": [],
+  "cleanedUp": true,
+  "observations": [
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-arbitration",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "57ee0fcf-e874-4b47-bbd6-3368211cc88e",
+            "kind": "show",
+            "action": "stage",
+            "state": "uploading",
+            "request_sha256": "4673641f771be77486133231c373fd1c1dbddfaec56f2c29e29348e6ae790d53"
+          }
+        },
+        "etag": "6181f9abc892f927dc83b9d18d39a279"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed while claiming the operation"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-idempotent",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "dfea15d8-90f4-4449-ba56-63f3ab21d21e",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "ffced906dae979a63a08a5192ad5d3cacb70f5db748442ce0672f252d060640f"
+          }
+        },
+        "etag": "01b49d798fe3d55cbdb77c6b2a402397"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-idempotent",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "dfea15d8-90f4-4449-ba56-63f3ab21d21e",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "ffced906dae979a63a08a5192ad5d3cacb70f5db748442ce0672f252d060640f"
+          }
+        },
+        "etag": "01b49d798fe3d55cbdb77c6b2a402397"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-idempotent",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "dfea15d8-90f4-4449-ba56-63f3ab21d21e",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "ffced906dae979a63a08a5192ad5d3cacb70f5db748442ce0672f252d060640f"
+          }
+        },
+        "etag": "01b49d798fe3d55cbdb77c6b2a402397"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-idempotent",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "dfea15d8-90f4-4449-ba56-63f3ab21d21e",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "ffced906dae979a63a08a5192ad5d3cacb70f5db748442ce0672f252d060640f"
+          }
+        },
+        "etag": "01b49d798fe3d55cbdb77c6b2a402397"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-idempotent",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "dfea15d8-90f4-4449-ba56-63f3ab21d21e",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "ffced906dae979a63a08a5192ad5d3cacb70f5db748442ce0672f252d060640f"
+          }
+        },
+        "etag": "01b49d798fe3d55cbdb77c6b2a402397"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-idempotent",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "dfea15d8-90f4-4449-ba56-63f3ab21d21e",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "ffced906dae979a63a08a5192ad5d3cacb70f5db748442ce0672f252d060640f"
+          }
+        },
+        "etag": "01b49d798fe3d55cbdb77c6b2a402397"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-idempotent",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "dfea15d8-90f4-4449-ba56-63f3ab21d21e",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "processing",
+            "request_sha256": "ffced906dae979a63a08a5192ad5d3cacb70f5db748442ce0672f252d060640f"
+          }
+        },
+        "etag": "9749d0f095ccfc8454e52dd184e3161a"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 409,
+      "data": {
+        "error": "Error: Only an unstarted reserved operation can be abandoned"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-abandoned",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "a8648892-4a32-4ad8-ba80-206b26112563",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "45cba8d47964e3395217c29c657c9cd67c69de3c347fb1b8b676717ca4aa34c8"
+          }
+        },
+        "etag": "a60f3a0322541eeadd2f46c50229ba14"
+      }
+    },
+    {
+      "action": "abandon-lost",
+      "status": 503,
+      "data": {
+        "error": "Injected lost response"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-abandoned",
+          "lifecycle": "active",
+          "generation": 2,
+          "feed_generation": 0,
+          "last_abandoned_operation": {
+            "job_id": "a8648892-4a32-4ad8-ba80-206b26112563",
+            "generation": 1,
+            "request_sha256": "45cba8d47964e3395217c29c657c9cd67c69de3c347fb1b8b676717ca4aa34c8"
+          }
+        },
+        "etag": "10d953f355a2d3422b0b6855ea6f7510"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 409,
+      "data": {
+        "error": "Error: Operation no longer owns the Show"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show generation changed; inspect the current state before retrying"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Job ID already has a different control request"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-abandoned",
+          "lifecycle": "active",
+          "generation": 3,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "d4bba808-aece-4006-b9f5-0a83b5b6a98b",
+            "kind": "show",
+            "action": "delete",
+            "state": "reserved",
+            "request_sha256": "8fe429b6d2354af483851e62b2b74f23cc01505538d731af14b34432410ec8d2"
+          },
+          "last_abandoned_operation": {
+            "job_id": "a8648892-4a32-4ad8-ba80-206b26112563",
+            "generation": 1,
+            "request_sha256": "45cba8d47964e3395217c29c657c9cd67c69de3c347fb1b8b676717ca4aa34c8"
+          }
+        },
+        "etag": "249248ede3afe358cd54fcbe3089a99f"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-0",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "d4c14161-4abb-4880-b6a7-3a0bd3a8e3fd",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "acb2fae08e55ffbd2aaaf63e46757800af922b9fc38cfa0694a355c8af70c280"
+          }
+        },
+        "etag": "382a47e22b8d69b8be15a620bb756a24"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-0",
+          "lifecycle": "active",
+          "generation": 2,
+          "feed_generation": 0,
+          "last_abandoned_operation": {
+            "job_id": "d4c14161-4abb-4880-b6a7-3a0bd3a8e3fd",
+            "generation": 1,
+            "request_sha256": "acb2fae08e55ffbd2aaaf63e46757800af922b9fc38cfa0694a355c8af70c280"
+          }
+        },
+        "etag": "6c3692d55907e198bf0bacb3e3c84b80"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before processing began"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-1",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "4cf5a8c3-b01e-4804-b766-6a50fa5fc3df",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "f8a48aba3fa26e800037a0c5726684dc44f2f3b193a5cbdad4efa390a40bc7cf"
+          }
+        },
+        "etag": "72a02ed00701632c0c77651d21e16bfb"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-1",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "4cf5a8c3-b01e-4804-b766-6a50fa5fc3df",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "processing",
+            "request_sha256": "f8a48aba3fa26e800037a0c5726684dc44f2f3b193a5cbdad4efa390a40bc7cf"
+          }
+        },
+        "etag": "319040f32283ffdc77e666e2fc7ba33f"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before the reserved operation was abandoned"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-2",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "6c956056-b3f5-4d25-aa1d-8d8c9541c061",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "11ef5da2fedad57c30b53706eee414ba4fa71234e0cc483268750591df80d822"
+          }
+        },
+        "etag": "c5dbbbb2faac1c0841f6273d2418703a"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-2",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "6c956056-b3f5-4d25-aa1d-8d8c9541c061",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "processing",
+            "request_sha256": "11ef5da2fedad57c30b53706eee414ba4fa71234e0cc483268750591df80d822"
+          }
+        },
+        "etag": "93e4d159f9d125775fa0a19a404b21ac"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before the reserved operation was abandoned"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-3",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "682d74d4-7987-4c61-96dd-1b349aac88a1",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "435e70177a8f9b8c30c50148bf21301d413d28895a5fdc935ca9e6d67433d239"
+          }
+        },
+        "etag": "5dcedc0d8a987257d0e04b21459a9b90"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-3",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "682d74d4-7987-4c61-96dd-1b349aac88a1",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "processing",
+            "request_sha256": "435e70177a8f9b8c30c50148bf21301d413d28895a5fdc935ca9e6d67433d239"
+          }
+        },
+        "etag": "8286ed1a979bc91fa494e03acc19ec98"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before the reserved operation was abandoned"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-4",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "a913af9a-c913-42f8-a3f4-9dab800f7486",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "9dc6930a032cd85f54d061e5765eced8142701106f63be513fca5ff95d6ee4a1"
+          }
+        },
+        "etag": "24d6f7914000f7f48f6f9e2e2d5f9401"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before processing began"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-4",
+          "lifecycle": "active",
+          "generation": 2,
+          "feed_generation": 0,
+          "last_abandoned_operation": {
+            "job_id": "a913af9a-c913-42f8-a3f4-9dab800f7486",
+            "generation": 1,
+            "request_sha256": "9dc6930a032cd85f54d061e5765eced8142701106f63be513fca5ff95d6ee4a1"
+          }
+        },
+        "etag": "4c9794f1e22704a4307b470b1ee51b6c"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-5",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "7eadde6d-82b5-49c4-882e-fdf1e65d3fca",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "be3e8f8f2d78f354367ae30b3fb7178a58035fc445bd7645164b67273740e97f"
+          }
+        },
+        "etag": "93872a6da4174ffa3f4b2ee968285e44"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-5",
+          "lifecycle": "active",
+          "generation": 2,
+          "feed_generation": 0,
+          "last_abandoned_operation": {
+            "job_id": "7eadde6d-82b5-49c4-882e-fdf1e65d3fca",
+            "generation": 1,
+            "request_sha256": "be3e8f8f2d78f354367ae30b3fb7178a58035fc445bd7645164b67273740e97f"
+          }
+        },
+        "etag": "bb5179c645b8afa84ceb6a01f182d8e8"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before processing began"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-6",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "4baeaced-a7c7-4aa1-9191-0e59170a158a",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "5a7f0e873837426323623b7dc1008d28ea7aec05c9948a420cdf687e0e38045c"
+          }
+        },
+        "etag": "7e40a2e99fc0ca5e51f381174e14c31d"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-6",
+          "lifecycle": "active",
+          "generation": 2,
+          "feed_generation": 0,
+          "last_abandoned_operation": {
+            "job_id": "4baeaced-a7c7-4aa1-9191-0e59170a158a",
+            "generation": 1,
+            "request_sha256": "5a7f0e873837426323623b7dc1008d28ea7aec05c9948a420cdf687e0e38045c"
+          }
+        },
+        "etag": "aa7bee32a7d54ed2d0547e597ec38218"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before processing began"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-7",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "75051f99-bcec-4937-ad89-b1349db2ce32",
+            "kind": "show",
+            "action": "unpublish",
+            "state": "reserved",
+            "request_sha256": "59e86e1aa4c43f6acf6314354e5d0439e5d54c0d668ba5d5b882c867a14b0830"
+          }
+        },
+        "etag": "0b26e3fb79b2b5d493b36851f11ba092"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-race-7",
+          "lifecycle": "active",
+          "generation": 2,
+          "feed_generation": 0,
+          "last_abandoned_operation": {
+            "job_id": "75051f99-bcec-4937-ad89-b1349db2ce32",
+            "generation": 1,
+            "request_sha256": "59e86e1aa4c43f6acf6314354e5d0439e5d54c0d668ba5d5b882c867a14b0830"
+          }
+        },
+        "etag": "10dfb805c4bead5fb533eb7361a35ab8"
+      }
+    },
+    {
+      "action": "begin",
+      "status": 409,
+      "data": {
+        "error": "Error: Show control changed before processing began"
+      }
+    },
+    {
+      "action": "seed",
+      "status": 200,
+      "data": {
+        "seeded": true
+      }
+    },
+    {
+      "action": "claim",
+      "status": 200,
+      "data": {
+        "value": {
+          "schema_version": 2,
+          "show_id": "probe-uploading",
+          "lifecycle": "active",
+          "generation": 1,
+          "feed_generation": 0,
+          "owner": {
+            "job_id": "bd64c575-0a41-4ed2-bad7-bc2d0a9f16f3",
+            "kind": "show",
+            "action": "stage",
+            "state": "uploading",
+            "request_sha256": "4cb5167cddb90b2cf5a5b4638db7a07616cc389c284c79f0ef3c11528a7b0168"
+          }
+        },
+        "etag": "89401ad50d5d09a82b6044da8fef86c8"
+      }
+    },
+    {
+      "action": "abandon",
+      "status": 409,
+      "data": {
+        "error": "Error: Only an unstarted reserved operation can be abandoned"
+      }
+    },
+    {
+      "action": "claim",
+      "status": 409,
+      "data": {
+        "error": "Error: Show has an unfinished operation"
+      }
+    },
+    {
+      "action": "object",
+      "status": 200,
+      "data": {
+        "etag": "fa9c8ab925b4a1cd4c75b1886fac8f61",
+        "size": 7,
+        "text": "barrier"
+      }
+    },
+    {
+      "action": "object",
+      "status": 200,
+      "data": {
+        "etag": "2bda2998d9b0ee197da142a0447f6725",
+        "size": 5,
+        "text": "wrong"
+      }
+    },
+    {
+      "action": "cleanup",
+      "status": 200,
+      "data": {
+        "cleaned": true
+      }
+    }
+  ],
+  "cleanupAttempts": [
+    {
+      "path": "/workers/scripts/castloop-m6-admission-89e9794f-07f",
+      "attempt": 1
+    },
+    {
+      "path": "/r2/buckets/castloop-m6-admission-89e9794f-07f",
+      "attempt": 1
+    }
+  ],
+  "finishedAt": "2026-09-30T14:43:23.015Z",
+  "source_sha256": {
+    "experiments/m6/admission-worker.ts": "c238b7b4af9f8ee05412d9c573e2fe773650c55f8e4b1bbbdb5a0571bb40659c",
+    "experiments/m6/verify-admission.ts": "dbe5b50f40b4a31b282ccaac816eea48028f3798f7a16aa0a7fa1f7900503470",
+    "experiments/m6/probe-harness.ts": "711868c8b3fbe3f260c9b47f5a7b25646925ee0c4df2d1845f761a0074511841",
+    "src/lifecycle-control.ts": "274c0e2c9f25cc7a744f8a68f7abc68252b5911a4a0eb87ec4d0c7b4f89ba26f",
+    "packages/shared/src/lifecycle.ts": "eaab914893da0bcb34279ec933f5fa82f85c7fb598c63775da4834465599e3ef"
+  }
+}

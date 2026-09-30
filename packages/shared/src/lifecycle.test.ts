@@ -52,6 +52,17 @@ describe("M6 lifecycle schemas", () => {
     expect(showControlSchema.safeParse({ ...control, lifecycle: "deleted",
       owner: { ...owner, action: "publish" } }).success).toBe(false);
   });
+
+  test("abandonment receipts require an older generation and cannot identify the current owner", () => {
+    const control = { schema_version: 2, show_id: "daily", lifecycle: "active", generation: 2, feed_generation: 0 };
+    const receipt = { job_id: request.job_id, generation: 1, request_sha256: "a".repeat(64) };
+    expect(showControlSchema.safeParse({ ...control, last_abandoned_operation: receipt }).success).toBe(true);
+    expect(showControlSchema.safeParse({ ...control,
+      last_abandoned_operation: { ...receipt, generation: 2 } }).success).toBe(false);
+    expect(showControlSchema.safeParse({ ...control, last_abandoned_operation: receipt,
+      owner: { job_id: request.job_id, kind: "show", action: "delete", state: "reserved",
+        request_sha256: "a".repeat(64) } }).success).toBe(false);
+  });
 });
 
 test("ordinary publication cannot restore stopped or deleted content", () => {

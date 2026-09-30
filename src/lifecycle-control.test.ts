@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { episodeLifecycleSchema, parseShowControl, stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { ControlRequest, LifecycleState } from "../packages/shared/src/index";
-import { beginShowOperation, claimShowOperation, readEpisodeLifecycle, readPublicVisibility,
+import { abandonReservedShowOperation, beginShowOperation, claimShowOperation, readEpisodeLifecycle, readPublicVisibility,
   readShowControl } from "./lifecycle-control";
 
 function memoryBucket() {
@@ -181,6 +181,89 @@ describe("M6 atomic Show control", () => {
     await bucket.put("system/show-publications/daily.json", old);
     await expect(claimShowOperation(env, request({ action: "delete" }))).rejects.toThrow();
     expect(bucket.entries.get("system/show-publications/daily.json")?.data).toBe(old);
+  });
+});
+
+describe("M6 reserved-operation abandonment", () => {
+  test("abandonment atomically revokes ownership without changing public state", async () => {
+    const { env } = await fixture();
+    const input = request();
+    await claimShowOperation(env, input);
+    const abandoned = await abandonReservedShowOperation(env, "daily", input.job_id, 1);
+    expect(abandoned.value.owner).toBeUndefined();
+    expect(abandoned.value.lifecycle).toBe("active");
+    expect(abandoned.value.feed_generation).toBe(0);
+    expect(abandoned.value.generation).toBe(2);
+    expect(abandoned.value.last_abandoned_operation?.job_id).toBe(input.job_id);
+    expect((await abandonReservedShowOperation(env, "daily", input.job_id, 1)).etag).toBe(abandoned.etag);
+    await expect(beginShowOperation(env, "daily", input.job_id, 1)).rejects.toThrow("no longer owns");
+    await expect(claimShowOperation(env, input)).rejects.toThrow("Show generation changed");
+    await expect(claimShowOperation(env, { ...input, expected_show_generation: 2 })).rejects.toThrow("different control request");
+    const next = await claimShowOperation(env, request({ expected_show_generation: 2, action: "delete" }));
+    expect(next.value.generation).toBe(3);
+  });
+
+  test("begin and abandon compete for the same CAS; processing cannot be revoked", async () => {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const { env } = await fixture();
+      const input = request();
+      await claimShowOperation(env, input);
+      const contenders = [() => beginShowOperation(env, "daily", input.job_id, 1),
+        () => abandonReservedShowOperation(env, "daily", input.job_id, 1)];
+      if (attempt % 2) contenders.reverse();
+      const results = await Promise.allSettled(contenders.map((run) => run()));
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      const current = (await readShowControl(env, "daily"))!;
+      if (current.value.owner) {
+        expect(current.value.owner.state).toBe("processing");
+        await expect(abandonReservedShowOperation(env, "daily", input.job_id, 1)).rejects.toThrow("unstarted reserved");
+      } else {
+        expect(current.value.last_abandoned_operation?.job_id).toBe(input.job_id);
+        await expect(beginShowOperation(env, "daily", input.job_id, 1)).rejects.toThrow("no longer owns");
+      }
+    }
+  });
+
+  test("uploading, stale generations and mismatched requests never release the Show", async () => {
+    const { env, bucket } = await fixture();
+    const input = request({ action: "stage" });
+    await claimShowOperation(env, input);
+    await expect(abandonReservedShowOperation(env, "daily", input.job_id, 1)).rejects.toThrow("unstarted reserved");
+    await expect(abandonReservedShowOperation(env, "daily", input.job_id, 2)).rejects.toThrow("does not match");
+    await bucket.put(`system/jobs/${input.job_id}/request.toml`, stringifyLifecycleToml({ ...input, action: "delete" }));
+    await expect(abandonReservedShowOperation(env, "daily", input.job_id, 1)).rejects.toThrow("no longer owns");
+    expect((await readShowControl(env, "daily"))?.value.owner?.state).toBe("uploading");
+  });
+
+  test("a lost abandonment response is recovered from the same atomic control record", async () => {
+    const { env: original, bucket } = await fixture();
+    const input = request();
+    await claimShowOperation(original, input);
+    let loseResponse = true;
+    const env = { CASTLOOP_BUCKET: { ...bucket, async put(...args: Parameters<typeof bucket.put>) {
+      const result = await bucket.put(...args);
+      if (loseResponse && args[0] === "system/show-publications/daily.json" && result) {
+        loseResponse = false;
+        throw new Error("Abandonment response was lost");
+      }
+      return result;
+    } } } as never;
+    await expect(abandonReservedShowOperation(env, "daily", input.job_id, 1)).rejects.toThrow("response was lost");
+    const retried = await abandonReservedShowOperation(env, "daily", input.job_id, 1);
+    expect(retried.value.generation).toBe(2);
+    expect(retried.value.owner).toBeUndefined();
+  });
+
+  test("a later abandonment does not allow an older job ID to be reclaimed", async () => {
+    const { env } = await fixture();
+    const first = request();
+    await claimShowOperation(env, first);
+    await abandonReservedShowOperation(env, "daily", first.job_id, 1);
+    const second = request({ expected_show_generation: 2 });
+    await claimShowOperation(env, second);
+    await abandonReservedShowOperation(env, "daily", second.job_id, 3);
+    await expect(beginShowOperation(env, "daily", first.job_id, 1)).rejects.toThrow("no longer owns");
+    await expect(claimShowOperation(env, { ...first, expected_show_generation: 4 })).rejects.toThrow("different control request");
   });
 });
 
