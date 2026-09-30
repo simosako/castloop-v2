@@ -1,0 +1,748 @@
+{
+  "name": "castloop-m6-cache-7b5a047d",
+  "baseUrl": "https://castloop-m6-cache-7b5a047d.simosako.workers.dev",
+  "settings": {
+    "cache_options": {
+      "enabled": true,
+      "cross_version_cache": false
+    },
+    "uploadedExports": {
+      "CachedMedia": {
+        "type": "worker",
+        "cache": {
+          "enabled": true
+        }
+      },
+      "default": {
+        "type": "worker",
+        "cache": {
+          "enabled": false
+        }
+      }
+    },
+    "requestedExports": {
+      "default": {
+        "type": "worker",
+        "cache": {
+          "enabled": false
+        }
+      },
+      "CachedMedia": {
+        "type": "worker",
+        "cache": {
+          "enabled": true
+        }
+      }
+    },
+    "compatibility_date": "2026-09-30",
+    "observability": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "redact_query_string": false,
+      "logs": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "persist": true,
+        "invocation_logs": true
+      },
+      "traces": {
+        "enabled": true,
+        "persist": true,
+        "head_sampling_rate": 1
+      }
+    },
+    "usage_model": "standard"
+  },
+  "checks": [
+    "REST deploy with per-entrypoint cache metadata",
+    "gateway runs on internal cache HIT; client cache is no-store",
+    "cold/hot Range, suffix, 416 and HEAD delivery",
+    "warm-cache Episode and parent Show gates without purge",
+    "outer purge leaves inner cache intact; inner RPC tag purge refreshes it",
+    "cold HEAD does not poison the shared GET cache entry",
+    "inner path-prefix purge invalidates tagless audio without purging cover",
+    "corrupt control record fails closed despite warm cache",
+    "old in-flight cache fill cannot bypass stop or restored generation",
+    "private paths and unauthenticated probe administration are blocked"
+  ],
+  "observations": [
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "d40c9f86-89f0-4e9e-9dac-a7e07fdb498f",
+      "inner": "ac4a2ab4-66fb-43b6-a622-1e02a044413b",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 651
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "5ab3c643-3f15-4477-bfdb-620e4f1c5479",
+      "inner": "ac4a2ab4-66fb-43b6-a622-1e02a044413b",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 270
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "9598f698-1497-4af6-999f-e3827e29f717",
+      "inner": "ac4a2ab4-66fb-43b6-a622-1e02a044413b",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 271
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 206,
+      "bytes": 10,
+      "gateway": "9430995f-ec0b-4cd5-850b-78ff39065677",
+      "inner": "6b3d8709-8e88-4217-8faa-70ffef841480",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": "bytes 0-9/65536",
+      "colo": "NRT",
+      "elapsedMs": 1396
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "51d3f4b2-c1ca-4eda-aa80-4aa505eaf688",
+      "inner": "6b3d8709-8e88-4217-8faa-70ffef841480",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 599
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 206,
+      "bytes": 10,
+      "gateway": "f571c2c6-dfd9-427f-bf56-da7d20d29633",
+      "inner": "6b3d8709-8e88-4217-8faa-70ffef841480",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": "bytes 250-259/65536",
+      "colo": "NRT",
+      "elapsedMs": 352
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 206,
+      "bytes": 10,
+      "gateway": "7b6520c7-b587-4c66-9328-fc67c4443144",
+      "inner": "6b3d8709-8e88-4217-8faa-70ffef841480",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": "bytes 65526-65535/65536",
+      "colo": "NRT",
+      "elapsedMs": 379
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 416,
+      "bytes": 0,
+      "gateway": "4625b937-f95c-4d46-96b7-0cf273c9d2d0",
+      "inner": "6b3d8709-8e88-4217-8faa-70ffef841480",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": "bytes */65536",
+      "colo": "NRT",
+      "elapsedMs": 399
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "HEAD",
+      "status": 200,
+      "bytes": 0,
+      "gateway": "1eb18808-9d69-42e7-a510-17e088bb8c19",
+      "inner": "6b3d8709-8e88-4217-8faa-70ffef841480",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 306
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "6303f115-837d-4b61-a5e8-f98fc51b31e6",
+      "inner": "87765295-f3c4-4fc2-a9f1-0888aa1d524c",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 905
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "ad6274f5-1b5d-446e-9cb9-9c636f5d0759",
+      "inner": "87765295-f3c4-4fc2-a9f1-0888aa1d524c",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 254
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 284
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "HEAD",
+      "status": 404,
+      "bytes": 0,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 245
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3?generation=0&bypass=true",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 361
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "2edc1998-451e-45c5-8c8e-ba38c11246d0",
+      "inner": "ac4a2ab4-66fb-43b6-a622-1e02a044413b",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 298
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "46bd85b3-a94c-45f7-a660-a46a9439e05f",
+      "inner": "87765295-f3c4-4fc2-a9f1-0888aa1d524c",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 214
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 410,
+      "bytes": 21,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 373
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 388
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "HEAD",
+      "status": 404,
+      "bytes": 0,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 266
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 192
+    },
+    {
+      "path": "/podcasts/probe/feed.xml?generation=0",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 140
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 71
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "HEAD",
+      "status": 404,
+      "bytes": 0,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 133
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 226
+    },
+    {
+      "path": "/podcasts/probe/cover.png?generation=0",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 87
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 109
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "HEAD",
+      "status": 404,
+      "bytes": 0,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 79
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 171
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3?generation=0",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 145
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 410,
+      "bytes": 21,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 165
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "1f25ee57-0474-416c-a4b4-08932e569b8b",
+      "inner": "ac4a2ab4-66fb-43b6-a622-1e02a044413b",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 259
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "e6a128be-abbe-4f57-9267-fb471ac28fe9",
+      "inner": "ac4a2ab4-66fb-43b6-a622-1e02a044413b",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 246
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "1739bf3e-ae3a-4f48-ba2a-39b86a6e01cd",
+      "inner": "8e4b3560-39d1-4fc7-83a2-305cc8ae32af",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 453
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "HEAD",
+      "status": 200,
+      "bytes": 0,
+      "gateway": "37055e2d-ea8e-47d7-8d44-d95080ded4a2",
+      "inner": "f157ac7d-fd4c-430f-b5f8-72bb805e3a5c",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 335
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "7bb54152-ae2a-4406-92c1-f73bd11a0dbb",
+      "inner": "f157ac7d-fd4c-430f-b5f8-72bb805e3a5c",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 229
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "82848311-793b-4f3c-9261-02ab42ca7790",
+      "inner": "6b3d8709-8e88-4217-8faa-70ffef841480",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 442
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "48b8662d-4c28-4864-be4b-86d0dde3d9eb",
+      "inner": "f157ac7d-fd4c-430f-b5f8-72bb805e3a5c",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 287
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r1.mp3",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "87a02b61-4fa4-4e71-8ffe-d5b90565aa87",
+      "inner": "277a2428-10d0-4fc5-a2df-47ee8486a3db",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 626
+    },
+    {
+      "path": "/podcasts/probe/cover.png",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "ee350604-8f89-4ed5-b31f-e9d515c7b372",
+      "inner": "f157ac7d-fd4c-430f-b5f8-72bb805e3a5c",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 217
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "89f274fe-ebb9-417c-9b90-42496c0e2c5f",
+      "inner": "8e4b3560-39d1-4fc7-83a2-305cc8ae32af",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 236
+    },
+    {
+      "path": "/podcasts/probe/feed.xml",
+      "method": "GET",
+      "status": 503,
+      "bytes": 34,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 166
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r2.mp3",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 179
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r2.mp3",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "62968fb7-abb9-4c87-902f-158f79d1bf53",
+      "inner": "79130b23-b4e4-4197-84f7-4bc9fee29645",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 2377
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r2.mp3",
+      "method": "GET",
+      "status": 404,
+      "bytes": 26,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 261
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r2.mp3",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "0d7975e3-dc5a-4cde-9bb5-32f8670dcad4",
+      "inner": "f42405a3-dbe8-45e0-8dd1-42bc37a8f0a8",
+      "cache": "MISS",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 616
+    },
+    {
+      "path": "/podcasts/probe/episodes/first/r2.mp3",
+      "method": "GET",
+      "status": 200,
+      "bytes": 65536,
+      "gateway": "90abd378-fa6a-4b54-bcbd-bd23fa2c6b60",
+      "inner": "f42405a3-dbe8-45e0-8dd1-42bc37a8f0a8",
+      "cache": "HIT",
+      "range": "absent",
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 498
+    },
+    {
+      "path": "/system/show-publications/probe.json",
+      "method": "GET",
+      "status": 404,
+      "bytes": 21,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 16
+    },
+    {
+      "path": "/staging/audio.mp3",
+      "method": "GET",
+      "status": 404,
+      "bytes": 21,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 14
+    },
+    {
+      "path": "/admin",
+      "method": "GET",
+      "status": 404,
+      "bytes": 21,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 9
+    },
+    {
+      "path": "/CachedMedia",
+      "method": "GET",
+      "status": 404,
+      "bytes": 21,
+      "gateway": null,
+      "inner": null,
+      "cache": null,
+      "range": null,
+      "contentRange": null,
+      "colo": "NRT",
+      "elapsedMs": 12
+    }
+  ],
+  "cleanupAttempts": [
+    {
+      "path": "/workers/scripts/castloop-m6-cache-7b5a047d",
+      "attempt": 1
+    },
+    {
+      "path": "/r2/buckets/castloop-m6-cache-7b5a047d",
+      "attempt": 1
+    }
+  ],
+  "cleanedUp": true,
+  "finishedAt": "2026-09-30T14:15:32.022Z",
+  "source_sha256": {
+    "experiments/m6/cache-worker.ts": "9f2d2ecd1bb609bb80344234f303649b5a09a6afbf466ec816cdd34ee3d49620",
+    "experiments/m6/verify-cache.ts": "b23e0325d6456819b5f1019349762a8dc51c90620d7784896ec92828e7a2c633",
+    "src/lifecycle-control.ts": "df271ce858ca57cd3fe9d66d4cf62371e3a4e9c5ca91469bd17a6e68aba06937",
+    "packages/shared/src/lifecycle.ts": "19682681c2daa7a19e9090a24b6a0c9ec9ba076119f9fb7b9fa451d04f3ea311"
+  },
+  "purge_results": {
+    "outerPurge": {
+      "success": true,
+      "errors": []
+    },
+    "innerPurge": {
+      "success": true,
+      "errors": []
+    }
+  }
+}

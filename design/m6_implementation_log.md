@@ -55,3 +55,45 @@
 1. M6.0の同一Worker内uncached gateway/cached entrypoint、REST deploy、purge scope、Rangeの技術実証。
 2. 既存Showの明示的移行とcapability、publication/stagingの受付・終了処理を新recordへ接続する設計・実装。
 3. 配信ゲートと回復の条件を揃えた後、Episode/Showのlifecycle consumer・CLIへ進む。
+
+## 2026-09-30: M6.0 キャッシュ構成の実機実証
+
+管理者の指示で、運用サービスとは別のWorker/private R2をREST APIから作成し、同じWorker内のuncached gateway＋cached named entrypointを実証した。認証情報は環境変数のみ、Wrangler・Node.js CLI・R2 S3 credentials・独自ドメインは使っていない。開発時の実行/bundleはBun。Queue/DNS/既存サービス/Releaseは変更していない。
+
+### 専用実装と証拠
+
+- [`experiments/m6/cache-worker.ts`](../experiments/m6/cache-worker.ts): `readPublicVisibility`で実際のR2制御recordを確認し、`CachedMedia`をloopback fetchで呼ぶ試験Worker。gateway/inner別UUID、generation props、内側purge RPC、遅延response fixtureを持つ。入力metadataや公開consumerは試験対象にしていない。
+- [`experiments/m6/verify-cache.ts`](../experiments/m6/verify-cache.ts): 毎回新規resourceを作成し、試験・証拠保存・cleanupを実行。型は[専用tsconfig](../experiments/m6/tsconfig.json)で既存platform typesに対して確認する。
+- 最終実行は`castloop-m6-cache-7b5a047d`、compatibility date `2026-09-30`、usage model `standard`、完了時刻 `2026-09-30T14:15:32.022Z`。10チェック合格。公開/隔離path等の50応答はNRTで観測した。
+- [保存したJSON結果](../experiments/m6/cache-results-20260930.json)にuploadのexports、settings、個々のHTTP status/bytes/ID/cache状態/colo/経過時間、cleanup結果を保持する。raw記録は`/tmp/opencode/castloop-m6-cache-7b5a047d/`。secret入りmanifestはGitに入れない。
+
+### 実測結果
+
+| 項目 | 結果 |
+| --- | --- |
+| REST module deploy | `cache_options.enabled=true`、`cross_version_cache=false`、`exports.default.cache.enabled=false`、`exports.CachedMedia.cache.enabled=true`を受理。upload応答にもentrypoint別設定が返る |
+| gatewayの毎要求実行 | feed MISS→HITでinner UUIDは固定、gateway UUIDは毎回異なる。外側はno-store、内側は300秒cache |
+| GET/HEAD/Range | cold Rangeは206/MISS、後続は206/HIT。`bytes=0-9`、`250-259`、suffix、416のContent-Range/bytesが一致。cold/warm HEADはbodyなし/正しいlength、cold HEAD後のGETも全量一致 |
+| warm cacheでの停止 | Episodeの404/410、Showのfeed/cover/MP3 404/410。GET/HEAD/Range、query/If-None-Matchの停止回避なし。停止試験ではpurgeしない |
+| purge scope | gatewayからのtag purgeはsuccessでもinnerの旧bodyが残る。inner RPCからのtag purge後は新body/新inner UUID。tagなし音源のpath-prefix purgeも有効、cover cacheは変わらない |
+| fail closed | warm cacheのままShow recordを壊すと503。cached bodyを返さない |
+| 遅延旧response | 判定・開始済みresponseは停止後に200完了し得る（保証対象外）。その後の要求は404のまま。再開generation 2では別inner UUIDでMISS→HITとなり旧cacheを再利用しない |
+| 非公開path | system/staging、内部class名の外部pathは404。未認証fixture管理は401 |
+
+65,536 bytesの人工payloadで配信/cachingを検証した。拡張子とContent-Typeだけfeed/cover/MP3に合わせたfixtureで、RSS構文・画像decode・MP3解析/再生は確認していない。停止fixtureはID再利用やdeleted→activeも許す検証専用操作であり、本番lifecycle APIには流用しない。prototypeのShow再readも本番の状態/generation snapshot API設計を代替しない。
+
+### 後片付け
+
+初回`castloop-m6-cache-a21e0c3b`も主要8チェック合格したが、Worker DELETEが500/code10013を返した。再試行でWorker/bucketを削除済み。runnerに有限retryと不在確認を追加し、最終実行はテストpayload・Worker・bucketを自動削除、不在確認まで成功した。作成した2組の検証resourceは残していない。
+
+### 料金・保証範囲・残るゲート
+
+- 公式[Workers Cache料金](https://developers.cloudflare.com/workers/cache/#pricing)と[Workers料金](https://developers.cloudflare.com/workers/platform/pricing/)を確認。cached loopbackもrequest課金対象なので、active配信はgateway＋innerの2 request相当を基本に試算する。inner HITでもgateway CPUとR2状態readは必要。castloop本番の実請求やCPUを測ったわけではない。
+- 今回はStandardであり、Freeの100,000 request/日・10ms CPU制限内で動作することは未実証。[purge rate limit](https://developers.cloudflare.com/workers/cache/purge/#rate-limits)はWorkers Cacheではプランに関係なくFree-tier。rate-limit時のconsumer retryを後続実装に含める。
+- 同一NRTの少量試験。複数colo・hostname・負荷・300MB音源・旧default cacheからの本番移行は未検証。tagなしinner cacheのprefix purge確認は旧default entrypointの移行/purge合格ではない。
+- 外向けheaderは試験ではno-store。設計の`max-age=0, must-revalidate`、activeのconditional 304、Episode generationやfeed generationの本番cache keyは接続時に回帰確認する。
+- **cache/REST/Range構成ゲートは実証済み、M6.0全体とM6公開ゲートは未完了。** 次はR2 CASの実機競合、staging uploadの中断/収束と安全な解放、限定reserved abandon、既存サービス移行/capabilityを進める。CLI/consumer/公開入口へ新構成を接続してから、本番相当の回帰試験を行う。
+
+### ローカル回帰
+
+`npm run check`、専用tsconfigの型チェック、`bun test`（56件）、文書リンク/コードフェンス/空白確認、`git diff --check`に合格。Cloudflare REST GETでも今回作成した2組のWorker/bucketが404であることを再確認した。

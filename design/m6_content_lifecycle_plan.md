@@ -10,7 +10,7 @@
 
 管理者のレビューにより、方式Bの**R2制御recordを公開状態の正とする方式**を決定し、実装開始の指示を受けた。入力Show/Episode TOMLへ公開・削除フラグは追加しない。方式Aとの比較は採否の記録として保持する。
 
-最初の実装ではstrictな状態/request schema、同じShow keyでのCAS受付、凍結request、processing開始時のowner照合、R2を毎回読む公開可否判定を追加する。旧recordの移行や既存CLI/consumer/公開入口への接続はまだ行わず、破壊的操作を先行公開しない。cache/REST deploy・upload収束・削除/復旧の実機ゲートは引き続き未通過であり、方式決定をそれらの合格と扱わない。具体的な進捗は[実装ログ](./m6_implementation_log.md)へ記録する。
+最初の実装ではstrictな状態/request schema、同じShow keyでのCAS受付、凍結request、processing開始時のowner照合、R2を毎回読む公開可否判定を追加した。2026-09-30に専用環境でcache/REST deploy・内部purge・generation key・GET/HEAD/Range構成を実証した。旧recordの移行や既存CLI/consumer/公開入口への接続はまだ行わず、破壊的操作を先行公開しない。Free制限・upload収束・削除/復旧等のゲートは引き続き未通過であり、構成実証をM6全体の合格と扱わない。具体的な進捗は[実装ログ](./m6_implementation_log.md)へ記録する。
 
 ## 1. 目的と開発順序
 
@@ -219,7 +219,9 @@ M6では入口から返すfeed/cover/MP3のクライアント向けheaderを`max
 
 ### REST deployの実証
 
-Cloudflareの文書にはper-entrypoint cache設定・loopback・RPC purgeの例があるが、castloopのREST module uploadでのmetadata形式・installed types・Bun bundle・料金/Free制限は未実測。M6.0で専用WorkerにREST API tokenからデプロイし検証する。Wranglerを管理端末の必須ツールに戻さない。成立しなければ外側のcacheを全無効化した安全な代案と性能コストを提示し、承認前に黙って別製品を増やさない。
+2026-09-30に[専用実証コード](../experiments/m6/README.md)で、REST multipart module uploadの`cache_options`と`exports`、installed types・Bun bundle、内部loopback・RPC purge・generation props・GET/HEAD/Rangeを確認した。default cache無効/内部cache有効の構成はStandard環境で成立した。外側からのpurgeでは内部cacheを消せず、内部entrypointでのtag/path purgeが必要であることも実測した。検証resourceは削除済みで、運用サービスには配備していない。
+
+公式[Workers Cache料金](https://developers.cloudflare.com/workers/cache/#pricing)では、cache HITとcache付きloopback呼出もrequest課金対象。gatewayが実行されるので、内部HITでもgatewayのCPUとR2状態readは残る。外部1要求とcached inner 1呼出の構成では、2 request相当を基本とした試算が必要であり、「同じWorkerだから追加request料金なし」としない。Freeの100,000 request/日・10ms CPU制限、実請求/CPU、300MB音源・複数coloでの挙動は今回未実証。purgeにもWorkers Cache共通のFree-tier rate limitがある。Wranglerを管理端末の必須ツールに戻さず、別製品も増やさない。
 
 ## 8. consumerの処理順と再開
 
