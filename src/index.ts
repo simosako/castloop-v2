@@ -1,8 +1,9 @@
 import { validateId } from "../packages/shared/src/ids";
-import { episodeCommitSchema, parseEpisodeRevision, parseJobStatus } from "../packages/shared/src/index";
+import { episodeCommitSchema, parseEpisodeRevision, parseJobStatus, parseServiceConfig } from "../packages/shared/src/index";
 import { publishEpisode, publishShow, readAdmission } from "./publication";
 import type { Admission } from "./publication";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
+import { initializeServiceAdmission, ServiceAdmissionBlocked, withServiceInvocation } from "./service-admission";
 
 type Env = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -26,6 +27,24 @@ function authenticated(request: Request, secret: string): boolean {
 
 function json(data: object, status: number): Response {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+async function serviceId(env: Env): Promise<string> {
+  const object = await env.CASTLOOP_BUCKET.get("system/service.toml");
+  if (!object || object.size < 1 || object.size > 16384) throw new Error("Published service configuration is missing or oversized");
+  return parseServiceConfig(await object.text()).service_id;
+}
+
+async function legacyMutation(env: Env, callback: () => Promise<Response>, recovering = false): Promise<Response> {
+  try {
+    const id = await serviceId(env);
+    await initializeServiceAdmission(env, id);
+    return await withServiceInvocation(env, id, recovering ? "legacy_recovery" : "legacy_admin", callback);
+  } catch (error) {
+    if (error instanceof ServiceAdmissionBlocked) return json({ error: "Service mutation admission is paused or requires an updated client" }, 409);
+    console.error(JSON.stringify({ event: "legacy_mutation_failed", reason_code: "service_mutation_failed" }));
+    return json({ error: "Service mutation could not complete; inspect admission before retrying" }, 503);
+  }
 }
 
 async function publicAsset(request: Request, env: Env, pathname: string): Promise<Response | null> {
@@ -174,36 +193,38 @@ export default {
       } catch {
         return json({ error: "invalid Episode ID" }, 400);
       }
-      const prefix = `staging/episodes/${showId}/${episodeId}/${job_id}`;
-      const [statusObject, admission, markerObject, revisionObject] = await Promise.all([
-        env.CASTLOOP_BUCKET.get(`system/jobs/${job_id}/status.toml`),
-        readAdmission(env, showId),
-        env.CASTLOOP_BUCKET.get(`${prefix}/commit.json`),
-        env.CASTLOOP_BUCKET.get(`public/episodes/${showId}/${episodeId}/revisions/${job_id}.toml`),
-      ]);
-      const status = statusObject ? parseJobStatus(await statusObject.text()) : null;
-      const marker = markerObject ? episodeCommitSchema.safeParse(await markerObject.json()) : null;
-      if (status?.state !== "published" || status.kind !== "episode" || status.job_id !== job_id ||
-        status.show_id !== showId || status.episode_id !== episodeId ||
-        !admission || admission.value.job_id === job_id && admission.value.state !== "free" ||
-        !marker?.success || marker.data.job_id !== job_id || marker.data.show_id !== showId ||
-        marker.data.episode_id !== episodeId || !revisionObject) {
-        return json({ error: "Only a completed Episode job with intact history can be cleaned" }, 409);
-      }
-      const revision = parseEpisodeRevision(await revisionObject.text());
-      if (revision.revision_id !== job_id || revision.episode_id !== episodeId ||
-        revision.sha256 !== (marker.data.audio_sha256 ?? revision.sha256)) {
-        return json({ error: "Published revision does not match this job" }, 409);
-      }
-      if (!marker.data.audio_sha256) return json({ result: "no staged audio" }, 200);
-      const media = await env.CASTLOOP_BUCKET.head(
-        `public/podcasts/${showId}/episodes/${episodeId}/${job_id}.mp3`);
-      if (!media || media.size !== marker.data.audio_length_bytes ||
-        media.customMetadata?.sha256 !== marker.data.audio_sha256) {
-        return json({ error: "Published media could not be verified" }, 409);
-      }
-      await env.CASTLOOP_BUCKET.delete(`${prefix}/audio.mp3`);
-      return json({ result: "staged audio removed; immutable media and metadata retained" }, 200);
+      return legacyMutation(env, async () => {
+        const prefix = `staging/episodes/${showId}/${episodeId}/${job_id}`;
+        const [statusObject, admission, markerObject, revisionObject] = await Promise.all([
+          env.CASTLOOP_BUCKET.get(`system/jobs/${job_id}/status.toml`),
+          readAdmission(env, showId),
+          env.CASTLOOP_BUCKET.get(`${prefix}/commit.json`),
+          env.CASTLOOP_BUCKET.get(`public/episodes/${showId}/${episodeId}/revisions/${job_id}.toml`),
+        ]);
+        const status = statusObject ? parseJobStatus(await statusObject.text()) : null;
+        const marker = markerObject ? episodeCommitSchema.safeParse(await markerObject.json()) : null;
+        if (status?.state !== "published" || status.kind !== "episode" || status.job_id !== job_id ||
+          status.show_id !== showId || status.episode_id !== episodeId ||
+          !admission || admission.value.job_id === job_id && admission.value.state !== "free" ||
+          !marker?.success || marker.data.job_id !== job_id || marker.data.show_id !== showId ||
+          marker.data.episode_id !== episodeId || !revisionObject) {
+          return json({ error: "Only a completed Episode job with intact history can be cleaned" }, 409);
+        }
+        const revision = parseEpisodeRevision(await revisionObject.text());
+        if (revision.revision_id !== job_id || revision.episode_id !== episodeId ||
+          revision.sha256 !== (marker.data.audio_sha256 ?? revision.sha256)) {
+          return json({ error: "Published revision does not match this job" }, 409);
+        }
+        if (!marker.data.audio_sha256) return json({ result: "no staged audio" }, 200);
+        const media = await env.CASTLOOP_BUCKET.head(
+          `public/podcasts/${showId}/episodes/${episodeId}/${job_id}.mp3`);
+        if (!media || media.size !== marker.data.audio_length_bytes ||
+          media.customMetadata?.sha256 !== marker.data.audio_sha256) {
+          return json({ error: "Published media could not be verified" }, 409);
+        }
+        await env.CASTLOOP_BUCKET.delete(`${prefix}/audio.mp3`);
+        return json({ result: "staged audio removed; immutable media and metadata retained" }, 200);
+      });
     }
     if (pathname === "/admin/jobs/retry") {
       if (typeof job_id !== "string" || !JOB_ID.test(job_id) ||
@@ -216,64 +237,74 @@ export default {
           return json({ error: "invalid Episode ID" }, 400);
         }
       }
-      const admission = await readAdmission(env, showId);
-      const status = await env.CASTLOOP_BUCKET.get(`system/jobs/${job_id}/status.toml`);
-      const job = status ? parseJobStatus(await status.text()) : null;
-      const markerKey = kind === "show" ? `staging/shows/${showId}/${job_id}/commit.json`
-        : `staging/episodes/${showId}/${episodeId}/${job_id}/commit.json`;
-      const [marker, dlq] = await Promise.all([
-        env.CASTLOOP_BUCKET.head(markerKey), env.CASTLOOP_BUCKET.head(`system/jobs/${job_id}/dlq.json`),
-      ]);
-      if (admission?.value.job_id !== job_id || admission.value.state === "free" ||
-        (job?.state !== "retrying" && job?.state !== "processing") ||
-        job.kind !== kind || job.job_id !== job_id || job.show_id !== showId ||
-        (kind === "episode" && job.episode_id !== episodeId) || !marker || !dlq) {
-        return json({ error: "Only an unfinished job in the DLQ can be retried" }, 409);
-      }
-      await env.CASTLOOP_QUEUE.send({ object: { key: markerKey } });
-      return json({ result: "requeued", job_id }, 202);
+      return legacyMutation(env, async () => {
+        const admission = await readAdmission(env, showId);
+        const status = await env.CASTLOOP_BUCKET.get(`system/jobs/${job_id}/status.toml`);
+        const job = status ? parseJobStatus(await status.text()) : null;
+        const markerKey = kind === "show" ? `staging/shows/${showId}/${job_id}/commit.json`
+          : `staging/episodes/${showId}/${episodeId}/${job_id}/commit.json`;
+        const [marker, dlq] = await Promise.all([
+          env.CASTLOOP_BUCKET.head(markerKey), env.CASTLOOP_BUCKET.head(`system/jobs/${job_id}/dlq.json`),
+        ]);
+        if (admission?.value.job_id !== job_id || admission.value.state === "free" ||
+          (job?.state !== "retrying" && job?.state !== "processing") ||
+          job.kind !== kind || job.job_id !== job_id || job.show_id !== showId ||
+          (kind === "episode" && job.episode_id !== episodeId) || !marker || !dlq) {
+          return json({ error: "Only an unfinished job in the DLQ can be retried" }, 409);
+        }
+        await env.CASTLOOP_QUEUE.send({ object: { key: markerKey } });
+        return json({ result: "requeued", job_id }, 202);
+      }, true);
     }
     if (pathname === "/admin/publications/claim") {
       if (typeof job_id !== "string" || !JOB_ID.test(job_id)) return json({ error: "invalid job ID" }, 400);
-      return claimPublication(env, showId, job_id);
+      return legacyMutation(env, () => claimPublication(env, showId, job_id));
     }
     if (typeof reservation_id !== "string" || !JOB_ID.test(reservation_id)) {
       return json({ error: "invalid reservation ID" }, 400);
     }
-    const key = `system/show-reservations/${showId}.json`;
-    const value: ShowReservation = { show_id: showId, reservation_id };
-    const current = await env.CASTLOOP_BUCKET.get(key);
-    if (current) {
-      const record: unknown = await current.json();
-      return record && typeof record === "object" && "reservation_id" in record &&
-        record.reservation_id === reservation_id
-        ? json({ result: "already-reserved" }, 200)
-        : json({ error: "show ID already reserved" }, 409);
-    }
-    const created = await env.CASTLOOP_BUCKET.put(key, JSON.stringify(value), {
-      onlyIf: new Headers({ "If-None-Match": "*" }),
+    return legacyMutation(env, async () => {
+      const key = `system/show-reservations/${showId}.json`;
+      const value: ShowReservation = { show_id: showId, reservation_id };
+      const current = await env.CASTLOOP_BUCKET.get(key);
+      if (current) {
+        const record: unknown = await current.json();
+        return record && typeof record === "object" && "reservation_id" in record &&
+          record.reservation_id === reservation_id
+          ? json({ result: "already-reserved" }, 200)
+          : json({ error: "show ID already reserved" }, 409);
+      }
+      const created = await env.CASTLOOP_BUCKET.put(key, JSON.stringify(value), {
+        onlyIf: new Headers({ "If-None-Match": "*" }),
+      });
+      if (created) return json({ result: "reserved" }, 201);
+      const existing = await env.CASTLOOP_BUCKET.get(key);
+      if (existing) {
+        const record: unknown = await existing.json();
+        if (record && typeof record === "object" && "reservation_id" in record &&
+          record.reservation_id === reservation_id) return json({ result: "already-reserved" }, 200);
+      }
+      return json({ error: "show ID already reserved" }, 409);
     });
-    if (created) return json({ result: "reserved" }, 201);
-    const existing = await env.CASTLOOP_BUCKET.get(key);
-    if (existing) {
-      const record: unknown = await existing.json();
-      if (record && typeof record === "object" && "reservation_id" in record &&
-        record.reservation_id === reservation_id) return json({ result: "already-reserved" }, 200);
-    }
-    return json({ error: "show ID already reserved" }, 409);
   },
   async queue(batch, env, ctx): Promise<void> {
     if (batch.queue === env.CASTLOOP_DLQ_NAME) {
       for (const message of batch.messages) {
-        await recordDeadLetterDelivery(env, message);
+        const id = await serviceId(env);
+        await initializeServiceAdmission(env, id);
+        await withServiceInvocation(env, id, "legacy_consumer", () => recordDeadLetterDelivery(env, message));
       }
       return;
     }
     for (const message of batch.messages) {
       const delivery = parseQueueDelivery(message.body);
       if (!delivery || delivery.family !== "publication") continue;
-      if (delivery.target.kind === "show") await publishShow(env, ctx, delivery.key);
-      else await publishEpisode(env, ctx, delivery.key);
+      const id = await serviceId(env);
+      await initializeServiceAdmission(env, id);
+      await withServiceInvocation(env, id, "legacy_consumer", async () => {
+        if (delivery.target.kind === "show") await publishShow(env, ctx, delivery.key);
+        else await publishEpisode(env, ctx, delivery.key);
+      });
     }
   },
 } satisfies ExportedHandler<Env>;

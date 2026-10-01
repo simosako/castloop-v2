@@ -150,6 +150,8 @@ Showがactiveで、かつEpisodeがactiveの場合だけ、その音源を公開
 
 ```text
 system/show-publications/<showId>.json             # 既存keyをversion付き制御recordへ拡張
+system/lifecycle-service.json                      # サービス書込registry・pause・移行owner・readiness
+system/lifecycle-migrations/<migrationId>/request.json # 凍結したpause ID・期待service generation
 system/episode-lifecycle/<showId>/<episodeId>.toml  # 状態・generation・最終操作ID
 system/jobs/<jobId>/request.toml                   # 凍結したaction・対象・期待generation
 system/jobs/<draftJobId>/publication.json           # 凍結publication commitとstaging検証操作ID
@@ -302,6 +304,8 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 - completedの書込後、owner解放前に落ちた場合は完了済みの副作用をやり直さず解放だけ再試行する。古いjobによる新ownerの解放を禁止する。
 
 ## 9. 既存サービスとの互換性・移行
+
+2026-10-01にservice CAS registryを追加した。新Workerの管理書込/Queue/DLQは副作用前にinvocation tokenを同じservice recordへ登録し、すべての書込Promise終了後に返す。pauseで新規管理操作を止め、取得済みinvocationと既存job consumer/限定retryをdrainする。移行ownerは同じCASで空registryだけを取得するため、遅れて入るconsumerとの競合でも同時成立しない。旧Workerがこのregistryに参加するわけではなく、100%切替前の処理と旧CLI REST直PUTには別途終了確認が必要である。取得応答喪失/強制終了のtokenを期限だけで消さない。M6 readinessへの切替、移行apply/API/CLIは後続とする。
 
 - 既存Show/Episode入力schema、GUID、公開日時、音源キー、public URLは変更しない。制御情報・job schemaだけをversion付きで拡張する。
 - 移行は管理者が公開/更新/uploadを止め、進行中jobを安全に収束させた状態で実施する。Show予約・公開snapshot・current Episode metadata・下書きを列挙し、従来公開済みをactive、未公開をdraftとして初期化する。既存recordは上書きしない。初期化途中はlifecycle受付を開けず、移行進捗を保存する。

@@ -3,6 +3,7 @@ import { lifecycleCommitKey } from "../packages/shared/src/index";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { lifecycleFixture } from "./test-support/lifecycle";
 import worker from "./index";
+import { PUBLICATION_SERVICE_TEXT } from "./test-support/publication";
 
 describe("publication/lifecycle Queue delivery boundary", () => {
   test("legacy publications and lifecycle commits are recognized without copying notification payloads", () => {
@@ -61,6 +62,7 @@ describe("publication/lifecycle Queue delivery boundary", () => {
 
   test("the live DLQ handler uses sanitized markers but does not change job status or admission", async () => {
     const setup = await lifecycleFixture();
+    await setup.bucket.put("system/service.toml", PUBLICATION_SERVICE_TEXT);
     const key = `staging/shows/daily/${setup.jobId}/commit.json`;
     const before = setup.entries.get("system/show-publications/daily.json");
     const unmatchedId = crypto.randomUUID();

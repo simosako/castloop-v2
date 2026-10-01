@@ -1,20 +1,28 @@
 import { describe, expect, test } from "bun:test";
 import { stringifyToml } from "../packages/shared/src/index";
 import worker from "./index";
+import { initializeServiceAdmission, pauseServiceAdmission, readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
+
+const SERVICE = "schema_version = 1\nservice_id = 'service'\naccount_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\nbucket_name = 'test-bucket'\nworker_name = 'test-worker'\nqueue_name = 'test-queue'\ndlq_name = 'test-dlq'\npublic_base_url = 'https://example.workers.dev'\n";
 
 type RecordValue = { show_id: string; reservation_id: string };
 
 function bucket() {
-  const entries = new Map<string, string>();
+  const entries = new Map<string, string>([["system/service.toml", SERVICE]]);
   return {
     entries,
-    put: async (key: string, value: string, options: { onlyIf: Headers }) => {
-      if (options.onlyIf.get("If-None-Match") === "*" && entries.has(key)) return null;
+    put: async (key: string, value: string, options?: { onlyIf?: Headers | { etagMatches: string } }) => {
+      if (options?.onlyIf instanceof Headers && options.onlyIf.get("If-None-Match") === "*" && entries.has(key)) return null;
+      if (options?.onlyIf && !(options.onlyIf instanceof Headers) && options.onlyIf.etagMatches !== entries.get(key)) return null;
       entries.set(key, value);
-      return { key };
+      return { key, etag: value };
     },
-    get: async (key: string) => entries.has(key) ? { json: async () => JSON.parse(entries.get(key)!) as RecordValue } : null,
-    head: async (key: string) => entries.has(key) ? { key } : null,
+    get: async (key: string) => {
+      const value = entries.get(key);
+      return value === undefined ? null : { etag: value, size: new TextEncoder().encode(value).length,
+        json: async () => JSON.parse(value) as RecordValue, text: async () => value };
+    },
+    head: async (key: string) => entries.has(key) ? { key, etag: entries.get(key), size: new TextEncoder().encode(entries.get(key)!).length } : null,
   };
 }
 
@@ -89,12 +97,7 @@ test("a DLQ job left processing after a terminated invocation can be retried", a
   storage.entries.set(`system/jobs/${jobId}/status.toml`, stringifyToml({ schema_version: 1,
     job_id: jobId, show_id: showId, episode_id: "large", kind: "episode", state: "processing" }));
   const sent: unknown[] = [];
-  const env = { CASTLOOP_BUCKET: { ...storage, get: async (key: string) => {
-    const value = storage.entries.get(key);
-    return value === undefined ? null : {
-      etag: "test-etag", json: async () => JSON.parse(value), text: async () => value,
-    };
-  } }, CASTLOOP_QUEUE: { send: async (message: unknown) => { sent.push(message); } },
+  const env = { CASTLOOP_BUCKET: storage, CASTLOOP_QUEUE: { send: async (message: unknown) => { sent.push(message); } },
   CASTLOOP_ADMIN_KEY: "test-secret" } as never;
   const retry = () => worker.fetch(new Request("https://example.workers.dev/admin/jobs/retry", {
     method: "POST", headers: { "X-Castloop-Key": "test-secret" },
@@ -104,4 +107,44 @@ test("a DLQ job left processing after a terminated invocation can be retried", a
   expect(sent).toEqual([{ object: { key: markerKey } }]);
   storage.entries.delete(`system/jobs/${jobId}/dlq.json`);
   expect((await retry()).status).toBe(409);
+});
+
+test("paused service rejects legacy reservation/claim and malformed admission fails closed", async () => {
+  const storage = bucket();
+  const env = { CASTLOOP_BUCKET: storage, CASTLOOP_ADMIN_KEY: "test-secret" } as never;
+  await initializeServiceAdmission(env, "service");
+  await pauseServiceAdmission(env, "service", crypto.randomUUID());
+  const before = new Map(storage.entries);
+  for (const path of ["/admin/shows/reserve", "/admin/publications/claim"]) {
+    const response = await worker.fetch(new Request(`https://example.workers.dev${path}`, { method: "POST",
+      headers: { "X-Castloop-Key": "test-secret" }, body: JSON.stringify({ show_id: "daily", job_id: crypto.randomUUID(), reservation_id: crypto.randomUUID() }) }), env);
+    expect(response.status).toBe(409);
+  }
+  expect(storage.entries).toEqual(before);
+  storage.entries.set(SERVICE_ADMISSION_KEY, "{}");
+  const response = await worker.fetch(new Request("https://example.workers.dev/admin/shows/reserve", { method: "POST",
+    headers: { "X-Castloop-Key": "test-secret" }, body: JSON.stringify({ show_id: "daily", reservation_id: crypto.randomUUID() }) }), env);
+  expect(response.status).toBe(503);
+  expect(storage.entries.has("system/show-reservations/daily.json")).toBe(false);
+});
+
+test("live legacy queue invocation remains registered until its work settles", async () => {
+  const storage = bucket();
+  const env = { CASTLOOP_BUCKET: storage, CASTLOOP_ADMIN_KEY: "test-secret", CASTLOOP_DLQ_NAME: "dead-queue" } as never;
+  await initializeServiceAdmission(env, "service");
+  const jobId = crypto.randomUUID();
+  const key = `staging/shows/daily/${jobId}/commit.json`;
+  const started = Promise.withResolvers<void>();
+  const ended = Promise.withResolvers<void>();
+  const liveEnv = { CASTLOOP_BUCKET: { ...storage, async get(path: string) {
+    if (path === key) { started.resolve(); await ended.promise; }
+    return storage.get(path);
+  } }, CASTLOOP_ADMIN_KEY: "test-secret", CASTLOOP_DLQ_NAME: "dead-queue" } as never;
+  const outcome = worker.queue({ queue: "main-queue", messages: [{ body: { object: { key } } }] } as never, liveEnv, {} as never);
+  await started.promise;
+  expect((await readServiceAdmission(env, "service"))?.value.invocations).toHaveLength(1);
+  await pauseServiceAdmission(env, "service", crypto.randomUUID());
+  ended.resolve();
+  await outcome;
+  expect((await readServiceAdmission(env, "service"))?.value.invocations).toEqual([]);
 });

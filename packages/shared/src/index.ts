@@ -14,6 +14,8 @@ export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, life
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
   showControlSchema, stringifyLifecycleToml } from "./lifecycle";
 export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
+export { serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
+export type { ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

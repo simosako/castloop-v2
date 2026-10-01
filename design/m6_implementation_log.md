@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: サービス単位の原子的な書込停止・移行受付を追加
+
+- `system/lifecycle-service.json`のstrict CAS recordにlegacy/M6 mode、open/paused/migrating、最大32件のmutating invocation tokenを保持する。pauseは新しい管理書込を止めるが、取得済みtokenの処理と、既存jobのconsumer/限定retryはpaused中も収束できる。移行は同じCASでregistryが空の場合だけmigrating ownerを取得し、以後consumerも登録できない。事前のreadだけによる受付停止ではない。
+- 現行WorkerのShow予約/publication claim/cleanup/retry、Queue/DLQの書込をregistryへ接続した。認証/入力検証後、service設定をstrict/boundedに読み、未初期化ならlegacy recordをCAS作成してから登録する。正常/例外で処理をawaitした後だけtokenを返す。停止中管理書込は409、破損record/不明な失敗は固定診断503でfail closedする。legacy公開HTTPは今回変更していない。
+- 移行requestはpause IDと期待service generationを凍結し、同IDの変更再送を拒否する。移行execution tokenもCAS排他し、未知tokenを時間で奪わない。plan/progressが未作成でexecutionがない移行だけ取消しでき、generationにより旧凍結requestの再claimを拒否する。M6 readiness evidenceはschemaのみで、今回M6 modeへ切り替える経路やlifecycleコマンドは追加していない。
+- `bun test`（292件、5051 assertions）、`npm run check`、M6実証tsconfigに合格。registry同時更新/返却、pause中のdrain、consumerとmigrationのCAS競合、live callback/Queue待ち、pause/resume/取得の応答喪失、移行token、旧request取消後拒否、現行管理APIの停止/破損拒否を確認した。
+- 実deployは未実施。旧Workerを100%置換し、登録前の旧invocationと旧CLI REST直PUTを終わらせる外部確認が別途必要で、このregistryだけで以前のWorker/CLIを停止できるとはしない。強制終了/取得応答喪失の未知invocationは残り、移行をブロックする。新移行apply/capability、公開gateway切替と旧cache purgeも次の実装で接続する。
+
 ## 2026-10-01: Episode publication runner・stream媒体保存・改訂回復を追加
 
 - `runOwnedEpisodePublication`と共通publication consumerを初回Episode/metadata-only/audio-onlyへ拡張した。凍結commitとstaging証拠を再照合し、保存済みbase revisionからGUID/公開日時と未変更metadata/audioを再利用する。active子だけのfeed入力を使い、停止中の親/子を通常publishで復帰させない。GUID重複は停止Episodeのcurrent metadataも含めたbounded inventoryで拒否する。
