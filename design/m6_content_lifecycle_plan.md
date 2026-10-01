@@ -266,7 +266,11 @@ M6では入口から返すfeed/cover/MP3のクライアント向けheaderを`max
 
 Show予約、Show制御record、Episode tombstone、lifecycle request/commit/progress、最小job監査は削除しない。古いpublication commitも復旧/拒否判断に必要な最小記録として残し、stagingの削除ではmetadata・cover・audioを消すがそのmarkerを区別する。2026-10-01に管理者が、小さい必要記録の自動期限削除は行わず、本文/個人情報/secretを複製しない方針を承認した。エラーreasonはallowlistの診断code/定型文に限定し、任意の例外messageを永続記録へ保存しない。期限付きの監査cleanupは後続とし、未完了/回復中jobを時間だけで消さない。
 
-`src/lifecycle-deletion.ts`に、固定scope・許可key分類・list/headだけのページinventoryを追加した。媒体bodyを読み込まず、payload/保持marker/未知key blockerを分離する。`authorizesDeletion=false`であり、一覧結果だけで実削除を許可しない。cursor完走後も各prefixの先頭から再照会する実削除consumerと耐久progressへの接続は未実装。
+`src/lifecycle-deletion.ts`に、固定scope・許可key分類・list/headだけのページinventoryを追加した。媒体bodyを読み込まず、payload/保持marker/未知key blockerを分離する。`authorizesDeletion=false`であり、一覧結果だけで実削除を許可しない。
+
+`src/lifecycle-delete-batch.ts`の独立した1 step処理は、delete owner/実行token、対象deleting状態と期待generation、durable progressの要求hash/phase/purge成功、呼出側の配信ゲート確認を必須とする。固定scopeのpayloadだけを最大100 keyのarrayで削除し、markerは本文をコピーせずstrict schema/対象/ETag/sizeを確認して保持する。未知key・不正marker・payload変更では削除を止める。progressはCASで保存し、payloadを削除したpageではcursorを進めず再列挙する。全scopeの削除走査後は先頭からverification passを行い、残存payloadがあれば削除へ戻る。終端は`finalizing`であり、まだdeleted/completedやowner解放にはしない。削除件数は応答喪失で過少になることがある診断値で、完了の証拠には使わない。
+
+このstepは本番API/Queue/CLIへ未接続である。配信ゲート確認callbackの本番実装、開始時のstate/feed/purge/progress、最後のpurge/tombstone完成/terminal status、Queue継続とinvocation間の安全な引継ぎは残ゲート。mockのgate成功を本番配信の保証と扱わず、旧CLI停止・upload/consumer収束・移行の条件も維持する。
 
 ### 公開再開
 
@@ -359,7 +363,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 独立して進められる実装を継続し、最終確認待ちと技術残件は[レビュー待ち一覧](./m6_review_queue.md)に分離してまとめる。未接続moduleの自動テスト追加を、公開policyの承認やM6の実機受け入れと扱わない。
 
-1. **deleteは物理削除、unpublishは保持**という分離。単なる論理削除にする代案もあるが、利用者が想定する容量削減を満たさないため上記を推奨する。
+1. **承認済み（2026-10-01）**: deleteはpayloadの物理削除、unpublishは保持。必要な小さい管理/操作記録を残す方針と分離する。
 2. **unpublishと対になるrestoreもM6に含める**こと。通常publishで暗黙再開する方式は誤公開を招くので推奨しない。
 3. **承認済み（2026-10-01）**: 停止時404、削除中/削除済み410、空Showのfeedは200というHTTP仕様。
 4. **承認済み（2026-10-01）**: 削除IDは永久再利用禁止。最小tombstoneと必要な小さい操作記録は自動期限削除せず保持し、本文/個人情報/secretは複製しない。期限付きの監査cleanupは後続。ローカル元ファイルはremote削除の対象外とする設計を維持する。

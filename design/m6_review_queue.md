@@ -1,4 +1,4 @@
-# M6: 確認待ち事項と残る技術ゲート
+# M6: 承認済み方針と残る技術ゲート
 
 更新日: 2026-10-01
 
@@ -39,11 +39,11 @@
 2. **consumer invocationの安全な回復**: 現在のtokenは同jobの重複実行を排除するが、取得応答喪失・runtime強制終了ではブロックを保持する。稼働中invocationを解放せずに終了を確認する手順と、次のinvocationへの引継ぎを成立させる。時間/HEAD不在だけの奪取を追加しない。
 3. **本番配信とpurge**: gatewayをdefault cache無効の入口へ接続し、cache有効named entrypointへの内部fetchと所有entrypoint内purgeを実装する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。
 4. **移行とcapability**: 読み取り専用planに加え、旧書込停止、atomicな移行受付、apply/途中再開、旧cache purge、100% Worker切替、対応機能照会と安全なrollbackを実装する。
-5. **再開・物理削除**: restoreの検証→feed/purge準備→active化、削除の配信停止→batch削除→先頭から最終再列挙→tombstone完成、続行message・DLQ・remote retryを実装する。未知keyを黙ってprefix削除しない。
+5. **再開・物理削除**: owner/実行token・deleting・purge・配信gate確認を必須とするpayload batchと、先頭からのverification passを独立moduleとして実装した。開始時のstate/feed/purge/progress、本番gate確認、最後のpurge/tombstone完成、続行message・DLQ・remote retryへの接続は残る。restoreの検証→feed/purge準備→active化も実装する。未知keyを黙ってprefix削除しない。
 6. **接続と受け入れ**: 注入effectを実装して停止状態機械をQueueへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
 
 ## 今回実装済みだが本番未接続
 
-strictな制御/request/status/progress、Show CAS受付、reserved限定abandon、invocation token、完了解放receipt、移行inventory、削除対象ページ、lifecycle対応feed入力、Show/Episode停止状態機械、公開gateway。個々の自動テスト合格はM6全体の受け入れ合格ではない。
+strictな制御/request/status/progressとallowlist診断、Show CAS受付、reserved限定abandon、invocation token、完了解放receipt、移行inventory、削除対象ページ、owner-gated payload batch/verification pass、lifecycle対応feed入力、Show/Episode停止状態機械、公開gateway。個々の自動テスト合格はM6全体の受け入れ合格ではない。
 
 詳細は[M6設計](./m6_content_lifecycle_plan.md)、[実装ログ](./m6_implementation_log.md)、[U1と単一PUT方針](./m6_upload_recovery_options.md)を参照。

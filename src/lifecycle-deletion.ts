@@ -101,7 +101,10 @@ export async function readLifecycleDeletionPage(env: DeletionReadEnv, input: Del
       result.scopeComplete = false;
     }
   }
+  const seen = new Set<string>();
   for (const object of objects) {
+    if (seen.has(object.key)) throw new Error("Duplicate deletion inventory key");
+    seen.add(object.key);
     if (!("key" in scope ? object.key === scope.key : object.key.startsWith(scope.prefix))) {
       throw new Error("Deletion inventory returned an object outside its scope");
     }

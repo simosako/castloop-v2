@@ -1,5 +1,15 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 保持policyに従うpayload削除batchと最終再列挙を追加
+
+- `stepLifecyclePayloadDeletion`にdelete owner/実行token、対象deleting、期待generation/最終job、durable progressの対象・action・要求hash・purge成功、呼出側の配信ゲート確認を必須とした。最大100 keyの許可payloadだけをbinding array DELETEで処理し、progressをETag CASで保存する。本番経路からはまだ呼ばない。
+- publication markerをstrict schema/対象/ETag/sizeで確認して保持し、予約・制御record・tombstone・request/job記録・service設定・別Show/似たEpisode IDを消さない。markerの本文をprogressへコピーせず、媒体bodyも読み込まない。未知key・不正/個人情報を追加したmarker・payload変更・gate未成立では削除を拒否する。
+- 削除pageのcursorをそのまま維持し、全scope走査後は各prefixの先頭からverification passを行う。取りこぼしたpayloadがあれば削除へ戻し、一覧から空を確認した後だけfinalizingへ進む。件数は応答喪失で過少になる可能性がある診断値で、終了条件は一覧の再確認である。
+- DELETEの部分成功/応答喪失、progress応答喪失/CAS競合、token喪失、markerだけの複数page、先頭prefixの残存payload、上限/破損progressを自動テストで確認した。failureでもowner/tokenを解放せず、同じ終了確認済み実行のremote progressから収束する。
+- このmoduleは最後のpurge、deleted tombstone、terminal status、owner解放を行わない。開始時state/feed/purgeと本番gate callback、Queue継続・invocation引継ぎ、API/CLI、実機受け入れは残件。mockでのgate確認を本番cache配信停止の実証と扱わない。
+- `bun test`（142件、1369 assertions）、`npm run check`、M6実証tsconfig、`git diff --check`に合格。運用リソース・Releaseは変更していない。
+- Linux x86-64 binaryのbuild、既存version/help、文書リンク/コードフェンス/空白/英語AGENTS.mdも確認した。公開CLIはv0.1.2のままでlifecycle操作を表示しない。
+
 ## 2026-10-01: 削除後の最小記録保持policyを承認
 
 - 管理者が説明へのannotationで、小さい必要な管理/操作記録は自動期限削除せず保持し、本文/個人情報/secretを複製せず、音源等のpayloadを物理削除するM6方針を承認した。期限付きの記録整理は後続とする。

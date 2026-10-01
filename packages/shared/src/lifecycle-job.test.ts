@@ -64,4 +64,16 @@ describe("M6 versioned job status and progress", () => {
       expect(lifecycleProgressSchema.safeParse({ ...progress, ...invalid }).success).toBe(false);
     }
   });
+
+  test("deletion positions are bounded and cannot be attached to other operations or terminal cursors", () => {
+    const base = { schema_version: 1, ...identity, action: "delete", phase: "verifying", deleted_objects: 0,
+      purge_confirmed: true, updated_at: "2026-10-01T12:00:00Z", deletion_scope_index: 0, deletion_cursor: "opaque-cursor" };
+    const progress = lifecycleProgressSchema.parse(base);
+    expect(parseLifecycleProgress(stringifyLifecycleProgress(progress))).toEqual(progress);
+    for (const invalid of [{ action: "unpublish" }, { deletion_scope_index: -1 }, { deletion_scope_index: 6 },
+      { deletion_scope_index: 0.5 }, { deletion_scope_index: undefined }, { deletion_cursor: "" },
+      { deletion_cursor: "x".repeat(4097) }, { phase: "finished" }, { phase: "finalizing" }]) {
+      expect(lifecycleProgressSchema.safeParse({ ...base, ...invalid }).success).toBe(false);
+    }
+  });
 });

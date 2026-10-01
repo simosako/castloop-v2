@@ -83,12 +83,21 @@ export const lifecycleProgressSchema = z.object({
   deleted_objects: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   purge_confirmed: z.boolean(),
   updated_at: z.iso.datetime({ offset: true, precision: 0 }),
+  deletion_scope_index: z.number().int().nonnegative().max(5).optional(),
+  deletion_cursor: z.string().min(1).max(4096).optional(),
 }).strict().superRefine((value, context) => {
   if ((value.kind === "episode") !== (value.episode_id !== undefined)) {
     context.addIssue({ code: "custom", message: "Only Episode progress requires an Episode ID" });
   }
   if (value.action !== "delete" && value.deleted_objects !== 0) {
     context.addIssue({ code: "custom", message: "Only deletion progress can count removed objects" });
+  }
+  if (value.action !== "delete" && (value.deletion_scope_index !== undefined || value.deletion_cursor !== undefined)) {
+    context.addIssue({ code: "custom", message: "Only deletion progress can contain a deletion position" });
+  }
+  if (value.deletion_cursor !== undefined &&
+    (value.deletion_scope_index === undefined || (value.phase !== "deleting" && value.phase !== "verifying"))) {
+    context.addIssue({ code: "custom", message: "Deletion cursors require an active deletion or verification scope" });
   }
 });
 
