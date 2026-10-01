@@ -4,6 +4,7 @@ import { publishEpisode, publishShow, readAdmission } from "./publication";
 import type { Admission } from "./publication";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { initializeServiceAdmission, ServiceAdmissionBlocked, withServiceInvocation } from "./service-admission";
+import { readServiceCapabilities } from "./service-capabilities";
 
 type Env = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -117,6 +118,14 @@ export default {
       return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
     }
     if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return json({ error: "unauthorized" }, 401);
+    if (pathname === "/admin/capabilities" && request.method === "GET") {
+      try {
+        return json(await readServiceCapabilities(env, await serviceId(env)), 200);
+      } catch {
+        console.error(JSON.stringify({ event: "service_capabilities_failed", reason_code: "service_capabilities_failed" }));
+        return json({ error: "Service capabilities are unavailable; inspect service configuration and admission" }, 503);
+      }
+    }
     if (request.method === "GET" && pathname.startsWith("/admin/episodes/") &&
       pathname.endsWith("/current")) {
       const parts = pathname.split("/");

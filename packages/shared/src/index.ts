@@ -16,6 +16,10 @@ export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, life
 export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
 export { serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
 export type { ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
+export { frozenMigrationPlanSchema, migrationApplyProgressSchema, migrationRuntimeProofSchema } from "./migration-plan";
+export type { FrozenMigrationPlan, MigrationApplyProgress, MigrationRuntimeProof } from "./migration-plan";
+export { serviceCapabilitiesSchema } from "./service-capabilities";
+export type { ServiceCapabilities } from "./service-capabilities";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

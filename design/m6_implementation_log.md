@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 凍結移行planのCAS初期化・途中再開とcapability照会を追加
+
+- strictな凍結planに許可された既存object key/ETag/sizeと制御record値を保存し、Episode→Showの順に条件付きPUTで初期化する。既存lifecycleの停止/generation/tombstoneとpayloadは保持する。service identity、inventory/sourceの追加/消失/変更、未知key、不完全owner等をfail closedで拒否する。
+- 移行execution tokenを取得し、bounded apply→全inventory照合→runtime callback→durable finished証拠→service CASへ進む。PUT/progress/完了応答喪失は凍結値から再開し、初期化済みcontrolを上書きしない。正常/例外終了後だけ既知tokenを返し、取得応答喪失/強制終了の未知token回復は追加しない。完了後もpausedを維持する。finished証拠からの完了再試行は同じruntime証拠の再確認を必須にした。
+- 現行Workerに認証必須・no-store・読み取り専用の`GET /admin/capabilities`を接続した。registry未初期化でも書込まず、mode/state/generation/稼働件数だけを返し、token/本文/secretは返さない。このWorkerの未接続M6 routeはfalse、`m6_ready=false`を維持し、mock readinessから本番安全性を推測しない。
+- 本番quiescence/cutover callbackの契約と未完成rollbackを`m6_migration_runtime_contract.md`へ記録した。移行apply自体のAPI/CLI接続、100%対応Worker切替、旧IO終了確認、cache purge/本番配信gateは未完成であり、実deployも既存環境の更新も行っていない。
+- `bun test`（311件、5211 assertions）、`npm run check`、M6実証tsconfig、Worker/移行moduleのbrowser bundle、Linux x86-64単一binary build/version、`git diff --check`に合格。apply/preserve、各PUT応答喪失、live実行token、source変化、無効runtime証拠、切替中の旧書込、finished後のdeployment変化、private値非保持、capability認証/read-only/fail-closedを確認した。これらはmock/ローカル確認であり、新しい実機合格ではない。
+
 ## 2026-10-01: サービス単位の原子的な書込停止・移行受付を追加
 
 - `system/lifecycle-service.json`のstrict CAS recordにlegacy/M6 mode、open/paused/migrating、最大32件のmutating invocation tokenを保持する。pauseは新しい管理書込を止めるが、取得済みtokenの処理と、既存jobのconsumer/限定retryはpaused中も収束できる。移行は同じCASでregistryが空の場合だけmigrating ownerを取得し、以後consumerも登録できない。事前のreadだけによる受付停止ではない。

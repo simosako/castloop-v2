@@ -1,4 +1,4 @@
-import { serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "../packages/shared/src/index";
+import { migrationApplyProgressSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "../packages/shared/src/index";
 import type { ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
 import type { LifecycleControlEnv } from "./lifecycle-control";
 
@@ -190,4 +190,25 @@ export async function abortUnstartedServiceMigration(env: LifecycleControlEnv, s
   }
   const { migration: _owner, ...value } = snapshot.value;
   if (!await write(env, snapshot, { ...value, state: "paused" })) throw new Error("Migration changed before it could be aborted");
+}
+
+export async function completeServiceMigration(env: LifecycleControlEnv, execution: ServiceMigrationExecution,
+  input: NonNullable<ServiceAdmission["readiness"]>): Promise<void> {
+  const readiness = serviceAdmissionSchema.shape.readiness.unwrap().parse(input);
+  if (readiness.migration_id !== execution.migrationId) throw new Error("Migration readiness targets another operation");
+  const existing = await requireService(env, execution.serviceId);
+  if (existing.value.mode === "m6" && existing.value.readiness?.migration_id === execution.migrationId &&
+    JSON.stringify(existing.value.readiness) === JSON.stringify(readiness)) return;
+  const snapshot = await requireServiceMigration(env, execution);
+  const object = await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${execution.migrationId}/progress.json`);
+  if (!object || object.size > MAX_RECORD_BYTES) throw new Error("Migration has no durable finished progress");
+  const progress = migrationApplyProgressSchema.parse(await object.json<unknown>());
+  if (progress.phase !== "finished" || progress.migration_id !== execution.migrationId || progress.service_id !== execution.serviceId ||
+    progress.request_sha256 !== snapshot.value.migration!.request_sha256 || progress.plan_sha256 !== readiness.plan_sha256 ||
+    progress.completed_execution_id !== readiness.completed_execution_id || !progress.runtime ||
+    JSON.stringify(serviceAdmissionSchema.shape.readiness.unwrap().parse({ migration_id: progress.migration_id,
+      plan_sha256: progress.plan_sha256, ...progress.runtime, completed_execution_id: progress.completed_execution_id })) !==
+      JSON.stringify(readiness)) throw new Error("Migration readiness does not match its completion evidence");
+  const { migration: _owner, ...value } = snapshot.value;
+  if (!await write(env, snapshot, { ...value, state: "paused", mode: "m6", readiness })) throw new Error("Migration changed before readiness was saved");
 }
