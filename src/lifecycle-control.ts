@@ -6,7 +6,7 @@ import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/
 export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head"> };
 export type LifecycleReadEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head"> };
 export type ShowControlSnapshot = { value: ShowControl; etag: string };
-type OwnedShowControlSnapshot = { value: ShowControl & { owner: NonNullable<ShowControl["owner"]> }; etag: string };
+export type OwnedShowControlSnapshot = { value: ShowControl & { owner: NonNullable<ShowControl["owner"]> }; etag: string };
 export type ShowExecution = { showId: string; jobId: string; generation: number; executionId: string };
 export type PublicVisibility = "public" | "not_found" | "gone";
 export type PublicVisibilitySnapshot = { visibility: "not_found" | "gone" } | {
@@ -57,6 +57,8 @@ async function requestHash(request: ControlRequest): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(request)));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+
+export { requestHash as controlRequestHash, requireOwnedOperation };
 
 async function freezeRequest(env: LifecycleControlEnv, request: ControlRequest, hash: string): Promise<void> {
   const key = `system/jobs/${request.job_id}/request.toml`;

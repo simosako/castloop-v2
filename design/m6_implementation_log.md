@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 凍結lifecycle commitとQueue接続用の照合を追加
+
+- Show/Episodeのlifecycle markerをstrict schemaと固定`staging/lifecycle/.../commit.json` keyで定義した。actionはunpublish/restore/deleteのみとし、対象・job・受付後generation・凍結request hash以外の本文/secretを保存しない。旧publication markerと混同しない。
+- `commitOwnedLifecycleOperation`は凍結requestを照合したreserved ownerだけが初回markerをIf-None-Match CASで作る。既存markerは上書きせず、processing開始後も一致する既存markerの照会のみ許す。`readLifecycleCommit`はpath/schema/requestの対象/action/generation/hashを検証し、不正markerと読取通信障害を区別する。
+- 同時作成の1勝者、成功応答喪失、取消/stale owner、publication/stage拒否、破損/過大/不一致marker・request、body読取障害を自動テストした。作成自体は配信状態を変更せず、consumer開始時のowner CASが引き続き必要である。
+- `bun test`（181件、3041 assertions）、`npm run check`に合格。管理API/CLI/本番Queueには未公開で、既存テスト環境へのdeploy/変更はしていない。
+
 ## 2026-10-01: 管理者のv0.1.1テスト環境を読み取り専用で確認
 
 - 管理者が既存環境はテスト用で削除可能、CLI/Workerはv0.1.1、1 Show/2公開Episode、処理中/失敗中jobなしと申告した。[移行前基準](./m6_legacy_test_baseline.md)へ記録した。管理API/R2/Queueの状態を取得したわけではない。

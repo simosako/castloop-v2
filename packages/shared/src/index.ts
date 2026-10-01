@@ -4,6 +4,8 @@ import { lifecycleJobStatusSchema } from "./lifecycle-job";
 export { lifecycleFailureForPhase, lifecycleFailureMessages, lifecycleJobStatusSchema, lifecyclePhaseSchema, lifecycleProgressSchema,
   parseLifecycleProgress, stringifyLifecycleProgress } from "./lifecycle-job";
 export type { LifecycleFailure, LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";
+export { lifecycleCommitKey, lifecycleCommitSchema, parseLifecycleCommitKey } from "./lifecycle-commit";
+export type { LifecycleCommit, LifecycleCommitTarget } from "./lifecycle-commit";
 export { validateId } from "./ids";
 export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
