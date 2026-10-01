@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 初回bridge用のread-only REST準備を分離
+
+- `prepareMigrationBridgeDeployment`/`CloudflareApi.prepareMigrationBridge`とstrict bridge metadata/準備requestを追加した。既存legacy Workerの期待単一version 100%、default-only fetch/queue、service binding/旧date/flags/全binding snapshot、workers.dev有効/domainなしをGET照合し、settings/preview/deploymentを再GETする。追加KV等の未知binding parameter変更もhash/照合から落とさない。
+- bridge UUIDをversion tagへ固定し、default cache無効/cross-version無効/version metadata binding/ctx.exports/logs/tracesを明示する。secret/追加bindingは指定legacy versionからinheritし、sampling/tag/tail/placement/logpushを保持する。旧cross-version設定の省略は`unspecified`として保持し、cache scope/purge/旧IO終了へ昇格しない。準備requestはID/観測値/hashだけを返し、durable local保存や初回deploy許可を実行しない。
+- pure/GET-only mock RESTテストでlegacy profile・secret非コピー・runtime/追加binding不一致・途中変化・共通schema gateを確認した。詳細と初回一度限りdriver/preview無効化/unknown outcome保持の残件は`m6_migration_bridge_preparation.md`へ記録した。CLI書込commandと現行deploy/initへは未接続で、既存v0.1.1環境/Cloudflare実機へ書込していない。
+- `bun test`（398件、6998 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build、`git diff --check`に合格。mock/ローカル確認であり、実response shape/全hostname・colo/旧cache撤去/300MB・CPU・料金/移行完了の合格ではない。
+
 ## 2026-10-01: 候補REST deploy adapterとdurable journalを結合
 
 - 凍結bootstrapへ実Cloudflare REST候補PUT/preview無効化/GET inspectionを組み合わせる未公開`createMigrationRestEffects`を追加した。bridgeの認証status・初期化済みruntime owner・空registry・未知execution不在・単一期待version 100%・default cache無効・旧preview無効・domainなし・settings再照合を要求し、旧Workerへ直接candidateをPUTしない。対象は同accountの既存workers.devに限定する。

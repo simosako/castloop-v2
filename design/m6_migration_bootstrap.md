@@ -10,7 +10,7 @@
 
 ## 安全な順序
 
-1. 旧端末の新規書込を止め、bridgeを100%へ切り替え、旧version previewを無効にする。この最初のdeploy受付/REST設定照合はCLI接続の残件である。bridge default cacheは無効にする必要があり、codeの存在だけでは成立しない。
+1. 旧端末の新規書込を止め、bridgeを100%へ切り替え、旧version previewを無効にする。初回deployの読み取り専用REST準備は`m6_migration_bridge_preparation.md`の範囲で実装したが、一度限りdeploy受付/書込adapter/CLI接続は残件である。bridge default cacheは無効にする必要があり、codeの存在だけでは成立しない。
 2. bridgeでservice registryを初期化し、pauseする。既存invocation/consumer/限定recoveryはdrainし、未完了publication/uploadを先に収束させる。空registryだけを確認して移行ownerをCAS取得する。
 3. 管理者が旧端末/旧Worker invocation/旧REST PUTの終了と今後の旧書込禁止を明示申告する。`quiescence.json`へbridge version/owner/request hashと定型条件だけを凍結する。これはWorkerが別REST接続や登録前invocationの終了を直接証明したものではなく、管理者の外部確認を記録するもの。時刻やHEAD不在を証拠にしない。
 4. bounded applyでEpisode→Showの順に初期化し、inventory/sourceを再照合する。`initializeOnly`はprogressを`runtime`で止め、cutover callbackやM6完了CASを呼ばない。bridgeはplan凍結後の公開pathを503/no-storeにし、部分初期化状態を旧配信で迂回しない。

@@ -1,8 +1,10 @@
 import { migrationBootstrapRequestSchema, migrationCandidateUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
   workerSubdomainSnapshotSchema } from "@castloop/shared";
-import type { MigrationBootstrapRequest, MigrationCandidateUpload, M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
+import type { MigrationBootstrapRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
+  M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
 import { buildMigrationCandidateUpload, inspectM6WorkerDeployment, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
+import { prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
 
@@ -259,6 +261,18 @@ export class CloudflareApi {
       throw new Error("Migration requires the expected single Worker version serving 100% before any write");
     }
     return value;
+  }
+
+  async prepareMigrationBridge(config: ServiceConfig, legacyVersionId: string, bridgeId: string, source: string):
+    Promise<{ request: MigrationBridgePreparation; metadata: MigrationBridgeUpload }> {
+    const path = this.migrationWorkerPath(config);
+    return prepareMigrationBridgeDeployment(config, legacyVersionId, bridgeId, source, {
+      deployments: () => this.json<unknown>("GET", `${path}/deployments`),
+      settings: () => this.json<unknown>("GET", `${path}/settings`),
+      version: (id) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(id)}`),
+      subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
+      domains: () => this.workerDomains("service", config.worker_name),
+    });
   }
 
   async migrationCandidateUploadMetadata(config: ServiceConfig, bootstrapId: string, bridgeVersionId: string): Promise<MigrationCandidateUpload> {
