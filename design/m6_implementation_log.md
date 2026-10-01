@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 削除開始と最終確定を接続
+
+- `stepLifecycleDelete`を追加し、配信状態をdeletingへ変更→配信gate確認→active親のEpisode feed更新→generation→初回purge→durable削除進捗へ接続した。Show削除と停止中の親ではfeedを書かない。削除batch後は最終purge→tombstone→finished progress→completed status→同一CASのowner解放/receiptまで進める。
+- payload削除と子tombstoneは1回最大100 objectのstepに分けた。Show削除では子Episodeの制御recordだけをページ単位でdeletedにする。既存deleted recordは変更せず、子generationは維持する。親Showの受付generationと不可逆deletedゲートで旧job/ID再利用を拒否し、最大generationの子も削除できる。件数は応答喪失で過少になり得る診断値である。
+- strict progressに最終purge証拠とShow子tombstoneのcursor/完了証拠を追加した。削除finishedには全scopeのverification完了、cursorなし、初回/最終purge、必要な子tombstone完了を要求する。不正な子recordは上書きせずownerを保持して停止する。
+- Episode/Show、draft/停止対象、最後のEpisodeの空feed、部分DELETE、初回/最終purge失敗、feed/gate失敗、各状態/進捗/完了/解放応答喪失、新owner取得後の旧実行再送を自動テストした。媒体bodyは読まず、必要marker/予約/service/別Showを保持し、診断へ例外本文を保存しない。
+- `bun test`（160件、2457 assertions）、`npm run check`、M6実証tsconfigに合格。本番gate callback、Queueの続行とinvocation引継ぎ、API/CLI、移行、実機受け入れは未接続であり、運用環境は変更していない。
+
 ## 2026-10-01: lifecycle共通遷移とCAS job journalを追加
 
 - 停止/削除の配信閉鎖と冪等feed generation更新を共通moduleへ分離した。Episodeは凍結requestの期待generationと最終jobを照合してCASで1度だけ進め、Showもowner/tokenを保持したまま状態を変える。

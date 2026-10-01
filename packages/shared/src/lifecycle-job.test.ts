@@ -76,4 +76,21 @@ describe("M6 versioned job status and progress", () => {
       expect(lifecycleProgressSchema.safeParse({ ...base, ...invalid }).success).toBe(false);
     }
   });
+
+  test("finished deletion requires final purge, complete scope verification and Show child tombstones", () => {
+    const base = { schema_version: 1, ...identity, action: "delete", phase: "finished", deleted_objects: 10,
+      purge_confirmed: true, final_purge_confirmed: true, deletion_scope_index: 3, updated_at: "2026-10-01T12:00:00Z" };
+    expect(lifecycleProgressSchema.safeParse(base).success).toBe(true);
+    for (const invalid of [{ final_purge_confirmed: undefined }, { final_purge_confirmed: false }, { purge_confirmed: false },
+      { deletion_scope_index: 2 }, { deletion_cursor: "old" }, { tombstones_complete: true }]) {
+      expect(lifecycleProgressSchema.safeParse({ ...base, ...invalid }).success).toBe(false);
+    }
+    const show = { ...base, kind: "show", episode_id: undefined, deletion_scope_index: 5, tombstones_complete: true,
+      tombstoned_episodes: 20 };
+    expect(lifecycleProgressSchema.safeParse(show).success).toBe(true);
+    for (const invalid of [{ tombstones_complete: false }, { tombstone_cursor: "old" }, { tombstoned_episodes: -1 },
+      { phase: "deleting" }, { final_purge_confirmed: false }]) {
+      expect(lifecycleProgressSchema.safeParse({ ...show, ...invalid }).success).toBe(false);
+    }
+  });
 });

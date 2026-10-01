@@ -85,6 +85,10 @@ export const lifecycleProgressSchema = z.object({
   updated_at: z.iso.datetime({ offset: true, precision: 0 }),
   deletion_scope_index: z.number().int().nonnegative().max(5).optional(),
   deletion_cursor: z.string().min(1).max(4096).optional(),
+  final_purge_confirmed: z.boolean().optional(),
+  tombstone_cursor: z.string().min(1).max(4096).optional(),
+  tombstoned_episodes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  tombstones_complete: z.boolean().optional(),
 }).strict().superRefine((value, context) => {
   if ((value.kind === "episode") !== (value.episode_id !== undefined)) {
     context.addIssue({ code: "custom", message: "Only Episode progress requires an Episode ID" });
@@ -98,6 +102,24 @@ export const lifecycleProgressSchema = z.object({
   if (value.deletion_cursor !== undefined &&
     (value.deletion_scope_index === undefined || (value.phase !== "deleting" && value.phase !== "verifying"))) {
     context.addIssue({ code: "custom", message: "Deletion cursors require an active deletion or verification scope" });
+  }
+  if (value.final_purge_confirmed !== undefined && (value.action !== "delete" || !value.purge_confirmed ||
+    (value.phase !== "finalizing" && value.phase !== "finished"))) {
+    context.addIssue({ code: "custom", message: "Final purge evidence requires verified deletion finalization progress" });
+  }
+  const childProgress = value.tombstone_cursor !== undefined || value.tombstoned_episodes !== undefined || value.tombstones_complete !== undefined;
+  if (childProgress && (value.action !== "delete" || value.kind !== "show" ||
+    (value.phase !== "finalizing" && value.phase !== "finished") || !value.final_purge_confirmed)) {
+    context.addIssue({ code: "custom", message: "Child tombstones require final-purged Show deletion progress" });
+  }
+  if (value.tombstone_cursor !== undefined && (value.phase !== "finalizing" || value.tombstones_complete)) {
+    context.addIssue({ code: "custom", message: "Completed child tombstones cannot have a continuation cursor" });
+  }
+  if (value.action === "delete" && value.phase === "finished" &&
+    (!value.purge_confirmed || !value.final_purge_confirmed ||
+      value.deletion_scope_index !== (value.kind === "show" ? 5 : 3) || value.deletion_cursor !== undefined ||
+      (value.kind === "show" && !value.tombstones_complete))) {
+    context.addIssue({ code: "custom", message: "Finished deletion requires payload verification, final purge and applicable tombstones" });
   }
 });
 

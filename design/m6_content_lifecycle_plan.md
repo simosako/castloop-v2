@@ -170,6 +170,8 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 
 `finishShowOperation`は実行tokenの保持者だけが呼べる。durable terminal status/progressの対象・action・generation・要求hash、purge成功、結果状態（Episodeでは最終job IDも）を照合し、Show owner解放と完了receiptを同じCASで保存する。完了receiptを使った再送は新しいownerを変更しない。`completed`だけを見て新ownerを解放する実装にはしない。staging ownerの終了・中断解放は別の後続処理であり、このconsumer用関数では解放しない。
 
+独立moduleの削除stepは開始時のdeleting/feed/purgeからpayload削除・先頭からのverification・最終purge・deleted確定・完了解放まで実装した（2026-10-01）。Show削除では子制御recordも小さなdeleted tombstoneにするが、既存deletedは保持し、子generationは進めない。親Showの受付generationと永久deleted状態で旧jobとID再利用を拒否する。progressの`final_purge_confirmed`と、Showの`tombstone_cursor`/`tombstoned_episodes`/`tombstones_complete`は必要な小さい進捗証拠として保持する。削除/tombstone件数は診断値であり完了証拠にはしない。本番Queue/配信gate/CLIへはまだ接続していない。
+
 ## 6. 原子的受付と既存処理との排他
 
 ### 受付・commitの順序
