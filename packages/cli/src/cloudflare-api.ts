@@ -1,4 +1,5 @@
-import type { ServiceConfig } from "@castloop/shared";
+import type { M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
+import { inspectM6WorkerDeployment } from "./m6-worker-deployment";
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
 
@@ -8,6 +9,7 @@ type ConsumerRecord = { consumer_id: string; script_name?: string; script?: stri
   dead_letter_queue?: string; settings?: { batch_size?: number; max_concurrency?: number; max_retries?: number } };
 type WorkerSettings = {
   bindings?: Array<{ name: string; type: string }>;
+  exports?: Record<string, unknown>;
   cache_options?: { enabled: boolean; cross_version_cache?: boolean };
   compatibility_flags?: string[];
   logpush?: boolean;
@@ -190,6 +192,10 @@ export class CloudflareApi {
   async deployWorker(config: ServiceConfig, source: string, adminKey: string,
     compatibilityDate: string): Promise<void> {
     const previous = await this.existingWorker(config.worker_name);
+    if (previous?.exports?.CachedPublicAssets !== undefined ||
+      previous?.bindings?.some((binding) => binding.name === "CASTLOOP_VERSION_METADATA")) {
+      throw new Error("Legacy deploy cannot replace an M6 Worker; use a verified migration-aware deployment path");
+    }
     const managed = new Set(["CASTLOOP_BUCKET", "CASTLOOP_QUEUE", "CASTLOOP_DLQ_NAME", "CASTLOOP_ADMIN_KEY"]);
     const preserved = previous?.bindings?.filter((binding) => !managed.has(binding.name))
       .map((binding) => ({ name: binding.name, type: "inherit" })) ?? [];
@@ -220,6 +226,17 @@ export class CloudflareApi {
     await this.jsonUpload(`/workers/scripts/${encodeURIComponent(config.worker_name)}?bindings_inherit=strict`, upload);
     await this.json("POST", `/workers/scripts/${encodeURIComponent(config.worker_name)}/subdomain`,
       { enabled: true, previews_enabled: false });
+  }
+
+  async inspectM6WorkerDeployment(config: ServiceConfig, expectedVersionId: string): Promise<M6WorkerDeploymentEvidence> {
+    if (config.account_id !== this.accountId) throw new Error("Worker inspection targets another Cloudflare account");
+    const path = `/workers/scripts/${encodeURIComponent(config.worker_name)}`;
+    return inspectM6WorkerDeployment(config, expectedVersionId, {
+      deployments: () => this.json<unknown>("GET", `${path}/deployments`),
+      settings: () => this.json<unknown>("GET", `${path}/settings`),
+      version: (versionId) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(versionId)}`),
+      subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
+    });
   }
 
   private async jsonUpload(path: string, body: FormData): Promise<void> {

@@ -22,6 +22,9 @@ export { serviceCapabilitiesSchema } from "./service-capabilities";
 export type { ServiceCapabilities } from "./service-capabilities";
 export { cachedDeliveryRuntimeSchema } from "./delivery-runtime";
 export type { CachedDeliveryRuntime } from "./delivery-runtime";
+export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVersionSnapshotSchema, workerSubdomainSnapshotSchema,
+  m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
+export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

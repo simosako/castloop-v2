@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: M6向けREST metadata生成と読み取り専用のdeployment検査を追加
+
+- 純粋なmetadata builderにdefault cache無効/named cache有効/cross-version cache無効、version metadata binding、ctx.exports flagとlogs/tracesを明示した。既存secretと無関係なbindingはinheritし、sampling/tag/tail/placement/logpushは保持する。既存deploy/initへはまだ接続しない。
+- Cloudflare REST GETのdeployment/version/settings/subdomain照合と再GETを追加した。単一の期待versionの100%配信、cache入口、所有binding、telemetry、旧version preview無効化を要求する。設定変化/部分配信/別version/不明fieldをfail closedで拒否し、返却証拠はIDとallowlistedな成立条件だけにする。旧IO/cache purge等の完了証拠には変換しない。
+- 現行legacy deployはM6 cache export/version metadataを見つけたらPUT前に拒否する。通常のlegacy cache/binding政策は回帰で維持した。このpreflightは原子的な移行/deploy fenceや旧バイナリの停止に置き換わらない。
+- `bun test`（332件、5374 assertions）、`npm run check`、M6実証tsconfig、Linux x86-64単一binary buildに合格。docs形状のmock RESTであり、実upload/実機合格ではない。契約と残件は`m6_worker_deployment_inspection.md`参照。既存v0.1.1/運用環境は変更していない。
+
 ## 2026-10-01: 実行version・cache owner・service tokenを照合する配信gate adapterを追加
 
 - `createM6DeliveryGate`はservice registryのM6 invocation token、移行完了readiness、実行Worker version metadata、uncached gateway protocolとcache owner RPCのstrict識別結果を照合する。RPC待ち後もtoken/readinessを再確認し、旧/返却済みtoken、foreign version/entrypoint、破損record、不明protocol、purge API欠落を拒否する。

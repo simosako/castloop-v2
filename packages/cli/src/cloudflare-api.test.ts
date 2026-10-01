@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
-import { serviceConfigSchema } from "@castloop/shared";
+import { serviceConfigSchema, workerSettingsSnapshotSchema } from "@castloop/shared";
 import { CloudflareApi, normalizeHostname } from "./cloudflare-api";
+import { buildM6WorkerUploadMetadata } from "./m6-worker-deployment";
 
 const accountId = "a".repeat(32);
 const worker = "castloop-example";
@@ -97,5 +98,102 @@ test("refuses partial zones, occupied DNS names, and a domain owned by another W
         await expect(api.removeWorkerDomain("podcasts.example.com", worker)).rejects.toThrow("not owned");
       }
     });
+  }
+});
+
+test("M6 runtime inspection calls only authenticated Cloudflare GETs and returns no sensitive metadata", async () => {
+  const metadata = buildM6WorkerUploadMetadata(config, null, "private-admin-key");
+  const versionId = crypto.randomUUID();
+  const deploymentId = crypto.randomUUID();
+  const methods: string[] = [];
+  await withCloudflare((request) => {
+    const url = new URL(request.url);
+    methods.push(`${request.method} ${url.pathname}`);
+    expect(request.method).toBe("GET");
+    expect(request.headers.get("Authorization")).toBe("Bearer test-token");
+    expect(url.pathname.startsWith(`/client/v4/accounts/${accountId}/workers/scripts/${worker}/`)).toBe(true);
+    if (url.pathname.endsWith("/deployments")) return reply({ deployments: [{ id: deploymentId, strategy: "percentage",
+      versions: [{ version_id: versionId, percentage: 100 }], author_email: "private@example.com" }] });
+    if (url.pathname.endsWith("/settings")) return reply(metadata);
+    if (url.pathname.endsWith("/subdomain")) return reply({ enabled: true, previews_enabled: false });
+    if (url.pathname.endsWith(`/versions/${versionId}`)) return reply({ id: versionId, resources: { bindings: metadata.bindings,
+      script: { handlers: ["fetch", "queue"], named_handlers: [{ name: "CachedPublicAssets", handlers: ["fetch"] }] },
+      script_runtime: { compatibility_date: metadata.compatibility_date, compatibility_flags: metadata.compatibility_flags, exports: metadata.exports } } });
+    throw new Error("Unexpected Cloudflare read");
+  }, async (api) => {
+    const evidence = await api.inspectM6WorkerDeployment(config, versionId);
+    expect(evidence.worker_version_id).toBe(versionId);
+    expect(evidence.deployment_id).toBe(deploymentId);
+    expect(JSON.stringify(evidence)).not.toContain("private");
+    expect(JSON.stringify(evidence)).not.toContain("test-token");
+  });
+  expect(methods).toHaveLength(7);
+});
+
+test("M6 inspection rejects cross-account and invalid-version requests before HTTP calls", async () => {
+  await withCloudflare(() => { throw new Error("No HTTP request is allowed"); }, async (api) => {
+    await expect(api.inspectM6WorkerDeployment({ ...config, account_id: "b".repeat(32) }, crypto.randomUUID())).rejects.toThrow("another Cloudflare account");
+    await expect(api.inspectM6WorkerDeployment(config, "not-a-version")).rejects.toThrow();
+  });
+});
+
+test("M6 inspection does not retry or substitute a successful proof when Cloudflare GET fails", async () => {
+  let calls = 0;
+  await withCloudflare(() => {
+    calls += 1;
+    return Response.json({ success: false, result: null, errors: [{ code: 1000, message: "Access denied" }] }, { status: 403 });
+  }, async (api) => {
+    await expect(api.inspectM6WorkerDeployment(config, crypto.randomUUID())).rejects.toThrow("HTTP 403");
+  });
+  expect(calls).toBe(1);
+});
+
+test("existing legacy deploy keeps its cache/bindings policy and does not silently opt into M6", async () => {
+  const methods: string[] = [];
+  await withCloudflare(async (request) => {
+    const url = new URL(request.url);
+    methods.push(request.method);
+    if (request.method === "GET" && url.pathname.endsWith("/settings")) return reply({
+      cache_options: { enabled: true, cross_version_cache: true },
+      bindings: [{ name: "CASTLOOP_ADMIN_KEY", type: "secret_text" }, { name: "EXTRA_SECRET", type: "secret_text" }],
+      observability: { enabled: true, traces: { enabled: true } },
+    });
+    if (request.method === "PUT") {
+      const form = await request.formData();
+      const metadata = workerSettingsSnapshotSchema.parse(JSON.parse(String(form.get("metadata"))));
+      expect(metadata.cache_options).toEqual({ enabled: true, cross_version_cache: true });
+      expect(metadata.exports).toBeUndefined();
+      expect(metadata.bindings).toContainEqual({ name: "CASTLOOP_ADMIN_KEY", type: "inherit" });
+      expect(metadata.bindings).toContainEqual({ name: "EXTRA_SECRET", type: "inherit" });
+      expect(metadata.bindings.some((binding) => binding.name === "CASTLOOP_VERSION_METADATA")).toBe(false);
+      expect(metadata.compatibility_date).toBe("2026-09-30");
+      expect(JSON.stringify(metadata)).not.toContain("replacement-secret");
+      expect(url.searchParams.get("bindings_inherit")).toBe("strict");
+      return reply({});
+    }
+    if (request.method === "POST" && url.pathname.endsWith("/subdomain")) {
+      expect(await request.json<{ enabled: boolean; previews_enabled: boolean }>()).toEqual({ enabled: true, previews_enabled: false });
+      return reply({});
+    }
+    throw new Error("Unexpected legacy deployment request");
+  }, async (api) => {
+    await api.deployWorker(config, "export default {};", "replacement-secret", "2026-09-30");
+  });
+  expect(methods).toEqual(["GET", "PUT", "POST"]);
+});
+
+test("legacy deploy refuses M6 cache exports or version metadata before any Worker write", async () => {
+  for (const marker of ["export", "binding"]) {
+    let calls = 0;
+    await withCloudflare((request) => {
+      calls += 1;
+      expect(request.method).toBe("GET");
+      expect(new URL(request.url).pathname.endsWith("/settings")).toBe(true);
+      return reply(marker === "export" ? { bindings: [], exports: { CachedPublicAssets: { type: "worker", cache: { enabled: true } } } } :
+        { bindings: [{ name: "CASTLOOP_VERSION_METADATA", type: "version_metadata" }] });
+    }, async (api) => {
+      await expect(api.deployWorker(config, "export default {};", "private-secret", "2026-09-30")).rejects.toThrow("Legacy deploy cannot replace");
+    });
+    expect(calls).toBe(1);
   }
 });
