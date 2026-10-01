@@ -93,6 +93,9 @@ export const stageUploadProgressSchema = z.object({
   if (new Set(value.verified_assets.map((asset) => asset.asset)).size !== value.verified_assets.length) {
     context.addIssue({ code: "custom", message: "Verified staging assets must be unique" });
   }
+  if (value.reason_code && value.phase !== "settled") {
+    context.addIssue({ code: "custom", message: "Staging failure diagnostics belong to settled, recoverable progress" });
+  }
 });
 
 export type StageUploadProgress = z.infer<typeof stageUploadProgressSchema>;

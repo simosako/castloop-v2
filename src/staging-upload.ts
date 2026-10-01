@@ -50,9 +50,12 @@ export async function readStageUploadProgress(env: LifecycleControlEnv, operatio
   return { value, etag: object.etag };
 }
 
-export async function writeStageUploadProgress(env: LifecycleControlEnv, operation: StageOperation, input: StageUploadProgress): Promise<void> {
+export async function writeStageUploadProgress(env: LifecycleControlEnv, operation: StageOperation, input: StageUploadProgress,
+  verificationId?: string): Promise<void> {
   const snapshot = await requireStageUpload(env, operation);
+  if (snapshot.control.value.owner.verification_id !== verificationId) throw new Error("Staging progress requires its current verification token");
   const value = stageUploadProgressSchema.parse(input);
+  if (["verifying", "verified", "finished"].includes(value.phase) && !verificationId) throw new Error("Verification progress requires an active staging verification token");
   if (value.operation_id !== operation.operationId || value.show_id !== operation.showId || value.show_generation !== operation.generation ||
     value.manifest_sha256 !== snapshot.manifestHash) throw new Error("Staging progress write does not match its owner");
   const existing = await readStageUploadProgress(env, operation, snapshot);
@@ -71,7 +74,8 @@ export async function writeStageUploadProgress(env: LifecycleControlEnv, operati
       throw new Error("Staging progress cannot reopen PUT permission");
     }
   }
-  await requireStageUpload(env, operation);
+  const latest = await requireStageUpload(env, operation);
+  if (latest.control.value.owner.verification_id !== verificationId) throw new Error("Staging verification token changed before progress was written");
   const written = await env.CASTLOOP_BUCKET.put(`system/jobs/${operation.operationId}/upload-progress.json`, JSON.stringify(value), {
     onlyIf: existing ? { etagMatches: existing.etag } : new Headers({ "If-None-Match": "*" }),
   });

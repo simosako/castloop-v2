@@ -1,5 +1,14 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: stagingのstream検証・完了/取消・照合済み解放を追加
+
+- uploading ownerへstage専用`verification_id`をCASで付与し、durable client settlement後だけ内容検証を開始する。同operationのlive検証・取得応答喪失・未終了clientでは検証/取消を開始せず、時間でtokenを奪わない。consumer実行tokenとは別に扱う。
+- R2 HEADのsizeとETag条件付きGETを照合する。audioはWorkers DigestStreamとbyte計数Transformで全量SHA-256/実bytesをstream検証し、pipe/digest両Promiseのsettleを待つ。metadata/coverはそれぞれ1MB/5MBに制限してchecksumとstrict schema/画像signatureを確認し、Show ID/cover extension、Episode ID/GUID/公開日時を保護する。本文をauditへ複製しない。
+- 完了にはmanifestに対応した全assetの検証証拠、完了progress/v2 status、最後のHEADによる同ETag/size確認が必要であり、owner解放と`last_finished_upload` receiptを同じShow CASへ保存する。取消は明示的settlement後だけ行い、payloadを保持してstage受付だけを解放する。公開状態/feed/媒体履歴を変更せず、stage成功はpublishではない。
+- 通常の検証失敗では固定codeのretrying記録を残し、全処理終了後に検証tokenだけを返す。finished進捗の応答喪失、status応答喪失、解放応答喪失は保持recordから回復し、新ownerを旧operationから解放しない。検証済みpayloadが完了解放前に変わった場合はownerを保持してfail closedとする。
+- `bun test`（238件、3530 assertions）、`npm run check`、M6実証tsconfigに合格。Show/metadata/audio、明示的abort、size/hash/schema/image/identity拒否、live検証排他、stream長不足/超過、token応答喪失・返却失敗、完了応答喪失、新ownerを確認した。DigestStream自体のテストはBun上のstream sink mockであり、300MB/CPU/Free制限の実機合格ではない。
+- 管理API/既存CLIのREST PUT経路への接続と、既存publicationの新制御record対応は残る。client終了の申告とU1仮定を別のREST取消保証へ読み替えず、既存テスト環境・運用環境は変更していない。
+
 ## 2026-10-01: REST単一PUTのstaging受付と開始/終了確認を追加
 
 - strict staging manifestにupload操作IDと継続draft job ID、対象/期待generation、asset種別・size/SHA-256を分離して保存する。Showはmetadata+cover、Episodeはmetadataまたはaudioの1操作とし、任意key/本文/secretを受け付けない。asset別上限と300,000,000 bytes上限をupload開始前に検証する。

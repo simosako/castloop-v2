@@ -16,6 +16,7 @@ const operationOwnerSchema = z.object({
   state: z.enum(["reserved", "processing", "uploading"]),
   request_sha256: checksum,
   execution_id: z.uuid().optional(),
+  verification_id: z.uuid().optional(),
 }).strict().superRefine((value, context) => {
   if ((value.kind === "episode") !== (value.episode_id !== undefined)) {
     context.addIssue({ code: "custom", message: "Only Episode operations require an Episode ID" });
@@ -25,6 +26,9 @@ const operationOwnerSchema = z.object({
   }
   if (value.execution_id && value.state !== "processing") {
     context.addIssue({ code: "custom", message: "Only a processing owner can hold an execution token" });
+  }
+  if (value.verification_id && (value.action !== "stage" || value.state !== "uploading")) {
+    context.addIssue({ code: "custom", message: "Only staging admission can hold an upload verification token" });
   }
 });
 
@@ -47,6 +51,14 @@ export const showControlSchema = z.object({
     execution_id: z.uuid(),
     request_sha256: checksum,
   }).strict().optional(),
+  last_finished_upload: z.object({
+    operation_id: z.uuid(),
+    generation,
+    verification_id: z.uuid(),
+    request_sha256: checksum,
+    manifest_sha256: checksum,
+    outcome: z.enum(["staged", "aborted"]),
+  }).strict().optional(),
 }).strict().superRefine((value, context) => {
   if ((value.lifecycle === "deleting" || value.lifecycle === "deleted") &&
     value.owner && value.owner.action !== "delete") {
@@ -61,6 +73,10 @@ export const showControlSchema = z.object({
     (value.last_finished_operation.generation > value.generation ||
       value.last_finished_operation.job_id === value.owner?.job_id)) {
     context.addIssue({ code: "custom", message: "A finished operation cannot be newer than the control or still own it" });
+  }
+  if (value.last_finished_upload && (value.last_finished_upload.generation > value.generation ||
+    value.last_finished_upload.operation_id === value.owner?.job_id)) {
+    context.addIssue({ code: "custom", message: "A finished upload cannot be newer than the control or still own it" });
   }
 });
 

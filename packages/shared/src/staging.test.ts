@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema } from "./index";
+import { parseShowControl, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema } from "./index";
 
 const base = { schema_version: 1, operation_id: crypto.randomUUID(), draft_job_id: crypto.randomUUID(), kind: "episode", show_id: "daily",
   episode_id: "first", expected_show_generation: 0, expected_episode_generation: 0, created_at: "2026-10-01T12:00:00Z",
@@ -39,5 +39,19 @@ describe("M6 staging manifest and settlement", () => {
     }
     expect(stageUploadProgressSchema.safeParse({ ...progress, phase: "finished", client_settled: true, outcome: "aborted" }).success).toBe(true);
     expect(stageUploadProgressSchema.safeParse({ ...progress, phase: "finished", client_settled: true, outcome: "staged" }).success).toBe(false);
+  });
+
+  test("verification tokens belong only to staging, and completion receipts cannot coexist with their owner", () => {
+    const owner = { job_id: base.operation_id, kind: "show", action: "stage", state: "uploading", request_sha256: "a".repeat(64),
+      verification_id: crypto.randomUUID() };
+    const control = { schema_version: 2, show_id: "daily", lifecycle: "active", generation: 1, feed_generation: 0, owner };
+    expect(parseShowControl(control).owner?.verification_id).toBe(owner.verification_id);
+    expect(() => parseShowControl({ ...control, owner: { ...owner, action: "publish", state: "processing" } })).toThrow();
+    const receipt = { operation_id: owner.job_id, generation: 1, verification_id: owner.verification_id,
+      request_sha256: owner.request_sha256, manifest_sha256: "b".repeat(64), outcome: "staged" };
+    expect(() => parseShowControl({ ...control, last_finished_upload: receipt })).toThrow();
+    expect(parseShowControl({ ...control, owner: undefined, last_finished_upload: receipt }).last_finished_upload?.outcome).toBe("staged");
+    expect(() => parseShowControl({ ...control, owner: undefined, last_finished_upload: { ...receipt, generation: 2 } })).toThrow();
+    expect(() => parseShowControl({ ...control, owner: undefined, last_finished_upload: { ...receipt, title: "Private title" } })).toThrow();
   });
 });
