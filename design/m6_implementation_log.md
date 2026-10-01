@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Bridge管理操作とbounded初期化をclientへ接続
+
+- `MigrationAdminClient`に明示的なinitialize/pause/claim/quiescence/1-step初期化、開始前限定abort/legacy resumeを追加した。各操作は初回bridge検査receiptを受け取り、service/account/Worker一致とPOST前の同実行version/UUID tag/legacy modeを要求し、active migration execution tokenは奪わず拒否する。入力ID/generation/timestamp/旧IO確認はcallerの凍結値を使い、自動生成・retry・工程loopをしない。
+- pause/operation/apply inputとstrict responseをshared schemaへ移し、server/clientで同じ上限/結果契約を利用する。初期化responseは`pending`と`applying/verifying/runtime`だけに制限し、`completed/finished`や付加readinessを成功扱いしない。quiescenceの別bridge version、foreign request/receipt、無効ID/上限はPOST前に拒否する。
+- 実管理handlerとのローカル結合でpause→drained claim→明示quiescence→Episode/Show初期化→runtime停止を回帰した。plan以後のabort/resume拒否、実行version/tag/token不一致、pause/claim応答喪失でのPOST非再送、偽completion応答の拒否も確認した。durable claim/申告journalと移行書込CLI、full cutover/受付再開は未接続である。
+- `bun test`（416件、7718 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build、`git diff --check`に合格。mock/ローカル統合であり、Cloudflare実機や既存v0.1.1環境への書込・deployは行っていない。`m6_ready=false`とCLI公開gateを維持する。詳細は`m6_migration_client.md`。
+
 ## 2026-10-02: 初回bridgeのdurable一度限りdeployとGET限定復旧を接続
 
 - 未公開の`runMigrationBridgeDeployment`/`createMigrationBridgeRestEffects`を追加した。明示的な旧管理端末新規書込停止/他deploy停止申告をstrict requestへ固定し、service単位のprivate/fsync/rename付き`.castloop/bridge-deployments/<serviceId>.json`とexclusive非期限lockで別UUIDからの再開始・phase後退/飛ばしを拒否する。候補のserver開始許可は初回bridgeへ流用しない。

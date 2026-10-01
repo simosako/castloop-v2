@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationQuiescenceSchema,
-  migrationAdminStatusSchema, migrationApplyProgressSchema, migrationBootstrapSchema, parseServiceConfig, serviceAdmissionSchema,
-  serviceMigrationRequestSchema } from "../packages/shared/src/index";
+  migrationAdminStatusSchema, migrationApplyProgressSchema, migrationBootstrapSchema, parseServiceConfig,
+  serviceMigrationRequestSchema, migrationServiceIdentitySchema, migrationOperationIdentitySchema, migrationPauseRequestSchema,
+  migrationInitializationRequestSchema, migrationInitializationResultSchema } from "../packages/shared/src/index";
 import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { runLifecycleMigrationStep } from "./lifecycle-migration-apply";
@@ -13,10 +14,8 @@ import { abortUnstartedServiceMigration, acquireServiceMigrationExecution, claim
   pauseServiceAdmission, readServiceAdmission, releaseServiceMigrationExecution, resumeServiceAdmission } from "./service-admission";
 import type { ServiceMigrationExecution } from "./service-admission";
 
-const identity = { schema_version: z.literal(1), service_id: serviceAdmissionSchema.shape.service_id };
-const operation = { ...identity, migration_id: z.uuid() };
-const pauseSchema = z.object({ ...identity, pause_id: z.uuid() }).strict();
-const applySchema = z.object({ ...operation, maximum_targets: z.number().int().min(1).max(100).optional() }).strict();
+const identity = migrationServiceIdentitySchema.shape;
+const operation = migrationOperationIdentitySchema.shape;
 const bootstrapIdSchema = z.object({ ...operation, bootstrap_id: z.uuid() }).strict();
 const settlementSchema = z.object({ ...operation, settlement: migrationDeploymentSettlementSchema }).strict();
 const verifySchema = z.object({ ...operation, maximum_assets: z.number().int().min(1).max(20).optional() }).strict();
@@ -97,10 +96,10 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
     const common = z.object(identity).parse(input);
     if (common.service_id !== serviceId) throw new Error("Service ID mismatch");
     if (route === "initialize-admission") {
-      z.object(identity).strict().parse(input);
+      migrationServiceIdentitySchema.parse(input);
       action = async () => { bridge(); await initializeServiceAdmission(env, serviceId); return { result: "initialized" }; };
     } else if (route === "pause" || route === "resume-legacy") {
-      const value = pauseSchema.parse(input);
+      const value = migrationPauseRequestSchema.parse(input);
       action = async () => {
         bridge();
         if (route === "pause") await pauseServiceAdmission(env, serviceId, value.pause_id);
@@ -114,7 +113,7 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
       const value = serviceMigrationRequestSchema.parse(input);
       action = async () => { bridge(); await claimServiceMigration(env, value); return { result: "claimed" }; };
     } else if (route === "abort-unstarted") {
-      const value = z.object(operation).strict().parse(input);
+      const value = migrationOperationIdentitySchema.parse(input);
       action = async () => { bridge(); await abortUnstartedServiceMigration(env, serviceId, value.migration_id); return { result: "paused" }; };
     } else if (route === "quiescence") {
       const value = migrationQuiescenceSchema.parse(input);
@@ -122,13 +121,14 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
         await confirmMigrationQuiescence(env, execution, value, runtime); return { result: "confirmed" };
       });
     } else if (route === "apply") {
-      const value = applySchema.parse(input);
+      const value = migrationInitializationRequestSchema.parse(input);
       action = async () => {
         bridge();
-        return runLifecycleMigrationStep(env, serviceId, value.migration_id, {
+        const result = await runLifecycleMigrationStep(env, serviceId, value.migration_id, {
           checkQuiescence: (execution) => requireMigrationQuiescence(env, execution),
           verifyCutover: async () => { throw new Error("Full M6 route cutover is not released"); },
         }, { maximumTargets: value.maximum_targets, initializeOnly: true });
+        return migrationInitializationResultSchema.parse(result);
       };
     } else if (route === "prepare-deployment") {
       const value = migrationBootstrapRequestSchema.parse(input);

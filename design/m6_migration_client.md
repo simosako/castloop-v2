@@ -1,12 +1,26 @@
 # M6: 移行client・deploy開始のdurableローカルjournal
 
-更新日: 2026-10-01
+更新日: 2026-10-02
 
 ## 実装した範囲
 
 - `MigrationAdminClient`は固定HTTPS originの認証APIでstatus/凍結prepare/一度限りbegin/明示settlementを呼び出す。redirectは拒否し、自動retryをしない。応答は明示的no-storeを要求し、bodyはstreamで65,536 bytesまでに制限し、HTTP失敗本文を診断へコピーしない。statusはstrict schemaとservice/plan/request一致を検査する。
 - `castloop migration-status`だけを公開した。workspaceの`castloop.toml`/local admin keyを使うGETで、Cloudflare管理tokenは不要。Workerがbridge/candidateでなければ対応routeはなく、deployを自動実行しない。Release済みv0.1.2 binaryにはこの新しい照会は含まれない。
-- `runMigrationCandidateDeployment`と`resumeMigrationCandidateSettlement`に組み合わせる実REST adapter `createMigrationRestEffects`を追加した。CLI書込command・初回bridge deploy・full cutoverへはまだ接続しておらず、実Cloudflare書込も行っていない。
+- `runMigrationCandidateDeployment`と`resumeMigrationCandidateSettlement`に組み合わせる実REST adapter `createMigrationRestEffects`を追加した。CLI書込command・full cutoverへはまだ接続しておらず、実Cloudflare書込も行っていない。
+
+初回bridgeは別のdurable driver/REST adapterへ接続した（`m6_initial_bridge_client.md`）。その後のclient管理操作も下記の未公開methodとして追加したが、移行書込CLI/full cutoverはまだ提供しない。
+
+## Bridge切替後の明示的client操作
+
+`MigrationAdminClient`に`initializeAdmission` / `pauseAdmission` / `claimMigration` / `confirmQuiescence` / `initializeMigrationStep`と、開始前限定の`abortUnstartedMigration` / `resumeLegacyAdmission`を追加した。
+
+- 各操作は初回bridge検査receiptを明示的に受け取り、service/account/Workerを入力時に照合する。POST前にstatus GETで同実行version/bridge UUID tag/legacy modeを確認し、activeなmigration execution tokenがあれば拒否する。receiptやstatus GETはdeployment lease/全cache scope撤去の証拠ではない。
+- pause/migration ID、expected generation、timestamp、旧IO終了確認はcallerが凍結して渡す。UUIDや旧IO確認trueを自動生成せず、claim応答喪失で新IDを作ることも、自動retryで次工程へ進むこともしない。CLI用のdurable claim/申告journalはまだ接続していない。
+- 入力schemaをserverと共有し、foreign service/bridge、無効ID/上限、quiescenceの別bridge versionをPOST前に拒否する。応答はstrictなresultを要求し、不明field/別result/任意診断を成功証拠へ変換しない。
+- 初期化は1回につき1～100 targetの1 POSTで、戻り値は`pending`と`applying/verifying/runtime`だけ。client/server双方で`completed/finished`や付加readinessを認めず、loop/候補deploy/移行完了/受付再開を自動実行しない。
+- abort/resumeは別の明示操作で、serverのplan未作成限定契約を維持する。初期化後は拒否し、legacyへの自動rollbackやM6書込再開として利用しない。
+
+ローカル結合でpause→drained claim→明示quiescence→bounded初期化→runtime停止、開始前限定abort/resume、foreign version/tag/token拒否、pause/claim応答喪失時のPOST非再送、偽completion応答拒否を確認した。実機ゲート・unknown token/残存lock復旧・全route切替は別の残件である。
 
 ## ローカルrecord
 

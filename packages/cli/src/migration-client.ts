@@ -1,6 +1,9 @@
 import { migrationAdminStatusSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema,
-  serviceConfigSchema } from "@castloop/shared";
-import type { MigrationAdminStatus, MigrationBootstrapRequest, ServiceConfig } from "@castloop/shared";
+  serviceConfigSchema, migrationBridgeDeploymentEvidenceSchema, migrationQuiescenceSchema, serviceMigrationRequestSchema,
+  migrationServiceIdentitySchema, migrationPauseRequestSchema, migrationOperationIdentitySchema,
+  migrationInitializationRequestSchema, migrationInitializationResultSchema, migrationActionResponseSchema } from "@castloop/shared";
+import type { MigrationAdminStatus, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationQuiescence,
+  MigrationInitializationResult, ServiceConfig, ServiceMigrationRequest } from "@castloop/shared";
 
 export class MigrationAdminClient {
   private readonly config: ServiceConfig;
@@ -57,6 +60,60 @@ export class MigrationAdminClient {
       throw new Error("Migration status belongs to another service/account/Worker");
     }
     return value;
+  }
+
+  private async bridgeCall(bridgeInput: MigrationBridgeDeploymentEvidence, route: string, input: { service_id: string }): Promise<unknown> {
+    const bridge = migrationBridgeDeploymentEvidenceSchema.parse(bridgeInput);
+    if (input.service_id !== this.config.service_id || bridge.service_id !== this.config.service_id ||
+      bridge.account_id !== this.config.account_id || bridge.worker_name !== this.config.worker_name) throw new Error("Bridge operation belongs to another service/account/Worker");
+    const status = await this.status();
+    if (status.worker_protocol !== "legacy_fenced" || status.worker_bridge_id !== bridge.bridge_id ||
+      status.worker_version_id !== bridge.worker_version_id || status.admission && status.admission.mode !== "legacy" ||
+      status.admission?.migration?.execution_id) throw new Error("Bridge operation requires its expected executing version/tag without an unknown active migration token");
+    return this.call(route, input);
+  }
+
+  private async bridgeResult(bridge: MigrationBridgeDeploymentEvidence, route: string, input: { service_id: string },
+    expected: "initialized" | "paused" | "resumed" | "claimed" | "confirmed"): Promise<void> {
+    const response = migrationActionResponseSchema.parse(await this.bridgeCall(bridge, route, input));
+    if (response.result !== expected) throw new Error("Bridge operation returned an unexpected result; inspect retained state without automatic retry");
+  }
+
+  async initializeAdmission(bridge: MigrationBridgeDeploymentEvidence): Promise<void> {
+    await this.bridgeResult(bridge, "initialize-admission", migrationServiceIdentitySchema.parse({ schema_version: 1,
+      service_id: this.config.service_id }), "initialized");
+  }
+
+  async pauseAdmission(bridge: MigrationBridgeDeploymentEvidence, pauseId: string): Promise<void> {
+    await this.bridgeResult(bridge, "pause", migrationPauseRequestSchema.parse({ schema_version: 1,
+      service_id: this.config.service_id, pause_id: pauseId }), "paused");
+  }
+
+  async claimMigration(bridge: MigrationBridgeDeploymentEvidence, input: ServiceMigrationRequest): Promise<void> {
+    await this.bridgeResult(bridge, "claim", serviceMigrationRequestSchema.parse(input), "claimed");
+  }
+
+  async confirmQuiescence(bridgeInput: MigrationBridgeDeploymentEvidence, input: MigrationQuiescence): Promise<void> {
+    const bridge = migrationBridgeDeploymentEvidenceSchema.parse(bridgeInput);
+    const confirmation = migrationQuiescenceSchema.parse(input);
+    if (confirmation.bridge_worker_version_id !== bridge.worker_version_id) throw new Error("Quiescence confirmation belongs to another bridge version");
+    await this.bridgeResult(bridge, "quiescence", confirmation, "confirmed");
+  }
+
+  async initializeMigrationStep(bridge: MigrationBridgeDeploymentEvidence, migrationId: string, maximumTargets = 20): Promise<MigrationInitializationResult> {
+    const input = migrationInitializationRequestSchema.parse({ schema_version: 1, service_id: this.config.service_id,
+      migration_id: migrationId, maximum_targets: maximumTargets });
+    return migrationInitializationResultSchema.parse(await this.bridgeCall(bridge, "apply", input));
+  }
+
+  async abortUnstartedMigration(bridge: MigrationBridgeDeploymentEvidence, migrationId: string): Promise<void> {
+    await this.bridgeResult(bridge, "abort-unstarted", migrationOperationIdentitySchema.parse({ schema_version: 1,
+      service_id: this.config.service_id, migration_id: migrationId }), "paused");
+  }
+
+  async resumeLegacyAdmission(bridge: MigrationBridgeDeploymentEvidence, pauseId: string): Promise<void> {
+    await this.bridgeResult(bridge, "resume-legacy", migrationPauseRequestSchema.parse({ schema_version: 1,
+      service_id: this.config.service_id, pause_id: pauseId }), "resumed");
   }
 
   async prepareDeployment(input: MigrationBootstrapRequest): Promise<void> {
