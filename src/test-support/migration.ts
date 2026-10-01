@@ -22,12 +22,16 @@ export async function migrationFixture(pageSize = 1000) {
       writes.push(key);
       return { key, etag };
     },
-    async list(options: { cursor?: string; limit: number }) {
-      const objects = [...entries].sort(([left], [right]) => left.localeCompare(right))
+    async list(options: { prefix?: string; cursor?: string; limit: number }) {
+      const objects = [...entries].filter(([key]) => options.prefix === undefined || key.startsWith(options.prefix))
+        .sort(([left], [right]) => left.localeCompare(right))
         .map(([key, entry]) => ({ key, etag: entry.etag, size: entry.size }));
       const offset = Number(options.cursor ?? 0);
       const limit = Math.min(pageSize, options.limit);
       return { objects: objects.slice(offset, offset + limit), truncated: offset + limit < objects.length, cursor: String(offset + limit) };
+    },
+    async delete(input: string | string[]) {
+      for (const key of typeof input === "string" ? [input] : input) entries.delete(key);
     },
   };
   const env = { CASTLOOP_BUCKET: bucket } as never;

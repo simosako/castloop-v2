@@ -30,4 +30,4 @@ gateはR2書込もpurgeも行わない。Worker effectは対象とShow execution
 - 旧cache purge、旧Worker/CLI/PUTの終了、各hostname/coloのstate-first配信、料金/CPU/Free制限は別のmigration/runtime実機ゲートである。
 - R2 readiness保存後にdeployment/route/cache設定を外部から変更した場合、このadapterが自動で全設定を検出するわけではない。後続のdeploy/migration/domain経路はservice排他と証拠の更新を必須にし、稼働中旧invocationの排除を単なる100%設定/時間経過から推測しない。
 
-現在はruntime RPC/helperとbinding mockの照合テストだけである。main module export、default/named cache設定、loopback、binding、M6 API/Queue/staging/CLI接続、runtime証拠の本番検証と安全な回復が成立するまで、capabilityはM6未対応を維持する。
+別entry moduleのM6候補Workerへnamed export/loopback/gateway/Queueを接続したが、現行binary/deployには接続していない。候補capabilityはcompiled gatewayの存在だけを区別し、M6管理操作とreadyはfalseを維持する。default/named cache設定・実binding・M6管理API/staging/CLI・runtime証拠の本番検証と安全な回復が成立するまでReleaseしない。`m6_candidate_worker.md`参照。

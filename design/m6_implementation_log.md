@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 別entry moduleのM6候補Workerへgateway/new consumerを接続
+
+- `src/m6-worker.ts`にdefault fetch/queueと`CachedPublicAssets`のnamed exportをまとめ、型付き`ctx.exports` loopbackを`m6-routes.ts`へ渡した。現行Worker/binaryのentrypointやdeploy/initは変更せず、実deployも行っていない。
+- 候補public fetchはservice設定/readiness/実行versionを毎要求照合してからlifecycle状態照会→generation付き内部cacheへ進む。未移行/別versionは503/no-store、停止404、削除410、cache/破損record障害503とし、legacy配信へfallbackしない。
+- 候補Queueはservice/DLQ/batch/readinessを検査後、service invocation登録→共通Show execution token→配信gate/effect factory→新Show/Episode publicationまたはlifecycle consumerへdispatchする。Show削除の同job続行、internal purge待ち、正常終了時の2種token返却、DLQでstatus/owner非変更、旧marker非昇格を統合した。
+- 候補管理APIは認証GETだけで、旧/新管理書込は409。capabilityはcompiled gateway接続を`m6_candidate`/delivery=trueで区別するが、未提供command/staging/publication管理操作と`m6_ready`はfalse。移行bootstrap/HTTP検証順序・旧IO/cache purge・本番API/CLI・安全な強制終了回復・rollbackが残る。契約を`m6_candidate_worker.md`へ記録した。
+- `bun test`（349件、5589 assertions）、`npm run check`、M6実証tsconfig、候補Worker browser bundle、Linux x86-64単一binary build、`git diff --check`に合格。新17件はmock/ローカル統合であり、Cloudflare実機・300MB/CPU/Free制限・複数colo/hostnameの合格ではない。既存v0.1.1/運用環境は未変更。
+
 ## 2026-10-01: M6向けREST metadata生成と読み取り専用のdeployment検査を追加
 
 - 純粋なmetadata builderにdefault cache無効/named cache有効/cross-version cache無効、version metadata binding、ctx.exports flagとlogs/tracesを明示した。既存secretと無関係なbindingはinheritし、sampling/tag/tail/placement/logpushは保持する。既存deploy/initへはまだ接続しない。

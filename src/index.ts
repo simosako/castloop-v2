@@ -5,6 +5,7 @@ import type { Admission } from "./publication";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { initializeServiceAdmission, ServiceAdmissionBlocked, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
+import { authenticated } from "./admin-auth";
 
 type Env = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -15,16 +16,6 @@ type Env = {
 
 type ShowReservation = { show_id: string; reservation_id: string };
 const JOB_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
-
-function authenticated(request: Request, secret: string): boolean {
-  const received = new TextEncoder().encode(request.headers.get("X-Castloop-Key") ?? "");
-  const expected = new TextEncoder().encode(secret);
-  let difference = received.length ^ expected.length;
-  for (let index = 0; index < expected.length; index += 1) {
-    difference |= expected[index] ^ (received[index] ?? 0);
-  }
-  return expected.length > 0 && difference === 0;
-}
 
 function json(data: object, status: number): Response {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
