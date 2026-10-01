@@ -1,11 +1,28 @@
 import { describe, expect, test } from "bun:test";
-import { jobStatusSchema, lifecycleJobStatusSchema, lifecycleProgressSchema, parseJobStatus,
+import { jobStatusSchema, lifecycleFailureForPhase, lifecycleFailureMessages, lifecycleJobStatusSchema, lifecyclePhaseSchema,
+  lifecycleProgressSchema, parseJobStatus,
   parseLifecycleProgress, stringifyLifecycleProgress, stringifyToml } from "./index";
 
 const identity = { job_id: crypto.randomUUID(), show_id: "daily", kind: "episode" as const,
   episode_id: "first", action: "unpublish" as const, show_generation: 1, request_sha256: "a".repeat(64) };
 
 describe("M6 versioned job status and progress", () => {
+  test("retained diagnostics use only fixed codes/messages and never arbitrary exception text", () => {
+    const base = { schema_version: 2, ...identity, state: "retrying", phase: "purge" };
+    for (const phase of lifecyclePhaseSchema.options) {
+      const failure = lifecycleFailureForPhase(phase);
+      const status = lifecycleJobStatusSchema.parse({ ...base, phase, ...failure,
+        ...(phase === "finished" ? { state: "abandoned" } : {}) });
+      expect(status.reason).toBe(lifecycleFailureMessages[failure.reason_code]);
+      expect(parseJobStatus(stringifyToml(status))).toEqual(status);
+    }
+    for (const invalid of [{ reason: "owner@example.com title=private Bearer secret" },
+      { reason_code: "cache_purge_failed" }, { reason: "Cache purge failed." },
+      { reason_code: "cache_purge_failed", reason: "Payload deletion failed." },
+      { reason_code: "arbitrary", reason: "Cache purge failed." }]) {
+      expect(lifecycleJobStatusSchema.safeParse({ ...base, ...invalid }).success).toBe(false);
+    }
+  });
   test("legacy publication status remains strict and round trips", () => {
     const status = jobStatusSchema.parse({ schema_version: 1, job_id: identity.job_id, show_id: "daily",
       kind: "show", state: "published" });

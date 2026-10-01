@@ -1,4 +1,4 @@
-import { lifecycleJobStatusSchema, lifecycleProgressSchema, parseControlRequest, parseEpisodeLifecycle,
+import { lifecycleFailureForPhase, lifecycleJobStatusSchema, lifecycleProgressSchema, parseControlRequest, parseEpisodeLifecycle,
   parseJobStatus, parseLifecycleProgress, parseShowControl, stringifyLifecycleProgress,
   stringifyLifecycleToml, stringifyToml } from "../packages/shared/src/index";
 import type { EpisodeRevision, LifecycleJobStatus, LifecycleProgress } from "../packages/shared/src/index";
@@ -101,11 +101,11 @@ export async function runLifecycleUnpublish(env: LifecycleFeedEnv, execution: Sh
     return;
   }
   if (status?.state === "abandoned" || status?.state === "published") throw new Error("Unpublish status is incompatible");
-  async function recordStatus(state: "processing" | "retrying" | "completed", reason?: string): Promise<void> {
+  async function recordStatus(state: "processing" | "retrying" | "completed"): Promise<void> {
     await requireShowExecution(env, execution);
     const value = lifecycleJobStatusSchema.parse({ schema_version: 2, ...identity, state, phase: progress.phase,
       ...(state === "completed" ? { result_lifecycle: "unpublished" } : {}),
-      ...(reason ? { reason: reason.slice(0, 4096) } : {}) });
+      ...(state === "retrying" ? lifecycleFailureForPhase(progress.phase) : {}) });
     await env.CASTLOOP_BUCKET.put(`${prefix}/status.toml`, stringifyToml(value));
   }
   async function recordProgress(phase: LifecycleProgress["phase"], purged = false): Promise<void> {
@@ -136,7 +136,7 @@ export async function runLifecycleUnpublish(env: LifecycleFeedEnv, execution: Sh
       await effects.purge({ showId: execution.showId, ...(owner.episode_id ? { episodeId: owner.episode_id } : {}) });
       await recordProgress("finished", true);
     } catch (error) {
-      await recordStatus("retrying", error instanceof Error ? error.message : "Unpublish processing failed");
+      await recordStatus("retrying");
       throw error;
     }
   }

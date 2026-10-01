@@ -29,10 +29,10 @@ export async function serveLifecyclePublicRequest(request: Request, env: Lifecyc
     return new Response(request.method === "HEAD" ? null : response.body, {
       status: response.status, statusText: response.statusText, headers,
     });
-  } catch (error) {
+  } catch {
     console.error(JSON.stringify({ event: "lifecycle_public_request_failed", show_id: asset.showId,
       ...(asset.kind === "audio" ? { episode_id: asset.episodeId } : {}),
-      reason: error instanceof Error ? error.message : "Public delivery failed" }));
+      reason_code: "public_delivery_failed" }));
     return rejected(request, 503);
   }
 }

@@ -6,6 +6,31 @@ export const lifecyclePhaseSchema = z.enum([
   "admitted", "validating", "visibility", "feed", "purge", "deleting", "verifying", "finalizing", "finished",
 ]);
 
+export const lifecycleFailureMessages = {
+  validation_failed: "Stored inputs could not be validated.",
+  state_update_failed: "Lifecycle state update failed.",
+  feed_update_failed: "Feed preparation or update failed.",
+  cache_purge_failed: "Cache purge failed.",
+  payload_deletion_failed: "Payload deletion failed.",
+  deletion_verification_failed: "Deletion verification failed.",
+  completion_failed: "Operation finalization failed.",
+} as const;
+
+export type LifecycleFailure = {
+  reason_code: keyof typeof lifecycleFailureMessages;
+  reason: typeof lifecycleFailureMessages[keyof typeof lifecycleFailureMessages];
+};
+
+export function lifecycleFailureForPhase(phase: z.infer<typeof lifecyclePhaseSchema>): LifecycleFailure {
+  const codes: Record<z.infer<typeof lifecyclePhaseSchema>, LifecycleFailure["reason_code"]> = {
+    admitted: "validation_failed", validating: "validation_failed", visibility: "state_update_failed",
+    feed: "feed_update_failed", purge: "cache_purge_failed", deleting: "payload_deletion_failed",
+    verifying: "deletion_verification_failed", finalizing: "completion_failed", finished: "completion_failed",
+  };
+  const code = codes[phase];
+  return { reason_code: code, reason: lifecycleFailureMessages[code] };
+}
+
 const identity = {
   job_id: z.uuid(),
   show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -22,8 +47,14 @@ export const lifecycleJobStatusSchema = z.object({
   state: z.enum(["reserved", "processing", "retrying", "failed", "published", "completed", "abandoned"]),
   phase: lifecyclePhaseSchema,
   result_lifecycle: lifecycleStateSchema.optional(),
-  reason: z.string().min(1).max(4096).optional(),
+  reason_code: z.enum(["validation_failed", "state_update_failed", "feed_update_failed", "cache_purge_failed",
+    "payload_deletion_failed", "deletion_verification_failed", "completion_failed"]).optional(),
+  reason: z.enum(lifecycleFailureMessages).optional(),
 }).strict().superRefine((value, context) => {
+  if ((value.reason_code !== undefined) !== (value.reason !== undefined) ||
+    (value.reason_code && value.reason !== lifecycleFailureMessages[value.reason_code])) {
+    context.addIssue({ code: "custom", message: "Failure reason must match its allowlisted diagnostic code" });
+  }
   if ((value.kind === "episode") !== (value.episode_id !== undefined)) {
     context.addIssue({ code: "custom", message: "Only Episode jobs require an Episode ID" });
   }

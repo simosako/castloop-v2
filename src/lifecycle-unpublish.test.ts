@@ -174,6 +174,28 @@ describe("M6 unpublish state machine", () => {
     expect(await readPublicVisibility(setup.env, "daily")).toBe("public");
   });
 
+  test("retained failure records contain no injected title, description, email or token", async () => {
+    const setup = await fixture({ episode: true });
+    const privateMessage = "Private title; confidential description; owner@example.com; Bearer super-secret-token";
+    await expect(runLifecycleUnpublish(setup.env, setup.execution, {
+      async writeFeed() {}, async purge() { throw new Error(privateMessage); },
+    })).rejects.toThrow(privateMessage);
+    const statusText = setup.entries.get(`system/jobs/${setup.request.job_id}/status.toml`)!.data;
+    const status = parseJobStatus(statusText);
+    expect(status.schema_version).toBe(2);
+    if (status.schema_version === 2) {
+      expect(status.reason_code).toBe("cache_purge_failed");
+      expect(status.reason).toBe("Cache purge failed.");
+    }
+    for (const [key, object] of setup.entries) {
+      if (key.startsWith("system/jobs/")) {
+        for (const value of ["Private title", "confidential description", "owner@example.com", "super-secret-token"]) {
+          expect(object.data).not.toContain(value);
+        }
+      }
+    }
+  });
+
   test("lost state, feed-generation, progress and release responses converge without double generations", async () => {
     for (const fault of ["show", "episode", "feed-generation", "progress", "release"] as const) {
       const setup = await fixture({ episode: fault !== "show" });

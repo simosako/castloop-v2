@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { serveLifecyclePublicRequest } from "./lifecycle-gateway";
 import { episodeLifecycleSchema, stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { LifecycleState } from "../packages/shared/src/index";
@@ -30,6 +30,22 @@ function fixture(showState: LifecycleState = "active", episodeState: LifecycleSt
 }
 
 describe("M6 uncached gateway delivery", () => {
+  test("persistent logs do not receive raw exception messages or secrets", async () => {
+    const setup = fixture();
+    const logs: unknown[][] = [];
+    const logger = spyOn(console, "error").mockImplementation((...values: unknown[]) => { logs.push(values); });
+    try {
+      const response = await serveLifecyclePublicRequest(new Request(`https://public.example${audioPath}`), setup.env,
+        async () => { throw new Error("title=private owner@example.com Bearer super-secret-token"); });
+      expect(response?.status).toBe(503);
+      expect(logs).toHaveLength(1);
+      const text = JSON.stringify(logs);
+      expect(text).toContain("public_delivery_failed");
+      for (const value of ["title=private", "owner@example.com", "super-secret-token"]) expect(text).not.toContain(value);
+    } finally {
+      logger.mockRestore();
+    }
+  });
   test("every warm-cache request rechecks state and stops all revision links before conditional/Range processing", async () => {
     const setup = fixture();
     let cachedCalls = 0;

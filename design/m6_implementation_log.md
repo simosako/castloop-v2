@@ -1,5 +1,18 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 削除後の最小記録保持policyを承認
+
+- 管理者が説明へのannotationで、小さい必要な管理/操作記録は自動期限削除せず保持し、本文/個人情報/secretを複製せず、音源等のpayloadを物理削除するM6方針を承認した。期限付きの記録整理は後続とする。
+- レビュー待ち一覧・M6設計・英語Agent Guideへ承認を反映した。tombstone/凍結request/commit/status/progressの保持とpayload削除を分離し、未完了/回復中jobを時間だけで消さない。
+- この承認は運用bucketの削除実行やM6公開ゲートの通過ではない。実装・自動テストを順次進め、運用リソースは変更しない。
+
+## 2026-10-01: 保持するM6診断をallowlist化
+
+- M6 v2 statusのreasonをphase別の定型文・`reason_code`へ限定し、不一致pairや自由な例外messageをstrict schemaで拒否する。公開停止runnerはretrying記録へ例外本文をコピーせず、phaseと安全な定型診断を保存する。
+- gatewayの永続ログも任意の例外messageを出力せず、対象IDと固定codeで障害を記録する。例外へタイトル/説明文/メール/secretを注入したテストで、R2 job記録とgatewayログに含まれないことを確認する。
+- 旧v1 status parserは互換性のため維持する。既存R2記録を一括書換/削除したわけではなく、旧publication経路のv2統合は引き続き残件である。
+- `bun test`（131件、956 assertions）、`npm run check`、M6実証tsconfig、`git diff --check`に合格。運用リソースは変更していない。
+
 ## 2026-10-01: レビューannotationを反映
 
 - 管理者が公開時の利用条件を承認した。停止404/削除410/空feed 200、外部cache再検証、削除ID再利用禁止、進行中jobへ割り込まない仕様と、状態照会/内部cache構成に伴う性能・料金増の許容を承認済みとして設計・レビュー待ち一覧へ反映した。具体的な測定値や実機合格は承認に含めず、技術検証を継続する。

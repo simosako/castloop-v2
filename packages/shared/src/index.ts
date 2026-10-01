@@ -1,9 +1,9 @@
 import * as TOML from "@iarna/toml";
 import { z } from "zod";
 import { lifecycleJobStatusSchema } from "./lifecycle-job";
-export { lifecycleJobStatusSchema, lifecyclePhaseSchema, lifecycleProgressSchema,
+export { lifecycleFailureForPhase, lifecycleFailureMessages, lifecycleJobStatusSchema, lifecyclePhaseSchema, lifecycleProgressSchema,
   parseLifecycleProgress, stringifyLifecycleProgress } from "./lifecycle-job";
-export type { LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";
+export type { LifecycleFailure, LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";
 export { validateId } from "./ids";
 export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,

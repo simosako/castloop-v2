@@ -264,7 +264,7 @@ M6では入口から返すfeed/cover/MP3のクライアント向けheaderを`max
 | Episode | `public/podcasts/<showId>/episodes/<episodeId>/`、`public/episodes/<showId>/<episodeId>/`、`staging/episodes/<showId>/<episodeId>/` |
 | Show | `system/shows/<showId>/show.toml`、`public/podcasts/<showId>/`、`public/episodes/<showId>/`、`staging/shows/<showId>/`、`staging/episodes/<showId>/` |
 
-Show予約、Show制御record、Episode tombstone、lifecycle request/commit/progress、最小job監査は削除しない。古いpublication commitも復旧/拒否判断に必要な最小記録として残し、stagingの削除ではmetadata・cover・audioを消すがそのmarkerを区別する。残す記録に個人情報やコンテンツを含める範囲・保持期間はM6.0で定める。
+Show予約、Show制御record、Episode tombstone、lifecycle request/commit/progress、最小job監査は削除しない。古いpublication commitも復旧/拒否判断に必要な最小記録として残し、stagingの削除ではmetadata・cover・audioを消すがそのmarkerを区別する。2026-10-01に管理者が、小さい必要記録の自動期限削除は行わず、本文/個人情報/secretを複製しない方針を承認した。エラーreasonはallowlistの診断code/定型文に限定し、任意の例外messageを永続記録へ保存しない。期限付きの監査cleanupは後続とし、未完了/回復中jobを時間だけで消さない。
 
 `src/lifecycle-deletion.ts`に、固定scope・許可key分類・list/headだけのページinventoryを追加した。媒体bodyを読み込まず、payload/保持marker/未知key blockerを分離する。`authorizesDeletion=false`であり、一覧結果だけで実削除を許可しない。cursor完走後も各prefixの先頭から再照会する実削除consumerと耐久progressへの接続は未実装。
 
@@ -355,14 +355,14 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 この文書の作成だけで、以下を承認済みとは扱わない。
 
-2026-10-01に管理者が[レビュー待ち一覧](./m6_review_queue.md)へのannotationで公開時の利用条件を承認した。停止404/削除410/空feed 200、外部cache再検証、削除ID再利用禁止、進行中jobへ割り込まない仕様、状態照会/内部cache構成に伴うrequest・CPU・R2 read増を許容する方針を承認済みとする。性能/料金の具体値や実機受け入れは別途確認し、運用記録の保持項目・期間は引き続き確認待ちである。
+2026-10-01に管理者が[レビュー待ち一覧](./m6_review_queue.md)へのannotationで公開時の利用条件を承認した。停止404/削除410/空feed 200、外部cache再検証、削除ID再利用禁止、進行中jobへ割り込まない仕様、状態照会/内部cache構成に伴うrequest・CPU・R2 read増を許容する方針を承認済みとする。続けて、小さい必要な管理/操作記録は自動期限削除せず保持し、本文/個人情報/secretを複製せずpayloadを物理削除する方針も承認した。性能/料金の具体値や実機受け入れは別途確認する。
 
 独立して進められる実装を継続し、最終確認待ちと技術残件は[レビュー待ち一覧](./m6_review_queue.md)に分離してまとめる。未接続moduleの自動テスト追加を、公開policyの承認やM6の実機受け入れと扱わない。
 
 1. **deleteは物理削除、unpublishは保持**という分離。単なる論理削除にする代案もあるが、利用者が想定する容量削減を満たさないため上記を推奨する。
 2. **unpublishと対になるrestoreもM6に含める**こと。通常publishで暗黙再開する方式は誤公開を招くので推奨しない。
 3. **承認済み（2026-10-01）**: 停止時404、削除中/削除済み410、空Showのfeedは200というHTTP仕様。
-4. **削除IDの永久再利用禁止は承認済み（2026-10-01）**。そのための最小tombstoneと、削除後の運用記録の保持項目・期間は区別して説明し、詳細を最終確認する。ローカル元ファイルはremote削除の対象外とする設計を維持する。
+4. **承認済み（2026-10-01）**: 削除IDは永久再利用禁止。最小tombstoneと必要な小さい操作記録は自動期限削除せず保持し、本文/個人情報/secretは複製しない。期限付きの監査cleanupは後続。ローカル元ファイルはremote削除の対象外とする設計を維持する。
 5. **方針は承認済み（2026-10-01）**: 長期immutableのクライアントcacheを再検証必須へ変えることと、毎要求のR2状態照会・内部呼出の性能/料金増を受け入れること。実測は引き続き必要。
 6. **承認済み（2026-10-01）**: 進行中publicationやuploadへ割り込まないこと。必要なら緊急遮断を別要件として設計する。
 
