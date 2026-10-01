@@ -1,6 +1,6 @@
 import { episodeCommitSchema, episodeDraftFromRevision, parseEpisodeDraft, parseEpisodeRevision, parseJobStatus,
   parseServiceConfig, parseShowMetadata, showCommitSchema, stringifyToml } from "../packages/shared/src/index";
-import type { EpisodeCommit, EpisodeRevision, JobStatus, ShowCommit } from "../packages/shared/src/index";
+import type { EpisodeCommit, EpisodeRevision, PublicationJobStatus, ShowCommit } from "../packages/shared/src/index";
 import { renderFeed } from "./feed";
 import { canonicalEnclosureUrl } from "./media-url";
 
@@ -19,8 +19,8 @@ export async function readAdmission(env: PublicationEnv, showId: string): Promis
 
 async function writeStatus(env: PublicationEnv,
   commit: Pick<ShowCommit, "job_id" | "show_id"> & { kind: "show" | "episode"; episode_id?: string },
-  state: JobStatus["state"], reason?: string): Promise<void> {
-  const status: JobStatus = {
+  state: PublicationJobStatus["state"], reason?: string): Promise<void> {
+  const status: PublicationJobStatus = {
     schema_version: 1, job_id: commit.job_id, show_id: commit.show_id, kind: commit.kind, state,
     ...(commit.episode_id ? { episode_id: commit.episode_id } : {}),
     ...(reason ? { reason } : {}),

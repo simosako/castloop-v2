@@ -166,7 +166,9 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 - 既存公開の終端`published`を維持する。lifecycleの終端には`completed`を設け、対象状態と処理結果も表示する。`published`/`completed`かつowner `free`が完了条件。
 - JSON制御recordもruntime検証する。新しいTOMLは`@iarna/toml`とstrict Zodで読み、共通stringifyを拡張する。具体的フィールドはM6.0で確定する。
 
-基礎実装のフィールドは`packages/shared/src/lifecycle.ts`に定義する。Show recordはv2、Episode recordとrequestはv1とし、ownerがない状態をfreeとして表す。受付成功時にShow generationを1つ進め、そのgenerationをownerの処理開始tokenとする。requestの`expected_show_generation`は受付前の値、`expected_episode_generation`は対象Episodeの値である。consumer開始時は凍結requestのhash・対象・owner・受付後generationの一致を確認する。旧v1 admissionを暗黙にこの形式へ変換しない。job status v2・終了処理・移行は後続実装で接続する。
+基礎実装のフィールドは`packages/shared/src/lifecycle.ts`に定義する。Show recordはv2、Episode recordとrequestはv1とし、ownerがない状態をfreeとして表す。受付成功時にShow generationを1つ進め、そのgenerationをownerの処理開始tokenとする。requestの`expected_show_generation`は受付前の値、`expected_episode_generation`は対象Episodeの値である。consumer開始時は凍結requestのhash・対象・owner・受付後generationの一致を確認する。旧v1 admissionを暗黙にこの形式へ変換しない。job status v2・progressのstrict schemaと完了解放基礎関数を追加したが、consumerでの進捗更新・移行・既存経路への接続は後続実装とする。
+
+`finishShowOperation`は実行tokenの保持者だけが呼べる。durable terminal status/progressの対象・action・generation・要求hash、purge成功、結果状態（Episodeでは最終job IDも）を照合し、Show owner解放と完了receiptを同じCASで保存する。完了receiptを使った再送は新しいownerを変更しない。`completed`だけを見て新ownerを解放する実装にはしない。staging ownerの終了・中断解放は別の後続処理であり、このconsumer用関数では解放しない。
 
 ## 6. 原子的受付と既存処理との排他
 

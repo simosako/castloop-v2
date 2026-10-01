@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: version別status・耐久progress・完了解放を追加
+
+- 旧v1 publication statusを保持し、strictなv2 statusとv1 progressを追加した。action・phase・owner generation・要求hash・対象・結果状態を検証し、`published`とlifecycleの`completed`を分離する。既存publicationの書込はv1型へ限定し、挙動を変更していない。
+- 実行tokenを保持した`finishShowOperation`は、耐久terminal status/progress、purge成功、owner/request/generation、対象の結果状態を照合して同じShow keyのCASで解放する。完了receiptを同時保存し、解放応答喪失の再送でも次のownerを変更しない。
+- 欠落/破損/旧status、retrying、hash不一致、未完phase、purge未確認、対象状態の不一致ではowner/tokenを保持する。generationの上限でShow/feed/Episodeを受付拒否する。
+- `npm run check`、M6実証tsconfig、`bun test`（100件、642 assertions）に合格。status/progressを書き進めるconsumer、upload終了処理、API/CLIへの接続は後続。実機・運用リソースは変更していない。
+
 ## 2026-10-01: 同job内のconsumer実行排他を追加
 
 - Show ownerへprocessing専用の`execution_id`を追加し、取得・照合・解放をShow制御keyのETag CASで実装した。reserved→processingとtoken取得を一度に行い、同jobの重複配送16件でも1 invocationだけを実行可能にする。

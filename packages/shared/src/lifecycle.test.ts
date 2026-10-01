@@ -73,6 +73,16 @@ describe("M6 lifecycle schemas", () => {
       expect(showControlSchema.safeParse({ ...control, owner: { ...owner, ...invalid } }).success).toBe(false);
     }
   });
+
+  test("completion receipts cannot claim a future generation or the current owner", () => {
+    const control = { schema_version: 2, show_id: "daily", lifecycle: "active", generation: 1, feed_generation: 0 };
+    const receipt = { job_id: request.job_id, generation: 1, execution_id: crypto.randomUUID(), request_sha256: "a".repeat(64) };
+    expect(showControlSchema.safeParse({ ...control, last_finished_operation: receipt }).success).toBe(true);
+    expect(showControlSchema.safeParse({ ...control, last_finished_operation: { ...receipt, generation: 2 } }).success).toBe(false);
+    expect(showControlSchema.safeParse({ ...control, last_finished_operation: receipt, owner: {
+      job_id: request.job_id, kind: "show", action: "unpublish", state: "processing", request_sha256: "a".repeat(64),
+    } }).success).toBe(false);
+  });
 });
 
 test("ordinary publication cannot restore stopped or deleted content", () => {

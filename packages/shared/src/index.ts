@@ -1,5 +1,9 @@
 import * as TOML from "@iarna/toml";
 import { z } from "zod";
+import { lifecycleJobStatusSchema } from "./lifecycle-job";
+export { lifecycleJobStatusSchema, lifecyclePhaseSchema, lifecycleProgressSchema,
+  parseLifecycleProgress, stringifyLifecycleProgress } from "./lifecycle-job";
+export type { LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";
 export { validateId } from "./ids";
 export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
@@ -114,7 +118,7 @@ export const episodeRevisionSchema = episodeDraftSchema.extend({
   updated_at: publishedAt,
 }).strict();
 
-export const jobStatusSchema = z.object({
+export const publicationJobStatusSchema = z.object({
   schema_version: z.literal(1),
   job_id: z.uuid(),
   show_id: ID(32),
@@ -124,6 +128,8 @@ export const jobStatusSchema = z.object({
   reason: z.string().optional(),
 }).strict();
 
+export const jobStatusSchema = z.discriminatedUnion("schema_version", [publicationJobStatusSchema, lifecycleJobStatusSchema]);
+
 export type ServiceConfig = z.infer<typeof serviceConfigSchema>;
 export type ShowMetadata = z.infer<typeof showMetadataSchema>;
 export type EpisodeDraft = z.infer<typeof episodeDraftSchema>;
@@ -131,6 +137,7 @@ export type ShowCommit = z.infer<typeof showCommitSchema>;
 export type EpisodeCommit = z.infer<typeof episodeCommitSchema>;
 export type EpisodeRevision = z.infer<typeof episodeRevisionSchema>;
 export type JobStatus = z.infer<typeof jobStatusSchema>;
+export type PublicationJobStatus = z.infer<typeof publicationJobStatusSchema>;
 
 export function episodeDraftFromRevision(revision: EpisodeRevision): EpisodeDraft {
   return episodeDraftSchema.parse(Object.fromEntries(

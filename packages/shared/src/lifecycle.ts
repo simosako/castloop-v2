@@ -40,6 +40,12 @@ export const showControlSchema = z.object({
     generation,
     request_sha256: checksum,
   }).strict().optional(),
+  last_finished_operation: z.object({
+    job_id: z.uuid(),
+    generation,
+    execution_id: z.uuid(),
+    request_sha256: checksum,
+  }).strict().optional(),
 }).strict().superRefine((value, context) => {
   if ((value.lifecycle === "deleting" || value.lifecycle === "deleted") &&
     value.owner && value.owner.action !== "delete") {
@@ -49,6 +55,11 @@ export const showControlSchema = z.object({
     (value.last_abandoned_operation.generation >= value.generation ||
       value.last_abandoned_operation.job_id === value.owner?.job_id)) {
     context.addIssue({ code: "custom", message: "An abandoned operation must be older than the current generation and owner" });
+  }
+  if (value.last_finished_operation &&
+    (value.last_finished_operation.generation > value.generation ||
+      value.last_finished_operation.job_id === value.owner?.job_id)) {
+    context.addIssue({ code: "custom", message: "A finished operation cannot be newer than the control or still own it" });
   }
 });
 

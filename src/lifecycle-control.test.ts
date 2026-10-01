@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { episodeLifecycleSchema, parseShowControl, stringifyLifecycleToml } from "../packages/shared/src/index";
+import { episodeLifecycleSchema, lifecycleJobStatusSchema, lifecycleProgressSchema, parseShowControl,
+  stringifyLifecycleProgress, stringifyLifecycleToml, stringifyToml } from "../packages/shared/src/index";
 import type { ControlRequest, LifecycleState } from "../packages/shared/src/index";
 import { abandonReservedShowOperation, acquireShowExecution, beginShowOperation, claimShowOperation,
+  finishShowOperation,
   readEpisodeLifecycle, readPublicVisibility, readPublicVisibilitySnapshot, readShowControl,
   releaseShowExecution, requireShowExecution } from "./lifecycle-control";
 
@@ -165,6 +167,25 @@ describe("M6 atomic Show control", () => {
     expect((await readShowControl(env, "daily"))?.value.owner).toBeUndefined();
   });
 
+  test("exhausted Show, feed and Episode generations cannot admit an operation", async () => {
+    for (const field of ["generation", "feed_generation", "episode"] as const) {
+      const { env, bucket } = await fixture();
+      if (field === "episode") {
+        const episode = (await readEpisodeLifecycle(env, "daily", "first"))!;
+        await bucket.put("system/episode-lifecycle/daily/first.toml",
+          stringifyLifecycleToml({ ...episode, generation: Number.MAX_SAFE_INTEGER }));
+      } else {
+        const control = (await readShowControl(env, "daily"))!.value;
+        await bucket.put("system/show-publications/daily.json", JSON.stringify({ ...control, [field]: Number.MAX_SAFE_INTEGER }));
+      }
+      await expect(claimShowOperation(env, request({
+        ...(field === "generation" ? { expected_show_generation: Number.MAX_SAFE_INTEGER } : {}),
+        ...(field === "episode" ? { kind: "episode", episode_id: "first", expected_episode_generation: Number.MAX_SAFE_INTEGER } : {}),
+      }))).rejects.toThrow("generation is exhausted");
+      expect((await readShowControl(env, "daily"))?.value.owner).toBeUndefined();
+    }
+  });
+
   test("missing or changed frozen requests prevent a consumer from starting", async () => {
     const { env, bucket } = await fixture();
     const input = request();
@@ -262,6 +283,73 @@ describe("M6 per-invocation execution admission", () => {
     await second.bucket.put(`system/jobs/${input.job_id}/request.toml`, stringifyLifecycleToml({ ...input, action: "delete" }));
     await expect(acquireShowExecution(second.env, "daily", input.job_id, 1)).rejects.toThrow("does not match");
     expect(bucket.entries.has(`system/jobs/${staged.job_id}/request.toml`)).toBe(true);
+  });
+});
+
+describe("M6 durable operation completion", () => {
+  async function completing() {
+    const result = await fixture();
+    const input = request();
+    await claimShowOperation(result.env, input);
+    const execution = await acquireShowExecution(result.env, "daily", input.job_id, 1);
+    const control = (await requireShowExecution(result.env, execution)).value;
+    await result.bucket.put("system/show-publications/daily.json", JSON.stringify({ ...control, lifecycle: "unpublished" }));
+    const identity = { job_id: input.job_id, show_id: "daily", kind: "show" as const, action: "unpublish" as const,
+      show_generation: 1, request_sha256: control.owner!.request_sha256 };
+    const status = lifecycleJobStatusSchema.parse({ schema_version: 2, ...identity,
+      state: "completed", phase: "finished", result_lifecycle: "unpublished" });
+    const progress = lifecycleProgressSchema.parse({ schema_version: 1, ...identity, phase: "finished",
+      deleted_objects: 0, purge_confirmed: true, updated_at: "2026-10-01T12:00:00Z" });
+    await result.bucket.put(`system/jobs/${input.job_id}/status.toml`, stringifyToml(status));
+    await result.bucket.put(`system/jobs/${input.job_id}/progress.toml`, stringifyLifecycleProgress(progress));
+    return { ...result, input, execution, status, progress };
+  }
+
+  test("terminal status, matching result and purge permit atomic owner release", async () => {
+    const { env, execution } = await completing();
+    const result = await finishShowOperation(env, execution);
+    expect(result.value.owner).toBeUndefined();
+    expect(result.value.lifecycle).toBe("unpublished");
+    expect(result.value.generation).toBe(1);
+    expect(result.value.last_finished_operation?.execution_id).toBe(execution.executionId);
+    expect((await finishShowOperation(env, execution)).etag).toBe(result.etag);
+    const next = await claimShowOperation(env, request({ action: "restore", expected_show_generation: 1 }));
+    expect((await finishShowOperation(env, execution)).value.owner?.job_id).toBe(next.value.owner?.job_id);
+    await expect(releaseShowExecution(env, execution)).rejects.toThrow("no longer owns");
+  });
+
+  test("unfinished, missing, corrupt, mismatched and unpurged results retain ownership", async () => {
+    for (const fault of ["missing", "corrupt", "legacy", "retrying", "hash", "target", "purge", "phase"] as const) {
+      const { env, bucket, execution, input, status, progress } = await completing();
+      const key = `system/jobs/${input.job_id}/status.toml`;
+      if (fault === "missing") bucket.entries.delete(key);
+      if (fault === "corrupt") await bucket.put(key, "broken");
+      if (fault === "legacy") await bucket.put(key, stringifyToml({ schema_version: 1, job_id: input.job_id,
+        show_id: "daily", kind: "show", state: "published" }));
+      if (fault === "retrying") await bucket.put(key, stringifyToml({ ...status, state: "retrying", phase: "purge",
+        result_lifecycle: undefined }));
+      if (fault === "hash") await bucket.put(key, stringifyToml({ ...status, request_sha256: "b".repeat(64) }));
+      if (fault === "target") {
+        const control = (await readShowControl(env, "daily"))!.value;
+        await bucket.put("system/show-publications/daily.json", JSON.stringify({ ...control, lifecycle: "active" }));
+      }
+      if (fault === "purge" || fault === "phase") await bucket.put(`system/jobs/${input.job_id}/progress.toml`,
+        stringifyLifecycleProgress({ ...progress, ...(fault === "purge" ? { purge_confirmed: false } : { phase: "purge" }) }));
+      await expect(finishShowOperation(env, execution)).rejects.toThrow();
+      expect((await readShowControl(env, "daily"))?.value.owner?.execution_id).toBe(execution.executionId);
+    }
+  });
+
+  test("a lost finish response is recovered without touching a later owner", async () => {
+    const { env: original, bucket, execution } = await completing();
+    const env = { CASTLOOP_BUCKET: { ...bucket, async put(...args: Parameters<typeof bucket.put>) {
+      const result = await bucket.put(...args);
+      if (result && args[0] === "system/show-publications/daily.json") throw new Error("Finish response lost");
+      return result;
+    } } } as never;
+    await expect(finishShowOperation(env, execution)).rejects.toThrow("response lost");
+    const next = await claimShowOperation(original, request({ action: "restore", expected_show_generation: 1 }));
+    expect((await finishShowOperation(original, execution)).value.owner?.job_id).toBe(next.value.owner?.job_id);
   });
 });
 

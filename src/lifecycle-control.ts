@@ -1,4 +1,5 @@
-import { controlRequestSchema, parseControlRequest, parseEpisodeLifecycle, parseShowControl,
+import { controlRequestSchema, parseControlRequest, parseEpisodeLifecycle, parseJobStatus,
+  parseLifecycleProgress, parseShowControl,
   permitsControlAction, stringifyLifecycleToml, validateId } from "../packages/shared/src/index";
 import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/shared/src/index";
 
@@ -77,6 +78,7 @@ async function requireEligibleTarget(env: LifecycleControlEnv, control: ShowCont
     throw new Error("Show generation changed; inspect the current state before retrying");
   }
   if (control.generation === Number.MAX_SAFE_INTEGER) throw new Error("Show generation is exhausted");
+  if (control.feed_generation === Number.MAX_SAFE_INTEGER) throw new Error("Feed generation is exhausted");
   if (request.kind === "show") {
     if (!permitsControlAction(control.lifecycle, request.action)) {
       throw new Error(`Show state ${control.lifecycle} does not permit ${request.action}`);
@@ -93,6 +95,7 @@ async function requireEligibleTarget(env: LifecycleControlEnv, control: ShowCont
   if (episode.generation !== request.expected_episode_generation) {
     throw new Error("Episode generation changed; inspect the current state before retrying");
   }
+  if (episode.generation === Number.MAX_SAFE_INTEGER) throw new Error("Episode generation is exhausted");
   if (!permitsControlAction(episode.lifecycle, request.action)) {
     throw new Error(`Episode state ${episode.lifecycle} does not permit ${request.action}`);
   }
@@ -200,6 +203,53 @@ export async function releaseShowExecution(env: LifecycleControlEnv,
     onlyIf: { etagMatches: current.etag },
   });
   if (!written) throw new Error("Show control changed before execution was released");
+  return { value, etag: written.etag };
+}
+
+export async function finishShowOperation(env: LifecycleControlEnv,
+  execution: ShowExecution): Promise<ShowControlSnapshot> {
+  const snapshot = await readShowControl(env, execution.showId);
+  const receipt = snapshot?.value.last_finished_operation;
+  if (receipt?.job_id === execution.jobId && receipt.generation === execution.generation &&
+    receipt.execution_id === execution.executionId) return snapshot!;
+  const current = await requireShowExecution(env, execution);
+  const owner = current.value.owner!;
+  const [statusObject, progressObject] = await Promise.all([
+    env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/status.toml`),
+    env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/progress.toml`),
+  ]);
+  if (!statusObject || !progressObject) throw new Error("Operation has no durable terminal status and progress");
+  checkRecordSize(statusObject);
+  checkRecordSize(progressObject);
+  const status = parseJobStatus(await statusObject.text());
+  const progress = parseLifecycleProgress(await progressObject.text());
+  for (const record of [status, progress]) {
+    if (!("request_sha256" in record) || record.job_id !== execution.jobId ||
+      record.show_id !== execution.showId || record.show_generation !== execution.generation ||
+      record.request_sha256 !== owner.request_sha256 || record.action !== owner.action ||
+      record.kind !== owner.kind || record.episode_id !== owner.episode_id) {
+      throw new Error("Terminal records do not match the Show owner");
+    }
+  }
+  if (status.schema_version !== 2 || (status.state !== "completed" && status.state !== "published") ||
+    progress.phase !== "finished" || !progress.purge_confirmed) {
+    throw new Error("Operation is not complete with confirmed cache purging");
+  }
+  const episode = owner.kind === "episode" ? await readEpisodeLifecycle(env, execution.showId, owner.episode_id!) : null;
+  if (owner.kind === "episode" && episode?.last_job_id !== execution.jobId) {
+    throw new Error("Episode result was not written by this operation");
+  }
+  const lifecycle = owner.kind === "show" ? current.value.lifecycle : episode?.lifecycle;
+  if (lifecycle !== status.result_lifecycle) throw new Error("Target lifecycle does not match the completed result");
+  const { owner: _owner, ...withoutOwner } = current.value;
+  const value = parseShowControl({ ...withoutOwner, last_finished_operation: {
+    job_id: execution.jobId, generation: execution.generation, execution_id: execution.executionId,
+    request_sha256: owner.request_sha256,
+  } });
+  const written = await env.CASTLOOP_BUCKET.put(showControlKey(execution.showId), JSON.stringify(value), {
+    onlyIf: { etagMatches: current.etag },
+  });
+  if (!written) throw new Error("Show control changed before the operation finished");
   return { value, etag: written.etag };
 }
 
