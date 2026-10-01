@@ -20,6 +20,8 @@ export { frozenMigrationPlanSchema, migrationApplyProgressSchema, migrationRunti
 export type { FrozenMigrationPlan, MigrationApplyProgress, MigrationRuntimeProof } from "./migration-plan";
 export { serviceCapabilitiesSchema } from "./service-capabilities";
 export type { ServiceCapabilities } from "./service-capabilities";
+export { cachedDeliveryRuntimeSchema } from "./delivery-runtime";
+export type { CachedDeliveryRuntime } from "./delivery-runtime";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

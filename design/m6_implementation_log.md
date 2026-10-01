@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 実行version・cache owner・service tokenを照合する配信gate adapterを追加
+
+- `createM6DeliveryGate`はservice registryのM6 invocation token、移行完了readiness、実行Worker version metadata、uncached gateway protocolとcache owner RPCのstrict識別結果を照合する。RPC待ち後もtoken/readinessを再確認し、旧/返却済みtoken、foreign version/entrypoint、破損record、不明protocol、purge API欠落を拒否する。
+- `CachedPublicAssets.describeRuntime`にversion metadata bindingとpurge API存在からの内部識別結果を追加した。本文/secretやHTTP公開診断は含めず、実cache設定/100%切替をRPCだけで証明したとはしない。配信gateはR2書込/purgeを行わず、既存effect factoryの必須callbackとして利用する。
+- Show停止consumerと実gate adapterをmockで統合し、不一致時に公開状態/payload/purgeを進めず、通常終了後のShow実行token返却とjob owner保持を確認した。paused drain、RPC待ち中のtoken/readiness変更、未知runtime/target、missing bindingも確認した。
+- main module export/default cache無効deploy/loopback・実version binding・M6 routingにはまだ接続していない。本番設定の検証、旧IO終了、100%切替、旧cache purge、out-of-band deployの制限と安全なtoken回復は残る。範囲/限界を`m6_delivery_runtime_gate.md`へ記録した。既存v0.1.1/運用環境へのdeployは行っていない。
+- `bun test`（318件、5257 assertions）、`npm run check`、M6実証tsconfig、cached entrypoint/gateのbrowser bundle、Linux x86-64単一binary build/version/help、`git diff --check`に合格。binaryはv0.1.2と従来コマンドのみを維持し、実機合格やlifecycleコマンド公開を主張しない。
+
 ## 2026-10-01: 凍結移行planのCAS初期化・途中再開とcapability照会を追加
 
 - strictな凍結planに許可された既存object key/ETag/sizeと制御record値を保存し、Episode→Showの順に条件付きPUTで初期化する。既存lifecycleの停止/generation/tombstoneとpayloadは保持する。service identity、inventory/sourceの追加/消失/変更、未知key、不完全owner等をfail closedで拒否する。
