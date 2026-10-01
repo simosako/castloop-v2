@@ -1,5 +1,14 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: Episode publication runner・stream媒体保存・改訂回復を追加
+
+- `runOwnedEpisodePublication`と共通publication consumerを初回Episode/metadata-only/audio-onlyへ拡張した。凍結commitとstaging証拠を再照合し、保存済みbase revisionからGUID/公開日時と未変更metadata/audioを再利用する。active子だけのfeed入力を使い、停止中の親/子を通常publishで復帰させない。GUID重複は停止Episodeのcurrent metadataも含めたbounded inventoryで拒否する。
+- 新音源はR2 bindingのReadableStream PUTでimmutable job/revision keyへ保存し、If-None-MatchとSHA-256 integrity optionを指定する。その後、保存先のETag条件付きGETをDigestStream/byte計数で全量検証する。既存keyは上書きせず、再試行では保存済み媒体をstream検証して再利用する。音源をアプリケーション側ArrayBufferへ読み込まず、旧revision媒体/履歴とstaging音源は保持する。metadata-onlyでは音源PUTを行わない。
+- immutable revision metadataはCAS新規作成し、既存なら同じ候補との一致を確認する。current metadata→feed→冪等feed generation→内部purge→durable purge証拠→Episode active/generation→finished/v2 published/照合済み解放へ進める。current書込応答喪失は元のbaseと同一候補の履歴から回復し、active CAS応答喪失は同job/次generationとdurable purged progressが一致する場合だけ認める。一般の受付/commit作成はこの再開例外を使わない。
+- publicationのbounded読取/checksum/保守的feed render予算を共通helperへ移し、既存Show runnerを回帰した。Worker effectはShow/Episode双方の正確な対象と実行tokenを照合して内部cache ownerへpurgeを依頼する。
+- `bun test`（281件、4991 assertions）、`npm run check`、M6実証tsconfig、共通consumer browser bundleに合格。追加11件で初回/2種改訂、purge失敗、媒体/履歴/current/feed/generation/active/status/解放応答喪失、live stream、媒体/履歴競合、内容checksum不一致、停止子GUID衝突、旧receipt、新しい状態への不正再開、digest失敗診断と再試行を確認した。
+- PUT checksum/stream sink・cacheはmockと型確認であり、Cloudflare実機・300MB・CPU/Free制限の合格ではない。本番Queue/API/CLIへの接続、migration/capabilityと配信gate、旧書込/consumerの収束、強制終了tokenの安全な回復は残る。運用サービス・既存v0.1.1環境へのdeploy/書込は行っていない。
+
 ## 2026-10-01: Show publication runnerと実行token付きconsumerを追加
 
 - `runOwnedShowPublication`は凍結manifest/commit、共通Show owner/実行token、staging検証証拠を再照合し、bounded/ETag条件付きGETでmetadata/cover/serviceを読み、checksum/schema/画像signature/cover extensionを再確認する。lifecycle対応Episode集合でfeedを生成し、停止/削除/draft子を復帰させない。音源とimmutable履歴は変更しない。

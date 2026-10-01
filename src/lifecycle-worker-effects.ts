@@ -11,6 +11,7 @@ import type { LifecycleDeleteEnv } from "./lifecycle-delete-batch";
 import { readLifecycleFeedInputs } from "./lifecycle-feed";
 import type { RestoreFeedSnapshot } from "./lifecycle-restore";
 import type { ShowPublicationEffects } from "./publication-show-runner";
+import type { PublicationEffects } from "./publication-inputs";
 
 export type LifecycleWorkerBindings = {
   cachedAssets: { invalidate: (target: LifecyclePurgeTarget) => Promise<void> };
@@ -22,9 +23,16 @@ export async function createShowPublicationWorkerEffects(env: LifecycleDeleteEnv
   bindings: Pick<LifecycleWorkerBindings, "cachedAssets" | "checkDeliveryGate">): Promise<ShowPublicationEffects> {
   const current = await requireShowExecution(env, execution);
   if (current.value.owner?.action !== "publish" || current.value.owner.kind !== "show") throw new Error("Show publication effects require a Show publish owner");
-  const target = { showId: execution.showId };
-  async function guard(input: { showId: string }): Promise<void> {
-    if (input.showId !== target.showId) throw new Error("Show publication effect targets another Show");
+  return createPublicationWorkerEffects(env, execution, bindings);
+}
+
+export async function createPublicationWorkerEffects(env: LifecycleDeleteEnv, execution: ShowExecution,
+  bindings: Pick<LifecycleWorkerBindings, "cachedAssets" | "checkDeliveryGate">): Promise<PublicationEffects> {
+  const current = await requireShowExecution(env, execution);
+  if (current.value.owner?.action !== "publish") throw new Error("Publication effects require a publish owner");
+  const target = { showId: execution.showId, ...(current.value.owner.episode_id ? { episodeId: current.value.owner.episode_id } : {}) };
+  async function guard(input: { showId: string; episodeId?: string }): Promise<void> {
+    if (input.showId !== target.showId || input.episodeId !== target.episodeId) throw new Error("Publication effect targets another operation");
     await requireShowExecution(env, execution);
     await bindings.checkDeliveryGate(target);
     await requireShowExecution(env, execution);

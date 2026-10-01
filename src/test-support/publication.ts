@@ -27,7 +27,8 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
       }
       bodyReads.push(key);
       return { key, ...entry, body: new Blob([entry.bytes]).stream(),
-        async arrayBuffer() { return entry.bytes.slice().buffer; }, async text() { return new TextDecoder().decode(entry.bytes); },
+        async arrayBuffer() { if (key.endsWith(".mp3")) throw new Error("Audio must not be buffered by the application"); return entry.bytes.slice().buffer; },
+        async text() { return new TextDecoder().decode(entry.bytes); },
         async json() { return JSON.parse(new TextDecoder().decode(entry.bytes)); } };
     },
     async put(key: string, input: string | Uint8Array | ArrayBuffer | ReadableStream, options?: PutOptions) {

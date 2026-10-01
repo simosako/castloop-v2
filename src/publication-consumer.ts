@@ -4,18 +4,19 @@ import { LifecycleExecutionBusy, releaseSettledExecution } from "./lifecycle-con
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
 import { InvalidFrozenPublication, parsePublicationCommitKey, readFrozenPublicationCommit } from "./publication-admission";
 import { runOwnedShowPublication } from "./publication-show-runner";
-import type { ShowPublicationEffects } from "./publication-show-runner";
+import { runOwnedEpisodePublication } from "./publication-episode-runner";
+import type { PublicationEffects } from "./publication-inputs";
+import type { StageStreamDigest } from "./staging-verification";
 
 export type PublicationConsumerResult = { state: "completed" } |
-  { state: "ignored"; reason: "unmatched_path" | "unsupported_kind" | "missing_marker" | "stale_operation" } |
+  { state: "ignored"; reason: "unmatched_path" | "missing_marker" | "stale_operation" } |
   { state: "invalid"; reason: "invalid_frozen_publication" };
-export type ShowPublicationEffectFactory = (execution: ShowExecution) => ShowPublicationEffects | Promise<ShowPublicationEffects>;
+export type PublicationEffectFactory = (execution: ShowExecution) => PublicationEffects | Promise<PublicationEffects>;
 
 export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string,
-  source: ShowPublicationEffects | ShowPublicationEffectFactory): Promise<PublicationConsumerResult> {
+  source: PublicationEffects | PublicationEffectFactory, options: { digest?: StageStreamDigest } = {}): Promise<PublicationConsumerResult> {
   const target = parsePublicationCommitKey(key);
   if (!target) return { state: "ignored", reason: "unmatched_path" };
-  if (target.kind !== "show") return { state: "ignored", reason: "unsupported_kind" };
   let frozen;
   try { frozen = await readFrozenPublicationCommit(env, key); }
   catch (error) {
@@ -33,7 +34,8 @@ export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string
   const execution = await acquireShowExecution(env, request.show_id, request.job_id, current.value.generation);
   try {
     const effects = typeof source === "function" ? await source(execution) : source;
-    await runOwnedShowPublication(env, execution, effects);
+    if (request.kind === "show") await runOwnedShowPublication(env, execution, effects);
+    else await runOwnedEpisodePublication(env, execution, effects, options);
   } catch (error) {
     if (await releaseSettledExecution(env, execution) === "completed") return { state: "completed" };
     throw error;

@@ -205,6 +205,8 @@ consumer invocationごとの排他基礎関数を追加した。`acquireShowExec
 
 2026-10-01に`publication-admission.ts`を追加した。publish control requestと既存strict commitを`publication.json`へ凍結し、draft job IDをpublication job IDとして共通Show CASを取得する。marker作成前に、参照するstage操作のfinished progress/completed statusとasset hash/size/現行ETag、再利用するbase revision/history/audioを照合する。marker形式は既存v1を維持するが、新経路では凍結manifest/control requestとの一致が必須である。本文/secretは追加記録へ複製しない。これは受付/commit準備の基礎実装であり、既存CLI/管理API/本番publication consumerには未接続。新consumerは同generation/ownerの実行tokenを取得し、入力を再確認してから書き、未知の旧markerを暗黙に承認しない。
 
+同日に`publication-show-runner.ts`/`publication-episode-runner.ts`と共通`publication-consumer.ts`を追加した。Show/Episodeの保存→lifecycle対応feed→generation→cache所有entrypoint内purge→active→published/receiptまで、同じ実行token内でawaitする。新しい音源はimmutable keyへstream保存し、全量checksumを検証する。改訂では既存媒体/履歴を上書きせず、GUID/公開日時を保つ。初回対象はpurge成功後に配信を開ける。再開時の自身のcurrent revisionや自身のactive化は、同じ候補/履歴、または同job/次generationとdurable purge進捗を照合した例外だけを認め、一般のpublish受付を緩めない。本番Queue/API/CLIには未接続で、配信gateの本番確認・移行・実機受け入れを省略しない。
+
 ## 7. 配信ゲートとキャッシュ（最重要の検証ゲート）
 
 ### 推奨構成

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { controlRequestSchema, episodeCommitSchema, parseControlRequest, parseEpisodeRevision, parseJobStatus,
+import { controlRequestSchema, episodeCommitSchema, episodeRevisionSchema, parseControlRequest, parseEpisodeRevision, parseJobStatus, parseLifecycleProgress,
   permitsControlAction, showCommitSchema, stageControlRequest, stagePayloadKey, stageUploadProgressSchema,
   stageUploadRequestSchema } from "../packages/shared/src/index";
-import type { EpisodeCommit, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
+import type { EpisodeCommit, EpisodeRevision, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
 import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
 import { canonicalEnclosureUrl } from "./media-url";
@@ -85,7 +85,8 @@ export async function readFrozenPublicationCommit(env: LifecycleControlEnv, key:
   return frozen;
 }
 
-export async function requireOwnedPublication(env: LifecycleControlEnv, operation: PublicationOperation): Promise<OwnedPublication> {
+export async function requireOwnedPublication(env: LifecycleControlEnv, operation: PublicationOperation,
+  options: { allowPublishedResult?: boolean } = {}): Promise<OwnedPublication> {
   const control = await requireOwnedOperation(env, operation.showId, operation.jobId, operation.generation);
   const frozen = await readFrozenRequest(env, operation.jobId);
   const request = frozen.request;
@@ -96,8 +97,19 @@ export async function requireOwnedPublication(env: LifecycleControlEnv, operatio
   }
   if (request.kind === "episode") {
     const episode = await readEpisodeLifecycle(env, operation.showId, request.episode_id!);
-    if (!episode || !permitsControlAction(episode.lifecycle, "publish") || episode.generation !== request.expected_episode_generation) {
+    const ownResult = options.allowPublishedResult && episode?.lifecycle === "active" && episode.last_job_id === operation.jobId &&
+      episode.generation === request.expected_episode_generation! + 1;
+    if (!episode || !permitsControlAction(episode.lifecycle, "publish") || episode.generation !== request.expected_episode_generation && !ownResult) {
       throw new InvalidFrozenPublication();
+    }
+    if (ownResult) {
+      const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${operation.jobId}/progress.toml`);
+      if (!object || object.size > 16384) throw new InvalidFrozenPublication();
+      const progress = parseLifecycleProgress(await object.text());
+      if (progress.job_id !== operation.jobId || progress.show_id !== operation.showId || progress.show_generation !== operation.generation ||
+        progress.action !== "publish" || progress.kind !== "episode" || progress.episode_id !== request.episode_id ||
+        progress.request_sha256 !== control.value.owner.request_sha256 || !progress.purge_confirmed ||
+        !["visibility", "finished"].includes(progress.phase)) throw new InvalidFrozenPublication();
     }
   }
   return { frozen, control };
@@ -129,7 +141,8 @@ async function readStagedProof(env: LifecycleControlEnv, frozen: PublicationRequ
   return { request, progress };
 }
 
-export async function verifyPublicationStaging(env: LifecycleControlEnv, operation: PublicationOperation): Promise<PublicationRequest> {
+export async function verifyPublicationStaging(env: LifecycleControlEnv, operation: PublicationOperation,
+  options: { publishedCandidate?: EpisodeRevision } = {}): Promise<PublicationRequest> {
   const { frozen } = await requireOwnedPublication(env, operation);
   const expected = new Map<StageAsset, { sha256: string; length?: number }>();
   if (frozen.commit.kind === "show") {
@@ -142,8 +155,11 @@ export async function verifyPublicationStaging(env: LifecycleControlEnv, operati
     if (currentObject && (currentObject.size < 1 || currentObject.size > 1_000_000)) throw new Error("Published Episode snapshot is oversized");
     const current = currentObject ? parseEpisodeRevision(await currentObject.text()) : null;
     const lifecycle = await readEpisodeLifecycle(env, operation.showId, frozen.commit.episode_id);
-    if (frozen.commit.base_revision_id ? current?.revision_id !== frozen.commit.base_revision_id || lifecycle?.lifecycle !== "active" :
-      current !== null || lifecycle?.lifecycle !== "draft") throw new Error("Publication base revision no longer matches its Episode");
+    const candidate = options.publishedCandidate ? episodeRevisionSchema.parse(options.publishedCandidate) : null;
+    const ownCurrent = candidate && candidate.revision_id === operation.jobId && candidate.episode_id === frozen.commit.episode_id &&
+      JSON.stringify(current) === JSON.stringify(candidate);
+    if (!ownCurrent && (frozen.commit.base_revision_id ? current?.revision_id !== frozen.commit.base_revision_id || lifecycle?.lifecycle !== "active" :
+      current !== null || lifecycle?.lifecycle !== "draft")) throw new Error("Publication base revision no longer matches its Episode");
     if (current?.episode_id !== undefined && current.episode_id !== frozen.commit.episode_id) throw new Error("Published Episode snapshot targets another Episode");
     if (current) {
       const history = await env.CASTLOOP_BUCKET.get(`public/episodes/${operation.showId}/${frozen.commit.episode_id}/revisions/${current.revision_id}.toml`);

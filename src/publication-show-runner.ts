@@ -1,7 +1,6 @@
 import { lifecycleFailureForPhase, lifecycleJobStatusSchema, lifecycleProgressSchema, parseServiceConfig,
   parseShowControl, parseShowMetadata } from "../packages/shared/src/index";
 import type { LifecycleProgress } from "../packages/shared/src/index";
-import { renderFeed } from "./feed";
 import { finishShowOperation, readShowControl, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import { readLifecycleFeedInputs } from "./lifecycle-feed";
@@ -9,28 +8,10 @@ import type { LifecycleFeedEnv } from "./lifecycle-feed";
 import { readLifecycleJobJournal, writeLifecycleJobStatus, writeLifecycleProgress } from "./lifecycle-job-store";
 import { advanceLifecycleFeedGeneration } from "./lifecycle-mutations";
 import { publicationCommitKey, readFrozenPublicationCommit, requireOwnedPublication, verifyPublicationStaging } from "./publication-admission";
+import { publicationChecksum, readPublicationBytes, renderPublicationFeed } from "./publication-inputs";
+import type { PublicationEffects } from "./publication-inputs";
 
-export type ShowPublicationEffects = {
-  checkDeliveryGate: (target: { showId: string }) => Promise<void>;
-  purge: (target: { showId: string }) => Promise<void>;
-};
-
-async function readBytes(env: LifecycleFeedEnv, key: string, maximum: number): Promise<Uint8Array> {
-  const head = await env.CASTLOOP_BUCKET.head(key);
-  if (!head || head.size < 1 || head.size > maximum) throw new Error("Show publication snapshot is missing or oversized");
-  const object = await env.CASTLOOP_BUCKET.get(key, { onlyIf: { etagMatches: head.etag } });
-  if (!object || !("body" in object) || !object.body || object.etag !== head.etag || object.size !== head.size) {
-    throw new Error("Show publication snapshot changed before reading");
-  }
-  const bytes = new Uint8Array(await object.arrayBuffer());
-  if (bytes.length !== head.size) throw new Error("Show publication snapshot contents have a different size");
-  return bytes;
-}
-
-async function checksum(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
+export type ShowPublicationEffects = PublicationEffects;
 
 export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: ShowExecution,
   effects: ShowPublicationEffects): Promise<void> {
@@ -93,9 +74,9 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
       await recordStatus("processing");
       await verifyPublicationStaging(env, execution);
       const prefix = `staging/shows/${execution.showId}/${execution.jobId}`;
-      const metadata = await readBytes(env, `${prefix}/show.toml`, 1_000_000);
-      const cover = await readBytes(env, `${prefix}/cover.${commit.cover_extension}`, 5_000_000);
-      if (await checksum(metadata) !== commit.metadata_sha256 || await checksum(cover) !== commit.cover_sha256) {
+      const metadata = await readPublicationBytes(env, `${prefix}/show.toml`, 1_000_000);
+      const cover = await readPublicationBytes(env, `${prefix}/cover.${commit.cover_extension}`, 5_000_000);
+      if (await publicationChecksum(metadata) !== commit.metadata_sha256 || await publicationChecksum(cover) !== commit.cover_sha256) {
         throw new Error("Show publication payload differs from its frozen commit");
       }
       const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(metadata);
@@ -110,17 +91,15 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
       const control = await requireShowExecution(env, execution);
       if (!current && control.value.lifecycle === "active") throw new Error("Active Show has no published metadata");
       if (current) {
-        const previous = parseShowMetadata(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(await readBytes(env, showKey, 1_000_000)));
+        const previous = parseShowMetadata(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(await readPublicationBytes(env, showKey, 1_000_000)));
         if (previous.show_id !== show.show_id || (previous.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg") !== extension) {
           throw new Error("Show publication cannot change the published cover extension");
         }
       }
-      const service = parseServiceConfig(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(await readBytes(env, "system/service.toml", 16384)));
+      const service = parseServiceConfig(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(await readPublicationBytes(env, "system/service.toml", 16384)));
       const inputs = await readLifecycleFeedInputs(env, execution);
       if (!inputs.writeFeed) throw new Error("Show lifecycle does not permit publication feed writing");
-      const sourceBytes = new TextEncoder().encode(JSON.stringify({ show, episodes: inputs.episodes, baseUrl: service.public_base_url })).byteLength;
-      if (sourceBytes * 6 + inputs.episodes.length * 1024 + 4096 > 32_000_000) throw new Error("Show publication feed exceeds its conservative rendering budget");
-      const feed = renderFeed(show, inputs.episodes, service.public_base_url, extension);
+      const feed = renderPublicationFeed(show, inputs.episodes, service.public_base_url, extension);
       failurePhase = "feed";
       await recordProgress("feed");
       await overwrite(showKey, source);
