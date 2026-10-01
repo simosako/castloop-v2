@@ -69,9 +69,13 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
       const migrationId = admission?.migration?.migration_id ?? admission?.readiness?.migration_id;
       const progress = migrationId ? await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${migrationId}/progress.json`) : null;
       const bootstrap = migrationId ? await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${migrationId}/bootstrap.json`) : null;
-      if (progress && progress.size > MAX_BODY || bootstrap && bootstrap.size > MAX_BODY) throw new Error("Oversized migration status");
+      const quiescence = migrationId ? await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${migrationId}/quiescence.json`) : null;
+      if (progress && progress.size > MAX_BODY || bootstrap && bootstrap.size > MAX_BODY || quiescence && quiescence.size > MAX_BODY) {
+        throw new Error("Oversized migration status");
+      }
       return reply(migrationAdminStatusSchema.parse({ service_id: config.service_id, account_id: config.account_id, worker_name: config.worker_name,
-        admission, progress: progress ? migrationApplyProgressSchema.parse(await progress.json<unknown>()) : null,
+        admission, quiescence: quiescence ? migrationQuiescenceSchema.parse(await quiescence.json<unknown>()) : null,
+        progress: progress ? migrationApplyProgressSchema.parse(await progress.json<unknown>()) : null,
         bootstrap: bootstrap ? migrationBootstrapSchema.parse(await bootstrap.json<unknown>()) : null,
         worker_protocol: runtime.protocol, worker_version_id: runtime.workerVersionId, m6_ready: false,
         ...(runtime.workerBootstrapId ? { worker_bootstrap_id: runtime.workerBootstrapId } : {}),

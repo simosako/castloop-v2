@@ -90,7 +90,7 @@ test("status identity is checked even before any service admission record exists
   const config = parseServiceConfig(setup.entries.get("system/service.toml")!.data);
   for (const identity of [{ service_id: "foreign" }, { account_id: "b".repeat(32) }, { worker_name: "foreign-worker" }]) {
     const transport = Object.assign(async () => Response.json({ service_id: config.service_id, account_id: config.account_id,
-      worker_name: config.worker_name, admission: null, progress: null, bootstrap: null, worker_protocol: "legacy_fenced",
+      worker_name: config.worker_name, admission: null, quiescence: null, progress: null, bootstrap: null, worker_protocol: "legacy_fenced",
       worker_version_id: crypto.randomUUID(), m6_ready: false, ...identity }, { headers: { "Cache-Control": "no-store" } }), { preconnect: () => {} });
     await expect(new MigrationAdminClient(config, "private-key", transport).status()).rejects.toThrow("another service/account/Worker");
   }

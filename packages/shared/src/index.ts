@@ -34,6 +34,8 @@ export type { MigrationBridgeDeploymentRequest, MigrationBridgeDeploymentEvidenc
 export { migrationServiceIdentitySchema, migrationOperationIdentitySchema, migrationPauseRequestSchema,
   migrationInitializationRequestSchema, migrationInitializationResultSchema, migrationActionResponseSchema } from "./migration-admin";
 export type { MigrationInitializationResult } from "./migration-admin";
+export { migrationSetupRequestSchema, migrationSetupClientStateSchema } from "./migration-setup";
+export type { MigrationSetupRequest, MigrationSetupClientState } from "./migration-setup";
 export { migrationQuiescenceSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationBootstrapSchema } from "./migration-bootstrap";
 export type { MigrationQuiescence, MigrationBootstrapRequest, MigrationBootstrap } from "./migration-bootstrap";
 export { migrationAdminStatusSchema, migrationDeploymentClientStateSchema } from "./migration-bootstrap";

@@ -11,6 +11,7 @@ import { CloudflareApi, hashFile } from "./cloudflare-api";
 import { waitForWorkerHealth } from "./health";
 import { commandHelp } from "./help";
 import { MigrationAdminClient } from "./migration-client";
+import { readLocalMigrationSetup } from "./migration-setup-journal";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync,
@@ -50,9 +51,9 @@ const USAGE = "Usage: castloop init [dir] --service-id ID --bucket-name NAME --w
   "create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | " +
   "update-episode ID | update-episode-audio ID MP3 | publish-episode ID | " +
   "job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | " +
-  "cleanup-job JOB --show ID --episode ID | migration-status | deploy";
+  "cleanup-job JOB --show ID --episode ID | migration-status [--local] | deploy";
 
-function argsOf(values: string[]): { positional: string[]; flags: Record<string, string> } {
+function argsOf(values: string[], switches: string[] = []): { positional: string[]; flags: Record<string, string> } {
   const positional: string[] = [];
   const flags: Record<string, string> = {};
   for (let index = 0; index < values.length; index += 1) {
@@ -62,7 +63,12 @@ function argsOf(values: string[]): { positional: string[]; flags: Record<string,
       continue;
     }
     const name = item.slice(2);
-    if (!name || !values[index + 1] || values[index + 1].startsWith("--") || flags[name]) {
+    if (!name || flags[name]) throw new Error(`Invalid or missing value for ${item}`);
+    if (switches.includes(name)) {
+      flags[name] = "true";
+      continue;
+    }
+    if (!values[index + 1] || values[index + 1].startsWith("--")) {
       throw new Error(`Invalid or missing value for ${item}`);
     }
     flags[name] = values[++index];
@@ -631,7 +637,7 @@ async function main(): Promise<void> {
     console.log(CLI_VERSION);
     return;
   }
-  const { positional, flags } = argsOf(rest);
+  const { positional, flags } = argsOf(rest, command === "migration-status" ? ["local"] : []);
   if (command === "init" && positional.length <= 1) return init(positional[0] ?? ".", flags);
   if (command === "create-show" && positional.length === 1) return createShow(positional[0], flags);
   if (command === "create-episode" && positional.length === 1) {
@@ -650,9 +656,11 @@ async function main(): Promise<void> {
   if (command === "retry-job" && positional.length === 1) return retryJob(positional[0], flags);
   if (command === "cleanup-job" && positional.length === 1) return cleanupJob(positional[0], flags);
   if (command === "migration-status" && positional.length === 0) {
-    allowedFlags(flags, []);
+    allowedFlags(flags, ["local"]);
     const root = process.cwd();
-    console.log(JSON.stringify(await new MigrationAdminClient(loadConfig(root), adminKey(root)).status(), null, 2));
+    const config = loadConfig(root);
+    const result = flags.local ? readLocalMigrationSetup(root, config) : await new MigrationAdminClient(config, adminKey(root)).status();
+    console.log(JSON.stringify(result, null, 2));
     return;
   }
   if (command === "update-episode" && positional.length === 1) {

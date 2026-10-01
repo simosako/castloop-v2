@@ -60,9 +60,10 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.",
   },
   "migration-status": {
-    usage: "migration-status",
+    usage: "migration-status [--local]",
     description: "Run from the service workspace. Read migration admission/progress from a migration bridge or candidate Worker.\n" +
-      "This does not deploy, initialize controls, resume writes or certify M6 readiness. Legacy Workers do not provide this route.",
+      "Use --local to inspect the local setup journal and lock without network access or credentials; remote state is not checked.\n" +
+      "This does not deploy, initialize controls, resume writes, remove locks or certify M6 readiness. Legacy Workers do not provide the remote route.",
   },
 };
 

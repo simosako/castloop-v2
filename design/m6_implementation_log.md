@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Pause・claim・旧IO申告のdurable setup journalとoffline照会を追加
+
+- `.castloop/migration-setups/<serviceId>.json`にbridge receiptとcaller指定のpause/migration ID/timestamp/明示的書込停止申告を凍結した。private/exclusive/fsync/rename/非期限lockを用い、各POST前にrequested phaseを保存し、成功応答と保存後だけ進める。claim generationは同pause owner/空registryのGET後に一回だけ固定し、live処理中はpauseを保持する。
+- 各POSTの応答喪失・保存失敗・unknown tokenはrequested phaseを保持し、GETに成功recordが見えても再送/新ID/phase解放へ進めない。初期化成功を保存済みでpause POST未開始の`admission_ready`だけに限定した明示再開を追加した。quiescence input/hash/bridge/ownerとforeign effectsを照合し、phase飛ばし/変更を拒否する。apply/deploy/移行完了/受付再開は自動実行しない。
+- server statusへbounded/strictなquiescenceを追加し、owner/request/bootstrap bridge不一致や過大recordをfail closedで拒否する。`migration-status --local`はrecord/lockの読み取り専用表示だけで、key/token/HTTPなし、`remote_state_checked=false`を明示する。live/残存lockも削除せず、空workspaceにrecordを作らない。
+- `bun test`（430件、7850 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build、`git diff --check`に合格。ローカルhandler/mockとfetch禁止のCLI child-process検証であり、Cloudflare実機や既存v0.1.1環境への書込/deployは行っていない。unknown復旧/full cutover/実機受け入れ/CLI書込公開を完了するまで`m6_ready=false`を維持する。詳細は`m6_migration_setup_client.md`。
+
 ## 2026-10-02: Bridge管理操作とbounded初期化をclientへ接続
 
 - `MigrationAdminClient`に明示的なinitialize/pause/claim/quiescence/1-step初期化、開始前限定abort/legacy resumeを追加した。各操作は初回bridge検査receiptを受け取り、service/account/Worker一致とPOST前の同実行version/UUID tag/legacy modeを要求し、active migration execution tokenは奪わず拒否する。入力ID/generation/timestamp/旧IO確認はcallerの凍結値を使い、自動生成・retry・工程loopをしない。

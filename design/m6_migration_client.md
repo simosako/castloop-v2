@@ -5,7 +5,7 @@
 ## 実装した範囲
 
 - `MigrationAdminClient`は固定HTTPS originの認証APIでstatus/凍結prepare/一度限りbegin/明示settlementを呼び出す。redirectは拒否し、自動retryをしない。応答は明示的no-storeを要求し、bodyはstreamで65,536 bytesまでに制限し、HTTP失敗本文を診断へコピーしない。statusはstrict schemaとservice/plan/request一致を検査する。
-- `castloop migration-status`だけを公開した。workspaceの`castloop.toml`/local admin keyを使うGETで、Cloudflare管理tokenは不要。Workerがbridge/candidateでなければ対応routeはなく、deployを自動実行しない。Release済みv0.1.2 binaryにはこの新しい照会は含まれない。
+- `castloop migration-status`だけを公開した。通常はworkspaceの`castloop.toml`/local admin keyを使うGETで、Cloudflare管理tokenは不要。`--local`はkey/token/通信なしのsetup record/lock照会で、remote状態を検査しない。Workerがbridge/candidateでなければremote routeはなく、deployを自動実行しない。Release済みv0.1.2 binaryにはこの新しい照会は含まれない。
 - `runMigrationCandidateDeployment`と`resumeMigrationCandidateSettlement`に組み合わせる実REST adapter `createMigrationRestEffects`を追加した。CLI書込command・full cutoverへはまだ接続しておらず、実Cloudflare書込も行っていない。
 
 初回bridgeは別のdurable driver/REST adapterへ接続した（`m6_initial_bridge_client.md`）。その後のclient管理操作も下記の未公開methodとして追加したが、移行書込CLI/full cutoverはまだ提供しない。
@@ -15,7 +15,7 @@
 `MigrationAdminClient`に`initializeAdmission` / `pauseAdmission` / `claimMigration` / `confirmQuiescence` / `initializeMigrationStep`と、開始前限定の`abortUnstartedMigration` / `resumeLegacyAdmission`を追加した。
 
 - 各操作は初回bridge検査receiptを明示的に受け取り、service/account/Workerを入力時に照合する。POST前にstatus GETで同実行version/bridge UUID tag/legacy modeを確認し、activeなmigration execution tokenがあれば拒否する。receiptやstatus GETはdeployment lease/全cache scope撤去の証拠ではない。
-- pause/migration ID、expected generation、timestamp、旧IO終了確認はcallerが凍結して渡す。UUIDや旧IO確認trueを自動生成せず、claim応答喪失で新IDを作ることも、自動retryで次工程へ進むこともしない。CLI用のdurable claim/申告journalはまだ接続していない。
+- pause/migration ID、expected generation、timestamp、旧IO終了確認は凍結して渡す。UUIDや旧IO確認trueを自動生成せず、claim応答喪失で新IDを作ることも、自動retryで次工程へ進むこともしない。durable claim/申告journalを別の未公開driverへ接続した（`m6_migration_setup_client.md`）。CLI書込commandはまだ公開していない。
 - 入力schemaをserverと共有し、foreign service/bridge、無効ID/上限、quiescenceの別bridge versionをPOST前に拒否する。応答はstrictなresultを要求し、不明field/別result/任意診断を成功証拠へ変換しない。
 - 初期化は1回につき1～100 targetの1 POSTで、戻り値は`pending`と`applying/verifying/runtime`だけ。client/server双方で`completed/finished`や付加readinessを認めず、loop/候補deploy/移行完了/受付再開を自動実行しない。
 - abort/resumeは別の明示操作で、serverのplan未作成限定契約を維持する。初期化後は拒否し、legacyへの自動rollbackやM6書込再開として利用しない。
@@ -45,7 +45,7 @@
 
 ## 候補REST adapter
 
-1. 対象を同account/serviceの既存workers.devに限定する。Custom DomainがあるWorker、旧preview有効、default cache有効、別version/部分配信、settings再GETでの変化をprepare前に拒否する。初回bridgeのdeployは別の未実装工程であり、legacy Workerへ直接candidateをPUTしない。
+1. 対象を同account/serviceの既存workers.devに限定する。Custom DomainがあるWorker、旧preview有効、default cache有効、別version/部分配信、settings再GETでの変化をprepare前に拒否する。初回bridgeのdeployは別driverであり、legacy Workerへ直接candidateをPUTしない。
 2. 認証HTTP statusでmigration owner/runtime初期化完了/空registry/未知execution不在/期待bridge versionを確認する。source/metadata hashに加え、metadataの`workers/tag`をbootstrap UUIDへ固定し、secret/追加bindingは指定bridge versionからstrict inheritする。service TOMLやlocal journalへsecretを保存しない。
 3. serverの凍結prepare→一度限りbeginとローカルjournal `uploading`の後だけ、同requestの`deploying` statusを再照合する。metadata/REST bridge設定を再検査し、`PUT .../scripts/<worker>?bindings_inherit=strict`を一回awaitする。API PUTのscript IDをversion IDと誤認しない。
 4. candidateの認証no-store statusから実行versionを取得し、別bridge version・bootstrap tag一致・同じ凍結request/ownerを要求する。REST deploymentで単一version 100%を照合してからworkers.dev preview無効化をPOSTし、成功応答をawaitする。その後だけdriverへversionを返す。

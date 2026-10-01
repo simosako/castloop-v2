@@ -38,6 +38,7 @@ export type MigrationBootstrap = z.infer<typeof migrationBootstrapSchema>;
 export const migrationAdminStatusSchema = z.object({ service_id: serviceAdmissionSchema.shape.service_id,
   account_id: m6WorkerDeploymentEvidenceSchema.shape.account_id, worker_name: m6WorkerDeploymentEvidenceSchema.shape.worker_name,
   admission: serviceAdmissionSchema.nullable(),
+  quiescence: migrationQuiescenceSchema.nullable(),
   progress: migrationApplyProgressSchema.nullable(), bootstrap: migrationBootstrapSchema.nullable(),
   worker_protocol: z.enum(["legacy_fenced", "m6_candidate"]), worker_version_id: z.uuid(), m6_ready: z.literal(false),
   worker_bootstrap_id: z.uuid().optional(),
@@ -53,7 +54,7 @@ export const migrationAdminStatusSchema = z.object({ service_id: serviceAdmissio
   if (value.worker_bridge_id && value.worker_protocol !== "legacy_fenced") {
     context.addIssue({ code: "custom", message: "Only a bridge Worker may identify its initial deployment" });
   }
-  for (const evidence of [value.progress, value.bootstrap?.request]) {
+  for (const evidence of [value.quiescence, value.progress, value.bootstrap?.request]) {
     if (evidence && (evidence.migration_id !== id || evidence.service_id !== value.admission?.service_id ||
       value.admission.migration && evidence.request_sha256 !== value.admission.migration.request_sha256)) {
       context.addIssue({ code: "custom", message: "Migration status evidence belongs to another admission" });
@@ -61,6 +62,9 @@ export const migrationAdminStatusSchema = z.object({ service_id: serviceAdmissio
   }
   if (value.bootstrap && value.progress?.plan_sha256 !== value.bootstrap.request.plan_sha256) {
     context.addIssue({ code: "custom", message: "Bootstrap status does not match its initialized plan" });
+  }
+  if (value.quiescence && value.bootstrap && value.quiescence.bridge_worker_version_id !== value.bootstrap.request.bridge_worker_version_id) {
+    context.addIssue({ code: "custom", message: "Bootstrap status and quiescence belong to different bridge versions" });
   }
 });
 export type MigrationAdminStatus = z.infer<typeof migrationAdminStatusSchema>;

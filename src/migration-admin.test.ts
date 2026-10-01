@@ -16,6 +16,23 @@ async function call(setup: Setup, route: string, input?: object, runtime: Bootst
 const identity = (setup: Setup) => ({ schema_version: 1, service_id: "service", migration_id: setup.migrationId });
 
 describe("authenticated migration bridge/candidate control API", () => {
+  test("status includes only the matching bounded quiescence record and never mutates it", async () => {
+    const setup = await bootstrapFixture();
+    const response = await call(setup, "status");
+    const body = await response.json<{ quiescence: unknown }>();
+    expect(body.quiescence).toEqual(setup.quiescence);
+    const key = `system/lifecycle-migrations/${setup.migrationId}/quiescence.json`;
+    for (const data of [JSON.stringify({ ...setup.quiescence, request_sha256: "f".repeat(64) }), "x".repeat(17000)]) {
+      await setup.bucket.put(key, data);
+      const before = new Map(setup.entries);
+      const failure = await call(setup, "status");
+      expect(failure.status).toBe(503);
+      expect(failure.headers.get("Cache-Control")).toBe("no-store");
+      expect(await failure.text()).toContain("migration_status_failed");
+      expect(setup.entries).toEqual(before);
+    }
+  });
+
   test("authentication/method/path/input validation performs no mutation and returns no-store fixed diagnostics", async () => {
     const setup = await bootstrapFixture(false);
     const before = new Map(setup.entries);

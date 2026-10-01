@@ -6,7 +6,7 @@
 
 未公開helper `runMigrationBridgeDeployment` / `createMigrationBridgeRestEffects`に、読み取り専用準備からの初回bridge REST PUT、preview無効化、実行version/tag/設定の検査を接続した。現行`deploy/init`、embedded Worker、CLI書込commandは変更していない。Cloudflare実deployも既存v0.1.1環境の更新も行っていない。
 
-この工程は**旧Workerからbridgeへの初回切替**だけであり、候補Worker deploy/Show・Episode初期化/旧IO終了・旧cache purge/M6移行完了/受付再開ではない。候補deployのserver開始許可やjournalを、移行APIのない旧Workerへ流用しない。bridge以後のpause/claim/quiescence/bounded初期化は別の明示的client methodへ接続した（`m6_migration_client.md`）が、durable claim/申告journalとCLI公開は未接続である。
+この工程は**旧Workerからbridgeへの初回切替**だけであり、候補Worker deploy/Show・Episode初期化/旧IO終了・旧cache purge/M6移行完了/受付再開ではない。候補deployのserver開始許可やjournalを、移行APIのない旧Workerへ流用しない。bridge以後のpause/claim/quiescence/bounded初期化は別の明示的client methodへ接続し（`m6_migration_client.md`）、pause/claim/申告には別のdurable setup journalを追加した（`m6_migration_setup_client.md`）。CLI書込公開はまだ行わない。
 
 ## 開始前の明示申告
 
