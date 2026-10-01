@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: lifecycleを反映したfeed入力の読取を追加
+
+- 実行tokenを照合してcurrent metadataとEpisode lifecycleをページ列挙し、activeだけをfeed入力へ採用する共通処理を追加した。Episode停止/削除の対象はstate書込前でも除外し、明示的restoreの対象自身だけを復帰候補とする。Show再開でも他の停止/削除/draft Episodeは戻さない。
+- Show停止中の子操作およびShow全体の停止/削除はfeedを書かない。初回Show公開・空feed・metadata-only Episode revisionの旧音源再利用も扱う。候補revisionはpublication ownerと照合する。
+- 既知Episodeのstate欠落、active/restore対象metadataの欠落、媒体の欠落/size変化、不正音源path、inventory変化、実行token喪失、件数/metadata予算超過はfail closed。媒体はHEADだけで存在・sizeを確認し、300MB bodyを読み込まない。これは内容checksum再検証ではない。
+- `npm run check`、`bun test`（113件、750 assertions）に合格。本番publication/feed書込はまだこの入力処理へ接続しておらず、運用bucketは変更していない。
+
 ## 2026-10-01: 読み取り専用の削除対象ページを追加
 
 - Episodeの3 prefix、Showの4 prefix＋Show snapshot単一keyを固定した削除inventoryを追加した。payloadとpublication commit markerを区別し、未知keyをblockerとして返す。対象ID・revision/job UUID・一覧metadata・cursorの進行を検証する。

@@ -270,6 +270,8 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 受付を保持したまま、保存されたShow・active Episode・音源の存在を検証してfeedとcacheを準備する。再開対象自身はfeed構築時にactive候補として扱うが、他の停止/削除Episodeは除外する。purge後に対象をactiveへ進め、新generationで配信を開ける。Show再開は子の状態を維持する。ローカル編集の更新は再開完了後に通常のupdate/publishで行う。
 
+`readLifecycleFeedInputs`でこの入力選択を実装した。current metadataとlifecycle両方から既知Episodeを把握し、欠落をactive扱いせず、restore対象自身だけを候補にする。音源は承認済みimmutable pathとHEADのsize/存在を確認し、metadata-only revisionの再利用pathを維持する。件数とmetadata読取量を制限し、tokenを読取前後に照合する。本番feed書込・state遷移・内部purgeの接続は後続。
+
 ### 失敗の扱い
 
 - 認証・対象不一致・stale generationは副作用前に拒否する。無用な自動retryを行わない。
