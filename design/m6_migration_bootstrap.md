@@ -10,7 +10,7 @@
 
 ## 安全な順序
 
-1. 旧端末の新規書込を止め、bridgeを100%へ切り替え、旧version previewを無効にする。初回deployの読み取り専用REST準備は`m6_migration_bridge_preparation.md`の範囲で実装したが、一度限りdeploy受付/書込adapter/CLI接続は残件である。bridge default cacheは無効にする必要があり、codeの存在だけでは成立しない。
+1. 旧端末の新規書込を止め、bridgeを100%へ切り替え、旧version previewを無効にする。初回deployの読み取り専用REST準備とdurable一度限りclient/書込adapterは未公開helperへ接続した（`m6_migration_bridge_preparation.md` / `m6_initial_bridge_client.md`）。CLI/実機/安全なunknown復旧は残件である。bridge default cacheは無効にする必要があり、codeの存在だけでは成立しない。
 2. bridgeでservice registryを初期化し、pauseする。既存invocation/consumer/限定recoveryはdrainし、未完了publication/uploadを先に収束させる。空registryだけを確認して移行ownerをCAS取得する。
 3. 管理者が旧端末/旧Worker invocation/旧REST PUTの終了と今後の旧書込禁止を明示申告する。`quiescence.json`へbridge version/owner/request hashと定型条件だけを凍結する。これはWorkerが別REST接続や登録前invocationの終了を直接証明したものではなく、管理者の外部確認を記録するもの。時刻やHEAD不在を証拠にしない。
 4. bounded applyでEpisode→Showの順に初期化し、inventory/sourceを再照合する。`initializeOnly`はprogressを`runtime`で止め、cutover callbackやM6完了CASを呼ばない。bridgeはplan凍結後の公開pathを503/no-storeにし、部分初期化状態を旧配信で迂回しない。
@@ -46,4 +46,4 @@ default loopback probeは実際のgateway/named transportを通すが、外部DN
 
 deployment証拠は認証管理者がCLIから渡したsnapshotであり、candidateはCloudflare RESTを再GETしていない。未提供の本番finalizerは、この値だけでreadinessを確定してはならない。
 
-候補REST adapterはdurable client journalへ組み合わせられるように接続した（`m6_migration_client.md`）。metadata/hash/指定bridge versionからのinherit/候補bootstrap tagを照合し、PUT/previewの応答不明では再送しない。初回bridge deploy、移行書込CLI、staging/publication/lifecycle管理操作・外部HTTP検証・最終証拠照合・pausedでの完了/明示再開は残る。通常処理のtoken強制終了回復とrollback手順、実機受け入れも残る。
+候補REST adapterはdurable client journalへ組み合わせられるように接続した（`m6_migration_client.md`）。metadata/hash/指定bridge versionからのinherit/候補bootstrap tagを照合し、PUT/previewの応答不明では再送しない。初回bridgeにも別のdurable driver/REST adapterを接続したが、移行書込CLI、staging/publication/lifecycle管理操作・外部HTTP検証・最終証拠照合・pausedでの完了/明示再開は残る。通常処理のtoken強制終了回復とrollback手順、実機受け入れも残る。

@@ -10,6 +10,7 @@ import { parsePublicAssetPath } from "./public-assets";
 
 export type BootstrapRuntime = { workerVersionId: string; protocol: "legacy_fenced" | "m6_candidate";
   workerBootstrapId?: string;
+  workerBridgeId?: string;
   cachedRuntime?: () => Promise<unknown>; defaultFetch?: (request: Request) => Promise<Response>;
   purgeDefaultCache?: () => Promise<CachePurgeResult> };
 

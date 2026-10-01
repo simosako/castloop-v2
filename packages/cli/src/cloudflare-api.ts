@@ -1,10 +1,10 @@
-import { migrationBootstrapRequestSchema, migrationCandidateUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
+import { migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
   workerSubdomainSnapshotSchema } from "@castloop/shared";
-import type { MigrationBootstrapRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
+import type { MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
   M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
 import { buildMigrationCandidateUpload, inspectM6WorkerDeployment, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
-import { prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
+import { inspectMigrationBridgeDeployment, prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
 
@@ -272,6 +272,31 @@ export class CloudflareApi {
       version: (id) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(id)}`),
       subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
       domains: () => this.workerDomains("service", config.worker_name),
+    });
+  }
+
+  async uploadMigrationBridge(config: ServiceConfig, input: MigrationBridgeDeploymentRequest, source: string, metadataInput: object): Promise<void> {
+    const request = migrationBridgeDeploymentRequestSchema.parse(input);
+    const preparation = request.preparation;
+    const metadata = migrationBridgeUploadSchema.parse(metadataInput);
+    if (preparation.service_id !== config.service_id || preparation.account_id !== config.account_id || preparation.worker_name !== config.worker_name ||
+      metadata.annotations["workers/tag"] !== preparation.bridge_id || migrationPayloadHash(source) !== preparation.worker_source_sha256 ||
+      migrationPayloadHash(metadataInput) !== preparation.worker_metadata_sha256) throw new Error("Initial bridge upload differs from its frozen preparation");
+    const path = this.migrationWorkerPath(config);
+    const current = await this.prepareMigrationBridge(config, preparation.legacy_worker_version_id, preparation.bridge_id, source);
+    if (JSON.stringify(current.request) !== JSON.stringify(preparation)) throw new Error("Legacy snapshot changed after initial bridge preparation");
+    const form = new FormData();
+    form.set("metadata", JSON.stringify(metadataInput));
+    form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
+    await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
+  }
+
+  async inspectMigrationBridge(config: ServiceConfig, bridgeId: string, expectedVersionId: string): Promise<MigrationBridgeDeploymentEvidence> {
+    const path = this.migrationWorkerPath(config);
+    return inspectMigrationBridgeDeployment(config, bridgeId, expectedVersionId, {
+      deployments: () => this.json<unknown>("GET", `${path}/deployments`), settings: () => this.json<unknown>("GET", `${path}/settings`),
+      version: (id) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(id)}`),
+      subdomain: () => this.json<unknown>("GET", `${path}/subdomain`), domains: () => this.workerDomains("service", config.worker_name),
     });
   }
 

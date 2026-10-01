@@ -35,14 +35,23 @@ export const migrationBootstrapSchema = z.object({ schema_version: z.literal(1),
 });
 export type MigrationBootstrap = z.infer<typeof migrationBootstrapSchema>;
 
-export const migrationAdminStatusSchema = z.object({ admission: serviceAdmissionSchema.nullable(),
+export const migrationAdminStatusSchema = z.object({ service_id: serviceAdmissionSchema.shape.service_id,
+  account_id: m6WorkerDeploymentEvidenceSchema.shape.account_id, worker_name: m6WorkerDeploymentEvidenceSchema.shape.worker_name,
+  admission: serviceAdmissionSchema.nullable(),
   progress: migrationApplyProgressSchema.nullable(), bootstrap: migrationBootstrapSchema.nullable(),
   worker_protocol: z.enum(["legacy_fenced", "m6_candidate"]), worker_version_id: z.uuid(), m6_ready: z.literal(false),
   worker_bootstrap_id: z.uuid().optional(),
+  worker_bridge_id: z.uuid().optional(),
 }).strict().superRefine((value, context) => {
   const id = value.admission?.migration?.migration_id ?? value.admission?.readiness?.migration_id;
+  if (value.admission && value.admission.service_id !== value.service_id) {
+    context.addIssue({ code: "custom", message: "Migration admission belongs to another published service" });
+  }
   if (value.worker_bootstrap_id && value.worker_protocol !== "m6_candidate") {
     context.addIssue({ code: "custom", message: "Only a candidate Worker may identify its uploaded bootstrap" });
+  }
+  if (value.worker_bridge_id && value.worker_protocol !== "legacy_fenced") {
+    context.addIssue({ code: "custom", message: "Only a bridge Worker may identify its initial deployment" });
   }
   for (const evidence of [value.progress, value.bootstrap?.request]) {
     if (evidence && (evidence.migration_id !== id || evidence.service_id !== value.admission?.service_id ||

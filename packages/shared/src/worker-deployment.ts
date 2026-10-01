@@ -90,3 +90,37 @@ export const migrationBridgePreparationSchema = z.object({
   worker_source_sha256: z.string().regex(/^[a-f0-9]{64}$/), worker_metadata_sha256: z.string().regex(/^[a-f0-9]{64}$/),
 }).strict();
 export type MigrationBridgePreparation = z.infer<typeof migrationBridgePreparationSchema>;
+
+export const migrationBridgeDeploymentRequestSchema = z.object({
+  schema_version: z.literal(1), preparation: migrationBridgePreparationSchema,
+  administrator_writes_stopped: z.literal(true), other_deployers_stopped: z.literal(true),
+}).strict();
+export type MigrationBridgeDeploymentRequest = z.infer<typeof migrationBridgeDeploymentRequestSchema>;
+
+export const migrationBridgeDeploymentEvidenceSchema = z.object({
+  schema_version: z.literal(1), service_id: m6WorkerDeploymentEvidenceSchema.shape.service_id,
+  account_id: m6WorkerDeploymentEvidenceSchema.shape.account_id, worker_name: m6WorkerDeploymentEvidenceSchema.shape.worker_name,
+  bridge_id: z.uuid(), deployment_id: z.uuid(), worker_version_id: z.uuid(),
+  compatibility_date: z.literal("2026-10-01"), traffic_percentage: z.literal(100),
+  default_cache_disabled: z.literal(true), cross_version_cache_disabled: z.literal(true),
+  version_metadata_binding_verified: z.literal(true), service_bindings_verified: z.literal(true),
+  observability_enabled: z.literal(true), workers_dev_previews_disabled: z.literal(true),
+}).strict();
+export type MigrationBridgeDeploymentEvidence = z.infer<typeof migrationBridgeDeploymentEvidenceSchema>;
+
+export const migrationBridgeClientStateSchema = z.object({
+  schema_version: z.literal(1), request: migrationBridgeDeploymentRequestSchema,
+  phase: z.enum(["prepared", "uploading", "rest_settled", "verified"]),
+  worker_version_id: z.uuid().optional(), deployment: migrationBridgeDeploymentEvidenceSchema.optional(),
+}).strict().superRefine((value, context) => {
+  const preparation = value.request.preparation;
+  if (["rest_settled", "verified"].includes(value.phase) !== (value.worker_version_id !== undefined) ||
+    value.worker_version_id === preparation.legacy_worker_version_id ||
+    (value.phase === "verified") !== (value.deployment !== undefined) ||
+    value.deployment && (value.deployment.worker_version_id !== value.worker_version_id ||
+      value.deployment.bridge_id !== preparation.bridge_id || value.deployment.service_id !== preparation.service_id ||
+      value.deployment.account_id !== preparation.account_id || value.deployment.worker_name !== preparation.worker_name)) {
+    context.addIssue({ code: "custom", message: "Initial bridge journal evidence is inconsistent with its frozen request/phase" });
+  }
+});
+export type MigrationBridgeClientState = z.infer<typeof migrationBridgeClientStateSchema>;

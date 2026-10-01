@@ -2,6 +2,7 @@ import { z } from "zod";
 import { migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationQuiescenceSchema,
   migrationAdminStatusSchema, migrationApplyProgressSchema, migrationBootstrapSchema, parseServiceConfig, serviceAdmissionSchema,
   serviceMigrationRequestSchema } from "../packages/shared/src/index";
+import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { runLifecycleMigrationStep } from "./lifecycle-migration-apply";
 import type { MigrationApplyEnv } from "./lifecycle-migration-apply";
@@ -56,12 +57,13 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
   const route = path.slice("/admin/migration/".length);
   if (route !== "status" && !ROUTES.has(route)) return reply({ error: "not found" }, 404);
   if (request.method !== (route === "status" ? "GET" : "POST")) return reply({ error: "method not allowed" }, 405);
-  let serviceId: string;
+  let config: ServiceConfig;
   try {
     const object = await env.CASTLOOP_BUCKET.get("system/service.toml");
     if (!object || object.size < 1 || object.size > MAX_BODY) throw new Error("Invalid service config");
-    serviceId = parseServiceConfig(await object.text()).service_id;
+    config = parseServiceConfig(await object.text());
   } catch { return reply({ error: "Service configuration unavailable", reason_code: "migration_config_failed" }, 503); }
+  const serviceId = config.service_id;
   if (route === "status") {
     try {
       const admission = (await readServiceAdmission(env, serviceId))?.value ?? null;
@@ -69,10 +71,12 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
       const progress = migrationId ? await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${migrationId}/progress.json`) : null;
       const bootstrap = migrationId ? await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${migrationId}/bootstrap.json`) : null;
       if (progress && progress.size > MAX_BODY || bootstrap && bootstrap.size > MAX_BODY) throw new Error("Oversized migration status");
-      return reply(migrationAdminStatusSchema.parse({ admission, progress: progress ? migrationApplyProgressSchema.parse(await progress.json<unknown>()) : null,
+      return reply(migrationAdminStatusSchema.parse({ service_id: config.service_id, account_id: config.account_id, worker_name: config.worker_name,
+        admission, progress: progress ? migrationApplyProgressSchema.parse(await progress.json<unknown>()) : null,
         bootstrap: bootstrap ? migrationBootstrapSchema.parse(await bootstrap.json<unknown>()) : null,
         worker_protocol: runtime.protocol, worker_version_id: runtime.workerVersionId, m6_ready: false,
-        ...(runtime.workerBootstrapId ? { worker_bootstrap_id: runtime.workerBootstrapId } : {}) }));
+        ...(runtime.workerBootstrapId ? { worker_bootstrap_id: runtime.workerBootstrapId } : {}),
+        ...(runtime.workerBridgeId ? { worker_bridge_id: runtime.workerBridgeId } : {}) }));
     }
     catch { return reply({ error: "Migration status unavailable", reason_code: "migration_status_failed" }, 503); }
   }

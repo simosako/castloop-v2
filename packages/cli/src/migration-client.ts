@@ -53,7 +53,9 @@ export class MigrationAdminClient {
 
   async status(): Promise<MigrationAdminStatus> {
     const value = migrationAdminStatusSchema.parse(await this.call("status"));
-    if (value.admission && value.admission.service_id !== this.config.service_id) throw new Error("Migration status belongs to another service");
+    if (value.service_id !== this.config.service_id || value.account_id !== this.config.account_id || value.worker_name !== this.config.worker_name) {
+      throw new Error("Migration status belongs to another service/account/Worker");
+    }
     return value;
   }
 

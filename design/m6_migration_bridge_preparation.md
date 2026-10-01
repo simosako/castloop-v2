@@ -1,12 +1,12 @@
 # M6: 初回bridge deployの読み取り専用準備
 
-更新日: 2026-10-01
+更新日: 2026-10-02
 
 ## 現在の範囲
 
 `CloudflareApi.prepareMigrationBridge` / `prepareMigrationBridgeDeployment`は、既存legacy WorkerのREST GET照会からstrictなbridge upload metadataと準備requestを返す。Cloudflare書込・deploy・preview設定変更・R2初期化・移行受付・local journal保存は行わない。CLI commandへも公開していない。現行`deploy/init`と既存v0.1.1環境は未変更である。
 
-初回bridgeはまだ通常deployで代用しない。専用のdurable一度限り開始、全REST終了待ち、実行bridge version/tag照合、preview無効化、read-only inspectionと中断時のunknown outcome保持を実装してから切り替える必要がある。候補PUTの既存journalはserverに凍結plan/開始許可がある工程用であり、移行APIのない旧Workerへの初回deployには流用しない。
+初回bridgeは通常deployで代用しない。専用のdurable一度限り開始、全REST終了待ち、実行bridge version/tag照合、preview無効化、read-only inspectionとunknown outcome保持を未公開helperへ接続した（`m6_initial_bridge_client.md`）。CLI/実機/安全なunknown復旧のgateは未完了である。候補PUTの既存journalはserverに凍結plan/開始許可がある工程用であり、移行APIのない旧Workerへの初回deployには流用しない。
 
 ## GET照合
 
@@ -27,7 +27,7 @@ strict requestにはservice/account/Worker/bridge UUID、期待legacy version/de
 
 旧`cross_version_cache`が取得できなければ`unspecified`とし、Cloudflareのdefaultを推測してenabled/disabledへ変換しない。bridge metadataで明示的falseにしても旧version/cache scopeが消えたとは扱わない。
 
-これはGET時点の準備であってatomic deploy fenceやsource実体のremote checksumではない。returned requestのdurable保存とPUT直前の同snapshot再照合は次の初回deploy driverで必要になる。旧CLI/PUT/consumerの終了、他端末のdeploy禁止、全route/hostname/colo、preview撤去、旧cache全scope purge、最終cutover/readinessを証明しない。未知fieldで安全な照合ができない場合は推測せず保留する。
+これはGET時点の準備であってatomic deploy fenceやsource実体のremote checksumではない。returned requestのdurable保存とPUT直前の同snapshot再照合は別の初回deploy driverへ接続した。準備GETだけで旧CLI/PUT/consumerの終了、他端末のdeploy禁止、全route/hostname/colo、preview撤去、旧cache全scope purge、最終cutover/readinessを証明しない。未知fieldで安全な照合ができない場合は推測せず保留する。
 
 ## 検証
 

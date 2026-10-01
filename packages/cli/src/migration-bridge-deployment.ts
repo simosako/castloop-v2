@@ -1,7 +1,7 @@
-import { migrationBridgePreparationSchema, migrationBridgeUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
+import { migrationBridgeDeploymentEvidenceSchema, migrationBridgePreparationSchema, migrationBridgeUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
   workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema } from "@castloop/shared";
-import type { MigrationBridgePreparation, MigrationBridgeUpload, ServiceConfig, WorkerSettingsSnapshot } from "@castloop/shared";
-import { buildM6WorkerUploadMetadata } from "./m6-worker-deployment";
+import type { MigrationBridgeDeploymentEvidence, MigrationBridgePreparation, MigrationBridgeUpload, ServiceConfig, WorkerSettingsSnapshot } from "@castloop/shared";
+import { buildM6WorkerUploadMetadata, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import type { M6DeploymentReads } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
 
@@ -110,4 +110,39 @@ export async function prepareMigrationBridgeDeployment(input: ServiceConfig, exp
     legacy_version_profile_sha256: migrationPayloadHash(version), worker_source_sha256: migrationPayloadHash(source),
     worker_metadata_sha256: migrationPayloadHash(metadata) });
   return { request, metadata };
+}
+
+export async function inspectMigrationBridgeDeployment(input: ServiceConfig, bridgeId: string, expectedVersionId: string,
+  reads: MigrationBridgeReads): Promise<MigrationBridgeDeploymentEvidence> {
+  const config = serviceConfigSchema.parse(input);
+  migrationBridgePreparationSchema.shape.bridge_id.parse(bridgeId);
+  migrationBridgePreparationSchema.shape.legacy_worker_version_id.parse(expectedVersionId);
+  const deployment = (input: unknown) => {
+    const value = workerDeploymentsSnapshotSchema.parse(input).deployments[0]!;
+    if (value.versions.length !== 1 || value.versions[0]!.version_id !== expectedVersionId || value.versions[0]!.percentage !== 100) {
+      throw new Error("Initial bridge inspection requires the expected single version serving 100%");
+    }
+    return value;
+  };
+  const settings = (input: unknown) => {
+    const value = requireMigrationBridgeSettings(input, config);
+    if (value.cache_options!.cross_version_cache !== false) throw new Error("Initial bridge requires explicit version-isolated caching");
+    return settingsSnapshotHash(input);
+  };
+  const first = deployment(await reads.deployments());
+  requireMigrationBridgeVersion(await reads.version(expectedVersionId), config, expectedVersionId);
+  const firstSettings = settings(await reads.settings());
+  const domains = await reads.domains();
+  if (!Array.isArray(domains) || domains.length) throw new Error("Initial bridge inspection does not support attached Custom Domains");
+  const subdomain = workerSubdomainSnapshotSchema.parse(await reads.subdomain());
+  if (!subdomain.enabled || subdomain.previews_enabled) throw new Error("Initial bridge requires workers.dev enabled and old previews disabled");
+  const currentSettings = settings(await reads.settings());
+  const currentSubdomain = workerSubdomainSnapshotSchema.parse(await reads.subdomain());
+  const current = deployment(await reads.deployments());
+  if (JSON.stringify(current) !== JSON.stringify(first) || currentSettings !== firstSettings ||
+    JSON.stringify(currentSubdomain) !== JSON.stringify(subdomain)) throw new Error("Initial bridge deployment/settings/previews changed during inspection");
+  return migrationBridgeDeploymentEvidenceSchema.parse({ schema_version: 1, service_id: config.service_id, account_id: config.account_id,
+    worker_name: config.worker_name, bridge_id: bridgeId, deployment_id: first.id, worker_version_id: expectedVersionId,
+    compatibility_date: "2026-10-01", traffic_percentage: 100, default_cache_disabled: true, cross_version_cache_disabled: true,
+    version_metadata_binding_verified: true, service_bindings_verified: true, observability_enabled: true, workers_dev_previews_disabled: true });
 }

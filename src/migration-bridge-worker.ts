@@ -1,4 +1,4 @@
-import { parseServiceConfig } from "../packages/shared/src/index";
+import { migrationBridgePreparationSchema, parseServiceConfig } from "../packages/shared/src/index";
 import legacyWorker from "./index";
 import { handleMigrationAdmin } from "./migration-admin";
 import { readServiceAdmission } from "./service-admission";
@@ -9,7 +9,9 @@ type BridgeEnv = { CASTLOOP_BUCKET: R2Bucket; CASTLOOP_QUEUE: Queue; CASTLOOP_DL
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
+    const bridgeId = migrationBridgePreparationSchema.shape.bridge_id.safeParse(env.CASTLOOP_VERSION_METADATA.tag);
     const migration = await handleMigrationAdmin(request, env, { workerVersionId: env.CASTLOOP_VERSION_METADATA.id,
+      ...(bridgeId.success ? { workerBridgeId: bridgeId.data } : {}),
       protocol: "legacy_fenced", purgeDefaultCache: async () => {
         if (!ctx.cache) throw new Error("Bridge default-entrypoint cache purge is unavailable");
         return ctx.cache.purge({ purgeEverything: true });

@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 初回bridgeのdurable一度限りdeployとGET限定復旧を接続
+
+- 未公開の`runMigrationBridgeDeployment`/`createMigrationBridgeRestEffects`を追加した。明示的な旧管理端末新規書込停止/他deploy停止申告をstrict requestへ固定し、service単位のprivate/fsync/rename付き`.castloop/bridge-deployments/<serviceId>.json`とexclusive非期限lockで別UUIDからの再開始・phase後退/飛ばしを拒否する。候補のserver開始許可は初回bridgeへ流用しない。
+- 開始前とPUT直前に同legacy snapshotを照合し、durable `uploading`保存後だけ一回のstrict-inherit PUTをawaitする。実bridgeの認証no-store status/version/UUID tagとREST100%配信を照合してpreview無効化POSTをawaitし、全REST終了後だけ`rest_settled`を保存する。default cache無効/version隔離/所有binding/logs・traces/previewをGET再検査したreceiptから`verified`へ進む。
+- PUT/preview応答喪失・不正tag/部分配信・保存失敗は`uploading`で保持し、自動再送・時間/GETでの終了認定をしない。開始消費後のpreflight失敗も未送信と推測して再許可しない。`rest_settled`からの明示再開はGETのみ。残存lock/unknown outcomeの安全な外部復旧は未成立で、release gateを維持する。
+- statusにpublished service/account/Worker identityとbridge UUIDを追加し、admission未初期化でもclientがforeign targetを拒否する。mock RESTと実bridge管理handlerのローカル結合、live PUT排他、未知応答、secret非保持、private file、破損/過大record、GET限定復旧を回帰した。詳細は`m6_initial_bridge_client.md`。
+- `bun test`（410件、7627 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build、`git diff --check`に合格。Cloudflare書込・実機deployは行わず、既存v0.1.1環境と現行deploy/init/embedded Workerは未変更。初回bridge/移行書込CLI・full cutover・管理routes・強制終了復旧・実機受け入れを完了するまで`m6_ready=false`を維持する。
+
 ## 2026-10-01: 初回bridge用のread-only REST準備を分離
 
 - `prepareMigrationBridgeDeployment`/`CloudflareApi.prepareMigrationBridge`とstrict bridge metadata/準備requestを追加した。既存legacy Workerの期待単一version 100%、default-only fetch/queue、service binding/旧date/flags/全binding snapshot、workers.dev有効/domainなしをGET照合し、settings/preview/deploymentを再GETする。追加KV等の未知binding parameter変更もhash/照合から落とさない。

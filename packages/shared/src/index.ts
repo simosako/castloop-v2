@@ -29,6 +29,8 @@ export { migrationCandidateUploadSchema } from "./worker-deployment";
 export type { MigrationCandidateUpload } from "./worker-deployment";
 export { migrationBridgeUploadSchema, migrationBridgePreparationSchema } from "./worker-deployment";
 export type { MigrationBridgeUpload, MigrationBridgePreparation } from "./worker-deployment";
+export { migrationBridgeDeploymentRequestSchema, migrationBridgeDeploymentEvidenceSchema, migrationBridgeClientStateSchema } from "./worker-deployment";
+export type { MigrationBridgeDeploymentRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeClientState } from "./worker-deployment";
 export { migrationQuiescenceSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationBootstrapSchema } from "./migration-bootstrap";
 export type { MigrationQuiescence, MigrationBootstrapRequest, MigrationBootstrap } from "./migration-bootstrap";
 export { migrationAdminStatusSchema, migrationDeploymentClientStateSchema } from "./migration-bootstrap";
