@@ -1,5 +1,11 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Lifecycle内部clientのstrict応答照合と一回限り送信を追加
+
+- 未公開`LifecycleAdminClient`を追加した。固定HTTPS origin/redirect拒否/管理key/送信前service・action・request hash・削除確認、応答no-store/JSON/64KB/strict UTF-8/取消awaitを実装し、凍結requestとservice/result/全operation identity/preview pageを照合する。
+- clientはID/generation/timestamp/confirmationを生成せず、失敗/応答喪失で自動再送しない。任意のserver本文やtransport exceptionを診断へコピーしない。client→内部管理API→M6 Queue adapterの6操作、foreign/偽response、body上限/取消待ち、commit成功応答喪失後のowner/marker保持と読み取り専用照会を回帰した。
+- `bun test`（514件、8901 assertions）、`npm run check`、Linux x86-64 binary build、`git diff --check`に合格。公開CLI/現行Worker入口へは接続せず、Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。durable journal/unknown outcome復旧と公開gateは残る。詳細は`m6_management_api.md`。
+
 ## 2026-10-02: Lifecycle内部API・dry-run・状態照会・同job retryを接続
 
 - 未公開`handleM6LifecycleAdmin`を追加し、Show/Episodeの停止・再開・削除を共通service registry/runtime gate、Show CAS受付、凍結request/commitへ接続した。変更操作にはrequest全体のhash確認、deleteには不可逆削除と運用記録保持の明示承認を要求する。HTTP handlerはpayloadを直接削除しない。

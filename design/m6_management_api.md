@@ -83,6 +83,12 @@ commit/retryは`m6_recovery`として登録し、pause中でも同じ保持owner
 
 Queue.sendは一回awaitする。応答喪失ではmarker/ownerを保持し、自動再送や成功認定をしない。`requeued`は送信応答でありconsumer完了・一回限り配送を意味しない。commitの通常配送はR2 notificationを使い、HTTP commitから追加送信しない。
 
+### 内部CLI client
+
+未公開`LifecycleAdminClient`は固定HTTPS service originと管理keyを使い、各actionを明示的に一回送信する。リダイレクトを拒否し、自動retry・ID/generation/timestamp生成・confirmation生成をしない。送信前にservice/action/strict入力/request hash/削除確認を照合し、応答はno-store/JSON/64KB/strict UTF-8を要求する。異常streamのcancelをawaitする。
+
+responseのservice/result/全operation identity/hash、preview requestとscope/page上限を凍結入力へ照合する。serverの任意本文やtransport exceptionを診断へコピーせず、不明応答では状態照会を案内して止まる。ローカルでclient→内部API→Queueの6操作と応答喪失非再送を回帰した。公開CLI commandには接続しておらず、durable journal/安全なunknown復旧の代用にはしない。
+
 ## 検証と残件
 
 ローカルhandler結合でShow/Episode metadata/audio、pause/drain、一回限りbegin、settlement前finish拒否、stream検証中のregistry/Show token保持、checksum失敗、foreign owner/generation、未知token・begin応答喪失、body/response上限、read-only candidateを回帰した。これはCloudflare実機/300MB/CPU・料金/切断挙動の合格ではない。
