@@ -96,6 +96,11 @@ export const lifecycleProgressSchema = z.object({
   if (value.action !== "delete" && value.deleted_objects !== 0) {
     context.addIssue({ code: "custom", message: "Only deletion progress can count removed objects" });
   }
+  if (value.action === "restore" &&
+    (!["admitted", "validating", "feed", "purge", "visibility", "finished"].includes(value.phase) ||
+      value.purge_confirmed !== (value.phase === "visibility" || value.phase === "finished"))) {
+    context.addIssue({ code: "custom", message: "Restore visibility and completion require confirmed preparation purging" });
+  }
   if (value.action !== "delete" && (value.deletion_scope_index !== undefined || value.deletion_cursor !== undefined)) {
     context.addIssue({ code: "custom", message: "Only deletion progress can contain a deletion position" });
   }

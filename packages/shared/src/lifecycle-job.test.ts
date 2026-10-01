@@ -93,4 +93,14 @@ describe("M6 versioned job status and progress", () => {
       expect(lifecycleProgressSchema.safeParse({ ...show, ...invalid }).success).toBe(false);
     }
   });
+
+  test("restore cannot advance to visibility without durable purge or claim purging during preparation", () => {
+    const base = { schema_version: 1, ...identity, action: "restore", deleted_objects: 0, updated_at: "2026-10-01T12:00:00Z" };
+    for (const phase of lifecyclePhaseSchema.options) {
+      const purged = phase === "visibility" || phase === "finished";
+      const allowed = !["deleting", "verifying", "finalizing"].includes(phase);
+      expect(lifecycleProgressSchema.safeParse({ ...base, phase, purge_confirmed: purged }).success).toBe(allowed);
+      expect(lifecycleProgressSchema.safeParse({ ...base, phase, purge_confirmed: !purged }).success).toBe(false);
+    }
+  });
 });

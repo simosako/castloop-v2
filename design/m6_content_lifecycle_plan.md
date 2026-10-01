@@ -278,7 +278,9 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 受付を保持したまま、保存されたShow・active Episode・音源の存在を検証してfeedとcacheを準備する。再開対象自身はfeed構築時にactive候補として扱うが、他の停止/削除Episodeは除外する。purge後に対象をactiveへ進め、新generationで配信を開ける。Show再開は子の状態を維持する。ローカル編集の更新は再開完了後に通常のupdate/publishで行う。
 
-`readLifecycleFeedInputs`でこの入力選択を実装した。current metadataとlifecycle両方から既知Episodeを把握し、欠落をactive扱いせず、restore対象自身だけを候補にする。音源は承認済みimmutable pathとHEADのsize/存在を確認し、metadata-only revisionの再利用pathを維持する。件数とmetadata読取量を制限し、tokenを読取前後に照合する。本番feed書込・state遷移・内部purgeの接続は後続。
+`readLifecycleFeedInputs`でこの入力選択を実装した。current metadataとlifecycle両方から既知Episodeを把握し、欠落をactive扱いせず、restore対象自身だけを候補にする。音源は承認済みimmutable pathとHEADのsize/存在を確認し、metadata-only revisionの再利用pathを維持する。件数とmetadata読取量を制限し、tokenを読取前後に照合する。
+
+`runLifecycleRestore`はこの入力とR2の保存済みShow/service snapshot・cover HEADを検証し、現在のpublic_base_urlでfeedを準備する（2026-10-01）。feed generation→purge→durable visibility/purge証拠→active CAS→finished/terminal status→owner解放を独立moduleとして実装した。配信gate callbackを準備前/purge前/active化前に要求し、purge失敗時は停止を維持する。HEAD確認は媒体checksum再検証ではない。本番feed書込・内部purge・gate callback・Queue/API/CLIへの接続は後続。
 
 ### 失敗の扱い
 

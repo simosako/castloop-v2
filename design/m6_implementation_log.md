@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 保存済みShow/Episodeの公開再開を追加
+
+- `runLifecycleRestore`はR2のpublished Show/service snapshotと現在のpublic_base_urlだけを読み、coverとactive/復帰候補Episode音源のHEAD照合→feed再生成→冪等feed generation→purge→durable purge証拠→active化→完了status/owner解放へ進む。stagingやローカルの未公開編集を使わず、GUID/公開日時/revision/音源pathとbytesを変更しない。
+- Show再開は子制御recordを変更せず、個別停止/削除/draftをfeedへ復帰させない。空Showも対応する。Episode再開はactive親を必須とし、期待generationと最終jobを照合してCASで1度だけ進める。配信gate callbackは必須で、purge後にgateが失敗してもactive化せず、保存した準備証拠から再試行できる。
+- restore progressのvisibility/finishedにはpurge確認を必須にし、準備phaseでのpurge完了や削除phase混入をstrict schemaで拒否する。snapshot欠落/過大/対象不一致、親/対象/generation変化、feed/gate/purge失敗、状態/進捗/status/解放応答喪失を自動テストした。通常終了が確認された実行からのtoken返却/再取得もmockで確認したが、runtime強制終了や取得応答喪失の安全な回復が成立したとは扱わない。
+- `bun test`（171件、2924 assertions）、`npm run check`、M6実証tsconfig、Linux x86-64 binary buildとversion/helpに合格。公開binaryは0.1.2のままでlifecycleコマンドを表示しない。本番effect/Queue/API/CLI/移行/配信は未接続、Cloudflare実機の新規操作・運用変更・Releaseは行っていない。
+
 ## 2026-10-01: 削除開始と最終確定を接続
 
 - `stepLifecycleDelete`を追加し、配信状態をdeletingへ変更→配信gate確認→active親のEpisode feed更新→generation→初回purge→durable削除進捗へ接続した。Show削除と停止中の親ではfeedを書かない。削除batch後は最終purge→tombstone→finished progress→completed status→同一CASのowner解放/receiptまで進める。
