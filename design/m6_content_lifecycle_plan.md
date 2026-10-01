@@ -246,6 +246,8 @@ M6では入口から返すfeed/cover/MP3のクライアント向けheaderを`max
 1. 同じ制御recordのCASでunpublishedへ進める。子状態は保持する。
 2. Show全体のcacheをpurgeし、完了status・受付解放へ進む。複数Episodeを列挙して全状態を上書きする必要はない。
 
+`src/lifecycle-unpublish.ts`にShow/Episode停止の状態機械を実装した。処理済みstateは最終job/generationで照合し、feed generationは`last_feed_job_id`で冪等に進める。feed書込とpurgeは注入したeffectをawaitし、purge完了後だけfinished progress/terminal statusとCAS解放へ進む。自動テストでは状態/進捗/解放の応答喪失とeffect失敗の再開を確認した。本番effect・Queue・管理API・CLIは未接続であり、mock成功を配信停止の実機合格と扱わない。
+
 ### 削除
 
 1. 対象をdeletingへ進めて配信を遮断する。activeからのdeleteも停止を内包する。

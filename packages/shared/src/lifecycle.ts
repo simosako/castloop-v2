@@ -34,6 +34,7 @@ export const showControlSchema = z.object({
   lifecycle: lifecycleStateSchema,
   generation,
   feed_generation: generation,
+  last_feed_job_id: z.uuid().optional(),
   owner: operationOwnerSchema.optional(),
   last_abandoned_operation: z.object({
     job_id: z.uuid(),

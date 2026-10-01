@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: Show/Episode公開停止の状態機械を追加
+
+- `runLifecycleUnpublish`は既に取得済みの実行tokenを照合し、状態停止→親がactiveならfeed入力更新→feed generation→purge→durable完了→owner解放を実行する。Show停止では子状態と保存済みcontentを変更せず、停止中の親の子操作ではfeedを書かない。
+- Episodeは期待generation/最終jobの照合とETag CASで停止する。同jobの状態書込再送を冪等にし、feed generationも`last_feed_job_id`で二重加算を防ぐ。purge phaseまで完了したfeedはpurge retryで書き直さない。
+- feed/purge失敗で停止を戻さず、retrying statusとowner/tokenを保持する。状態、feed generation、完了progress/status、解放の各応答喪失から収束する自動テストを追加した。完了後の同token再送で副作用を繰り返さない。
+- feed書込とcache所有entrypointのpurgeは必ずawaitする注入effectであり、現在のテストはその契約をmockで確認している。本番feed/内部Cache/Queue/API/CLIへの接続・実機確認は未完了。failed invocationから次のinvocationへ安全に引き継ぐ実行終了確認も未実装で、tokenの時間切れ解放はない。
+- `npm run check`、M6実証tsconfig、`bun test`（121件、818 assertions）、`git diff --check`に合格。公開停止コマンドはまだ提供せず、運用サービスは変更していない。
+
 ## 2026-10-01: lifecycleを反映したfeed入力の読取を追加
 
 - 実行tokenを照合してcurrent metadataとEpisode lifecycleをページ列挙し、activeだけをfeed入力へ採用する共通処理を追加した。Episode停止/削除の対象はstate書込前でも除外し、明示的restoreの対象自身だけを復帰候補とする。Show再開でも他の停止/削除/draft Episodeは戻さない。
