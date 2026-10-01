@@ -69,3 +69,11 @@
 ## 現在の進め方
 
 現行REST単一PUTを維持し、原子的なstaging受付、PUTの照合、切断後の回復・受付解放を新recordへ接続する。U1の解消や分割sessionの実証はM6公開ゲートにしない。publication processingの強制解放は禁止したまま、cache・移行・削除consumer・CLIの残るゲートを進める。今回の文書更新ではruntimeやCloudflareリソースは変更していない。
+
+### staging受付の実装契約（2026-10-01）
+
+`claimStageUpload`/`beginStageUpload`は操作IDとdraft job IDを分離し、同じShow CASのuploading ownerと、凍結asset/size/hashからの固定keyを使う。ready→uploadingのCASで1 callerだけがPUT許可を取得し、開始済みの再送や開始応答喪失では新しいPUT許可を発行しない。
+
+`settleStageUpload`には`put_requests_settled=true`と`no_more_puts=true`の明示的な申告が必要である。単一PUTが継続している間や、旧clientが後でPUTを開始/再試行し得る間は申告してはならない。新client helperは自身の全PUTをawaitして以後PUTしない場合だけ送信し、beginの結果不明では自動送信しない。別端末からの回復も旧clientの終了確認が必要である。この申告は認証された管理者/準拠CLIの契約であって、R2/Workerが別経路のREST接続終了を直接証明するものではない。Cloudflare tokenによる手動REST書込や虚偽の終了申告を防ぐ保証はない。
+
+終了確認だけではownerを解放しない。内容検証と検証実行排他・receiptが必要であり、時間/HEAD不在だけの解放は追加しない。これらの基礎関数とclient helperは既存CLI/管理APIへ未接続である。

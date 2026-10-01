@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: REST単一PUTのstaging受付と開始/終了確認を追加
+
+- strict staging manifestにupload操作IDと継続draft job ID、対象/期待generation、asset種別・size/SHA-256を分離して保存する。Showはmetadata+cover、Episodeはmetadataまたはaudioの1操作とし、任意key/本文/secretを受け付けない。asset別上限と300,000,000 bytes上限をupload開始前に検証する。
+- `claimStageUpload`はmanifestを凍結して既存Show CASのuploading ownerを取得する。commit済みdraftや停止対象を拒否する。`beginStageUpload`はdurable ready→uploadingのCASで1 callerだけに固定payload keyを返し、開始済みの再送にPUT許可を再発行しない。開始応答喪失もブロックを保持する。
+- client helperは取得した固定key/size/hashを照合し、単一PUTを順にawaitする。PUTが成功/例外でsettleし、今後のPUTも行わない場合だけ終了確認を送る。begin結果不明では自動確認/取消しない。終了確認は認証された管理経路からの明示的申告であり、サーバーがREST接続終了を直接観測した証拠ではない。別端末で回復する際も旧client/PUTが終わり、今後書かないことの確認が必要で、時間/HEAD不在を使わない。
+- settlement後もjob ownerはuploadingのまま保持する。内容検証・verification invocation排他・完了/取消receipt・owner解放は次の実装で接続する。client helperも既存公開CLIへはまだ接続せず、単一PUT/U1の既存仮定を変更しない。
+- `bun test`（223件、3379 assertions）、`npm run check`に合格。12同時beginの1許可、manifest変更/commit/停止拒否、開始/終了確認の応答喪失、live PUT待ち、phase退行拒否を確認した。既存テスト環境・運用環境は未変更。
+
 ## 2026-10-01: 内部cached entrypointの配信・purge実装を追加
 
 - `CachedPublicAssets`をWorkerEntrypointとして実装し、`this.ctx.props`の正確なgeneration組と許可pathだけを受け付ける。gateway用transportはloopback bindingを使い、host/queryを内部の固定URLへ正規化し、Range/条件付きheaderだけを転送する。Cookie/Authorization/管理キー等は転送しない。
