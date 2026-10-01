@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: lifecycle共通遷移とCAS job journalを追加
+
+- 停止/削除の配信閉鎖と冪等feed generation更新を共通moduleへ分離した。Episodeは凍結requestの期待generationと最終jobを照合してCASで1度だけ進め、Showもowner/tokenを保持したまま状態を変える。
+- v2 status/progressの共通journalはowner/要求hash/対象/generationを検証し、初回はIf-None-Match、更新はETag CASで保存する。finished progressとterminal statusの改変・退行を拒否する。terminal statusにはdurable finished/purge証拠と対象の結果状態が必要。
+- 既存の公開停止runnerもこの共通処理へ移行した。旧v1記録や破損記録を暗黙に上書きせず、CAS競合・応答喪失・stale tokenを確認した。
+- `bun test`（149件、1395 assertions）、`npm run check`、M6実証tsconfigに合格。本番ルートと運用環境は未変更。
+
 ## 2026-10-01: 保持policyに従うpayload削除batchと最終再列挙を追加
 
 - `stepLifecyclePayloadDeletion`にdelete owner/実行token、対象deleting、期待generation/最終job、durable progressの対象・action・要求hash・purge成功、呼出側の配信ゲート確認を必須とした。最大100 keyの許可payloadだけをbinding array DELETEで処理し、progressをETag CASで保存する。本番経路からはまだ呼ばない。
