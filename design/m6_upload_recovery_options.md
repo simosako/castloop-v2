@@ -1,8 +1,25 @@
-# M6: upload中断・収束の選択肢
+# M6: 単一PUTの維持と切断後書込の未解決懸念
 
 更新日: 2026-10-01
 
-状態: **検討資料。upload方式の変更は未承認・未実装。** [M6設計](./m6_content_lifecycle_plan.md)と[実測ログ](./m6_implementation_log.md)の補足。
+状態: **現行のCloudflare REST単一PUTを維持する方針を決定（2026-10-01）。切断後の遅延書込は未解決の懸念として保持する。** [M6設計](./m6_content_lifecycle_plan.md)と[実測ログ](./m6_implementation_log.md)の補足。
+
+## M6の決定事項
+
+管理者の指示により、M6では**クライアント切断後に、そのPUTが遅れてobjectを作成・更新することはない**と仮定し、metadata/cover/MP3を従来どおりCloudflare REST APIの単一PUTで送る。Worker経由の分割upload sessionは採用せず、この懸念の解消や方式変更をM6の公開条件にしない。
+
+これはCloudflareの確認済み仕様や実機実証ではなく、未確認のリスクを認識した上での設計上の仮定である。下記の懸念と既存の`If-Match`実測は記録に残す。サポートへの問い合わせは行わず、困難な境界条件のローカル再現を合格の根拠にしない。
+
+同じShowのupload/publication/lifecycle間の原子的排他、PUT成功後のsize/内容照合、明示的publish、300,000,000 bytes上限は維持する。通信がまだ継続中のPUTや、書き込み可能なWorker/consumerを時間切れ・HEAD不在だけで解放する許可ではない。中断後の受付回復はこの仮定の下でowner/generationを照合して実装し、終了・再試行・解放の競合を検証する。現行の基礎関数がuploadingのabandonを拒否することは、変更方針が未接続である実装状況として区別する。
+
+## 未解決の懸念 U1: クライアント切断後の単一PUT確定
+
+- **未確認の点**: REST単一PUTのbody全量受信後・metadata commit前にクライアントが切断した場合、保存処理が必ず中止されるか。切断後にcommitするか、終了を確認する手段があるかは公開資料から確認できなかった。
+- **確認済みの点**: [R2の内部構成説明](https://developers.cloudflare.com/r2/how-r2-works/#write-data-to-r2)はデータ保存→metadata commit→object可視化→200送信の順序を説明する。[R2の整合性仕様](https://developers.cloudflare.com/r2/reference/consistency/)は競合するPUT/DELETEで最後に完了した操作が勝つとする。どちらもabort後の保存継続を証明するものではない。
+- [IncompleteBody/ClientDisconnect](https://developers.cloudflare.com/r2/api/error-codes/)はWorkers/S3 APIのエラー仕様であり、[現在のREST Upload Object](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/upload/)の取消保証へ無条件に流用しない。公開事例・binding側の公開実装からも、対象REST経路でabort後に保存が完了する根拠は得られなかった。
+- 部分的なobjectが読取可能になり、その部分ファイルをDELETEすることを前提にしない。単一PUTは完成objectの保存として扱う。既に保存されたobjectの成功応答喪失と、まだ確定していないPUTの切断は区別する。
+- **仮定が誤っていた場合の影響**: 削除側の列挙時にはobjectがなく、受付解放・削除完了後に旧PUTが確定するなら、staging payloadが残る可能性がある。これは確認済みの障害ではなく条件付きのリスク想定である。公開状態のtombstoneによる配信拒否と、R2 payloadの物理削除は別の保証である。
+- **扱い**: U1は未解決のまま記録し、M6をブロックしない。反例や明確な公開仕様が得られた場合は、受付解放・削除完了条件とupload方式を再検討する。仮定の成立をテスト合格や削除保証の実証と表示しない。
 
 ## 実測で分かった制約
 
@@ -10,19 +27,19 @@
 
 専用R2で既存objectへ不一致`If-Match`付きPUTを送った結果、HTTP 200で上書きされた。[証拠](../experiments/m6/admission-results-20260930.json)を参照。R2 binding側のonlyIf/CASは成立しても、このREST object PUTに同じ保証はない。
 
-したがって、Show ownerを取得してから直PUTし、失敗/時間切れならownerを消すだけでは安全でない。旧HTTPが後から完了すれば、削除後にstaging payloadが再作成され得る。CLIのfetch abort、HEADの不在、経過時間、削除prefixの一度の再列挙は「旧writeが今後起きない」ことの証明にしない。
+この実測は条件付きREST PUTをfenceとして使えないことを示すが、クライアント切断後にPUTが保存を続けることを示さない。以前はその未確認の可能性をM6公開ゲートにしたが、上記の管理者判断で未解決の懸念へ変更した。HEAD不在や一度の再列挙をU1解決の証拠にはしない。
 
-## 選択肢
+## 以前検討した選択肢と今回の採否
 
 | 選択肢 | 利点 | 制約/判断 |
 | --- | --- | --- |
-| A: 現行直PUTを維持し、不明uploadはブロックを保持 | 既存のCloudflare REST経路・300MB対応を変えない。unsafe releaseを防げる | 中断したuploadを安全に取消/再開する仕組みは未成立。M6公開ゲートが残る |
-| B: 同じWorkerの認証付きAPIで分割upload sessionを管理 | 旧part要求をmultipart sessionの取消で無効化し、completeとcancelをShow CASで競合させる設計が可能。追加Worker/bucket/product/S3 credentialsは不要 | **R2 uploadをCloudflare REST直PUTからWorker経由へ変更するため承認が必要。** session/part/complete/recoveryを新規実装・実証する必要がある |
+| A: 現行直PUTを維持 | 既存のCloudflare REST経路・300MB対応を変えず、実装を簡潔に保つ | **M6で採用。** 切断後に遅延object作成がないという仮定を明示し、U1を残す。通常の排他・照合・回復実装は必要 |
+| B: 同じWorkerの認証付きAPIで分割upload sessionを管理 | completeとcancelの権限をサーバー側へ集約する候補。追加Worker/bucket/product/S3 credentialsは不要 | **M6では採用しない。** 当初の候補であり安全性は未実証。将来変更する場合は改めて承認・実証が必要 |
 | C: 管理端末からS3 multipartを直接操作 | multipartのupload IDを使う標準経路 | 管理端末へ別R2/S3 credentialを要求しない方針に反するため、採用しない |
 
-推奨する検討候補はB。方式を黙って変更したり、Bの安全性が確認済みであると扱ったりはしない。
+当初はBを推奨候補にしたが、未確認のU1を理由に方式変更が必要とする根拠は不十分だった。今回の決定はAであり、Bの案は比較・経緯としてのみ保持する。
 
-## Bを承認した場合の技術実証案
+## 参考: Bの技術実証案（M6では実施しない）
 
 ### 維持する利用者向け仕様
 
@@ -51,4 +68,4 @@
 
 ## 現在の進め方
 
-uploading/processingの強制解放やdelete CLIは提供しないまま、状態schema・原子的受付・限定reserved abandon・読み取り専用移行plan・公開snapshot/path/cache keyの共通処理を進めている。Bを採用する場合は、まず方式変更の承認、その後に専用環境の技術実証を行い、成立後にCLI/Workerへ接続する。
+現行REST単一PUTを維持し、原子的なstaging受付、PUTの照合、切断後の回復・受付解放を新recordへ接続する。U1の解消や分割sessionの実証はM6公開ゲートにしない。publication processingの強制解放は禁止したまま、cache・移行・削除consumer・CLIの残るゲートを進める。今回の文書更新ではruntimeやCloudflareリソースは変更していない。

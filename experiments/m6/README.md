@@ -50,4 +50,6 @@ bun experiments/m6/verify-admission.ts
 
 2026-09-30、CAS/abandonの5チェックに合格。[`admission-results-20260930.json`](./admission-results-20260930.json)に記録する。ただしuploadゲートは**未通過**。既存objectへの不一致`If-Match`付きREST PUTが200で上書きされ、binding側CASと同じ条件付きwrite保証を使えなかった。runnerの終了コード0は「測定が完了しcleanupに成功」の意味であり、`uploadEvidence.conditionalRestSupported=false`をupload安全性の合格と扱わない。
 
+**2026-10-01の方針更新**: 上記の「uploadゲート未通過」は条件付きREST PUT fenceを検討した時点の判断。この試験はクライアント切断後の保存継続を検証していない。M6では管理者判断によりREST単一PUTを維持し、切断後の遅延object作成がないと仮定する。[未解決懸念U1](../../design/m6_upload_recovery_options.md)として記録し、その解消・分割upload実証を公開条件にしない。既存JSON/試験コードは変更せず、方針決定を実測合格として扱わない。通常のupload排他・照合・回復ゲートは残る。
+
 `abandonReservedShowOperation`は凍結requestとreserved ownerを同じCASで失効させる基礎関数だけ。processing/uploadingは拒否し、CLI/管理APIにはまだ接続していない。bindingでのCAS成功をREST object PUTの条件付き動作の根拠として流用しない。

@@ -12,6 +12,8 @@
 
 最初の実装ではstrictな状態/request schema、同じShow keyでのCAS受付、凍結request、processing開始時のowner照合、R2を毎回読む公開可否判定を追加した。2026-09-30に専用環境でcache/REST deploy・内部purge・generation key・GET/HEAD/Range構成を実証した。旧recordの移行や既存CLI/consumer/公開入口への接続はまだ行わず、破壊的操作を先行公開しない。Free制限・upload収束・削除/復旧等のゲートは引き続き未通過であり、構成実証をM6全体の合格と扱わない。具体的な進捗は[実装ログ](./m6_implementation_log.md)へ記録する。
 
+2026-10-01の管理者判断で、M6のuploadは**現行Cloudflare REST APIの単一PUTを維持**する。クライアント切断後にそのPUTが遅れてobjectを作成・更新することはないと仮定する。これは確認済みのCloudflare仕様ではなく、[未解決の懸念U1](./m6_upload_recovery_options.md)として保持する。U1の解消や分割uploadへの変更をM6公開条件にせず、通常のupload排他・照合・中断回復の実装は引き続き必要とする。
+
 ## 1. 目的と開発順序
 
 管理者がEpisode単位、Show単位で配信を停止し、不要なコンテンツを安全に削除できるようにする。次の機能開発を**M6**とし、着手済みの[独自ドメイン対応](./custom_domain_plan.md)は基礎コードと承認済み方針を保持して後続へ回す。独自ドメインの完成をM6の前提にはしない。
@@ -182,9 +184,9 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 - 既存`publish-show`/`publish-episode`のclaim、consumerの開始・終了も新recordを理解するよう一緒に改修する。対象が停止/削除状態なら、古い下書きのcommitでも通常公開を拒否する。
 - 公開jobがreserved/processing/retryingの間は停止・削除を受け付けない。単一並列consumerだけに安全性を依存させない。**processingを強制解放せず、経過時間だけでownerを取り上げない。** 緊急停止が公開jobを割り込む機能は今回対象外。
 - 現行CLIのREST直PUTは公開停止とは独立してstorageへ書ける。物理削除との競合を防ぐため、M6対応CLIの`update-*`はupload前に同じShow制御keyで短期のstaging受付を取得し、PUTと照合終了後に解放する。upload操作IDと継続するdraft job IDは分ける。
-- uploadが途中終了した場合の再照会・解放は、旧HTTP PUTが今後完了しないと確認できる手順が必要。タイムアウトだけで強制解放する案は採用しない。この実機検証をM6.0のゲートにする。
-- 2026-09-30の専用実測では、R2 REST object PUTは不一致`If-Match`でも200で上書きした。R2 bindingのCAS保証をこのREST経路へ流用できず、条件付きPUT fenceによるupload取消・安全解放は採用しない。現行直PUTの収束確認、またはサーバー管理のupload session等の別プロトコルを成立させるまで、uploadingの取消や削除CLIを公開しない。
-- [upload中断・収束の選択肢](./m6_upload_recovery_options.md)に制約と候補をまとめる。同じWorkerを使う分割upload sessionは追加product/管理端末依存を要しない候補だが、Cloudflare REST直PUT方針の変更なので、未承認のまま本番へ組み込まない。
+- upload中断後の再照会・解放は、**クライアント切断後に旧PUTが遅れてobjectを作成・更新しない**という承認済みのM6仮定の下で設計する。通信中断と、まだ継続中のPUT/Worker処理を区別し、owner/generationを照合して終了・再試行・解放する。通信が生きたままのPUTやpublication processingをタイムアウト/HEAD不在だけで強制解放しない。通常の回復・排他テストは行うが、この仮定自体の実機証明をM6.0公開ゲートにしない。
+- 2026-09-30の専用実測では、R2 REST object PUTは不一致`If-Match`でも200で上書きした。R2 bindingのCAS保証をこのREST経路へ流用せず、条件付きPUT fenceは使わない。この実測はabort後の保存継続を示すものではなく、単独で分割uploadが必要とする根拠にはしない。
+- [単一PUTの維持と未解決懸念U1](./m6_upload_recovery_options.md)に、公開資料では確認できなかった切断後commitのリスク、仮定が誤っていた場合の影響、再検討条件を記録する。M6ではWorker経由の分割upload sessionを採用しない。サポート問い合わせも行わない。
 - M6移行時は旧CLIによる書き込みを止める。Cloudflare tokenを持つ旧CLIや手動REST PUTをWorkerだけで禁止できるとは説明しない。保証範囲はM6対応の管理経路と、移行後に収束済みの旧uploadに限る。
 - 恒久failed/reservedの旧公開jobで停止・削除も塞がるケースを扱う必要がある。M6.0で限定的な安全abandon手順を設計する。reservedを同じCASで失効させ、旧commitの再配送・再claimを耐久的に拒否できることを条件とする。processing、書き込みが始まったjob、状態不明jobは対象外。安全性が確認できるまではブロックを保持し、手動でrecordを消さない。
 - 新v2制御record用の限定abandon基礎関数を実装・実測した。凍結requestを照合し、reservedだけをCASで失効、generationを進め、同じrecordへ直近の取消receiptを残す。応答喪失の再実行はreceiptで確認できる。immutable requestと旧generationはその後も保持し、後続操作がreceiptを置換しても旧jobの再claim/beginを許さない。新consumerが**processing CAS成功前に書かない**ことが前提。旧v1 jobの取消・CLI/API公開・status/progressへの接続は別のゲートであり、旧recordをこの関数で取消しない。
@@ -299,7 +301,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 - 下記の承認事項を確定する。
 - per-entrypoint cacheのREST deploy、内部purge、generation key、GET/HEAD/Range、料金/Free制限を専用Workerで確認する。
-- Show制御recordのCASと、旧job/uploadの収束、安全なreserved abandonの限定条件を実証する。
+- Show制御recordのCASと、旧job/uploadの移行手順、単一PUTの通常の排他・照合・中断回復、安全なreserved abandonの限定条件を検証する。切断後の遅延object作成がないという仮定U1の証明は公開ゲートに含めない。
 - delete batch/Queue続行、対象markerと監査記録の保持規則、移行/rollback手順を確定する。
 
 ### M6.1: 状態モデル・受付・gateway
@@ -337,6 +339,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 10. 多ページR2一覧を全件処理し、終端の再列挙で欠落がない。DLQ後・CLI状態喪失後もremoteから再開できる。processingのunsafe abandonができない。
 11. v0.1.2サービスを移行して新規公開・metadata-only/audio-only改訂・cleanup・retry・deployを回帰確認する。MP3上限300,000,000 bytes、private R2、system/staging非公開を維持する。
 12. 削除の不可逆性、残す記録、外部コピーを回収できないこと、directoryの手作業、旧CLI/Workerへのdowngrade禁止が公開文書に明記される。
+13. REST単一PUTを維持し、切断後に遅延object作成がないというM6仮定と未解決懸念U1を公開文書に明記する。既存の`If-Match`試験や中断回復テストを、この仮定の実証と表示しない。
 
 ## 13. 実装前に承認が必要な判断
 

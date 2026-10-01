@@ -1,5 +1,7 @@
 # M6: 公開停止・削除 実装ログ
 
+**現在のupload方針（2026-10-01）**: 管理者判断により現行REST単一PUTを維持し、クライアント切断後に遅れてobjectが作成・更新されないと仮定する。確認済み仕様ではなく[未解決懸念U1](./m6_upload_recovery_options.md)として保持し、M6公開をブロックしない。以下の過去ログにある条件付きPUT/分割uploadの公開ゲート判断は、末尾の決定で更新された。既存実測はそのまま保持する。
+
 ## 2026-09-30: 次マイルストーンの設定と設計案
 
 管理者の依頼により、Episode/Showの公開停止・削除を次のマイルストーンM6とした。[設計案](./m6_content_lifecycle_plan.md)を作成し、全体設計・README・Agent Guideと独自ドメイン計画に開発順を反映した。
@@ -155,3 +157,17 @@ CAS実証と限定abandonを`0523af1`でcommit/pushした後、upload protocol�
 - 新たな8テストでread回数、snapshot世代/対象照合、非公開/不正generationのcache key拒否、private/encoded/不正ID path拒否、tag衝突防止を確認。`npm run check`、専用実証tsconfig、`bun test`（85件、532 assertions）に合格。
 - [upload方式の選択肢](./m6_upload_recovery_options.md)を追加。既存REST直PUTを条件付きwriteで取消できないことが現在の主要ゲート。同じWorkerを介する分割sessionを推奨候補として整理したが、方式変更は未承認・未実装。CLI/公開入口の接続とdelete公開は引き続き保留する。
 - Linux x86-64 build、既存version/init help、文書リンク/コードフェンス/空白、英語AGENTS.md、`git diff --check`にも合格。今回のCAS試験で作成した4組のWorker/bucketすべてがREST GETで404であることを最終確認した。
+
+## 2026-10-01: 単一PUTの維持と未解決懸念U1の扱いを決定
+
+管理者のレビューで、abort済みのREST単一PUTが保存を続けるという説明の根拠を再調査した。公開資料・公開事例・binding側の公開実装から、対象REST経路でクライアント切断後にmetadata commitが完了することや、その取消保証を確認できなかった。R2のデータ保存→metadata commit→object可視化→200送信という説明、PUT/DELETEのlast-writer規則、Workers/S3のIncompleteBody/ClientDisconnectは、その挙動の証明ではない。部分ファイルをDELETEする前提ではなく、未確認の遅延確定リスクとして説明すべきだった。
+
+管理者はCloudflareサポートへの問い合わせを行わないと指示し、続けて以下のM6方針を決定した。
+
+- **現行Cloudflare REST APIの単一object PUTを維持**する。Worker経由の分割upload sessionやS3 credentialsは導入しない。
+- **クライアント切断後にそのPUTが遅れてobjectを作成・更新することはない**と仮定する。これはCloudflareの確認済み仕様でも新たな実機合格でもない。
+- 仮定が誤っているなら削除完了後にstaging payloadが残る可能性があるという点を、[未解決懸念U1](./m6_upload_recovery_options.md)として記録する。この懸念の解消・困難なローカル再現・分割uploadへの変更をM6公開条件にはしない。反例や明確な公開仕様が得られた場合は再検討する。
+- REST PUTが不一致`If-Match`でも上書きしたという既存実測は変更しない。条件付きREST PUT fenceは使わず、この試験を切断後の保存継続の証拠とも扱わない。
+- 同じShowの原子的受付、通常PUTの完了/size/内容照合、明示的publish、300,000,000 bytes上限、移行時の旧CLI停止は維持する。単なる経過時間やHEAD不在を理由に、まだ継続中のPUT/Worker/consumerを解放する方針ではない。切断後のowner/generationを照合した回復・解放は上記仮定の下で後続実装へ接続する。
+- 変更は設計・実装ログ・README・Agent Guide・試験の解釈に限定する。CLI/Worker/テストコード、保存済み実測JSON、Cloudflareリソース、Releaseは変更していない。M6全体の公開ゲートを通過したとは扱わない。
+- `npm run check`、`bun test`（85件、532 assertions）、文書リンク/コードフェンス/空白・英語AGENTS.md確認、`git diff --check`に合格。これらは文書更新の回帰確認であり、U1の仮定を実証したものではない。
