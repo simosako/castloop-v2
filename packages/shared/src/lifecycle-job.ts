@@ -31,8 +31,8 @@ export const lifecycleJobStatusSchema = z.object({
   if (terminal !== (value.phase === "finished")) {
     context.addIssue({ code: "custom", message: "Only terminal jobs have a finished phase" });
   }
-  if (value.state === "published" && value.action !== "publish" ||
-    value.state === "completed" && value.action === "publish") {
+  if ((value.state === "published" && value.action !== "publish") ||
+    (value.state === "completed" && value.action === "publish")) {
     context.addIssue({ code: "custom", message: "Publication and lifecycle terminal states are distinct" });
   }
   if (value.state === "published" || value.state === "completed") {

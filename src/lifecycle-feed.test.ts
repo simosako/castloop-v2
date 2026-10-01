@@ -149,6 +149,18 @@ describe("M6 lifecycle-aware feed inputs", () => {
     await expect(readLifecycleFeedInputs(full.env, full.execution, { maximumObjects: 0 })).rejects.toThrow("Invalid");
   });
 
+  test("unexpected lifecycle changes cannot silently omit a restore target or revive a publication target", async () => {
+    for (const action of ["restore", "publish"] as const) {
+      const setup = await fixture({ action, episodeId: action === "restore" ? "stopped" : "first" });
+      const episodeId = action === "restore" ? "stopped" : "first";
+      await setup.bucket.put(`system/episode-lifecycle/daily/${episodeId}.toml`, stringifyLifecycleToml(episodeLifecycleSchema.parse({
+        schema_version: 1, show_id: "daily", episode_id: episodeId, lifecycle: "deleting", generation: 1,
+      })));
+      await expect(readLifecycleFeedInputs(setup.env, setup.execution,
+        action === "publish" ? { candidate: setup.revisions.get("first")! } : {})).rejects.toThrow();
+    }
+  });
+
   test("lost execution ownership during audio validation prevents use of the feed snapshot", async () => {
     const setup = await fixture();
     const env = { CASTLOOP_BUCKET: { ...setup.bucket, async head(key: string) {

@@ -355,6 +355,8 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 この文書の作成だけで、以下を承認済みとは扱わない。
 
+独立して進められる実装を継続し、最終確認待ちと技術残件は[レビュー待ち一覧](./m6_review_queue.md)に分離してまとめる。未接続moduleの自動テスト追加を、公開policyの承認やM6の実機受け入れと扱わない。
+
 1. **deleteは物理削除、unpublishは保持**という分離。単なる論理削除にする代案もあるが、利用者が想定する容量削減を満たさないため上記を推奨する。
 2. **unpublishと対になるrestoreもM6に含める**こと。通常publishで暗黙再開する方式は誤公開を招くので推奨しない。
 3. 停止時404、削除中/削除済み410、空Showのfeedは200というHTTP仕様。

@@ -81,7 +81,7 @@ export async function runLifecycleUnpublish(env: LifecycleFeedEnv, execution: Sh
   const [statusObject, progressObject] = await Promise.all([
     env.CASTLOOP_BUCKET.get(`${prefix}/status.toml`), env.CASTLOOP_BUCKET.get(`${prefix}/progress.toml`),
   ]);
-  if (statusObject && statusObject.size > 16384 || progressObject && progressObject.size > 16384) {
+  if ((statusObject && statusObject.size > 16384) || (progressObject && progressObject.size > 16384)) {
     throw new Error("Unpublish job records exceed the size limit");
   }
   const status = statusObject ? parseJobStatus(await statusObject.text()) : null;

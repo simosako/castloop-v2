@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 公開gateway処理とレビュー待ち一覧を追加
+
+- `serveLifecyclePublicRequest`を追加し、許可pathについて毎要求のstate読取、検証済みgeneration props、停止404/削除410/障害503、HEAD bodyなし、内部TTLと外部再検証headerの分離を実装した。Range/条件付きheaderは公開可否の確認後だけ内部transportへ渡す。
+- warm cache相当のmock、別host/query、全revision、GET/HEAD/206/304、状態破損/R2障害/内部transport障害の自動テストを追加した。停止時はcached transportを呼ばず、障害時にもfallbackしない。内部HTTP/CDN cache用headerは外部応答から除去する。
+- gatewayはまだ本番default入口へ接続しておらず、deploy metadataによるcache無効化や内部entrypointの実装をこの関数だけで保証しない。専用実機の既存実証と今回のmock結果を区別する。
+- 確認が必要な監査記録policy/公開利用条件と、判断待ちではないupload統合・実行回復・配信/移行・restore/delete・CLI/実機の残件を[レビュー待ち一覧](./m6_review_queue.md)へまとめた。運用への配備、物理削除、サポート問い合わせ、Releaseは行っていない。
+- 最終回帰は`bun test`（128件、911 assertions）、`npm run check`、M6実証tsconfig、Linux x86-64 buildと既存`--version`/`--help`、文書リンク/コードフェンス/空白/英語AGENTS.md、`git diff --check`に合格。既存CLIはv0.1.2のままでlifecycleコマンドをまだ表示しない。今回の新moduleの検証はローカル自動テストであり、Cloudflare実機の新しい合格記録は追加していない。
+
 ## 2026-10-01: Show/Episode公開停止の状態機械を追加
 
 - `runLifecycleUnpublish`は既に取得済みの実行tokenを照合し、状態停止→親がactiveならfeed入力更新→feed generation→purge→durable完了→owner解放を実行する。Show停止では子状態と保存済みcontentを変更せず、停止中の親の子操作ではfeedを書かない。

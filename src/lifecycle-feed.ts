@@ -55,7 +55,7 @@ export async function readLifecycleFeedInputs(env: LifecycleFeedEnv, execution: 
   }
   const restoringShow = owner.kind === "show" && owner.action === "restore" && snapshot.value.lifecycle === "unpublished";
   const publishingShow = owner.kind === "show" && owner.action === "publish" && snapshot.value.lifecycle === "draft";
-  if (owner.kind === "show" && (owner.action === "unpublish" || owner.action === "delete") ||
+  if ((owner.kind === "show" && (owner.action === "unpublish" || owner.action === "delete")) ||
     !(snapshot.value.lifecycle === "active" || restoringShow || publishingShow)) {
     return { writeFeed: false, episodes: [] };
   }
@@ -84,6 +84,13 @@ export async function readLifecycleFeedInputs(env: LifecycleFeedEnv, execution: 
     const lifecycle = await readEpisodeLifecycle(env, execution.showId, episodeId);
     if (!lifecycle) throw new Error("Known Episode has no lifecycle record");
     const isTarget = owner.kind === "episode" && owner.episode_id === episodeId;
+    if (isTarget && owner.action === "restore" && lifecycle.lifecycle !== "unpublished" &&
+      !(lifecycle.lifecycle === "active" && lifecycle.last_job_id === execution.jobId)) {
+      throw new Error("Restore target is no longer eligible for feed preparation");
+    }
+    if (isTarget && candidate && lifecycle.lifecycle !== "draft" && lifecycle.lifecycle !== "active") {
+      throw new Error("Publication candidate cannot revive a stopped Episode");
+    }
     if (isTarget && (owner.action === "unpublish" || owner.action === "delete")) continue;
     const restoringEpisode = isTarget && owner.action === "restore" && lifecycle.lifecycle === "unpublished";
     const publishingEpisode = isTarget && candidate && (lifecycle.lifecycle === "draft" || lifecycle.lifecycle === "active");
