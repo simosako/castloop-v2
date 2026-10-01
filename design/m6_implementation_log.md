@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 検証済みstagingからのpublication受付・commit準備を追加
+
+- `publication-admission.ts`にstrictな凍結publication manifest、固定marker key、共通Show CASでのpublish受付、凍結control requestとmarkerの照合を追加した。`system/jobs/<draftJobId>/publication.json`には既存Show/Episode commitのhash/size/revision情報とstage操作IDだけを保存し、本文/secretは複製しない。publication job IDは凍結するdraft job IDと一致し、upload操作IDとは別にする。
+- commit作成前に、参照するupload manifest/finished progress/v2 completed statusの対象・draft・要求hash・generationと、全changed assetのsize/hash/現行HEAD ETagを照合する。Showは1 uploadのmetadata+cover、Episodeはmetadata/audioの各upload証拠を使い、古いローカルhash、差替payload、不完全/取消済み/別対象の証拠を拒否する。metadata-only/audio-onlyはcurrent/base revisionとimmutable履歴を照合し、音源再利用では許可path/HEAD size/保存済みchecksumも確認する。
+- marker本文は既存strict v1 publication commit形式を維持し、CASで最後に作る。新経路ではside manifestとcontrol requestとの完全一致が必須で、旧markerを暗黙に新経路へ昇格しない。新consumerはこの照合に加えて同generation/owner/実行tokenを取得し、publication入力を再確認してから副作用を行う必要がある。既存本番consumerは改修していない。
+- `bun test`（261件、4176 assertions）、`npm run check`、M6実証tsconfig、新アダプター2種のbrowser bundleに合格。13件の追加テストでShow/初回Episode/metadata-only/audio-only、live stage/停止/削除拒否、検証証拠/ETag/base不一致、同job改変、10同時commitの1作成、manifest/受付/commit応答喪失、旧marker拒否、abandon/stale/processing、履歴/再利用音源の欠落を確認した。
+- Linux x86-64単一binaryのbuild/version/helpも確認し、v0.1.2と従来コマンドのみを維持した。新受付は管理API/既存CLIへ未接続で、実公開runnerとproduction routing、移行/capabilityは残る。運用環境と既存v0.1.1環境は変更していない。
+
 ## 2026-10-01: lifecycle consumerのWorker binding用effect factoryを追加
 
 - consumerは実行token取得後にeffect factoryをawaitできるようにし、factory準備の失敗も全処理終了後に実行tokenだけを返す。live factoryには別invocationが割り込まない。

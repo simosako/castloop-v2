@@ -152,6 +152,9 @@ Showがactiveで、かつEpisodeがactiveの場合だけ、その音源を公開
 system/show-publications/<showId>.json             # 既存keyをversion付き制御recordへ拡張
 system/episode-lifecycle/<showId>/<episodeId>.toml  # 状態・generation・最終操作ID
 system/jobs/<jobId>/request.toml                   # 凍結したaction・対象・期待generation
+system/jobs/<draftJobId>/publication.json           # 凍結publication commitとstaging検証操作ID
+system/jobs/<uploadOperationId>/upload.json         # 凍結staging対象・draft ID・asset size/hash
+system/jobs/<uploadOperationId>/upload-progress.json # client終了確認・検証証拠・完了/取消
 system/jobs/<jobId>/status.toml                    # 既存statusを拡張
 system/jobs/<jobId>/progress.toml                  # phase・削除進捗・purge結果
 
@@ -199,6 +202,8 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 consumer invocationごとの排他基礎関数を追加した。`acquireShowExecution`はreserved/processing ownerへランダムな`execution_id`を同じShow keyのCASで設定し、同jobの重複配送も1 invocationだけが書けるようにする。`beginShowOperation`単独の冪等なprocessing確認は実行排他の代用にしない。すべての副作用をawaitして書込終了したinvocationだけが`releaseShowExecution`を呼び、job ownerはprocessingのまま保持する。tokenを時間で失効させず、取得応答喪失・runtime強制終了ではブロックを維持する。強制終了後の実行終了確認・安全なtoken回復は未実装であり、本番consumer接続前の残ゲートである。
 
 `consumeLifecycleCommit`は凍結requestとstrict markerを照合し、停止/再開/削除runnerの通常終了・例外終了をawaitしてから実行tokenを返却する（2026-10-01）。削除続行はtoken返却後に同じmarkerのQueue送信をawaitする。送信失敗/応答喪失でもjob owner/progressを保持し、重複配送と`requeueLifecycleOperation`で同jobへ収束できる。取得応答喪失と強制終了のtokenは保持したままであり、この通常終了経路を強制終了回復の証明にはしない。基礎consumerは本番Queueに未接続。
+
+2026-10-01に`publication-admission.ts`を追加した。publish control requestと既存strict commitを`publication.json`へ凍結し、draft job IDをpublication job IDとして共通Show CASを取得する。marker作成前に、参照するstage操作のfinished progress/completed statusとasset hash/size/現行ETag、再利用するbase revision/history/audioを照合する。marker形式は既存v1を維持するが、新経路では凍結manifest/control requestとの一致が必須である。本文/secretは追加記録へ複製しない。これは受付/commit準備の基礎実装であり、既存CLI/管理API/本番publication consumerには未接続。新consumerは同generation/ownerの実行tokenを取得し、入力を再確認してから書き、未知の旧markerを暗黙に承認しない。
 
 ## 7. 配信ゲートとキャッシュ（最重要の検証ゲート）
 
