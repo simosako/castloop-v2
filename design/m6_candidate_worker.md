@@ -25,7 +25,7 @@
 
 ## 管理APIとcapability
 
-候補入口の管理APIは認証されたGETだけである。現行のjob-status/current/published照会を利用できるが、reservation/claim/retry/cleanup/staging/publication/lifecycle/migrationの管理書込は409で拒否する。
+候補入口の通常管理APIは認証されたGETだけである。現行のjob-status/current/published照会を利用できるが、reservation/claim/retry/cleanup/staging/publication/lifecycleの管理書込は409で拒否する。独立した移行bootstrapのsettlement/HTTP検査だけを`/admin/migration/`へ接続した。full cutover/完了/受付再開は未提供である。`m6_migration_bootstrap.md`参照。
 
 capabilityは`worker_protocol=m6_candidate`とcompiled gatewayの`lifecycle_delivery=true`を返すが、未提供の管理操作・M6 staging/publication commandはfalse、`m6_ready=false`を維持する。これは候補codeの接続状態を表すもので、実機合格やRelease可否を表さない。healthも`result=candidate`/`m6_ready=false`であり、通常初期化への置換を意図しない。
 
@@ -33,6 +33,6 @@ capabilityは`worker_protocol=m6_candidate`とcompiled gatewayの`lifecycle_deli
 
 自動統合でstate-first GET/HEAD/Range/validator transport、cached 304からの停止/削除、foreign/missing readiness、cache fail-closed、候補APIのread-only、Show/Episode初回/2種改訂の新consumer、Show停止/物理削除と同job続行、live purge中の2種token保持、DLQ、legacy marker拒否、service token取得応答喪失を確認した。媒体stream digest/cacheは既存mockによる検証であり、Cloudflare実機ではない。
 
-候補入口は移行完了readinessがない間、公開pathを503にする。移行bootstrap/切替中の可用性と検証順序はまだ完成していない。候補の503だけを見て`cutover_verified`/`publication_routes_verified`を成立とすることは禁止する。
+候補入口はreadinessも初期化完了bootstrap windowもない間、公開pathを503にする。初期化→凍結deploy→明示settlement→HTTP検査の順序を追加したが、外部切替/最終証拠/受付再開・移行可用性はまだ完成していない。候補の503やloopback合格だけを見て`cutover_verified`/`publication_routes_verified`を成立とすることは禁止する。
 
 次に移行管理API/CLI、bootstrapの原子的なdeploy受付、旧IO終了確認、旧cache purge、本番REST設定検査/HTTP検証、rollback、staging/publication/lifecycleの管理操作を接続する。token取得応答喪失/強制終了の安全な復旧も残る。これらが成立するまで候補入口を現行バイナリのdeployへ接続せず、6 lifecycleコマンドを公開しない。

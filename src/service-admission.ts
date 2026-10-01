@@ -185,11 +185,26 @@ export async function abortUnstartedServiceMigration(env: LifecycleControlEnv, s
     throw new Error("Only an idle unstarted migration can be aborted");
   }
   const prefix = `system/lifecycle-migrations/${migrationId}`;
-  if (await env.CASTLOOP_BUCKET.head(`${prefix}/plan.json`) || await env.CASTLOOP_BUCKET.head(`${prefix}/progress.json`)) {
+  if (owner.delivery_candidate || await env.CASTLOOP_BUCKET.head(`${prefix}/bootstrap.json`) ||
+    await env.CASTLOOP_BUCKET.head(`${prefix}/plan.json`) || await env.CASTLOOP_BUCKET.head(`${prefix}/progress.json`)) {
     throw new Error("A migration with a frozen plan or progress must be resumed, not aborted");
   }
   const { migration: _owner, ...value } = snapshot.value;
   if (!await write(env, snapshot, { ...value, state: "paused" })) throw new Error("Migration changed before it could be aborted");
+}
+
+export async function openMigrationDeliveryCandidate(env: LifecycleControlEnv, execution: ServiceMigrationExecution,
+  input: NonNullable<NonNullable<ServiceAdmission["migration"]>["delivery_candidate"]>): Promise<void> {
+  const snapshot = await requireServiceMigration(env, execution);
+  const candidate = serviceAdmissionSchema.shape.migration.unwrap().shape.delivery_candidate.unwrap().parse(input);
+  const previous = snapshot.value.migration!.delivery_candidate;
+  if (previous) {
+    if (JSON.stringify(previous) === JSON.stringify(candidate)) return;
+    throw new Error("Migration already has another frozen delivery candidate");
+  }
+  if (!await write(env, snapshot, { ...snapshot.value, migration: { ...snapshot.value.migration!, delivery_candidate: candidate } })) {
+    throw new Error("Migration changed before its delivery candidate opened");
+  }
 }
 
 export async function completeServiceMigration(env: LifecycleControlEnv, execution: ServiceMigrationExecution,

@@ -11,7 +11,11 @@ declare global {
 
 export default {
   async fetch(request, env, ctx): Promise<Response> {
-    return fetchM6Candidate(request, env, ctx.exports.CachedPublicAssets);
+    return fetchM6Candidate(request, env, ctx.exports.CachedPublicAssets, {
+      workerVersionId: env.CASTLOOP_VERSION_METADATA.id, protocol: "m6_candidate",
+      cachedRuntime: () => ctx.exports.CachedPublicAssets.describeRuntime(),
+      defaultFetch: (input) => ctx.exports.default.fetch(input),
+    });
   },
   async queue(batch, env, ctx): Promise<void> {
     await queueM6Candidate(batch, env, ctx.exports.CachedPublicAssets);

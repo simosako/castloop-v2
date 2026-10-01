@@ -4,7 +4,7 @@
 
 ## 現在の実装範囲
 
-`runLifecycleMigrationStep`は独立moduleであり、管理API/CLIには接続していない。現行Workerに接続した`GET /admin/capabilities`は認証必須・no-storeの読み取り専用照会だけである。`worker_protocol=legacy_fenced`、`m6_ready=false`と未接続のroute feature=falseを返す。R2にmock readinessがあっても、このWorkerがlifecycle配信/操作に対応するとは報告しない。
+独立bridgeの移行管理APIへ`runLifecycleMigrationStep`の初期化限定モードを接続した。候補HTTP検査windowも追加したが、CLI・本番full cutover/完了/受付再開は未接続である。現行binary/Workerは変更せず、`GET /admin/capabilities`は引き続き認証必須・no-store、`worker_protocol=legacy_fenced`/`m6_ready=false`を返す。R2にmock readinessがあっても、このWorkerがlifecycle配信/操作に対応するとは報告しない。`m6_migration_bootstrap.md`参照。
 
 旧Worker/CLIから移行を実施できるリリース手順や、安全なrollback手順はまだ完成していない。既存v0.1.1環境の更新・削除は行わない。
 

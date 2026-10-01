@@ -2,6 +2,8 @@ import { z } from "zod";
 
 const uuid = z.uuid();
 const checksum = z.string().regex(/^[a-f0-9]{64}$/);
+export const migrationDeliveryCandidateSchema = z.object({ bootstrap_id: uuid, worker_version_id: uuid,
+  deployment_id: uuid, plan_sha256: checksum }).strict();
 export const serviceInvocationKindSchema = z.enum(["legacy_admin", "legacy_consumer", "legacy_recovery", "m6_admin", "m6_consumer", "m6_recovery"]);
 export const serviceAdmissionSchema = z.object({
   schema_version: z.literal(1),
@@ -12,7 +14,8 @@ export const serviceAdmissionSchema = z.object({
   invocations: z.array(z.object({ token: uuid, kind: serviceInvocationKindSchema }).strict()).max(32),
   pause_id: uuid.optional(),
   last_resumed_pause_id: uuid.optional(),
-  migration: z.object({ migration_id: uuid, request_sha256: checksum, execution_id: uuid.optional() }).strict().optional(),
+  migration: z.object({ migration_id: uuid, request_sha256: checksum, execution_id: uuid.optional(),
+    delivery_candidate: migrationDeliveryCandidateSchema.optional() }).strict().optional(),
   readiness: z.object({ migration_id: uuid, plan_sha256: checksum, deployment_id: uuid, worker_version_id: uuid,
     completed_execution_id: uuid, default_cache_disabled: z.literal(true), cached_entrypoint: z.literal("CachedPublicAssets"),
     old_cache_purged: z.literal(true), cutover_verified: z.literal(true), old_io_quiesced: z.literal(true),

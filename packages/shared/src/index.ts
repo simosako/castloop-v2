@@ -25,6 +25,8 @@ export type { CachedDeliveryRuntime } from "./delivery-runtime";
 export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVersionSnapshotSchema, workerSubdomainSnapshotSchema,
   m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
 export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
+export { migrationQuiescenceSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationBootstrapSchema } from "./migration-bootstrap";
+export type { MigrationQuiescence, MigrationBootstrapRequest, MigrationBootstrap } from "./migration-bootstrap";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

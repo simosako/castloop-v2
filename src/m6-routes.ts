@@ -14,6 +14,9 @@ import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { readServiceAdmission, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
 import type { StageStreamDigest } from "./staging-verification";
+import { readBootstrapDeliveryWindow } from "./migration-bootstrap";
+import { handleMigrationAdmin } from "./migration-admin";
+import type { BootstrapRuntime } from "./migration-bootstrap";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -49,18 +52,30 @@ async function requireCandidateReadiness(env: M6CandidateEnv, config: ServiceCon
   }
 }
 
+async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Promise<string | undefined> {
+  const current = await readServiceAdmission(env, config.service_id);
+  if (current?.value.state === "migrating") {
+    return readBootstrapDeliveryWindow(env, current.value, env.CASTLOOP_VERSION_METADATA?.id);
+  }
+  await requireCandidateReadiness(env, config);
+  return undefined;
+}
+
 export async function fetchM6Candidate(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
-  cachedAssets: M6CachedLoopback): Promise<Response> {
+  cachedAssets: M6CachedLoopback, bootstrapRuntime?: BootstrapRuntime): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const asset = parsePublicAssetPath(pathname);
   if (asset) {
     if (request.method !== "GET" && request.method !== "HEAD") return reply(request, { error: "method not allowed" }, 405);
     try {
       const config = await serviceConfig(env);
-      await requireCandidateReadiness(env, config);
+      const migrationId = await deliveryMigration(env, config);
       const response = await serveLifecyclePublicRequest(request, env, createCachedPublicFetch(cachedAssets));
       if (!response) throw new Error("M6 public path was not handled by its lifecycle gateway");
-      return response;
+      const headers = new Headers(response.headers);
+      headers.set("X-Castloop-Worker-Version", env.CASTLOOP_VERSION_METADATA.id);
+      if (migrationId) headers.set("X-Castloop-Migration-ID", migrationId);
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     } catch {
       console.error(JSON.stringify({ event: "m6_candidate_public_failed", reason_code: "runtime_not_ready" }));
       return reply(request, { error: "temporarily unavailable" }, 503);
@@ -68,6 +83,10 @@ export async function fetchM6Candidate(request: Request<unknown, IncomingRequest
   }
   if (!pathname.startsWith("/admin/")) return reply(request, { error: "not found" }, 404);
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply(request, { error: "unauthorized" }, 401);
+  if (bootstrapRuntime) {
+    const migration = await handleMigrationAdmin(request, env, bootstrapRuntime);
+    if (migration) return migration;
+  }
   if (request.method !== "GET") return reply(request, { error: "M6 candidate administration is read-only; mutation routes are not released" }, 409);
   if (pathname === "/admin/health") return reply(request, { result: "candidate", m6_ready: false }, 200);
   if (pathname === "/admin/capabilities") {

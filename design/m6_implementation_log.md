@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 移行bridge・凍結bootstrap・候補HTTP検査を接続
+
+- 独立bridge/candidate入口へ認証必須の移行APIを追加した。service pause/drain/空registry移行受付、旧IO外部確認のstrict凍結申告、bounded applyを接続し、初期化はruntimeで停止する。現行binary/deploy/既存環境は変更していない。
+- bridge default purge成功後の一度限りdeploy開始と、source/metadata/plan hash・candidate versionに固定したsettlement/配信windowを追加した。開始応答喪失では二重PUT許可を返さず、候補は初期化完了plan/progress/quiescence照合後だけstate-first配信する。通常管理書込/consumer/M6完了・受付再開はまだ閉じている。
+- default loopbackでHEAD/GET/Range/304とstatus/version/再検証header/size/ETagをbounded検査し、chain hash/cursorをCAS保存する。失敗・CAS/応答喪失・live HTTP中のtoken保持を回帰した。bodyはcancelし、本文・任意exceptionを記録しない。HTTP合格やclient REST snapshotだけからfull cutover/readinessを生成しない。
+- 詳細・暫定停止区間・purge/loopback/client申告の証明範囲とCLI/finalizer/外部検証/復旧残件を`m6_migration_bootstrap.md`へ記録した。Cloudflare deployや実機合格ではなく、旧v0.1.1環境の移行案内も未提供。
+- `bun test`（371件、5763 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build、`git diff --check`に合格。追加22件はmock/ローカル統合である。
+
 ## 2026-10-01: 別entry moduleのM6候補Workerへgateway/new consumerを接続
 
 - `src/m6-worker.ts`にdefault fetch/queueと`CachedPublicAssets`のnamed exportをまとめ、型付き`ctx.exports` loopbackを`m6-routes.ts`へ渡した。現行Worker/binaryのentrypointやdeploy/initは変更せず、実deployも行っていない。

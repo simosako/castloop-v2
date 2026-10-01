@@ -17,7 +17,7 @@ export type MigrationApplyResult = { state: "pending" | "completed"; phase: Migr
 type Target = { key: string; mode: "initialize" | "preserve"; source: string; parse: (source: string) => unknown; value: unknown };
 
 function managedKey(key: string): boolean {
-  return key === SERVICE_ADMISSION_KEY || /^system\/lifecycle-migrations\/[a-f0-9-]{36}\/(request|plan|progress)\.json$/.test(key);
+  return key === SERVICE_ADMISSION_KEY || /^system\/lifecycle-migrations\/[a-f0-9-]{36}\/(request|plan|progress|quiescence|bootstrap)\.json$/.test(key);
 }
 
 function targets(plan: FrozenMigrationPlan): Target[] {
@@ -66,7 +66,7 @@ async function freezePlan(env: MigrationApplyEnv, execution: ServiceMigrationExe
   return plan;
 }
 
-async function verifyInventory(env: MigrationApplyEnv, execution: ServiceMigrationExecution, plan: FrozenMigrationPlan, initialized: boolean): Promise<void> {
+export async function verifyMigrationInventory(env: MigrationApplyEnv, execution: ServiceMigrationExecution, plan: FrozenMigrationPlan, initialized: boolean): Promise<void> {
   const expected = new Map(plan.sources.map((source) => [source.key, source]));
   const controls = new Map(targets(plan).map((target) => [target.key, target]));
   const seen = new Set<string>();
@@ -150,7 +150,7 @@ async function writeProgress(env: MigrationApplyEnv, execution: ServiceMigration
 }
 
 export async function runLifecycleMigrationStep(env: MigrationApplyEnv, serviceId: string, migrationId: string,
-  effects: MigrationApplyEffects, options: { maximumTargets?: number } = {}): Promise<MigrationApplyResult> {
+  effects: MigrationApplyEffects, options: { maximumTargets?: number; initializeOnly?: boolean } = {}): Promise<MigrationApplyResult> {
   const maximum = options.maximumTargets ?? 20;
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 100) throw new Error("Invalid migration step limit");
   const current = await readServiceAdmission(env, serviceId);
@@ -165,7 +165,7 @@ export async function runLifecycleMigrationStep(env: MigrationApplyEnv, serviceI
     let progress = (await readProgress(env, execution, plan))?.value ?? migrationApplyProgressSchema.parse({ schema_version: 1,
       migration_id: migrationId, service_id: serviceId, request_sha256: plan.request_sha256, plan_sha256: await hash(plan), phase: "applying", next_target: 0 });
     phase = progress.phase;
-    await verifyInventory(env, execution, plan, progress.phase !== "applying");
+    await verifyMigrationInventory(env, execution, plan, progress.phase !== "applying");
     if (progress.phase === "applying") {
       const controls = targets(plan);
       const end = Math.min(controls.length, progress.next_target + maximum);
@@ -180,9 +180,10 @@ export async function runLifecycleMigrationStep(env: MigrationApplyEnv, serviceI
       return { state: "pending", phase: "runtime" };
     }
     if (progress.phase === "runtime") {
+      if (options.initializeOnly) return { state: "pending", phase: "runtime" };
       const runtime = migrationRuntimeProofSchema.parse(await effects.verifyCutover(execution));
       await requireServiceMigration(env, execution);
-      await verifyInventory(env, execution, plan, true);
+      await verifyMigrationInventory(env, execution, plan, true);
       progress = { ...progress, phase: "finished", runtime, completed_execution_id: execution.executionId };
       delete progress.reason_code;
       await writeProgress(env, execution, plan, progress);
@@ -190,7 +191,7 @@ export async function runLifecycleMigrationStep(env: MigrationApplyEnv, serviceI
       const runtime = migrationRuntimeProofSchema.parse(await effects.verifyCutover(execution));
       if (JSON.stringify(runtime) !== JSON.stringify(progress.runtime)) throw new Error("Migration runtime changed after its completion evidence was saved");
       await requireServiceMigration(env, execution);
-      await verifyInventory(env, execution, plan, true);
+      await verifyMigrationInventory(env, execution, plan, true);
     }
     const readiness = serviceAdmissionSchema.shape.readiness.unwrap().parse({ migration_id: migrationId, plan_sha256: progress.plan_sha256,
       ...progress.runtime, completed_execution_id: progress.completed_execution_id });
