@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: consumerの通常終了回復・削除続行とDLQ境界を実装
+
+- `consumeLifecycleCommit`は凍結marker/owner/generation/hashを照合して実行tokenを取得し、停止/再開/削除runnerを呼ぶ。削除の1 stepが終わったら全副作用終了後に実行tokenだけを返し、job ownerをprocessingのまま保持して同じmarkerの続行送信をawaitする。FIFOや重複なしを前提にしない。
+- 通常の例外終了ではrunnerのPromiseがsettleしてからtokenを返却する。token返却の成功応答喪失はremote recordで照合し、完了解放の応答喪失は同token receiptで収束する。取得応答喪失/強制終了ではtokenを取り上げず、保持中tokenへのconsume/requeueは拒否する。強制終了後の安全な回復ゲートは引き続き未成立。
+- `requeueLifecycleOperation`は保持markerと凍結request・未完了ownerを照合して同じjobだけを送信する。通知/続行送信の失敗・成功応答喪失・重複、遅延purge中のtoken保持、多invocation削除、取消/古い配送・新ownerを自動テストした。管理API/本番Queueへのlifecycle実行接続はまだ行わない。
+- 既存本番Queueの通知境界を固定publication/lifecycle pathのparserへ統一した。DLQ handlerは任意のmessage body/keyを保存せず、未一致配送には固定codeだけを残す。一致配送の既存`{ key }`形式を維持し、初回CASと一致照合で保持markerの衝突を拒否する。DLQ到達でstatus/ownerを変えない。
+- `bun test`（200件、3217 assertions）、型検査、M6実証tsconfig、Linux binary buildで確認した。公開CLI/配信/publicationは既存経路のままでlifecycleを公開せず、既存v0.1.1テスト環境・運用環境へのdeploy/変更はしていない。
+
 ## 2026-10-01: 凍結lifecycle commitとQueue接続用の照合を追加
 
 - Show/Episodeのlifecycle markerをstrict schemaと固定`staging/lifecycle/.../commit.json` keyで定義した。actionはunpublish/restore/deleteのみとし、対象・job・受付後generation・凍結request hash以外の本文/secretを保存しない。旧publication markerと混同しない。

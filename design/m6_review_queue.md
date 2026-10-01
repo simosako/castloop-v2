@@ -36,10 +36,10 @@
 ## 管理者の判断待ちではない技術残件
 
 1. **upload/publication統合**: staging操作IDとdraft job IDの分離、単一PUT前の受付、size/内容照合、切断後のowner/generation照合回復・終了処理、既存publication consumerの新record対応。
-2. **consumer invocationの安全な回復**: 現在のtokenは同jobの重複実行を排除するが、取得応答喪失・runtime強制終了ではブロックを保持する。稼働中invocationを解放せずに終了を確認する手順と、次のinvocationへの引継ぎを成立させる。時間/HEAD不在だけの奪取を追加しない。
+2. **consumer invocationの安全な回復**: 全副作用をawaitした通常終了/例外終了からのtoken返却・続行/requeueを独立consumerで実装した。取得応答喪失・runtime強制終了ではブロックを保持する。稼働中invocationを解放せずに終了を確認する手順と、安全な回復を成立させる。時間/HEAD不在だけの奪取を追加しない。
 3. **本番配信とpurge**: gatewayをdefault cache無効の入口へ接続し、cache有効named entrypointへの内部fetchと所有entrypoint内purgeを実装する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。
 4. **移行とcapability**: 読み取り専用planに加え、旧書込停止、atomicな移行受付、apply/途中再開、旧cache purge、100% Worker切替、対応機能照会と安全なrollbackを実装する。
-5. **再開・物理削除**: 削除開始のstate/feed/purge、owner-gated payload batchと先頭からのverification、最終purge/子tombstone/deleted/完了解放までを独立moduleで実装した。restoreも保存済みsnapshot検証→feed/purge準備→durable証拠→active化を実装した。本番gate確認、続行message・DLQ・remote retryへの接続と実機確認は残る。未知keyを黙ってprefix削除しない。
+5. **再開・物理削除**: 削除開始のstate/feed/purge、owner-gated payload batchと先頭からのverification、最終purge/子tombstone/deleted/完了解放までを独立moduleで実装した。restoreも保存済みsnapshot検証→feed/purge準備→durable証拠→active化を実装した。凍結commit・consumer続行/同job requeueの基礎処理は追加済みだが、本番gate確認、本番Queue/管理APIへの接続と実機確認は残る。未知keyを黙ってprefix削除しない。
 6. **接続と受け入れ**: 注入effectを実装して停止・再開・削除状態機械をQueueへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
 
 ## 今回実装済みだが本番未接続

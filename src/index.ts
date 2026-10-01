@@ -2,6 +2,7 @@ import { validateId } from "../packages/shared/src/ids";
 import { episodeCommitSchema, parseEpisodeRevision, parseJobStatus } from "../packages/shared/src/index";
 import { publishEpisode, publishShow, readAdmission } from "./publication";
 import type { Admission } from "./publication";
+import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 
 type Env = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -264,34 +265,15 @@ export default {
   async queue(batch, env, ctx): Promise<void> {
     if (batch.queue === env.CASTLOOP_DLQ_NAME) {
       for (const message of batch.messages) {
-        const body: unknown = message.body;
-        const detail = body && typeof body === "object" && "object" in body ? body.object : null;
-        const key = detail && typeof detail === "object" && "key" in detail ? detail.key : null;
-        if (typeof key !== "string") {
-          await env.CASTLOOP_BUCKET.put(`system/dlq/unmatched/${message.id}.json`, JSON.stringify({ body }));
-          continue;
-        }
-        const parts = key.split("/");
-        const jobId = parts.at(-2);
-        if (!jobId || !JOB_ID.test(jobId)) {
-          await env.CASTLOOP_BUCKET.put(`system/dlq/unmatched/${message.id}.json`, JSON.stringify({ key }));
-          continue;
-        }
-        await env.CASTLOOP_BUCKET.put(`system/jobs/${jobId}/dlq.json`, JSON.stringify({ key }));
+        await recordDeadLetterDelivery(env, message);
       }
       return;
     }
     for (const message of batch.messages) {
-      const body: unknown = message.body;
-      if (!body || typeof body !== "object" || !("object" in body) ||
-        !body.object || typeof body.object !== "object" || !("key" in body.object) ||
-        typeof body.object.key !== "string") continue;
-      const key = body.object.key;
-      if (key.startsWith("staging/shows/") && key.endsWith("/commit.json")) {
-        await publishShow(env, ctx, key);
-      } else if (key.startsWith("staging/episodes/") && key.endsWith("/commit.json")) {
-        await publishEpisode(env, ctx, key);
-      }
+      const delivery = parseQueueDelivery(message.body);
+      if (!delivery || delivery.family !== "publication") continue;
+      if (delivery.target.kind === "show") await publishShow(env, ctx, delivery.key);
+      else await publishEpisode(env, ctx, delivery.key);
     }
   },
 } satisfies ExportedHandler<Env>;

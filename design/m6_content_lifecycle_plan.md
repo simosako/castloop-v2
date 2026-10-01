@@ -198,6 +198,8 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 
 consumer invocationごとの排他基礎関数を追加した。`acquireShowExecution`はreserved/processing ownerへランダムな`execution_id`を同じShow keyのCASで設定し、同jobの重複配送も1 invocationだけが書けるようにする。`beginShowOperation`単独の冪等なprocessing確認は実行排他の代用にしない。すべての副作用をawaitして書込終了したinvocationだけが`releaseShowExecution`を呼び、job ownerはprocessingのまま保持する。tokenを時間で失効させず、取得応答喪失・runtime強制終了ではブロックを維持する。強制終了後の実行終了確認・安全なtoken回復は未実装であり、本番consumer接続前の残ゲートである。
 
+`consumeLifecycleCommit`は凍結requestとstrict markerを照合し、停止/再開/削除runnerの通常終了・例外終了をawaitしてから実行tokenを返却する（2026-10-01）。削除続行はtoken返却後に同じmarkerのQueue送信をawaitする。送信失敗/応答喪失でもjob owner/progressを保持し、重複配送と`requeueLifecycleOperation`で同jobへ収束できる。取得応答喪失と強制終了のtokenは保持したままであり、この通常終了経路を強制終了回復の証明にはしない。基礎consumerは本番Queueに未接続。
+
 ## 7. 配信ゲートとキャッシュ（最重要の検証ゲート）
 
 ### 推奨構成
@@ -272,7 +274,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 `src/lifecycle-delete-batch.ts`の独立した1 step処理は、delete owner/実行token、対象deleting状態と期待generation、durable progressの要求hash/phase/purge成功、呼出側の配信ゲート確認を必須とする。固定scopeのpayloadだけを最大100 keyのarrayで削除し、markerは本文をコピーせずstrict schema/対象/ETag/sizeを確認して保持する。未知key・不正marker・payload変更では削除を止める。progressはCASで保存し、payloadを削除したpageではcursorを進めず再列挙する。全scopeの削除走査後は先頭からverification passを行い、残存payloadがあれば削除へ戻る。終端は`finalizing`であり、まだdeleted/completedやowner解放にはしない。削除件数は応答喪失で過少になることがある診断値で、完了の証拠には使わない。
 
-このstepは本番API/Queue/CLIへ未接続である。配信ゲート確認callbackの本番実装、開始時のstate/feed/purge/progress、最後のpurge/tombstone完成/terminal status、Queue継続とinvocation間の安全な引継ぎは残ゲート。mockのgate成功を本番配信の保証と扱わず、旧CLI停止・upload/consumer収束・移行の条件も維持する。
+このbatchの前後処理は`stepLifecycleDelete`で開始時state/feed/purgeから最後のpurge/tombstone/terminal statusまで接続済みであり、`consumeLifecycleCommit`で通常終了後のQueue継続も実装した。本番API/Queue/CLIへは未接続。配信ゲート確認callbackの本番実装、強制終了invocationの安全な回復は残ゲート。mockのgate成功を本番配信の保証と扱わず、旧CLI停止・upload/consumer収束・移行の条件も維持する。
 
 ### 公開再開
 
