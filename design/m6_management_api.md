@@ -6,6 +6,8 @@
 
 `handleM6StagingAdmin`を独立した内部handlerとして追加した。共通service registry、M6 readiness/実行version/cache owner gate、staging Show CAS owner、一度限りPUT開始、明示的終了申告、stream検証/取消を接続した。
 
+`handleM6PublicationAdmin`も独立した内部handlerとして追加した。service設定/identity、service invocation、副作用前後のruntime gateは`withM6ManagementInvocation`で共通化し、公開manifestの凍結/Show CAS受付とstaging証拠検査後のcommit marker作成へ接続する。
+
 現行Worker、bridge、candidateのfetch入口には接続していない。candidateは引き続きread-onlyで、R2にmock readinessを入れても通常書込を開けず、`m6_ready=false`を維持する。CLI書込操作も公開しない。Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。
 
 ## Stagingのwire契約
@@ -34,8 +36,27 @@
 - 正常な検証失敗はsettled/retryingと固定診断を残し、Show ownerを保持する。同ownerの明示的検証/取消を可能にするが、異なるID/generationへ解放しない。
 - abortはstaging ownerの安全な終了であり、payload物理削除ではない。payloadは別の明示的cleanup方針へ委ね、ここで期限削除やprefix削除をしない。
 
+## Publicationのwire契約
+
+将来の`POST /admin/publication`は同じ認証/16KB bounded JSON/no-store/固定診断を使い、`schema_version=1`、`service_id`と次のactionを受け付ける。
+
+| action | 入力 | 結果 |
+| --- | --- | --- |
+| `claim` | 凍結する`publication` request/commit/staged_uploads | `claimed`とshow/job ID・取得generation。新規受付はopenだけ |
+| `commit` | `operation` | `committed`とmarker key/created。既受付publicationはpause中にも収束できる |
+
+manifest schemaをsharedへ移し、既存の`src/publication-admission.ts`のexportも互換re-exportとして保持した。Show/Episode commit schemaと既存RFC3339 timestamp検査もsharedの独立moduleへ移し、既存の検査条件を変えず、CLIがWorker側schemaをimportする必要をなくした。
+
+publication job IDは凍結draft job IDと一致する。commit作成はretained staging manifest/progress/status、検証済みhash/length/current ETag、Episodeのbase revision/history/unchanged audioを照合する。新しいmetadata/audio/公開状態をwire入力から直接配信しない。失敗時はreserved ownerを保持し、同IDのrequestを勝手に変えたり、別jobへ解放したりしない。
+
+claim/commitはfeed/cover/音源/current metadataを公開しない。commit markerを最後にR2へ作成し、そのnotificationが同じ管理Queueへ渡る既存構成を使う。HTTP handlerから追加Queue送信やconsumer実行をしない。明示的な同marker照合ではcreated=falseを返し、markerを再PUTしてnotificationを増やさない。Queue配送はat-least-onceであり、created=falseを配送/consumer終了の証拠として扱わない。
+
+commit応答喪失や最後のruntime gate失敗でも、既存marker/ownerは保持する。service token取得応答喪失はregistryを保持する。自動retry/新job作成は行わず、CLI側のdurable outcome照会と安全な明示復旧を別途完成する。
+
 ## 検証と残件
 
 ローカルhandler結合でShow/Episode metadata/audio、pause/drain、一回限りbegin、settlement前finish拒否、stream検証中のregistry/Show token保持、checksum失敗、foreign owner/generation、未知token・begin応答喪失、body/response上限、read-only candidateを回帰した。これはCloudflare実機/300MB/CPU・料金/切断挙動の合格ではない。
 
-公開API/CLI client、upload progress照会/復旧journal、publication/lifecycle管理boundary、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
+publicationは新しいstaging内部API→publication内部API→実M6 Queue adapterをローカル結合し、Show/Episode初回公開、metadata-only/audio-only改訂、immutable media/history保持とpurge終了後のpublished化を回帰した。live commit検証中のpause/registry保持、検証後payload変更、missing proof/status、base revision変更、foreign job/generation、commit応答喪失/最後のgate失敗、未知service token、同marker非再PUT、read-only candidateも検査した。R2 notification実配送やCloudflare実routingの合格ではない。
+
+公開入口/CLI clientへの接続、upload/publication progress照会とdurable復旧journal、lifecycle管理boundary、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。

@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Publication内部APIと共通管理invocation boundaryを接続
+
+- 未公開`handleM6PublicationAdmin`をstrictな共有wire契約と凍結manifest/Show CAS受付/staging検証/commit作成へ接続した。service設定・identity・registry登録・副作用前後のreadiness/実行version/cache owner確認を`withM6ManagementInvocation`でstagingと共通化した。新claimはopenだけ、既受付commitはpause中にも収束可能とする。
+- PublicationRequest、Show/Episode commit、既存RFC3339 timestamp検査をsharedの独立moduleへ移し、従来exportと検査条件を維持した。commitはretained staging証拠/current ETag/base revision/history/unchanged audioを照合し、公開payloadへ直接書かずmarkerを最後に作る。HTTP側で追加Queue送信しない。同markerの明示照合は再PUTせずcreated=falseを返す。
+- 新staging内部API→publication内部API→M6 Queue adapterのローカル結合で、Show/Episode初回公開・metadata-only/audio-only改訂・媒体/history保持・purge後published化を回帰した。pause/live commit registry保持、payload/base/proof変更、foreign owner、commit応答喪失/最後のgate失敗、未知token、candidate書込拒否も確認した。
+- `bun test`（477件、8319 assertions）、`npm run check`、browser bundle、M6実証tsconfig、Linux x86-64 binary build、`git diff --check`に合格。内部handlerは現行Worker/bridge/candidate fetchや書込CLIへ公開せず、`m6_ready=false`を維持する。Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。詳細は`m6_management_api.md`。
+
 ## 2026-10-02: Staging管理の内部APIを共通service受付・配信gateへ接続
 
 - strictな共有wire契約と未公開`handleM6StagingAdmin`を追加した。認証/16KB bounded JSON/service identity検査後、claim/beginはm6_admin、settle/finishはm6_recoveryとして登録し、実行version/readiness/cache owner gateの前後で既存Show CAS・一度限りPUT開始・明示settlement・stream検証/取消をawaitする。

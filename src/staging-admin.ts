@@ -1,11 +1,10 @@
-import { parseServiceConfig, stagingAdminRequestSchema, stagingAdminResponseSchema } from "../packages/shared/src/index";
+import { stagingAdminRequestSchema, stagingAdminResponseSchema } from "../packages/shared/src/index";
 import type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
-import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleControlEnv } from "./lifecycle-control";
-import { withServiceInvocation } from "./service-admission";
+import { M6ManagementServiceMismatch, withM6ManagementInvocation } from "./m6-management";
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "./staging-upload";
 import type { StageOperation } from "./staging-upload";
 import { runStageVerification } from "./staging-verification";
@@ -30,16 +29,10 @@ export async function handleM6StagingAdmin(request: Request, env: StagingAdminEn
   try { input = stagingAdminRequestSchema.parse(await readBoundedAdminJson(request)); }
   catch { return reply({ error: "Invalid staging input", reason_code: "staging_input_invalid" }, 400); }
   try {
-    const object = await env.CASTLOOP_BUCKET.get("system/service.toml");
-    if (!object || object.size < 1 || object.size > 16384) throw new Error("Invalid service configuration");
-    const config = parseServiceConfig(await object.text());
-    if (config.service_id !== input.service_id) return reply({ error: "Service ID mismatch", reason_code: "staging_input_invalid" }, 400);
     const kind = input.action === "claim" || input.action === "begin" ? "m6_admin" : "m6_recovery";
-    const result = await withServiceInvocation(env, config.service_id, kind, async (invocation): Promise<StagingAdminResponse> => {
-      const gate = createM6DeliveryGate(env, invocation, bindings);
-      const showId = input.action === "claim" ? input.upload.show_id : input.operation.show_id;
-      await gate({ showId });
-      const identity = { schema_version: 1 as const, service_id: config.service_id };
+    const showId = input.action === "claim" ? input.upload.show_id : input.operation.show_id;
+    const result = await withM6ManagementInvocation(env, input.service_id, kind, { showId }, bindings, async (): Promise<StagingAdminResponse> => {
+      const identity = { schema_version: 1 as const, service_id: input.service_id };
       let response: StagingAdminResponse;
       if (input.action === "claim") {
         response = { ...identity, result: "claimed", operation: wireOperation(await claimStageUpload(env, input.upload)) };
@@ -55,11 +48,11 @@ export async function handleM6StagingAdmin(request: Request, env: StagingAdminEn
           response = { ...identity, result: input.outcome, operation: input.operation };
         }
       }
-      await gate({ showId });
       return stagingAdminResponseSchema.parse(response);
     });
     return reply(result);
-  } catch {
+  } catch (error) {
+    if (error instanceof M6ManagementServiceMismatch) return reply({ error: "Service ID mismatch", reason_code: "staging_input_invalid" }, 400);
     console.error(JSON.stringify({ event: "staging_operation_blocked", reason_code: "staging_operation_blocked" }));
     return reply({ error: "Staging operation blocked; inspect retained ownership and progress", reason_code: "staging_operation_blocked" }, 409);
   }

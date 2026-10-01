@@ -1,32 +1,16 @@
 import { z } from "zod";
 import { controlRequestSchema, episodeCommitSchema, episodeRevisionSchema, parseControlRequest, parseEpisodeRevision, parseJobStatus, parseLifecycleProgress,
   permitsControlAction, showCommitSchema, stageControlRequest, stagePayloadKey, stageUploadProgressSchema,
-  stageUploadRequestSchema } from "../packages/shared/src/index";
-import type { EpisodeCommit, EpisodeRevision, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
+  stageUploadRequestSchema, publicationRequestSchema } from "../packages/shared/src/index";
+import type { EpisodeCommit, EpisodeRevision, PublicationRequest, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
 import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
 import { canonicalEnclosureUrl } from "./media-url";
 import { parsePublicAssetPath } from "./public-assets";
 import { stageManifestHash } from "./staging-upload";
 
-export const publicationRequestSchema = z.object({
-  schema_version: z.literal(1),
-  request: controlRequestSchema,
-  commit: z.union([showCommitSchema, episodeCommitSchema]),
-  staged_uploads: z.array(z.uuid()).min(1).max(2),
-}).strict().superRefine((value, context) => {
-  const episodeId = value.commit.kind === "episode" ? value.commit.episode_id : undefined;
-  if (value.request.action !== "publish" || value.request.kind !== value.commit.kind ||
-    value.request.job_id !== value.commit.job_id || value.request.show_id !== value.commit.show_id || value.request.episode_id !== episodeId) {
-    context.addIssue({ code: "custom", message: "Publication commit must match its frozen control request" });
-  }
-  const count = value.commit.kind === "show" ? 1 : Number(value.commit.metadata_sha256 !== undefined) + Number(value.commit.audio_sha256 !== undefined);
-  if (value.staged_uploads.length !== count || new Set(value.staged_uploads).size !== count || value.staged_uploads.includes(value.commit.job_id)) {
-    context.addIssue({ code: "custom", message: "Publication requires distinct staging operations for its changed payloads" });
-  }
-});
-
-export type PublicationRequest = z.infer<typeof publicationRequestSchema>;
+export { publicationRequestSchema } from "../packages/shared/src/index";
+export type { PublicationRequest } from "../packages/shared/src/index";
 export type PublicationOperation = { showId: string; jobId: string; generation: number };
 export type PublicationCommitTarget = { kind: "show" | "episode"; showId: string; jobId: string; episodeId?: string };
 export type OwnedPublication = { frozen: PublicationRequest; control: OwnedShowControlSnapshot };

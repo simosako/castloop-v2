@@ -1,6 +1,12 @@
 import * as TOML from "@iarna/toml";
 import { z } from "zod";
 import { lifecycleJobStatusSchema } from "./lifecycle-job";
+import { publishedTimestampSchema as publishedAt } from "./metadata-time";
+import { episodeCommitSchema, showCommitSchema } from "./publication-request";
+export { episodeCommitSchema, publicationRequestSchema, showCommitSchema } from "./publication-request";
+export type { PublicationRequest } from "./publication-request";
+export { publicationAdminRequestSchema, publicationAdminResponseSchema, publicationOperationSchema } from "./publication-admin";
+export type { PublicationAdminRequest, PublicationAdminResponse, PublicationOperationIdentity } from "./publication-admin";
 export { lifecycleFailureForPhase, lifecycleFailureMessages, lifecycleJobStatusSchema, lifecyclePhaseSchema, lifecycleProgressSchema,
   parseLifecycleProgress, stringifyLifecycleProgress } from "./lifecycle-job";
 export type { LifecycleFailure, LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";
@@ -80,18 +86,6 @@ export const showMetadataSchema = z.object({
   show_type: z.enum(["episodic", "serial"]).optional(),
 }).strict();
 
-const publishedAt = z.string().regex(
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/,
-).refine((value) => {
-  const [year, month, day, hour, minute, second] = value.slice(0, 19).split(/[-T:]/).map(Number);
-  const offset = value.slice(19);
-  if (offset !== "Z" && (Number(offset.slice(1, 3)) > 23 || Number(offset.slice(4, 6)) > 59)) return false;
-  const local = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-  return local.getUTCFullYear() === year && local.getUTCMonth() === month - 1 &&
-    local.getUTCDate() === day && local.getUTCHours() === hour &&
-    local.getUTCMinutes() === minute && local.getUTCSeconds() === second;
-}, "Expected a valid RFC 3339 timestamp");
-
 export const episodeDraftSchema = z.object({
   schema_version: z.literal(1),
   episode_id: ID(80),
@@ -104,42 +98,6 @@ export const episodeDraftSchema = z.object({
   season_number: z.number().int().positive().optional(),
   episode_number: z.number().int().positive().optional(),
 }).strict();
-
-export const showCommitSchema = z.object({
-  schema_version: z.literal(1),
-  kind: z.literal("show"),
-  show_id: ID(32),
-  job_id: z.uuid(),
-  metadata_sha256: z.string().regex(/^[a-f0-9]{64}$/),
-  cover_sha256: z.string().regex(/^[a-f0-9]{64}$/),
-  cover_extension: z.enum(["jpg", "png"]),
-}).strict();
-
-export const episodeCommitSchema = z.object({
-  schema_version: z.literal(1),
-  kind: z.literal("episode"),
-  show_id: ID(32),
-  episode_id: ID(80),
-  job_id: z.uuid(),
-  base_revision_id: z.uuid().optional(),
-  metadata_sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  audio_sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  audio_length_bytes: z.number().int().positive().max(300_000_000).optional(),
-  duration_seconds: z.number().int().positive().optional(),
-  committed_at: publishedAt,
-}).strict().superRefine((value, context) => {
-  const hasAudio = value.audio_sha256 !== undefined;
-  if (hasAudio !== (value.audio_length_bytes !== undefined) ||
-    hasAudio !== (value.duration_seconds !== undefined)) {
-    context.addIssue({ code: "custom", message: "Audio checksum, length and duration must be provided together" });
-  }
-  if (!value.base_revision_id && (!value.metadata_sha256 || !hasAudio)) {
-    context.addIssue({ code: "custom", message: "Initial publication requires both metadata and audio" });
-  }
-  if (value.base_revision_id && !value.metadata_sha256 && !hasAudio) {
-    context.addIssue({ code: "custom", message: "An update must change metadata or audio" });
-  }
-});
 
 export const episodeRevisionSchema = episodeDraftSchema.extend({
   revision_id: z.uuid(),

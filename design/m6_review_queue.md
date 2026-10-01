@@ -1,6 +1,6 @@
 # M6: 承認済み方針と残る技術ゲート
 
-更新日: 2026-10-01
+更新日: 2026-10-02
 
 管理者の指示に従い、判断待ちでも独立した開発は進める。確認待ちと明示的に承認されたpolicyを区別する。公開停止・再開・削除コマンドは未提供。現行REST単一PUTの維持と未解決懸念U1の非ブロッカー扱いは決定済みで、再承認を求めない。
 
@@ -36,13 +36,14 @@
 ## 管理者の判断待ちではない技術残件
 
 1. **upload/publication統合**: staging操作IDとdraft job IDの分離、単一PUT前の受付/一度限りの開始、明示的client終了確認、検証token、size/全量checksum/metadata/cover照合、完了/取消receiptとowner解放の基礎処理を追加した。凍結publication manifest・共通CAS受付・staging証拠/current ETag/base revision照合後のcommit準備も追加した。Show/Episode publication runner/実行token付きconsumer/内部purge effect、stream媒体保存と2種改訂の再開まで独立moduleで追加済み。管理API/既存CLIのREST PUTへの接続、状態喪失後の回復手順、本番publication routingを完成する。未知の検証tokenは時間で奪わない。
+   staging/publicationの独立した内部管理handlerを共通service registry/runtime gateへ接続し、新APIからM6 Queue adapterまでのローカル結合を追加した。公開入口/CLI書込接続、durable client journal、実機受け入れは未完了である。`m6_management_api.md`参照。
 2. **consumer invocationの安全な回復**: 全副作用をawaitした通常終了/例外終了からのtoken返却・続行/requeueを独立consumerで実装した。取得応答喪失・runtime強制終了ではブロックを保持する。稼働中invocationを解放せずに終了を確認する手順と、安全な回復を成立させる。時間/HEAD不在だけの奪取を追加しない。
 3. **本番配信とpurge**: cache有効named entrypoint向けの内部fetch/stream配信、所有entrypoint内purge、service token/readiness/実行version/cache ownerを照合する配信gate adapterを実装した。adapter/RPCは実cache設定や100%切替を単独で証明せず、まだ本番main moduleへexport/接続していない。gatewayをdefault cache無効の入口へ接続し、CLIのdeploy設定と移行capabilityを完成する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。`m6_delivery_runtime_gate.md`参照。
    別entry moduleの`src/m6-worker.ts`へgateway/named export/新Queue consumerを接続した。現行binary/deployには接続せず、候補管理APIはread-only、ready=falseを維持する。bootstrap/本番REST設定/HTTP検証/旧IO/cache purge等は残る。`m6_candidate_worker.md`参照。
 4. **移行とcapability**: サービスCAS registry/pause/drain/atomic移行受付と凍結planのCAS初期化/途中再開を追加した。現行管理API/Queue/DLQのregistry接続と認証必須の読み取り専用capability照会も追加したが、M6 route=false/ready=falseを維持する。旧Worker/CLI直PUTの外部収束確認は別途必要。本番quiescence/cutover callback、applyのAPI/CLI、旧cache purge、100% Worker切替、安全なrollbackを完成する。未知のregistry tokenも時間で解放しない。`m6_migration_runtime_contract.md`参照。
    M6用REST metadata生成と読み取り専用deployment/version/settings/preview検査も追加済み。実upload/CLI接続は未提供で、GET照合を旧IO/cache purge証明としては扱わない。`m6_worker_deployment_inspection.md`参照。
    独立bridge/candidateの移行APIへpause/claim/旧IO明示申告/初期化限定apply/凍結bootstrap開始・終了/HTTP検査を接続した。候補HTTP window中も通常書込・consumer・完了/再開は閉じる。CLI/full cutover/旧cache全scope/外部検証/rollback等が残る。`m6_migration_bootstrap.md`参照。
-   移行client/durableローカルdeploy journalと読み取り専用`migration-status`も追加した。実deploy adapter/移行書込commandは未接続で、不明応答のPUT再送や残存lock/token奪取はしない。`m6_migration_client.md`参照。
+    移行client/durableローカルdeploy journalと実REST deploy adapter、pause/claim/旧IO申告/1-step初期化のdurable setup journal、読み取り専用`migration-status [--local]`も追加した。実Cloudflare deploy検証/移行書込command/full cutoverは未完了で、不明応答のPUT再送や残存lock/token奪取はしない。`m6_migration_client.md`と`m6_migration_setup_client.md`参照。
 5. **再開・物理削除**: 削除開始のstate/feed/purge、owner-gated payload batchと先頭からのverification、最終purge/子tombstone/deleted/完了解放までを独立moduleで実装した。restoreも保存済みsnapshot検証→feed/purge準備→durable証拠→active化を実装した。凍結commit・consumer続行/同job requeueの基礎処理は追加済みだが、本番gate確認、本番Queue/管理APIへの接続と実機確認は残る。未知keyを黙ってprefix削除しない。
 6. **接続と受け入れ**: 実行token付きeffect factoryとWorker binding用のfeed書込/内部purge/Queue送信を追加した。本番配信gateとQueue routingへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
 

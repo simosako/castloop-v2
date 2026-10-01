@@ -10,7 +10,7 @@ export const stagingOperationSchema = z.object({
 
 const identity = { schema_version: z.literal(1), service_id: serviceAdmissionSchema.shape.service_id };
 const slug = "[a-z0-9]+(?:-[a-z0-9]+)*";
-const uuid = "[a-f0-9-]{36}";
+const uuid = "[a-fA-F0-9-]{36}";
 const payloadKey = new RegExp(`^staging/(?:shows/${slug}/${uuid}/(?:show\\.toml|cover\\.(?:jpg|png))|` +
   `episodes/${slug}/${slug}/${uuid}/(?:episode\\.toml|audio\\.mp3))$`);
 export const stagingAdminRequestSchema = z.discriminatedUnion("action", [
