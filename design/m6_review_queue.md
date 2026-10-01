@@ -40,7 +40,7 @@
 3. **本番配信とpurge**: cache有効named entrypoint向けの内部fetch/stream配信と所有entrypoint内purgeを実装した。まだ本番main moduleへexport/接続しておらず、gatewayをdefault cache無効の入口へ接続し、CLIのdeploy設定と移行capabilityを完成する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。
 4. **移行とcapability**: 読み取り専用planに加え、旧書込停止、atomicな移行受付、apply/途中再開、旧cache purge、100% Worker切替、対応機能照会と安全なrollbackを実装する。
 5. **再開・物理削除**: 削除開始のstate/feed/purge、owner-gated payload batchと先頭からのverification、最終purge/子tombstone/deleted/完了解放までを独立moduleで実装した。restoreも保存済みsnapshot検証→feed/purge準備→durable証拠→active化を実装した。凍結commit・consumer続行/同job requeueの基礎処理は追加済みだが、本番gate確認、本番Queue/管理APIへの接続と実機確認は残る。未知keyを黙ってprefix削除しない。
-6. **接続と受け入れ**: 注入effectを実装して停止・再開・削除状態機械をQueueへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
+6. **接続と受け入れ**: 実行token付きeffect factoryとWorker binding用のfeed書込/内部purge/Queue送信を追加した。本番配信gateとQueue routingへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
 
 ## 今回実装済みだが本番未接続
 

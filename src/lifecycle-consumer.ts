@@ -17,6 +17,7 @@ export type LifecycleConsumerEffects = {
   delete: DeleteEffects;
   sendContinuation: (key: string) => Promise<void>;
 };
+export type LifecycleConsumerEffectFactory = (execution: ShowExecution) => LifecycleConsumerEffects | Promise<LifecycleConsumerEffects>;
 export type LifecycleConsumerResult = { state: "completed" | "continued" } |
   { state: "ignored"; reason: "unmatched_path" | "missing_marker" | "stale_operation" } |
   { state: "invalid"; reason: "invalid_lifecycle_commit" };
@@ -57,7 +58,7 @@ async function releaseSettledExecution(env: LifecycleControlEnv, execution: Show
   return "released";
 }
 
-export async function consumeLifecycleCommit(env: LifecycleDeleteEnv, key: string, effects: LifecycleConsumerEffects,
+export async function consumeLifecycleCommit(env: LifecycleDeleteEnv, key: string, source: LifecycleConsumerEffects | LifecycleConsumerEffectFactory,
   options: { maximumObjects?: number } = {}): Promise<LifecycleConsumerResult> {
   if (!parseLifecycleCommitKey(key)) return { state: "ignored", reason: "unmatched_path" };
   let marker: LifecycleCommit | null;
@@ -73,7 +74,9 @@ export async function consumeLifecycleCommit(env: LifecycleDeleteEnv, key: strin
   if (current.value.owner.execution_id) throw new LifecycleExecutionBusy();
   const execution = await acquireShowExecution(env, marker.show_id, marker.job_id, marker.show_generation);
   let pending = false;
+  let effects: LifecycleConsumerEffects;
   try {
+    effects = typeof source === "function" ? await source(execution) : source;
     if (marker.action === "unpublish") await runLifecycleUnpublish(env, execution, effects.unpublish);
     else if (marker.action === "restore") await runLifecycleRestore(env, execution, effects.restore);
     else pending = (await stepLifecycleDelete(env, execution, effects.delete, options)).state === "pending";

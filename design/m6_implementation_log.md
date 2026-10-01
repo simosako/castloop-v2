@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: lifecycle consumerのWorker binding用effect factoryを追加
+
+- consumerは実行token取得後にeffect factoryをawaitできるようにし、factory準備の失敗も全処理終了後に実行tokenだけを返す。live factoryには別invocationが割り込まない。
+- `createLifecycleWorkerEffects`は同じtokenから固定対象を生成し、feed書込/内部purge/削除配信確認の前後に所有権と必須の配信gate callbackを照合する。保存済みShow/service/coverとlifecycle対応Episode集合からfeedを作り、入力差替え、snapshot変更、feed CAS競合を拒否する。空feedを保持し、公開日時/GUID/immutable音源pathを変えず現在のpublic URLを使う。
+- purgeはcache所有entrypointの`invalidate`をawaitする。削除gateは対象の`gone`を必須にする。続行はtoken返却後、同generation/ownerと凍結markerを照合してQueue bindingへ`{ object: { key } }`を送る。send失敗でも削除progressとjob ownerを保持する。
+- `bun test`（248件、4056 assertions）、`npm run check`、M6実証tsconfigに合格。Show/Episode双方の停止/再開/削除、空feed、停止子除外、factory/purge/Queue失敗、live factory、偽metadata/別対象/旧token、snapshot欠落/変更、feed CAS競合を確認した。
+- これは本番接続用アダプターとbinding mockでの統合確認である。main module/公開Queue routingには未接続、deployも未実施。`checkDeliveryGate`の本番実装、移行/capability、旧書込収束、強制終了token回復と実機受け入れは残る。
+
 ## 2026-10-01: stagingのstream検証・完了/取消・照合済み解放を追加
 
 - uploading ownerへstage専用`verification_id`をCASで付与し、durable client settlement後だけ内容検証を開始する。同operationのlive検証・取得応答喪失・未終了clientでは検証/取消を開始せず、時間でtokenを奪わない。consumer実行tokenとは別に扱う。
