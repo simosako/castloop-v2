@@ -15,12 +15,16 @@ const operationOwnerSchema = z.object({
   action: controlActionSchema,
   state: z.enum(["reserved", "processing", "uploading"]),
   request_sha256: checksum,
+  execution_id: z.uuid().optional(),
 }).strict().superRefine((value, context) => {
   if ((value.kind === "episode") !== (value.episode_id !== undefined)) {
     context.addIssue({ code: "custom", message: "Only Episode operations require an Episode ID" });
   }
   if ((value.action === "stage") !== (value.state === "uploading")) {
     context.addIssue({ code: "custom", message: "Staging operations require an uploading owner" });
+  }
+  if (value.execution_id && value.state !== "processing") {
+    context.addIssue({ code: "custom", message: "Only a processing owner can hold an execution token" });
   }
 });
 

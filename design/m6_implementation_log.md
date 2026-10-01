@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 同job内のconsumer実行排他を追加
+
+- Show ownerへprocessing専用の`execution_id`を追加し、取得・照合・解放をShow制御keyのETag CASで実装した。reserved→processingとtoken取得を一度に行い、同jobの重複配送16件でも1 invocationだけを実行可能にする。
+- 終了したinvocationはtokenだけを解放し、Showのprocessing ownerを保持する。誤ったjob/generation/token、前invocationからの遅延解放、凍結requestの改変、uploadingでの実行を拒否する。
+- 取得応答喪失はtokenを保持してfail closedとし、解放応答喪失は再照会で冪等に回復する。時間切れでtokenを奪う仕組みは追加していない。すべての副作用が終了した後だけ解放することが呼出側の契約である。
+- 本番consumerは未接続。runtime強制終了時の安全なtoken回復は未実装であり、M6の残ゲートとして保持する。これはREST単一PUTの未解決懸念U1とは別の問題である。
+- 自動テストは91件・561 assertionsに合格。Cloudflareリソース・運用サービスは変更していない。
+
 **現在のupload方針（2026-10-01）**: 管理者判断により現行REST単一PUTを維持し、クライアント切断後に遅れてobjectが作成・更新されないと仮定する。確認済み仕様ではなく[未解決懸念U1](./m6_upload_recovery_options.md)として保持し、M6公開をブロックしない。以下の過去ログにある条件付きPUT/分割uploadの公開ゲート判断は、末尾の決定で更新された。既存実測はそのまま保持する。
 
 ## 2026-09-30: 次マイルストーンの設定と設計案

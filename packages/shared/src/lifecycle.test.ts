@@ -63,6 +63,16 @@ describe("M6 lifecycle schemas", () => {
       owner: { job_id: request.job_id, kind: "show", action: "delete", state: "reserved",
         request_sha256: "a".repeat(64) } }).success).toBe(false);
   });
+
+  test("execution tokens belong only to processing owners", () => {
+    const control = { schema_version: 2, show_id: "daily", lifecycle: "active", generation: 1, feed_generation: 0 };
+    const owner = { job_id: request.job_id, kind: "show", action: "delete", state: "processing",
+      request_sha256: "a".repeat(64), execution_id: crypto.randomUUID() };
+    expect(showControlSchema.safeParse({ ...control, owner }).success).toBe(true);
+    for (const invalid of [{ state: "reserved" }, { state: "uploading", action: "stage" }, { execution_id: "bad" }]) {
+      expect(showControlSchema.safeParse({ ...control, owner: { ...owner, ...invalid } }).success).toBe(false);
+    }
+  });
 });
 
 test("ordinary publication cannot restore stopped or deleted content", () => {

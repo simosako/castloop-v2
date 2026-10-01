@@ -192,6 +192,8 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 - 新v2制御record用の限定abandon基礎関数を実装・実測した。凍結requestを照合し、reservedだけをCASで失効、generationを進め、同じrecordへ直近の取消receiptを残す。応答喪失の再実行はreceiptで確認できる。immutable requestと旧generationはその後も保持し、後続操作がreceiptを置換しても旧jobの再claim/beginを許さない。新consumerが**processing CAS成功前に書かない**ことが前提。旧v1 jobの取消・CLI/API公開・status/progressへの接続は別のゲートであり、旧recordをこの関数で取消しない。
 - 後続の独自ドメイン移行も同じ制御recordを使う。M6はShow単位の排他であり、全Showのサービス移行を原子的に止める方式まで解決したとは扱わない。
 
+consumer invocationごとの排他基礎関数を追加した。`acquireShowExecution`はreserved/processing ownerへランダムな`execution_id`を同じShow keyのCASで設定し、同jobの重複配送も1 invocationだけが書けるようにする。`beginShowOperation`単独の冪等なprocessing確認は実行排他の代用にしない。すべての副作用をawaitして書込終了したinvocationだけが`releaseShowExecution`を呼び、job ownerはprocessingのまま保持する。tokenを時間で失効させず、取得応答喪失・runtime強制終了ではブロックを維持する。強制終了後の実行終了確認・安全なtoken回復は未実装であり、本番consumer接続前の残ゲートである。
+
 ## 7. 配信ゲートとキャッシュ（最重要の検証ゲート）
 
 ### 推奨構成

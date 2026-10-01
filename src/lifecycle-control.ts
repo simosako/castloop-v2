@@ -5,6 +5,8 @@ import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/
 export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head"> };
 export type LifecycleReadEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head"> };
 export type ShowControlSnapshot = { value: ShowControl; etag: string };
+type OwnedShowControlSnapshot = { value: ShowControl & { owner: NonNullable<ShowControl["owner"]> }; etag: string };
+export type ShowExecution = { showId: string; jobId: string; generation: number; executionId: string };
 export type PublicVisibility = "public" | "not_found" | "gone";
 export type PublicVisibilitySnapshot = { visibility: "not_found" | "gone" } | {
   visibility: "public";
@@ -131,8 +133,8 @@ export async function claimShowOperation(env: LifecycleControlEnv, input: unknow
   throw new Error("Show control changed while claiming the operation");
 }
 
-export async function beginShowOperation(env: LifecycleControlEnv, showId: string,
-  jobId: string, expectedGeneration: number): Promise<ShowControlSnapshot> {
+async function requireOwnedOperation(env: LifecycleControlEnv, showId: string,
+  jobId: string, expectedGeneration: number): Promise<OwnedShowControlSnapshot> {
   const current = await readShowControl(env, showId);
   if (!current || current.value.generation !== expectedGeneration || current.value.owner?.job_id !== jobId) {
     throw new Error("Operation no longer owns the Show");
@@ -144,6 +146,12 @@ export async function beginShowOperation(env: LifecycleControlEnv, showId: strin
   if (request.show_id !== showId || !ownsRequest(current.value, request, await requestHash(request))) {
     throw new Error("Frozen control request does not match the Show owner");
   }
+  return { ...current, value: { ...current.value, owner: current.value.owner } };
+}
+
+export async function beginShowOperation(env: LifecycleControlEnv, showId: string,
+  jobId: string, expectedGeneration: number): Promise<ShowControlSnapshot> {
+  const current = await requireOwnedOperation(env, showId, jobId, expectedGeneration);
   if (current.value.owner.state === "processing") return current;
   if (current.value.owner.state !== "reserved") throw new Error("Only a reserved operation can begin processing");
   const value = parseShowControl({ ...current.value, owner: { ...current.value.owner, state: "processing" } });
@@ -151,6 +159,47 @@ export async function beginShowOperation(env: LifecycleControlEnv, showId: strin
     onlyIf: { etagMatches: current.etag },
   });
   if (!written) throw new Error("Show control changed before processing began");
+  return { value, etag: written.etag };
+}
+
+export async function acquireShowExecution(env: LifecycleControlEnv, showId: string,
+  jobId: string, expectedGeneration: number): Promise<ShowExecution> {
+  const current = await requireOwnedOperation(env, showId, jobId, expectedGeneration);
+  if (current.value.owner.state === "uploading") throw new Error("A staging operation cannot acquire consumer execution");
+  if (current.value.owner.execution_id) throw new Error("Another invocation is still executing this operation");
+  const executionId = crypto.randomUUID();
+  const value = parseShowControl({ ...current.value,
+    owner: { ...current.value.owner, state: "processing", execution_id: executionId } });
+  const written = await env.CASTLOOP_BUCKET.put(showControlKey(showId), JSON.stringify(value), {
+    onlyIf: { etagMatches: current.etag },
+  });
+  if (!written) throw new Error("Show control changed before execution was acquired");
+  return { showId, jobId, generation: expectedGeneration, executionId };
+}
+
+export async function requireShowExecution(env: LifecycleControlEnv,
+  execution: ShowExecution): Promise<ShowControlSnapshot> {
+  const current = await requireOwnedOperation(env, execution.showId, execution.jobId, execution.generation);
+  if (current.value.owner.state !== "processing" || current.value.owner.execution_id !== execution.executionId) {
+    throw new Error("Invocation no longer owns the execution token");
+  }
+  return current;
+}
+
+export async function releaseShowExecution(env: LifecycleControlEnv,
+  execution: ShowExecution): Promise<ShowControlSnapshot> {
+  const current = await requireOwnedOperation(env, execution.showId, execution.jobId, execution.generation);
+  if (current.value.owner.state !== "processing") throw new Error("Only processing execution can be released");
+  if (!current.value.owner.execution_id) return current;
+  if (current.value.owner.execution_id !== execution.executionId) {
+    throw new Error("Invocation no longer owns the execution token");
+  }
+  const { execution_id: _executionId, ...owner } = current.value.owner;
+  const value = parseShowControl({ ...current.value, owner });
+  const written = await env.CASTLOOP_BUCKET.put(showControlKey(execution.showId), JSON.stringify(value), {
+    onlyIf: { etagMatches: current.etag },
+  });
+  if (!written) throw new Error("Show control changed before execution was released");
   return { value, etag: written.etag };
 }
 

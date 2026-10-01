@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { episodeLifecycleSchema, parseShowControl, stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { ControlRequest, LifecycleState } from "../packages/shared/src/index";
-import { abandonReservedShowOperation, beginShowOperation, claimShowOperation, readEpisodeLifecycle, readPublicVisibility,
-  readPublicVisibilitySnapshot, readShowControl } from "./lifecycle-control";
+import { abandonReservedShowOperation, acquireShowExecution, beginShowOperation, claimShowOperation,
+  readEpisodeLifecycle, readPublicVisibility, readPublicVisibilitySnapshot, readShowControl,
+  releaseShowExecution, requireShowExecution } from "./lifecycle-control";
 
 function memoryBucket() {
   const entries = new Map<string, { data: string; etag: string }>();
@@ -181,6 +182,86 @@ describe("M6 atomic Show control", () => {
     await bucket.put("system/show-publications/daily.json", old);
     await expect(claimShowOperation(env, request({ action: "delete" }))).rejects.toThrow();
     expect(bucket.entries.get("system/show-publications/daily.json")?.data).toBe(old);
+  });
+});
+
+describe("M6 per-invocation execution admission", () => {
+  test("duplicate deliveries of the same job have only one executing invocation", async () => {
+    const { env } = await fixture();
+    const input = request();
+    await claimShowOperation(env, input);
+    const results = await Promise.allSettled(Array.from({ length: 16 }, () =>
+      acquireShowExecution(env, "daily", input.job_id, 1)));
+    const winners = results.filter((result) => result.status === "fulfilled");
+    expect(winners).toHaveLength(1);
+    const execution = winners[0]!.status === "fulfilled" ? winners[0]!.value : null;
+    expect(execution).not.toBeNull();
+    expect((await requireShowExecution(env, execution!)).value.owner?.execution_id).toBe(execution!.executionId);
+    await expect(acquireShowExecution(env, "daily", input.job_id, 1)).rejects.toThrow("still executing");
+    await expect(abandonReservedShowOperation(env, "daily", input.job_id, 1)).rejects.toThrow("unstarted reserved");
+    await releaseShowExecution(env, execution!);
+    const next = await acquireShowExecution(env, "daily", input.job_id, 1);
+    expect(next.executionId).not.toBe(execution!.executionId);
+    await expect(releaseShowExecution(env, execution!)).rejects.toThrow("execution token");
+    expect((await requireShowExecution(env, next)).value.owner?.execution_id).toBe(next.executionId);
+  });
+
+  test("execution release retains the processing owner and cannot free a different job", async () => {
+    const { env } = await fixture();
+    const input = request();
+    await claimShowOperation(env, input);
+    const execution = await acquireShowExecution(env, "daily", input.job_id, 1);
+    for (const invalid of [{ executionId: crypto.randomUUID() }, { generation: 2 }, { jobId: crypto.randomUUID() }]) {
+      await expect(releaseShowExecution(env, { ...execution, ...invalid })).rejects.toThrow();
+    }
+    const released = await releaseShowExecution(env, execution);
+    expect(released.value.owner?.state).toBe("processing");
+    expect(released.value.owner?.execution_id).toBeUndefined();
+    expect(released.value.generation).toBe(1);
+    expect(released.value.lifecycle).toBe("active");
+    expect((await releaseShowExecution(env, execution)).etag).toBe(released.etag);
+    await expect(claimShowOperation(env, request({ expected_show_generation: 1 }))).rejects.toThrow("unfinished operation");
+  });
+
+  test("unknown acquisition outcomes retain the token and never automatically steal it", async () => {
+    const { env: original, bucket } = await fixture();
+    const input = request();
+    await claimShowOperation(original, input);
+    const env = { CASTLOOP_BUCKET: { ...bucket, async put(...args: Parameters<typeof bucket.put>) {
+      const result = await bucket.put(...args);
+      if (result && args[0] === "system/show-publications/daily.json") throw new Error("Execution response lost");
+      return result;
+    } } } as never;
+    await expect(acquireShowExecution(env, "daily", input.job_id, 1)).rejects.toThrow("response lost");
+    expect((await readShowControl(original, "daily"))?.value.owner?.execution_id).toBeDefined();
+    await expect(acquireShowExecution(original, "daily", input.job_id, 1)).rejects.toThrow("still executing");
+  });
+
+  test("release response loss is idempotent without clearing the operation", async () => {
+    const { env: original, bucket } = await fixture();
+    const input = request();
+    await claimShowOperation(original, input);
+    const execution = await acquireShowExecution(original, "daily", input.job_id, 1);
+    const env = { CASTLOOP_BUCKET: { ...bucket, async put(...args: Parameters<typeof bucket.put>) {
+      const result = await bucket.put(...args);
+      if (result && args[0] === "system/show-publications/daily.json") throw new Error("Release response lost");
+      return result;
+    } } } as never;
+    await expect(releaseShowExecution(env, execution)).rejects.toThrow("response lost");
+    expect((await releaseShowExecution(original, execution)).value.owner?.job_id).toBe(input.job_id);
+  });
+
+  test("staging and tampered frozen requests cannot execute", async () => {
+    const { env, bucket } = await fixture();
+    const staged = request({ action: "stage" });
+    await claimShowOperation(env, staged);
+    await expect(acquireShowExecution(env, "daily", staged.job_id, 1)).rejects.toThrow("staging operation");
+    const second = await fixture();
+    const input = request();
+    await claimShowOperation(second.env, input);
+    await second.bucket.put(`system/jobs/${input.job_id}/request.toml`, stringifyLifecycleToml({ ...input, action: "delete" }));
+    await expect(acquireShowExecution(second.env, "daily", input.job_id, 1)).rejects.toThrow("does not match");
+    expect(bucket.entries.has(`system/jobs/${staged.job_id}/request.toml`)).toBe(true);
   });
 });
 
