@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Staging管理の内部APIを共通service受付・配信gateへ接続
+
+- strictな共有wire契約と未公開`handleM6StagingAdmin`を追加した。認証/16KB bounded JSON/service identity検査後、claim/beginはm6_admin、settle/finishはm6_recoveryとして登録し、実行version/readiness/cache owner gateの前後で既存Show CAS・一度限りPUT開始・明示settlement・stream検証/取消をawaitする。
+- pauseは新規受付/PUT開始を止めるが、既受付uploadの明示settlement/検証/取消は収束可能とした。begin HTTP終了後もShow uploading ownerは保持し、token取得/一度限り開始の応答喪失では再許可・自動奪取しない。abortはpayloadを削除せず、任意exception/本文/secretを管理記録やresponseへコピーしない。
+- ローカルhandler結合でShow/metadata/audio、pause/live stream排他、未知token/begin応答喪失、checksum/owner/generation/schema/size検査と固定診断を回帰した。現行Worker/bridge/candidate fetchとCLI書込には接続せず、candidateはmock readinessがあってもread-only、`m6_ready=false`を維持する。詳細は`m6_management_api.md`。
+- `bun test`（462件、8158 assertions）、`npm run check`、独立handler/browser bundle、M6実証tsconfig、Linux x86-64 binary build、`git diff --check`に合格。Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。
+
 ## 2026-10-02: Bounded初期化の各stepをdurable setup journalへ接続
 
 - 未公開`runMigrationSetupInitializationStep`を追加した。quiesced/前step確認済みpendingだけから、同bridge/tag/owner/凍結quiescence/空registry/token不在/bootstrap不在と前回確認済みprogressの完全一致をGET確認し、step番号/上限/beforeをdurable保存した後だけ一回のapply POSTを送る。POST応答と終了後GETのplan/hash/phase/target上限・単調性を照合してから次phaseを保存する。

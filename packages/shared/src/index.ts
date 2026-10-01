@@ -9,6 +9,8 @@ export type { LifecycleCommit, LifecycleCommitTarget } from "./lifecycle-commit"
 export { stageAssetSchema, stageControlRequest, stageDraftPrefix, stagePayloadKey, stagePayloadSchema,
   stageUploadProgressSchema, stageUploadRequestSchema } from "./staging";
 export type { StageAsset, StagePayload, StageUploadProgress, StageUploadRequest } from "./staging";
+export { stagingAdminRequestSchema, stagingAdminResponseSchema, stagingOperationSchema } from "./staging-admin";
+export type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from "./staging-admin";
 export { validateId } from "./ids";
 export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
