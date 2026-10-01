@@ -103,6 +103,20 @@ describe("authenticated migration bridge/candidate control API", () => {
     expect((await call(setup, "apply", identity(setup), setup.candidate)).status).toBe(409);
   });
 
+  test("candidate settlement requires the executing version's frozen bootstrap tag", async () => {
+    const setup = await bootstrapFixture();
+    await call(setup, "prepare-deployment", setup.bootstrapRequest);
+    await call(setup, "begin-deployment", { ...identity(setup), bootstrap_id: setup.bootstrapRequest.bootstrap_id });
+    const before = setup.entries.get(setup.bootstrapKey)!.data;
+    for (const workerBootstrapId of [undefined, crypto.randomUUID()]) {
+      const runtime = { ...setup.candidate, workerBootstrapId };
+      expect((await call(setup, "settle-deployment", { ...identity(setup), settlement: setup.settlement }, runtime)).status).toBe(409);
+      expect(setup.entries.get(setup.bootstrapKey)!.data).toBe(before);
+      expect((await readServiceAdmission(setup.env, "service"))!.value.migration!.delivery_candidate).toBeUndefined();
+    }
+    expect((await call(setup, "settle-deployment", { ...identity(setup), settlement: setup.settlement }, setup.candidate)).status).toBe(200);
+  });
+
   test("concurrent/live verification keeps its invocation token until HTTP promises settle", async () => {
     const setup = await bootstrapFixture();
     await call(setup, "prepare-deployment", setup.bootstrapRequest);

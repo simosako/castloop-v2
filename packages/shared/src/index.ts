@@ -25,6 +25,8 @@ export type { CachedDeliveryRuntime } from "./delivery-runtime";
 export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVersionSnapshotSchema, workerSubdomainSnapshotSchema,
   m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
 export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
+export { migrationCandidateUploadSchema } from "./worker-deployment";
+export type { MigrationCandidateUpload } from "./worker-deployment";
 export { migrationQuiescenceSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationBootstrapSchema } from "./migration-bootstrap";
 export type { MigrationQuiescence, MigrationBootstrapRequest, MigrationBootstrap } from "./migration-bootstrap";
 export { migrationAdminStatusSchema, migrationDeploymentClientStateSchema } from "./migration-bootstrap";

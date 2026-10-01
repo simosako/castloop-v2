@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 候補REST deploy adapterとdurable journalを結合
+
+- 凍結bootstrapへ実Cloudflare REST候補PUT/preview無効化/GET inspectionを組み合わせる未公開`createMigrationRestEffects`を追加した。bridgeの認証status・初期化済みruntime owner・空registry・未知execution不在・単一期待version 100%・default cache無効・旧preview無効・domainなし・settings再照合を要求し、旧Workerへ直接candidateをPUTしない。対象は同accountの既存workers.devに限定する。
+- upload source/metadata hashと`workers/tag`のbootstrap UUIDを固定し、secret/追加bindingは指定bridge versionから`bindings_inherit=strict`で継承する。PUT成功のscript IDをversion IDと扱わず、候補の認証no-store status/実行version/tag/凍結requestを照合後、期待100% deploymentでpreview設定POSTをawaitする。全REST終了後だけ`rest_settled`へ進み、PUT/preview応答喪失/候補不一致から自動再PUTしない。
+- candidate settlement/HTTP windowにもbootstrap tag照合を追加し、管理clientとREST認証requestはredirect拒否、管理応答は明示的no-store必須にした。結合テストで一回限りPUT・secret非保持・preview応答喪失・設定変化・GET失敗後のinspection/同settlement限定再開を確認した。全suiteで発見した既存CAS競合testの非決定的scheduleは、双方の初回readをbarrierで揃えるtest-only修正で安定化した。
+- `bun test`（391件、6911 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle（`cloudflare:workers` external）、Linux x86-64 binary build/version/migration-status help、`git diff --check`に合格。実REST形状はmock確認であり、Cloudflare書込/deploy/実機合格ではない。現行binary embedded Worker/deploy/initと既存v0.1.1環境は未変更。初回bridge deploy・移行書込CLI・full cutover・safe unknown-token復旧・管理routes/実機受け入れを完了するまで`m6_ready=false`を維持する。
+
 ## 2026-10-01: 移行client・durable deploy journal・読み取り専用CLI照会を追加
 
 - 固定HTTPS origin/redirect拒否/自動retryなしの`MigrationAdminClient`を追加した。status/prepare/begin/settlementのschemaとservice/request/plan一致を検査し、応答streamをboundedにした。server statusにも同じstrict照合を接続した。

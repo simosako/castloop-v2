@@ -55,7 +55,7 @@ async function requireCandidateReadiness(env: M6CandidateEnv, config: ServiceCon
 async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Promise<string | undefined> {
   const current = await readServiceAdmission(env, config.service_id);
   if (current?.value.state === "migrating") {
-    return readBootstrapDeliveryWindow(env, current.value, env.CASTLOOP_VERSION_METADATA?.id);
+    return readBootstrapDeliveryWindow(env, current.value, env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_VERSION_METADATA?.tag);
   }
   await requireCandidateReadiness(env, config);
   return undefined;

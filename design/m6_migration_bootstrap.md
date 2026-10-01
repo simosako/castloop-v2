@@ -46,4 +46,4 @@ default loopback probeは実際のgateway/named transportを通すが、外部DN
 
 deployment証拠は認証管理者がCLIから渡したsnapshotであり、candidateはCloudflare RESTを再GETしていない。未提供の本番finalizerは、この値だけでreadinessを確定してはならない。
 
-次にCLIのdurable deploy開始/終了申告とbridge/candidate REST deploy設定を接続し、staging/publication/lifecycle管理操作・consumer切替・外部HTTP検証・最終証拠照合・pausedでの完了/明示再開を完成する。通常処理のtoken強制終了回復とrollback手順、実機受け入れも残る。
+候補REST adapterはdurable client journalへ組み合わせられるように接続した（`m6_migration_client.md`）。metadata/hash/指定bridge versionからのinherit/候補bootstrap tagを照合し、PUT/previewの応答不明では再送しない。初回bridge deploy、移行書込CLI、staging/publication/lifecycle管理操作・外部HTTP検証・最終証拠照合・pausedでの完了/明示再開は残る。通常処理のtoken強制終了回復とrollback手順、実機受け入れも残る。

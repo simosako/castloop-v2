@@ -1,5 +1,8 @@
-import type { M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
-import { inspectM6WorkerDeployment } from "./m6-worker-deployment";
+import { migrationBootstrapRequestSchema, migrationCandidateUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
+  workerSubdomainSnapshotSchema } from "@castloop/shared";
+import type { MigrationBootstrapRequest, MigrationCandidateUpload, M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
+import { buildMigrationCandidateUpload, inspectM6WorkerDeployment, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
+import { migrationPayloadHash } from "./migration-deployment";
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
 
@@ -56,7 +59,7 @@ export class CloudflareApi {
       response = await fetch(`${global ? "https://api.cloudflare.com/client/v4" : this.base}${path}`, {
         method, headers: { Authorization: `Bearer ${this.token}`,
           ...(contentType ? { "Content-Type": contentType } : {}) },
-        ...(body === undefined ? {} : { body }), signal: AbortSignal.timeout(timeout),
+        ...(body === undefined ? {} : { body }), signal: AbortSignal.timeout(timeout), redirect: "error",
       });
     } catch (error) {
       throw new Error(`Cloudflare ${method} ${path} could not connect: ${error instanceof Error ? error.message : String(error)}`);
@@ -237,6 +240,66 @@ export class CloudflareApi {
       version: (versionId) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(versionId)}`),
       subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
     });
+  }
+
+  private migrationWorkerPath(input: ServiceConfig): string {
+    const config = serviceConfigSchema.parse(input);
+    const url = new URL(config.public_base_url);
+    if (config.account_id !== this.accountId || url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/" ||
+      !url.hostname.startsWith(`${config.worker_name}.`) || !url.hostname.endsWith(".workers.dev")) {
+      throw new Error("Migration REST deploy requires this account's existing workers.dev service; custom-domain/route migration is not released");
+    }
+    return `/workers/scripts/${encodeURIComponent(config.worker_name)}`;
+  }
+
+  private async singleMigrationDeployment(path: string, expectedVersionId: string) {
+    migrationBootstrapRequestSchema.shape.bridge_worker_version_id.parse(expectedVersionId);
+    const value = workerDeploymentsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/deployments`)).deployments[0]!;
+    if (value.versions.length !== 1 || value.versions[0]!.version_id !== expectedVersionId || value.versions[0]!.percentage !== 100) {
+      throw new Error("Migration requires the expected single Worker version serving 100% before any write");
+    }
+    return value;
+  }
+
+  async migrationCandidateUploadMetadata(config: ServiceConfig, bootstrapId: string, bridgeVersionId: string): Promise<MigrationCandidateUpload> {
+    const path = this.migrationWorkerPath(config);
+    const before = await this.singleMigrationDeployment(path, bridgeVersionId);
+    const previous = requireMigrationBridgeSettings(await this.json<unknown>("GET", `${path}/settings`), config);
+    requireMigrationBridgeVersion(await this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(bridgeVersionId)}`), config, bridgeVersionId);
+    const domains = await this.workerDomains("service", config.worker_name);
+    if (domains.length) throw new Error("Migration deploy cannot alter a Worker with attached Custom Domains");
+    const previews = workerSubdomainSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/subdomain`));
+    if (!previews.enabled || previews.previews_enabled) throw new Error("Migration bridge requires workers.dev enabled and old previews disabled");
+    const metadata = buildMigrationCandidateUpload(config, previous, bootstrapId, bridgeVersionId);
+    const latestMetadata = buildMigrationCandidateUpload(config, await this.json<unknown>("GET", `${path}/settings`), bootstrapId, bridgeVersionId);
+    const current = await this.singleMigrationDeployment(path, bridgeVersionId);
+    if (JSON.stringify(current) !== JSON.stringify(before) || migrationPayloadHash(latestMetadata) !== migrationPayloadHash(metadata)) {
+      throw new Error("Migration bridge deployment/settings changed during metadata preparation");
+    }
+    return metadata;
+  }
+
+  async uploadMigrationCandidate(config: ServiceConfig, input: MigrationBootstrapRequest, source: string, metadataInput: object): Promise<void> {
+    const request = migrationBootstrapRequestSchema.parse(input);
+    const metadata = migrationCandidateUploadSchema.parse(metadataInput);
+    if (request.service_id !== config.service_id || metadata.annotations["workers/tag"] !== request.bootstrap_id ||
+      migrationPayloadHash(source) !== request.worker_source_sha256 || migrationPayloadHash(metadataInput) !== request.worker_metadata_sha256) {
+      throw new Error("Candidate upload differs from its frozen service/bootstrap/source/metadata request");
+    }
+    const path = this.migrationWorkerPath(config);
+    const expected = await this.migrationCandidateUploadMetadata(config, request.bootstrap_id, request.bridge_worker_version_id);
+    if (migrationPayloadHash(expected) !== request.worker_metadata_sha256) throw new Error("Migration bridge settings changed after upload metadata was frozen");
+    const form = new FormData();
+    form.set("metadata", JSON.stringify(metadataInput));
+    form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
+    await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
+  }
+
+  async disableMigrationWorkerPreviews(config: ServiceConfig, workerVersionId: string): Promise<void> {
+    const path = this.migrationWorkerPath(config);
+    await this.singleMigrationDeployment(path, workerVersionId);
+    const result = workerSubdomainSnapshotSchema.parse(await this.json<unknown>("POST", `${path}/subdomain`, { enabled: true, previews_enabled: false }));
+    if (!result.enabled || result.previews_enabled) throw new Error("Migration preview setting was not accepted");
   }
 
   private async jsonUpload(path: string, body: FormData): Promise<void> {

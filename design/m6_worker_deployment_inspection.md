@@ -14,7 +14,7 @@
 - global Workers Cachingは有効、cross-version cacheは無効。default exportをcache無効、`CachedPublicAssets`だけをcache有効にする。
 - R2/Queue/DLQ/admin secretの既存契約を維持し、`CASTLOOP_VERSION_METADATA`のversion metadata bindingを追加する。loopbackは`ctx.exports`を使うため、別Workerへのservice bindingを作らない。
 - admin keyが既存ならinheritし、取得結果からsecret本文をコピーしない。無関係なbindingもname/type=inheritだけを生成する。既存のsampling/destination/tag/tail/placement/logpushは保持し、logs/traces/observabilityは明示的に有効にする。
-- 実upload/100%切替を行うmethodやCLI commandは今回追加していない。main module exportと本番gateway/consumerの接続、移行owner・quiescence・復旧を完了してから利用する。
+- 初期実装はmetadata生成/GET検査のみだった。その後、凍結bootstrap/旧IO確認/初期化完了bridgeからの候補PUTとpreview無効化を未公開adapterへ接続した（`m6_migration_client.md`）。指定bridge versionからstrict inheritし、version tagへbootstrap UUIDを固定する。初回bridge deploy/CLI書込command/full cutoverは未接続で、実uploadも行っていない。
 
 ## REST検査
 

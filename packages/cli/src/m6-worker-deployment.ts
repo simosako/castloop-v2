@@ -1,6 +1,6 @@
-import { m6WorkerDeploymentEvidenceSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema, workerSettingsSnapshotSchema,
+import { migrationBootstrapRequestSchema, migrationCandidateUploadSchema, m6WorkerDeploymentEvidenceSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema, workerSettingsSnapshotSchema,
   workerSubdomainSnapshotSchema, workerVersionSnapshotSchema } from "@castloop/shared";
-import type { M6WorkerDeploymentEvidence, ServiceConfig, WorkerSettingsSnapshot } from "@castloop/shared";
+import type { MigrationCandidateUpload, M6WorkerDeploymentEvidence, ServiceConfig, WorkerSettingsSnapshot } from "@castloop/shared";
 
 export const M6_WORKER_COMPATIBILITY_DATE = "2026-10-01";
 const MANAGED_BINDINGS = new Set(["CASTLOOP_BUCKET", "CASTLOOP_QUEUE", "CASTLOOP_DLQ_NAME", "CASTLOOP_ADMIN_KEY", "CASTLOOP_VERSION_METADATA"]);
@@ -11,7 +11,7 @@ export type M6WorkerUploadMetadata = {
   exports: { default: { type: string; cache: { enabled: boolean } }; CachedPublicAssets: { type: string; cache: { enabled: boolean } } };
   observability: { enabled: boolean; logs: { enabled: boolean; [key: string]: unknown };
     traces: { enabled: boolean; [key: string]: unknown }; [key: string]: unknown };
-  bindings: Array<{ name: string; type: string; bucket_name?: string; queue_name?: string; text?: string }>;
+  bindings: Array<{ name: string; type: string; bucket_name?: string; queue_name?: string; text?: string; version_id?: string }>;
   tags?: string[]; tail_consumers?: Array<Record<string, unknown>>; placement?: Record<string, unknown>; logpush?: boolean;
 };
 
@@ -141,4 +141,40 @@ export async function inspectM6WorkerDeployment(input: ServiceConfig, expectedVe
     traffic_percentage: 100, default_cache_disabled: true, cached_entrypoint: "CachedPublicAssets", cached_entrypoint_enabled: true,
     cross_version_cache_disabled: true, version_metadata_binding_verified: true, service_bindings_verified: true,
     observability_enabled: true, workers_dev_previews_disabled: true });
+}
+
+export function requireMigrationBridgeSettings(input: unknown, config: ServiceConfig): WorkerSettingsSnapshot {
+  const settings = workerSettingsSnapshotSchema.parse(input);
+  verifyBindings(settings.bindings, config);
+  if (!settings.exports || Object.keys(settings.exports).length !== 1 || settings.exports.default?.cache.enabled !== false ||
+    settings.cache_options?.enabled !== true || settings.cache_options.cross_version_cache === undefined) {
+    throw new Error("Migration deploy requires explicit uncached bridge settings, not a legacy or M6 candidate Worker");
+  }
+  compatibilityDate(settings.compatibility_date ?? "");
+  if (!settings.compatibility_flags?.includes("enable_ctx_exports") || settings.compatibility_flags.includes("disable_ctx_exports") ||
+    settings.observability?.enabled !== true || settings.observability.logs?.enabled !== true || settings.observability.traces?.enabled !== true) {
+    throw new Error("Migration bridge compatibility/telemetry does not match this build");
+  }
+  return settings;
+}
+
+export function requireMigrationBridgeVersion(input: unknown, config: ServiceConfig, expectedVersionId: string): void {
+  const version = workerVersionSnapshotSchema.parse(input);
+  verifyBindings(version.resources.bindings, config);
+  const runtime = version.resources.script_runtime;
+  compatibilityDate(runtime.compatibility_date);
+  if (version.id !== expectedVersionId || Object.keys(runtime.exports).length !== 1 || runtime.exports.default?.cache.enabled !== false ||
+    !runtime.compatibility_flags.includes("enable_ctx_exports") || runtime.compatibility_flags.includes("disable_ctx_exports") ||
+    !version.resources.script.handlers.includes("fetch") || !version.resources.script.handlers.includes("queue") ||
+    version.resources.script.named_handlers.length) throw new Error("Executing bridge version does not match its expected runtime profile");
+}
+
+export function buildMigrationCandidateUpload(config: ServiceConfig, previousInput: unknown, bootstrapId: string,
+  bridgeVersionId: string): MigrationCandidateUpload {
+  migrationBootstrapRequestSchema.shape.bootstrap_id.parse(bootstrapId);
+  migrationBootstrapRequestSchema.shape.bridge_worker_version_id.parse(bridgeVersionId);
+  const previous = requireMigrationBridgeSettings(previousInput, config);
+  const metadata = buildM6WorkerUploadMetadata(config, previous, "");
+  return migrationCandidateUploadSchema.parse({ ...metadata, annotations: { "workers/tag": bootstrapId },
+    bindings: metadata.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: bridgeVersionId } : binding) });
 }

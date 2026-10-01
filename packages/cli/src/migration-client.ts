@@ -29,6 +29,10 @@ export class MigrationAdminClient {
       if (response.body) await response.body.cancel();
       throw new Error(`Migration ${route} failed (HTTP ${response.status}); inspect retained admission/progress before retrying`);
     }
+    if (response.headers.get("Cache-Control") !== "no-store") {
+      if (response.body) await response.body.cancel();
+      throw new Error("Migration administrator response is not explicitly non-cacheable");
+    }
     if (!response.body) throw new Error("Migration response body is missing");
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });

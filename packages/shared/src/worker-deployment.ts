@@ -3,7 +3,7 @@ import { serviceAdmissionSchema } from "./service-admission";
 
 const bindingSchema = z.object({
   name: z.string().min(1).max(128), type: z.string().min(1).max(128),
-  bucket_name: z.string().optional(), queue_name: z.string().optional(), text: z.string().optional(),
+  bucket_name: z.string().optional(), queue_name: z.string().optional(), text: z.string().optional(), version_id: z.uuid().optional(),
 });
 const workerExportSchema = z.object({ type: z.literal("worker"), cache: z.object({ enabled: z.boolean() }),
   state: z.literal("created").optional() });
@@ -49,3 +49,22 @@ export const m6WorkerDeploymentEvidenceSchema = z.object({
   observability_enabled: z.literal(true), workers_dev_previews_disabled: z.literal(true),
 }).strict();
 export type M6WorkerDeploymentEvidence = z.infer<typeof m6WorkerDeploymentEvidenceSchema>;
+
+export const migrationCandidateUploadSchema = z.object({
+  main_module: z.literal("index.js"), compatibility_date: z.literal("2026-10-01"),
+  compatibility_flags: z.array(z.string()).max(100),
+  cache_options: z.object({ enabled: z.literal(true), cross_version_cache: z.literal(false) }).strict(),
+  exports: z.object({ default: z.object({ type: z.literal("worker"), cache: z.object({ enabled: z.literal(false) }).strict() }).strict(),
+    CachedPublicAssets: z.object({ type: z.literal("worker"), cache: z.object({ enabled: z.literal(true) }).strict() }).strict() }).strict(),
+  observability: observabilitySchema.refine((value) => value.enabled === true && value.logs?.enabled === true && value.traces?.enabled === true),
+  bindings: z.array(bindingSchema.strict()).max(100),
+  annotations: z.object({ "workers/tag": z.uuid() }).strict(),
+  tags: z.array(z.string()).optional(), tail_consumers: z.array(z.record(z.string(), z.unknown())).optional(),
+  placement: z.record(z.string(), z.unknown()).optional(), logpush: z.boolean().optional(),
+}).strict().superRefine((value, context) => {
+  if (new Set(value.bindings.map((binding) => binding.name)).size !== value.bindings.length ||
+    !value.compatibility_flags.includes("enable_ctx_exports") || value.compatibility_flags.includes("disable_ctx_exports")) {
+    context.addIssue({ code: "custom", message: "Candidate bindings or loopback flags are inconsistent" });
+  }
+});
+export type MigrationCandidateUpload = z.infer<typeof migrationCandidateUploadSchema>;

@@ -71,7 +71,8 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
       if (progress && progress.size > MAX_BODY || bootstrap && bootstrap.size > MAX_BODY) throw new Error("Oversized migration status");
       return reply(migrationAdminStatusSchema.parse({ admission, progress: progress ? migrationApplyProgressSchema.parse(await progress.json<unknown>()) : null,
         bootstrap: bootstrap ? migrationBootstrapSchema.parse(await bootstrap.json<unknown>()) : null,
-        worker_protocol: runtime.protocol, worker_version_id: runtime.workerVersionId, m6_ready: false }));
+        worker_protocol: runtime.protocol, worker_version_id: runtime.workerVersionId, m6_ready: false,
+        ...(runtime.workerBootstrapId ? { worker_bootstrap_id: runtime.workerBootstrapId } : {}) }));
     }
     catch { return reply({ error: "Migration status unavailable", reason_code: "migration_status_failed" }, 503); }
   }

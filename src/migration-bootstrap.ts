@@ -9,6 +9,7 @@ import { cachedDeliveryRuntimeSchema } from "../packages/shared/src/index";
 import { parsePublicAssetPath } from "./public-assets";
 
 export type BootstrapRuntime = { workerVersionId: string; protocol: "legacy_fenced" | "m6_candidate";
+  workerBootstrapId?: string;
   cachedRuntime?: () => Promise<unknown>; defaultFetch?: (request: Request) => Promise<Response>;
   purgeDefaultCache?: () => Promise<CachePurgeResult> };
 
@@ -128,8 +129,9 @@ export async function beginBootstrapDeployment(env: MigrationApplyEnv, execution
   return { bootstrap_id: bootstrapId, start_allowed: true };
 }
 
-async function requireCandidate(runtime: BootstrapRuntime, versionId: string): Promise<void> {
+async function requireCandidate(runtime: BootstrapRuntime, versionId: string, bootstrapId: string): Promise<void> {
   if (runtime.protocol !== "m6_candidate" || runtime.workerVersionId !== versionId || !runtime.cachedRuntime) throw new Error("Bootstrap requires the executing candidate Worker version");
+  if (runtime.workerBootstrapId !== bootstrapId) throw new Error("Candidate version metadata tag does not match its frozen bootstrap");
   const cached = cachedDeliveryRuntimeSchema.parse(await runtime.cachedRuntime());
   if (cached.worker_version_id !== versionId) throw new Error("Bootstrap cache owner belongs to another Worker version");
 }
@@ -147,7 +149,7 @@ export async function settleBootstrapDeployment(env: MigrationApplyEnv, executio
   const config = parseServiceConfig(await serviceObject.text());
   if (settlement.deployment.service_id !== config.service_id || settlement.deployment.account_id !== config.account_id ||
     settlement.deployment.worker_name !== config.worker_name) throw new Error("Deployment evidence belongs to another service");
-  await requireCandidate(runtime, settlement.deployment.worker_version_id);
+  await requireCandidate(runtime, settlement.deployment.worker_version_id, settlement.bootstrap_id);
   await requireServiceMigration(env, execution);
   if (previous.value.settlement) {
     if (JSON.stringify(previous.value.settlement) !== JSON.stringify(settlement)) throw new Error("Frozen deployment settlement cannot change");
@@ -163,7 +165,7 @@ export async function verifyBootstrapDeliveryStep(env: MigrationApplyEnv, execut
   const plan = await initializedPlan(env, execution);
   const previous = await readMigrationBootstrap(env, execution);
   if (!previous?.value.settlement || !["verifying", "verified"].includes(previous.value.phase)) throw new Error("Bootstrap deployment is not settled for verification");
-  await requireCandidate(runtime, previous.value.settlement.deployment.worker_version_id);
+  await requireCandidate(runtime, previous.value.settlement.deployment.worker_version_id, previous.value.request.bootstrap_id);
   if (!runtime.defaultFetch) throw new Error("Bootstrap requires an actual default-entrypoint fetch binding");
   const owner = await requireServiceMigration(env, execution);
   const candidate = owner.value.migration!.delivery_candidate;
@@ -233,17 +235,20 @@ export async function verifiedBootstrapDelivery(env: MigrationApplyEnv, executio
     bootstrap.value.next_asset !== plan.sources.filter((source) => source.key.startsWith("public/") && parsePublicAssetPath(source.key.slice(6))).length) {
     throw new Error("Migration bootstrap has not completed owned cache purge and HTTP verification");
   }
-  await requireCandidate(runtime, bootstrap.value.settlement.deployment.worker_version_id);
+  await requireCandidate(runtime, bootstrap.value.settlement.deployment.worker_version_id, bootstrap.value.request.bootstrap_id);
   await requireServiceMigration(env, execution);
   return { deployment_id: bootstrap.value.settlement.deployment.deployment_id, worker_version_id: runtime.workerVersionId,
     assets_verified: bootstrap.value.next_asset, checks_sha256: bootstrap.value.checks_sha256 };
 }
 
-export async function readBootstrapDeliveryWindow(env: MigrationApplyEnv, admission: ServiceAdmission, workerVersionId: string): Promise<string> {
+export async function readBootstrapDeliveryWindow(env: MigrationApplyEnv, admission: ServiceAdmission, workerVersionId: string,
+  workerBootstrapId?: string): Promise<string> {
   const migration = admission.migration;
   const candidate = migration?.delivery_candidate;
   if (admission.mode !== "legacy" || admission.state !== "migrating" || admission.invocations.length || !candidate ||
-    candidate.worker_version_id !== workerVersionId) throw new Error("No owned migration delivery window exists for this candidate");
+    candidate.worker_version_id !== workerVersionId || candidate.bootstrap_id !== workerBootstrapId) {
+    throw new Error("No owned migration delivery window exists for this candidate");
+  }
   const base = `system/lifecycle-migrations/${migration.migration_id}`;
   const bootstrapObject = await boundedObject(env, `${base}/bootstrap.json`);
   const progressObject = await boundedObject(env, `${base}/progress.json`);

@@ -81,8 +81,18 @@ describe("M6 owner-checked job journal", () => {
 
   test("concurrent first writes compete on CAS instead of silently overwriting", async () => {
     const setup = await fixture();
-    const results = await Promise.allSettled([writeLifecycleProgress(setup.env, setup.execution, setup.progress),
-      writeLifecycleProgress(setup.env, setup.execution, { ...setup.progress, phase: "feed" })]);
+    let readers = 0;
+    const ready = Promise.withResolvers<void>();
+    const env = { CASTLOOP_BUCKET: { ...setup.bucket, get: async (key: string) => {
+      const object = await setup.bucket.get(key);
+      if (key === `system/jobs/${setup.jobId}/progress.toml`) {
+        if (++readers === 2) ready.resolve();
+        await ready.promise;
+      }
+      return object;
+    } } } as never;
+    const results = await Promise.allSettled([writeLifecycleProgress(env, setup.execution, setup.progress),
+      writeLifecycleProgress(env, setup.execution, { ...setup.progress, phase: "feed" })]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
   });

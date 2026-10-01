@@ -38,8 +38,12 @@ export type MigrationBootstrap = z.infer<typeof migrationBootstrapSchema>;
 export const migrationAdminStatusSchema = z.object({ admission: serviceAdmissionSchema.nullable(),
   progress: migrationApplyProgressSchema.nullable(), bootstrap: migrationBootstrapSchema.nullable(),
   worker_protocol: z.enum(["legacy_fenced", "m6_candidate"]), worker_version_id: z.uuid(), m6_ready: z.literal(false),
+  worker_bootstrap_id: z.uuid().optional(),
 }).strict().superRefine((value, context) => {
   const id = value.admission?.migration?.migration_id ?? value.admission?.readiness?.migration_id;
+  if (value.worker_bootstrap_id && value.worker_protocol !== "m6_candidate") {
+    context.addIssue({ code: "custom", message: "Only a candidate Worker may identify its uploaded bootstrap" });
+  }
   for (const evidence of [value.progress, value.bootstrap?.request]) {
     if (evidence && (evidence.migration_id !== id || evidence.service_id !== value.admission?.service_id ||
       value.admission.migration && evidence.request_sha256 !== value.admission.migration.request_sha256)) {

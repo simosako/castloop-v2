@@ -1,4 +1,4 @@
-import { frozenMigrationPlanSchema, migrationBootstrapRequestSchema, m6WorkerDeploymentEvidenceSchema, parseServiceConfig } from "../../packages/shared/src/index";
+import { frozenMigrationPlanSchema, migrationBootstrapRequestSchema, m6WorkerDeploymentEvidenceSchema, parseServiceConfig, stringifyToml } from "../../packages/shared/src/index";
 import { serveCachedLifecycleAsset } from "../lifecycle-cache";
 import { describeCachedDeliveryRuntime } from "../lifecycle-delivery-gate";
 import { runLifecycleMigrationStep } from "../lifecycle-migration-apply";
@@ -10,10 +10,14 @@ import { acquireServiceMigrationExecution, readServiceAdmission, releaseServiceM
 import type { ServiceMigrationExecution } from "../service-admission";
 import { migrationFixture } from "./migration";
 
-export async function bootstrapFixture(initialize = true) {
+export async function bootstrapFixture(initialize = true, publicBaseUrl?: string) {
   const setup = await migrationFixture();
+  if (publicBaseUrl) await setup.bucket.put("system/service.toml", stringifyToml({
+    ...parseServiceConfig(setup.entries.get("system/service.toml")!.data), public_base_url: publicBaseUrl,
+  }));
   const bridgeVersion = crypto.randomUUID();
   const candidateVersion = crypto.randomUUID();
+  const bootstrapId = crypto.randomUUID();
   const purges: string[] = [];
   const calls: Request[] = [];
   const run = async <T>(callback: (execution: ServiceMigrationExecution) => Promise<T>): Promise<T> => {
@@ -48,13 +52,13 @@ export async function bootstrapFixture(initialize = true) {
     },
   };
   const env: M6CandidateEnv = { CASTLOOP_BUCKET: bucket, CASTLOOP_DLQ_NAME: "test-dlq", CASTLOOP_ADMIN_KEY: "private-key",
-    CASTLOOP_VERSION_METADATA: { id: candidateVersion, tag: "", timestamp: "2026-10-01T12:00:00Z" },
+    CASTLOOP_VERSION_METADATA: { id: candidateVersion, tag: bootstrapId, timestamp: "2026-10-01T12:00:00Z" },
     CASTLOOP_QUEUE: { send: async () => {} } } as never;
   const cached: M6CachedLoopback = Object.assign(({ props }: Parameters<M6CachedLoopback>[0]) => ({
     fetch: (request: Request) => serveCachedLifecycleAsset(request, env, props),
   }), { invalidate: async () => {}, describeRuntime: async () => describeCachedDeliveryRuntime({ id: candidateVersion },
     { purge: async () => ({ success: true, errors: [] }) }) });
-  const candidate: BootstrapRuntime = { workerVersionId: candidateVersion, protocol: "m6_candidate", cachedRuntime: cached.describeRuntime,
+  const candidate: BootstrapRuntime = { workerVersionId: candidateVersion, workerBootstrapId: bootstrapId, protocol: "m6_candidate", cachedRuntime: cached.describeRuntime,
     defaultFetch: async (request) => {
       calls.push(request);
       return fetchM6Candidate(new Request<unknown, IncomingRequestCfProperties>(request.url, {
@@ -69,7 +73,7 @@ export async function bootstrapFixture(initialize = true) {
     service_bindings_verified: true, observability_enabled: true, workers_dev_previews_disabled: true });
   const plan = initialize ? frozenMigrationPlanSchema.parse(JSON.parse(setup.entries.get(`system/lifecycle-migrations/${setup.migrationId}/plan.json`)!.data)) : null;
   const bootstrapRequest = migrationBootstrapRequestSchema.parse({ schema_version: 1, service_id: "service", migration_id: setup.migrationId,
-    request_sha256: quiescence.request_sha256, bootstrap_id: crypto.randomUUID(), plan_sha256: plan ? await bootstrapHash(plan) : "0".repeat(64),
+    request_sha256: quiescence.request_sha256, bootstrap_id: bootstrapId, plan_sha256: plan ? await bootstrapHash(plan) : "0".repeat(64),
     bridge_worker_version_id: bridgeVersion, worker_source_sha256: "a".repeat(64), worker_metadata_sha256: "b".repeat(64) });
   const settlement = { bootstrap_id: bootstrapRequest.bootstrap_id, rest_requests_settled: true, no_more_deploys: true, deployment };
   return { ...setup, env, run, bridge, candidate, cached, calls, purges, quiescence, bootstrapRequest, settlement,

@@ -54,11 +54,26 @@ test("client response stream budget cancels oversized status and invalid schemas
   let cancelled = false;
   const transport = Object.assign(async () => new Response(new ReadableStream<Uint8Array>({
     pull(controller) { controller.enqueue(new Uint8Array(33000)); }, cancel() { cancelled = true; },
-  })), { preconnect: () => {} });
+  }), { headers: { "Cache-Control": "no-store" } }), { preconnect: () => {} });
   await expect(new MigrationAdminClient(config, "private-key", transport).status()).rejects.toThrow("budget");
   expect(cancelled).toBe(true);
-  const malformed = Object.assign(async () => Response.json({ m6_ready: true, private: "secret" }), { preconnect: () => {} });
+  const malformed = Object.assign(async () => Response.json({ m6_ready: true, private: "secret" },
+    { headers: { "Cache-Control": "no-store" } }), { preconnect: () => {} });
   await expect(new MigrationAdminClient(config, "private-key", malformed).status()).rejects.toThrow();
+});
+
+test("client rejects cacheable migration evidence and cancels the unread response without retry", async () => {
+  const setup = await bootstrapFixture();
+  const config = parseServiceConfig(setup.entries.get("system/service.toml")!.data);
+  let cancelled = false;
+  let calls = 0;
+  const transport = Object.assign(async () => {
+    calls += 1;
+    return new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } }));
+  }, { preconnect: () => {} });
+  await expect(new MigrationAdminClient(config, "private-key", transport).status()).rejects.toThrow("non-cacheable");
+  expect(cancelled).toBe(true);
+  expect(calls).toBe(1);
 });
 
 test("migration administrator credentials are not sent to nonorigin, credential-bearing or insecure URLs", async () => {

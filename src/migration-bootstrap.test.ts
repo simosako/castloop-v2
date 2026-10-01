@@ -21,6 +21,16 @@ async function settled() {
 }
 
 describe("owned migration bootstrap", () => {
+  test("public bootstrap window rejects a missing or foreign executing version tag", async () => {
+    const setup = await settled();
+    for (const tag of ["", crypto.randomUUID(), setup.bootstrapRequest.bootstrap_id]) {
+      setup.env.CASTLOOP_VERSION_METADATA.tag = tag;
+      const response = await setup.candidate.defaultFetch!(new Request("https://current.example/podcasts/daily/feed.xml"));
+      expect(response.status).toBe(tag === setup.bootstrapRequest.bootstrap_id ? 200 : 503);
+      if (response.body) await response.body.cancel();
+    }
+  });
+
   test("initialization stops at runtime without calling a cutover callback or opening admission", async () => {
     const setup = await bootstrapFixture();
     let called = false;
