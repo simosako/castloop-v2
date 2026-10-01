@@ -8,6 +8,8 @@
 
 `handleM6PublicationAdmin`も独立した内部handlerとして追加した。service設定/identity、service invocation、副作用前後のruntime gateは`withM6ManagementInvocation`で共通化し、公開manifestの凍結/Show CAS受付とstaging証拠検査後のcommit marker作成へ接続する。
 
+`handleM6LifecycleAdmin`も独立した内部handlerとして追加した。Show/Episodeの停止・再開・削除を同じservice gate/Show CAS受付/凍結commitへ接続し、読み取り専用dry-run/statusと同jobの明示的retryを提供する。HTTP handlerにpayload削除bindingを要求せず、物理削除は所有権を確認するQueue consumerのbounded処理だけで行う。
+
 現行Worker、bridge、candidateのfetch入口には接続していない。candidateは引き続きread-onlyで、R2にmock readinessを入れても通常書込を開けず、`m6_ready=false`を維持する。CLI書込操作も公開しない。Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。
 
 ## Stagingのwire契約
@@ -53,10 +55,40 @@ claim/commitはfeed/cover/音源/current metadataを公開しない。commit mar
 
 commit応答喪失や最後のruntime gate失敗でも、既存marker/ownerは保持する。service token取得応答喪失はregistryを保持する。自動retry/新job作成は行わず、CLI側のdurable outcome照会と安全な明示復旧を別途完成する。
 
+## Lifecycleのwire契約
+
+将来の`POST /admin/lifecycle`も同じ認証/16KB bounded JSON/no-store/固定診断を使う。`request`は対象・job ID・action・期待generation・timestampを含むstrictな凍結入力で、actionは`unpublish/restore/delete`だけとする。
+
+| action | 入力 | 結果 |
+| --- | --- | --- |
+| `dry-run` | request、deleteだけ任意のscope/cursor/最大100 objects | `preview`。書込・予約・実行許可なし |
+| `status` | request | `status`。保持request/marker/status/progressとownerの読み取り専用照会 |
+| `claim` | requestとconfirmation | `claimed`。新規受付はopenだけ、公開状態は変更しない |
+| `commit` | 同じrequestとconfirmation | `committed`とmarker key/created。既受付jobはpause中にも収束可能 |
+| `retry` | 同じrequestとconfirmation | `requeued`と既存marker key。同jobだけを一回awaitしてQueue送信 |
+
+confirmationは`operator_confirmed=true`とrequest全体のSHA-256を要求する。deleteには`irreversible_delete_acknowledged=true`と`retained_records_acknowledged=true`も必要で、対象・action・ID・generation・timestampの変更は拒否する。これは認証された管理者の明示申告であり、dry-runの予約証拠や実行capabilityではない。claim/commitは改めて現在の状態・所有権・凍結requestを検査する。
+
+### 読み取り専用previewと状態照会
+
+`withM6ManagementRead`はservice identity、M6 readiness、実行version/cache ownerを前後に検査し、service設定/registry snapshotが変化したら拒否する。新しいservice tokenを登録せず、pause中や保持中tokenがある場合にも観測だけを行う。registry/tokenの観測から旧処理終了を推測しない。
+
+previewはShow/Episode状態・期待generation・未完了owner・使用済job等を検査し、固定blockerを返す。削除対象は一回に一つのbounded pageの件数/bytesとopaque cursorだけを返し、未知key名や本文を返さない。`snapshot_only=true`、`authorizes_operation=false`、`payloads_verified=false`とし、削除pageも`authorizes_deletion=false`である。全scopeのinventory合格やrestore音源の完全性を証明しない。restore時のpayload検査はconsumerが実施する。
+
+statusは保持requestのhash/対象/action/generationとmarker/status/progressを照合し、読取前後のShow control/record ETagを確認する。ownerはheld/released/unclaimed/supersededを区別し、後のrestore等で現状態が変わっても過去jobは履歴として照会できる。`execution_active`は観測値だけで、常に`authorizes_retry=false`を返す。任意exception/secretを含む不正statusや旧形式statusは採用しない。
+
+### 同jobの明示retryと応答喪失
+
+commit/retryは`m6_recovery`として登録し、pause中でも同じ保持owner/requestを再確認する。retryは保持markerを上書きせず、job/status/progressを初期化せず、別jobを作らない。Show execution tokenが保持されている場合は送信を拒否し、時間で解放しない。完了済み/foreign/古いjobも送信しない。
+
+Queue.sendは一回awaitする。応答喪失ではmarker/ownerを保持し、自動再送や成功認定をしない。`requeued`は送信応答でありconsumer完了・一回限り配送を意味しない。commitの通常配送はR2 notificationを使い、HTTP commitから追加送信しない。
+
 ## 検証と残件
 
 ローカルhandler結合でShow/Episode metadata/audio、pause/drain、一回限りbegin、settlement前finish拒否、stream検証中のregistry/Show token保持、checksum失敗、foreign owner/generation、未知token・begin応答喪失、body/response上限、read-only candidateを回帰した。これはCloudflare実機/300MB/CPU・料金/切断挙動の合格ではない。
 
 publicationは新しいstaging内部API→publication内部API→実M6 Queue adapterをローカル結合し、Show/Episode初回公開、metadata-only/audio-only改訂、immutable media/history保持とpurge終了後のpublished化を回帰した。live commit検証中のpause/registry保持、検証後payload変更、missing proof/status、base revision変更、foreign job/generation、commit応答喪失/最後のgate失敗、未知service token、同marker非再PUT、read-only candidateも検査した。R2 notification実配送やCloudflare実routingの合格ではない。
 
-公開入口/CLI clientへの接続、upload/publication progress照会とdurable復旧journal、lifecycle管理boundary、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
+lifecycleは6操作を内部API→M6 Queue adapterへローカル結合し、停止404・再開200・削除410、媒体/履歴の保持とbounded削除、兄弟Episode分離、運用記録保持を回帰した。preview非書込/非予約、完全request確認、削除の二つの明示確認、paused drain、live consumer中retry拒否、purge失敗から同job retry、Queue応答喪失非再送、過去status、不正/過大/途中変更record、candidate書込拒否も確認した。全504テスト/8550 assertionsと型・bundle・binary検査の合格はCloudflare実機の合格ではない。
+
+公開入口/CLI clientへの接続、upload/publication progress照会とdurable復旧journal、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。

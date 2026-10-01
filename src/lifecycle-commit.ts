@@ -1,13 +1,13 @@
 import { lifecycleCommitKey, lifecycleCommitSchema, parseControlRequest, parseLifecycleCommitKey } from "../packages/shared/src/index";
 import type { LifecycleCommit } from "../packages/shared/src/index";
 import { controlRequestHash, requireOwnedOperation } from "./lifecycle-control";
-import type { LifecycleControlEnv } from "./lifecycle-control";
+import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 
 export class InvalidLifecycleCommit extends Error {
   constructor() { super("Lifecycle commit does not match its frozen request and target"); }
 }
 
-export async function readLifecycleCommit(env: LifecycleControlEnv, key: string): Promise<LifecycleCommit | null> {
+export async function readLifecycleCommit(env: LifecycleReadEnv, key: string): Promise<LifecycleCommit | null> {
   const target = parseLifecycleCommitKey(key);
   if (!target) throw new InvalidLifecycleCommit();
   const object = await env.CASTLOOP_BUCKET.get(key);

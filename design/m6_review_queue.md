@@ -45,6 +45,7 @@
    独立bridge/candidateの移行APIへpause/claim/旧IO明示申告/初期化限定apply/凍結bootstrap開始・終了/HTTP検査を接続した。候補HTTP window中も通常書込・consumer・完了/再開は閉じる。CLI/full cutover/旧cache全scope/外部検証/rollback等が残る。`m6_migration_bootstrap.md`参照。
     移行client/durableローカルdeploy journalと実REST deploy adapter、pause/claim/旧IO申告/1-step初期化のdurable setup journal、読み取り専用`migration-status [--local]`も追加した。実Cloudflare deploy検証/移行書込command/full cutoverは未完了で、不明応答のPUT再送や残存lock/token奪取はしない。`m6_migration_client.md`と`m6_migration_setup_client.md`参照。
 5. **再開・物理削除**: 削除開始のstate/feed/purge、owner-gated payload batchと先頭からのverification、最終purge/子tombstone/deleted/完了解放までを独立moduleで実装した。restoreも保存済みsnapshot検証→feed/purge準備→durable証拠→active化を実装した。凍結commit・consumer続行/同job requeueの基礎処理は追加済みだが、本番gate確認、本番Queue/管理APIへの接続と実機確認は残る。未知keyを黙ってprefix削除しない。
+   lifecycle内部APIを共通service boundaryへ接続し、非予約dry-run/削除確認/6操作の受付とcommit、読み取り専用job照会、live tokenを拒否する同jobの明示retryを追加した。API→M6 Queue adapterのローカル結合は確認済みだが、公開入口/CLI client・durable復旧・実機確認は未完了である。`m6_management_api.md`参照。
 6. **接続と受け入れ**: 実行token付きeffect factoryとWorker binding用のfeed書込/内部purge/Queue送信を追加した。本番配信gateとQueue routingへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
 
 ## 今回実装済みだが本番未接続

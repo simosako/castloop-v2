@@ -58,7 +58,7 @@ async function requestHash(request: ControlRequest): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export { requestHash as controlRequestHash, requireOwnedOperation };
+export { requestHash as controlRequestHash, requireOwnedOperation, requireEligibleTarget };
 
 async function freezeRequest(env: LifecycleControlEnv, request: ControlRequest, hash: string): Promise<void> {
   const key = `system/jobs/${request.job_id}/request.toml`;

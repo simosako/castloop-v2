@@ -12,6 +12,8 @@ export { lifecycleFailureForPhase, lifecycleFailureMessages, lifecycleJobStatusS
 export type { LifecycleFailure, LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";
 export { lifecycleCommitKey, lifecycleCommitSchema, parseLifecycleCommitKey } from "./lifecycle-commit";
 export type { LifecycleCommit, LifecycleCommitTarget } from "./lifecycle-commit";
+export { lifecycleAdminRequestSchema, lifecycleAdminResponseSchema, lifecycleOperationRequestSchema } from "./lifecycle-admin";
+export type { LifecycleAdminRequest, LifecycleAdminResponse, LifecycleOperationRequest } from "./lifecycle-admin";
 export { stageAssetSchema, stageControlRequest, stageDraftPrefix, stagePayloadKey, stagePayloadSchema,
   stageUploadProgressSchema, stageUploadRequestSchema } from "./staging";
 export type { StageAsset, StagePayload, StageUploadProgress, StageUploadRequest } from "./staging";

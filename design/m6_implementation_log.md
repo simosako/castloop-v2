@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Lifecycle内部API・dry-run・状態照会・同job retryを接続
+
+- 未公開`handleM6LifecycleAdmin`を追加し、Show/Episodeの停止・再開・削除を共通service registry/runtime gate、Show CAS受付、凍結request/commitへ接続した。変更操作にはrequest全体のhash確認、deleteには不可逆削除と運用記録保持の明示承認を要求する。HTTP handlerはpayloadを直接削除しない。
+- 読み取り専用runtime/snapshot boundary、非予約dry-run、最大100 objectsの削除page集計、保持jobのstatus/progress/owner照会を追加した。previewはpayload検証/実行許可ではなく、statusはretry許可ではない。本文/未知key名/任意exceptionを返さず、古いjobは後の状態変更後も履歴として照会できる。
+- 同jobの明示retryはpause中にも可能だが、live/未知execution token・foreign/完了/変更requestを拒否する。既存marker/status/progressを変更せずQueue送信を一回awaitし、送信応答喪失ではownerを保持して自動再送しない。
+- 内部API→M6 Queue adapterのローカル結合で6操作の404/200/410、immutable媒体/履歴保持、bounded削除/兄弟分離/運用記録保持、preview非書込、確認入力、paused drain、live consumer拒否、purge失敗同job復旧、未知応答、不正/過大/途中変更recordを回帰した。
+- `bun test`（504件、8550 assertions）、`npm run check`、内部handler/Worker browser bundle、M6実証tsconfig、Linux x86-64 binary build、`git diff --check`に合格。現行Worker/bridge/candidate fetchや書込CLIには公開せず、`m6_ready=false`を維持する。Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。詳細は`m6_management_api.md`。
+
 ## 2026-10-02: Publication内部APIと共通管理invocation boundaryを接続
 
 - 未公開`handleM6PublicationAdmin`をstrictな共有wire契約と凍結manifest/Show CAS受付/staging検証/commit作成へ接続した。service設定・identity・registry登録・副作用前後のreadiness/実行version/cache owner確認を`withM6ManagementInvocation`でstagingと共通化した。新claimはopenだけ、既受付commitはpause中にも収束可能とする。
