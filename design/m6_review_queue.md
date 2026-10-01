@@ -42,6 +42,7 @@
 4. **移行とcapability**: サービスCAS registry/pause/drain/atomic移行受付と凍結planのCAS初期化/途中再開を追加した。現行管理API/Queue/DLQのregistry接続と認証必須の読み取り専用capability照会も追加したが、M6 route=false/ready=falseを維持する。旧Worker/CLI直PUTの外部収束確認は別途必要。本番quiescence/cutover callback、applyのAPI/CLI、旧cache purge、100% Worker切替、安全なrollbackを完成する。未知のregistry tokenも時間で解放しない。`m6_migration_runtime_contract.md`参照。
    M6用REST metadata生成と読み取り専用deployment/version/settings/preview検査も追加済み。実upload/CLI接続は未提供で、GET照合を旧IO/cache purge証明としては扱わない。`m6_worker_deployment_inspection.md`参照。
    独立bridge/candidateの移行APIへpause/claim/旧IO明示申告/初期化限定apply/凍結bootstrap開始・終了/HTTP検査を接続した。候補HTTP window中も通常書込・consumer・完了/再開は閉じる。CLI/full cutover/旧cache全scope/外部検証/rollback等が残る。`m6_migration_bootstrap.md`参照。
+   移行client/durableローカルdeploy journalと読み取り専用`migration-status`も追加した。実deploy adapter/移行書込commandは未接続で、不明応答のPUT再送や残存lock/token奪取はしない。`m6_migration_client.md`参照。
 5. **再開・物理削除**: 削除開始のstate/feed/purge、owner-gated payload batchと先頭からのverification、最終purge/子tombstone/deleted/完了解放までを独立moduleで実装した。restoreも保存済みsnapshot検証→feed/purge準備→durable証拠→active化を実装した。凍結commit・consumer続行/同job requeueの基礎処理は追加済みだが、本番gate確認、本番Queue/管理APIへの接続と実機確認は残る。未知keyを黙ってprefix削除しない。
 6. **接続と受け入れ**: 実行token付きeffect factoryとWorker binding用のfeed書込/内部purge/Queue送信を追加した。本番配信gateとQueue routingへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
 

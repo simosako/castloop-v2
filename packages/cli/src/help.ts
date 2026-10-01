@@ -59,6 +59,11 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Run from the service workspace. Deploy this executable's embedded Worker and preserve existing secrets.\n" +
       "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.",
   },
+  "migration-status": {
+    usage: "migration-status",
+    description: "Run from the service workspace. Read migration admission/progress from a migration bridge or candidate Worker.\n" +
+      "This does not deploy, initialize controls, resume writes or certify M6 readiness. Legacy Workers do not provide this route.",
+  },
 };
 
 export function commandHelp(command: string): string {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationQuiescenceSchema,
-  migrationApplyProgressSchema, migrationBootstrapSchema, parseServiceConfig, serviceAdmissionSchema,
+  migrationAdminStatusSchema, migrationApplyProgressSchema, migrationBootstrapSchema, parseServiceConfig, serviceAdmissionSchema,
   serviceMigrationRequestSchema } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { runLifecycleMigrationStep } from "./lifecycle-migration-apply";
@@ -69,9 +69,9 @@ export async function handleMigrationAdmin(request: Request, env: MigrationApply
       const progress = migrationId ? await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${migrationId}/progress.json`) : null;
       const bootstrap = migrationId ? await env.CASTLOOP_BUCKET.get(`system/lifecycle-migrations/${migrationId}/bootstrap.json`) : null;
       if (progress && progress.size > MAX_BODY || bootstrap && bootstrap.size > MAX_BODY) throw new Error("Oversized migration status");
-      return reply({ admission, progress: progress ? migrationApplyProgressSchema.parse(await progress.json<unknown>()) : null,
+      return reply(migrationAdminStatusSchema.parse({ admission, progress: progress ? migrationApplyProgressSchema.parse(await progress.json<unknown>()) : null,
         bootstrap: bootstrap ? migrationBootstrapSchema.parse(await bootstrap.json<unknown>()) : null,
-        worker_protocol: runtime.protocol, worker_version_id: runtime.workerVersionId, m6_ready: false });
+        worker_protocol: runtime.protocol, worker_version_id: runtime.workerVersionId, m6_ready: false }));
     }
     catch { return reply({ error: "Migration status unavailable", reason_code: "migration_status_failed" }, 503); }
   }

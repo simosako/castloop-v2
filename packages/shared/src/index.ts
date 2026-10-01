@@ -27,6 +27,8 @@ export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVe
 export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
 export { migrationQuiescenceSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationBootstrapSchema } from "./migration-bootstrap";
 export type { MigrationQuiescence, MigrationBootstrapRequest, MigrationBootstrap } from "./migration-bootstrap";
+export { migrationAdminStatusSchema, migrationDeploymentClientStateSchema } from "./migration-bootstrap";
+export type { MigrationAdminStatus, MigrationDeploymentClientState } from "./migration-bootstrap";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

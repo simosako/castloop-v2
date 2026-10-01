@@ -1,4 +1,4 @@
-import { frozenMigrationPlanSchema, m6WorkerDeploymentEvidenceSchema, parseServiceConfig } from "../../packages/shared/src/index";
+import { frozenMigrationPlanSchema, migrationBootstrapRequestSchema, m6WorkerDeploymentEvidenceSchema, parseServiceConfig } from "../../packages/shared/src/index";
 import { serveCachedLifecycleAsset } from "../lifecycle-cache";
 import { describeCachedDeliveryRuntime } from "../lifecycle-delivery-gate";
 import { runLifecycleMigrationStep } from "../lifecycle-migration-apply";
@@ -68,9 +68,9 @@ export async function bootstrapFixture(initialize = true) {
     cached_entrypoint_enabled: true, cross_version_cache_disabled: true, version_metadata_binding_verified: true,
     service_bindings_verified: true, observability_enabled: true, workers_dev_previews_disabled: true });
   const plan = initialize ? frozenMigrationPlanSchema.parse(JSON.parse(setup.entries.get(`system/lifecycle-migrations/${setup.migrationId}/plan.json`)!.data)) : null;
-  const bootstrapRequest = { schema_version: 1, service_id: "service", migration_id: setup.migrationId,
+  const bootstrapRequest = migrationBootstrapRequestSchema.parse({ schema_version: 1, service_id: "service", migration_id: setup.migrationId,
     request_sha256: quiescence.request_sha256, bootstrap_id: crypto.randomUUID(), plan_sha256: plan ? await bootstrapHash(plan) : "0".repeat(64),
-    bridge_worker_version_id: bridgeVersion, worker_source_sha256: "a".repeat(64), worker_metadata_sha256: "b".repeat(64) };
+    bridge_worker_version_id: bridgeVersion, worker_source_sha256: "a".repeat(64), worker_metadata_sha256: "b".repeat(64) });
   const settlement = { bootstrap_id: bootstrapRequest.bootstrap_id, rest_requests_settled: true, no_more_deploys: true, deployment };
   return { ...setup, env, run, bridge, candidate, cached, calls, purges, quiescence, bootstrapRequest, settlement,
     plan, candidateVersion, bridgeVersion, bootstrapKey: `system/lifecycle-migrations/${setup.migrationId}/bootstrap.json` };

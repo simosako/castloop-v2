@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { serviceAdmissionSchema } from "./service-admission";
 import { m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
+import { migrationApplyProgressSchema } from "./migration-plan";
 
 const checksum = z.string().regex(/^[a-f0-9]{64}$/);
 const identity = { schema_version: z.literal(1), service_id: serviceAdmissionSchema.shape.service_id, migration_id: z.uuid(), request_sha256: checksum };
@@ -33,3 +34,30 @@ export const migrationBootstrapSchema = z.object({ schema_version: z.literal(1),
   if (value.settlement && (value.settlement.bootstrap_id !== value.request.bootstrap_id || value.settlement.deployment.service_id !== value.request.service_id)) fail("Bootstrap deployment belongs to another request");
 });
 export type MigrationBootstrap = z.infer<typeof migrationBootstrapSchema>;
+
+export const migrationAdminStatusSchema = z.object({ admission: serviceAdmissionSchema.nullable(),
+  progress: migrationApplyProgressSchema.nullable(), bootstrap: migrationBootstrapSchema.nullable(),
+  worker_protocol: z.enum(["legacy_fenced", "m6_candidate"]), worker_version_id: z.uuid(), m6_ready: z.literal(false),
+}).strict().superRefine((value, context) => {
+  const id = value.admission?.migration?.migration_id ?? value.admission?.readiness?.migration_id;
+  for (const evidence of [value.progress, value.bootstrap?.request]) {
+    if (evidence && (evidence.migration_id !== id || evidence.service_id !== value.admission?.service_id ||
+      value.admission.migration && evidence.request_sha256 !== value.admission.migration.request_sha256)) {
+      context.addIssue({ code: "custom", message: "Migration status evidence belongs to another admission" });
+    }
+  }
+  if (value.bootstrap && value.progress?.plan_sha256 !== value.bootstrap.request.plan_sha256) {
+    context.addIssue({ code: "custom", message: "Bootstrap status does not match its initialized plan" });
+  }
+});
+export type MigrationAdminStatus = z.infer<typeof migrationAdminStatusSchema>;
+
+export const migrationDeploymentClientStateSchema = z.object({ schema_version: z.literal(1), request: migrationBootstrapRequestSchema,
+  phase: z.enum(["prepared", "start_requested", "uploading", "rest_settled", "settled"]),
+  worker_version_id: z.uuid().optional(), deployment: m6WorkerDeploymentEvidenceSchema.optional(),
+}).strict().superRefine((value, context) => {
+  if (["rest_settled", "settled"].includes(value.phase) !== (value.worker_version_id !== undefined) ||
+    value.deployment && (value.deployment.worker_version_id !== value.worker_version_id || value.deployment.service_id !== value.request.service_id) ||
+    value.phase === "settled" && !value.deployment) context.addIssue({ code: "custom", message: "Client deployment evidence is inconsistent with its phase" });
+});
+export type MigrationDeploymentClientState = z.infer<typeof migrationDeploymentClientStateSchema>;

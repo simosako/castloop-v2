@@ -10,6 +10,7 @@ import { analyzeAudio } from "./audio";
 import { CloudflareApi, hashFile } from "./cloudflare-api";
 import { waitForWorkerHealth } from "./health";
 import { commandHelp } from "./help";
+import { MigrationAdminClient } from "./migration-client";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync,
@@ -49,7 +50,7 @@ const USAGE = "Usage: castloop init [dir] --service-id ID --bucket-name NAME --w
   "create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | " +
   "update-episode ID | update-episode-audio ID MP3 | publish-episode ID | " +
   "job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | " +
-  "cleanup-job JOB --show ID --episode ID | deploy";
+  "cleanup-job JOB --show ID --episode ID | migration-status | deploy";
 
 function argsOf(values: string[]): { positional: string[]; flags: Record<string, string> } {
   const positional: string[] = [];
@@ -648,6 +649,12 @@ async function main(): Promise<void> {
   if (command === "job-status" && positional.length === 1) return jobStatus(positional[0], flags);
   if (command === "retry-job" && positional.length === 1) return retryJob(positional[0], flags);
   if (command === "cleanup-job" && positional.length === 1) return cleanupJob(positional[0], flags);
+  if (command === "migration-status" && positional.length === 0) {
+    allowedFlags(flags, []);
+    const root = process.cwd();
+    console.log(JSON.stringify(await new MigrationAdminClient(loadConfig(root), adminKey(root)).status(), null, 2));
+    return;
+  }
   if (command === "update-episode" && positional.length === 1) {
     allowedFlags(flags, []);
     return updateEpisode(positional[0]);

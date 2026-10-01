@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 移行client・durable deploy journal・読み取り専用CLI照会を追加
+
+- 固定HTTPS origin/redirect拒否/自動retryなしの`MigrationAdminClient`を追加した。status/prepare/begin/settlementのschemaとservice/request/plan一致を検査し、応答streamをboundedにした。server statusにも同じstrict照合を接続した。
+- 未公開client helperにsource/metadata hash固定、private/fsync/rename付き`.castloop/migrations/<bootstrapId>.json`、exclusive非期限lock、開始申告前とPUT前のdurable phase、inspection/settlementだけの明示再開を追加した。開始/PUT/保存の不明応答では自動再PUTせず、稼働中/残存lockも奪わない。実Cloudflare deploy adapterと移行書込CLI commandはまだ接続しない。
+- `castloop migration-status`だけを認証GETの読み取り専用照会として公開した。旧Workerはroute未提供で、コマンドが自動deploy/移行/受付再開することはない。従来deploy/binary Worker入口と既存環境は変更していない。詳細は`m6_migration_client.md`参照。
+- `bun test`（382件、5873 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build/version/migration-status help、`git diff --check`に合格。新11件はmock/ローカル統合で、Cloudflare実deployは行っていない。
+
 ## 2026-10-01: 移行bridge・凍結bootstrap・候補HTTP検査を接続
 
 - 独立bridge/candidate入口へ認証必須の移行APIを追加した。service pause/drain/空registry移行受付、旧IO外部確認のstrict凍結申告、bounded applyを接続し、初期化はruntimeで停止する。現行binary/deploy/既存環境は変更していない。
