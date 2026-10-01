@@ -236,6 +236,8 @@ M6では入口から返すfeed/cover/MP3のクライアント向けheaderを`max
 
 公式[Workers Cache料金](https://developers.cloudflare.com/workers/cache/#pricing)では、cache HITとcache付きloopback呼出もrequest課金対象。gatewayが実行されるので、内部HITでもgatewayのCPUとR2状態readは残る。外部1要求とcached inner 1呼出の構成では、2 request相当を基本とした試算が必要であり、「同じWorkerだから追加request料金なし」としない。Freeの100,000 request/日・10ms CPU制限、実請求/CPU、300MB音源・複数coloでの挙動は今回未実証。purgeにもWorkers Cache共通のFree-tier rate limitがある。Wranglerを管理端末の必須ツールに戻さず、別製品も増やさない。
 
+`src/lifecycle-cached-entrypoint.ts`と`src/lifecycle-cache.ts`に本番接続用のclass/transport/handler/purgeを実装した（2026-10-01）。許可pathとgeneration props、秘密header除去、GET stream、HEAD/Range/HTTP条件、cache所有entrypoint内のtag+path purgeを扱う。GET MISSではHEADで選んだETagのbinding条件付きGETを使うため、内部のR2 readはHEAD+GETの2 operationとなる。HEAD/304/412/416はHEADだけでbodyを取得しない。mockとbundle/型検査で確認した段階であり、named entrypointの本番export、default cache無効deploy、移行と実機のcache HIT/MISS回帰はまだ未接続。
+
 ## 8. consumerの処理順と再開
 
 ### Episode公開停止

@@ -1,5 +1,14 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 内部cached entrypointの配信・purge実装を追加
+
+- `CachedPublicAssets`をWorkerEntrypointとして実装し、`this.ctx.props`の正確なgeneration組と許可pathだけを受け付ける。gateway用transportはloopback bindingを使い、host/queryを内部の固定URLへ正規化し、Range/条件付きheaderだけを転送する。Cookie/Authorization/管理キー等は転送しない。
+- 内部handlerはHEADでmetadataを取得し、GETは同ETag条件付きR2 binding readのstreamを返す。HEADと304/412/416は音源bodyを読まない。cold MISSの単一byte/open-ended/suffix/clamped Range、If-Range、ETag/date条件・秒精度・優先順位を実装し、HEAD/GET間のobject変更は503/no-storeとする。複数/不正Rangeは無視して全量200、満たせない単一Rangeは416とする。
+- feed/cover/Show/Episode tagと内部TTLを付け、purgeはcache所有entrypointのRPCからtagと末尾slash付きpath prefixを順にawaitする。どちらかが失敗したら完了扱いにしない。gatewayは外向け再検証headerを維持し、状態確認前にRange/304で配信させない。
+- helperとgatewayのmock接続、header除去、条件/Range/競合、tag/prefix scopeとpurge失敗を確認した。`bun test`（210件、3322 assertions）、`npm run check`、M6実証tsconfig、内部entrypointのBun browser bundle、Linux binary buildに合格した。
+- GET MISSは内部でHEAD+GETの2回のR2 operationを追加し、HEAD/304等はHEADだけになる。gatewayの状態readとloopback request課金は別途残る。料金/CPU/Free制限/300MB/複数colo・cache HIT時のHTTP処理はこのmock結果では実証しない。
+- クラスはまだ本番main moduleへexport/接続せず、CLIのcache deploy設定も未変更。default入口のcache無効化・移行capability・実機回帰が必要であり、既存テスト環境・運用環境は変更していない。
+
 ## 2026-10-01: consumerの通常終了回復・削除続行とDLQ境界を実装
 
 - `consumeLifecycleCommit`は凍結marker/owner/generation/hashを照合して実行tokenを取得し、停止/再開/削除runnerを呼ぶ。削除の1 stepが終わったら全副作用終了後に実行tokenだけを返し、job ownerをprocessingのまま保持して同じmarkerの続行送信をawaitする。FIFOや重複なしを前提にしない。

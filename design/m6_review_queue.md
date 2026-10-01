@@ -37,13 +37,13 @@
 
 1. **upload/publication統合**: staging操作IDとdraft job IDの分離、単一PUT前の受付、size/内容照合、切断後のowner/generation照合回復・終了処理、既存publication consumerの新record対応。
 2. **consumer invocationの安全な回復**: 全副作用をawaitした通常終了/例外終了からのtoken返却・続行/requeueを独立consumerで実装した。取得応答喪失・runtime強制終了ではブロックを保持する。稼働中invocationを解放せずに終了を確認する手順と、安全な回復を成立させる。時間/HEAD不在だけの奪取を追加しない。
-3. **本番配信とpurge**: gatewayをdefault cache無効の入口へ接続し、cache有効named entrypointへの内部fetchと所有entrypoint内purgeを実装する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。
+3. **本番配信とpurge**: cache有効named entrypoint向けの内部fetch/stream配信と所有entrypoint内purgeを実装した。まだ本番main moduleへexport/接続しておらず、gatewayをdefault cache無効の入口へ接続し、CLIのdeploy設定と移行capabilityを完成する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。
 4. **移行とcapability**: 読み取り専用planに加え、旧書込停止、atomicな移行受付、apply/途中再開、旧cache purge、100% Worker切替、対応機能照会と安全なrollbackを実装する。
 5. **再開・物理削除**: 削除開始のstate/feed/purge、owner-gated payload batchと先頭からのverification、最終purge/子tombstone/deleted/完了解放までを独立moduleで実装した。restoreも保存済みsnapshot検証→feed/purge準備→durable証拠→active化を実装した。凍結commit・consumer続行/同job requeueの基礎処理は追加済みだが、本番gate確認、本番Queue/管理APIへの接続と実機確認は残る。未知keyを黙ってprefix削除しない。
 6. **接続と受け入れ**: 注入effectを実装して停止・再開・削除状態機械をQueueへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
 
 ## 今回実装済みだが本番未接続
 
-strictな制御/request/status/progressとallowlist診断、CAS job journal、Show CAS受付、reserved限定abandon、invocation token、完了解放receipt、移行inventory、削除対象ページ、owner-gated payload batch/verification pass、削除開始/最終purge/子tombstone/完了解放、lifecycle対応feed入力、Show/Episode停止・保存済みsnapshot再開状態機械、公開gateway。個々の自動テスト合格はM6全体の受け入れ合格ではない。
+strictな制御/request/status/progress/commitとallowlist診断、CAS job journal、Show CAS受付、reserved限定abandon、invocation token、完了解放receipt、移行inventory、削除対象ページ、owner-gated payload batch/verification pass、削除開始/最終purge/子tombstone/完了解放、lifecycle対応feed入力、Show/Episode停止・保存済みsnapshot再開状態機械、通常終了consumer/続行/requeue、公開gateway、内部cached entrypoint/transport/purge。既存本番DLQ handlerの固定診断化は接続済みだが、lifecycle操作はまだ本番へ接続しない。個々の自動テスト合格はM6全体の受け入れ合格ではない。
 
 詳細は[M6設計](./m6_content_lifecycle_plan.md)、[実装ログ](./m6_implementation_log.md)、[U1と単一PUT方針](./m6_upload_recovery_options.md)を参照。
