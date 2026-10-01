@@ -1,5 +1,11 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 管理者のv0.1.1テスト環境を読み取り専用で確認
+
+- 管理者が既存環境はテスト用で削除可能、CLI/Workerはv0.1.1、1 Show/2公開Episode、処理中/失敗中jobなしと申告した。[移行前基準](./m6_legacy_test_baseline.md)へ記録した。管理API/R2/Queueの状態を取得したわけではない。
+- 公開feed GETは200/item 2件、音源2本のHEADは200でfeed記載サイズと一致、先頭16 bytesのRange GETは206、cover HEADは200だった。NRTの音源cache HITと既存immutable応答を確認した。GUID/date/path/サイズだけを記録し、本文/メールを複製せず、音源全体のchecksum/再生確認は行っていない。
+- 公開URLの読み取り以外のCloudflare操作、deploy、R2書込/削除、環境撤去は実施していない。v0.1.1からの安全な移行手順と本番統合は未完成で、既存環境は基準として保持する。
+
 ## 2026-10-01: 保存済みShow/Episodeの公開再開を追加
 
 - `runLifecycleRestore`はR2のpublished Show/service snapshotと現在のpublic_base_urlだけを読み、coverとactive/復帰候補Episode音源のHEAD照合→feed再生成→冪等feed generation→purge→durable purge証拠→active化→完了status/owner解放へ進む。stagingやローカルの未公開編集を使わず、GUID/公開日時/revision/音源pathとbytesを変更しない。
