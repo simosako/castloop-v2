@@ -1,12 +1,15 @@
-import { migrationAdminStatusSchema, migrationQuiescenceSchema, migrationSetupRequestSchema, serviceConfigSchema, serviceMigrationRequestSchema } from "@castloop/shared";
-import type { MigrationAdminStatus, MigrationQuiescence, MigrationSetupClientState, MigrationSetupRequest, ServiceConfig, ServiceMigrationRequest } from "@castloop/shared";
+import { migrationAdminStatusSchema, migrationInitializationRequestSchema, migrationInitializationResultSchema, migrationQuiescenceSchema,
+  migrationSetupRequestSchema, serviceConfigSchema, serviceMigrationRequestSchema } from "@castloop/shared";
+import type { MigrationAdminStatus, MigrationInitializationResult, MigrationQuiescence, MigrationSetupClientState, MigrationSetupRequest,
+  ServiceConfig, ServiceMigrationRequest } from "@castloop/shared";
 import { MigrationAdminClient } from "./migration-client";
 import { migrationPayloadHash } from "./migration-deployment";
 import { validateMigrationSetupState } from "./migration-setup-journal";
 import type { MigrationSetupJournal } from "./migration-setup-journal";
 
 export type MigrationSetupEffects = { request: MigrationSetupRequest; status: () => Promise<MigrationAdminStatus>; initialize: () => Promise<void>; pause: () => Promise<void>;
-  claim: (request: ServiceMigrationRequest) => Promise<void>; confirm: (input: MigrationQuiescence) => Promise<void> };
+  claim: (request: ServiceMigrationRequest) => Promise<void>; confirm: (input: MigrationQuiescence) => Promise<void>;
+  initializeStep: (maximumTargets: number) => Promise<MigrationInitializationResult> };
 
 function loadSetup(journal: MigrationSetupJournal, effects: MigrationSetupEffects): MigrationSetupClientState {
   const state = validateMigrationSetupState(journal.load());
@@ -117,6 +120,45 @@ export async function inspectMigrationSetup(journal: MigrationSetupJournal, effe
   });
 }
 
+function requireInitializationOwner(state: MigrationSetupClientState, input: unknown): MigrationAdminStatus {
+  const status = requireBridge(state, input);
+  if (status.admission?.state !== "migrating" || status.admission.pause_id !== state.request.pause_id ||
+    status.admission.invocations.length || status.admission.migration?.migration_id !== state.request.migration_id ||
+    status.admission.migration.request_sha256 !== state.quiescence?.request_sha256 || status.bootstrap ||
+    JSON.stringify(status.quiescence) !== JSON.stringify(state.quiescence)) {
+    throw new Error("Initialization requires its frozen quiescence and migration owner without deployment or active writes");
+  }
+  return status;
+}
+
+export async function runMigrationSetupInitializationStep(journal: MigrationSetupJournal, effects: MigrationSetupEffects,
+  maximumTargets = 20): Promise<MigrationInitializationResult> {
+  return journal.exclusively(async () => {
+    const state = loadSetup(journal, effects);
+    if (state.phase !== "quiesced" && state.phase !== "initialization_pending") {
+      throw new Error("Initialization outcome is unknown or controls are already initialized; never replay its POST");
+    }
+    const request = migrationInitializationRequestSchema.parse({ schema_version: 1, service_id: state.request.bridge.service_id,
+      migration_id: state.request.migration_id, maximum_targets: maximumTargets });
+    const before = requireInitializationOwner(state, await effects.status()).progress;
+    if (JSON.stringify(before) !== JSON.stringify(state.initialization?.after ?? null)) {
+      throw new Error("Server initialization progress differs from the last acknowledged step; inspect without retry");
+    }
+    const started = validateMigrationSetupState({ ...state, phase: "initialization_requested", initialization: {
+      step: (state.initialization?.step ?? 0) + 1, maximum_targets: request.maximum_targets!, before,
+    } });
+    journal.save(started);
+    const result = migrationInitializationResultSchema.parse(await effects.initializeStep(request.maximum_targets!));
+    const after = requireInitializationOwner(started, await effects.status()).progress;
+    const acknowledged = validateMigrationSetupState({ ...started,
+      phase: result.phase === "runtime" ? "controls_initialized" : "initialization_pending",
+      initialization: { ...started.initialization!, result, after },
+    });
+    journal.save(acknowledged);
+    return result;
+  });
+}
+
 export function createMigrationSetupEffects(input: ServiceConfig, setupInput: MigrationSetupRequest, adminKey: string,
   dependencies: { client?: MigrationAdminClient } = {}): MigrationSetupEffects {
   const config = serviceConfigSchema.parse(input);
@@ -139,5 +181,6 @@ export function createMigrationSetupEffects(input: ServiceConfig, setupInput: Mi
       if (confirmation.migration_id !== setup.migration_id) throw new Error("Migration setup effect received another declaration owner");
       await client.confirmQuiescence(bridge, confirmation);
     },
+    initializeStep: (maximumTargets) => client.initializeMigrationStep(bridge, setup.migration_id, maximumTargets),
   };
 }

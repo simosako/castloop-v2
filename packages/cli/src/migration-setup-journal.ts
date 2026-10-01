@@ -59,10 +59,23 @@ export function createMigrationSetupJournal(root: string, input: MigrationSetupR
       const previous = load();
       const phases = migrationSetupClientStateSchema.shape.phase.options;
       const distance = phases.indexOf(state.phase) - phases.indexOf(previous.phase);
-      if (JSON.stringify(state.request) !== JSON.stringify(request) || distance < 0 || distance > 1 ||
+      const continuing = previous.phase === "initialization_pending" && state.phase === "initialization_requested";
+      const completed = previous.phase === "initialization_requested" && state.phase === "controls_initialized";
+      if (JSON.stringify(state.request) !== JSON.stringify(request) || (!continuing && !completed && (distance < 0 || distance > 1)) ||
+        previous.phase === "initialization_pending" && distance !== 0 && !continuing ||
+        distance === 0 && JSON.stringify(state) !== JSON.stringify(previous) ||
         previous.claim && JSON.stringify(state.claim) !== JSON.stringify(previous.claim) ||
         previous.quiescence && JSON.stringify(state.quiescence) !== JSON.stringify(previous.quiescence)) {
         throw new Error("Frozen migration setup/claim/quiescence cannot change or skip phases");
+      }
+      if (state.initialization) {
+        const before = previous.initialization;
+        const after = state.initialization;
+        if (!before && after.step !== 1 || continuing && (!before || after.step !== before.step + 1 ||
+          JSON.stringify(after.before) !== JSON.stringify(before.after)) || before && !continuing &&
+          (after.step !== before.step || after.maximum_targets !== before.maximum_targets || JSON.stringify(after.before) !== JSON.stringify(before.before))) {
+          throw new Error("Migration initialization cannot change or skip its frozen step");
+        }
       }
       const temp = `${file}.${crypto.randomUUID()}.tmp`;
       const fd = openSync(temp, "wx", 0o600);

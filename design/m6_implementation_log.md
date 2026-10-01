@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Bounded初期化の各stepをdurable setup journalへ接続
+
+- 未公開`runMigrationSetupInitializationStep`を追加した。quiesced/前step確認済みpendingだけから、同bridge/tag/owner/凍結quiescence/空registry/token不在/bootstrap不在と前回確認済みprogressの完全一致をGET確認し、step番号/上限/beforeをdurable保存した後だけ一回のapply POSTを送る。POST応答と終了後GETのplan/hash/phase/target上限・単調性を照合してから次phaseを保存する。
+- 応答喪失、終了後GET失敗、保存失敗、未知token、偽completion/phase/foreign version/進捗矛盾は`initialization_requested`で保持する。成功recordのGET観測でも再送/次stepへ進めず、外部clientが進めたprogressを黙って採用しない。最新stepの最小入力/応答/前後progressだけを保存し、凍結入力変更/step飛ばし/POST省略を拒否する。
+- 正常なEpisode→Show初期化後も、明示的verificationで`runtime`へ達したら`controls_initialized`で停止する。payloadを変更せず、serviceはlegacy/migratingのまま、候補deploy/full cutover/readiness/受付再開は行わない。空inventoryもverificationを省略しない。既存offline照会は追加phaseを読み取れるが書込CLIは未公開。
+- `bun test`（443件、7981 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build、`git diff --check`に合格。生成binaryの`migration-status --local`でも、key/tokenなしのworkspaceで`controls_initialized`を状態変更せず読み取れることを確認した。ローカルhandler/mock検証であり、Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。unknown復旧/full cutover/管理routes/実機受け入れが成立するまで`m6_ready=false`を維持する。詳細は`m6_migration_setup_client.md`。
+
 ## 2026-10-02: Pause・claim・旧IO申告のdurable setup journalとoffline照会を追加
 
 - `.castloop/migration-setups/<serviceId>.json`にbridge receiptとcaller指定のpause/migration ID/timestamp/明示的書込停止申告を凍結した。private/exclusive/fsync/rename/非期限lockを用い、各POST前にrequested phaseを保存し、成功応答と保存後だけ進める。claim generationは同pause owner/空registryのGET後に一回だけ固定し、live処理中はpauseを保持する。
