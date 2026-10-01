@@ -33,7 +33,7 @@ function matchesOwner(marker: LifecycleCommit, owner: {
     marker.action === owner.action && marker.request_sha256 === owner.request_sha256;
 }
 
-async function releaseSettledExecution(env: LifecycleControlEnv, execution: ShowExecution): Promise<"released" | "completed"> {
+export async function releaseSettledExecution(env: LifecycleControlEnv, execution: ShowExecution): Promise<"released" | "completed"> {
   const current = await readShowControl(env, execution.showId);
   const receipt = current?.value.last_finished_operation;
   if (receipt?.job_id === execution.jobId && receipt.generation === execution.generation && receipt.execution_id === execution.executionId) {

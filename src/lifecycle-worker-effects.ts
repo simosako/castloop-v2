@@ -10,12 +10,32 @@ import type { LifecycleConsumerEffects } from "./lifecycle-consumer";
 import type { LifecycleDeleteEnv } from "./lifecycle-delete-batch";
 import { readLifecycleFeedInputs } from "./lifecycle-feed";
 import type { RestoreFeedSnapshot } from "./lifecycle-restore";
+import type { ShowPublicationEffects } from "./publication-show-runner";
 
 export type LifecycleWorkerBindings = {
   cachedAssets: { invalidate: (target: LifecyclePurgeTarget) => Promise<void> };
   queue: Pick<Queue, "send">;
   checkDeliveryGate: (target: LifecyclePurgeTarget) => Promise<void>;
 };
+
+export async function createShowPublicationWorkerEffects(env: LifecycleDeleteEnv, execution: ShowExecution,
+  bindings: Pick<LifecycleWorkerBindings, "cachedAssets" | "checkDeliveryGate">): Promise<ShowPublicationEffects> {
+  const current = await requireShowExecution(env, execution);
+  if (current.value.owner?.action !== "publish" || current.value.owner.kind !== "show") throw new Error("Show publication effects require a Show publish owner");
+  const target = { showId: execution.showId };
+  async function guard(input: { showId: string }): Promise<void> {
+    if (input.showId !== target.showId) throw new Error("Show publication effect targets another Show");
+    await requireShowExecution(env, execution);
+    await bindings.checkDeliveryGate(target);
+    await requireShowExecution(env, execution);
+  }
+  await guard(target);
+  return { checkDeliveryGate: guard, async purge(input) {
+    await guard(input);
+    await bindings.cachedAssets.invalidate(target);
+    await requireShowExecution(env, execution);
+  } };
+}
 type PublishedFeedSource = {
   show: ShowMetadata; service: ServiceConfig; coverExtension: "jpg" | "png";
   objects: Array<{ key: string; etag: string; size: number }>;

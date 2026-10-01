@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: Show publication runnerと実行token付きconsumerを追加
+
+- `runOwnedShowPublication`は凍結manifest/commit、共通Show owner/実行token、staging検証証拠を再照合し、bounded/ETag条件付きGETでmetadata/cover/serviceを読み、checksum/schema/画像signature/cover extensionを再確認する。lifecycle対応Episode集合でfeedを生成し、停止/削除/draft子を復帰させない。音源とimmutable履歴は変更しない。
+- metadata→cover→feedをR2 bindingのETag CASで書き、feed generationを冪等に進め、cache所有entrypointのpurge成功をdurable progressへ記録する。初回Showはpurge後だけactiveへ進め、v2 published statusと照合済みreceiptを保存してownerを解放する。Show更新は承認済みcover keyを上書きする。stage成功だけでは公開しない。
+- `consumeOwnedPublication`は実行token取得後にeffect factory/runnerをawaitする。通常例外終了では共通のsettled token返却を使い、取得応答喪失/強制終了の未知tokenは保持する。現段階はShowだけに対応し、Episode markerは副作用なしでunsupported扱いとする。本番routingへは未接続。
+- `createShowPublicationWorkerEffects`で必須配信gate callbackと内部entrypointのinvalidateをつないだ。gate/factory/purge失敗、metadata/cover/feed/generation/進捗/公開状態/status/解放の応答喪失、live purge、token取得応答喪失、staging差替/状態欠落/CAS競合、旧receiptによる新owner解放拒否を確認した。purge段階からの再開ではpayloadを書き直さず、初回purge失敗中はShowを非公開に保つ。
+- `bun test`（270件、4530 assertions）、`npm run check`、M6実証tsconfig、consumer browser bundleに合格。R2/内部cache bindingはmock確認であり、実機deploy/受け入れではない。Episode publication runner、migration/capability、旧処理収束、本番gate/routing/API/CLIは残る。既存v0.1.1環境と運用環境は未変更。
+
 ## 2026-10-01: 検証済みstagingからのpublication受付・commit準備を追加
 
 - `publication-admission.ts`にstrictな凍結publication manifest、固定marker key、共通Show CASでのpublish受付、凍結control requestとmarkerの照合を追加した。`system/jobs/<draftJobId>/publication.json`には既存Show/Episode commitのhash/size/revision情報とstage操作IDだけを保存し、本文/secretは複製しない。publication job IDは凍結するdraft job IDと一致し、upload操作IDとは別にする。
