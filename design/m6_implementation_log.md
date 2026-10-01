@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Lifecycleのdurable job journalと明示的なclaim/commit/retryを追加
+
+- `.castloop/lifecycle-jobs/<serviceId>/<jobId>.json`へidentity/確認済みrequest/最小receiptだけを凍結するprivate/fsync/rename付きjournalとexclusive非期限lockを追加した。本文/secret/任意exceptionを保持せず、strict/16KB/hash/phase照合で入力変更・foreign identity・飛ばし/後退を拒否する。
+- 未公開`runLifecycleClaim`/`runLifecycleCommit`/`runLifecycleRetry`を内部clientへ接続した。claimとcommitは別の明示操作で、各POST前にrequestedを保存する。retryも同jobのowner/marker/execution検査後に一つの通番を凍結し、一回だけ送信する。unknown response/receipt保存失敗はrequestedを保持し、後の観測から成功認定/再送しない。
+- offline record/lock照会とremote job照会は非書込で、live/残存lockを削除せず、token終了を推測しない。disk/client/API/Queueのローカル結合で3操作・応答喪失・保存失敗・live排他・残存lock・foreign/不正record・偽receipt・secret非保持を回帰した。詳細は`m6_lifecycle_client.md`。
+- `bun test`（528件、9050 assertions）、`npm run check`、内部client/runner Bun bundle、M6実証tsconfig、Linux x86-64 binary build、`git diff --check`に合格。公開CLI/現行Worker入口へは接続せず、Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。unknown outcomeの外部復旧とM6公開gateは残る。
+
 ## 2026-10-02: Lifecycle内部clientのstrict応答照合と一回限り送信を追加
 
 - 未公開`LifecycleAdminClient`を追加した。固定HTTPS origin/redirect拒否/管理key/送信前service・action・request hash・削除確認、応答no-store/JSON/64KB/strict UTF-8/取消awaitを実装し、凍結requestとservice/result/全operation identity/preview pageを照合する。

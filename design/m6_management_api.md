@@ -87,7 +87,9 @@ Queue.sendは一回awaitする。応答喪失ではmarker/ownerを保持し、�
 
 未公開`LifecycleAdminClient`は固定HTTPS service originと管理keyを使い、各actionを明示的に一回送信する。リダイレクトを拒否し、自動retry・ID/generation/timestamp生成・confirmation生成をしない。送信前にservice/action/strict入力/request hash/削除確認を照合し、応答はno-store/JSON/64KB/strict UTF-8を要求する。異常streamのcancelをawaitする。
 
-responseのservice/result/全operation identity/hash、preview requestとscope/page上限を凍結入力へ照合する。serverの任意本文やtransport exceptionを診断へコピーせず、不明応答では状態照会を案内して止まる。ローカルでclient→内部API→Queueの6操作と応答喪失非再送を回帰した。公開CLI commandには接続しておらず、durable journal/安全なunknown復旧の代用にはしない。
+responseのservice/result/全operation identity/hash、preview requestとscope/page上限を凍結入力へ照合する。serverの任意本文やtransport exceptionを診断へコピーせず、不明応答では状態照会を案内して止まる。ローカルでclient→内部API→Queueの6操作と応答喪失非再送を回帰した。公開CLI commandには接続していない。
+
+lifecycle専用のdurable journalも内部clientへ接続した。claim/commit/retryは送信前にrequestedをprivate/fsync/rename付きrecordへ保存し、受信・保存済みreceiptからだけ進める。unknown responseやreceipt保存失敗ではrequestedを保持し、後のmarker/status観測から再送/成功扱いしない。非期限lockを奪わず、offline/remote照会も非書込である。詳細と未完成の安全な外部復旧gateは[`m6_lifecycle_client.md`](./m6_lifecycle_client.md)参照。
 
 ## 検証と残件
 
@@ -97,4 +99,4 @@ publicationは新しいstaging内部API→publication内部API→実M6 Queue ada
 
 lifecycleは6操作を内部API→M6 Queue adapterへローカル結合し、停止404・再開200・削除410、媒体/履歴の保持とbounded削除、兄弟Episode分離、運用記録保持を回帰した。preview非書込/非予約、完全request確認、削除の二つの明示確認、paused drain、live consumer中retry拒否、purge失敗から同job retry、Queue応答喪失非再送、過去status、不正/過大/途中変更record、candidate書込拒否も確認した。全504テスト/8550 assertionsと型・bundle・binary検査の合格はCloudflare実機の合格ではない。
 
-公開入口/CLI clientへの接続、upload/publication progress照会とdurable復旧journal、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
+公開入口/CLI commandへの接続、staging/publication client・progress照会・durable journal、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
