@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-01: 読み取り専用の削除対象ページを追加
+
+- Episodeの3 prefix、Showの4 prefix＋Show snapshot単一keyを固定した削除inventoryを追加した。payloadとpublication commit markerを区別し、未知keyをblockerとして返す。対象ID・revision/job UUID・一覧metadata・cursorの進行を検証する。
+- list/headだけを使い、300MB媒体のbody読取・削除・状態変更は行わない。Show予約・制御record・Episode tombstone・lifecycle marker・job監査は対象外。末尾`/`を維持し、似たShow/Episode IDの混入を拒否する。
+- inventoryは`authorizesDeletion=false`を返す。1ページ完了は削除完了でも受付取得でもない。実削除にはowner/実行token・配信停止・purge・耐久progress・先頭からの最終再列挙が必要で、削除consumerはまだ未接続。
+- 残すpublication markerの内容・保持期間の最終確認は未完了であり、今回は保存・削除のpolicyを新たに確定していない。
+- `npm run check`、`bun test`（105件、708 assertions）、`git diff --check`に合格。Cloudflareリソースは変更していない。
+
 ## 2026-10-01: version別status・耐久progress・完了解放を追加
 
 - 旧v1 publication statusを保持し、strictなv2 statusとv1 progressを追加した。action・phase・owner generation・要求hash・対象・結果状態を検証し、`published`とlifecycleの`completed`を分離する。既存publicationの書込はv1型へ限定し、挙動を変更していない。

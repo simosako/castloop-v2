@@ -264,6 +264,8 @@ M6では入口から返すfeed/cover/MP3のクライアント向けheaderを`max
 
 Show予約、Show制御record、Episode tombstone、lifecycle request/commit/progress、最小job監査は削除しない。古いpublication commitも復旧/拒否判断に必要な最小記録として残し、stagingの削除ではmetadata・cover・audioを消すがそのmarkerを区別する。残す記録に個人情報やコンテンツを含める範囲・保持期間はM6.0で定める。
 
+`src/lifecycle-deletion.ts`に、固定scope・許可key分類・list/headだけのページinventoryを追加した。媒体bodyを読み込まず、payload/保持marker/未知key blockerを分離する。`authorizesDeletion=false`であり、一覧結果だけで実削除を許可しない。cursor完走後も各prefixの先頭から再照会する実削除consumerと耐久progressへの接続は未実装。
+
 ### 公開再開
 
 受付を保持したまま、保存されたShow・active Episode・音源の存在を検証してfeedとcacheを準備する。再開対象自身はfeed構築時にactive候補として扱うが、他の停止/削除Episodeは除外する。purge後に対象をactiveへ進め、新generationで配信を開ける。Show再開は子の状態を維持する。ローカル編集の更新は再開完了後に通常のupdate/publishで行う。
