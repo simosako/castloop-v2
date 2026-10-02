@@ -68,6 +68,7 @@
    lifecycle内部APIを共通service boundaryへ接続し、非予約dry-run/削除確認/6操作の受付とcommit、読み取り専用job照会、live tokenを拒否する同jobの明示retryを追加した。API→M6 Queue adapterのローカル結合は確認済みだが、公開入口/CLI client・durable復旧・実機確認は未完了である。`m6_management_api.md`参照。
    未公開lifecycle clientの固定origin/redirect拒否/一回限り送信/strict応答照合と6操作のローカル結合も追加した。確認済みrequestと送信前requestedをprivate/fsync付きjournalへ保存する明示claim/commit/retry、非書込offline/remote照会も接続した。公開CLIとunknown outcome/残存lock/tokenの安全な外部復旧は残る。`m6_lifecycle_client.md`参照。
 6. **接続と受け入れ**: 実行token付きeffect factoryとWorker binding用のfeed書込/内部purge/Queue送信を追加した。本番配信gateとQueue routingへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
+    新規Show登録/local Show・二Episode作成からhigh-level更新/公開・metadata改訂・Show/Episode六lifecycle操作まで、一つのlocal内部入口/consumerで通し、ID/GUID/date/history・対象外データ・物理削除と記録保持を回帰した。simulated REST/cache/Queueであり、公開CLI/実Cloudflare/300MBの受け入れを代替しない。`packages/cli/src/m6-content-flow.test.ts`参照。
     認証情報/HTTP/書込なしの`local-operation-status FAMILY ID`をsource CLIへ追加し、4familyのprivate journal/残存lockを照会可能にした。phase昇格/lock除去/復旧許可は行わず、書込commandの公開gateは閉じたままである。`m6_local_operation_status.md`参照。
     `operation-status FAMILY ID`もsource CLI/standalone buildへ接続した。凍結local要求のstatusだけを一回送り、local/remoteの非変更・requested非昇格を4familyとlocal HTTPS binaryで検証した。通常candidateのmanagement gateを開けず、保持record不足/未知応答/途中変更は拒否する。実Cloudflare受け入れではない。`m6_remote_operation_status.md`参照。
 

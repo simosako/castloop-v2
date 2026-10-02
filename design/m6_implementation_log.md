@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 新規登録から六つのlifecycle操作までのlocal全体結合
+
+- 新規Showのdurable reserve→registered receipt→local Show/二Episode下書き→target inspection→metadata/audio staging→publication commit→M6 Queue consumer→metadata改訂→Episode/Show各停止・再開・削除を、一つのsimulated R2/REST/内部管理入口で通した。
+- 未公開high-level helperを使ってgeneration/base/IDを手入力せず、source GUID/dateとimmutable media/history保持、対象外Show/Episodeの維持、複数consumer continuationによる物理削除、404/410 state-first gateway、永久reservation/tombstone/小さい記録保持、local source非削除と削除後の再更新拒否を確認した。
+- lifecycle要求はstrict schemaでcanonical化してから確認hashを作る。個別record/stateの順序に依存した入力hashを確認申告へ渡さない。全799テスト/12549 assertions、TypeScript/diff checkに合格。
+- この試験は実handler/client/consumerのlocal結合であり、実Cloudflare notification/Queue/cache/REST/300MB受け入れではない。公開gate/Cloudflare環境は変更しない。残タスクのCLI command dispatch・移行/外部復旧・実機受け入れは継続する。
+
 ## 2026-10-02: target snapshotからID/generation/baseを導出して更新・公開
 
 - 未公開high-level更新/公開helperを追加し、非書込target照会→identity/local前後一致→初回durable head生成/完了後history付きrotation→target排他runnerへ接続した。metadata/audioに同draft IDを使い、current base変更やunfinished ownerでは差替えない。
