@@ -51,6 +51,23 @@ function fixture(pageSize = 1000) {
 }
 
 describe("read-only M6 migration inventory", () => {
+  test("retains new registration identity and blocks a control/reservation identity mismatch", async () => {
+    const { env, entries } = fixture();
+    const reservationId = JSON.parse(entries.get("system/show-reservations/daily.json")!).reservation_id as string;
+    const control = { schema_version: 2 as const, show_id: "daily", reservation_id: reservationId,
+      lifecycle: "unpublished" as const, generation: 12, feed_generation: 9 };
+    entries.set("system/show-publications/daily.json", JSON.stringify(control));
+    entries.set("system/episode-lifecycle/daily/first.toml", stringifyLifecycleToml({ schema_version: 1,
+      show_id: "daily", episode_id: "first", lifecycle: "unpublished", generation: 4 }));
+    const valid = await planLifecycleMigration(env);
+    expect(valid.inventory_compatible).toBe(true);
+    expect(valid.shows[0]!.value).toEqual(control);
+    entries.set("system/show-publications/daily.json", JSON.stringify({ ...control, reservation_id: crypto.randomUUID() }));
+    const invalid = await planLifecycleMigration(env);
+    expect(invalid.inventory_compatible).toBe(false);
+    expect(invalid.blockers.some((blocker) => blocker.code === "target_mismatch" && blocker.key === "system/show-publications/daily.json")).toBe(true);
+  });
+
   test("legacy published snapshots become active; local/remote drafts do not become published", async () => {
     const { env, entries } = fixture(2);
     entries.set("system/show-reservations/draft-show.json", JSON.stringify({ show_id: "draft-show", reservation_id: crypto.randomUUID() }));

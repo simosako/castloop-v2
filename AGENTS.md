@@ -25,6 +25,7 @@ Follow the commands and conventions below.
 - Store non-secret service settings in `castloop.toml` at the working-directory root. Keep unpublished job IDs in a git-ignored local state file, not in service TOML.
 - The public URL is a Worker URL; a custom domain is optional. Store `public_base_url` in the service config, never an R2 public URL in show metadata.
 - Local TOML files are the editable source; R2 stores published snapshots and job status.
+- M6 new Show registration claims a permanent `reservation_id` in the Show control record before completing its matching reservation record; block mutations while registration is incomplete, never recreate an advanced or deleted Show, and retain the identity after deletion. New Episode controls are initialized only under the exact Show staging owner after checking for orphan data. These internal paths do not authorize exposing M6 write commands before the release gates pass.
 - `create-show` requires a real site URL supplied by the administrator and writes it into the local `show.toml`; publication requires `site_url`. `update-show` stages Show TOML and cover art in R2 without publishing; only `publish-show` creates its commit marker and starts publication.
 - `create-episode` fills `published_at` with the current timestamp as a quoted RFC 3339 string including seconds and an offset. Render RSS pubDate as RFC 2822.
 - Service and show metadata: `system/service.toml` and `system/shows/<showId>/show.toml`.

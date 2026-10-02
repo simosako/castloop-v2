@@ -19,6 +19,8 @@ export { stageAssetSchema, stageControlRequest, stageDraftPrefix, stagePayloadKe
 export type { StageAsset, StagePayload, StageUploadProgress, StageUploadRequest } from "./staging";
 export { stagingAdminRequestSchema, stagingAdminResponseSchema, stagingOperationSchema } from "./staging-admin";
 export type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from "./staging-admin";
+export { showRegistrationRequestSchema, showRegistrationResponseSchema, showReservationSchema } from "./show-registration";
+export type { ShowRegistrationRequest, ShowRegistrationResponse, ShowReservation } from "./show-registration";
 export { validateId } from "./ids";
 export { parsePublicAssetPath } from "./public-assets";
 export type { PublicAsset } from "./public-assets";

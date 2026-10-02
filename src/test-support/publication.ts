@@ -4,6 +4,7 @@ import { readShowControl } from "../lifecycle-control";
 import { claimPublicationOperation, commitOwnedPublication, publicationRequestSchema } from "../publication-admission";
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "../staging-upload";
 import { runStageVerification } from "../staging-verification";
+import { reserveM6Show } from "../show-registration";
 import { createHash } from "node:crypto";
 
 export const PUBLICATION_SHOW_TEXT = "schema_version = 1\nshow_id = 'daily'\ntitle = 'New Show title'\ndescription = 'Private description'\nlanguage = 'en'\nauthor = 'Author'\nowner_name = 'Owner'\nowner_email = 'owner@example.com'\ncategories = ['Arts']\nexplicit = false\nsite_url = 'https://example.com'\nimage_path = 'cover.jpg'\n";
@@ -55,9 +56,10 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
     async delete(input: string | string[]) { for (const key of typeof input === "string" ? [input] : input) entries.delete(key); },
   };
   const env = { CASTLOOP_BUCKET: bucket } as never;
-  await bucket.put("system/show-publications/daily.json", JSON.stringify({ schema_version: 2, show_id: "daily",
-    lifecycle: options.active ? "active" : "draft", generation: 0, feed_generation: 0 }));
   await bucket.put("system/service.toml", PUBLICATION_SERVICE_TEXT);
+  if (options.active) await bucket.put("system/show-publications/daily.json", JSON.stringify({ schema_version: 2, show_id: "daily",
+    lifecycle: "active", generation: 0, feed_generation: 0 }));
+  else await reserveM6Show(env, { schema_version: 1, service_id: "service", show_id: "daily", reservation_id: crypto.randomUUID(), action: "reserve" });
   if (options.active) {
     await bucket.put("system/shows/daily/show.toml", PUBLICATION_SHOW_TEXT.replace("New Show title", "Old Show title"));
     await bucket.put("public/podcasts/daily/cover.jpg", Uint8Array.from([255, 216, 255, 1]));

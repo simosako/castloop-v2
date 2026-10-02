@@ -41,6 +41,8 @@ describe("M6 lifecycle schemas", () => {
   test("Show controls reject legacy records, unknown fields and inconsistent owners", () => {
     const control = { schema_version: 2, show_id: "daily", lifecycle: "active", generation: 1, feed_generation: 0 };
     expect(parseShowControl(control).owner).toBeUndefined();
+    expect(showControlSchema.safeParse({ ...control, reservation_id: crypto.randomUUID() }).success).toBe(true);
+    expect(showControlSchema.safeParse({ ...control, reservation_id: "private" }).success).toBe(false);
     expect(showControlSchema.safeParse({ job_id: request.job_id, state: "free" }).success).toBe(false);
     expect(showControlSchema.safeParse({ ...control, publish: false }).success).toBe(false);
     const owner = { job_id: request.job_id, kind: "episode", episode_id: "first", action: "delete",

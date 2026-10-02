@@ -49,9 +49,9 @@ export class M6AdminJsonClient {
     this.transport = transport;
   }
 
-  async post(route: "staging" | "publication" | "lifecycle", input: object): Promise<unknown> {
-    if (!["staging", "publication", "lifecycle"].includes(route)) throw new Error("Unknown M6 administration route");
-    const label = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle" }[route];
+  async post(route: "staging" | "publication" | "lifecycle" | "shows", input: object): Promise<unknown> {
+    if (!["staging", "publication", "lifecycle", "shows"].includes(route)) throw new Error("Unknown M6 administration route");
+    const label = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration" }[route];
     const body = JSON.stringify(input);
     if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
     let response: Response;

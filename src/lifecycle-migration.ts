@@ -143,6 +143,9 @@ export async function planLifecycleMigration(env: MigrationReadEnv,
         ? parseShowControl(input) : legacyAdmissionSchema.parse(input);
     });
     const existing = admission && "schema_version" in admission ? admission : null;
+    if (existing?.reservation_id && existing.reservation_id !== reservation?.reservation_id) {
+      block("target_mismatch", controlKey, "Show control and reservation have different registration IDs");
+    }
     if (existing && existing.show_id !== showId) block("target_mismatch", controlKey, "Show control does not match its key");
     if (metadata && !objects.has(controlKey)) {
       block("missing_publication_record", controlKey, "Published legacy Show is missing its publication admission record");

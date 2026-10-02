@@ -2,6 +2,7 @@ import { controlRequestSchema, parseControlRequest, parseEpisodeLifecycle, parse
   parseLifecycleProgress, parseShowControl,
   permitsControlAction, stringifyLifecycleToml, validateId } from "../packages/shared/src/index";
 import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/shared/src/index";
+import { requireShowReservationReady } from "./show-reservation-record";
 
 export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head"> };
 export type LifecycleReadEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head"> };
@@ -76,6 +77,7 @@ async function freezeRequest(env: LifecycleControlEnv, request: ControlRequest, 
 
 async function requireEligibleTarget(env: LifecycleControlEnv, control: ShowControl,
   request: ControlRequest, options: { allowNewEpisodeDraft?: boolean } = {}): Promise<void> {
+  await requireShowReservationReady(env, control);
   if (control.generation !== request.expected_show_generation) {
     throw new Error("Show generation changed; inspect the current state before retrying");
   }
@@ -118,6 +120,7 @@ export async function claimShowOperation(env: LifecycleControlEnv, input: unknow
   const request = controlRequestSchema.parse(input);
   const current = await readShowControl(env, request.show_id);
   if (!current) throw new Error("Show lifecycle control is not initialized");
+  await requireShowReservationReady(env, current.value);
   const hash = await requestHash(request);
   if (current.value.owner) {
     if (!ownsRequest(current.value, request, hash)) throw new Error("Show has an unfinished operation");
@@ -148,6 +151,7 @@ async function requireOwnedOperation(env: LifecycleControlEnv, showId: string,
   if (!current || current.value.generation !== expectedGeneration || current.value.owner?.job_id !== jobId) {
     throw new Error("Operation no longer owns the Show");
   }
+  await requireShowReservationReady(env, current.value);
   const frozen = await env.CASTLOOP_BUCKET.get(`system/jobs/${jobId}/request.toml`);
   if (!frozen) throw new Error("Frozen control request is missing");
   checkRecordSize(frozen);

@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 新規Showの永久ID予約とdraft制御を内部API/clientへ接続
+
+- 新規Show controlの任意`reservation_id`とlegacy形式の予約recordを使い、control keyの条件付き新規作成でIDを取得した後に同IDの予約を補完するようにした。partial登録は共通受付/対象適格性/owner検査で拒否し、既存/advanced/削除済みcontrolを再初期化しない。
+- strictな内部`POST /admin/shows`のreserve/非書込statusと`ShowRegistrationClient`を未公開fetch結合へ追加した。認証/service/readiness/version/cache owner/paused gate、固定診断、exact receipt照合と未知応答非再送を維持する。公開candidate/CLIの書込gateは閉じたままである。
+- Show初回publication fixtureの手動control投入を登録helperへ置き換えた。Show/Episodeの新規初期化・staging/publication/Queueと停止/再開/削除まで回帰し、永久ID/予約保持・削除後再登録拒否を確認した。control/予約PUT前後応答喪失・同ID/別ID競合・late orphan/foreign record、service IO完了前のtoken保持とpauseも検証した。移行inventoryはcontrol/予約ID不一致を拒否する。
+- 全708テスト/11372 assertions、TypeScript/M6実証tsconfig、candidate/bridge browser bundle、内部client Bun bundle、Linux単一バイナリbuild/version/help、`git diff --check`に合格。binaryは現行CLIの回帰確認で、新しい書込commandは含めていない。Cloudflareへの書込/deploy・既存環境変更は行わない。
+- 公開CLIと登録の送信前durable journal、移行full cutover/復旧・実機受け入れは残る。詳細は`m6_show_registration.md`。
+
 ## 2026-10-02: 新規Episode draftの初期化をstaging受付へ接続
 
 - metadata/audioの最初のstagingで、期待Episode generation=0・既存公開/staging data不在を照会し、Show共通CASのexact stage owner取得後にdraft制御を条件付き新規作成するようにした。初期化はready progress/PUT permissionより先で、本文・GUID・secretを保持recordへ追加しない。

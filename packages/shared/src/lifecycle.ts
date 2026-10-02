@@ -35,6 +35,7 @@ const operationOwnerSchema = z.object({
 export const showControlSchema = z.object({
   schema_version: z.literal(2),
   show_id: slug(32),
+  reservation_id: z.uuid().optional(),
   lifecycle: lifecycleStateSchema,
   generation,
   feed_generation: generation,
