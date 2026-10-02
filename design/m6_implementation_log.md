@@ -1,5 +1,11 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: CLIのMP3解析をowned descriptor/非追従streamへ変更
+
+- ローカルM6 upload要求の組立に先立ち、共通`analyzeAudio`をno-follow/nonblocking regular-file descriptorとbounded streamへ変更した。300MB上限はstream/parser開始前に検査し、size/mtime/ctimeを解析前後で照合する。parser終了時はstreamの停止と残存read Promiseをawaitしてからdescriptorを閉じる。
+- Bunのfile stream destroyがdescriptorを閉じる挙動に依存せず、明示所有したdescriptorから64KiBずつ読むbyte-mode streamを使う。既存のMP3 codec/丸め秒数検査とCBR/VBR解析を維持し、symlink/directory/FIFO・空/過大/非MP3の拒否を回帰した。
+- 全737テスト/11654 assertions、TypeScriptとLinux単一バイナリbuildに合格。既存CLIの入力解析を改善しただけで、M6公開gate・REST単一PUT/U1・Cloudflare環境を変更しない。次は検査済みlocal入力からのstaging manifest/journal準備を接続する。
+
 ## 2026-10-02: 内部状態照会もlocal journalの読取前後照合へ統一
 
 - staging/publication/lifecycleの内部`inspect*Operation`へstatus完了後のlocal journal再検査を追加した。途中phase/receipt/request変更では古いclient stateと新しいserver statusを成功snapshotとして返さない。既存Show登録inspectorと同様、phase修復・再送・local lock/token奪取はしない。
