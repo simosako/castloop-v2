@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { migrationBridgePreparationSchema, migrationBridgeUploadSchema } from "@castloop/shared";
+import { legacyWorkerInspectionSchema, migrationBridgePreparationSchema, migrationBridgeUploadSchema } from "@castloop/shared";
 import { CloudflareApi } from "./cloudflare-api";
-import { buildMigrationBridgeUpload } from "./migration-bridge-deployment";
+import { buildMigrationBridgeUpload, inspectLegacyServiceDeployment } from "./migration-bridge-deployment";
 import type { MigrationBridgeReads } from "./migration-bridge-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
 
@@ -35,6 +35,26 @@ describe("read-only initial migration bridge preparation", () => {
     }
   });
 
+  test("read-only inspection shares preparation checks without generating IDs, freezing upload bytes or authorizing mutations", async () => {
+    const setup = fixture();
+    const report = await inspectLegacyServiceDeployment(setup.config, setup.legacyVersionId, setup.reads);
+    expect(legacyWorkerInspectionSchema.parse(report)).toEqual(report);
+    const prepared = await setup.prepare();
+    expect(report.legacy_version_profile_sha256).toBe(prepared.request.legacy_version_profile_sha256);
+    expect(report.legacy_settings_sha256).toBe(prepared.request.legacy_settings_sha256);
+    expect(report.legacy_deployment_id).toBe(prepared.request.legacy_deployment_id);
+    expect(report).toMatchObject({ snapshot_only: true, authorizes_deployment: false,
+      authorizes_mutation: false, authorizes_recovery: false, authorizes_migration_completion: false });
+    for (const value of [setup.config.account_id, setup.bridgeId, setup.source, "private@example.com", "original-kv"] ) {
+      expect(JSON.stringify(report)).not.toContain(value);
+    }
+    for (const key of ["authorizes_deployment", "authorizes_mutation", "authorizes_recovery", "authorizes_migration_completion"]) {
+      expect(legacyWorkerInspectionSchema.safeParse({ ...report, [key]: true }).success).toBe(false);
+    }
+    expect(legacyWorkerInspectionSchema.safeParse({ ...report, arbitrary: "private" }).success).toBe(false);
+    await expect(inspectLegacyServiceDeployment(setup.config, crypto.randomUUID(), setup.reads)).rejects.toThrow("single legacy version");
+  });
+
   test("observed cross-version flags remain explicit and are never inferred from omission", async () => {
     for (const enabled of [true, false]) {
       const setup = fixture();
@@ -43,6 +63,60 @@ describe("read-only initial migration bridge preparation", () => {
       expect(result.request.legacy_cross_version_cache).toBe(enabled ? "enabled" : "disabled");
       expect(result.metadata.cache_options.cross_version_cache).toBe(false);
     }
+  });
+
+  test("observed legacy omissions require a closed downloaded module and matching explicit cache and empty flags", async () => {
+    const setup = fixture();
+    const version = { id: setup.legacyVersionId, resources: { bindings: setup.version.resources.bindings,
+      script: { handlers: ["fetch", "queue"] }, script_runtime: { compatibility_date: "2026-09-30",
+        cache_options: { enabled: true, cross_version_cache: false } } } };
+    const settings = { ...setup.settings, compatibility_flags: [], cache_options: { enabled: true, cross_version_cache: false } };
+    let downloads = 0;
+    const module = 'export default {fetch(){return new Response("private source")},queue(){}};';
+    const reads: MigrationBridgeReads = { ...setup.reads, version: async () => version, settings: async () => settings,
+      script: async () => {
+        downloads += 1;
+        const form = new FormData();
+        form.append("index.js", new Blob([module], { type: "application/javascript+module" }), "index.js");
+        return new Response(form);
+      } };
+    const first = await setup.prepare(reads);
+    const second = await setup.prepare(reads);
+    expect(downloads).toBe(4);
+    expect(first).toEqual(second);
+    expect(first.request.legacy_default_cache_enabled).toBe(true);
+    expect(first.request.legacy_cross_version_cache).toBe("disabled");
+    expect(first.request.legacy_previews_enabled).toBe(true);
+    expect(first.metadata.compatibility_flags).toEqual(["enable_ctx_exports"]);
+    expect(JSON.stringify(first.request)).not.toContain("private source");
+    await expect(setup.prepare({ ...reads, script: undefined })).rejects.toThrow("module inspection");
+    await expect(setup.prepare({ ...reads, settings: async () => setup.settings })).rejects.toThrow("explicitly empty");
+    await expect(setup.prepare({ ...reads, settings: async () => ({ ...settings, compatibility_flags: undefined }) })).rejects.toThrow("explicitly empty");
+    await expect(setup.prepare({ ...reads, settings: async () => ({ ...settings, exports: setup.version.resources.script_runtime.exports }) })).rejects.toThrow("inherited global cache");
+    await expect(setup.prepare({ ...reads, settings: async () => ({ ...settings, cache_options: { enabled: true } }) })).rejects.toThrow("inherited global cache");
+    await expect(setup.prepare({ ...reads, version: async () => ({ ...version, resources: { ...version.resources,
+      script_runtime: { ...version.resources.script_runtime, cache_options: undefined } } }) })).rejects.toThrow("inherited global cache");
+    await expect(setup.prepare({ ...reads, script: async () => new Response("export default {}; export class Hidden {}",
+      { headers: { "Content-Type": "application/javascript" } }) })).rejects.toThrow("no deployment is authorized");
+  });
+
+  test("source changes and normal metadata changes remain fail-closed on legacy fallback", async () => {
+    const setup = fixture();
+    const version = { id: setup.legacyVersionId, resources: { bindings: setup.version.resources.bindings,
+      script: { handlers: ["fetch", "queue"] }, script_runtime: { compatibility_date: "2026-09-30", cache_options: { enabled: true } } } };
+    const settings = { ...setup.settings, compatibility_flags: [] };
+    const reads: MigrationBridgeReads = { ...setup.reads, version: async () => version, settings: async () => settings,
+      script: async () => new Response("export default {};", { headers: { "Content-Type": "application/javascript" } }) };
+    let downloaded = 0;
+    await expect(setup.prepare({ ...reads, script: async () => new Response(`export default {value:${++downloaded}};`,
+      { headers: { "Content-Type": "application/javascript" } }) })).rejects.toThrow("module changed");
+    let observed = 0;
+    await expect(setup.prepare({ ...reads, settings: async () => ({ ...settings,
+      tags: ++observed === 1 ? ["before"] : ["after"] }) })).rejects.toThrow("changed");
+    const original = await setup.prepare(reads);
+    const changed = await setup.prepare({ ...reads, script: async () => new Response("export default {value:1};",
+      { headers: { "Content-Type": "application/javascript" } }) });
+    expect(changed.request.legacy_version_profile_sha256).not.toBe(original.request.legacy_version_profile_sha256);
   });
 
   test("another version/partial rollout/custom domain/disabled workers.dev cannot be a preparation target", async () => {

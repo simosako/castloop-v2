@@ -1,10 +1,11 @@
 import { migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
   workerSubdomainSnapshotSchema } from "@castloop/shared";
-import type { MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
+import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
   M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
 import { buildMigrationCandidateUpload, inspectM6WorkerDeployment, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
-import { inspectMigrationBridgeDeployment, prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
+import { inspectLegacyServiceDeployment, inspectMigrationBridgeDeployment, prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
+import type { MigrationBridgeReads } from "./migration-bridge-deployment";
 import { createHash } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
 
@@ -263,16 +264,25 @@ export class CloudflareApi {
     return value;
   }
 
-  async prepareMigrationBridge(config: ServiceConfig, legacyVersionId: string, bridgeId: string, source: string):
-    Promise<{ request: MigrationBridgePreparation; metadata: MigrationBridgeUpload }> {
+  private legacyDeploymentReads(config: ServiceConfig): MigrationBridgeReads {
     const path = this.migrationWorkerPath(config);
-    return prepareMigrationBridgeDeployment(config, legacyVersionId, bridgeId, source, {
+    return {
       deployments: () => this.json<unknown>("GET", `${path}/deployments`),
       settings: () => this.json<unknown>("GET", `${path}/settings`),
       version: (id) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(id)}`),
       subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
       domains: () => this.workerDomains("service", config.worker_name),
-    });
+      script: () => this.request("GET", path),
+    };
+  }
+
+  async inspectLegacyService(config: ServiceConfig, legacyVersionId: string): Promise<LegacyWorkerInspection> {
+    return inspectLegacyServiceDeployment(config, legacyVersionId, this.legacyDeploymentReads(config));
+  }
+
+  async prepareMigrationBridge(config: ServiceConfig, legacyVersionId: string, bridgeId: string, source: string):
+    Promise<{ request: MigrationBridgePreparation; metadata: MigrationBridgeUpload }> {
+    return prepareMigrationBridgeDeployment(config, legacyVersionId, bridgeId, source, this.legacyDeploymentReads(config));
   }
 
   async uploadMigrationBridge(config: ServiceConfig, input: MigrationBridgeDeploymentRequest, source: string, metadataInput: object): Promise<void> {

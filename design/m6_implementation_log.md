@@ -1,5 +1,18 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 非書込legacy移行preflightをCLI/単一バイナリへ接続
+
+- `migration-preflight LEGACY_VERSION_ID`を追加した。準備helperと同じGET snapshot検査を使い、期待versionの単独100%・settings/bindings/cache/preview・default-only module・前後不変を照合する。UUID/upload metadata/lock/journalを作らず、admin secret/state/Worker管理POSTを使わない。
+- strict reportからaccount ID/source/binding本文を除き、snapshotだけでdeploy/mutation/recovery/migration completionを許可しない固定falseを返す。subprocessで実形式の省略項目・GET-only 10件・変更/不正引数/foreign origin拒否・壊れたsecret/state非読取・全local file不変を回帰した。
+- 同じ既存`smoke-20260930`へLinux x86-64 standalone binaryから照合し、期待version/deployment/cache/preview一致、TOMLだけのprivate workspace不変・journalなしを確認した。Cloudflare書込/deploy/配信停止・実移行・破壊的試験は行っていない。
+- 全670テスト/11019 assertions、`npm run check`、M6実証tsconfig、candidate/bridge browser bundle、Linux binary buildに合格した。未公開書込commandとM6 readiness gateは維持する。詳細は`m6_migration_bridge_preparation.md`。
+
+## 2026-10-02: legacy version RESTの省略項目をコード解析で裏付ける
+
+- legacy初回bridge準備だけにexports/named_handlers/空flags省略の対応を追加した。4MiB以下の単一module GETを前後で解析し、default-only/importなし、UTF-8/size/同hashを検査する。filenameなしの`index.js` text partも、実REST形式として確認した。remote codeは実行せず、source本文はjournalへ残さない。
+- flags省略は明示settings空配列、exports省略はper-entrypoint設定なし・version/settings global cache一致を要求する。M6/bridge schema、旧IO・cache・移行完了・公開CLI gateは変更しない。
+- 既存`smoke-20260930`環境で実adapterのGET-only検査が合格した。service GET 1件+準備GET 10件だけで、journal保存・Cloudflare POST/PUT・deploy/R2書込はない。限定準備経路の実応答確認であり、full cutover合格ではない。
+
 ## 2026-10-02: 外部公開originのbounded HTTP inspectorを追加
 
 - 公開path parserをsharedへ移し、Worker互換exportを維持した。未公開CLI helperでstrictな凍結plan/service/versionと公開originを検査し、1〜20 assetsのHEAD/GET/1-byte Range/304を順次確認する。管理credentialsを添付せず、redirect/自動retry/本文の全量バッファを使わない。

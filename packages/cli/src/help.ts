@@ -65,6 +65,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Use --local to inspect the local setup journal and lock without network access or credentials; remote state is not checked.\n" +
       "This does not deploy, initialize controls, resume writes, remove locks or certify M6 readiness. Legacy Workers do not provide the remote route.",
   },
+  "migration-preflight": {
+    usage: "migration-preflight LEGACY_VERSION_ID",
+    description: "Run from the service workspace. Inspect the expected single legacy Worker version through Cloudflare REST GETs only.\n" +
+      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. No administrator key or Wrangler is needed.\n" +
+      "This snapshot does not deploy, pause, save a journal, prove old IO termination or authorize migration completion or recovery.",
+  },
   "local-operation-status": {
     usage: "local-operation-status FAMILY ID",
     description: "Run from the service workspace. Read a local M6 staging, publication or lifecycle journal and observe its lock.\n" +

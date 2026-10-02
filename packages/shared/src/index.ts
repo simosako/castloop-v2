@@ -41,6 +41,8 @@ export { migrationCandidateUploadSchema } from "./worker-deployment";
 export type { MigrationCandidateUpload } from "./worker-deployment";
 export { migrationBridgeUploadSchema, migrationBridgePreparationSchema } from "./worker-deployment";
 export type { MigrationBridgeUpload, MigrationBridgePreparation } from "./worker-deployment";
+export { legacyWorkerInspectionSchema } from "./worker-deployment";
+export type { LegacyWorkerInspection } from "./worker-deployment";
 export { migrationBridgeDeploymentRequestSchema, migrationBridgeDeploymentEvidenceSchema, migrationBridgeClientStateSchema } from "./worker-deployment";
 export type { MigrationBridgeDeploymentRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeClientState } from "./worker-deployment";
 export { migrationServiceIdentitySchema, migrationOperationIdentitySchema, migrationPauseRequestSchema,

@@ -91,6 +91,12 @@ export const migrationBridgePreparationSchema = z.object({
 }).strict();
 export type MigrationBridgePreparation = z.infer<typeof migrationBridgePreparationSchema>;
 
+export const legacyWorkerInspectionSchema = migrationBridgePreparationSchema.omit({
+  account_id: true, bridge_id: true, worker_source_sha256: true, worker_metadata_sha256: true,
+}).extend({ snapshot_only: z.literal(true), authorizes_deployment: z.literal(false), authorizes_mutation: z.literal(false),
+  authorizes_recovery: z.literal(false), authorizes_migration_completion: z.literal(false) }).strict();
+export type LegacyWorkerInspection = z.infer<typeof legacyWorkerInspectionSchema>;
+
 export const migrationBridgeDeploymentRequestSchema = z.object({
   schema_version: z.literal(1), preparation: migrationBridgePreparationSchema,
   administrator_writes_stopped: z.literal(true), other_deployers_stopped: z.literal(true),

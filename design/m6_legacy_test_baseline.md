@@ -71,7 +71,11 @@ R2の全24 objectsを1ページで列挙した。公開領域はfeed/cover、2 E
 
 ### 移行adapterで対応すべき実REST形状
 
-この旧Workerのversion GETでは`resources.script.named_handlers`、`resources.script_runtime.compatibility_flags`、`resources.script_runtime.exports`が省略されていた。settings GETでもexportsがなく、compatibility_flagsは空配列である。現在のlegacy移行version schemaはこれらのversion項目を必須としているため、初回bridgeのread-only準備adapterに実応答互換性の残件がある。省略を無条件にM6 runtime証拠や安全なdefault-only/cache設定とみなさず、legacy限定の補完・裏付けと回帰検証を検討する。今回schema修正・移行準備POST・deployは行わない。
+この旧Workerのversion GETでは`resources.script.named_handlers`、`resources.script_runtime.compatibility_flags`、`resources.script_runtime.exports`が省略されていた。settings GETでもexportsがなく、compatibility_flagsは空配列である。最初の再確認時点ではlegacy移行version schemaがこれらを必須としており、初回bridgeのread-only準備adapterに実応答互換性の残件があった。省略を無条件にM6 runtime証拠や安全なdefault-only/cache設定とみなさず、legacy限定の裏付けを検討した。基準確認時にはschema修正・移行準備POST・deployを行わなかった。
+
+その後の開発でlegacy限定のmodule解析/前後hash照合と明示settings照合を追加した。更新後adapterのGET-only準備検査はこの同じversionで合格した。元の観測時点の互換性問題は解消したが、M6/bridgeのruntime必須fieldや本番移行gateは緩和しない。準備結果は保存せず、Cloudflare変更も行わない。`m6_migration_bridge_preparation.md`参照。
+
+さらにこのcheckoutからbuildしたLinux単一バイナリの`migration-preflight`も、service TOMLだけの一時workspaceで同じversion/deploymentを照合して合格した。admin secret/state不要、TOML不変・journalなし、変更/復旧/移行完了の許可falseを確認した。診断commandの合格であり、旧IO収束や実移行の合格ではない。
 
 ## この環境を使う順序
 
