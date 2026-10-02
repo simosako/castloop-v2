@@ -1,5 +1,11 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: frozen下書き履歴を残して次draftへ切替
+
+- `rotateLocalDraft`を追加し、target排他とexact local committed journal再照合の下で旧frozen recordをprivate historyへ先にfsync保存し、新editable headをatomic renameする。既存同内容archiveからの続行を認め、異なるhistory/過去ID/publication ID/lock/未凍結recordを拒否する。
+- 同next IDの再呼出でもphase/uploadを再初期化せず、旧handleから新headの編集を拒否する。commitとpublication完了を区別し、remote owner解放/current revision/consumer終了の推定はしない。
+- Show/Episodeの履歴保持・archive後中断相当の再開・異なるhistory保持・不正/missing/editable/lock拒否を回帰した。9対象テスト/64 assertionsとTypeScriptに合格。公開gate/Cloudflare環境は変更しない。次はtarget journalを準備/runner全体の排他へ接続する。
+
 ## 2026-10-02: target別draft ID・upload参照・publication freezeを永続化
 
 - private/strictなtarget別local draft journalを追加し、service identity・draft/base IDを固定した。prepared uploadを送信前にslotへ記録し、未解決/lock/foreign uploadの置換を拒否する。finished後の置換でも過去のoperation journalは保持する。

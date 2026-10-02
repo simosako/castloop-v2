@@ -17,4 +17,10 @@ private file/directory、exclusive create、file/directory fsync、temp rename�
 2. `publication_prepared`: prepared publication journalのexact target、draft、base、upload集合、finished/staged receiptを照合してhashを固定する。以降は編集不可。claimより前にこの状態へ移す。
 3. `frozen`: exact local publication journalのacknowledged `committed`だけを受けて移す。status観測、R2 marker観測、時間、HEAD不在で完了を認定しない。
 
-現時点で新jobへのrotationは拒否する。凍結済みrecordの履歴保存と次draftへの明示切替、準備helper/runnerとの一体化、公開CLI、unknown outcomeの外部復旧、Cloudflare受け入れは次の実装単位。内部helperの自動testは実機受け入れではない。
+## 次の下書き
+
+`rotateLocalDraft`はtarget排他下で旧frozen recordとexact acknowledged commitを再照合する。旧recordを`history/<old-job>.json`へexclusive保存・fsyncしてから新しいeditable headをatomic renameする。過去history/publication IDは再利用不可。archiveだけ保存して中断した場合、exact同内容のarchiveだけを認めて続行できる。異なるhistoryは上書きしない。旧journal handleは新headを編集できない。
+
+新headが既に指定IDなら同identity/baseのhandleだけを返し、phaseやuploadを初期化しない。新しいEpisode base IDはcallerが指定するが、current revisionやconsumer終了を証明するものではなく、server側のadmission/current/base照合を省略しない。commitはpublication完了ではなく、rotationはremote ownerを解放せず、進行中consumerへ割り込まない。
+
+準備helper/runnerとの一体化、公開CLI、unknown outcomeの外部復旧、Cloudflare受け入れは残る。内部helperの自動testは実機受け入れではない。

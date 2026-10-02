@@ -92,7 +92,7 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
   draftJobId: string, baseRevisionId?: string): LocalDraftJournal {
   const config = serviceConfigSchema.parse(configInput);
   const initial = validateLocalDraftState({ schema_version: 1, identity: showRegistrationIdentity(config), target,
-    draft_job_id: draftJobId, ...(baseRevisionId ? { base_revision_id: baseRevisionId } : {}), phase: "editable", uploads: [] });
+    draft_job_id: draftJobId, ...(baseRevisionId !== undefined ? { base_revision_id: baseRevisionId } : {}), phase: "editable", uploads: [] });
   checkDirectories(root, config, true);
   const file = draftFile(root, config, initial.target);
   if (present(`${file}.lock`)) throw new Error("Preserve the retained local draft lock; it cannot be stolen");
@@ -184,4 +184,46 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
     try { fsyncSync(fd); syncDirectory(dirname(file)); load(); return await callback(editor); }
     finally { locked = false; closeSync(fd); unlinkSync(`${file}.lock`); syncDirectory(dirname(file)); }
   } };
+}
+
+export async function rotateLocalDraft(root: string, configInput: ServiceConfig, targetInput: LocalDraftTarget,
+  nextJobId: string, baseRevisionId?: string): Promise<LocalDraftJournal> {
+  const config = serviceConfigSchema.parse(configInput);
+  const target = targetSchema.parse(targetInput);
+  const next = validateLocalDraftState({ schema_version: 1, identity: showRegistrationIdentity(config), target,
+    draft_job_id: nextJobId, ...(baseRevisionId !== undefined ? { base_revision_id: baseRevisionId } : {}), phase: "editable", uploads: [] });
+  const snapshot = readLocalDraft(root, config, target);
+  const previous = snapshot.client_state;
+  if (!previous || snapshot.lock_present) throw new Error("Next draft requires its retained predecessor without a client lock");
+  if (previous.draft_job_id === nextJobId) return createLocalDraftJournal(root, config, target, nextJobId, baseRevisionId);
+  const journal = createLocalDraftJournal(root, config, target, previous.draft_job_id, previous.base_revision_id);
+  await journal.exclusively(async (editor) => {
+    if (editor.load().phase !== "frozen") throw new Error("Only an acknowledged frozen draft can become a predecessor");
+    editor.acknowledgeCommit();
+    const frozen = editor.load();
+    const archiveDirectory = join(dirname(draftFile(root, config, target)), "history");
+    if (!present(archiveDirectory)) { mkdirSync(archiveDirectory, { mode: 0o700 }); syncDirectory(dirname(archiveDirectory)); }
+    if (!lstatSync(archiveDirectory).isDirectory()) throw new Error("Draft history must be a real directory, not a symlink");
+    const nextPublication = readLocalPublicationJob(root, config, nextJobId);
+    if (present(join(archiveDirectory, `${nextJobId}.json`)) || nextPublication.client_state || nextPublication.lock_present) {
+      throw new Error("A retained draft or publication identity cannot be reused for new edits");
+    }
+    const archive = join(archiveDirectory, `${frozen.draft_job_id}.json`);
+    if (present(archive)) {
+      if (JSON.stringify(validateLocalDraftState(readBoundedLocalJournal(archive))) !== JSON.stringify(frozen)) {
+        throw new Error("Preserve the different retained draft history record");
+      }
+    } else {
+      const fd = openSync(archive, "wx", 0o600);
+      try { writeFileSync(fd, JSON.stringify(frozen)); fsyncSync(fd); } finally { closeSync(fd); }
+      syncDirectory(archiveDirectory);
+    }
+    const file = draftFile(root, config, target);
+    const temp = `${file}.${crypto.randomUUID()}.tmp`;
+    const fd = openSync(temp, "wx", 0o600);
+    try { writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
+    renameSync(temp, file);
+    syncDirectory(dirname(file));
+  });
+  return createLocalDraftJournal(root, config, target, nextJobId, baseRevisionId);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { stringifyToml } from "@castloop/shared";
-import { createLocalDraftJournal, readLocalDraft, validateLocalDraftState } from "./local-draft-journal";
+import { createLocalDraftJournal, readLocalDraft, rotateLocalDraft, validateLocalDraftState } from "./local-draft-journal";
 import { prepareLocalPublication } from "./local-publication-preparation";
 import { prepareLocalStagingUpload } from "./local-staging-preparation";
 import { PublicationAdminClient } from "./publication-client";
@@ -118,6 +118,25 @@ describe("durable target-local M6 draft identity", () => {
         });
         expect(setup.journal.load().phase).toBe("frozen");
         expect(setup.journal.load().publication_sha256).toBe(publication.journal.load().manifest_sha256);
+        const frozen = setup.journal.load();
+        const nextId = crypto.randomUUID();
+        const nextBase = episode ? setup.id : undefined;
+        const history = join(setup.root, ".castloop", "drafts", setup.config.service_id, "history");
+        mkdirSync(history);
+        const archive = join(history, `${setup.id}.json`);
+        writeFileSync(archive, JSON.stringify({ ...frozen, publication_sha256: "0".repeat(64) }));
+        await expect(rotateLocalDraft(setup.root, setup.config, setup.target, nextId, nextBase)).rejects.toThrow("history record");
+        expect(setup.journal.load()).toEqual(frozen);
+        writeFileSync(archive, JSON.stringify(frozen));
+        const next = await rotateLocalDraft(setup.root, setup.config, setup.target, nextId, nextBase);
+        expect(next.load().phase).toBe("editable");
+        expect(next.load().uploads).toEqual([]);
+        expect(next.load().base_revision_id).toBe(nextBase);
+        expect(() => setup.journal.load()).toThrow("different");
+        expect((await rotateLocalDraft(setup.root, setup.config, setup.target, nextId, nextBase)).load()).toEqual(next.load());
+        expect(JSON.parse(readFileSync(archive, "utf8"))).toEqual(frozen);
+        await expect(rotateLocalDraft(setup.root, setup.config, setup.target, setup.id)).rejects.toThrow();
+        expect(publication.journal.load().phase).toBe("committed");
       } finally { for (const stage of stages) await stage.sources.dispose(); setup.dispose(); }
     });
   }
@@ -161,6 +180,20 @@ describe("durable target-local M6 draft identity", () => {
         { ...state, uploads: [{ slot: "show", operation_id: crypto.randomUUID() }, { slot: "show", operation_id: crypto.randomUUID() }] }]) {
         expect(() => validateLocalDraftState(invalid)).toThrow();
       }
+    } finally { setup.dispose(); }
+  });
+
+  test("rotation refuses missing, editable, locked or invalid successor identities without changing the head", async () => {
+    const setup = await fixture();
+    try {
+      const bytes = readFileSync(setup.file, "utf8");
+      await expect(rotateLocalDraft(setup.root, setup.config, setup.target, crypto.randomUUID())).rejects.toThrow("frozen");
+      await expect(rotateLocalDraft(setup.root, setup.config, { kind: "show", show_id: "missing" }, crypto.randomUUID())).rejects.toThrow("predecessor");
+      await expect(rotateLocalDraft(setup.root, setup.config, setup.target, "invalid")).rejects.toThrow();
+      await expect(rotateLocalDraft(setup.root, setup.config, setup.target, crypto.randomUUID(), "")).rejects.toThrow();
+      writeFileSync(`${setup.file}.lock`, "retained");
+      await expect(rotateLocalDraft(setup.root, setup.config, setup.target, crypto.randomUUID())).rejects.toThrow("lock");
+      expect(readFileSync(setup.file, "utf8")).toBe(bytes);
     } finally { setup.dispose(); }
   });
 
