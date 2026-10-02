@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Publication同job retryを内部API/client/durable journalへ接続
+
+- exact operation/完全manifest hash/保持marker/request/未完了owner/generationとexecution・verification token不在を照合し、pause中も同jobだけを一回Queue送信する独立再キューを追加した。marker/status/progressや媒体を上書きせず、完了/foreign/未知tokenを拒否する。
+- client/runnerへ明示retryを接続し、commit応答保存済みからだけdurable通番/requested保存→一回POST→一致receipt保存へ進める。Queue応答喪失/receipt保存失敗/偽keyではrequestedを保持し、観測から再送・成功認定しない。
+- Show/Episode/metadata-only/audio-onlyのpurge失敗から同job完了、媒体/history保持、paused収束、live token、Queue応答喪失、disk失敗、変更manifest/marker、偽Episode key、通番飛ばし/巻戻し拒否を回帰した。`bun test`（601件、10145 assertions）、`npm run check`、候補Worker/内部handler browser bundleに合格。
+- 公開route/CLIは未接続で`m6_ready=false`を維持し、Cloudflare書込/deployは行っていない。unknown outcomeの外部復旧と公開gateは残る。詳細は`m6_publication_client.md`。
+
 ## 2026-10-02: 単一REST PUTとprivateな固定source snapshotを内部runnerへ接続
 
 - no-follow regular file/asset上限/size/全量SHA/stat照合、private/fsync済み一時snapshot、claim/begin/PUT前の最新source照合を追加した。本文/path/secretは保持journalへコピーせず、元ファイルは変更・削除しない。

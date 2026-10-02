@@ -7,8 +7,10 @@ import type { LifecycleControlEnv } from "./lifecycle-control";
 import { M6ManagementServiceMismatch, withM6ManagementInvocation, withM6ManagementRead } from "./m6-management";
 import { claimPublicationOperation, commitOwnedPublication, requireOwnedPublication } from "./publication-admission";
 import { inspectPublication } from "./publication-inspection";
+import { requeuePublicationOperation } from "./publication-consumer";
 
-export type PublicationAdminEnv = LifecycleControlEnv & { CASTLOOP_ADMIN_KEY: string };
+export type PublicationAdminEnv = LifecycleControlEnv & { CASTLOOP_ADMIN_KEY: string;
+  CASTLOOP_QUEUE: { send: (body: { object: { key: string } }) => Promise<unknown> } };
 
 function reply(input: object, status = 200): Response {
   return Response.json(input, { status, headers: { "Cache-Control": "no-store" } });
@@ -36,8 +38,13 @@ export async function handleM6PublicationAdmin(request: Request, env: Publicatio
           } });
         }
         const operation = { showId: input.operation.show_id, jobId: input.operation.job_id, generation: input.operation.show_generation };
-        const owned = await requireOwnedPublication(env, operation);
+        const owned = await requireOwnedPublication(env, operation, { allowPublishedResult: input.action === "retry" });
         if (await publicationManifestHash(owned.frozen) !== input.manifest_sha256) throw new Error("Publication input differs from its retained manifest");
+        if (input.action === "retry") {
+          const key = await requeuePublicationOperation(env, operation, async (key) => { await env.CASTLOOP_QUEUE.send({ object: { key } }); });
+          return publicationAdminResponseSchema.parse({ ...identity, result: "requeued", operation: input.operation,
+            manifest_sha256: input.manifest_sha256, key });
+        }
         const committed = await commitOwnedPublication(env, operation);
         return publicationAdminResponseSchema.parse({ ...identity, result: "committed", operation: input.operation,
           manifest_sha256: input.manifest_sha256, ...committed });

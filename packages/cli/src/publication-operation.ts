@@ -1,4 +1,4 @@
-import { publicationAdminResponseSchema, publicationRequestSchema, serviceConfigSchema } from "@castloop/shared";
+import { publicationAdminResponseSchema, publicationCommitKey, publicationRequestSchema, serviceConfigSchema } from "@castloop/shared";
 import type { PublicationAdminResponse, PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { PublicationAdminClient, publicationClientOperation } from "./publication-client";
 import { validatePublicationClientState } from "./publication-journal";
@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 
 type Receipt<Result extends PublicationAdminResponse["result"]> = Extract<PublicationAdminResponse, { result: Result }>;
 export type PublicationOperationEffects = { publication: PublicationRequest; claim: () => Promise<Receipt<"claimed">>;
-  commit: () => Promise<Receipt<"committed">>; status: () => Promise<Receipt<"status">> };
+  commit: () => Promise<Receipt<"committed">>; status: () => Promise<Receipt<"status">>; retry: () => Promise<Receipt<"requeued">> };
 
 function load(journal: PublicationJournal, effects: PublicationOperationEffects): PublicationClientState {
   const state = validatePublicationClientState(journal.load());
@@ -20,7 +20,8 @@ function load(journal: PublicationJournal, effects: PublicationOperationEffects)
 function receipt(state: PublicationClientState, input: unknown, expected: PublicationAdminResponse["result"]): PublicationAdminResponse {
   const value = publicationAdminResponseSchema.parse(input);
   if (value.service_id !== state.identity.service_id || value.result !== expected || value.manifest_sha256 !== state.manifest_sha256 ||
-    JSON.stringify(value.operation) !== JSON.stringify(publicationClientOperation(state.publication)) || value.result === "status" &&
+    JSON.stringify(value.operation) !== JSON.stringify(publicationClientOperation(state.publication)) ||
+    (value.result === "committed" || value.result === "requeued") && value.key !== publicationCommitKey(state.publication.commit) || value.result === "status" &&
     (JSON.stringify(value.publication) !== JSON.stringify(state.publication) ||
       value.request_sha256 !== createHash("sha256").update(JSON.stringify(state.publication.request)).digest("hex"))) {
     throw new Error("Publication receipt differs from the journal's frozen manifest/request");
@@ -63,8 +64,25 @@ export async function inspectPublicationOperation(journal: PublicationJournal, e
   return { client_state: state, server_status: status };
 }
 
+export async function runPublicationRetry(journal: PublicationJournal, effects: PublicationOperationEffects): Promise<void> {
+  await journal.exclusively(async () => {
+    const state = load(journal, effects);
+    if (state.phase !== "committed" || state.retry?.state === "requested") throw new Error("Publication retry outcome is unknown or its commit was not acknowledged; never replay its POST");
+    const status = receipt(state, await effects.status(), "status");
+    if (status.result !== "status" || status.ownership !== "held" || status.execution_active || !status.marker_present ||
+      status.status?.state === "published" || status.status?.state === "abandoned") {
+      throw new Error("Publication retry requires its unfinished held owner without active or unknown execution");
+    }
+    const started = validatePublicationClientState({ ...state, retry: { attempt: (state.retry?.attempt ?? 0) + 1, state: "requested" } });
+    journal.save(started);
+    const value = receipt(started, await effects.retry(), "requeued");
+    if (value.result !== "requeued") throw new Error("Invalid publication retry receipt");
+    journal.save({ ...started, retry: { ...started.retry!, state: "requeued", key: value.key } });
+  });
+}
+
 export function createPublicationOperationEffects(configInput: ServiceConfig, input: PublicationClientState, adminKey: string,
-  client?: Pick<PublicationAdminClient, "claim" | "commit" | "status">): PublicationOperationEffects {
+  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">): PublicationOperationEffects {
   const config = serviceConfigSchema.parse(configInput);
   const state = validatePublicationClientState(input);
   if (state.identity.service_id !== config.service_id || state.identity.account_id !== config.account_id ||
@@ -73,5 +91,5 @@ export function createPublicationOperationEffects(configInput: ServiceConfig, in
   }
   const api = client ?? new PublicationAdminClient(config, adminKey);
   const publication = state.publication;
-  return { publication, claim: () => api.claim(publication), commit: () => api.commit(publication), status: () => api.status(publication) };
+  return { publication, claim: () => api.claim(publication), commit: () => api.commit(publication), retry: () => api.retry(publication), status: () => api.status(publication) };
 }

@@ -12,6 +12,7 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 export const publicationAdminRequestSchema = z.discriminatedUnion("action", [
   z.object({ ...identity, action: z.literal("claim"), publication: publicationRequestSchema }).strict(),
   z.object({ ...identity, action: z.literal("commit"), operation: publicationOperationSchema, manifest_sha256: hash }).strict(),
+  z.object({ ...identity, action: z.literal("retry"), operation: publicationOperationSchema, manifest_sha256: hash }).strict(),
   z.object({ ...identity, action: z.literal("status"), publication: publicationRequestSchema }).strict(),
 ]);
 
@@ -25,6 +26,13 @@ export const publicationAdminResponseSchema = z.discriminatedUnion("result", [
       const parts = value.key.split("/");
       if (parts[2] !== value.operation.show_id || parts.at(-2) !== value.operation.job_id) {
         context.addIssue({ code: "custom", message: "Publication commit key does not match its operation" });
+      }
+    }),
+  z.object({ ...identity, result: z.literal("requeued"), operation: publicationOperationSchema,
+    manifest_sha256: hash, key: z.string().max(256).regex(commitKey) }).strict().superRefine((value, context) => {
+      const parts = value.key.split("/");
+      if (parts[2] !== value.operation.show_id || parts.at(-2) !== value.operation.job_id) {
+        context.addIssue({ code: "custom", message: "Publication retry key does not match its operation" });
       }
     }),
   z.object({ ...identity, result: z.literal("status"), publication: publicationRequestSchema, operation: publicationOperationSchema,

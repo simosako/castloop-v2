@@ -2,7 +2,9 @@ import { acquireShowExecution, controlRequestHash, readShowControl } from "./lif
 import type { ShowExecution } from "./lifecycle-control";
 import { LifecycleExecutionBusy, releaseSettledExecution } from "./lifecycle-consumer";
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
-import { InvalidFrozenPublication, parsePublicationCommitKey, readFrozenPublicationCommit } from "./publication-admission";
+import { InvalidFrozenPublication, parsePublicationCommitKey, publicationCommitKey, readFrozenPublicationCommit, requireOwnedPublication } from "./publication-admission";
+import type { PublicationOperation } from "./publication-admission";
+import type { LifecycleControlEnv } from "./lifecycle-control";
 import { runOwnedShowPublication } from "./publication-show-runner";
 import { runOwnedEpisodePublication } from "./publication-episode-runner";
 import type { PublicationEffects } from "./publication-inputs";
@@ -12,6 +14,20 @@ export type PublicationConsumerResult = { state: "completed" } |
   { state: "ignored"; reason: "unmatched_path" | "missing_marker" | "stale_operation" } |
   { state: "invalid"; reason: "invalid_frozen_publication" };
 export type PublicationEffectFactory = (execution: ShowExecution) => PublicationEffects | Promise<PublicationEffects>;
+
+export async function requeuePublicationOperation(env: LifecycleControlEnv, operation: PublicationOperation,
+  send: (key: string) => Promise<void>): Promise<string> {
+  const owned = await requireOwnedPublication(env, operation, { allowPublishedResult: true });
+  const key = publicationCommitKey(owned.frozen.commit);
+  const marker = await readFrozenPublicationCommit(env, key);
+  if (!marker || JSON.stringify(marker) !== JSON.stringify(owned.frozen)) throw new InvalidFrozenPublication();
+  const latest = await requireOwnedPublication(env, operation, { allowPublishedResult: true });
+  if (JSON.stringify(latest.frozen) !== JSON.stringify(marker)) throw new InvalidFrozenPublication();
+  if (latest.control.value.owner.execution_id || latest.control.value.owner.verification_id) throw new LifecycleExecutionBusy();
+  if (!["reserved", "processing"].includes(latest.control.value.owner.state)) throw new Error("Publication retry requires an unfinished non-upload owner");
+  await send(key);
+  return key;
+}
 
 export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string,
   source: PublicationEffects | PublicationEffectFactory, options: { digest?: StageStreamDigest } = {}): Promise<PublicationConsumerResult> {

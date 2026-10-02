@@ -5,6 +5,7 @@ import { readShowControl } from "../lifecycle-control";
 import type { LifecyclePurgeTarget } from "../lifecycle-cache";
 import type { M6CachedLoopback, M6CandidateEnv } from "../m6-routes";
 import { handleM6PublicationAdmin } from "../publication-admin";
+import type { PublicationAdminEnv } from "../publication-admin";
 import { stagingAdminFixture } from "./staging-admin";
 import { createHash } from "node:crypto";
 
@@ -46,14 +47,18 @@ export async function publicationAdminFixture(mode: "show" | "episode" | "metada
       committed_at: "2026-10-02T12:00:00Z",
     }, staged_uploads: stages.map((stage) => stage.operation_id) });
   const publicationOperation = { show_id: "daily", job_id: frozen.request.job_id, show_generation: frozen.request.expected_show_generation + 1 };
-  const body = (action: "claim" | "commit") => ({ schema_version: 1, service_id: "service", action,
+  const sent: string[] = [];
+  const env: PublicationAdminEnv = { ...setup.env, CASTLOOP_QUEUE: { send: async (body) => {
+    sent.push((body as { object: { key: string } }).object.key);
+  } } };
+  const body = (action: "claim" | "commit" | "retry") => ({ schema_version: 1, service_id: "service", action,
     ...(action === "claim" ? { publication: frozen } : { operation: publicationOperation,
       manifest_sha256: sha256(new TextEncoder().encode(JSON.stringify(frozen))) }) });
   const http = (input: unknown, secret = "private-secret", method = "POST") => new Request("https://current.example/admin/publication", {
     method, headers: { "X-Castloop-Key": secret }, ...(method === "POST" ? { body: JSON.stringify(input) } : {}),
   });
   const call = async (input: unknown) => {
-    const response = await handleM6PublicationAdmin(http(input), setup.env, setup.bindings);
+    const response = await handleM6PublicationAdmin(http(input), env, setup.bindings);
     if (!response) throw new Error("Publication API not handled");
     return response;
   };
@@ -66,10 +71,10 @@ export async function publicationAdminFixture(mode: "show" | "episode" | "metada
   const cachedAssets: M6CachedLoopback = Object.assign(() => ({ fetch: async () => new Response() }), {
     invalidate: async (target: LifecyclePurgeTarget) => { purges.push(target); }, ...setup.bindings.cachedAssets,
   });
-  const candidateEnv: M6CandidateEnv = { ...setup.env, CASTLOOP_BUCKET: setup.bucket as never,
+  const candidateEnv: M6CandidateEnv = { ...env, CASTLOOP_BUCKET: setup.bucket as never,
     CASTLOOP_VERSION_METADATA: { id: setup.versionId, tag: "", timestamp: "2026-10-02T12:00:00Z" },
     CASTLOOP_DLQ_NAME: setup.config.dlq_name, CASTLOOP_QUEUE: { send: async () => {} } as never };
   const markerKey = mode === "show" ? `staging/shows/daily/${publicationOperation.job_id}/commit.json` :
     `staging/episodes/daily/next/${publicationOperation.job_id}/commit.json`;
-  return { ...setup, base, stages, frozen, publicationOperation, body, http, call, publicationSuccess, markerKey, candidateEnv, cachedAssets, purges };
+  return { ...setup, env, sent, base, stages, frozen, publicationOperation, body, http, call, publicationSuccess, markerKey, candidateEnv, cachedAssets, purges };
 }

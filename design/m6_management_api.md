@@ -49,6 +49,7 @@
 | --- | --- | --- |
 | `claim` | 凍結する`publication` request/commit/staged_uploads | `claimed`とshow/job ID・取得generation・manifest hash。新規受付はopenだけ |
 | `commit` | `operation`と完全manifestの`manifest_sha256` | `committed`とmarker key/created/hash。既受付publicationはpause中にも収束できる |
+| `retry` | 同じ`operation`と完全manifestの`manifest_sha256` | `requeued`とexact marker key/hash。保持jobだけを一回Queue送信 |
 | `status` | 同じ完全な`publication` manifest | 非書込status/progress/owner/execution/marker観測。staging検証/復旧許可なし |
 
 manifest schemaをsharedへ移し、既存の`src/publication-admission.ts`のexportも互換re-exportとして保持した。Show/Episode commit schemaと既存RFC3339 timestamp検査もsharedの独立moduleへ移し、既存の検査条件を変えず、CLIがWorker側schemaをimportする必要をなくした。
@@ -59,7 +60,7 @@ claim/commitはfeed/cover/音源/current metadataを公開しない。commit mar
 
 commit応答喪失や最後のruntime gate失敗でも、既存marker/ownerは保持する。service token取得応答喪失はregistryを保持する。自動retry/新job作成は行わず、CLI側のdurable outcome照会と安全な明示復旧を別途完成する。
 
-未公開publication client/durable journalも接続した。commit前に完全manifest hashを保持manifestへ照合し、同jobでも変更された入力から古いstaged copyを黙って公開しない。claim/commitは別の明示操作で、各POST前にrequestedを保存する。状態照会は保持manifest/request/marker/status/progressだけを読み、staging/payload検証やtoken返却を行わない。unknown response/receipt保存失敗では後の観測からphaseを進めたり再送したりしない。詳細とローカル編集/source adapter/同job retry/外部復旧の残件は[`m6_publication_client.md`](./m6_publication_client.md)参照。
+未公開publication client/durable journalも接続した。commit前に完全manifest hashを保持manifestへ照合し、同jobでも変更された入力から古いstaged copyを黙って公開しない。claim/commitは別の明示操作で、各POST前にrequestedを保存する。状態照会は保持manifest/request/marker/status/progressだけを読み、staging/payload検証やtoken返却を行わない。unknown response/receipt保存失敗では後の観測からphaseを進めたり再送したりしない。retryも保持owner/marker/hash/tokenを検査し、private journalへ通番/requested保存後に一回だけ送信する。marker/status/progressは変更せず、Queue応答喪失でも自動再送しない。詳細とローカル編集/外部復旧の残件は[`m6_publication_client.md`](./m6_publication_client.md)参照。
 
 ## Lifecycleのwire契約
 
@@ -105,4 +106,4 @@ publicationは新しいstaging内部API→publication内部API→実M6 Queue ada
 
 lifecycleは6操作を内部API→M6 Queue adapterへローカル結合し、停止404・再開200・削除410、媒体/履歴の保持とbounded削除、兄弟Episode分離、運用記録保持を回帰した。preview非書込/非予約、完全request確認、削除の二つの明示確認、paused drain、live consumer中retry拒否、purge失敗から同job retry、Queue応答喪失非再送、過去status、不正/過大/途中変更record、candidate書込拒否も確認した。全504テスト/8550 assertionsと型・bundle・binary検査の合格はCloudflare実機の合格ではない。
 
-公開入口/CLI commandとローカルdraft stateへの接続、実REST/source adapter、publication同job retry、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
+内部REST/source adapterとpublication同job retryも追加したが、公開入口/CLI commandとローカルdraft stateへの接続、実Cloudflare REST/300MB、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。

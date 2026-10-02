@@ -11,7 +11,7 @@ import { publicationTestDigest } from "../../../src/test-support/episode-publica
 import { PublicationAdminClient } from "./publication-client";
 import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
 import type { PublicationJournal } from "./publication-journal";
-import { createPublicationOperationEffects, inspectPublicationOperation, runPublicationClaim, runPublicationCommit } from "./publication-operation";
+import { createPublicationOperationEffects, inspectPublicationOperation, runPublicationClaim, runPublicationCommit, runPublicationRetry } from "./publication-operation";
 import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -90,6 +90,126 @@ test("commit rejects a changed local manifest with unchanged job/target/generati
   expect((await readShowControl(setup.env, "daily"))!.value.owner?.job_id).toBe(setup.frozen.request.job_id);
   expect((await setup.client.status(setup.frozen)).manifest_sha256).toBe(await publicationManifestHash(setup.frozen));
   expect(setup.calls.filter((action) => action === "commit")).toHaveLength(1);
+});
+
+for (const mode of ["show", "episode", "metadata", "audio"] as const) {
+  test(`explicit same-job ${mode} retry preserves marker/media/history after purge failure`, async () => {
+    const setup = await fixture(mode);
+    await runPublicationClaim(setup.journal, setup.effects);
+    await runPublicationCommit(setup.journal, setup.effects);
+    const marker = await setup.bucket.head(setup.markerKey);
+    const invalidate = setup.cachedAssets.invalidate;
+    setup.cachedAssets.invalidate = async () => { throw new Error("Private purge exception"); };
+    await expect(setup.consume(setup.markerKey)).rejects.toThrow();
+    expect((await readShowControl(setup.env, "daily"))!.value.owner?.execution_id).toBeUndefined();
+    const before = await setup.client.status(setup.frozen);
+    expect(before.ownership).toBe("held");
+    expect(before.status?.state).toBe("retrying");
+    const records = [setup.markerKey, `system/jobs/${setup.frozen.request.job_id}/status.toml`, `system/jobs/${setup.frozen.request.job_id}/progress.toml`];
+    const old = records.map((key) => setup.text(key));
+    await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ ...setup.service, state: "paused", pause_id: crypto.randomUUID() }));
+    await runPublicationRetry(setup.journal, setup.effects);
+    expect(setup.journal.load().retry).toEqual({ attempt: 1, state: "requeued", key: setup.markerKey });
+    expect(setup.sent).toEqual([setup.markerKey]);
+    expect(records.map((key) => setup.text(key))).toEqual(old);
+    expect((await setup.bucket.head(setup.markerKey))!.etag).toBe(marker!.etag);
+    setup.cachedAssets.invalidate = invalidate;
+    await setup.consume(setup.sent[0]!);
+    expect((await setup.client.status(setup.frozen)).ownership).toBe("released");
+    await expect(runPublicationRetry(setup.journal, setup.effects)).rejects.toThrow("unfinished held owner");
+    await expect(setup.client.retry(setup.frozen)).rejects.toThrow("response was not verified");
+    expect(setup.sent).toHaveLength(1);
+    if (mode !== "show") {
+      const metadata = parseEpisodeRevision(setup.text("public/episodes/daily/next/metadata.toml"));
+      expect(metadata.revision_id).toBe(setup.frozen.request.job_id);
+      if (setup.base) expect(await setup.bucket.head(`public/episodes/daily/next/revisions/${setup.base.revision_id}.toml`)).not.toBeNull();
+    }
+  });
+}
+
+test("retry requires an acknowledged commit and never steals active/unknown consumer execution", async () => {
+  const setup = await fixture();
+  await expect(runPublicationRetry(setup.journal, setup.effects)).rejects.toThrow("never replay");
+  await setup.client.claim(setup.frozen);
+  await expect(setup.client.retry(setup.frozen)).rejects.toThrow("response was not verified");
+  await runPublicationClaim(setup.journal, setup.effects);
+  await runPublicationCommit(setup.journal, setup.effects);
+  const token = await acquireShowExecution(setup.env, "daily", setup.frozen.request.job_id, setup.publicationOperation.show_generation);
+  await expect(runPublicationRetry(setup.journal, setup.effects)).rejects.toThrow("unfinished held owner");
+  await expect(setup.client.retry(setup.frozen)).rejects.toThrow("response was not verified");
+  expect(setup.journal.load().retry).toBeUndefined();
+  expect(setup.sent).toEqual([]);
+  expect((await readShowControl(setup.env, "daily"))!.value.owner?.execution_id).toBe(token.executionId);
+});
+
+test("unknown retry response or receipt-save failure keeps requested and observation never permits replay", async () => {
+  for (const failure of ["response", "save", "queue"] as const) {
+    const setup = await fixture();
+    await runPublicationClaim(setup.journal, setup.effects);
+    await runPublicationCommit(setup.journal, setup.effects);
+    let saves = 0;
+    if (failure === "queue") setup.env.CASTLOOP_QUEUE.send = async (body) => {
+      setup.sent.push((body as { object: { key: string } }).object.key); throw new Error("Unknown Queue send result");
+    };
+    const effects = { ...setup.effects, retry: async () => {
+      const value = await setup.effects.retry();
+      if (failure === "response") throw new Error("Lost retry response");
+      return value;
+    } };
+    const journal: PublicationJournal = { ...setup.journal, save: (state) => {
+      if (++saves === 2 && failure === "save") throw new Error("Receipt save failed");
+      setup.journal.save(state);
+    } };
+    await expect(runPublicationRetry(journal, effects)).rejects.toThrow();
+    expect(setup.journal.load().retry).toEqual({ attempt: 1, state: "requested" });
+    const bytes = readFileSync(setup.file, "utf8");
+    await inspectPublicationOperation(setup.journal, setup.effects);
+    expect(readFileSync(setup.file, "utf8")).toBe(bytes);
+    await expect(runPublicationRetry(setup.journal, setup.effects)).rejects.toThrow("never replay");
+    expect(setup.calls.filter((action) => action === "retry")).toHaveLength(1);
+    expect(setup.sent).toEqual([setup.markerKey]);
+    expect((await readShowControl(setup.env, "daily"))!.value.owner?.job_id).toBe(setup.frozen.request.job_id);
+    expect(bytes).not.toContain("Unknown Queue send result");
+  }
+});
+
+test("known retries are explicit numbered sends; requested save must precede Queue and journal cannot skip attempts", async () => {
+  const setup = await fixture();
+  await runPublicationClaim(setup.journal, setup.effects);
+  await runPublicationCommit(setup.journal, setup.effects);
+  const journal: PublicationJournal = { ...setup.journal, save: () => { throw new Error("Disk write failed"); } };
+  await expect(runPublicationRetry(journal, setup.effects)).rejects.toThrow("Disk write failed");
+  expect(setup.sent).toEqual([]);
+  await runPublicationRetry(setup.journal, setup.effects);
+  await runPublicationRetry(setup.journal, setup.effects);
+  expect(setup.sent).toEqual([setup.markerKey, setup.markerKey]);
+  expect(setup.journal.load().retry?.attempt).toBe(2);
+  await setup.journal.exclusively(async () => {
+    const state = setup.journal.load();
+    for (const retry of [undefined, { attempt: 4, state: "requested" as const }, { attempt: 2, state: "requested" as const },
+      { attempt: 3, state: "requeued" as const, key: setup.markerKey }]) {
+      expect(() => setup.journal.save({ ...state, retry })).toThrow();
+    }
+  });
+});
+
+test("false retry manifest and marker block Queue; client/runner reject foreign Episode key receipt", async () => {
+  const setup = await fixture("episode");
+  await runPublicationClaim(setup.journal, setup.effects);
+  await runPublicationCommit(setup.journal, setup.effects);
+  const commit = setup.frozen.commit;
+  const changed = publicationRequestSchema.parse({ ...setup.frozen, commit: { ...commit, metadata_sha256: "0".repeat(64) } });
+  await expect(setup.client.retry(changed)).rejects.toThrow("response was not verified");
+  await setup.bucket.put(setup.markerKey, JSON.stringify({ ...commit, metadata_sha256: "0".repeat(64) }));
+  await expect(setup.client.retry(setup.frozen)).rejects.toThrow("response was not verified");
+  expect(setup.sent).toEqual([]);
+  await setup.bucket.put(setup.markerKey, JSON.stringify(commit));
+  const value = await setup.client.retry(setup.frozen);
+  const foreign = { ...value, key: value.key.replace("/next/", "/foreign/") };
+  const client = new PublicationAdminClient(setup.config, "private-secret", async () => Response.json(foreign, { headers: { "Cache-Control": "no-store" } }));
+  await expect(client.retry(setup.frozen)).rejects.toThrow("response was not verified");
+  await expect(runPublicationRetry(setup.journal, { ...setup.effects, retry: async () => foreign })).rejects.toThrow("receipt differs");
+  expect(setup.journal.load().retry?.state).toBe("requested");
 });
 
 test("client rejects false manifest, result, identity and Episode commit-key receipts", async () => {

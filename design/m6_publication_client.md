@@ -42,7 +42,15 @@ private directoryは0700、record/temp/lockは0600とし、exclusive作成、tem
 
 `runPublicationClaim`はpreparedから一回だけ受付する。`runPublicationCommit`はclaimedから、同jobのheld owner・active execution不在・marker未作成を読み取り専用で観測し、commit_requestedを保存してから一回だけPOSTする。preflightは実行capabilityではなく、serverがcurrent owner/runtime/staging証拠を改めて検査する。
 
-POST応答喪失・不正response・成功receipt保存失敗ではrequestedを保持する。後でowner/marker/published statusが見えてもphaseを昇格せず、自動POSTや新job作成をしない。別callerが作ったmarkerも自動採用しない。explicit same-job再キューとunknown outcomeの安全な外部復旧は今回追加しない。
+POST応答喪失・不正response・成功receipt保存失敗ではrequestedを保持する。後でowner/marker/published statusが見えてもphaseを昇格せず、自動POSTや新job作成をしない。別callerが作ったmarkerも自動採用しない。unknown outcomeの安全な外部復旧は未提供である。
+
+## 同jobの明示retry
+
+内部`action=retry`はcommitと同じoperation/完全manifest hashを入力とし、`requeued`とexact marker key/hashを返す。保持manifest/marker/request、現在の同owner/generation、reservedまたはprocessing、consumer/verification token不在を再照合してQueue.sendを一回awaitする。pause中の既受付jobも収束可能で、完了/foreign/未知tokenは拒否する。
+
+marker/status/progressを初期化・上書きせず、staging/sourceを再PUTせず、新jobを作らない。Episode visibility後に同jobのgenerationが進んだ場合も、purge確認済みの同job progressがある場合だけ既存publication runnerと同じ再開条件を使う。`requeued`は配送/consumer完了の証明ではない。
+
+`runPublicationRetry`はcommit応答保存済みで、前retryが未知requestedでない場合だけstatus preflight後に通番と`retry.state=requested`を保存してPOSTする。一致する応答を保存した後にだけrequeuedへ進める。次のretryは別の明示呼出で通番を増やす。Queue送信応答喪失/不正receipt/保存失敗ではrequestedを保持し、観測で再送許可へ変換しない。
 
 ## Lockと照会
 
@@ -56,4 +64,6 @@ disk/client/内部API/M6 Queue adapterをローカル結合し、Show/Episode初
 
 全576テスト/9776 assertions、TypeScript、Worker/browser・内部client/Bun bundle、M6実証tsconfig、Linux x86-64 binary buildに合格した。これはCloudflare実機の合格ではない。
 
-実REST upload/source検査、ローカルdraft/job state連携、公開CLI/管理入口、unknown outcome/残存lock/tokenの安全な外部復旧、publication同job retry、full cutover/paused移行完了/明示受付再開、専用環境受け入れと利用・移行・復旧案内は残る。公開gate成立前に書込commandを公開しない。
+同job retry追加後は全601テスト/10145 assertions、TypeScriptと候補Worker/内部handler browser bundleにも合格した。Show/Episode/2種改訂のpurge失敗からの同job完了、pause収束、token保持、Queue応答喪失/receipt保存失敗/偽key/通番飛ばし拒否を回帰した。
+
+REST/source adapterは`m6_staging_rest.md`へ追加済み。ローカルdraft/job state連携、公開CLI/管理入口、unknown outcome/残存lock/tokenの安全な外部復旧、full cutover/paused移行完了/明示受付再開、専用環境受け入れと利用・移行・復旧案内は残る。公開gate成立前に書込commandを公開しない。

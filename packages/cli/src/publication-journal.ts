@@ -11,6 +11,8 @@ const stateSchema = z.object({ schema_version: z.literal(1), identity: identityS
   manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), phase: z.enum(["prepared", "claim_requested", "claimed", "commit_requested", "committed"]),
   claim_receipt: publicationOperationSchema.optional(),
   commit_receipt: z.object({ key: z.string().min(1).max(256), created: z.boolean() }).strict().optional(),
+  retry: z.object({ attempt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), state: z.enum(["requested", "requeued"]),
+    key: z.string().min(1).max(256).optional() }).strict().optional(),
 }).strict();
 
 export type PublicationClientState = z.infer<typeof stateSchema>;
@@ -25,7 +27,9 @@ export function validatePublicationClientState(input: unknown): PublicationClien
     state.manifest_sha256 !== createHash("sha256").update(JSON.stringify(state.publication)).digest("hex") ||
     (phase >= 2) !== (state.claim_receipt !== undefined) || (phase === 4) !== (state.commit_receipt !== undefined) ||
     state.claim_receipt && JSON.stringify(state.claim_receipt) !== JSON.stringify(publicationClientOperation(state.publication)) ||
-    state.commit_receipt && state.commit_receipt.key !== publicationCommitKey(state.publication.commit)) {
+    state.commit_receipt && state.commit_receipt.key !== publicationCommitKey(state.publication.commit) || state.retry && (phase !== 4 ||
+      state.retry.state === "requested" && state.retry.key !== undefined ||
+      state.retry.state === "requeued" && state.retry.key !== publicationCommitKey(state.publication.commit))) {
     throw new Error("Publication journal has inconsistent frozen identity, phase or receipts");
   }
   publicationClientOperation(state.publication);
@@ -90,10 +94,15 @@ export function createPublicationJournal(root: string, configInput: ServiceConfi
       const previous = load();
       const phases = stateSchema.shape.phase.options;
       const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
+      const retryChanged = JSON.stringify(next.retry) !== JSON.stringify(previous.retry);
+      const retryStarted = next.phase === "committed" && next.retry?.state === "requested" &&
+        (!previous.retry || previous.retry.state === "requeued") && next.retry.attempt === (previous.retry?.attempt ?? 0) + 1;
+      const retryAcknowledged = previous.retry?.state === "requested" && next.retry?.state === "requeued" && next.retry.attempt === previous.retry.attempt;
       if (JSON.stringify(next.identity) !== JSON.stringify(previous.identity) || next.manifest_sha256 !== previous.manifest_sha256 ||
-        distance < 0 || distance > 1 || distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) ||
+        distance < 0 || distance > 1 || distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) &&
+          !(previous.phase === "committed" && retryChanged && (retryStarted || retryAcknowledged)) ||
         previous.claim_receipt && JSON.stringify(next.claim_receipt) !== JSON.stringify(previous.claim_receipt) ||
-        previous.commit_receipt && JSON.stringify(next.commit_receipt) !== JSON.stringify(previous.commit_receipt)) {
+        previous.commit_receipt && JSON.stringify(next.commit_receipt) !== JSON.stringify(previous.commit_receipt) || distance !== 0 && retryChanged) {
         throw new Error("Frozen publication journal cannot change, skip phases or replay an unknown request");
       }
       const temp = `${file}.${crypto.randomUUID()}.tmp`;
