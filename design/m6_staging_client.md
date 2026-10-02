@@ -14,6 +14,8 @@
 
 staging clientはcallerのstrict manifestだけを使い、operation IDとdraft job IDを区別する。begin receiptのservice/show/operation/generationに加え、payloadの個数・順序・正確なstaging key・サイズ・checksumを凍結manifestへ照合する。別draft/episodeや任意prefixのPUT許可を採用しない。ID/generation/timestampの生成、自動retry、body/mediaの管理API送信はしない。
 
+最初の新規Episode stagingではserverが、公開中Showの共通owner取得後にgeneration-zero draftを条件付き初期化する。metadata-first/audio-firstの両方を許可し、既存control/tombstone/orphanを上書きしない。clientのunknown outcome/一度限りbegin規則は変えない。`m6_new_episode_staging.md`参照。
+
 内部`POST /admin/staging`の`action=status`は完全なmanifestを入力とし、retained manifest/control request/progress/status、Show owner/completion receipt、draft commitの存在を読む。manifest/control request hash、対象/generation/全検証assetを照合し、Show controlと各record/markerの読取前後ETag/sizeが変わったら拒否する。これは複数objectの原子的snapshotではなく、途中変化を保守的に拒否するbounded照会である。
 
 statusはservice tokenを登録せず、`withM6ManagementRead`でservice設定/readiness/実行version/cache ownerを前後照合する。pause中や保持verification tokenがある場合にも観測だけを行う。ownerはunclaimed/held/released/superseded、検証tokenは`verification_active`のboolだけで返す。後のjobがreceiptを置換しても過去の完了statusを履歴として読める。

@@ -28,7 +28,6 @@ export async function stagingAdminFixture(kind: "show" | "audio" | "episode_meta
     { asset: "episode_metadata", bytes: new TextEncoder().encode(stringifyToml({ schema_version: 1, episode_id: "next", guid: crypto.randomUUID(),
       title: "Private Episode title", description: "Private description", published_at: "2026-10-02T12:00:00Z" })) },
   ];
-  if (kind !== "show") await setup.addEpisode("next", "draft");
   const upload = stageUploadRequestSchema.parse({ schema_version: 1, operation_id: crypto.randomUUID(), draft_job_id: crypto.randomUUID(),
     show_id: "daily", kind: kind === "show" ? "show" : "episode", expected_show_generation: (await readShowControl(setup.env, "daily"))!.value.generation,
     ...(kind !== "show" ? { episode_id: "next", expected_episode_generation: 0 } : {}), created_at: "2026-10-02T12:00:00Z",

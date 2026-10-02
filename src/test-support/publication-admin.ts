@@ -6,6 +6,7 @@ import type { LifecyclePurgeTarget } from "../lifecycle-cache";
 import type { M6CachedLoopback, M6CandidateEnv } from "../m6-routes";
 import { handleM6PublicationAdmin } from "../publication-admin";
 import type { PublicationAdminEnv } from "../publication-admin";
+import type { StagingAdminEnv } from "../staging-admin";
 import { stagingAdminFixture } from "./staging-admin";
 import { createHash } from "node:crypto";
 
@@ -48,7 +49,7 @@ export async function publicationAdminFixture(mode: "show" | "episode" | "metada
     }, staged_uploads: stages.map((stage) => stage.operation_id) });
   const publicationOperation = { show_id: "daily", job_id: frozen.request.job_id, show_generation: frozen.request.expected_show_generation + 1 };
   const sent: string[] = [];
-  const env: PublicationAdminEnv = { ...setup.env, CASTLOOP_QUEUE: { send: async (body) => {
+  const env: PublicationAdminEnv & StagingAdminEnv = { ...setup.env, CASTLOOP_QUEUE: { send: async (body) => {
     sent.push((body as { object: { key: string } }).object.key);
   } } };
   const body = (action: "claim" | "commit" | "retry") => ({ schema_version: 1, service_id: "service", action,

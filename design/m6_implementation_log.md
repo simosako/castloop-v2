@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 新規Episode draftの初期化をstaging受付へ接続
+
+- metadata/audioの最初のstagingで、期待Episode generation=0・既存公開/staging data不在を照会し、Show共通CASのexact stage owner取得後にdraft制御を条件付き新規作成するようにした。初期化はready progress/PUT permissionより先で、本文・GUID・secretを保持recordへ追加しない。
+- 既存/tombstone/停止状態、世代不一致、orphan/未知key、incomplete inventory、破損control/progressを拒否する。PUT前後応答喪失・late orphan/tombstoneではownerを保持し、上書き・時間による解放・durable clientの自動再送を行わない。
+- Episode publication/staging管理fixtureの手動draft投入を除き、既存の内部管理API/client/Queue初回公開の結合testも自動初期化経路へ変更した。metadata/audio-first・同request/別request競合と初期化順序を追加回帰した。新規Showの予約/制御初期化は別の残件である。
+- 全685テスト/11117 assertions、TypeScript/M6実証tsconfig、candidate/bridge browser bundle、`git diff --check`に合格。公開route/CLIの書込gateと旧IO収束条件は維持し、Cloudflareへの書込/deployは行っていない。詳細は`m6_new_episode_staging.md`。
+
 ## 2026-10-02: 非書込legacy移行preflightをCLI/単一バイナリへ接続
 
 - `migration-preflight LEGACY_VERSION_ID`を追加した。準備helperと同じGET snapshot検査を使い、期待versionの単独100%・settings/bindings/cache/preview・default-only module・前後不変を照合する。UUID/upload metadata/lock/journalを作らず、admin secret/state/Worker管理POSTを使わない。

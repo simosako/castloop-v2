@@ -31,7 +31,6 @@ export async function episodePublicationFixture(update?: "metadata" | "audio") {
   await consumeOwnedPublication(setup.env, setup.key, { async checkDeliveryGate() {}, async purge() {} });
   const episodeId = update ? "first" : "new-episode";
   const prefix = `public/episodes/daily/${episodeId}`;
-  if (!update) await setup.addEpisode(episodeId, "draft");
   const base = update ? parseEpisodeRevision(setup.text(`${prefix}/metadata.toml`)) : null;
   const draft = base ? { ...episodeDraftFromRevision(base), title: "Updated Episode title" } : {
     schema_version: 1 as const, episode_id: episodeId, guid: crypto.randomUUID(), title: "Initial Episode title",

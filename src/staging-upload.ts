@@ -2,6 +2,8 @@ import { stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProg
 import type { StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
 import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
+import { initializeOwnedEpisodeDraft, prepareNewEpisodeDraft } from "./staging-episode-draft";
+import type { StageEpisodeDraftEnv } from "./staging-episode-draft";
 
 export type StageOperation = { showId: string; operationId: string; generation: number };
 export type StageUploadSnapshot = { request: StageUploadRequest; manifestHash: string; control: OwnedShowControlSnapshot };
@@ -82,9 +84,10 @@ export async function writeStageUploadProgress(env: LifecycleControlEnv, operati
   if (!written) throw new Error("Staging progress write conflicted");
 }
 
-export async function claimStageUpload(env: LifecycleControlEnv, input: unknown): Promise<StageOperation> {
+export async function claimStageUpload(env: StageEpisodeDraftEnv, input: unknown): Promise<StageOperation> {
   const request = stageUploadRequestSchema.parse(input);
   if (await env.CASTLOOP_BUCKET.head(`${stageDraftPrefix(request)}/commit.json`)) throw new Error("Committed drafts cannot be staged");
+  const newEpisode = await prepareNewEpisodeDraft(env, request);
   const hash = await stageManifestHash(request);
   const written = await env.CASTLOOP_BUCKET.put(`system/jobs/${request.operation_id}/upload.json`, JSON.stringify(request), {
     onlyIf: new Headers({ "If-None-Match": "*" }),
@@ -92,7 +95,8 @@ export async function claimStageUpload(env: LifecycleControlEnv, input: unknown)
   if (!written && await stageManifestHash(await readManifest(env, request.operation_id)) !== hash) {
     throw new Error("Upload operation ID already has a different staging manifest");
   }
-  await claimShowOperation(env, stageControlRequest(request));
+  await claimShowOperation(env, stageControlRequest(request), { allowNewEpisodeDraft: newEpisode });
+  if (newEpisode) await initializeOwnedEpisodeDraft(env, request);
   const operation = { showId: request.show_id, operationId: request.operation_id, generation: request.expected_show_generation + 1 };
   const snapshot = await requireStageUpload(env, operation);
   const existing = await readStageUploadProgress(env, operation, snapshot);

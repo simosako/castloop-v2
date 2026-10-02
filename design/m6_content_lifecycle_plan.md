@@ -168,6 +168,7 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 
 - Show制御recordは公開状態、単調増加generation、feed generation、受付owner、操作種別、要求hashを持つ。**公開状態と受付を同じkeyのETag CASで変更**する。新しいShow状態keyを読むだけの受付は不可。
 - Episode状態は同じShowの受付ownerを取得した処理だけが変更する。Showの受付枠を保持している間は他のEpisode/Show変更を許さない。
+- 新規Episodeは最初のmetadata/audio stagingで、期待generation=0・既存payload/history/staging不在を確認し、公開中Showのstaging owner取得後にdraft制御を条件付き新規作成する。既存/tombstoneを上書きせず、ready progressやPUT許可より先に初期化する。local `create-episode`はTOMLだけを作る仕様を維持する。`m6_new_episode_staging.md`参照。
 - 既存の`reserved`/`processing`/`free`の意味を維持し、staging upload用の排他状態も定義する。`free`になっても公開停止状態やgenerationを捨てない。
 - requestに`action`（publish/unpublish/restore/delete）、`kind`（show/episode）、IDs、期待generation、作成時刻を固定する。statusはv2でactionとphaseを扱い、旧v1の公開statusも読めるstrictなversion別Zod schemaにする。
 - 既存公開の終端`published`を維持する。lifecycleの終端には`completed`を設け、対象状態と処理結果も表示する。`published`/`completed`かつowner `free`が完了条件。

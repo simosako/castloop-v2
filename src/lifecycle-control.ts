@@ -75,7 +75,7 @@ async function freezeRequest(env: LifecycleControlEnv, request: ControlRequest, 
 }
 
 async function requireEligibleTarget(env: LifecycleControlEnv, control: ShowControl,
-  request: ControlRequest): Promise<void> {
+  request: ControlRequest, options: { allowNewEpisodeDraft?: boolean } = {}): Promise<void> {
   if (control.generation !== request.expected_show_generation) {
     throw new Error("Show generation changed; inspect the current state before retrying");
   }
@@ -93,7 +93,10 @@ async function requireEligibleTarget(env: LifecycleControlEnv, control: ShowCont
     throw new Error(`Show state ${control.lifecycle} does not permit this Episode operation`);
   }
   const episode = await readEpisodeLifecycle(env, request.show_id, request.episode_id!);
-  if (!episode) throw new Error("Episode lifecycle record is missing");
+  if (!episode) {
+    if (options.allowNewEpisodeDraft && request.action === "stage" && request.expected_episode_generation === 0) return;
+    throw new Error("Episode lifecycle record is missing");
+  }
   if (episode.generation !== request.expected_episode_generation) {
     throw new Error("Episode generation changed; inspect the current state before retrying");
   }
@@ -110,7 +113,8 @@ function ownsRequest(control: ShowControl, request: ControlRequest, hash: string
     control.owner.episode_id === request.episode_id;
 }
 
-export async function claimShowOperation(env: LifecycleControlEnv, input: unknown): Promise<ShowControlSnapshot> {
+export async function claimShowOperation(env: LifecycleControlEnv, input: unknown,
+  options: { allowNewEpisodeDraft?: boolean } = {}): Promise<ShowControlSnapshot> {
   const request = controlRequestSchema.parse(input);
   const current = await readShowControl(env, request.show_id);
   if (!current) throw new Error("Show lifecycle control is not initialized");
@@ -120,7 +124,7 @@ export async function claimShowOperation(env: LifecycleControlEnv, input: unknow
     await freezeRequest(env, request, hash);
     return current;
   }
-  await requireEligibleTarget(env, current.value, request);
+  await requireEligibleTarget(env, current.value, request, options);
   if (await env.CASTLOOP_BUCKET.head(`system/jobs/${request.job_id}/status.toml`)) {
     throw new Error("Job ID has already been used");
   }

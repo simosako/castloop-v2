@@ -3,15 +3,15 @@ import type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
-import type { LifecycleControlEnv } from "./lifecycle-control";
 import { M6ManagementServiceMismatch, withM6ManagementInvocation, withM6ManagementRead } from "./m6-management";
 import { inspectStageUpload } from "./staging-inspection";
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "./staging-upload";
 import type { StageOperation } from "./staging-upload";
+import type { StageEpisodeDraftEnv } from "./staging-episode-draft";
 import { runStageVerification } from "./staging-verification";
 import type { StageStreamDigest } from "./staging-verification";
 
-export type StagingAdminEnv = LifecycleControlEnv & { CASTLOOP_ADMIN_KEY: string };
+export type StagingAdminEnv = StageEpisodeDraftEnv & { CASTLOOP_ADMIN_KEY: string };
 
 function reply(input: object, status = 200): Response {
   return Response.json(input, { status, headers: { "Cache-Control": "no-store" } });
