@@ -1,6 +1,6 @@
 # M6: 候補Worker入口のgateway/consumer統合
 
-更新日: 2026-10-01
+更新日: 2026-10-02
 
 ## Entry module
 
@@ -25,7 +25,7 @@
 
 ## 管理APIとcapability
 
-候補入口の通常管理APIは認証されたGETだけである。現行のjob-status/current/published照会を利用できるが、reservation/claim/retry/cleanup/staging/publication/lifecycleの管理書込は409で拒否する。独立した移行bootstrapのsettlement/HTTP検査だけを`/admin/migration/`へ接続した。full cutover/完了/受付再開は未提供である。`m6_migration_bootstrap.md`参照。
+候補入口の認証管理APIは、通常のjob-status/current/published照会GETを維持し、reservation/claim/retry/cleanup等の通常書込を拒否する。独立した移行bootstrapのsettlement/HTTP検査は`/admin/migration/`へ接続済みだが、full cutover/完了/受付再開のfinalizer、CLI公開は未提供である。2026-10-02に別の未公開`fetchM6ManagementIntegration`へ3管理handlerを接続し、readiness/version照合後のdispatchを結合testで検証した。`src/m6-worker.ts`はこの入口を使わず、通常の`fetchM6Candidate`はmock readinessがあってもmanagement書込を拒否する。`m6_migration_bootstrap.md`と`m6_management_api.md`参照。
 
 capabilityは`worker_protocol=m6_candidate`とcompiled gatewayの`lifecycle_delivery=true`を返すが、未提供の管理操作・M6 staging/publication commandはfalse、`m6_ready=false`を維持する。これは候補codeの接続状態を表すもので、実機合格やRelease可否を表さない。healthも`result=candidate`/`m6_ready=false`であり、通常初期化への置換を意図しない。
 

@@ -10,7 +10,9 @@
 
 `handleM6LifecycleAdmin`も独立した内部handlerとして追加した。Show/Episodeの停止・再開・削除を同じservice gate/Show CAS受付/凍結commitへ接続し、読み取り専用dry-run/statusと同jobの明示的retryを提供する。HTTP handlerにpayload削除bindingを要求せず、物理削除は所有権を確認するQueue consumerのbounded処理だけで行う。
 
-現行Worker、bridge、candidateのfetch入口には接続していない。candidateは引き続きread-onlyで、R2にmock readinessを入れても通常書込を開けず、`m6_ready=false`を維持する。CLI書込操作も公開しない。Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。
+2026-10-02に3handlerを未公開の`fetchM6ManagementIntegration`へ接続した。`POST /admin/staging|publication|lifecycle`だけを、認証後に`requireCandidateReadiness`（M6 mode・完了readiness・実行version一致）で検査してから各handlerへ渡す。legacy/migrating/未初期化serviceやversion不一致は固定診断409で書込前に拒否し、method不正は405、認証失敗は401である。
+
+これは結合検証専用の明示的入口であり、`src/m6-worker.ts`は引き続き通常の`fetchM6Candidate`を呼ぶ。現行Worker・bridge・通常candidateのmanagement書込は閉じたまま、R2にmock readinessを入れても開かない。既存の認証GET照会は維持し、legacy管理書込も拒否する。`m6_ready=false`・CLI書込command非公開を維持し、Cloudflare書込/deployや既存環境への適用は行っていない。
 
 ## Stagingのwire契約
 
@@ -106,4 +108,10 @@ publicationは新しいstaging内部API→publication内部API→実M6 Queue ada
 
 lifecycleは6操作を内部API→M6 Queue adapterへローカル結合し、停止404・再開200・削除410、媒体/履歴の保持とbounded削除、兄弟Episode分離、運用記録保持を回帰した。preview非書込/非予約、完全request確認、削除の二つの明示確認、paused drain、live consumer中retry拒否、purge失敗から同job retry、Queue応答喪失非再送、過去status、不正/過大/途中変更record、candidate書込拒否も確認した。全504テスト/8550 assertionsと型・bundle・binary検査の合格はCloudflare実機の合格ではない。
 
-内部REST/source adapterとpublication同job retryも追加したが、公開入口/CLI commandとローカルdraft stateへの接続、実Cloudflare REST/300MB、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
+公開入口/CLI commandとローカルdraft stateへの接続、実Cloudflare REST/300MB、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
+
+## 未公開fetch結合入口への接続（2026-10-02）
+
+内部管理APIの結合testを、handler直呼び出しから`fetchM6ManagementIntegration`経由へ拡張した。通常candidateと共通の認証・公開path・GET診断処理を使い、management dispatchだけを明示的に有効にする。staging受付→一度限り開始→明示settlement→検証、publicationのmanifest固定claim/commit→M6 Queue consumerによるpublished化、lifecycleの確認付きclaim/commit→同job retry→unpublished化まで、認証/readiness gateを通るrouteで回帰した。
+
+結合入口でもlegacy mode・migrating中・admission欠損・実行version不一致では固定診断409で書込前に拒否する。legacy管理書込は拒否し、既存GET診断は維持する。通常candidateはreadinessの有無にかかわらずmanagement書込を拒否する回帰を保持する。結合testのmock readinessは移行完了や実機deploy・`m6_ready`・CLI公開の合格ではない。

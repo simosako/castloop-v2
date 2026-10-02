@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 内部管理APIの未公開fetch結合入口を追加
+
+- 未公開の`fetchM6ManagementIntegration`へ`POST /admin/staging|publication|lifecycle`を接続した。認証後、`requireCandidateReadiness`（M6 mode・完了readiness・実行version一致）を検査してから各handlerへ渡る。legacy/migrating/未初期化・version不一致は固定診断409、method不正は405・認証失敗は401で拒否する。
+- handler直結からfetch経由の結合testへ拡張した。staging受付→一度限り開始→明示settlement→検証、publication manifest固定claim/commit→M6 Queue consumerでのpublished化、lifecycle確認付きclaim/commit→同job retry→unpublished化、移行前stateでの書込拒否・foreign service入力の事前400を回帰した。
+- `src/m6-worker.ts`はこの結合入口を使わず、通常`fetchM6Candidate`はmock readinessがあってもmanagement書込を拒否する。既存の認証GET診断は維持する。中断時の変更にあった通常candidateの条件付き書込有効化は公開gate未完了のため採用せず、元のread-only回帰も保持した。実機deploy・`m6_ready`・CLI公開は含まない。詳細は`m6_management_api.md`。
+- `bun test`（628件、10472 assertions）、`npm run check`、M6実証tsconfig、bridge/candidate browser bundle、Linux x86-64 binary build、`git diff --check`に合格。
+
 ## 2026-10-02: 試験環境・停止を許容する移行・M6一式の正式リリース方針を承認
 
 - 管理者の3件のannotationに従い、同一Cloudflareアカウント内の専用試験環境、予定メンテナンス中の配信/更新停止を許容する移行、M6機能一式の完成と次バージョンとしての正式リリースを決定事項へ記録した。限定先行リリースや無停止移行を前提にしない。

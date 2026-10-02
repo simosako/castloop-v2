@@ -248,6 +248,27 @@ describe("unreleased M6 publication admission and commit boundary", () => {
     expect(setup.writes).toHaveLength(before);
   });
 
+  test("candidate publication mutations also stay closed for legacy and migrating services", async () => {
+    const setup = await publicationAdminFixture();
+    const admission = setup.text(SERVICE_ADMISSION_KEY);
+    const fetchCandidate = () => fetchM6Candidate(new Request<unknown, IncomingRequestCfProperties>(setup.http(setup.body("claim"))),
+      setup.candidateEnv, setup.cachedAssets);
+    try {
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ schema_version: 1, service_id: "service",
+        generation: 0, mode: "legacy", state: "open", invocations: [] }));
+      expect((await fetchCandidate()).status).toBe(409);
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ ...setup.service, state: "migrating",
+        pause_id: crypto.randomUUID(), migration: { migration_id: crypto.randomUUID(), request_sha256: "a".repeat(64) } }));
+      const before = setup.writes.length;
+      expect((await fetchCandidate()).status).toBe(409);
+      expect(setup.writes).toHaveLength(before);
+      expect(setup.entries.has(`system/jobs/${setup.publicationOperation.job_id}/publication.json`)).toBe(false);
+      expect(setup.entries.has(setup.markerKey)).toBe(false);
+    } finally {
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, admission);
+    }
+  });
+
   test("shared commit response refuses arbitrary paths, foreign target/job and readiness claims", async () => {
     const setup = await publicationAdminFixture();
     const result = { schema_version: 1, service_id: "service", result: "committed", operation: setup.publicationOperation,

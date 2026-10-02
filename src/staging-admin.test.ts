@@ -255,6 +255,28 @@ describe("unreleased M6 staging management boundary", () => {
     expect(setup.writes).toHaveLength(before);
   });
 
+  test("candidate staging mutations also stay closed for legacy and migrating services", async () => {
+    const setup = await stagingAdminFixture();
+    const admission = setup.text(SERVICE_ADMISSION_KEY);
+    const fetchCandidate = () => fetchM6Candidate(new Request<unknown, IncomingRequestCfProperties>(setup.http(setup.input("claim", { upload: setup.upload }))), {
+      CASTLOOP_BUCKET: setup.bucket as never, CASTLOOP_ADMIN_KEY: "private-secret", CASTLOOP_DLQ_NAME: setup.config.dlq_name,
+      CASTLOOP_VERSION_METADATA: { id: setup.versionId, tag: "", timestamp: "2026-10-02T12:00:00Z" }, CASTLOOP_QUEUE: {} as never,
+    }, Object.assign(() => ({ fetch: async () => new Response() }), { invalidate: async () => {}, ...setup.bindings.cachedAssets }));
+    try {
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ schema_version: 1, service_id: "service",
+        generation: 0, mode: "legacy", state: "open", invocations: [] }));
+      expect((await fetchCandidate()).status).toBe(409);
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ ...setup.service, state: "migrating",
+        pause_id: crypto.randomUUID(), migration: { migration_id: crypto.randomUUID(), request_sha256: "a".repeat(64) } }));
+      const before = setup.writes.length;
+      expect((await fetchCandidate()).status).toBe(409);
+      expect(setup.writes).toHaveLength(before);
+      expect(setup.entries.has(`system/jobs/${setup.upload.operation_id}/upload.json`)).toBe(false);
+    } finally {
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, admission);
+    }
+  });
+
   test("shared response schemas reject arbitrary/foreign/traversal/oversized/duplicated PUT locations", async () => {
     const setup = await stagingAdminFixture();
     const request = setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true });

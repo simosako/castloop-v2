@@ -4,15 +4,18 @@ import { authenticated } from "./admin-auth";
 import legacyWorker from "./index";
 import { createCachedPublicFetch } from "./lifecycle-cache";
 import type { CachedAssetBinding, LifecyclePurgeTarget } from "./lifecycle-cache";
+import { handleM6LifecycleAdmin } from "./lifecycle-admin";
 import { consumeLifecycleCommit } from "./lifecycle-consumer";
 import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import { serveLifecyclePublicRequest } from "./lifecycle-gateway";
 import { createLifecycleWorkerEffects, createPublicationWorkerEffects } from "./lifecycle-worker-effects";
 import { parsePublicAssetPath } from "./public-assets";
+import { handleM6PublicationAdmin } from "./publication-admin";
 import { consumeOwnedPublication } from "./publication-consumer";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { readServiceAdmission, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
+import { handleM6StagingAdmin } from "./staging-admin";
 import type { StageStreamDigest } from "./staging-verification";
 import { readBootstrapDeliveryWindow } from "./migration-bootstrap";
 import { handleMigrationAdmin } from "./migration-admin";
@@ -61,8 +64,36 @@ async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Pr
   return undefined;
 }
 
+async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
+  options: { digest?: StageStreamDigest }): Promise<Response | null> {
+  const pathname = new URL(request.url).pathname;
+  if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle") return null;
+  if (request.method !== "POST") return reply(request, { error: "method not allowed" }, 405);
+  try {
+    await requireCandidateReadiness(env, await serviceConfig(env));
+  } catch {
+    console.error(JSON.stringify({ event: "m6_management_not_ready", reason_code: "migration_not_completed" }));
+    return reply(request, { error: "M6 management requires a completed migration for this Worker version" }, 409);
+  }
+  const bindings = { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1" as const, cachedAssets };
+  if (pathname === "/admin/staging") return handleM6StagingAdmin(request, env, bindings, options);
+  if (pathname === "/admin/publication") return handleM6PublicationAdmin(request, env, bindings);
+  return handleM6LifecycleAdmin(request, env, bindings);
+}
+
 export async function fetchM6Candidate(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, bootstrapRuntime?: BootstrapRuntime): Promise<Response> {
+  return fetchM6Routes(request, env, cachedAssets, false, bootstrapRuntime);
+}
+
+export async function fetchM6ManagementIntegration(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
+  cachedAssets: M6CachedLoopback, options: { digest?: StageStreamDigest } = {}): Promise<Response> {
+  return fetchM6Routes(request, env, cachedAssets, true, undefined, options);
+}
+
+async function fetchM6Routes(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
+  cachedAssets: M6CachedLoopback, managementIntegration: boolean, bootstrapRuntime?: BootstrapRuntime,
+  options: { digest?: StageStreamDigest } = {}): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const asset = parsePublicAssetPath(pathname);
   if (asset) {
@@ -87,7 +118,11 @@ export async function fetchM6Candidate(request: Request<unknown, IncomingRequest
     const migration = await handleMigrationAdmin(request, env, bootstrapRuntime);
     if (migration) return migration;
   }
-  if (request.method !== "GET") return reply(request, { error: "M6 candidate administration is read-only; mutation routes are not released" }, 409);
+  if (managementIntegration) {
+    const management = await m6ManagementRoute(request, env, cachedAssets, options);
+    if (management) return management;
+  }
+  if (request.method !== "GET") return reply(request, { error: "Mutation routes are not released on the M6 candidate" }, 409);
   if (pathname === "/admin/health") return reply(request, { result: "candidate", m6_ready: false }, 200);
   if (pathname === "/admin/capabilities") {
     try {

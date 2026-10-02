@@ -276,6 +276,28 @@ describe("unreleased lifecycle management with read-only previews and explicit c
     expect(parseShowControl(JSON.parse(setup.text("system/show-publications/daily.json"))).lifecycle).toBe("active");
   });
 
+  test("candidate lifecycle mutations also stay closed for legacy and migrating services", async () => {
+    const setup = await lifecycleAdminFixture();
+    const request = await setup.operationRequest("show", "delete");
+    const admission = setup.text(SERVICE_ADMISSION_KEY);
+    const claimBody = await setup.body("claim", request);
+    const fetchCandidate = () => fetchM6Candidate(new Request<unknown, IncomingRequestCfProperties>(setup.http(claimBody)),
+      setup.candidateEnv, setup.cachedAssets);
+    try {
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ schema_version: 1, service_id: "service",
+        generation: 0, mode: "legacy", state: "open", invocations: [] }));
+      expect((await fetchCandidate()).status).toBe(409);
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ ...setup.service, state: "migrating",
+        pause_id: crypto.randomUUID(), migration: { migration_id: crypto.randomUUID(), request_sha256: "a".repeat(64) } }));
+      const before = setup.writes.length;
+      expect((await fetchCandidate()).status).toBe(409);
+      expect(setup.writes).toHaveLength(before);
+      expect(parseShowControl(JSON.parse(setup.text("system/show-publications/daily.json"))).lifecycle).toBe("active");
+    } finally {
+      await setup.bucket.put(SERVICE_ADMISSION_KEY, admission);
+    }
+  });
+
   test("preview is only admission eligibility and never skips saved-payload validation for restoration", async () => {
     const setup = await lifecycleAdminFixture();
     await setup.execute(await setup.operationRequest("episode", "unpublish"));
