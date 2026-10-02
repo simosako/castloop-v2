@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: finished stagingからpublication要求・journal・送信前guardを自動準備
+
+- `prepareLocalPublication`を追加し、同identityのfinished/staged receiptsと最新local入力からShow/Episode初回・metadata-only/audio-onlyのcommit/checksum/size/解析durationを組み立てる。stage ID集合をcanonical sortし、caller固定timestampを維持する。本文/base metadata/path/GUID/secretをpublication recordへ複製しない。
+- 準備前とclaim/commit直前のstaging記録/lock存在照合を既存local source guardへ接続した。stale inputs・different target/draft/base・missing/aborted/unfinished/lock・manifest変更・requested/claimed再準備を拒否し、準備自体はHTTPを送らない。
+- local TOML/実MP3→自動staging→実内部API→自動publication→明示claim/commit→owned consumerの5経路（Show、Episode初回、2改訂、audio-first）を結合し、GUID/date・既存媒体path/history保持と準備後のack lock変化拒否を回帰した。全756テスト/11843 assertions、TypeScript/M6実証tsconfig、内部helper Bun bundleに合格。
+- MP3解析変更後のLinux binaryでも既存4family statusのlocal HTTPS試験を再実行し、credentialsなし・requested/古いlock/local/remote record保持を確認した。Cloudflare書込/deploy・公開gate変更は行わない。残タスクはtarget別durable draft ID/公開CLI、移行/復旧と実機受け入れである。詳細は`m6_local_publication_preparation.md`。
+
 ## 2026-10-02: local入力からstaging manifest/journal/source snapshotを自動準備
 
 - `prepareLocalStagingUpload`を追加し、固定operation/draft ID/期待generationを検査して、Show TOML+署名一致cover、Episode metadata、MP3全量hash/解析durationからstrictな要求を組み立てる。bounded/no-follow読取・前後stat・再読/再hash照合を経てprivate snapshotとprepared journalへ接続した。
