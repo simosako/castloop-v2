@@ -79,6 +79,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "No credentials, network access or writes are used. Missing local records do not prove remote absence or completion.\n" +
       "This does not retry, remove locks, release tokens, authorize recovery or certify M6 readiness.",
   },
+  "operation-status": {
+    usage: "operation-status FAMILY ID",
+    description: "Run from the service workspace. Compare a frozen local M6 operation with its read-only server status.\n" +
+      "FAMILY must be staging, publication, lifecycle or show-registration; IDs match local-operation-status.\n" +
+      "Requires the local administrator key and an M6 management status route. No Cloudflare API token is required.\n" +
+      "This does not send mutations, update local phases, remove locks, release tokens, authorize recovery or certify M6 readiness.\n" +
+      "Legacy Workers and unreleased candidate management routes reject this inspection.",
+  },
 };
 
 export function commandHelp(command: string): string {

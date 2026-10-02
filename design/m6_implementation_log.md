@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 4familyの非書込remote状態照会をCLI/standalone binaryへ接続
+
+- `operation-status FAMILY ID`を追加し、local凍結journalを検査してから管理keyを読み、4内部clientのstatus actionだけを一回送る。identity/完全manifest/control hash/strict receiptを照合し、HTTP後のlocal state/lock存在観測変更を拒否する。journal/lock/legacy stateを変更せず、phase昇格/再送/復旧許可を行わない。
+- local disk→未公開fetch結合入口→実管理handlerの結合、欠落/foreign/symlink/破損/引数不正、local途中変更、応答喪失/偽identity、通常candidate拒否とsource CLIの4familyを回帰した。保持record不足のremote照会は安全に拒否する。
+- Linux x86-64 standalone binaryを一時CA付きlocal HTTPS/実内部handler・simulated R2へ接続し、requested/epoch日時の古いlock保持・4 status requestsだけ・credentialsなし・全local bytes/mtimeとremote records不変を確認した。TLS検証は無効化せず、Cloudflare実機検証とは区別する。
+- 全732テスト/11628 assertionsとTypeScript/M6実証tsconfig、candidate/bridge browser bundle、Linux binary build/実行/command helpが合格。通常candidateのmanagement/readiness gateと公開書込commandは変更せず、Cloudflareへの書込/deployは行わない。詳細は`m6_remote_operation_status.md`。
+
 ## 2026-10-02: 登録receiptからのローカルShow/Episode下書き作成を追加
 
 - 未公開のShow/Episode下書きhelperをM6登録journalの同一identity/registered receipt/非期限lockへ接続した。Showは指定site URL、EpisodeはローカルShow IDとstrict schemaを照合して現在時刻の引用RFC 3339/GUIDを保存する。legacy confirmedの採用・登録journal変更・remote操作は行わない。

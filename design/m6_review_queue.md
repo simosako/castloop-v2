@@ -67,6 +67,7 @@
    未公開lifecycle clientの固定origin/redirect拒否/一回限り送信/strict応答照合と6操作のローカル結合も追加した。確認済みrequestと送信前requestedをprivate/fsync付きjournalへ保存する明示claim/commit/retry、非書込offline/remote照会も接続した。公開CLIとunknown outcome/残存lock/tokenの安全な外部復旧は残る。`m6_lifecycle_client.md`参照。
 6. **接続と受け入れ**: 実行token付きeffect factoryとWorker binding用のfeed書込/内部purge/Queue送信を追加した。本番配信gateとQueue routingへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
     認証情報/HTTP/書込なしの`local-operation-status FAMILY ID`をsource CLIへ追加し、4familyのprivate journal/残存lockを照会可能にした。phase昇格/lock除去/復旧許可は行わず、書込commandの公開gateは閉じたままである。`m6_local_operation_status.md`参照。
+    `operation-status FAMILY ID`もsource CLI/standalone buildへ接続した。凍結local要求のstatusだけを一回送り、local/remoteの非変更・requested非昇格を4familyとlocal HTTPS binaryで検証した。通常candidateのmanagement gateを開けず、保持record不足/未知応答/途中変更は拒否する。実Cloudflare受け入れではない。`m6_remote_operation_status.md`参照。
 
 ## 今回実装済みだが本番未接続
 

@@ -11,6 +11,7 @@ import { CloudflareApi, hashFile } from "./cloudflare-api";
 import { waitForWorkerHealth } from "./health";
 import { commandHelp } from "./help";
 import { readLocalOperationStatus } from "./local-operation-status";
+import { readRemoteOperationStatus } from "./remote-operation-status";
 import { MigrationAdminClient } from "./migration-client";
 import { readLocalMigrationSetup } from "./migration-setup-journal";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
@@ -53,7 +54,7 @@ const USAGE = "Usage: castloop init [dir] --service-id ID --bucket-name NAME --w
   "update-episode ID | update-episode-audio ID MP3 | publish-episode ID | " +
   "job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | " +
   "cleanup-job JOB --show ID --episode ID | migration-preflight LEGACY_VERSION_ID | migration-status [--local] | " +
-  "local-operation-status FAMILY ID | deploy";
+  "local-operation-status FAMILY ID | operation-status FAMILY ID | deploy";
 
 function argsOf(values: string[], switches: string[] = []): { positional: string[]; flags: Record<string, string> } {
   const positional: string[] = [];
@@ -675,6 +676,12 @@ async function main(): Promise<void> {
     allowedFlags(flags, []);
     const root = process.cwd();
     console.log(JSON.stringify(readLocalOperationStatus(root, loadConfig(root), positional[0], positional[1]), null, 2));
+    return;
+  }
+  if (command === "operation-status" && positional.length === 2) {
+    allowedFlags(flags, []);
+    const root = process.cwd();
+    console.log(JSON.stringify(await readRemoteOperationStatus(root, loadConfig(root), positional[0], positional[1], () => adminKey(root)), null, 2));
     return;
   }
   if (command === "update-episode" && positional.length === 1) {
