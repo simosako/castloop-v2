@@ -1,5 +1,5 @@
-import { stagePayloadSchema, stageUploadRequestSchema } from "@castloop/shared";
-import type { StagePayload, StageUploadRequest } from "@castloop/shared";
+import { stageAssetSchema, stagePayloadSchema, stageUploadRequestSchema } from "@castloop/shared";
+import type { StageAsset, StagePayload, StageUploadRequest } from "@castloop/shared";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { chmod, lstat, mkdir, mkdtemp, open, rmdir, unlink } from "node:fs/promises";
@@ -59,6 +59,33 @@ async function checkSource(path: string, expected: StageUploadRequest["payloads"
 
 export async function assertLocalStagingSource(path: string, input: StagePayload): Promise<void> {
   await checkSource(path, stagePayloadSchema.parse(input));
+}
+
+export async function inspectLocalStagingSource(path: string, input: StageAsset): Promise<{ payload: StagePayload; prefix: Buffer }> {
+  const asset = stageAssetSchema.parse(input);
+  const source = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const before = await source.stat({ bigint: true });
+    if (!before.isFile()) throw new Error("Local staging input must be a regular file");
+    const candidate = stagePayloadSchema.parse({ asset, length_bytes: Number(before.size), sha256: "0".repeat(64) });
+    const hash = createHash("sha256");
+    const buffer = Buffer.alloc(64 * 1024);
+    let size = 0;
+    let prefix = Buffer.alloc(0);
+    for (;;) {
+      const { bytesRead } = await source.read(buffer, 0, Math.min(buffer.length, candidate.length_bytes - size + 1), null);
+      if (!bytesRead) break;
+      if (!size) prefix = Buffer.from(buffer.subarray(0, Math.min(8, bytesRead)));
+      size += bytesRead;
+      if (size > candidate.length_bytes) throw new Error("Local staging input grew during inspection");
+      hash.update(buffer.subarray(0, bytesRead));
+    }
+    const after = await source.stat({ bigint: true });
+    if (size !== candidate.length_bytes || before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) {
+      throw new Error("Local staging input changed during inspection");
+    }
+    return { payload: { ...candidate, sha256: hash.digest("hex") }, prefix };
+  } finally { await source.close(); }
 }
 
 export async function freezeStagingSources(root: string, input: StageUploadRequest, paths: readonly string[]): Promise<FrozenStagingSources> {

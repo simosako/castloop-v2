@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: local入力からstaging manifest/journal/source snapshotを自動準備
+
+- `prepareLocalStagingUpload`を追加し、固定operation/draft ID/期待generationを検査して、Show TOML+署名一致cover、Episode metadata、MP3全量hash/解析durationからstrictな要求を組み立てる。bounded/no-follow読取・前後stat・再読/再hash照合を経てprivate snapshotとprepared journalへ接続した。
+- 既存preparedの同要求だけを明示再準備でき、入力変更・foreign/requested/残存lockは拒否する。新規HTTP/ID生成/legacy state変換は行わず、source paths/body/GUID/durationを保持upload recordへ追加しない。
+- 3入力種別をlocal file→内部API→simulated REST単一PUT/全量GET→settlement/finishへ結合し、PNG/ID/selection/budget/symlink/不正MP3/全chunk hashと未知状態保持を回帰した。全746テスト/11732 assertions、TypeScriptと内部helper Bun bundleが合格。
+- Cloudflare環境・公開gate・U1を変更しない。残タスクを見直し、次はfinished staging journalsからpublication要求を組み立てる処理を接続する。詳細は`m6_local_staging_preparation.md`。
+
 ## 2026-10-02: CLIのMP3解析をowned descriptor/非追従streamへ変更
 
 - ローカルM6 upload要求の組立に先立ち、共通`analyzeAudio`をno-follow/nonblocking regular-file descriptorとbounded streamへ変更した。300MB上限はstream/parser開始前に検査し、size/mtime/ctimeを解析前後で照合する。parser終了時はstreamの停止と残存read Promiseをawaitしてからdescriptorを閉じる。
