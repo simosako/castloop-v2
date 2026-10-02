@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: local draft排他を準備・REST upload・publication全体へ接続
+
+- 二つの内部runnerを追加し、durable headからtarget/draft/base/upload集合を取得してlocal準備→一度限りREST PUT/GET→settlement/finish、publication準備→head freeze→claim/commit→acknowledged freezeをtarget排他下で実行する。caller headerをstrictに検査し、送信前にhead/source/receiptを前後照合する。
+- 全slotの未解決/残存lockを保持し、lost claim/commit応答では再送/ID差替え/完了推定を拒否する。settled PUT失敗はexplicit aborted receiptを保持し、別の明示uploadでだけ置換する。U1の前提と公開gateは変更しない。
+- Show/Episode初回/metadata-only/audio-onlyのlocal→実内部handler→simulated REST→commit、全transport中target lock、並行operation、head途中変更、unknown outcome、aborted置換を回帰した。全776テスト/12093 assertions、TypeScriptと281module内部runner Bun bundleに合格。実Cloudflare書込/deployはない。
+- 残件を再確認した。次はtarget state/current/baseの取得・CLI統合に必要な内部読取契約を調査し、移行/復旧/実機受け入れも継続する。詳細は`m6_local_draft_operation.md`。
+
 ## 2026-10-02: frozen下書き履歴を残して次draftへ切替
 
 - `rotateLocalDraft`を追加し、target排他とexact local committed journal再照合の下で旧frozen recordをprivate historyへ先にfsync保存し、新editable headをatomic renameする。既存同内容archiveからの続行を認め、異なるhistory/過去ID/publication ID/lock/未凍結recordを拒否する。
