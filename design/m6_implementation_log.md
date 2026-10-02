@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 単一REST PUTとprivateな固定source snapshotを内部runnerへ接続
+
+- no-follow regular file/asset上限/size/全量SHA/stat照合、private/fsync済み一時snapshot、claim/begin/PUT前の最新source照合を追加した。本文/path/secretは保持journalへコピーせず、元ファイルは変更・削除しない。
+- account一致credentials、exact staging key/size/hash、一回限りPUT、bounded success/size receipt、全量GET検証、redirect拒否、source/response IO終了awaitを追加した。live IO中dispose/再送/REST CAS fenceは拒否し、承認済みU1を未検証仮定のまま維持する。
+- mock API/管理handler/durable runnerの3種stagingと実Bun loopbackの8MiB stream、転送中source変更、早期応答/応答喪失/取消待ち/過大receipt/Range/foreign/symlink/再送拒否を回帰した。`bun test`（593件、9895 assertions）、`npm run check`、内部adapterのBun bundleに合格。
+- 公開CLI/候補Worker入口は変更せず、Cloudflare書込/deployは行っていない。実Cloudflare REST/300MB測定、最新draftのpublication照合と安全な外部復旧は残る。詳細は`m6_staging_rest.md`。
+
 ## 2026-10-02: Publication内部client・状態照会・durable job journalを接続
 
 - commitの未公開wire入力へ完全manifest hashを必須追加し、保持manifest照合後だけmarkerを作る。同job/対象/generationでもpayload hash/base/stage ID/timestampが変われば拒否する。claim/commit responseもmanifest hashを返し、sharedのexact marker key/hash helperとWorker互換re-exportを追加した。
