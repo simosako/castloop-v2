@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 五familyのjournal親path・lock返却をfail closedへ
+
+- staging/publication/lifecycle/Show登録/target draftの親directory検査を追加し、静的symlink/非directoryを読取・create・handle load/lock取得前に拒否する。recursive mkdirを一段ずつのprivate create/fsyncへ変え、directory fsyncにもno-followを使う。
+- dangling symlinkもlockとして保持し、missing journal+retained lockから要求を再生成しない。返却時はowned descriptorと現在lockのdevice/inode/type/空sizeを照合し、callback中に他の所有物へ差し替えられたlockを削除しない。
+- 五familyの四親階層symlink、missing/dangling lock、既存handle後の親差替え、callback中のreplacement lock保持を回帰した。全826テスト/12725 assertions、TypeScript/diff check、Linux binary buildと四family local HTTPS status回帰に合格。
+- 完全な悪意あるlocal-process TOCTOU排除や外部IO終了の証明とは扱わない。公開gate/Cloudflare環境は変更しない。移行journal/snapshot監査とCLI/移行・外部復旧・実機受け入れは残る。詳細は`m6_local_journal_paths.md`。
+
 ## 2026-10-02: lifecycle snapshot/dry-run/明示確認をdurable runnerへ統合
 
 - 非書込planning helperを追加し、target generationと固定UUID/timestampからcanonical要求を作り、exact request/hash付きpreviewを返す。current Episode本文や確認を自動保存/生成しない。

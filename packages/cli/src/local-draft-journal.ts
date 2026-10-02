@@ -2,10 +2,11 @@ import { z } from "zod";
 import { serviceConfigSchema, stageUploadRequestSchema } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
+import { releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
 import { readLocalPublicationJob } from "./publication-journal";
 import { showRegistrationIdentity, showRegistrationIdentitySchema } from "./show-registration-journal";
 import { readLocalStagingOperation } from "./staging-journal";
-import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const targetSchema = z.object({ kind: stageUploadRequestSchema.shape.kind, show_id: stageUploadRequestSchema.shape.show_id,
@@ -67,8 +68,7 @@ function checkDirectories(root: string, config: ServiceConfig, create: boolean):
 }
 
 function syncDirectory(directory: string): void {
-  const fd = openSync(directory, "r");
-  try { fsyncSync(fd); } finally { closeSync(fd); }
+  syncLocalJournalDirectory(directory);
 }
 
 function draftFile(root: string, config: ServiceConfig, target: LocalDraftTarget): string {
@@ -185,10 +185,11 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
       if (state.phase !== "frozen") save({ ...state, phase: "frozen" });
     } };
   return { load, exclusively: async (callback) => {
+    checkDirectories(root, config, false);
     const fd = openSync(`${file}.lock`, "wx", 0o600);
     locked = true;
     try { fsyncSync(fd); syncDirectory(dirname(file)); load(); return await callback(editor); }
-    finally { locked = false; closeSync(fd); unlinkSync(`${file}.lock`); syncDirectory(dirname(file)); }
+    finally { locked = false; releaseLocalJournalLock(root, "drafts", config.service_id, `${file}.lock`, fd); }
   } };
 }
 
