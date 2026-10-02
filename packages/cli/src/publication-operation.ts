@@ -7,7 +7,8 @@ import { createHash } from "node:crypto";
 
 type Receipt<Result extends PublicationAdminResponse["result"]> = Extract<PublicationAdminResponse, { result: Result }>;
 export type PublicationOperationEffects = { publication: PublicationRequest; claim: () => Promise<Receipt<"claimed">>;
-  commit: () => Promise<Receipt<"committed">>; status: () => Promise<Receipt<"status">>; retry: () => Promise<Receipt<"requeued">> };
+  commit: () => Promise<Receipt<"committed">>; status: () => Promise<Receipt<"status">>; retry: () => Promise<Receipt<"requeued">>;
+  checkLocalInputs?: () => Promise<void> };
 
 function load(journal: PublicationJournal, effects: PublicationOperationEffects): PublicationClientState {
   const state = validatePublicationClientState(journal.load());
@@ -33,6 +34,7 @@ export async function runPublicationClaim(journal: PublicationJournal, effects: 
   await journal.exclusively(async () => {
     const state = load(journal, effects);
     if (state.phase !== "prepared") throw new Error("Publication claim outcome is unknown or consumed; never replay its POST");
+    await effects.checkLocalInputs?.();
     journal.save({ ...state, phase: "claim_requested" });
     const value = receipt(state, await effects.claim(), "claimed");
     if (value.result !== "claimed") throw new Error("Invalid publication claim receipt");
@@ -49,6 +51,7 @@ export async function runPublicationCommit(journal: PublicationJournal, effects:
       status.status?.state === "published" || status.status?.state === "abandoned") {
       throw new Error("Publication commit requires its unstarted held owner without active or unknown execution");
     }
+    await effects.checkLocalInputs?.();
     journal.save({ ...state, phase: "commit_requested" });
     const value = receipt(state, await effects.commit(), "committed");
     if (value.result !== "committed") throw new Error("Invalid publication commit receipt");

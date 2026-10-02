@@ -1,5 +1,5 @@
-import { stageUploadRequestSchema } from "@castloop/shared";
-import type { StageUploadRequest } from "@castloop/shared";
+import { stagePayloadSchema, stageUploadRequestSchema } from "@castloop/shared";
+import type { StagePayload, StageUploadRequest } from "@castloop/shared";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { chmod, lstat, mkdir, mkdtemp, open, rmdir, unlink } from "node:fs/promises";
@@ -55,6 +55,10 @@ async function checkSource(path: string, expected: StageUploadRequest["payloads"
       if (output) await output.sync();
     } finally { await output?.close(); }
   } finally { await source.close(); }
+}
+
+export async function assertLocalStagingSource(path: string, input: StagePayload): Promise<void> {
+  await checkSource(path, stagePayloadSchema.parse(input));
 }
 
 export async function freezeStagingSources(root: string, input: StageUploadRequest, paths: readonly string[]): Promise<FrozenStagingSources> {

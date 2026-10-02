@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 最新local入力・完了stage証拠をpublication直前へ照合
+
+- `createLocalPublicationEffects`を追加し、finished/staged local journalのexact集合・service/target/draft/generation/checksum/sizeと最新TOML/cover/audioをclaim/commit直前に照合した。metadataは1MB bounded/no-follow/strict読取、媒体は全量stream hash、照合後metadata再読を行う。
+- audio-onlyのmetadataはbase revision射影との意味的一致を要求し、未stageのlocal編集を無視しない。GUID/date、Showのimage_path/cover source、base snapshot/変更asset集合も検査する。本文/path/secretは保持journalへ追加しない。
+- local preflight失敗はPOST前prepared/claimedを保持する。commit済みjobのretry/statusは元ファイルを要求せず、後の編集を凍結jobへ混ぜない。実local staging journal/REST/source adapter/内部API→guarded publication→M6 Queueのローカル結合を追加した。
+- `bun test`（616件、10254 assertions）、`npm run check`、内部source guardのBun bundleに合格。公開CLI/legacy state変換は未接続で、Cloudflare書込/deployは行っていない。binary/専用環境受け入れと安全な外部復旧は残る。詳細は`m6_local_publication_inputs.md`。
+
 ## 2026-10-02: Publication同job retryを内部API/client/durable journalへ接続
 
 - exact operation/完全manifest hash/保持marker/request/未完了owner/generationとexecution・verification token不在を照合し、pause中も同jobだけを一回Queue送信する独立再キューを追加した。marker/status/progressや媒体を上書きせず、完了/foreign/未知tokenを拒否する。
