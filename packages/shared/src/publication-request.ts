@@ -43,3 +43,14 @@ export const publicationRequestSchema = z.object({
 });
 
 export type PublicationRequest = z.infer<typeof publicationRequestSchema>;
+
+export function publicationCommitKey(commit: PublicationRequest["commit"]): string {
+  const value = z.union([showCommitSchema, episodeCommitSchema]).parse(commit);
+  return value.kind === "show" ? `staging/shows/${value.show_id}/${value.job_id}/commit.json` :
+    `staging/episodes/${value.show_id}/${value.episode_id}/${value.job_id}/commit.json`;
+}
+
+export async function publicationManifestHash(input: PublicationRequest): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(publicationRequestSchema.parse(input))));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}

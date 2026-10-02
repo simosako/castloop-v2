@@ -1,11 +1,12 @@
-import { publicationAdminRequestSchema, publicationAdminResponseSchema } from "../packages/shared/src/index";
+import { publicationAdminRequestSchema, publicationAdminResponseSchema, publicationManifestHash } from "../packages/shared/src/index";
 import type { PublicationAdminRequest, PublicationAdminResponse } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleControlEnv } from "./lifecycle-control";
-import { M6ManagementServiceMismatch, withM6ManagementInvocation } from "./m6-management";
-import { claimPublicationOperation, commitOwnedPublication } from "./publication-admission";
+import { M6ManagementServiceMismatch, withM6ManagementInvocation, withM6ManagementRead } from "./m6-management";
+import { claimPublicationOperation, commitOwnedPublication, requireOwnedPublication } from "./publication-admission";
+import { inspectPublication } from "./publication-inspection";
 
 export type PublicationAdminEnv = LifecycleControlEnv & { CASTLOOP_ADMIN_KEY: string };
 
@@ -21,19 +22,25 @@ export async function handleM6PublicationAdmin(request: Request, env: Publicatio
   try { input = publicationAdminRequestSchema.parse(await readBoundedAdminJson(request)); }
   catch { return reply({ error: "Invalid publication input", reason_code: "publication_input_invalid" }, 400); }
   try {
+    if (input.action === "status") {
+      return reply(await withM6ManagementRead(env, input.service_id, bindings, () => inspectPublication(env, input.service_id, input.publication)));
+    }
     const showId = input.action === "claim" ? input.publication.request.show_id : input.operation.show_id;
     const result = await withM6ManagementInvocation(env, input.service_id, input.action === "claim" ? "m6_admin" : "m6_recovery",
       { showId }, bindings, async (): Promise<PublicationAdminResponse> => {
         const identity = { schema_version: 1 as const, service_id: input.service_id };
         if (input.action === "claim") {
           const claimed = await claimPublicationOperation(env, input.publication);
-          return publicationAdminResponseSchema.parse({ ...identity, result: "claimed", operation: {
+          return publicationAdminResponseSchema.parse({ ...identity, result: "claimed", manifest_sha256: await publicationManifestHash(input.publication), operation: {
             show_id: claimed.showId, job_id: claimed.jobId, show_generation: claimed.generation,
           } });
         }
-        const committed = await commitOwnedPublication(env, { showId: input.operation.show_id,
-          jobId: input.operation.job_id, generation: input.operation.show_generation });
-        return publicationAdminResponseSchema.parse({ ...identity, result: "committed", operation: input.operation, ...committed });
+        const operation = { showId: input.operation.show_id, jobId: input.operation.job_id, generation: input.operation.show_generation };
+        const owned = await requireOwnedPublication(env, operation);
+        if (await publicationManifestHash(owned.frozen) !== input.manifest_sha256) throw new Error("Publication input differs from its retained manifest");
+        const committed = await commitOwnedPublication(env, operation);
+        return publicationAdminResponseSchema.parse({ ...identity, result: "committed", operation: input.operation,
+          manifest_sha256: input.manifest_sha256, ...committed });
       });
     return reply(result);
   } catch (error) {

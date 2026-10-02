@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { episodeCommitSchema, parseEpisodeRevision, parseJobStatus, publicationAdminRequestSchema, publicationAdminResponseSchema,
-  publicationRequestSchema, showCommitSchema, stagePayloadKey } from "../packages/shared/src/index";
+  publicationManifestHash, publicationRequestSchema, showCommitSchema, stagePayloadKey } from "../packages/shared/src/index";
 import { readShowControl } from "./lifecycle-control";
 import { fetchM6Candidate, queueM6Candidate } from "./m6-routes";
 import { handleM6PublicationAdmin } from "./publication-admin";
@@ -250,7 +250,8 @@ describe("unreleased M6 publication admission and commit boundary", () => {
 
   test("shared commit response refuses arbitrary paths, foreign target/job and readiness claims", async () => {
     const setup = await publicationAdminFixture();
-    const result = { schema_version: 1, service_id: "service", result: "committed", operation: setup.publicationOperation, key: setup.markerKey, created: true };
+    const result = { schema_version: 1, service_id: "service", result: "committed", operation: setup.publicationOperation,
+      manifest_sha256: await publicationManifestHash(setup.frozen), key: setup.markerKey, created: true };
     expect(publicationAdminResponseSchema.safeParse(result).success).toBe(true);
     for (const key of ["system/service.toml", setup.markerKey.replace("/daily/", "/foreign/"), setup.markerKey.replace(setup.publicationOperation.job_id, crypto.randomUUID()),
       setup.markerKey.replace("commit.json", "../commit.json")]) expect(publicationAdminResponseSchema.safeParse({ ...result, key }).success).toBe(false);

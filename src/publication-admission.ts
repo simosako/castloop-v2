@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { controlRequestSchema, episodeCommitSchema, episodeRevisionSchema, parseControlRequest, parseEpisodeRevision, parseJobStatus, parseLifecycleProgress,
   permitsControlAction, showCommitSchema, stageControlRequest, stagePayloadKey, stageUploadProgressSchema,
-  stageUploadRequestSchema, publicationRequestSchema } from "../packages/shared/src/index";
+  stageUploadRequestSchema, publicationCommitKey, publicationRequestSchema } from "../packages/shared/src/index";
 import type { EpisodeCommit, EpisodeRevision, PublicationRequest, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
 import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
@@ -9,7 +9,7 @@ import { canonicalEnclosureUrl } from "./media-url";
 import { parsePublicAssetPath } from "./public-assets";
 import { stageManifestHash } from "./staging-upload";
 
-export { publicationRequestSchema } from "../packages/shared/src/index";
+export { publicationCommitKey, publicationRequestSchema } from "../packages/shared/src/index";
 export type { PublicationRequest } from "../packages/shared/src/index";
 export type PublicationOperation = { showId: string; jobId: string; generation: number };
 export type PublicationCommitTarget = { kind: "show" | "episode"; showId: string; jobId: string; episodeId?: string };
@@ -28,12 +28,6 @@ export function parsePublicationCommitKey(key: string): PublicationCommitTarget 
     return { kind: "episode", showId: parts[2]!, episodeId: parts[3]!, jobId: parts[4]! };
   }
   return null;
-}
-
-export function publicationCommitKey(commit: ShowCommit | EpisodeCommit): string {
-  const value = z.union([showCommitSchema, episodeCommitSchema]).parse(commit);
-  return value.kind === "show" ? `staging/shows/${value.show_id}/${value.job_id}/commit.json` :
-    `staging/episodes/${value.show_id}/${value.episode_id}/${value.job_id}/commit.json`;
 }
 
 async function readFrozenRequest(env: LifecycleControlEnv, jobId: string): Promise<PublicationRequest> {

@@ -47,7 +47,8 @@ export async function publicationAdminFixture(mode: "show" | "episode" | "metada
     }, staged_uploads: stages.map((stage) => stage.operation_id) });
   const publicationOperation = { show_id: "daily", job_id: frozen.request.job_id, show_generation: frozen.request.expected_show_generation + 1 };
   const body = (action: "claim" | "commit") => ({ schema_version: 1, service_id: "service", action,
-    ...(action === "claim" ? { publication: frozen } : { operation: publicationOperation }) });
+    ...(action === "claim" ? { publication: frozen } : { operation: publicationOperation,
+      manifest_sha256: sha256(new TextEncoder().encode(JSON.stringify(frozen))) }) });
   const http = (input: unknown, secret = "private-secret", method = "POST") => new Request("https://current.example/admin/publication", {
     method, headers: { "X-Castloop-Key": secret }, ...(method === "POST" ? { body: JSON.stringify(input) } : {}),
   });

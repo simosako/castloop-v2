@@ -3,7 +3,7 @@ import { z } from "zod";
 import { lifecycleJobStatusSchema } from "./lifecycle-job";
 import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
-export { episodeCommitSchema, publicationRequestSchema, showCommitSchema } from "./publication-request";
+export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
 export type { PublicationRequest } from "./publication-request";
 export { publicationAdminRequestSchema, publicationAdminResponseSchema, publicationOperationSchema } from "./publication-admin";
 export type { PublicationAdminRequest, PublicationAdminResponse, PublicationOperationIdentity } from "./publication-admin";

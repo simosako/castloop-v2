@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Publication内部client・状態照会・durable job journalを接続
+
+- commitの未公開wire入力へ完全manifest hashを必須追加し、保持manifest照合後だけmarkerを作る。同job/対象/generationでもpayload hash/base/stage ID/timestampが変われば拒否する。claim/commit responseもmanifest hashを返し、sharedのexact marker key/hash helperとWorker互換re-exportを追加した。
+- 未公開publication statusを共通read-only runtime/snapshot boundaryへ接続した。保持manifest/request/marker/status/progress/receiptと前後ETagを照合し、payload/staging内容を読まず、paused/active execution/履歴も観測だけを行う。staging検証/復旧許可はfalseで、tokenを登録/返却しない。
+- `PublicationAdminClient`と`.castloop/publication-jobs/<serviceId>/<jobId>.json`のprivate/fsync/rename付きjournal/非期限lockを追加し、claimとcommitを別の明示操作へ接続した。POST前requested保存、完全manifest/operation/exact Episode key照合、未知応答/receipt保存失敗非再送、非書込offline/remote照会を実装した。
+- ローカルdisk/client/API/M6 Queue結合で初回Show/Episodeと2種改訂、媒体/history/GUID/date保持、purge後published化、stale入力拒否、応答喪失/保存失敗/live・残存lock/active execution/過去status/不正record/secret非保持を回帰した。`bun test`（576件、9776 assertions）、`npm run check`、browser/Bun bundle、M6実証tsconfig、Linux x86-64 binary build、`git diff --check`に合格。
+- 公開CLI/Worker入口は変更せず、`m6_ready=false`を維持する。Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。REST/source/local draft adapter、同job retry、安全な外部復旧と公開gateは残る。詳細は`m6_publication_client.md`。
+
 ## 2026-10-02: Staging内部client・状態照会・durable upload journalを接続
 
 - 未公開staging statusを共通read-only runtime/snapshot boundaryへ接続した。保持manifest/control request/progress/status/完了receiptと読取前後ETagを照合し、payloadを読まず、paused/検証token保持中や履歴jobも観測できる。PUT/復旧許可は常にfalseで、観測から終了や再許可を推測しない。
