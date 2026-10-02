@@ -10,6 +10,7 @@ import { analyzeAudio } from "./audio";
 import { CloudflareApi, hashFile } from "./cloudflare-api";
 import { waitForWorkerHealth } from "./health";
 import { commandHelp } from "./help";
+import { readLocalOperationStatus } from "./local-operation-status";
 import { MigrationAdminClient } from "./migration-client";
 import { readLocalMigrationSetup } from "./migration-setup-journal";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
@@ -51,7 +52,7 @@ const USAGE = "Usage: castloop init [dir] --service-id ID --bucket-name NAME --w
   "create-show ID --site-url URL | create-episode ID | update-show ID | publish-show ID | " +
   "update-episode ID | update-episode-audio ID MP3 | publish-episode ID | " +
   "job-status JOB --show ID [--episode ID] | retry-job JOB --show ID [--episode ID] | " +
-  "cleanup-job JOB --show ID --episode ID | migration-status [--local] | deploy";
+  "cleanup-job JOB --show ID --episode ID | migration-status [--local] | local-operation-status FAMILY ID | deploy";
 
 function argsOf(values: string[], switches: string[] = []): { positional: string[]; flags: Record<string, string> } {
   const positional: string[] = [];
@@ -661,6 +662,12 @@ async function main(): Promise<void> {
     const config = loadConfig(root);
     const result = flags.local ? readLocalMigrationSetup(root, config) : await new MigrationAdminClient(config, adminKey(root)).status();
     console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (command === "local-operation-status" && positional.length === 2) {
+    allowedFlags(flags, []);
+    const root = process.cwd();
+    console.log(JSON.stringify(readLocalOperationStatus(root, loadConfig(root), positional[0], positional[1]), null, 2));
     return;
   }
   if (command === "update-episode" && positional.length === 1) {

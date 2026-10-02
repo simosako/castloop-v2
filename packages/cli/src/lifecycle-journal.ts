@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { lifecycleAdminRequestSchema, lifecycleCommitSchema, serviceConfigSchema } from "@castloop/shared";
 import type { LifecycleAdminRequest, ServiceConfig } from "@castloop/shared";
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { readBoundedLocalJournal } from "./local-journal-read";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 
@@ -51,8 +52,7 @@ export function validateLifecycleClientState(input: unknown): LifecycleClientSta
 }
 
 function readRecord(file: string): LifecycleClientState {
-  if (statSync(file).size > 16384) throw new Error("Lifecycle journal exceeds its record budget");
-  return validateLifecycleClientState(JSON.parse(readFileSync(file, "utf8")));
+  return validateLifecycleClientState(readBoundedLocalJournal(file));
 }
 
 function matchesConfig(state: LifecycleClientState, config: ServiceConfig): boolean {

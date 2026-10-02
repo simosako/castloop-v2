@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 非書込local operation診断をsource CLI/binaryへ接続
+
+- `local-operation-status FAMILY ID`をsource CLI/helpへ追加した。staging/publication/lifecycleのprivate journalと残存lockをcredentials/HTTP/書込なしで読み、remote未確認と変更/復旧許可falseを返す。欠落recordをremote不在/完了とは扱わず、legacy state/secretを読み込まない。
+- 3familyのjournal readをno-follow/nonblocking regular file/実16KiB上限/前後stat/strict UTF-8へ共通化した。不正/過大/foreign/symlink recordを上書きせず、CLI診断では任意本文を表示しない。local lockは作成・削除・奪取しない。
+- `bun test`（621件、10396 assertions）、`npm run check`、M6実証tsconfig、Linux x86-64 binary buildに合格。standalone binaryでもcredentialsなしでjournal/残存lock読取・全file不変・help/versionを確認した。
+- Cloudflare書込/deploy/Release更新、既存環境への適用、書込/破壊的M6 commandの公開は行っていない。unknown outcomeの外部復旧、移行full cutover、本番受け入れgateは残る。詳細は`m6_local_operation_status.md`。
+
 ## 2026-10-02: 最新local入力・完了stage証拠をpublication直前へ照合
 
 - `createLocalPublicationEffects`を追加し、finished/staged local journalのexact集合・service/target/draft/generation/checksum/sizeと最新TOML/cover/audioをclaim/commit直前に照合した。metadataは1MB bounded/no-follow/strict読取、媒体は全量stream hash、照合後metadata再読を行う。

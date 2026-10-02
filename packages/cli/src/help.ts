@@ -65,6 +65,13 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Use --local to inspect the local setup journal and lock without network access or credentials; remote state is not checked.\n" +
       "This does not deploy, initialize controls, resume writes, remove locks or certify M6 readiness. Legacy Workers do not provide the remote route.",
   },
+  "local-operation-status": {
+    usage: "local-operation-status FAMILY ID",
+    description: "Run from the service workspace. Read a local M6 staging, publication or lifecycle journal and observe its lock.\n" +
+      "FAMILY must be staging, publication or lifecycle. Staging uses an upload operation ID; the other families use a job ID.\n" +
+      "No credentials, network access or writes are used. Missing local records do not prove remote absence or completion.\n" +
+      "This does not retry, remove locks, release tokens, authorize recovery or certify M6 readiness.",
+  },
 };
 
 export function commandHelp(command: string): string {

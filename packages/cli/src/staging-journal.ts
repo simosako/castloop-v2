@@ -2,7 +2,8 @@ import { z } from "zod";
 import { serviceConfigSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
 import type { ServiceConfig, StageUploadRequest } from "@castloop/shared";
 import { stagingClientOperation, stagingClientTargets } from "./staging-client";
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { readBoundedLocalJournal } from "./local-journal-read";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const identitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
@@ -44,8 +45,7 @@ function identityFromConfig(config: ServiceConfig): z.infer<typeof identitySchem
 }
 
 function readRecord(file: string): StagingClientState {
-  if (statSync(file).size > 16384) throw new Error("Staging journal exceeds its record budget");
-  return validateStagingClientState(JSON.parse(readFileSync(file, "utf8")));
+  return validateStagingClientState(readBoundedLocalJournal(file));
 }
 
 export function readLocalStagingOperation(root: string, input: ServiceConfig, operationId: string):

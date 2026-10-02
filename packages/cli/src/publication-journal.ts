@@ -2,8 +2,9 @@ import { z } from "zod";
 import { publicationCommitKey, publicationOperationSchema, publicationRequestSchema, serviceConfigSchema } from "@castloop/shared";
 import type { PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { publicationClientOperation } from "./publication-client";
+import { readBoundedLocalJournal } from "./local-journal-read";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const identitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
@@ -41,8 +42,7 @@ function identityFromConfig(config: ServiceConfig): z.infer<typeof identitySchem
 }
 
 function readRecord(file: string): PublicationClientState {
-  if (statSync(file).size > 16384) throw new Error("Publication journal exceeds its record budget");
-  return validatePublicationClientState(JSON.parse(readFileSync(file, "utf8")));
+  return validatePublicationClientState(readBoundedLocalJournal(file));
 }
 
 export function readLocalPublicationJob(root: string, input: ServiceConfig, jobId: string):
