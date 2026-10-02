@@ -39,7 +39,7 @@ strict入力は`schema_version=1`、`service_id`、`show_id`、`reservation_id`�
 
 statusはservice tokenを作らず、両recordの読取後ETagとservice/runtime snapshotを検査する。pause中にも観測できるが、観測だけで登録成功/再送許可やlocal phaseを成立させない。occupied時に別のreservation IDを漏らさない。errors/logsは固定診断だけにする。
 
-内部clientは固定HTTPS origin、管理key、redirect拒否、no-store/JSON/64KB bounded strict応答を使い、service/show/reservation ID/resultを照合する。各callは一回だけで、未知応答や偽receiptを再送・成功扱いしない。公開CLIと送信前durable journalへの接続は残件である。
+内部clientは固定HTTPS origin、管理key、redirect拒否、no-store/JSON/64KB bounded strict応答を使い、service/show/reservation ID/resultを照合する。各callは一回だけで、未知応答や偽receiptを再送・成功扱いしない。送信前durable journalと一度限りのrunner/非書込照会も接続した（`m6_show_registration_client.md`）。公開`create-show`とunknown outcomeの外部復旧は残件である。
 
 ## 検証と残件
 

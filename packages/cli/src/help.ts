@@ -73,8 +73,9 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "local-operation-status": {
     usage: "local-operation-status FAMILY ID",
-    description: "Run from the service workspace. Read a local M6 staging, publication or lifecycle journal and observe its lock.\n" +
-      "FAMILY must be staging, publication or lifecycle. Staging uses an upload operation ID; the other families use a job ID.\n" +
+    description: "Run from the service workspace. Read a local M6 operation journal and observe its lock.\n" +
+      "FAMILY must be staging, publication, lifecycle or show-registration. Staging uses an upload operation ID,\n" +
+      "publication/lifecycle use a job ID, and show-registration uses a Show ID.\n" +
       "No credentials, network access or writes are used. Missing local records do not prove remote absence or completion.\n" +
       "This does not retry, remove locks, release tokens, authorize recovery or certify M6 readiness.",
   },

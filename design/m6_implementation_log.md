@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Show登録の送信前journal・一度限りrunner・offline診断を接続
+
+- Show ID単位のprivate journalへservice/account/Worker/originと予約要求を凍結し、非期限exclusive lock下で`reserve_requested`のdurable保存後に一回だけPOSTするrunnerを追加した。strictな一致receiptの保存後だけ`registered`へ進め、未知応答・receipt保存失敗・remote観測からの自動再送/昇格を拒否する。
+- private permission、file/directory fsync、atomic rename、bounded/no-follow読取、identity/request固定、phase飛ばし/後退拒否と稼働/残存lock保持を回帰した。本文・site URL・メール・secret・任意exceptionをjournalへ複製しない。
+- `local-operation-status show-registration SHOW_ID`を4番目の非書込familyとしてsource CLIへ追加した。Linux x86-64 standalone binaryでもcredentialsなしでrequested状態とepoch日時の古いlockを読み、全fileのbytes/mtime不変・lock保持・変更/復旧許可falseを確認した。remote statusもlocal phaseを変更しない。
+- 全716テスト/11442 assertions、TypeScript/M6実証tsconfig、candidate/bridge browser bundle、内部runner Bun bundle、Linux単一バイナリbuild、`git diff --check`に合格した。Cloudflareへの書込/deploy・既存環境変更は行わず、公開`create-show`と通常candidateの書込gateは変更しない。
+- 公開CLIのlocal TOML/state連携、unknown outcomeの安全な外部復旧、移行full cutoverと実機受け入れは残る。詳細は`m6_show_registration_client.md`。
+
 ## 2026-10-02: 新規Showの永久ID予約とdraft制御を内部API/clientへ接続
 
 - 新規Show controlの任意`reservation_id`とlegacy形式の予約recordを使い、control keyの条件付き新規作成でIDを取得した後に同IDの予約を補完するようにした。partial登録は共通受付/対象適格性/owner検査で拒否し、既存/advanced/削除済みcontrolを再初期化しない。
