@@ -14,6 +14,8 @@
 
 2026-10-01の管理者判断で、M6のuploadは**現行Cloudflare REST APIの単一PUTを維持**する。クライアント切断後にそのPUTが遅れてobjectを作成・更新することはないと仮定する。これは確認済みのCloudflare仕様ではなく、[未解決の懸念U1](./m6_upload_recovery_options.md)として保持する。U1の解消や分割uploadへの変更をM6公開条件にせず、通常のupload排他・照合・中断回復の実装は引き続き必要とする。
 
+2026-10-02の管理者判断で、同一Cloudflareアカウント内の専用試験環境と、公開配信・更新操作の一時停止を許容するメンテナンス移行を採用した。**M6機能一式を完成させて次バージョンとして正式リリース**し、限定先行リリースや無停止移行を必須にしない。無停止移行の検討、費用・停止時間の測定計画はMVP構築後へ回す。機能・安全性の受け入れ条件は維持し、測定値の承認待ちで通常の実装を止めない。詳細は[承認済み方針と残る技術ゲート](./m6_review_queue.md)を参照。
+
 ## 1. 目的と開発順序
 
 管理者がEpisode単位、Show単位で配信を停止し、不要なコンテンツを安全に削除できるようにする。次の機能開発を**M6**とし、着手済みの[独自ドメイン対応](./custom_domain_plan.md)は基礎コードと承認済み方針を保持して後続へ回す。独自ドメインの完成をM6の前提にはしない。
@@ -309,6 +311,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 - 既存Show/Episode入力schema、GUID、公開日時、音源キー、public URLは変更しない。制御情報・job schemaだけをversion付きで拡張する。
 - 移行は管理者が公開/更新/uploadを止め、進行中jobを安全に収束させた状態で実施する。Show予約・公開snapshot・current Episode metadata・下書きを列挙し、従来公開済みをactive、未公開をdraftとして初期化する。既存recordは上書きしない。初期化途中はlifecycle受付を開けず、移行進捗を保存する。
+- 2026-10-02に管理者が予定メンテナンス中の配信停止を許容した。部分初期化中などに503/no-storeで配信を閉じる区間を前提とし、可用性のために旧配信で安全ゲートを迂回しない。無停止移行は後続とし、具体的な移行日や停止時間は今回の決定から推定しない。
 - 読み取り専用の`planLifecycleMigration`を追加した。list/getだけでsource ETag/sizeと初期状態案を返し、予約欠落、未完了owner/commit、公開metadataと媒体/履歴の不整合、部分的なv2初期化等をblockerにする。既存v2の停止状態・generation・tombstoneは推論でactiveへ戻さない。`inventory_compatible`は構造確認の結果であって受付停止・旧HTTP収束・移行実行の許可ではなく、`requires_quiescence=true`を常に返す。apply/API/CLIはまだ実装していない。
 - 不完全な旧公開jobがある場合は移行を保留する。unknown/missingな制御recordを何でもactive扱いする後方互換は不可。移行済みサービスでの状態record欠落はfail closedする。
 - 停止判定とcache構成に対応したWorkerへ100%切り替え、旧consumer/uploadの収束を確認してから新コマンドを利用可能にする。旧versionの段階的配信が残ったまま停止/削除を始めない。
@@ -333,7 +336,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 ### M6.0: 設計承認・技術実証
 
 - 下記の承認事項を確定する。
-- per-entrypoint cacheのREST deploy、内部purge、generation key、GET/HEAD/Range、料金/Free制限を専用Workerで確認する。
+- per-entrypoint cacheのREST deploy、内部purge、generation key、GET/HEAD/Rangeとruntime制約内での正しい動作を、同一アカウントの専用Workerで確認する。費用・停止時間の測定計画はMVP構築後へ回し、機能実証と区別する。
 - Show制御recordのCASと、旧job/uploadの移行手順、単一PUTの通常の排他・照合・中断回復、安全なreserved abandonの限定条件を検証する。切断後の遅延object作成がないという仮定U1の証明は公開ゲートに含めない。
 - delete batch/Queue続行、対象markerと監査記録の保持規則、移行/rollback手順を確定する。
 
@@ -356,7 +359,7 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 - 以下の受け入れ条件を自動テストと専用Cloudflare環境で確認する。
 - 別マシンで対応Linuxバイナリだけから確認・停止・再開・削除・再試行を実行する。
-- README/help/smoke guideと復旧手順を完成する。部分実装をM6完了と表示せず、未検証の削除コマンドはReleaseに載せない。次のRelease番号は受け入れ後に決める。
+- README/help/smoke guideと復旧手順を完成する。M6機能一式を次バージョンとして正式リリースする。部分実装をM6完了と表示せず、未検証の削除コマンドはReleaseに載せない。次のRelease番号は受け入れ後に決める。限定先行リリースは必須にしない。
 
 ## 12. 受け入れ条件
 
@@ -383,11 +386,13 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 独立して進められる実装を継続し、最終確認待ちと技術残件は[レビュー待ち一覧](./m6_review_queue.md)に分離してまとめる。未接続moduleの自動テスト追加を、公開policyの承認やM6の実機受け入れと扱わない。
 
 1. **承認済み（2026-10-01）**: deleteはpayloadの物理削除、unpublishは保持。必要な小さい管理/操作記録を残す方針と分離する。
-2. **unpublishと対になるrestoreもM6に含める**こと。通常publishで暗黙再開する方式は誤公開を招くので推奨しない。
+2. **承認済み（2026-10-02）**: unpublishと対になるrestoreも含め、M6機能一式を構築して次バージョンとして正式リリースする。通常publishによる暗黙再開ではなく明示restoreを使う。
 3. **承認済み（2026-10-01）**: 停止時404、削除中/削除済み410、空Showのfeedは200というHTTP仕様。
 4. **承認済み（2026-10-01）**: 削除IDは永久再利用禁止。最小tombstoneと必要な小さい操作記録は自動期限削除せず保持し、本文/個人情報/secretは複製しない。期限付きの監査cleanupは後続。ローカル元ファイルはremote削除の対象外とする設計を維持する。
-5. **方針は承認済み（2026-10-01）**: 長期immutableのクライアントcacheを再検証必須へ変えることと、毎要求のR2状態照会・内部呼出の性能/料金増を受け入れること。実測は引き続き必要。
+5. **方針は承認済み（2026-10-01）**: 長期immutableのクライアントcacheを再検証必須へ変えることと、毎要求のR2状態照会・内部呼出の性能/料金増を受け入れること。具体的な費用・停止時間の測定計画は2026-10-02の決定によりMVP構築後へ回す。
 6. **承認済み（2026-10-01）**: 進行中publicationやuploadへ割り込まないこと。必要なら緊急遮断を別要件として設計する。
+7. **承認済み（2026-10-02）**: 既存と同じCloudflareアカウント内の専用試験環境を使い、運用リソースと試験データを分離する。有料契約変更・無制限支出を承認したものではない。
+8. **承認済み（2026-10-02）**: メンテナンス中の公開配信・更新操作の一時停止を許容する前提で構築する。無停止移行はMVP構築後の後続課題とする。
 
 ## 14. 一次資料と関連資料
 

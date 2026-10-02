@@ -1,12 +1,14 @@
 # M6: 移行applyとruntime証拠の契約
 
-更新日: 2026-10-01
+更新日: 2026-10-02
 
 ## 現在の実装範囲
 
 独立bridgeの移行管理APIへ`runLifecycleMigrationStep`の初期化限定モードを接続した。候補HTTP検査windowも追加したが、CLI・本番full cutover/完了/受付再開は未接続である。現行binary/Workerは変更せず、`GET /admin/capabilities`は引き続き認証必須・no-store、`worker_protocol=legacy_fenced`/`m6_ready=false`を返す。R2にmock readinessがあっても、このWorkerがlifecycle配信/操作に対応するとは報告しない。`m6_migration_bootstrap.md`参照。
 
 旧Worker/CLIから移行を実施できるリリース手順や、安全なrollback手順はまだ完成していない。既存v0.1.1環境の更新・削除は行わない。
+
+2026-10-02に管理者が、予定メンテナンス中の更新操作・公開配信の一時停止を許容した。M6は停止時間を取れる前提で構築し、無停止移行を必須にしない。費用・停止時間の測定計画と無停止移行の検討はMVP構築後へ回す。これは旧IO終了・cache撤去・安全な切替の条件を省く決定でも、既存環境を今すぐ切り替える指示でもない。
 
 ## 凍結planと進捗
 
@@ -36,7 +38,7 @@
 - publication/staging/lifecycle routesとconsumerが同じservice/control受付・配信gateに接続している。
 - 旧IO終了の確認を保持し、新たな旧書込を許可していない。
 
-証拠にはallowlistedなIDと成立した条件だけを残す。正常に返ったcallbackとR2 mockによる自動テストは、Cloudflare実機・旧invocation収束・Free/CPU/300MB・料金/複数colo等の受け入れに置き換わらない。
+証拠にはallowlistedなIDと成立した条件だけを残す。正常に返ったcallbackとR2 mockによる自動テストは、Cloudflare実機・旧invocation収束・runtime制約内の300MB処理・複数colo等の機能/安全性の受け入れに置き換わらない。費用・停止時間の定量測定はMVP構築後の別計画とし、runtime証拠から測定済みの費用や停止時間保証を推定しない。
 
 ## 次の接続作業
 

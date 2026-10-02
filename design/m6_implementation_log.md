@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 試験環境・停止を許容する移行・M6一式の正式リリース方針を承認
+
+- 管理者の3件のannotationに従い、同一Cloudflareアカウント内の専用試験環境、予定メンテナンス中の配信/更新停止を許容する移行、M6機能一式の完成と次バージョンとしての正式リリースを決定事項へ記録した。限定先行リリースや無停止移行を前提にしない。
+- 無停止移行の検討と費用・停止時間の測定計画はMVP構築後へ回す。これらの数値・承認待ちで通常の実装や機能完成を止めず、機能/安全性の受け入れ、runtime制約内の300MB処理、旧IO収束、cache・owner/tokenの安全条件は維持する。
+- `m6_review_queue.md`、M6設計、移行runtime契約、README、英語のAgent Guideへ反映した。予算上限/有料plan変更/無制限支出、具体的なversion番号/移行日/停止時間保証は決定していない。今回の更新は文書だけで、runtime・Cloudflareリソース・既存環境・Releaseは変更していない。
+- `bun test`（621件、10396 assertions）、`npm run check`、英語AGENTS.md/文書リンク/コードフェンス、`git diff --check`に合格。既存コードの回帰確認であり、専用環境の新しい実測ではない。
+
 ## 2026-10-02: 非書込local operation診断をsource CLI/binaryへ接続
 
 - `local-operation-status FAMILY ID`をsource CLI/helpへ追加した。staging/publication/lifecycleのprivate journalと残存lockをcredentials/HTTP/書込なしで読み、remote未確認と変更/復旧許可falseを返す。欠落recordをremote不在/完了とは扱わず、legacy state/secretを読み込まない。
