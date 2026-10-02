@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 登録receiptからのローカルShow/Episode下書き作成を追加
+
+- 未公開のShow/Episode下書きhelperをM6登録journalの同一identity/registered receipt/非期限lockへ接続した。Showは指定site URL、EpisodeはローカルShow IDとstrict schemaを照合して現在時刻の引用RFC 3339/GUIDを保存する。legacy confirmedの採用・登録journal変更・remote操作は行わない。
+- private directory/file・exclusive新規作成・file/directory fsyncで既存/partial dataを上書きせず、残存lock/missing/prepared/requested/foreign/不正recordとsymlink parent/metadataを拒否する。publication用bounded metadata readerを共通moduleへ抽出して再利用した。現在のremote公開状態やmutation権限をlocal receiptから推定しない。
+- local disk→durable登録runner→内部APIの結合と既存Episode/GUID/date保持・同時作成・不正URL/slug・legacy workspace非変換・過大/不正UTF-8/破損Show入力を回帰した。全725テスト/11515 assertions、TypeScript/M6実証tsconfig、candidate/bridge browser bundle、内部helper Bun bundleと既存Linux binary build/version/helpに合格。binaryには新helperを公開せず、現行CLIの回帰確認である。
+- 公開CLI/通常candidate gateと既存Cloudflare環境は変更しない。公開CLI・local staging/publication state連携、部分file/未知結果の復旧・既存workspace移行・実機受け入れは残る。詳細は`m6_local_drafts.md`。
+
 ## 2026-10-02: Show登録の送信前journal・一度限りrunner・offline診断を接続
 
 - Show ID単位のprivate journalへservice/account/Worker/originと予約要求を凍結し、非期限exclusive lock下で`reserve_requested`のdurable保存後に一回だけPOSTするrunnerを追加した。strictな一致receiptの保存後だけ`registered`へ進め、未知応答・receipt保存失敗・remote観測からの自動再送/昇格を拒否する。

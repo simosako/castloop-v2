@@ -52,7 +52,7 @@
     publication内部client/非書込status/privateなdurable job journalも追加した。commitは完全manifest hashを照合し、claim/commitを別の明示操作としてPOST前requested保存と未知応答非再送を行う。同jobの明示retryも未完了owner/token/marker検査とdurable通番/requested保存へ接続した。ローカルdraft state、公開CLI/安全な外部復旧/実機受け入れは残る。`m6_publication_client.md`参照。
     finished/staged local journalsと最新TOML/cover/audio、audio-onlyのbase metadataをclaim/commit直前に照合する独立guardも追加した。旧local stateの自動変換/公開command接続は行っていない。`m6_local_publication_inputs.md`参照。
     新規Episodeの最初のmetadata/audio stagingへ、generation-zero draft制御の条件付き初期化を追加した。orphan/tombstone拒否・Show共通CAS・exact owner照合後だけ初期化し、公開fixtureの手動draft投入も除いた。公開CLI接続・実機受け入れは残る。`m6_new_episode_staging.md`参照。
-    新規Showの永久reservation ID/CAS登録とdraft制御初期化、partial登録時の共通受付拒否、内部`POST /admin/shows`とstrictな非再送clientも追加した。既存/advanced/tombstoneを再初期化せず、同IDの限定補完だけを許す。private/fsync付き登録journal/送信前requested保存/一度限りrunnerも接続した。unknown outcome/残存lockを観測から昇格・再送せず、offline診断のshow-registration familyだけをsource CLIへ追加した。公開`create-show`/外部復旧/実機受け入れは残る。`m6_show_registration.md`と`m6_show_registration_client.md`参照。
+    新規Showの永久reservation ID/CAS登録とdraft制御初期化、partial登録時の共通受付拒否、内部`POST /admin/shows`とstrictな非再送clientも追加した。既存/advanced/tombstoneを再初期化せず、同IDの限定補完だけを許す。private/fsync付き登録journal/送信前requested保存/一度限りrunnerも接続した。unknown outcome/残存lockを観測から昇格・再送せず、offline診断のshow-registration familyだけをsource CLIへ追加した。registered receipt/非期限lockを使うローカルShow/Episode下書きhelperも追加したが、legacy confirmedは変換しない。公開`create-show`/local staging state統合/外部復旧/実機受け入れは残る。`m6_show_registration.md`、`m6_show_registration_client.md`と`m6_local_drafts.md`参照。
 2. **consumer invocationの安全な回復**: 全副作用をawaitした通常終了/例外終了からのtoken返却・続行/requeueを独立consumerで実装した。取得応答喪失・runtime強制終了ではブロックを保持する。稼働中invocationを解放せずに終了を確認する手順と、安全な回復を成立させる。時間/HEAD不在だけの奪取を追加しない。
 3. **本番配信とpurge**: cache有効named entrypoint向けの内部fetch/stream配信、所有entrypoint内purge、service token/readiness/実行version/cache ownerを照合する配信gate adapterを実装した。adapter/RPCは実cache設定や100%切替を単独で証明せず、まだ本番main moduleへexport/接続していない。gatewayをdefault cache無効の入口へ接続し、CLIのdeploy設定と移行capabilityを完成する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。`m6_delivery_runtime_gate.md`参照。
    別entry moduleの`src/m6-worker.ts`へgateway/named export/新Queue consumerを接続した。現行binary/deployには接続せず、通常候補のmanagement書込は閉じたまま、ready=falseを維持する。未公開fetch結合入口の追加は公開gateを変更しない。bootstrap/本番REST設定/HTTP検証/旧IO/cache purge等は残る。`m6_candidate_worker.md`参照。
@@ -66,7 +66,7 @@
    lifecycle内部APIを共通service boundaryへ接続し、非予約dry-run/削除確認/6操作の受付とcommit、読み取り専用job照会、live tokenを拒否する同jobの明示retryを追加した。API→M6 Queue adapterのローカル結合は確認済みだが、公開入口/CLI client・durable復旧・実機確認は未完了である。`m6_management_api.md`参照。
    未公開lifecycle clientの固定origin/redirect拒否/一回限り送信/strict応答照合と6操作のローカル結合も追加した。確認済みrequestと送信前requestedをprivate/fsync付きjournalへ保存する明示claim/commit/retry、非書込offline/remote照会も接続した。公開CLIとunknown outcome/残存lock/tokenの安全な外部復旧は残る。`m6_lifecycle_client.md`参照。
 6. **接続と受け入れ**: 実行token付きeffect factoryとWorker binding用のfeed書込/内部purge/Queue送信を追加した。本番配信gateとQueue routingへ接続し、管理API・CLIの6操作、確認入力/dry-run、job-status/retry、README/help・復旧手順を完成する。専用Cloudflare環境とLinux x86-64単一バイナリで確認してからReleaseを判断する。
-    認証情報/HTTP/書込なしの`local-operation-status FAMILY ID`をsource CLIへ追加し、3familyのprivate journal/残存lockを照会可能にした。phase昇格/lock除去/復旧許可は行わず、書込commandの公開gateは閉じたままである。`m6_local_operation_status.md`参照。
+    認証情報/HTTP/書込なしの`local-operation-status FAMILY ID`をsource CLIへ追加し、4familyのprivate journal/残存lockを照会可能にした。phase昇格/lock除去/復旧許可は行わず、書込commandの公開gateは閉じたままである。`m6_local_operation_status.md`参照。
 
 ## 今回実装済みだが本番未接続
 

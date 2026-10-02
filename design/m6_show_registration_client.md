@@ -42,4 +42,4 @@ local disk→内部client→M6 Show登録handlerの結合で、送信前requeste
 
 全716テスト/11442 assertions、TypeScript/M6実証tsconfig、candidate/bridge browser bundle、内部runner Bun bundle、Linux単一バイナリbuildに合格した。standalone binaryでもcredentialsなしでrequested状態とepoch日時の古いlockを照会し、全fileのbytes/mtime不変・lock保持・変更/復旧許可falseを確認した。Cloudflareへの書込/deployは行っていない。
 
-公開`create-show`のTOML/既存local state連携、unknown outcomeの明示的な外部復旧、実Cloudflare/次version受け入れは未完了である。記録されたregistered phaseもM6全体のreadinessやShow公開完了を意味しない。
+registered receiptを使う未公開のローカルShow/Episode下書きhelperも追加した（`m6_local_drafts.md`）。公開`create-show`の切替/既存local state連携、unknown outcomeの明示的な外部復旧、実Cloudflare/次version受け入れは未完了である。記録されたregistered phaseもM6全体のreadinessやShow公開完了を意味しない。

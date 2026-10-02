@@ -8,9 +8,8 @@ import type { PublicationAdminClient } from "./publication-client";
 import { validateStagingClientState } from "./staging-journal";
 import type { StagingClientState } from "./staging-journal";
 import { assertLocalStagingSource } from "./staging-sources";
+import { readLocalMetadata } from "./local-metadata-read";
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
-import { open } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 export type LocalPublicationInputs = {
@@ -20,29 +19,6 @@ export type LocalPublicationInputs = {
   audioPath?: string;
   baseRevision?: EpisodeRevision;
 };
-
-async function readLocalMetadata(path: string): Promise<Buffer> {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-  try {
-    const before = await handle.stat({ bigint: true });
-    if (!before.isFile() || before.size < 1n || before.size > 1000000n) throw new Error("Local publication metadata size/type is invalid");
-    const chunks: Buffer[] = [];
-    const buffer = Buffer.alloc(64 * 1024);
-    let size = 0;
-    for (;;) {
-      const { bytesRead } = await handle.read(buffer, 0, Math.min(buffer.length, 1000001 - size), null);
-      if (!bytesRead) break;
-      size += bytesRead;
-      if (size > 1000000) throw new Error("Local publication metadata exceeds its size limit");
-      chunks.push(Buffer.from(buffer.subarray(0, bytesRead)));
-    }
-    const after = await handle.stat({ bigint: true });
-    if (BigInt(size) !== before.size || before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) {
-      throw new Error("Local publication metadata changed during validation");
-    }
-    return Buffer.concat(chunks);
-  } finally { await handle.close(); }
-}
 
 export function createLocalPublicationEffects(config: ServiceConfig, input: PublicationClientState, adminKey: string,
   local: LocalPublicationInputs, client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">): PublicationOperationEffects {
