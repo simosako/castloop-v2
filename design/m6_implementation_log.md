@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: target snapshotからID/generation/baseを導出して更新・公開
+
+- 未公開high-level更新/公開helperを追加し、非書込target照会→identity/local前後一致→初回durable head生成/完了後history付きrotation→target排他runnerへ接続した。metadata/audioに同draft IDを使い、current base変更やunfinished ownerでは差替えない。
+- requested/残存lock/欠落recordをHTTP前に拒否し、prepared publicationの固定timestampは明示続行で維持する。target lock取得後も計画したdraft IDを照合する。欠落headの初期化でもhistory/publication ID/lock再利用を拒否した。
+- 四入力経路、consumer完了前の次更新拒否/完了後rotation、unknown outcome非再送、base/identity/local途中変更とprepared timestamp保持を回帰した。全798テスト/12310 assertions、TypeScriptと283module内部helper Bun bundleに合格。Cloudflare書込/公開CLI切替はない。
+- 残タスクを再確認し、公開前のCLI command dispatchと登録/local作成/lifecycleの全体統合、移行/外部復旧/実機受け入れを続ける。詳細は`m6_local_update.md`。
+
 ## 2026-10-02: generation/current/baseの非書込内部API/clientを追加
 
 - 未公開`POST /admin/target`とstrict clientを追加した。job ID/期待generationなしでtargetを照会し、M6 read boundary/controls/metadata/historyの前後照合後にgenerationとcurrent baseを返す。unfinished ownerではbaseを読まず、orphan/partial registration/不整合/過大入力を拒否する。

@@ -197,6 +197,23 @@ describe("durable target-local M6 draft identity", () => {
     } finally { setup.dispose(); }
   });
 
+  test("a missing target head cannot recreate an identity retained in history or a publication lock", async () => {
+    const setup = await fixture();
+    try {
+      const history = join(setup.root, ".castloop", "drafts", setup.config.service_id, "history");
+      mkdirSync(history);
+      writeFileSync(join(history, `${setup.id}.json`), readFileSync(setup.file));
+      rmSync(setup.file);
+      expect(() => createLocalDraftJournal(setup.root, setup.config, setup.target, setup.id)).toThrow("retained");
+      const publicationDirectory = join(setup.root, ".castloop", "publication-jobs", setup.config.service_id);
+      mkdirSync(publicationDirectory, { recursive: true });
+      const nextId = crypto.randomUUID();
+      writeFileSync(join(publicationDirectory, `${nextId}.json.lock`), "retained");
+      expect(() => createLocalDraftJournal(setup.root, setup.config, setup.target, nextId)).toThrow("retained");
+      expect(existsSync(setup.file)).toBe(false);
+    } finally { setup.dispose(); }
+  });
+
   test("symlink parents and files are refused without following or changing the target", async () => {
     const setup = await fixture();
     const other = mkdtempSync("/tmp/opencode/castloop-draft-symlink-");

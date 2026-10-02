@@ -26,7 +26,7 @@ const publicationHeaderSchema = z.object({ schema_version: publicationRequestSch
   action: z.literal("publish"), expected_show_generation: publicationRequestSchema.shape.request.shape.expected_show_generation,
   expected_episode_generation: publicationRequestSchema.shape.request.shape.expected_episode_generation,
   created_at: publicationRequestSchema.shape.request.shape.created_at }).strict();
-export type LocalDraftStagingOptions = { rest: StagingRestOptions;
+export type LocalDraftStagingOptions = { rest: StagingRestOptions; expectedDraftJobId?: string;
   client?: Pick<StagingAdminClient, "claim" | "begin" | "settle" | "finish" | "status"> };
 
 function existingDraft(root: string, config: ServiceConfig, target: LocalDraftTarget): LocalDraftJournal {
@@ -46,6 +46,9 @@ export async function runLocalDraftStaging(root: string, configInput: ServiceCon
   const journal = existingDraft(root, config, target);
   return journal.exclusively(async (editor) => {
     const state = editor.load();
+    if (options.expectedDraftJobId !== undefined && options.expectedDraftJobId !== state.draft_job_id) {
+      throw new Error("Draft identity changed after target inspection");
+    }
     if (state.phase !== "editable") throw new Error("A publication-prepared or frozen draft cannot receive uploads");
     for (const upload of state.uploads) {
       const snapshot = readLocalStagingOperation(root, config, upload.operation_id);
@@ -79,12 +82,16 @@ export async function runLocalDraftStaging(root: string, configInput: ServiceCon
 
 export async function runLocalDraftPublication(root: string, configInput: ServiceConfig, target: LocalDraftTarget,
   request: PublicationHeader, options: Omit<LocalPublicationPreparation, "stagedOperationIds">, adminKey: string,
-  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">): Promise<PublicationClientState> {
+  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">,
+  expectedDraftJobId?: string): Promise<PublicationClientState> {
   const config = serviceConfigSchema.parse(configInput);
   const header = publicationHeaderSchema.parse(request);
   const journal = existingDraft(root, config, target);
   return journal.exclusively(async (editor) => {
     const state = editor.load();
+    if (expectedDraftJobId !== undefined && expectedDraftJobId !== state.draft_job_id) {
+      throw new Error("Draft identity changed after target inspection");
+    }
     if (state.phase === "frozen") throw new Error("A frozen draft cannot be published again");
     if (options.baseRevision?.revision_id !== state.base_revision_id) throw new Error("Publication base differs from the permanent draft base identity");
     const prepared = await prepareLocalPublication(root, config, { ...header, ...state.target, job_id: state.draft_job_id },

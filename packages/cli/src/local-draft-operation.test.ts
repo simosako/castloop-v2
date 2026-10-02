@@ -1,14 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { episodeDraftFromRevision, stageDraftPrefix, stringifyToml } from "@castloop/shared";
+import { episodeDraftFromRevision, publicationCommitKey, stageDraftPrefix, stringifyToml } from "@castloop/shared";
 import { createLocalDraftJournal, readLocalDraft } from "./local-draft-journal";
 import { runLocalDraftPublication, runLocalDraftStaging } from "./local-draft-operation";
+import { publishLocalM6Draft, updateLocalM6Draft } from "./m6-local-update";
+import { prepareLocalPublication } from "./local-publication-preparation";
 import { PublicationAdminClient } from "./publication-client";
 import { readLocalPublicationJob } from "./publication-journal";
 import { StagingAdminClient } from "./staging-client";
 import { readLocalStagingOperation } from "./staging-journal";
+import { TargetInspectionClient } from "./target-inspection-client";
 import { readShowControl } from "../../../src/lifecycle-control";
 import { handleM6PublicationAdmin } from "../../../src/publication-admin";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
+import { handleM6TargetInspection } from "../../../src/target-inspection-admin";
+import { consumeOwnedPublication } from "../../../src/publication-consumer";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
 import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -57,6 +62,12 @@ async function fixture(mode: "show" | "initial" | "metadata" | "audio" = "show")
     if (loseAction === `publication:${action}`) throw new Error("Simulated lost acknowledgement");
     return response;
   });
+  const inspector = new TargetInspectionClient(setup.config, "private-secret", async (input, init) => {
+    requests.push("target:inspect");
+    const response = await handleM6TargetInspection(new Request(input, init), setup.env, setup.bindings);
+    if (!response) throw new Error("Unexpected target inspection route");
+    return response;
+  });
   const rest = { accountId: setup.config.account_id, apiToken: "test-rest-token", transport: async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     assertTargetLock();
     const method = init?.method;
@@ -81,7 +92,14 @@ async function fixture(mode: "show" | "initial" | "metadata" | "audio" = "show")
   const publish = async () => runLocalDraftPublication(root, setup.config, target, { ...await header(), action: "publish" },
     { ...(base ? { baseRevision: base } : {}), ...(mode === "initial" || mode === "audio" ? { audioPath: "audio.mp3" } : {}) },
     "private-secret", publicationClient);
-  return { ...setup, root, target, id, file, requests, upload, publish,
+  const updateAutomatically = async (asset: "show" | "episode_metadata" | "audio") => updateLocalM6Draft(root, setup.config, target,
+    asset === "audio" ? { asset, audio_path: "audio.mp3" } : { asset }, "private-secret",
+    { rest, client: stagingClient, inspector, now: () => new Date("2026-10-02T12:00:00Z") });
+  const publishAutomatically = async () => publishLocalM6Draft(root, setup.config, target, "private-secret",
+    { inspector, client: publicationClient, ...(mode === "initial" || mode === "audio" ? { audioPath: "audio.mp3" } : {}),
+      now: () => new Date("2026-10-02T12:01:00Z") });
+  return { ...setup, root, target, id, file, requests, upload, publish, inspector, rest, stagingClient, publicationClient,
+    updateAutomatically, publishAutomatically,
     lose: (action: string) => { loseAction = action; }, afterClaim: (effect: () => void | Promise<void>) => { afterClaim = effect; },
     dispose: () => rmSync(root, { recursive: true, force: true }) };
 }
@@ -207,6 +225,117 @@ describe("owned target-local staging and publication orchestration", () => {
       await expect(setup.upload("episode_metadata")).rejects.toThrow("unresolved");
       expect(setup.requests).toEqual(requests);
       expect(readLocalDraft(setup.root, setup.config, setup.target).client_state?.uploads).toHaveLength(1);
+    } finally { setup.dispose(); }
+  });
+});
+
+describe("M6 updates derive durable draft IDs and generation/base snapshots", () => {
+  for (const mode of ["show", "initial", "metadata", "audio"] as const) {
+    test(`${mode} uses target inspection instead of caller-supplied generations or draft IDs`, async () => {
+      const setup = await fixture(mode);
+      try {
+        rmSync(setup.file);
+        const assets = mode === "show" ? ["show"] as const : mode === "initial" ? ["audio", "episode_metadata"] as const :
+          mode === "metadata" ? ["episode_metadata"] as const : ["audio"] as const;
+        let draftId: string | undefined;
+        for (const asset of assets) {
+          const upload = await setup.updateAutomatically(asset);
+          draftId ??= upload.upload.draft_job_id;
+          expect(upload.upload.draft_job_id).toBe(draftId);
+          expect(upload.upload.created_at).toBe("2026-10-02T12:00:00Z");
+          expect(upload.finish_receipt).toBe("staged");
+        }
+        if (!draftId) throw new Error("Missing derived draft identity");
+        const published = await setup.publishAutomatically();
+        expect(published.publication.request.job_id).toBe(draftId);
+        expect(published.publication.request.created_at).toBe("2026-10-02T12:01:00Z");
+        expect(published.phase).toBe("committed");
+        expect(setup.requests.filter((action) => action === "target:inspect")).toHaveLength(assets.length + 1);
+      } finally { setup.dispose(); }
+    });
+  }
+
+  test("explicit update after completed publication archives the old draft and starts a distinct job", async () => {
+    const setup = await fixture();
+    try {
+      const upload = await setup.updateAutomatically("show");
+      const publication = await setup.publishAutomatically();
+      const previous = readLocalDraft(setup.root, setup.config, setup.target).client_state;
+      const requests = [...setup.requests];
+      await expect(setup.updateAutomatically("show")).rejects.toThrow("blocks");
+      expect(readLocalDraft(setup.root, setup.config, setup.target).client_state).toEqual(previous);
+      expect(setup.requests.slice(requests.length)).toEqual(["target:inspect"]);
+      await consumeOwnedPublication(setup.env, publicationCommitKey(publication.publication.commit),
+        { async checkDeliveryGate() {}, async purge() {} });
+      const next = await setup.updateAutomatically("show");
+      expect(next.upload.draft_job_id).not.toBe(upload.upload.draft_job_id);
+      const archive = join(setup.root, ".castloop", "drafts", setup.config.service_id, "history", `${upload.upload.draft_job_id}.json`);
+      expect(JSON.parse(readFileSync(archive, "utf8"))).toEqual(previous);
+    } finally { setup.dispose(); }
+  });
+
+  test("unknown local outcomes are refused before even an inspection HTTP request", async () => {
+    const setup = await fixture();
+    try {
+      setup.lose("stage:claim");
+      await expect(setup.updateAutomatically("show")).rejects.toThrow("unknown");
+      const requests = [...setup.requests];
+      await expect(setup.updateAutomatically("show")).rejects.toThrow("unresolved");
+      await expect(setup.publishAutomatically()).rejects.toThrow("unresolved");
+      expect(setup.requests).toEqual(requests);
+    } finally { setup.dispose(); }
+  });
+
+  test("foreign response identity and local head changes during inspection cannot initialize or stage", async () => {
+    const setup = await fixture();
+    try {
+      const response = await setup.inspector.inspect({ schema_version: 1, service_id: setup.config.service_id, ...setup.target });
+      const options = { rest: setup.rest, client: setup.stagingClient, inspector: { inspect: async () =>
+        ({ ...response, request: { ...response.request, show_id: "other" } }) } };
+      await expect(updateLocalM6Draft(setup.root, setup.config, setup.target, { asset: "show" }, "private-secret", options)).rejects.toThrow("changed");
+      options.inspector.inspect = async () => {
+        const state = JSON.parse(readFileSync(setup.file, "utf8"));
+        writeFileSync(setup.file, JSON.stringify({ ...state, draft_job_id: crypto.randomUUID() }));
+        return response;
+      };
+      await expect(updateLocalM6Draft(setup.root, setup.config, setup.target, { asset: "show" }, "private-secret", options)).rejects.toThrow("changed");
+      expect(setup.requests).toEqual(["target:inspect"]);
+    } finally { setup.dispose(); }
+  });
+
+  test("an editable draft with a different base never silently adopts the current revision", async () => {
+    const setup = await fixture("metadata");
+    try {
+      const state = JSON.parse(readFileSync(setup.file, "utf8"));
+      writeFileSync(setup.file, JSON.stringify({ ...state, base_revision_id: crypto.randomUUID() }));
+      await expect(setup.updateAutomatically("episode_metadata")).rejects.toThrow("different");
+      await expect(setup.publishAutomatically()).rejects.toThrow("base differs");
+      expect(setup.requests).toEqual(["target:inspect", "target:inspect"]);
+    } finally { setup.dispose(); }
+  });
+
+  test("pre-claim publication preparation keeps its fixed timestamp on an explicit continuation", async () => {
+    const setup = await fixture();
+    try {
+      const stage = await setup.updateAutomatically("show");
+      await prepareLocalPublication(setup.root, setup.config, { schema_version: 1, kind: "show", show_id: "daily", job_id: stage.upload.draft_job_id,
+        action: "publish", expected_show_generation: (await readShowControl(setup.env, "daily"))!.value.generation,
+        created_at: "2026-10-02T12:00:30Z" }, { stagedOperationIds: [stage.upload.operation_id] }, "private-secret", setup.publicationClient);
+      expect((await setup.publishAutomatically()).publication.request.created_at).toBe("2026-10-02T12:00:30Z");
+    } finally { setup.dispose(); }
+  });
+
+  test("lost commit cannot be replayed or promoted by another target inspection", async () => {
+    const setup = await fixture();
+    try {
+      await setup.updateAutomatically("show");
+      setup.lose("publication:commit");
+      await expect(setup.publishAutomatically()).rejects.toThrow("unknown");
+      const requests = [...setup.requests];
+      await expect(setup.publishAutomatically()).rejects.toThrow("requested");
+      await expect(setup.updateAutomatically("show")).rejects.toThrow("frozen");
+      expect(setup.requests).toEqual(requests);
+      expect(readLocalPublicationJob(setup.root, setup.config, setup.id).client_state?.phase).toBe("commit_requested");
     } finally { setup.dispose(); }
   });
 });

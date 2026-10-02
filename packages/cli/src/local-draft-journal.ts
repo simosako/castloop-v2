@@ -97,6 +97,12 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
   const file = draftFile(root, config, initial.target);
   if (present(`${file}.lock`)) throw new Error("Preserve the retained local draft lock; it cannot be stolen");
   if (!present(file)) {
+    const history = join(dirname(file), "history");
+    if (present(history) && !lstatSync(history).isDirectory()) throw new Error("Draft history must be a real directory, not a symlink");
+    const publication = readLocalPublicationJob(root, config, initial.draft_job_id);
+    if (present(join(history, `${initial.draft_job_id}.json`)) || publication.client_state || publication.lock_present) {
+      throw new Error("A retained draft or publication identity cannot initialize a missing target head");
+    }
     const fd = openSync(file, "wx", 0o600);
     try { writeFileSync(fd, JSON.stringify(initial)); fsyncSync(fd); } finally { closeSync(fd); }
     syncDirectory(dirname(file));
