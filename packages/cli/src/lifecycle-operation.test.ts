@@ -8,7 +8,7 @@ import { createLifecycleJournal, readLocalLifecycleJob } from "./lifecycle-journ
 import type { LifecycleJournal } from "./lifecycle-journal";
 import { createLifecycleOperationEffects, inspectLifecycleOperation, runLifecycleClaim, runLifecycleCommit, runLifecycleRetry } from "./lifecycle-operation";
 import type { LifecycleOperationEffects } from "./lifecycle-operation";
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 async function fixture(action: "unpublish" | "restore" | "delete" = "delete") {
@@ -32,6 +32,25 @@ async function fixture(action: "unpublish" | "restore" | "delete" = "delete") {
   const file = join(root, ".castloop", "lifecycle-jobs", setup.config.service_id, `${request.job_id}.json`);
   return { ...setup, request, claim, root, journal, calls, client, effects, file };
 }
+
+test("lifecycle inspection rejects a local phase change during status without committing or repairing the journal", async () => {
+  const setup = await fixture();
+  try {
+    await runLifecycleClaim(setup.journal, setup.effects);
+    const effects = { ...setup.effects, status: async () => {
+      const status = await setup.effects.status();
+      await setup.journal.exclusively(async () => {
+        setup.journal.save({ ...setup.journal.load(), phase: "commit_requested" });
+      });
+      return status;
+    } };
+    await expect(inspectLifecycleOperation(setup.journal, effects)).rejects.toThrow("changed during read-only inspection");
+    expect(setup.journal.load().phase).toBe("commit_requested");
+    expect(setup.calls).toEqual(["claim", "status"]);
+    expect(setup.continuations).toEqual([]);
+    expect(existsSync(`${setup.file}.lock`)).toBe(false);
+  } finally { rmSync(setup.root, { recursive: true, force: true }); }
+});
 
 for (const action of ["unpublish", "restore", "delete"] as const) {
   test(`durable ${action} journal keeps claim and commit separate and status read-only`, async () => {

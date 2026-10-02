@@ -64,6 +64,9 @@ export async function inspectPublicationOperation(journal: PublicationJournal, e
   const state = load(journal, effects);
   const status = receipt(state, await effects.status(), "status");
   if (status.result !== "status") throw new Error("Invalid publication inspection result");
+  if (JSON.stringify(load(journal, effects)) !== JSON.stringify(state)) {
+    throw new Error("Local publication journal changed during read-only inspection");
+  }
   return { client_state: state, server_status: status };
 }
 

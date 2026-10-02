@@ -1,5 +1,11 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 内部状態照会もlocal journalの読取前後照合へ統一
+
+- staging/publication/lifecycleの内部`inspect*Operation`へstatus完了後のlocal journal再検査を追加した。途中phase/receipt/request変更では古いclient stateと新しいserver statusを成功snapshotとして返さない。既存Show登録inspectorと同様、phase修復・再送・local lock/token奪取はしない。
+- 実内部APIのstatus受信中に、別の明示local操作がrequestedを保存する競合を3familyで追加回帰した。変更されたphaseは保持し、照会側のbegin/PUT/commit/Queue追加送信がないことを確認した。全735テスト/11648 assertions、TypeScript、3内部runner Bun bundleと`git diff --check`に合格。
+- これは意味的なlocal読取前後一致であり、HTTP/local file全体の原子的snapshotや旧consumer終了の証明ではない。公開書込gate/Cloudflare環境を変更しない。公開CLI統合・移行/復旧・実機受け入れは引き続き残る。
+
 ## 2026-10-02: 4familyの非書込remote状態照会をCLI/standalone binaryへ接続
 
 - `operation-status FAMILY ID`を追加し、local凍結journalを検査してから管理keyを読み、4内部clientのstatus actionだけを一回送る。identity/完全manifest/control hash/strict receiptを照合し、HTTP後のlocal state/lock存在観測変更を拒否する。journal/lock/legacy stateを変更せず、phase昇格/再送/復旧許可を行わない。

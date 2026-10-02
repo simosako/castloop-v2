@@ -11,7 +11,7 @@ import { createStagingJournal, readLocalStagingOperation } from "./staging-journ
 import type { StagingJournal } from "./staging-journal";
 import { createStagingOperationEffects, inspectStagingOperation, runStagingBeginAndUpload, runStagingClaim, runStagingFinish, runStagingSettle } from "./staging-operation";
 import type { StagingOperationEffects } from "./staging-operation";
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const settlement = { put_requests_settled: true as const, no_more_puts: true as const };
@@ -35,6 +35,25 @@ async function fixture(kind: "show" | "audio" | "episode_metadata" = "show") {
   }, client);
   return { ...setup, root, journal, file, client, calls, puts, effects };
 }
+
+test("staging inspection rejects a local phase change during status without beginning a PUT or repairing the journal", async () => {
+  const setup = await fixture();
+  try {
+    await runStagingClaim(setup.journal, setup.effects);
+    const effects = { ...setup.effects, status: async () => {
+      const status = await setup.effects.status();
+      await setup.journal.exclusively(async () => {
+        setup.journal.save({ ...setup.journal.load(), phase: "begin_requested" });
+      });
+      return status;
+    } };
+    await expect(inspectStagingOperation(setup.journal, effects)).rejects.toThrow("changed during read-only inspection");
+    expect(setup.journal.load().phase).toBe("begin_requested");
+    expect(setup.calls).toEqual(["claim", "status"]);
+    expect(setup.puts).toEqual([]);
+    expect(existsSync(`${setup.file}.lock`)).toBe(false);
+  } finally { rmSync(setup.root, { recursive: true, force: true }); }
+});
 
 for (const kind of ["show", "audio", "episode_metadata"] as const) {
   test(`durable staging ${kind} freezes each HTTP/PUT phase and keeps publication explicit`, async () => {

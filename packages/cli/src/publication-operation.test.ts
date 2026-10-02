@@ -12,7 +12,7 @@ import { PublicationAdminClient } from "./publication-client";
 import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
 import type { PublicationJournal } from "./publication-journal";
 import { createPublicationOperationEffects, inspectPublicationOperation, runPublicationClaim, runPublicationCommit, runPublicationRetry } from "./publication-operation";
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "show") {
@@ -36,6 +36,26 @@ async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "show")
     setup.candidateEnv, setup.cachedAssets, { digest: publicationTestDigest });
   return { ...setup, root, journal, file, calls, client, effects, consume };
 }
+
+test("publication inspection rejects a local phase change during status without committing or repairing the journal", async () => {
+  const setup = await fixture();
+  try {
+    await runPublicationClaim(setup.journal, setup.effects);
+    const effects = { ...setup.effects, status: async () => {
+      const status = await setup.effects.status();
+      await setup.journal.exclusively(async () => {
+        setup.journal.save({ ...setup.journal.load(), phase: "commit_requested" });
+      });
+      return status;
+    } };
+    await expect(inspectPublicationOperation(setup.journal, effects)).rejects.toThrow("changed during read-only inspection");
+    expect(setup.journal.load().phase).toBe("commit_requested");
+    expect(setup.calls).toEqual(["claim", "status"]);
+    expect(await setup.bucket.head(setup.markerKey)).toBeNull();
+    expect(setup.sent).toEqual([]);
+    expect(existsSync(`${setup.file}.lock`)).toBe(false);
+  } finally { rmSync(setup.root, { recursive: true, force: true }); }
+});
 
 for (const mode of ["show", "episode", "metadata", "audio"] as const) {
   test(`durable publication ${mode} keeps claim/commit separate and completes through M6 Queue`, async () => {

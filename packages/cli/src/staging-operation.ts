@@ -111,6 +111,9 @@ export async function inspectStagingOperation(journal: StagingJournal, effects: 
   const state = load(journal, effects);
   const status = receipt(state, await effects.status(), "status");
   if (status.result !== "status") throw new Error("Invalid staging inspection result");
+  if (JSON.stringify(load(journal, effects)) !== JSON.stringify(state)) {
+    throw new Error("Local staging journal changed during read-only inspection");
+  }
   return { client_state: state, server_status: status };
 }
 

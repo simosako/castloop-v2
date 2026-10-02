@@ -21,6 +21,7 @@ castloop operation-status show-registration SHOW_ID
 - 既存clientの固定origin/redirect拒否/no-store/bounded UTF-8 JSON/strict応答検査を使い、service・operation/Show/reservation ID・完全manifest/control hash・resultを照合する。claim/commit/reserve/begin/PUT/settle/finish/retryを送らない。
 - publication/lifecycle等のserverが照会に必要な保持recordを持たない場合、成功やremote不在とは扱わず拒否する。ローカルprepared/requestedの存在だけではremote status取得を保証しない。
 - HTTP完了後に同じlocal診断を再読し、client stateの意味的内容とlock存在観測が変わっていればsnapshotを拒否する。複数file/remoteの原子的snapshotやlockの同一性証明ではない。
+- 既存の内部staging/publication/lifecycle inspectorもstatus完了後にlocal journalを再照合する。CLIを経由しない照会でも、途中phase変更を古いclient stateとの成功snapshotにしない。Show登録inspectorの既存照合規則は維持する。
 - 出力はlocal診断に一致する`client_state`/`lock_present`、検査済み`server_status`、`remote_state_checked=true`を返す。`authorizes_mutation=false`と`authorizes_recovery=false`は維持する。serverのheld/released/finished/reservedもlocal phase昇格・再送・PUT再許可・consumer終了・lock/token解放の根拠にしない。
 - local journal/legacy state/lock/metadataを作成・更新・削除しない。残存lockがあっても観測だけを行い、期限による奪取をしない。未知応答/偽receipt/途中変更は固定診断だけを返し、任意exception/secretを表示・記録しない。
 
@@ -37,3 +38,5 @@ bun packages/cli/src/test-support/verify-operation-status-binary.ts dist/castloo
 ```
 
 全732テスト/11628 assertions、TypeScript、M6実証tsconfig、candidate/bridge browser bundleとLinux binary build/command helpに合格した。公開書込command/安全な外部復旧、full cutover/通常管理routing・実Cloudflare受け入れは残る。
+
+内部inspectorのlocal途中変更回帰を追加後、全735テスト/11648 assertionsとTypeScript、3内部runner Bun bundleに合格した。binary HTTPSの確認は上記732件時点のCLI接続に対する検証であり、内部runner変更を公開commandの拡張として扱わない。
