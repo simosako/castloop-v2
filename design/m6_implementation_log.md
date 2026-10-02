@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: target別draft ID・upload参照・publication freezeを永続化
+
+- private/strictなtarget別local draft journalを追加し、service identity・draft/base IDを固定した。prepared uploadを送信前にslotへ記録し、未解決/lock/foreign uploadの置換を拒否する。finished後の置換でも過去のoperation journalは保持する。
+- exact prepared publicationのupload集合/base/manifest照合で編集を凍結し、acknowledged local commitだけでfrozenへ進める。非期限target排他・fsync/rename・bounded/no-follow読取とsymlink parent拒否を追加し、status観測/時間から完了を推定しない。
+- Show/Episodeのstaging→publication claim/commitとlocal freezeを結合し、identity変更/並行操作/残存lock/escaped editor/本文混入を回帰した。全764テスト/11881 assertions、TypeScriptとdiff checkに合格。Cloudflare書込・公開gate変更はない。
+- 残件を再確認し、次は準備helper/runnerとの一体化と履歴を残す次draft切替へ進む。詳細は`m6_local_draft_journal.md`。
+
 ## 2026-10-02: finished stagingからpublication要求・journal・送信前guardを自動準備
 
 - `prepareLocalPublication`を追加し、同identityのfinished/staged receiptsと最新local入力からShow/Episode初回・metadata-only/audio-onlyのcommit/checksum/size/解析durationを組み立てる。stage ID集合をcanonical sortし、caller固定timestampを維持する。本文/base metadata/path/GUID/secretをpublication recordへ複製しない。
