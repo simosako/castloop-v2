@@ -1,11 +1,10 @@
 import { expect, test } from "bun:test";
-import { lifecycleOperationRequestSchema, parseEpisodeDraft, parseEpisodeRevision, publicationCommitKey, stringifyToml } from "@castloop/shared";
+import { parseEpisodeDraft, parseEpisodeRevision, publicationCommitKey, stringifyToml } from "@castloop/shared";
 import type { LifecycleOperationRequest } from "@castloop/shared";
 import { LifecycleAdminClient } from "./lifecycle-client";
-import { createLifecycleJournal } from "./lifecycle-journal";
-import { createLifecycleOperationEffects, runLifecycleClaim, runLifecycleCommit } from "./lifecycle-operation";
 import { readLocalDraft } from "./local-draft-journal";
 import { createM6LocalEpisodeDraft, createM6LocalShowDraft } from "./m6-local-drafts";
+import { executeLocalM6Lifecycle, previewLocalM6Lifecycle } from "./m6-local-lifecycle";
 import { publishLocalM6Draft, updateLocalM6Draft } from "./m6-local-update";
 import { PublicationAdminClient } from "./publication-client";
 import { createShowRegistrationJournal } from "./show-registration-journal";
@@ -69,26 +68,20 @@ test("new Show registration and local drafts flow through staging, publication, 
   const publicStatus = async (path: string, method = "GET") => (await fetchM6Candidate(
     new Request<unknown, IncomingRequestCfProperties>(`https://current.example${path}`, { method }), env, cachedAssets)).status;
   const lifecycle = async (kind: "show" | "episode", action: LifecycleOperationRequest["action"], episodeId?: string) => {
-    const snapshot = await inspector.inspect({ schema_version: 1, service_id: setup.config.service_id,
-      kind, show_id: "fresh", ...(episodeId ? { episode_id: episodeId } : {}) });
-    const request = lifecycleOperationRequestSchema.parse({ schema_version: 1, job_id: crypto.randomUUID(), kind, show_id: "fresh", action,
-      expected_show_generation: snapshot.show!.generation, created_at: "2026-10-02T12:00:00Z",
-      ...(episodeId ? { episode_id: episodeId, expected_episode_generation: snapshot.episode!.generation } : {}) });
-    const preview = await lifecycleClient.dryRun({ schema_version: 1, service_id: setup.config.service_id, action: "dry-run", request });
-    expect(preview.eligible).toBe(true);
-    expect(preview.authorizes_operation).toBe(false);
-    const journal = createLifecycleJournal(root, setup.config, { schema_version: 1, service_id: setup.config.service_id, action: "claim", request,
-      confirmation: { operator_confirmed: true, request_sha256: await controlRequestHash(request),
-        ...(action === "delete" ? { irreversible_delete_acknowledged: true, retained_records_acknowledged: true } : {}) } });
-    const effects = createLifecycleOperationEffects(setup.config, journal.load(), "private-secret", lifecycleClient);
-    await runLifecycleClaim(journal, effects);
-    await runLifecycleCommit(journal, effects);
-    const marker = journal.load().commit_receipt!.key;
+    const plan = await previewLocalM6Lifecycle(setup.config, { kind, show_id: "fresh", ...(episodeId ? { episode_id: episodeId } : {}) },
+      action, "private-secret", { inspector, client: lifecycleClient });
+    expect(plan.preview.eligible).toBe(true);
+    expect(plan.preview.authorizes_operation).toBe(false);
+    const state = await executeLocalM6Lifecycle(root, setup.config, plan,
+      { operator_confirmed: true, request_sha256: await controlRequestHash(plan.request),
+        ...(action === "delete" ? { irreversible_delete_acknowledged: true, retained_records_acknowledged: true } : {}) },
+      "private-secret", lifecycleClient);
+    const marker = state.commit_receipt!.key;
     const invocations = await consume(marker);
-    const status = await effects.status();
+    const status = await lifecycleClient.status({ schema_version: 1, service_id: setup.config.service_id, action: "status", request: plan.request });
     expect(status.status?.state).toBe("completed");
     expect(status.ownership).toBe("released");
-    expect(journal.load().phase).toBe("committed");
+    expect(state.phase).toBe("committed");
     return invocations;
   };
   try {

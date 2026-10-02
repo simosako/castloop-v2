@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: lifecycle snapshot/dry-run/明示確認をdurable runnerへ統合
+
+- 非書込planning helperを追加し、target generationと固定UUID/timestampからcanonical要求を作り、exact request/hash付きpreviewを返す。current Episode本文や確認を自動保存/生成しない。
+- 別の明示confirmationからprepared journal→claim/commitへ接続した。deleteのirreversible/retained両ack、plan identity/hash/eligible、requested/lockを検査し、stale previewでもserver CAS/current/owner照合を維持する。
+- 新規Show/二Episodeの全体flow六操作にも接続し、非書込planning・確認欠落/hash変更・blockers/foreign plan・lost acknowledgement・stale generationを回帰した。全805テスト/12586 assertions、TypeScript/M6実証tsconfig、Linux binary buildと既存4family local HTTPS status回帰に合格。
+- Cloudflare環境/公開gateは変更しない。残件の公開CLI表示/command routing、移行・外部復旧と実機受け入れを継続する。詳細は`m6_local_lifecycle.md`。
+
 ## 2026-10-02: 新規登録から六つのlifecycle操作までのlocal全体結合
 
 - 新規Showのdurable reserve→registered receipt→local Show/二Episode下書き→target inspection→metadata/audio staging→publication commit→M6 Queue consumer→metadata改訂→Episode/Show各停止・再開・削除を、一つのsimulated R2/REST/内部管理入口で通した。

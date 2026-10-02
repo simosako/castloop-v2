@@ -1,0 +1,13 @@
+# M6: lifecycle previewから明示確認・durable実行へ
+
+未公開`previewLocalM6Lifecycle`はtargetのgenerationを読み、UUID/秒精度timestampを一度生成し、strict schemaでcanonical化した要求をdry-runへ渡す。返すplanはexact要求とpreviewだけで、current Episode本文を含まない。local file、R2 record、Queue、tokenに書き込まない。
+
+previewはoperation/delete authorizationを与えず、missing/ineligible/paused/unfinishedのblockersを表示するためのsnapshot。要求ID・generation・timestamp・actionを変えずに管理者へ提示する。request hashはcanonical要求のSHA-256であり、入力objectのproperty順序に依存したhashを確認へ流用しない。
+
+`prepareLocalM6Lifecycle`はexact service/request/hash付きeligible previewと別途明示されたconfirmationを検査し、private prepared journalを保存する。confirmationを自動生成しない。deleteにはirreversible/retained-records両acknowledgementも必要。requested/残存lock/異なる凍結要求は拒否する。
+
+`executeLocalM6Lifecycle`はこの準備に続けて既存runnerのclaim/commitを実行する。古いpreviewでもserverのatomic admission/current generation/owner/runtime検査を省略しない。commit成功はconsumer完了ではなく、応答喪失はrequestedのまま非再送とする。
+
+new Show/二Episodeの全体flowにも接続し、六操作をsnapshot→dry-run→明示確認→local journal→管理API→consumerまで通した。確認欠落/hash変更/foreign plan/blockers/stale generation/lost acknowledgementを個別回帰した。実Cloudflare/公開CLIではない。
+
+公開CLIの入力・確認表示、明示retryとunknown outcome/lock/tokenの外部復旧、移行/実機受け入れ・release案内は残る。
