@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: Staging内部client・状態照会・durable upload journalを接続
+
+- 未公開staging statusを共通read-only runtime/snapshot boundaryへ接続した。保持manifest/control request/progress/status/完了receiptと読取前後ETagを照合し、payloadを読まず、paused/検証token保持中や履歴jobも観測できる。PUT/復旧許可は常にfalseで、観測から終了や再許可を推測しない。
+- `StagingAdminClient`のservice/operationとexact key/size/hash/order照合を追加し、lifecycleと固定HTTPS/redirect拒否/bounded UTF-8/no-store/固定診断transportを共通化した。既存lifecycle契約の回帰を維持し、legacy/移行clientは変更していない。
+- `.castloop/staging-uploads/<serviceId>/<operationId>.json`にprivate/fsync/rename付きjournalと非期限lockを追加し、claim→一度限りbegin/PUT→明示settlement→検証/取消を別段階として接続した。各POST/最初のPUT前にdurable phaseを保存し、未知応答/保存失敗では再送せず保持する。PUT例外は全Promise終了後に固定診断と予定abortedだけを残し、後続PUTやpayload削除をしない。
+- ローカルdisk/client/API/binding mockで3種payload、状態照会非書込、paused drain、live PUT/未知検証token、各応答喪失/保存失敗、偽permission、offline/残存lock/foreign/不正record/secret非保持を回帰した。`bun test`（557件、9437 assertions）、`npm run check`、browser/Bun bundle、M6実証tsconfig、Linux x86-64 binary build、`git diff --check`に合格。
+- 公開Worker入口/CLI書込commandには接続せず、Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。REST単一PUT/U1の承認済み方針を維持し、実REST source adapter/publication client/安全な外部復旧と公開gateは残る。詳細は`m6_staging_client.md`。
+
 ## 2026-10-02: Lifecycleのdurable job journalと明示的なclaim/commit/retryを追加
 
 - `.castloop/lifecycle-jobs/<serviceId>/<jobId>.json`へidentity/確認済みrequest/最小receiptだけを凍結するprivate/fsync/rename付きjournalとexclusive非期限lockを追加した。本文/secret/任意exceptionを保持せず、strict/16KB/hash/phase照合で入力変更・foreign identity・飛ばし/後退を拒否する。

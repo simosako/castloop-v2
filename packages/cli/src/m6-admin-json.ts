@@ -1,0 +1,76 @@
+import { serviceConfigSchema } from "@castloop/shared";
+import type { ServiceConfig } from "@castloop/shared";
+
+export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
+const RESPONSE_BUDGET = 65536;
+
+async function readResponse(response: Response): Promise<unknown> {
+  const length = response.headers.get("Content-Length");
+  if (response.headers.get("Cache-Control") !== "no-store" ||
+    !/^application\/json(?:\s*;|$)/i.test(response.headers.get("Content-Type") ?? "") ||
+    length !== null && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) > RESPONSE_BUDGET)) {
+    if (response.body) await response.body.cancel();
+    throw new Error("Invalid management response headers");
+  }
+  if (!response.body) throw new Error("Missing management response body");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
+  let text = "";
+  let bytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > RESPONSE_BUDGET) throw new Error("Management response exceeds its record budget");
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+    return JSON.parse(text) as unknown;
+  } catch {
+    await reader.cancel();
+    throw new Error("Invalid management response body");
+  } finally { reader.releaseLock(); }
+}
+
+export class M6AdminJsonClient {
+  readonly config: ServiceConfig;
+  private readonly adminKey: string;
+  private readonly transport: M6AdminTransport;
+
+  constructor(config: ServiceConfig, adminKey: string, transport: M6AdminTransport = fetch) {
+    this.config = serviceConfigSchema.parse(config);
+    const origin = new URL(this.config.public_base_url);
+    if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
+      throw new Error("M6 administration requires an HTTPS service origin without credentials or path");
+    }
+    if (!adminKey || /[\u0000-\u001f\u007f]/.test(adminKey)) throw new Error("M6 administration requires a valid local administrator key");
+    this.adminKey = adminKey;
+    this.transport = transport;
+  }
+
+  async post(route: "staging" | "publication" | "lifecycle", input: object): Promise<unknown> {
+    if (!["staging", "publication", "lifecycle"].includes(route)) throw new Error("Unknown M6 administration route");
+    const label = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle" }[route];
+    const body = JSON.stringify(input);
+    if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
+    let response: Response;
+    try {
+      response = await this.transport(new URL(`/admin/${route}`, this.config.public_base_url), {
+        method: "POST", redirect: "error", signal: AbortSignal.timeout(120000), cache: "no-store",
+        headers: { "X-Castloop-Key": this.adminKey, "User-Agent": "castloop-cli/0.1", "Content-Type": "application/json" }, body,
+      });
+    } catch {
+      throw new Error(`${label} request outcome is unknown; inspect retained ownership/progress without automatic retry`);
+    }
+    try {
+      if (response.status !== 200) {
+        if (response.body) await response.body.cancel();
+        throw new Error("Management operation was not confirmed");
+      }
+      return await readResponse(response);
+    } catch {
+      throw new Error(`${label} response was not verified; inspect retained ownership/progress without automatic retry`);
+    }
+  }
+}

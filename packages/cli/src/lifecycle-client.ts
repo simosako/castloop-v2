@@ -1,55 +1,20 @@
-import { lifecycleAdminRequestSchema, lifecycleAdminResponseSchema, lifecycleCommitSchema, serviceConfigSchema } from "@castloop/shared";
+import { lifecycleAdminRequestSchema, lifecycleAdminResponseSchema, lifecycleCommitSchema } from "@castloop/shared";
 import type { LifecycleAdminRequest, LifecycleAdminResponse, ServiceConfig } from "@castloop/shared";
+import { M6AdminJsonClient } from "./m6-admin-json";
+import type { M6AdminTransport } from "./m6-admin-json";
 import { createHash } from "node:crypto";
 
 type Input<Action extends LifecycleAdminRequest["action"]> = Extract<LifecycleAdminRequest, { action: Action }>;
 type Result<Name extends LifecycleAdminResponse["result"]> = Extract<LifecycleAdminResponse, { result: Name }>;
-export type LifecycleAdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
-const RESPONSE_BUDGET = 65536;
-
-async function readResponse(response: Response): Promise<unknown> {
-  const length = response.headers.get("Content-Length");
-  if (response.headers.get("Cache-Control") !== "no-store" ||
-    !/^application\/json(?:\s*;|$)/i.test(response.headers.get("Content-Type") ?? "") ||
-    length !== null && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) > RESPONSE_BUDGET)) {
-    if (response.body) await response.body.cancel();
-    throw new Error("Invalid lifecycle response headers");
-  }
-  if (!response.body) throw new Error("Missing lifecycle response body");
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
-  let text = "";
-  let bytes = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > RESPONSE_BUDGET) throw new Error("Lifecycle response exceeds its record budget");
-      text += decoder.decode(chunk.value, { stream: true });
-    }
-    text += decoder.decode();
-    return JSON.parse(text) as unknown;
-  } catch {
-    await reader.cancel();
-    throw new Error("Invalid lifecycle response body");
-  } finally { reader.releaseLock(); }
-}
+export type LifecycleAdminTransport = M6AdminTransport;
 
 export class LifecycleAdminClient {
   private readonly config: ServiceConfig;
-  private readonly adminKey: string;
-  private readonly transport: LifecycleAdminTransport;
+  private readonly http: M6AdminJsonClient;
 
   constructor(config: ServiceConfig, adminKey: string, transport: LifecycleAdminTransport = fetch) {
-    this.config = serviceConfigSchema.parse(config);
-    const origin = new URL(this.config.public_base_url);
-    if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
-      throw new Error("Lifecycle administration requires an HTTPS service origin without credentials or path");
-    }
-    if (!adminKey || /[\u0000-\u001f\u007f]/.test(adminKey)) throw new Error("Lifecycle administration requires a valid local administrator key");
-    this.adminKey = adminKey;
-    this.transport = transport;
+    this.http = new M6AdminJsonClient(config, adminKey, transport);
+    this.config = this.http.config;
   }
 
   private async call(input: LifecycleAdminRequest, expected: LifecycleAdminResponse["result"]): Promise<LifecycleAdminResponse> {
@@ -66,23 +31,9 @@ export class LifecycleAdminClient {
     if (request.action !== "dry-run" && request.action !== "status" && request.confirmation.request_sha256 !== hash) {
       throw new Error("Lifecycle confirmation differs from its frozen request");
     }
-    const body = JSON.stringify(request);
-    if (Buffer.byteLength(body) > 16384) throw new Error("Lifecycle request exceeds its record budget");
-    let response: Response;
+    const payload = await this.http.post("lifecycle", request);
     try {
-      response = await this.transport(new URL("/admin/lifecycle", this.config.public_base_url), {
-        method: "POST", redirect: "error", signal: AbortSignal.timeout(120000), cache: "no-store",
-        headers: { "X-Castloop-Key": this.adminKey, "User-Agent": "castloop-cli/0.1", "Content-Type": "application/json" }, body,
-      });
-    } catch {
-      throw new Error("Lifecycle request outcome is unknown; inspect retained ownership/progress without automatic retry");
-    }
-    try {
-      if (response.status !== 200) {
-        if (response.body) await response.body.cancel();
-        throw new Error("Lifecycle operation was not confirmed");
-      }
-      const value = lifecycleAdminResponseSchema.parse(await readResponse(response));
+      const value = lifecycleAdminResponseSchema.parse(payload);
       if (value.service_id !== this.config.service_id || value.result !== expected) throw new Error("Lifecycle response identity/result mismatch");
       if (value.result === "preview") {
         if (JSON.stringify(value.request) !== JSON.stringify(request.request) || value.request_sha256 !== hash) {

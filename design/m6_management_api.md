@@ -19,6 +19,7 @@
 | action | 入力 | 結果 |
 | --- | --- | --- |
 | `claim` | 凍結済み`upload` manifest | `claimed`とshow/operation ID・取得generation |
+| `status` | 同じ完全な`upload` manifest | 読み取り専用status/progress/owner/検証稼働/draft commit観測。PUT/復旧許可なし |
 | `begin` | `operation` | `started`と許可されたkey/length/checksum。開始は一回限り |
 | `settle` | `operation`、明示的`put_requests_settled=true`、`no_more_puts=true` | `settled`。PUT permissionを再発行しない |
 | `finish` | `operation`、`outcome=staged/aborted` | 全副作用終了後に同outcomeを返す。settlement前は拒否 |
@@ -26,6 +27,8 @@
 認証は既存の`X-Castloop-Key`照合を使い、認証/method/schema/対象serviceの検査を副作用より前に行う。bodyを16,384 bytesへ制限し、宣言長・実stream長・UTF-8・JSONを検査する。過大streamのcancelはawaitし、readerを解放する。responseは常にno-storeで、本文や任意exceptionを返さず、失敗にはallowlistの固定診断だけを使う。
 
 操作identityはsnake_caseで、入力manifestのoperation IDとdraft job IDを分離したまま返す。PUT locationsはstagingの許可keyだけに限定し、show ID/UUID/size/重複を検査する。responseを任意prefix書込の許可へ使わない。payload uploadは引き続きCLIの別REST接続で行う構成であり、Worker handlerで媒体を受信/バッファしない。
+
+未公開staging client/durable journalを追加し、exact PUT key/size/hash/order照合、送信前requested保存、一度限りPUT、全PUT終了保存後の明示settlement/検証を接続した。statusは共通read-only runtime/snapshot boundaryから保持manifest/request/progress/statusを照合し、payloadを読まずtokenを登録しない。unknown response/保存失敗では観測から再送/終了認定しない。詳細と実REST source adapter/公開CLI/外部復旧の残件は[`m6_staging_client.md`](./m6_staging_client.md)参照。
 
 ## 排他・pause・応答喪失
 
@@ -99,4 +102,4 @@ publicationは新しいstaging内部API→publication内部API→実M6 Queue ada
 
 lifecycleは6操作を内部API→M6 Queue adapterへローカル結合し、停止404・再開200・削除410、媒体/履歴の保持とbounded削除、兄弟Episode分離、運用記録保持を回帰した。preview非書込/非予約、完全request確認、削除の二つの明示確認、paused drain、live consumer中retry拒否、purge失敗から同job retry、Queue応答喪失非再送、過去status、不正/過大/途中変更record、candidate書込拒否も確認した。全504テスト/8550 assertionsと型・bundle・binary検査の合格はCloudflare実機の合格ではない。
 
-公開入口/CLI commandへの接続、staging/publication client・progress照会・durable journal、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。
+公開入口/CLI commandへの接続、stagingの実REST source adapter、publication client・progress照会・durable journal、full cutover/paused移行完了/明示受付再開、unknown outcomeの外部復旧、専用環境受け入れは残件である。

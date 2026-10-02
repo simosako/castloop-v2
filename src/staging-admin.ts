@@ -4,7 +4,8 @@ import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleControlEnv } from "./lifecycle-control";
-import { M6ManagementServiceMismatch, withM6ManagementInvocation } from "./m6-management";
+import { M6ManagementServiceMismatch, withM6ManagementInvocation, withM6ManagementRead } from "./m6-management";
+import { inspectStageUpload } from "./staging-inspection";
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "./staging-upload";
 import type { StageOperation } from "./staging-upload";
 import { runStageVerification } from "./staging-verification";
@@ -29,6 +30,9 @@ export async function handleM6StagingAdmin(request: Request, env: StagingAdminEn
   try { input = stagingAdminRequestSchema.parse(await readBoundedAdminJson(request)); }
   catch { return reply({ error: "Invalid staging input", reason_code: "staging_input_invalid" }, 400); }
   try {
+    if (input.action === "status") {
+      return reply(await withM6ManagementRead(env, input.service_id, bindings, () => inspectStageUpload(env, input.service_id, input.upload)));
+    }
     const kind = input.action === "claim" || input.action === "begin" ? "m6_admin" : "m6_recovery";
     const showId = input.action === "claim" ? input.upload.show_id : input.operation.show_id;
     const result = await withM6ManagementInvocation(env, input.service_id, kind, { showId }, bindings, async (): Promise<StagingAdminResponse> => {
