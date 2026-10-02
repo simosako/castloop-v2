@@ -1,6 +1,7 @@
 import * as TOML from "@iarna/toml";
 import { z } from "zod";
 import { lifecycleJobStatusSchema } from "./lifecycle-job";
+import { lifecycleStateSchema } from "./lifecycle";
 import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
 export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
@@ -116,6 +117,30 @@ export const episodeRevisionSchema = episodeDraftSchema.extend({
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   updated_at: publishedAt,
 }).strict();
+
+export const targetInspectionRequestSchema = z.object({ schema_version: z.literal(1), service_id: ID(20),
+  kind: z.enum(["show", "episode"]), show_id: ID(32), episode_id: ID(80).optional() }).strict().superRefine((value, context) => {
+  if ((value.kind === "episode") !== (value.episode_id !== undefined)) {
+    context.addIssue({ code: "custom", message: "Only Episode inspections require an Episode ID" });
+  }
+});
+const targetStateSchema = z.object({ lifecycle: lifecycleStateSchema, generation: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict();
+export const targetInspectionResponseSchema = z.object({ schema_version: z.literal(1), result: z.literal("target"),
+  request: targetInspectionRequestSchema, snapshot_only: z.literal(true), authorizes_operation: z.literal(false),
+  payloads_verified: z.literal(false), admission_state: z.enum(["open", "paused"]),
+  show: targetStateSchema.nullable(), episode: targetStateSchema.nullable(), unfinished_show_operation: z.boolean(),
+  current_revision: episodeRevisionSchema.nullable() }).strict().superRefine((value, context) => {
+  const episode = value.request.kind === "episode";
+  const published = value.episode && ["active", "unpublished"].includes(value.episode.lifecycle);
+  if (!episode && (value.episode || value.current_revision) || !value.show && (value.episode || value.unfinished_show_operation || value.current_revision) ||
+    value.current_revision && (value.current_revision.episode_id !== value.request.episode_id || !published) ||
+    episode && published && !value.unfinished_show_operation && !value.current_revision ||
+    value.unfinished_show_operation && value.current_revision) {
+    context.addIssue({ code: "custom", message: "Target inspection has inconsistent target, lifecycle or revision evidence" });
+  }
+});
+export type TargetInspectionRequest = z.infer<typeof targetInspectionRequestSchema>;
+export type TargetInspectionResponse = z.infer<typeof targetInspectionResponseSchema>;
 
 export const publicationJobStatusSchema = z.object({
   schema_version: z.literal(1),

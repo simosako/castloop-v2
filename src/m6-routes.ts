@@ -21,6 +21,7 @@ import { readBootstrapDeliveryWindow } from "./migration-bootstrap";
 import { handleMigrationAdmin } from "./migration-admin";
 import type { BootstrapRuntime } from "./migration-bootstrap";
 import { handleM6ShowRegistrationAdmin } from "./show-registration-admin";
+import { handleM6TargetInspection } from "./target-inspection-admin";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -68,7 +69,8 @@ async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Pr
 async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
   options: { digest?: StageStreamDigest }): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
-  if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle" && pathname !== "/admin/shows") return null;
+  if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle" && pathname !== "/admin/shows" &&
+    pathname !== "/admin/target") return null;
   if (request.method !== "POST") return reply(request, { error: "method not allowed" }, 405);
   try {
     await requireCandidateReadiness(env, await serviceConfig(env));
@@ -77,6 +79,7 @@ async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAs
     return reply(request, { error: "M6 management requires a completed migration for this Worker version" }, 409);
   }
   const bindings = { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1" as const, cachedAssets };
+  if (pathname === "/admin/target") return handleM6TargetInspection(request, env, bindings);
   if (pathname === "/admin/shows") return handleM6ShowRegistrationAdmin(request, env, bindings);
   if (pathname === "/admin/staging") return handleM6StagingAdmin(request, env, bindings, options);
   if (pathname === "/admin/publication") return handleM6PublicationAdmin(request, env, bindings);

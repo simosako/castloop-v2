@@ -4,11 +4,11 @@ import type { ServiceConfig } from "@castloop/shared";
 export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
 const RESPONSE_BUDGET = 65536;
 
-async function readResponse(response: Response): Promise<unknown> {
+async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
   const length = response.headers.get("Content-Length");
   if (response.headers.get("Cache-Control") !== "no-store" ||
     !/^application\/json(?:\s*;|$)/i.test(response.headers.get("Content-Type") ?? "") ||
-    length !== null && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) > RESPONSE_BUDGET)) {
+    length !== null && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) > maximumBytes)) {
     if (response.body) await response.body.cancel();
     throw new Error("Invalid management response headers");
   }
@@ -22,7 +22,7 @@ async function readResponse(response: Response): Promise<unknown> {
       const chunk = await reader.read();
       if (chunk.done) break;
       bytes += chunk.value.byteLength;
-      if (bytes > RESPONSE_BUDGET) throw new Error("Management response exceeds its record budget");
+      if (bytes > maximumBytes) throw new Error("Management response exceeds its record budget");
       text += decoder.decode(chunk.value, { stream: true });
     }
     text += decoder.decode();
@@ -49,9 +49,9 @@ export class M6AdminJsonClient {
     this.transport = transport;
   }
 
-  async post(route: "staging" | "publication" | "lifecycle" | "shows", input: object): Promise<unknown> {
-    if (!["staging", "publication", "lifecycle", "shows"].includes(route)) throw new Error("Unknown M6 administration route");
-    const label = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration" }[route];
+  async post(route: "staging" | "publication" | "lifecycle" | "shows" | "target", input: object): Promise<unknown> {
+    if (!["staging", "publication", "lifecycle", "shows", "target"].includes(route)) throw new Error("Unknown M6 administration route");
+    const label = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection" }[route];
     const body = JSON.stringify(input);
     if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
     let response: Response;
@@ -68,7 +68,7 @@ export class M6AdminJsonClient {
         if (response.body) await response.body.cancel();
         throw new Error("Management operation was not confirmed");
       }
-      return await readResponse(response);
+      return await readResponse(response, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
     } catch {
       throw new Error(`${label} response was not verified; inspect retained ownership/progress without automatic retry`);
     }

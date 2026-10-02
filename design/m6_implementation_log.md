@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: generation/current/baseの非書込内部API/clientを追加
+
+- 未公開`POST /admin/target`とstrict clientを追加した。job ID/期待generationなしでtargetを照会し、M6 read boundary/controls/metadata/historyの前後照合後にgenerationとcurrent baseを返す。unfinished ownerではbaseを読まず、orphan/partial registration/不整合/過大入力を拒否する。
+- read boundaryとservice admission readerの型もget/headだけへ狭めた。媒体検証/操作/復旧許可を明示falseとし、token登録/記録保存/Queue送信はしない。metadataを含むtarget応答だけ2MB boundedとし、既存管理応答64KiBを維持する。
+- Show/missing、Episode active/unpublished/draft/deleted、owner/paused、history/ETag変化、schema/auth/version/identity、70KB metadataと内部入口/default拒否を回帰した。全787テスト/12142 assertions、TypeScript/M6実証tsconfig、candidate/bridge browser bundleに合格。公開gate/Cloudflare環境は変更しない。
+- 残件を再確認し、次はsnapshot取得とlocal target head初期化/rotationの統合を進める。詳細は`m6_target_inspection.md`。
+
 ## 2026-10-02: local draft排他を準備・REST upload・publication全体へ接続
 
 - 二つの内部runnerを追加し、durable headからtarget/draft/base/upload集合を取得してlocal準備→一度限りREST PUT/GET→settlement/finish、publication準備→head freeze→claim/commit→acknowledged freezeをtarget排他下で実行する。caller headerをstrictに検査し、送信前にhead/source/receiptを前後照合する。

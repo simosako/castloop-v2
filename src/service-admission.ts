@@ -1,6 +1,6 @@
 import { migrationApplyProgressSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "../packages/shared/src/index";
 import type { ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
-import type { LifecycleControlEnv } from "./lifecycle-control";
+import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 
 export const SERVICE_ADMISSION_KEY = "system/lifecycle-service.json";
 const MAX_RECORD_BYTES = 16384;
@@ -13,7 +13,7 @@ export class ServiceAdmissionBlocked extends Error {
   constructor() { super("Service is not admitting this kind of mutation"); }
 }
 
-export async function readServiceAdmission(env: LifecycleControlEnv, serviceId: string): Promise<ServiceAdmissionSnapshot | null> {
+export async function readServiceAdmission(env: LifecycleReadEnv, serviceId: string): Promise<ServiceAdmissionSnapshot | null> {
   serviceAdmissionSchema.shape.service_id.parse(serviceId);
   const object = await env.CASTLOOP_BUCKET.get(SERVICE_ADMISSION_KEY);
   if (!object) return null;

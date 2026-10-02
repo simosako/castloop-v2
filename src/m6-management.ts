@@ -2,7 +2,7 @@ import { cachedDeliveryRuntimeSchema, parseServiceConfig } from "../packages/sha
 import type { ServiceAdmission } from "../packages/shared/src/index";
 import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
-import type { LifecycleControlEnv } from "./lifecycle-control";
+import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import { readServiceAdmission, withServiceInvocation } from "./service-admission";
 
@@ -25,7 +25,7 @@ export async function withM6ManagementInvocation<T>(env: LifecycleControlEnv, se
   });
 }
 
-export async function withM6ManagementRead<T>(env: LifecycleControlEnv, serviceId: string, bindings: M6DeliveryGateBindings,
+export async function withM6ManagementRead<T>(env: LifecycleReadEnv, serviceId: string, bindings: M6DeliveryGateBindings,
   callback: (admission: ServiceAdmission) => Promise<T>): Promise<T> {
   const configObject = await env.CASTLOOP_BUCKET.get("system/service.toml");
   if (!configObject || configObject.size < 1 || configObject.size > 16384) throw new Error("Invalid service configuration");

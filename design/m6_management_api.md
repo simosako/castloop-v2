@@ -14,6 +14,8 @@
 
 続いて新規Show登録用の4番目の内部handlerを`POST /admin/shows`へ接続した。共通gateの後で、永久reservation IDをShow controlのconditional createで取得し、同IDの予約recordを初期化する。partial登録中は共通Show受付を閉じる。`action=status`は非書込で、通常candidateの書込gateは変更しない。詳細は`m6_show_registration.md`。
 
+CLIが期待generation/current/baseを取得するための読み取り専用`POST /admin/target`も内部入口へ接続した。strict target入力、M6 read boundary、current metadata/historyと前後ETag照合を使い、unfinished owner中はbaseを返さない。応答は操作/復旧許可を与えず、operational recordへ本文を保存しない。通常candidateでは閉じたまま。詳細は`m6_target_inspection.md`。
+
 これは結合検証専用の明示的入口であり、`src/m6-worker.ts`は引き続き通常の`fetchM6Candidate`を呼ぶ。現行Worker・bridge・通常candidateのmanagement書込は閉じたまま、R2にmock readinessを入れても開かない。既存の認証GET照会は維持し、legacy管理書込も拒否する。`m6_ready=false`・CLI書込command非公開を維持し、Cloudflare書込/deployや既存環境への適用は行っていない。
 
 ## Stagingのwire契約
