@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 外部公開originのbounded HTTP inspectorを追加
+
+- 公開path parserをsharedへ移し、Worker互換exportを維持した。未公開CLI helperでstrictな凍結plan/service/versionと公開originを検査し、1〜20 assetsのHEAD/GET/1-byte Range/304を順次確認する。管理credentialsを添付せず、redirect/自動retry/本文の全量バッファを使わない。
+- 状態別HTTP、version/migration ID、凍結ETag/size/Range、再検証/no-storeを照合し、response cancel・1-byte stream終了をawaitする。固定診断、page/hashだけの非書込reportと、完了/変更/全量payload/全routing scopeの許可falseを維持する。
+- mock transportと実候補gatewayへの結合で、bootstrap settlement前503/後3 assets配信、R2記録不変・migrating/readiness未成立、各header/Range/redirect/取消障害、live取消のawaitを回帰した。CLI/finalizer・実Cloudflare・全hostname/colo受け入れは含まない。詳細は`m6_external_delivery_inspection.md`。
+- 全652テスト/10821 assertions、TypeScript/M6実証tsconfig、candidate/bridge browser bundle、新inspectorのBun bundle、既存Linux単一バイナリbuildとversion/help、`git diff --check`に合格。新inspectorは公開binary commandには含めず、binary検査は現行CLIの回帰確認である。
+
 ## 2026-10-02: staging送信前の入力検査とdurable phase保存順序を改善
 
 - staging effectsへpublicationと同じ任意の`checkLocalInputs`契約を追加し、claim/beginのrequested保存前に最新sourceを照合する。beginはread-only owner照会後に検査する。REST/source adapterへ接続し、未送信の検査失敗でprepared/claimedを保持する。

@@ -59,4 +59,4 @@ begin応答が不明、permission保存が不明、PUT稼働中または終了�
 
 ローカルdisk/client/API/binding mockで3種payload、非公開のままstaging完了、PUT例外から明示settled abort、paused drain、live PUT排他、各HTTP応答喪失・保存失敗、偽permission、未知verification token、offline非書込/残存lock/foreign identity、不正recordを回帰した。全557テスト/9437 assertions、型検査、Worker/browser・client/Bun bundle、M6実証tsconfig、Linux binary buildに合格した。
 
-実REST PUT/source検査adapter、publication client/journal/status、本番管理入口/公開CLI、unknown outcome/残存lock/tokenの安全な外部復旧、full cutover、専用Cloudflare環境での300MB/CPU・料金/配信受け入れ、利用・復旧案内は残る。mock PUT effectやローカル合格をCloudflare実機の合格とはしない。
+実REST PUT/source検査adapterとpublication client/journal/statusも内部runnerへ追加済みである（`m6_staging_rest.md`、`m6_publication_client.md`参照）。本番管理入口/公開CLI、unknown outcome/残存lock/tokenの安全な外部復旧、full cutover、専用Cloudflare環境での300MB/配信受け入れ、利用・復旧案内は残る。費用測定計画は承認済み方針に従ってMVP構築後へ回す。mock PUT effectやローカル合格をCloudflare実機の合格とはしない。

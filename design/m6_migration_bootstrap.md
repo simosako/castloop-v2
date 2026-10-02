@@ -1,6 +1,6 @@
 # M6: 移行bridge・初回候補配信のbootstrap
 
-更新日: 2026-10-01
+更新日: 2026-10-02
 
 ## 現在の範囲
 
@@ -43,6 +43,8 @@ POST bodyは16,384 bytesにstreamで制限し、Content-Lengthがなくても超
 bridge defaultで成功したpurgeのreceiptは、**その呼出scopeの成功**である。version-isolated cacheの旧version全scope、旧preview、登録前の稼働中requestの再保存、他hostname/zoneのcacheを無条件に消したとは扱わない。bridge設定/旧IO外部確認/旧cache scopeの実機検証を含む最終cutover adapterが必要である。
 
 default loopback probeは実際のgateway/named transportを通すが、外部DNS/hostname/colo/100% routingの証明ではない。GET bodyは全量digestをせずcancelするため、媒体の全量checksum/再生や300MB受け入れでもない。
+
+別の未公開CLI部品に、service公開originへのboundedな外部HTTP検査を追加した。HEAD/GET/1-byte Range/304とversion/migration ID/凍結size/ETag/cache headerを照合し、通常GETはcancel終了までawaitする。reportは観測だけで、bootstrap progress/readiness/移行完了を変更しない。全hostname/colo/旧cache全scopeの証明やfinalizerへの接続は残る。`m6_external_delivery_inspection.md`参照。
 
 deployment証拠は認証管理者がCLIから渡したsnapshotであり、candidateはCloudflare RESTを再GETしていない。未提供の本番finalizerは、この値だけでreadinessを確定してはならない。
 

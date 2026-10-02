@@ -20,6 +20,8 @@ export type { StageAsset, StagePayload, StageUploadProgress, StageUploadRequest 
 export { stagingAdminRequestSchema, stagingAdminResponseSchema, stagingOperationSchema } from "./staging-admin";
 export type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from "./staging-admin";
 export { validateId } from "./ids";
+export { parsePublicAssetPath } from "./public-assets";
+export type { PublicAsset } from "./public-assets";
 export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
   showControlSchema, stringifyLifecycleToml } from "./lifecycle";
