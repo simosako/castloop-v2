@@ -72,7 +72,7 @@
     新規Show登録/local Show・二Episode作成からhigh-level更新/公開・metadata改訂・Show/Episode六lifecycle操作まで、一つのlocal内部入口/consumerで通し、ID/GUID/date/history・対象外データ・物理削除と記録保持を回帰した。simulated REST/cache/Queueであり、公開CLI/実Cloudflare/300MBの受け入れを代替しない。`packages/cli/src/m6-content-flow.test.ts`参照。
     認証情報/HTTP/書込なしの`local-operation-status FAMILY ID`をsource CLIへ追加し、4familyのprivate journal/残存lockを照会可能にした。phase昇格/lock除去/復旧許可は行わず、書込commandの公開gateは閉じたままである。`m6_local_operation_status.md`参照。
     `operation-status FAMILY ID`もsource CLI/standalone buildへ接続した。凍結local要求のstatusだけを一回送り、local/remoteの非変更・requested非昇格を4familyとlocal HTTPS binaryで検証した。通常candidateのmanagement gateを開けず、保持record不足/未知応答/途中変更は拒否する。実Cloudflare受け入れではない。`m6_remote_operation_status.md`参照。
-    四operation familyとtarget draftのlocal journal親path/lock返却も監査し、symlink/dangling lock/他所有lockの削除を拒否した。移行journal/snapshotの監査と公開CLI・復旧・実機受け入れは継続する。`m6_local_journal_paths.md`参照。
+    四operation familyとtarget draft、三layoutの移行journalのlocal親path/lock返却も監査し、symlink/dangling lock/他所有lockの削除を拒否した。移行recordもbounded/no-follow readerへ統一した。snapshotの監査と公開CLI・復旧・実機受け入れは継続する。`m6_local_journal_paths.md`参照。
 
 ## 今回実装済みだが本番未接続
 

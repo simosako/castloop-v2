@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: 三種類の移行journalもbounded/no-follow読取・owned lock返却へ
+
+- 既存flat layoutを維持したままbridge deploy/migration setup/candidate deployの親directory検査、private一段create/fsync、dangling lock保持とmissing record再生成拒否、他所有lock非削除を接続した。record読取はstat+readFileからbounded/no-follow/regular-file/前後stat検査へ変更した。
+- candidate deploy lockの取得時にもfile/directory fsyncを追加した。requested/unknown outcomeの再送やtoken奪取、移行完了/reopenを追加せず、既存frozen要求のphaseとpathを維持する。
+- 三layoutの親/record symlink・dangling lock/missing record・replacement lockを回帰し、全829テスト/12762 assertions、TypeScript/diff check、Linux binary buildと四family local HTTPS status回帰に合格。Cloudflare操作はない。
+- 継続点: snapshot親path/cleanup監査と公開前CLI command adapterを進める。release前には移行finalizer/full cutover/旧IO外部収束と安全なunknown outcome復旧、専用Cloudflareで300MB/配信/cache/Queue/全lifecycle受け入れ、README/help/version/releaseが残る。現行公開gateを開けず、既存テスト環境を移行/削除しない。
+
 ## 2026-10-02: 五familyのjournal親path・lock返却をfail closedへ
 
 - staging/publication/lifecycle/Show登録/target draftの親directory検査を追加し、静的symlink/非directoryを読取・create・handle load/lock取得前に拒否する。recursive mkdirを一段ずつのprivate create/fsyncへ変え、directory fsyncにもno-followを使う。

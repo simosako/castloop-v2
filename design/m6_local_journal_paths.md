@@ -8,4 +8,10 @@ callback終了時は所有descriptorと現在lockのdevice/inode/type/空sizeを
 
 directory fsyncにもO_DIRECTORY/O_NOFOLLOWを使う。これは静的なsymlinkや観測された差替えへのfail-closed対策であり、悪意ある別local processが検査とsyscallの極短い間へ割り込むTOCTOUを完全排除するdirectory descriptor相対操作ではない。管理workspaceを信頼できるprivate領域に置く必要は残る。
 
-5familyで四つの親階層のsymlink、dangling lock/missing record、既存handle後の親差替え、callback中の他所有lock保持を回帰した。移行journalやsnapshotの親path監査は別途継続する。
+5familyで四つの親階層のsymlink、dangling lock/missing record、既存handle後の親差替え、callback中の他所有lock保持を回帰した。
+
+## 移行journalへの適用
+
+既存flat layoutの`bridge-deployments/<service>.json`、`migration-setups/<service>.json`、`migrations/<bootstrap>.json`も同じ親検査/owned lock返却へ接続した。保存pathや既存frozen requestを変換しない。stat+readFileによる読取は共通bounded/no-follow/regular-file/前後stat検査へ変更し、candidate deployのlock取得にもfile/directory fsyncを追加した。
+
+三layoutの親symlink、record symlink、missing record+dangling lock、他所有lock保持を回帰した。snapshotの親path/cleanup監査、実移行とunknown IOの外部復旧は残る。

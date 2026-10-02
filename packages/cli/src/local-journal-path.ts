@@ -1,7 +1,8 @@
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-type JournalFamily = "staging-uploads" | "publication-jobs" | "lifecycle-jobs" | "show-registrations" | "drafts";
+type JournalFamily = "staging-uploads" | "publication-jobs" | "lifecycle-jobs" | "show-registrations" | "drafts" |
+  "bridge-deployments" | "migration-setups" | "migrations";
 
 export function localJournalEntryExists(path: string): boolean {
   try { lstatSync(path); return true; } catch (error) {
@@ -15,10 +16,13 @@ export function syncLocalJournalDirectory(path: string): void {
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 
-export function ensureLocalJournalParents(root: string, family: JournalFamily, serviceId: string, create = false): void {
-  if (!["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts"].includes(family) ||
-    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(serviceId) || serviceId.length > 20) throw new Error("Invalid local journal directory identity");
-  const directories = [root, join(root, ".castloop"), join(root, ".castloop", family), join(root, ".castloop", family, serviceId)];
+export function ensureLocalJournalParents(root: string, family: JournalFamily, serviceId: string | undefined, create = false): void {
+  const flat = ["bridge-deployments", "migration-setups", "migrations"].includes(family);
+  if (!["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts", "bridge-deployments", "migration-setups", "migrations"].includes(family) ||
+    flat !== (serviceId === undefined) || serviceId !== undefined &&
+    (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(serviceId) || serviceId.length > 20)) throw new Error("Invalid local journal directory identity");
+  const directories = [root, join(root, ".castloop"), join(root, ".castloop", family),
+    ...(serviceId !== undefined ? [join(root, ".castloop", family, serviceId)] : [])];
   for (const directory of directories) {
     if (!localJournalEntryExists(directory)) {
       if (!create) return;
@@ -31,7 +35,7 @@ export function ensureLocalJournalParents(root: string, family: JournalFamily, s
   }
 }
 
-export function releaseLocalJournalLock(root: string, family: JournalFamily, serviceId: string, path: string, fd: number): void {
+export function releaseLocalJournalLock(root: string, family: JournalFamily, serviceId: string | undefined, path: string, fd: number): void {
   try {
     ensureLocalJournalParents(root, family, serviceId);
     const owned = fstatSync(fd, { bigint: true });

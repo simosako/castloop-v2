@@ -1,7 +1,9 @@
 import { migrationBootstrapRequestSchema, migrationDeploymentClientStateSchema, m6WorkerDeploymentEvidenceSchema } from "@castloop/shared";
 import type { M6WorkerDeploymentEvidence, MigrationBootstrapRequest, MigrationDeploymentClientState } from "@castloop/shared";
+import { readBoundedLocalJournal } from "./local-journal-read";
+import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export type MigrationDeploymentJournal = {
@@ -25,18 +27,16 @@ export function migrationPayloadHash(input: string | object): string {
 export function createMigrationDeploymentJournal(root: string, input: MigrationBootstrapRequest): MigrationDeploymentJournal {
   const request = migrationBootstrapRequestSchema.parse(input);
   const file = join(root, ".castloop", "migrations", `${request.bootstrap_id}.json`);
-  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  const syncDirectory = () => {
-    const fd = openSync(dirname(file), "r");
-    try { fsyncSync(fd); } finally { closeSync(fd); }
-  };
+  ensureLocalJournalParents(root, "migrations", undefined, true);
+  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
   const load = (): MigrationDeploymentClientState => {
-    if (statSync(file).size > 16384) throw new Error("Local migration journal exceeds its record budget");
-    const state = migrationDeploymentClientStateSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+    ensureLocalJournalParents(root, "migrations", undefined);
+    const state = migrationDeploymentClientStateSchema.parse(readBoundedLocalJournal(file));
     if (JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("Local bootstrap ID already has a different frozen request");
     return state;
   };
   if (!existsSync(file)) {
+    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained deployment lock without recreating its missing journal");
     const fd = openSync(file, "wx", 0o600);
     try {
       writeFileSync(fd, JSON.stringify({ schema_version: 1, request, phase: "prepared" }));
@@ -65,11 +65,12 @@ export function createMigrationDeploymentJournal(root: string, input: MigrationB
       syncDirectory();
     },
     exclusively: async (callback) => {
+      ensureLocalJournalParents(root, "migrations", undefined);
       const lock = `${file}.lock`;
       const fd = openSync(lock, "wx", 0o600);
       locked = true;
-      try { return await callback(); }
-      finally { locked = false; closeSync(fd); unlinkSync(lock); syncDirectory(); }
+      try { fsyncSync(fd); syncDirectory(); return await callback(); }
+      finally { locked = false; releaseLocalJournalLock(root, "migrations", undefined, lock, fd); }
     },
   };
 }
