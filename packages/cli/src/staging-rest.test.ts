@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { stageUploadRequestSchema } from "@castloop/shared";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
+import { readShowControl } from "../../../src/lifecycle-control";
+import { fetchM6ManagementIntegration } from "../../../src/m6-routes";
 import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { StagingAdminClient, stagingClientTargets } from "./staging-client";
 import { createStagingJournal } from "./staging-journal";
@@ -100,12 +102,119 @@ test("stale local draft prevents claim/begin POST, even with unchanged file size
   let claims = 0;
   const client = new StagingAdminClient(setup.config, "private-key", async () => { claims += 1; throw new Error("Must not call"); });
   const effects = createStagingRestEffects(setup.config, journal.load(), "private-key", setup.sources, setup.options, client);
+  const before = journal.load();
   await writeFile(setup.paths[0]!, new Uint8Array(setup.upload.payloads[0]!.length_bytes));
   await expect(runStagingClaim(journal, effects)).rejects.toThrow("checksum");
   expect(claims).toBe(0);
-  expect(journal.load().phase).toBe("claim_requested");
+  expect(journal.load()).toEqual(before);
+  expect(journal.load().phase).toBe("prepared");
   expect(setup.calls).toEqual([]);
   await setup.sources.dispose();
+});
+
+test("pre-send input rejection permits explicit same-journal claim and begin after restoring the frozen source", async () => {
+  const setup = await fixture();
+  const journal = createStagingJournal(setup.root, setup.config, setup.upload);
+  const actions: string[] = [];
+  const client = new StagingAdminClient(setup.config, "private-secret", async (input, init) => {
+    const request = new Request<unknown, IncomingRequestCfProperties>(new Request(input, init));
+    actions.push((await request.clone().json<{ action: string }>()).action);
+    return fetchM6ManagementIntegration(request, {
+      CASTLOOP_BUCKET: setup.bucket as never, CASTLOOP_ADMIN_KEY: "private-secret", CASTLOOP_DLQ_NAME: setup.config.dlq_name,
+      CASTLOOP_VERSION_METADATA: { id: setup.versionId, tag: "", timestamp: "2026-10-02T12:00:00Z" }, CASTLOOP_QUEUE: {} as never,
+    }, Object.assign(() => ({ fetch: async () => new Response() }), { invalidate: async () => {}, ...setup.bindings.cachedAssets }),
+    { digest: publicationTestDigest });
+  });
+  const effects = createStagingRestEffects(setup.config, journal.load(), "private-secret", setup.sources, setup.options, client);
+  try {
+    await writeFile(setup.paths[0]!, new Uint8Array(setup.upload.payloads[0]!.length_bytes));
+    await expect(runStagingClaim(journal, effects)).rejects.toThrow("checksum");
+    expect(journal.load().phase).toBe("prepared");
+    expect(actions).toEqual([]);
+    expect((await readShowControl(setup.env, "daily"))!.value.owner).toBeUndefined();
+    await writeFile(setup.paths[0]!, setup.contents[0]!.bytes);
+    await runStagingClaim(journal, effects);
+    const claimed = journal.load();
+    const owner = (await readShowControl(setup.env, "daily"))!.value.owner;
+    await writeFile(setup.paths[0]!, new Uint8Array(setup.upload.payloads[0]!.length_bytes));
+    await expect(runStagingBeginAndUpload(journal, effects)).rejects.toThrow("checksum");
+    expect(journal.load()).toEqual(claimed);
+    expect(actions).toEqual(["claim", "status"]);
+    expect((await readShowControl(setup.env, "daily"))!.value.owner).toEqual(owner);
+    expect(setup.calls).toEqual([]);
+    await writeFile(setup.paths[0]!, setup.contents[0]!.bytes);
+    expect(await runStagingBeginAndUpload(journal, effects)).toBe("staged");
+    await writeFile(setup.paths[0]!, new Uint8Array(setup.upload.payloads[0]!.length_bytes));
+    await runStagingSettle(journal, effects, { put_requests_settled: true, no_more_puts: true });
+    await runStagingFinish(journal, effects);
+    expect(journal.load().phase).toBe("finished");
+    expect(journal.load().finish_receipt).toBe("staged");
+    expect(actions).toEqual(["claim", "status", "status", "begin", "status", "settle", "status", "finish"]);
+    expect(setup.calls.map((call) => call.method)).toEqual(["PUT", "GET"]);
+    expect((await readShowControl(setup.env, "daily"))!.value.owner).toBeUndefined();
+  } finally { await setup.sources.dispose(); }
+});
+
+test("input failure after requested persistence never reopens a possibly consumed operation", async () => {
+  const setup = await fixture();
+  const journal = createStagingJournal(setup.root, setup.config, setup.upload);
+  let checks = 0;
+  let posts = 0;
+  const sources = { ...setup.sources, assertCurrent: async () => {
+    checks += 1;
+    if (checks > 1) throw new Error("local input changed after requested persistence");
+    await setup.sources.assertCurrent();
+  } };
+  const client = new StagingAdminClient(setup.config, "private-key", async () => { posts += 1; throw new Error("must not send"); });
+  const effects = createStagingRestEffects(setup.config, journal.load(), "private-key", sources, setup.options, client);
+  try {
+    await expect(runStagingClaim(journal, effects)).rejects.toThrow("after requested persistence");
+    expect(journal.load().phase).toBe("claim_requested");
+    expect(checks).toBe(2);
+    expect(posts).toBe(0);
+    await expect(runStagingClaim(journal, effects)).rejects.toThrow("never replay");
+    expect(checks).toBe(2);
+    expect(posts).toBe(0);
+    expect(setup.calls).toEqual([]);
+  } finally { await setup.sources.dispose(); }
+});
+
+test("begin rechecks local sources after the read-only owner check and keeps unknown outcomes frozen", async () => {
+  const setup = await fixture();
+  const journal = createStagingJournal(setup.root, setup.config, setup.upload);
+  const actions: string[] = [];
+  let changeAfterStatus = false;
+  const client = new StagingAdminClient(setup.config, "private-secret", async (input, init) => {
+    const request = new Request(input, init);
+    const action = (await request.clone().json<{ action: string }>()).action;
+    actions.push(action);
+    const response = await handleM6StagingAdmin(request, setup.env, setup.bindings, { digest: publicationTestDigest });
+    if (action === "status" && changeAfterStatus) await writeFile(setup.paths[0]!, new Uint8Array(setup.upload.payloads[0]!.length_bytes));
+    return response!;
+  });
+  const effects = createStagingRestEffects(setup.config, journal.load(), "private-secret", setup.sources, setup.options, client);
+  try {
+    await runStagingClaim(journal, effects);
+    changeAfterStatus = true;
+    await expect(runStagingBeginAndUpload(journal, effects)).rejects.toThrow("checksum");
+    expect(journal.load().phase).toBe("claimed");
+    expect(actions).toEqual(["claim", "status"]);
+    expect(setup.calls).toEqual([]);
+    changeAfterStatus = false;
+    await writeFile(setup.paths[0]!, setup.contents[0]!.bytes);
+    await expect(runStagingBeginAndUpload(journal, { ...effects, begin: async () => {
+      await effects.begin();
+      throw new Error("unknown begin response");
+    } })).rejects.toThrow("unknown begin response");
+    expect(journal.load().phase).toBe("begin_requested");
+    const before = actions.slice();
+    await expect(runStagingBeginAndUpload(journal, { ...effects, checkLocalInputs: async () => {
+      throw new Error("must not validate or replay an unknown begin");
+    } })).rejects.toThrow("never reopen");
+    expect(actions).toEqual(before);
+    expect(setup.calls).toEqual([]);
+    expect((await readShowControl(setup.env, "daily"))!.value.owner?.state).toBe("uploading");
+  } finally { await setup.sources.dispose(); }
 });
 
 test("source validation rejects missing/oversize/symlink/directory before uploading and removes owned partial snapshots", async () => {

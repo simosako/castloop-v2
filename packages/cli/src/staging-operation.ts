@@ -10,7 +10,8 @@ type Receipt<Result extends StagingAdminResponse["result"]> = Extract<StagingAdm
 export type StagingOperationEffects = { upload: StageUploadRequest; claim: () => Promise<Receipt<"claimed">>;
   begin: () => Promise<Receipt<"started">>; put: (target: StagePutTarget, index: number) => Promise<void>;
   settle: (evidence: { put_requests_settled: true; no_more_puts: true }) => Promise<Receipt<"settled">>;
-  finish: (outcome: "staged" | "aborted") => Promise<Receipt<"staged" | "aborted">>; status: () => Promise<Receipt<"status">> };
+  finish: (outcome: "staged" | "aborted") => Promise<Receipt<"staged" | "aborted">>; status: () => Promise<Receipt<"status">>;
+  checkLocalInputs?: () => Promise<void> };
 
 function load(journal: StagingJournal, effects: StagingOperationEffects): StagingClientState {
   const state = validateStagingClientState(journal.load());
@@ -45,6 +46,7 @@ export async function runStagingClaim(journal: StagingJournal, effects: StagingO
   await journal.exclusively(async () => {
     const state = load(journal, effects);
     if (state.phase !== "prepared") throw new Error("Staging claim outcome is unknown or consumed; never replay its POST");
+    await effects.checkLocalInputs?.();
     journal.save({ ...state, phase: "claim_requested" });
     const value = receipt(state, await effects.claim(), "claimed");
     if (value.result !== "claimed") throw new Error("Invalid staging claim receipt");
@@ -57,6 +59,7 @@ export async function runStagingBeginAndUpload(journal: StagingJournal, effects:
     const state = load(journal, effects);
     if (state.phase !== "claimed") throw new Error("Staging begin/PUT outcome is unknown or consumed; never reopen PUT permission");
     await requireOwner(state, effects, "ready");
+    await effects.checkLocalInputs?.();
     journal.save({ ...state, phase: "begin_requested" });
     const value = receipt(state, await effects.begin(), "started");
     if (value.result !== "started") throw new Error("Invalid staging begin receipt");

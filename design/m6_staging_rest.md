@@ -9,6 +9,7 @@
 - 正規化したmanifestと各assetのsize/checksumを凍結する。regular fileだけをno-followで開き、size/hashと読取前後statを照合する。asset上限はshared schemaでsnapshot作成前に検査する。
 - `.castloop/upload-inputs-<random>/`のprivate directoryへ64KiBずつcopy/hashし、fsyncした読み取り専用snapshotを作る。本文は一時的なローカルpayloadであり、保持journalにsource path/title/本文/secretを記録しない。元ファイルは消さない。
 - claim/beginの直前と各PUT前に、編集可能な元ファイルを凍結checksumへ再照合する。begin後に元ファイルが変わってもPUTは固定snapshotを読む。publication時の最新local draft照合は別途必要である。
+- durable runnerはclaim/beginのrequested保存より前にも`checkLocalInputs`を実行する。beginはread-only owner照会の後に検査し、その間の編集も拒否する。この送信前検査の失敗はprepared/claimedを保ち、元の凍結入力へ戻した後に明示操作をやり直せる。requested保存後の検査/送信/応答不明は従来どおり未知として凍結し、再送しない。
 - source sessionとREST adapterの両方が各indexを一度だけ消費する。stream終了前の早期応答は成功としない。fetch/response処理、source streamのdestroy/終了・handle close、response cancellationをawaitする。稼働中IOがあるsessionのdisposeは拒否する。
 - disposeはこのsessionが作成したexact snapshotと空directoryだけを除去する。強制終了で残ったsnapshotは自動期限cleanupしない。残存snapshotからPUT許可を復元しない。ローカルdisk失敗後の外部cleanup/recoveryは未提供である。
 

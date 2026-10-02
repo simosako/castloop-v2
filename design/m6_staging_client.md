@@ -41,6 +41,8 @@ private directoryは0700、record/temp/lockは0600で作る。recordはexclusive
 
 `runStagingClaim`は受付だけを行う。`runStagingBeginAndUpload`はclaimedから、同owner/ready progress/検証token不在/未commitを照会し、begin_requestedを保存してbeginを一回送る。exact receiptを保存し、puts_runningを保存してから、注入したPUT effectを順に一回ずつawaitする。
 
+REST/source adapterはclaim/beginのrequested保存より前に`checkLocalInputs`を使い、凍結size/checksumと最新の元ファイルを照合する。beginの検査はowner照会後に行う。送信前検査の失敗ではjournalをprepared/claimedのまま保持し、HTTP/PUTを送らない。入力を元のmanifestへ復元した後の明示操作は可能だが、未知requested phaseからの再送許可には使わない。settlement/finish/statusは後のローカル編集で妨げず、既受付IOの収束を優先する。
+
 PUT effectの契約は、その一回のPUTと付随する検証等の全IO Promiseを所有し、終了までawaitすること。background PUTや独自retryを行わない。HTTP clientとREST payload接続は別で、begin管理HTTPの終了をREST PUT終了とみなさない。
 
 PUTが正常/例外で終了したら、それ以上PUTしない。例外では後続payloadを送らず、任意exceptionを保存せず、puts_settledと固定put_failed/予定abortedを保存する。成功応答数はobjectの存在/不存在の証明ではない。`put_outcome=staged`も予定検証outcomeだけで、server検証済みや公開済みを意味しない。

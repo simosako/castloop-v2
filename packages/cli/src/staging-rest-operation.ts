@@ -13,6 +13,7 @@ export function createStagingRestEffects(config: ServiceConfig, state: StagingCl
   const effects = createStagingOperationEffects(config, state, adminKey, createStagingRestPut(config, sources, options), client);
   if (JSON.stringify(effects.upload) !== JSON.stringify(sources.upload)) throw new Error("REST staging sources differ from the durable frozen manifest");
   return { ...effects,
+    checkLocalInputs: () => sources.assertCurrent(),
     claim: async () => { await sources.assertCurrent(); return effects.claim(); },
     begin: async () => { await sources.assertCurrent(); return effects.begin(); },
   };

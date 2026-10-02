@@ -1,5 +1,11 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-02: staging送信前の入力検査とdurable phase保存順序を改善
+
+- staging effectsへpublicationと同じ任意の`checkLocalInputs`契約を追加し、claim/beginのrequested保存前に最新sourceを照合する。beginはread-only owner照会後に検査する。REST/source adapterへ接続し、未送信の検査失敗でprepared/claimedを保持する。
+- 元の凍結入力へ復元した後の明示操作で同journalを進められることを、未公開fetch結合入口→client/journal→単一REST PUT/GET→settlement/finishまで回帰した。status中の入力変更、requested保存後の検査失敗、begin応答喪失非再送、PUT終了後のローカル編集でも既受付settlement/finishを妨げないことを確認した。
+- 全631テスト/10514 assertionsとTypeScript検査に合格。HTTP送信後の結果不明、owner/token保持、U1仮定、公開CLIと通常candidateの書込gateは変更しない。実Cloudflareへの操作は行っていない。
+
 ## 2026-10-02: 内部管理APIの未公開fetch結合入口を追加
 
 - 未公開の`fetchM6ManagementIntegration`へ`POST /admin/staging|publication|lifecycle`を接続した。認証後、`requireCandidateReadiness`（M6 mode・完了readiness・実行version一致）を検査してから各handlerへ渡る。legacy/migrating/未初期化・version不一致は固定診断409、method不正は405・認証失敗は401で拒否する。
