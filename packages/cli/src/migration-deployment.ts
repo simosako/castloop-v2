@@ -1,7 +1,8 @@
 import { migrationBootstrapRequestSchema, migrationDeploymentClientStateSchema, m6WorkerDeploymentEvidenceSchema } from "@castloop/shared";
 import type { M6WorkerDeploymentEvidence, MigrationBootstrapRequest, MigrationDeploymentClientState } from "@castloop/shared";
 import { createLocalJournalStorage } from "./local-journal-storage";
-import { createHash } from "node:crypto";
+import { workerPayloadHash as migrationPayloadHash } from "./worker-upload-hash";
+export { workerPayloadHash as migrationPayloadHash } from "./worker-upload-hash";
 
 export type MigrationDeploymentJournal = {
   exclusively: <T>(callback: () => Promise<T>) => Promise<T>;
@@ -16,10 +17,6 @@ export type MigrationDeploymentEffects = {
   settle: (request: MigrationBootstrapRequest, evidence: { bootstrap_id: string; rest_requests_settled: true; no_more_deploys: true;
     deployment: M6WorkerDeploymentEvidence }) => Promise<void>;
 };
-
-export function migrationPayloadHash(input: string | object): string {
-  return createHash("sha256").update(typeof input === "string" ? input : JSON.stringify(input)).digest("hex");
-}
 
 export function createMigrationDeploymentJournal(root: string, input: MigrationBootstrapRequest): MigrationDeploymentJournal {
   const request = migrationBootstrapRequestSchema.parse(input);

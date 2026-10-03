@@ -34,9 +34,10 @@ export const workerDeploymentsSnapshotSchema = z.object({ deployments: z.array(z
 })).min(1).max(1000) });
 export const workerVersionSnapshotSchema = z.object({ id: z.uuid(), resources: z.object({
   bindings: z.array(bindingSchema).max(100),
-  script: z.object({ handlers: z.array(z.string()), named_handlers: z.array(z.object({ name: z.string(), handlers: z.array(z.string()) })) }),
+  script: z.object({ etag: z.string().min(1).max(256).optional(), handlers: z.array(z.string()), named_handlers: z.array(z.object({ name: z.string(), handlers: z.array(z.string()) })) }),
   script_runtime: z.object({ compatibility_date: z.string(), compatibility_flags: z.array(z.string()), exports: exportsSchema }),
 }) });
+export const workerScriptUploadReceiptSchema = z.object({ etag: z.string().min(1).max(256) });
 export const workerSubdomainSnapshotSchema = z.object({ enabled: z.boolean(), previews_enabled: z.boolean() });
 
 export const m6WorkerDeploymentEvidenceSchema = z.object({

@@ -1,31 +1,15 @@
-import { m6RuntimeReadinessSchema, m6RuntimeTargetSchema, m6ServiceConfigHash, m6WorkerDeploymentEvidenceSchema, parseServiceConfig,
-  serviceAdmissionSchema } from "../packages/shared/src/index";
-import type { M6RuntimeReadiness, M6RuntimeTarget, ServiceConfig } from "../packages/shared/src/index";
-import type { LifecycleControlEnv } from "./lifecycle-control";
+import { m6RuntimeTargetSchema, serviceAdmissionSchema } from "../packages/shared/src/index";
+import type { M6RuntimeReadiness, M6RuntimeTarget } from "../packages/shared/src/index";
+import { matchesM6RuntimeTarget, readM6RuntimeConfiguration, verifyM6RuntimeReadiness } from "./m6-runtime-readiness";
+import type { M6RuntimeChecks, M6RuntimeEnv } from "./m6-runtime-readiness";
 import { readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 
-export type M6InitializationEnv = LifecycleControlEnv & {
+export type M6InitializationEnv = M6RuntimeEnv & {
   CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head" | "put" | "list">;
   CASTLOOP_VERSION_METADATA: Pick<WorkerVersionMetadata, "id">;
 };
-export type M6InitializationChecks = {
-  inspectDeployment: (config: ServiceConfig, workerVersionId: string) => Promise<unknown>;
-  verifyRuntime: (config: ServiceConfig, target: M6RuntimeTarget) => Promise<unknown>;
-};
-
-export function matchesM6RuntimeTarget(value: M6RuntimeTarget | undefined, target: M6RuntimeTarget): boolean {
-  return value?.operation_id === target.operation_id && value.deployment_id === target.deployment_id &&
-    value.worker_version_id === target.worker_version_id && value.service_config_sha256 === target.service_config_sha256;
-}
-
-async function configuration(env: M6InitializationEnv, target: M6RuntimeTarget): Promise<{ config: ServiceConfig; etag: string }> {
-  if (target.worker_version_id !== env.CASTLOOP_VERSION_METADATA.id) throw new Error("Initialization targets another executing Worker version");
-  const object = await env.CASTLOOP_BUCKET.get("system/service.toml");
-  if (!object || object.size < 1 || object.size > 16384) throw new Error("Fresh M6 service configuration is missing or oversized");
-  const config = parseServiceConfig(await object.text());
-  if (await m6ServiceConfigHash(config) !== target.service_config_sha256) throw new Error("Fresh M6 service configuration differs from its frozen target");
-  return { config, etag: object.etag };
-}
+export type M6InitializationChecks = M6RuntimeChecks;
+export { matchesM6RuntimeTarget } from "./m6-runtime-readiness";
 
 async function requireEmptyService(env: M6InitializationEnv): Promise<void> {
   const page = await env.CASTLOOP_BUCKET.list({ prefix: "", limit: 3 });
@@ -36,7 +20,7 @@ async function requireEmptyService(env: M6InitializationEnv): Promise<void> {
 
 export async function prepareM6ServiceInitialization(env: M6InitializationEnv, input: M6RuntimeTarget): Promise<void> {
   const target = m6RuntimeTargetSchema.parse(input);
-  const { config } = await configuration(env, target);
+  const { config } = await readM6RuntimeConfiguration(env, target.service_config_sha256, target.worker_version_id);
   const existing = await readServiceAdmission(env, config.service_id);
   if (existing) {
     if (matchesM6RuntimeTarget(existing.value.initialization, target) || matchesM6RuntimeTarget(existing.value.runtime_readiness, target)) return;
@@ -55,23 +39,15 @@ export async function prepareM6ServiceInitialization(env: M6InitializationEnv, i
 export async function completeM6ServiceInitialization(env: M6InitializationEnv, input: M6RuntimeTarget,
   checks: M6InitializationChecks): Promise<M6RuntimeReadiness> {
   const target = m6RuntimeTargetSchema.parse(input);
-  const { config, etag } = await configuration(env, target);
+  const configuration = await readM6RuntimeConfiguration(env, target.service_config_sha256, target.worker_version_id);
+  const { config } = configuration;
   const snapshot = await readServiceAdmission(env, config.service_id);
   if (matchesM6RuntimeTarget(snapshot?.value.runtime_readiness, target)) return snapshot!.value.runtime_readiness!;
   if (!snapshot || snapshot.value.state !== "initializing" || !matchesM6RuntimeTarget(snapshot.value.initialization, target)) {
     throw new Error("Only the exact retained fresh M6 initialization can complete");
   }
   await requireEmptyService(env);
-  const deployment = m6WorkerDeploymentEvidenceSchema.parse(await checks.inspectDeployment(config, target.worker_version_id));
-  if (deployment.service_id !== config.service_id || deployment.account_id !== config.account_id || deployment.worker_name !== config.worker_name ||
-    deployment.worker_version_id !== target.worker_version_id || deployment.deployment_id !== target.deployment_id) {
-    throw new Error("Fresh M6 deployment evidence targets another service or deployment");
-  }
-  const readiness = m6RuntimeReadinessSchema.parse(await checks.verifyRuntime(config, target));
-  if (!matchesM6RuntimeTarget(readiness, target)) throw new Error("Fresh M6 runtime verification changed its frozen target");
-  const currentDeployment = m6WorkerDeploymentEvidenceSchema.parse(await checks.inspectDeployment(config, target.worker_version_id));
-  if (JSON.stringify(currentDeployment) !== JSON.stringify(deployment)) throw new Error("Fresh M6 deployment changed during runtime verification");
-  if ((await configuration(env, target)).etag !== etag) throw new Error("Fresh M6 configuration changed during verification");
+  const readiness = await verifyM6RuntimeReadiness(env, target, configuration, checks);
   await requireEmptyService(env);
   const { initialization: _initialization, ...value } = snapshot.value;
   const next = serviceAdmissionSchema.parse({ ...value, generation: value.generation + 1, state: "paused",

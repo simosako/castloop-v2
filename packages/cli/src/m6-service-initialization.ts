@@ -2,7 +2,7 @@ import { z } from "zod";
 import { m6RuntimeReadinessSchema, m6RuntimeTargetSchema, m6ServiceConfigHash, serviceConfigSchema } from "@castloop/shared";
 import type { M6RuntimeReadiness, M6RuntimeTarget, ServiceConfig } from "@castloop/shared";
 import { createLocalJournalStorage } from "./local-journal-storage";
-import { createHash } from "node:crypto";
+import { workerPayloadHash as digest } from "./worker-upload-hash";
 
 const checksum = z.string().regex(/^[a-f0-9]{64}$/);
 const requestSchema = z.object({ config: serviceConfigSchema, operation_id: z.uuid(), service_config_sha256: checksum,
@@ -21,10 +21,6 @@ export type FreshM6InitializationEffects = {
   deploy: (config: ServiceConfig, source: string, metadata: object) => Promise<{ deployment_id: string; worker_version_id: string }>;
   initialize: (config: ServiceConfig, target: M6RuntimeTarget) => Promise<M6RuntimeReadiness>;
 };
-
-function digest(value: string | object): string {
-  return createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
-}
 
 function validateState(input: unknown): FreshM6InitializationState {
   const state = stateSchema.parse(input);

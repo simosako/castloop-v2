@@ -29,8 +29,8 @@ export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, life
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
   showControlSchema, stringifyLifecycleToml } from "./lifecycle";
 export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
-export { m6RuntimeTargetSchema, m6RuntimeReadinessSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
-export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
+export { m6RuntimeTargetSchema, m6RuntimeReadinessSchema, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
+export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, M6ServiceUpdateRequest, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
 export { frozenMigrationPlanSchema, migrationApplyProgressSchema, migrationRuntimeProofSchema } from "./migration-plan";
 export type { FrozenMigrationPlan, MigrationApplyProgress, MigrationRuntimeProof } from "./migration-plan";
 export { serviceCapabilitiesSchema } from "./service-capabilities";
@@ -38,7 +38,7 @@ export type { ServiceCapabilities } from "./service-capabilities";
 export { cachedDeliveryRuntimeSchema } from "./delivery-runtime";
 export type { CachedDeliveryRuntime } from "./delivery-runtime";
 export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVersionSnapshotSchema, workerSubdomainSnapshotSchema,
-  m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
+  workerScriptUploadReceiptSchema, m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
 export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
 export { migrationCandidateUploadSchema } from "./worker-deployment";
 export type { MigrationCandidateUpload } from "./worker-deployment";

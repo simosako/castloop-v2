@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
-import { serviceConfigSchema, workerSettingsSnapshotSchema } from "@castloop/shared";
+import { m6ServiceConfigHash, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceConfigSchema, workerSettingsSnapshotSchema } from "@castloop/shared";
 import { CloudflareApi, normalizeHostname } from "./cloudflare-api";
 import { buildM6WorkerUploadMetadata, M6_FRESH_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
 import { createFreshM6RestEffects } from "./m6-initialization-rest";
+import { createM6UpdateRestEffects } from "./m6-update-rest";
+import { migrationPayloadHash } from "./migration-deployment";
 
 const accountId = "a".repeat(32);
 const worker = "castloop-example";
@@ -202,6 +204,7 @@ test("legacy deploy refuses M6 cache exports or version metadata before any Work
 test("fresh M6 REST provisioning creates isolated resources and verifies its frozen deployment without claiming runtime readiness", async () => {
   const fresh = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
   const metadata = buildM6WorkerUploadMetadata(fresh, null, "private-admin-key", M6_FRESH_WORKER_COMPATIBILITY_DATE);
+  const snapshot = structuredClone(metadata);
   const versionId = crypto.randomUUID();
   const deploymentId = crypto.randomUUID();
   const writes: string[] = [];
@@ -227,19 +230,20 @@ test("fresh M6 REST provisioning creates isolated resources and verifies its fro
     if (request.method === "POST" && path.endsWith("/workers/workers")) {
       expect(await request.json<unknown>()).toEqual({ name: worker });
       claimed = true;
+      metadata.compatibility_date = "2026-09-23";
       return reply({ id: crypto.randomUUID() });
     }
     if (request.method === "PUT" && path.endsWith(`/workers/scripts/${worker}`)) {
       const form = await request.formData();
-      expect(JSON.parse(String(form.get("metadata")))).toEqual(metadata);
+      expect(JSON.parse(String(form.get("metadata")))).toEqual(snapshot);
       expect(await (form.get("index.js") as Blob).text()).toBe("export default {};");
-      return reply({});
+      return reply({ etag: "fresh-script-content" });
     }
     if (path.endsWith("/deployments")) return reply({ deployments: [{ id: deploymentId, strategy: "percentage", versions: [{ version_id: versionId, percentage: 100 }] }] });
-    if (path.endsWith("/settings")) return reply(metadata);
-    if (path.endsWith(`/versions/${versionId}`)) return reply({ id: versionId, resources: { bindings: metadata.bindings,
-      script: { handlers: ["fetch", "queue"], named_handlers: [{ name: "CachedPublicAssets", handlers: ["fetch"] }] },
-      script_runtime: { compatibility_date: metadata.compatibility_date, compatibility_flags: metadata.compatibility_flags, exports: metadata.exports } } });
+    if (path.endsWith("/settings")) return reply(snapshot);
+    if (path.endsWith(`/versions/${versionId}`)) return reply({ id: versionId, resources: { bindings: snapshot.bindings,
+      script: { etag: "fresh-script-content", handlers: ["fetch", "queue"], named_handlers: [{ name: "CachedPublicAssets", handlers: ["fetch"] }] },
+      script_runtime: { compatibility_date: snapshot.compatibility_date, compatibility_flags: snapshot.compatibility_flags, exports: snapshot.exports } } });
     if (path.endsWith("/subdomain")) return reply({ enabled: true, previews_enabled: false });
     if (path.endsWith("/queues")) return reply([{ queue_id: "main", queue_name: fresh.queue_name }, { queue_id: "dlq", queue_name: fresh.dlq_name }]);
     if (path.endsWith("/consumers")) {
@@ -278,5 +282,94 @@ test("fresh M6 refuses existing or unknown resources and name collisions without
       await expect(api.createFreshM6Resources({ ...fresh, account_id: "b".repeat(32) })).rejects.toThrow("this account");
     });
     expect(writes).toEqual(scenario === "collision" ? ["POST"] : []);
+  }
+});
+
+test("compatible REST updates preserve secrets/settings, reject unfrozen inputs and only replace the admitted Worker", async () => {
+  const service = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
+  const previousVersion = crypto.randomUUID();
+  const nextVersion = crypto.randomUUID();
+  const previousDeployment = crypto.randomUUID();
+  const nextDeployment = crypto.randomUUID();
+  const oldMetadata = buildM6WorkerUploadMetadata(service, null, "private-key");
+  oldMetadata.bindings.push({ name: "EXTRA_SECRET", type: "secret_text" });
+  oldMetadata.tags = ["preserved-tag"];
+  const writes: string[] = [];
+  let uploaded = false;
+  let changed = false;
+  let nextMetadata: typeof oldMetadata | undefined;
+  await withCloudflare(async (request) => {
+    const url = new URL(request.url);
+    if (request.method !== "GET") writes.push(`${request.method} ${url.pathname}`);
+    if (url.pathname.endsWith(`/workers/scripts/${worker}`) && request.method === "PUT") {
+      const form = await request.formData();
+      expect(JSON.parse(String(form.get("metadata")))).toEqual(nextMetadata);
+      expect(String(form.get("metadata"))).not.toContain("private-key");
+      uploaded = true;
+      return reply({ etag: "compatible-script-content" });
+    }
+    const runtime = uploaded ? { ...nextMetadata!, bindings: nextMetadata!.bindings.map((binding) => binding.type === "inherit" ?
+      oldMetadata.bindings.find((old) => old.name === binding.name)! : binding) } : oldMetadata;
+    const version = uploaded ? nextVersion : previousVersion;
+    if (url.pathname.endsWith("/settings")) return reply(changed ? { ...runtime, tags: ["changed-tag"] } : runtime);
+    if (url.pathname.endsWith("/deployments")) return reply({ deployments: [{ id: uploaded ? nextDeployment : previousDeployment,
+      strategy: "percentage", versions: [{ version_id: version, percentage: 100 }] }] });
+    if (url.pathname.endsWith(`/versions/${version}`)) return reply({ id: version, resources: { bindings: runtime.bindings,
+      script: { etag: "compatible-script-content", handlers: ["fetch", "queue"], named_handlers: [{ name: "CachedPublicAssets", handlers: ["fetch"] }] },
+      script_runtime: { compatibility_date: runtime.compatibility_date, compatibility_flags: runtime.compatibility_flags, exports: runtime.exports } } });
+    if (url.pathname.endsWith("/subdomain")) return reply({ enabled: true, previews_enabled: false });
+    if (url.pathname.endsWith("/workers/domains")) return reply([]);
+    throw new Error("Compatible updates cannot create resources or write content");
+  }, async (api) => {
+    nextMetadata = await api.prepareCompatibleM6WorkerUpload(service, previousVersion);
+    expect(writes).toEqual([]);
+    expect(nextMetadata.compatibility_date).toBe(oldMetadata.compatibility_date);
+    expect(nextMetadata.tags).toEqual(oldMetadata.tags);
+    expect(nextMetadata.bindings).toContainEqual({ name: "CASTLOOP_ADMIN_KEY", type: "inherit", version_id: previousVersion });
+    expect(nextMetadata.bindings).toContainEqual({ name: "EXTRA_SECRET", type: "inherit", version_id: previousVersion });
+    const request = m6ServiceUpdateRequestSchema.parse({ operation_id: crypto.randomUUID(), service_id: service.service_id,
+      pause_id: crypto.randomUUID(), expected_service_generation: 1, previous_worker_version_id: previousVersion,
+      service_config_sha256: await m6ServiceConfigHash(service), worker_source_sha256: migrationPayloadHash("new-worker"),
+      worker_metadata_sha256: migrationPayloadHash(nextMetadata) });
+    await expect(api.uploadCompatibleM6Worker(service, request, "changed-worker", nextMetadata)).rejects.toThrow("frozen");
+    changed = true;
+    await expect(api.uploadCompatibleM6Worker(service, request, "new-worker", nextMetadata)).rejects.toThrow("metadata was frozen");
+    changed = false;
+    const readiness = { operation_id: crypto.randomUUID(), deployment_id: previousDeployment, worker_version_id: previousVersion,
+      service_config_sha256: request.service_config_sha256, default_cache_disabled: true, cached_entrypoint: "CachedPublicAssets",
+      cutover_verified: true, publication_routes_verified: true };
+    const paused = serviceAdmissionSchema.parse({ schema_version: 1, service_id: service.service_id, mode: "m6", state: "paused",
+      generation: 1, pause_id: request.pause_id, invocations: [], runtime_readiness: readiness });
+    let admission = paused;
+    const effects = createM6UpdateRestEffects(api, { begin: async () => {}, complete: async () => { throw new Error("Separate runtime verification"); },
+      admission: async () => admission });
+    await expect(effects.deploy(service, request, "new-worker", nextMetadata)).rejects.toThrow("admitted");
+    expect(writes).toEqual([]);
+    admission = serviceAdmissionSchema.parse({ ...paused, state: "updating", generation: 2, update: { request } });
+    expect(await effects.deploy(service, request, "new-worker", nextMetadata)).toEqual({ deployment_id: nextDeployment, worker_version_id: nextVersion });
+  });
+  expect(writes).toEqual([`PUT /client/v4/accounts/${accountId}/workers/scripts/${worker}`,
+    `POST /client/v4/accounts/${accountId}/workers/scripts/${worker}/subdomain`]);
+});
+
+test("M6 uploads reject missing receipts or another script's content without replaying PUT or activating the deployment", async () => {
+  const fresh = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
+  const metadata = buildM6WorkerUploadMetadata(fresh, null, "key", M6_FRESH_WORKER_COMPATIBILITY_DATE);
+  for (const missing of [false, true]) {
+    const versionId = crypto.randomUUID();
+    const writes: string[] = [];
+    await withCloudflare((request) => {
+      const path = new URL(request.url).pathname;
+      if (request.method !== "GET") writes.push(request.method);
+      if (path.endsWith("/workers/workers")) return reply({});
+      if (request.method === "PUT") return reply(missing ? {} : { etag: "uploaded-script" });
+      if (path.endsWith("/deployments")) return reply({ deployments: [{ id: crypto.randomUUID(), strategy: "percentage",
+        versions: [{ version_id: versionId, percentage: 100 }] }] });
+      if (path.endsWith(`/versions/${versionId}`)) return reply({ id: versionId, resources: { bindings: metadata.bindings,
+        script: { etag: "another-script", handlers: ["fetch", "queue"], named_handlers: [] },
+        script_runtime: { compatibility_date: metadata.compatibility_date, compatibility_flags: metadata.compatibility_flags, exports: metadata.exports } } });
+      throw new Error("No deployment setup or readiness write may follow a missing or mismatched upload receipt");
+    }, async (api) => { await expect(api.uploadFreshM6Worker(fresh, "worker-source", "key", metadata)).rejects.toThrow(); });
+    expect(writes).toEqual(["POST", "PUT"]);
   }
 });

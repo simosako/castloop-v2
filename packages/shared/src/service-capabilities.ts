@@ -15,7 +15,7 @@ export const serviceCapabilitiesSchema = z.object({
   }).strict(),
   admission: z.object({
     mode: serviceAdmissionSchema.shape.mode,
-    state: z.enum(["uninitialized", "open", "paused", "migrating", "initializing"]),
+    state: z.enum(["uninitialized", "open", "paused", "migrating", "initializing", "updating"]),
     generation: serviceAdmissionSchema.shape.generation.optional(),
     active_invocations: z.number().int().min(0).max(32),
     migration_id: z.uuid().optional(),
@@ -28,7 +28,7 @@ export const serviceCapabilitiesSchema = z.object({
     ["uninitialized", "open"].includes(value.admission.state))) fail("Legacy mutation capability must match admission");
   if ((value.admission.state === "uninitialized") !== (value.admission.generation === undefined)) fail("Initialized admission requires a generation");
   if (value.admission.state === "uninitialized" && (value.admission.mode !== "legacy" || value.admission.active_invocations !== 0)) fail("Uninitialized services can only use legacy mode");
-  if (value.admission.state === "initializing" && (value.admission.mode !== "m6" || value.admission.active_invocations !== 0)) fail("Initializing M6 services cannot have live invocations");
+  if (["initializing", "updating"].includes(value.admission.state) && (value.admission.mode !== "m6" || value.admission.active_invocations !== 0)) fail("Initializing or updating M6 services cannot have live invocations");
   if ((value.admission.state === "migrating") !== (value.admission.migration_id !== undefined)) fail("Migration capability requires its owner ID");
   if (value.features.lifecycle_delivery !== (value.worker_protocol === "m6_candidate")) fail("Delivery capability must match the compiled Worker protocol");
 });

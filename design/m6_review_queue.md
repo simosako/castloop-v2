@@ -50,6 +50,8 @@
 
 新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを内部実装した。完了はpausedであり、公開CLI・HTTP入口・実runtime検証adapter/Cloudflare受け入れは残る。[新規初期化](./m6_fresh_initialization.md)参照。
 
+保存形式を変えないM6更新の内部経路も追加した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通runtime検証は初期化と共有し、未知token/PUTを時間で終了扱いにしない。公開CLI/実機gateは残る。[通常更新](./m6_compatible_updates.md)参照。
+
 2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](./m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
 
 1. **upload/publication統合**: staging操作IDとdraft job IDの分離、単一PUT前の受付/一度限りの開始、明示的client終了確認、検証token、size/全量checksum/metadata/cover照合、完了/取消receiptとowner解放の基礎処理を追加した。凍結publication manifest・共通CAS受付・staging証拠/current ETag/base revision照合後のcommit準備も追加した。Show/Episode publication runner/実行token付きconsumer/内部purge effect、stream媒体保存と2種改訂の再開まで独立moduleで追加済み。管理API/既存CLIのREST PUTへの接続、状態喪失後の回復手順、本番publication routingを完成する。未知の検証tokenは時間で奪わない。

@@ -64,7 +64,7 @@ export async function acquireServiceInvocation(env: LifecycleControlEnv, service
   for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
     const snapshot = await requireService(env, serviceId);
     const mode = kind.startsWith("legacy_") ? "legacy" : "m6";
-    if (snapshot.value.mode !== mode || ["migrating", "initializing"].includes(snapshot.value.state) ||
+    if (snapshot.value.mode !== mode || ["migrating", "initializing", "updating"].includes(snapshot.value.state) ||
       snapshot.value.state === "paused" && kind.endsWith("_admin")) throw new ServiceAdmissionBlocked();
     if (snapshot.value.invocations.length === 32) throw new Error("Service mutation registry is full; do not expire active invocations");
     if (await write(env, snapshot, { ...snapshot.value, invocations: [...snapshot.value.invocations, { token, kind }] })) {

@@ -6,6 +6,10 @@ export const m6RuntimeTargetSchema = z.object({ operation_id: uuid, deployment_i
   service_config_sha256: checksum }).strict();
 export const m6RuntimeReadinessSchema = m6RuntimeTargetSchema.extend({ default_cache_disabled: z.literal(true),
   cached_entrypoint: z.literal("CachedPublicAssets"), cutover_verified: z.literal(true), publication_routes_verified: z.literal(true) }).strict();
+export const m6ServiceUpdateRequestSchema = z.object({ operation_id: uuid,
+  service_id: z.string().max(20).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  expected_service_generation: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), pause_id: uuid,
+  previous_worker_version_id: uuid, service_config_sha256: checksum, worker_source_sha256: checksum, worker_metadata_sha256: checksum }).strict();
 export const migrationDeliveryCandidateSchema = z.object({ bootstrap_id: uuid, worker_version_id: uuid,
   deployment_id: uuid, plan_sha256: checksum }).strict();
 export const serviceInvocationKindSchema = z.enum(["legacy_admin", "legacy_consumer", "legacy_recovery", "m6_admin", "m6_consumer", "m6_recovery"]);
@@ -14,21 +18,22 @@ export const serviceAdmissionSchema = z.object({
   service_id: z.string().max(20).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   generation: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   mode: z.enum(["legacy", "m6"]),
-  state: z.enum(["open", "paused", "migrating", "initializing"]),
+  state: z.enum(["open", "paused", "migrating", "initializing", "updating"]),
   invocations: z.array(z.object({ token: uuid, kind: serviceInvocationKindSchema }).strict()).max(32),
   pause_id: uuid.optional(),
   last_resumed_pause_id: uuid.optional(),
   migration: z.object({ migration_id: uuid, request_sha256: checksum, execution_id: uuid.optional(),
     delivery_candidate: migrationDeliveryCandidateSchema.optional() }).strict().optional(),
   initialization: m6RuntimeTargetSchema.optional(),
+  update: z.object({ request: m6ServiceUpdateRequestSchema, target: m6RuntimeTargetSchema.optional() }).strict().optional(),
   runtime_readiness: m6RuntimeReadinessSchema.optional(),
   readiness: z.object({ migration_id: uuid, plan_sha256: checksum, deployment_id: uuid, worker_version_id: uuid,
     completed_execution_id: uuid, default_cache_disabled: z.literal(true), cached_entrypoint: z.literal("CachedPublicAssets"),
     old_cache_purged: z.literal(true), cutover_verified: z.literal(true), old_io_quiesced: z.literal(true),
     publication_routes_verified: z.literal(true) }).strict().optional(),
 }).strict().superRefine((value, context) => {
-  if (["paused", "migrating"].includes(value.state) !== (value.pause_id !== undefined)) {
-    context.addIssue({ code: "custom", message: "Only paused or migrating services have a pause owner" });
+  if (["paused", "migrating", "updating"].includes(value.state) !== (value.pause_id !== undefined)) {
+    context.addIssue({ code: "custom", message: "Only paused, migrating or updating services have a pause owner" });
   }
   if ((value.state === "migrating") !== (value.migration !== undefined)) {
     context.addIssue({ code: "custom", message: "Migration admission must have its frozen request owner" });
@@ -45,6 +50,15 @@ export const serviceAdmissionSchema = z.object({
   if ((value.mode === "m6" && !initializing) !== ready) {
     context.addIssue({ code: "custom", message: "M6 mode requires durable runtime readiness evidence" });
   }
+  if ((value.state === "updating") !== (value.update !== undefined) || value.update &&
+    (value.mode !== "m6" || value.invocations.length || value.update.request.service_id !== value.service_id ||
+      value.update.request.pause_id !== value.pause_id ||
+      value.update.request.previous_worker_version_id !== (value.runtime_readiness ?? value.readiness)?.worker_version_id ||
+      value.update.target && (value.update.target.operation_id !== value.update.request.operation_id ||
+        value.update.target.service_config_sha256 !== value.update.request.service_config_sha256 ||
+        value.update.target.worker_version_id === value.update.request.previous_worker_version_id))) {
+    context.addIssue({ code: "custom", message: "Compatible M6 updates require their paused owner, previous readiness and exact new target without live invocations" });
+  }
   if (new Set(value.invocations.map((invocation) => invocation.token)).size !== value.invocations.length) {
     context.addIssue({ code: "custom", message: "Service invocation tokens must be unique" });
   }
@@ -54,6 +68,7 @@ export type ServiceAdmission = z.infer<typeof serviceAdmissionSchema>;
 export type ServiceInvocationKind = z.infer<typeof serviceInvocationKindSchema>;
 export type M6RuntimeTarget = z.infer<typeof m6RuntimeTargetSchema>;
 export type M6RuntimeReadiness = z.infer<typeof m6RuntimeReadinessSchema>;
+export type M6ServiceUpdateRequest = z.infer<typeof m6ServiceUpdateRequestSchema>;
 export type M6ServiceReadiness = NonNullable<ServiceAdmission["runtime_readiness"] | ServiceAdmission["readiness"]>;
 
 export const serviceMigrationRequestSchema = z.object({

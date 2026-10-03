@@ -1,10 +1,11 @@
-import { migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
-  workerSubdomainSnapshotSchema } from "@castloop/shared";
+import { m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
+  workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
-  M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
+   M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
 import { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
   M6_WORKER_COMPATIBILITY_DATE, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
+import type { M6WorkerUploadMetadata } from "./m6-worker-deployment";
 import { inspectLegacyServiceDeployment, inspectMigrationBridgeDeployment, prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
 import type { MigrationBridgeReads } from "./migration-bridge-deployment";
 import { createHash } from "node:crypto";
@@ -119,23 +120,69 @@ export class CloudflareApi {
     const config = serviceConfigSchema.parse(input);
     const path = this.migrationWorkerPath(config);
     const metadata = buildM6WorkerUploadMetadata(config, null, adminKey, M6_FRESH_WORKER_COMPATIBILITY_DATE);
-    if (!source || migrationPayloadHash(metadata) !== migrationPayloadHash(frozenMetadata)) {
+    const metadataSource = JSON.stringify(frozenMetadata);
+    if (!source || migrationPayloadHash(metadata) !== migrationPayloadHash(metadataSource)) {
       throw new Error("Fresh M6 upload differs from its frozen runtime metadata");
     }
     await this.json("POST", "/workers/workers", { name: config.worker_name });
     const form = new FormData();
-    form.set("metadata", JSON.stringify(frozenMetadata));
+    form.set("metadata", metadataSource);
     form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
-    await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
+    const uploaded = await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
     const deployment = workerDeploymentsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/deployments`)).deployments[0]!;
     if (deployment.versions.length !== 1 || deployment.versions[0]!.percentage !== 100) throw new Error("Fresh M6 Worker is not serving one version at 100%");
     const versionId = deployment.versions[0]!.version_id;
+    await this.requireUploadedM6Version(path, versionId, uploaded);
     await this.disableMigrationWorkerPreviews(config, versionId);
     await this.ensureConsumer(await this.queueId(config.queue_name), config, false);
     await this.ensureConsumer(await this.queueId(config.dlq_name), config, true);
     await this.createNotification(config, await this.queueId(config.queue_name));
     const evidence = await this.inspectM6WorkerDeployment(config, versionId, M6_FRESH_WORKER_COMPATIBILITY_DATE);
     if (evidence.deployment_id !== deployment.id) throw new Error("Fresh M6 deployment changed after upload");
+    return evidence;
+  }
+
+  async prepareCompatibleM6WorkerUpload(input: ServiceConfig, previousVersionId: string): Promise<M6WorkerUploadMetadata> {
+    const config = serviceConfigSchema.parse(input);
+    const path = this.migrationWorkerPath(config);
+    const previous = workerSettingsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/settings`));
+    if (!previous.compatibility_date) throw new Error("Compatible update requires the existing runtime compatibility date");
+    const evidence = await this.inspectM6WorkerDeployment(config, previousVersionId, previous.compatibility_date);
+    if ((await this.workerDomains("service", config.worker_name)).length) throw new Error("Compatible update with Custom Domains is not released");
+    const metadata = buildM6WorkerUploadMetadata(config, previous, "", previous.compatibility_date);
+    const current = buildM6WorkerUploadMetadata(config, await this.json<unknown>("GET", `${path}/settings`), "", previous.compatibility_date);
+    const deployment = await this.singleMigrationDeployment(path, previousVersionId);
+    if (migrationPayloadHash(current) !== migrationPayloadHash(metadata) || deployment.id !== evidence.deployment_id) {
+      throw new Error("M6 settings or deployment changed during compatible upload preparation");
+    }
+    metadata.bindings = metadata.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: previousVersionId } : binding);
+    return metadata;
+  }
+
+  async uploadCompatibleM6Worker(configInput: ServiceConfig, input: M6ServiceUpdateRequest, source: string,
+    metadata: object): Promise<M6WorkerDeploymentEvidence> {
+    const config = serviceConfigSchema.parse(configInput);
+    const request = m6ServiceUpdateRequestSchema.parse(input);
+    const metadataSource = JSON.stringify(metadata);
+    if (config.service_id !== request.service_id || await m6ServiceConfigHash(config) !== request.service_config_sha256 ||
+      migrationPayloadHash(source) !== request.worker_source_sha256 || migrationPayloadHash(metadataSource) !== request.worker_metadata_sha256) {
+      throw new Error("Compatible upload differs from its frozen service, source or metadata");
+    }
+    const path = this.migrationWorkerPath(config);
+    const expected = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id);
+    if (migrationPayloadHash(expected) !== request.worker_metadata_sha256) throw new Error("Compatible settings changed after metadata was frozen");
+    const form = new FormData();
+    form.set("metadata", metadataSource);
+    form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
+    const uploaded = await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
+    const deployment = workerDeploymentsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/deployments`)).deployments[0]!;
+    if (deployment.versions.length !== 1 || deployment.versions[0]!.percentage !== 100 ||
+      deployment.versions[0]!.version_id === request.previous_worker_version_id) throw new Error("Compatible upload has not acknowledged one new version at 100%");
+    const versionId = deployment.versions[0]!.version_id;
+    await this.requireUploadedM6Version(path, versionId, uploaded);
+    await this.disableMigrationWorkerPreviews(config, versionId);
+    const evidence = await this.inspectM6WorkerDeployment(config, versionId, expected.compatibility_date);
+    if (evidence.deployment_id !== deployment.id) throw new Error("Compatible deployment changed after upload");
     return evidence;
   }
 
@@ -397,10 +444,19 @@ export class CloudflareApi {
     if (!result.enabled || result.previews_enabled) throw new Error("Migration preview setting was not accepted");
   }
 
-  private async jsonUpload(path: string, body: FormData): Promise<void> {
+  private async requireUploadedM6Version(path: string, versionId: string, input: unknown): Promise<void> {
+    const uploaded = workerScriptUploadReceiptSchema.parse(input);
+    const version = workerVersionSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(versionId)}`));
+    if (version.id !== versionId || version.resources.script.etag !== uploaded.etag) {
+      throw new Error("M6 deployed Worker content differs from its acknowledged upload; preserve the unknown deployment");
+    }
+  }
+
+  private async jsonUpload(path: string, body: FormData): Promise<unknown> {
     const response = await this.request("PUT", path, body, undefined, 120000);
     const data: ApiResult<unknown> = await response.json();
     if (!data.success) throw new Error(`Cloudflare PUT ${path} did not succeed`);
+    return data.result;
   }
 
   async ensureConsumer(queueId: string, config: ServiceConfig, dlq: boolean): Promise<void> {

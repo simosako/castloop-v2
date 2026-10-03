@@ -53,6 +53,8 @@
 1. runtime readinessからlegacy移行証拠への必須依存を分離する。fresh initializationと既存の移行完了を区別して検証し、現行のfail-closed動作を維持する。
 2. 新規M6サービスの初期化を実装・検証する。現在の候補入口/CLI公開gateを、schema変更だけで開けない。
 3. schema互換のM6→M6更新手順を、pause/収束→deploy/検査→readiness更新→明示再開の最小経路として設計する。unknown IO/旧versionの継続書込を時間やHEADで終了認定しない。
-4. 新規初期化が独立して成立した後、legacy→M6変換をM6リリースの必須経路から外す案を採否決定する。不要となったbridge/API/client/専用testの撤去は依存関係と公開案内を確認してまとめて行い、通常runtimeの安全テストは保持する。
+4. 管理者が2026-10-03に承認した順序に従い、旧形式データ変換の追加対応は本当に必要になった場合だけ行う。既存bridge/API/client/専用testの即時撤去とは扱わず、通常runtimeの安全テストは保持する。
+
+上記1〜3の内部実装と自動テストを追加した。[新規初期化](./m6_fresh_initialization.md)と[通常更新](./m6_compatible_updates.md)を参照。公開CLI/HTTP接続・実runtime検証adapter・専用Cloudflare受け入れは残るため、利用可能なM6初期化/通常更新が完成したという意味ではない。
 
 既存のメンテナンス停止許容方針は、この分離後も活用できる。今必要なのは無停止化や巨大な汎用状態機械ではなく、新規起動と通常更新に必要な検証を適切な層へ置くことである。
