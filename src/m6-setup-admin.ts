@@ -8,7 +8,9 @@ import { m6SetupRecordKey, readM6SetupRecord, requireM6SetupOwner } from "./m6-s
 import { describeM6SetupProbe, verifyM6SetupRuntime } from "./m6-setup-runtime";
 import type { M6SetupRuntime } from "./m6-setup-runtime";
 import { readM6RuntimeConfiguration } from "./m6-runtime-readiness";
+import type { M6RuntimeChecks } from "./m6-runtime-readiness";
 import { readServiceAdmission } from "./service-admission";
+import { completeM6ServiceUpdate, prepareM6ServiceUpdate } from "./m6-service-update";
 
 type SetupEnv = M6InitializationEnv & { CASTLOOP_ADMIN_KEY: string; CASTLOOP_QUEUE: Pick<Queue, "send"> };
 function reply(data: unknown, status = 200): Response {
@@ -29,21 +31,22 @@ export async function handleM6SetupAdmin(request: Request, env: SetupEnv, runtim
       const object = await env.CASTLOOP_BUCKET.get(m6SetupRecordKey(operationId));
       if (!object || object.size > 16384) throw new Error("Missing runtime probe");
       const record = m6SetupRecordSchema.parse(await object.json<unknown>());
-      input = m6SetupRequestSchema.parse({ target: record.request.target });
+      input = m6SetupRequestSchema.parse(record.request);
     } else input = await readBoundedAdminJson(request);
     input = route === "complete" ? m6SetupCompleteSchema.parse(input) : m6SetupRequestSchema.parse(input);
   } catch { return reply({ reason_code: "setup_input_invalid" }, 400); }
   const frozen = route === "complete" ? m6SetupCompleteSchema.parse(input) : m6SetupRequestSchema.parse(input);
-  const owner = { target: frozen.target };
+  const owner = { target: frozen.target, ...(frozen.update_request ? { update_request: frozen.update_request } : {}) };
   try {
     if (route === "prepare") {
-      await prepareM6ServiceInitialization(env, owner.target);
+      if (owner.update_request) await prepareM6ServiceUpdate(env, owner.update_request, owner.target);
+      else await prepareM6ServiceInitialization(env, owner.target);
       await requireM6SetupOwner(env, owner);
       const existing = await readM6SetupRecord(env, owner);
       if (!existing) {
         const { config } = await readM6RuntimeConfiguration(env, owner.target.service_config_sha256, owner.target.worker_version_id);
         const admission = (await readServiceAdmission(env, config.service_id))!.value;
-        if (admission.state !== "initializing") throw new Error("Completed initialization cannot acquire a new runtime probe");
+        if (!["initializing", "updating"].includes(admission.state)) throw new Error("Completed runtime cannot acquire a new runtime probe");
         await runtime.invalidate(`setup-${owner.target.operation_id.slice(0, 20)}`);
         await requireM6SetupOwner(env, owner);
         const value = m6SetupRecordSchema.parse({ schema_version: 1, request: owner, cache_purge_verified: true });
@@ -58,12 +61,14 @@ export async function handleM6SetupAdmin(request: Request, env: SetupEnv, runtim
     if (route === "complete") {
       const completion = m6SetupCompleteSchema.parse(frozen);
       let inspection = 0;
-      const readiness = await completeM6ServiceInitialization(env, owner.target, {
+      const checks: M6RuntimeChecks = {
         inspectDeployment: (config, versionId) => inspectM6WorkerDeployment(config, versionId,
           m6SnapshotReads(completion.snapshots[inspection++]!), M6_FRESH_WORKER_COMPATIBILITY_DATE),
         verifyRuntime: () => verifyM6SetupRuntime(env, owner, runtime),
-      });
-      return reply(m6SetupCompletedSchema.parse({ result: "initialized", request: owner, readiness }));
+      };
+      const readiness = owner.update_request ? await completeM6ServiceUpdate(env, owner.update_request, owner.target, checks) :
+        await completeM6ServiceInitialization(env, owner.target, checks);
+      return reply(m6SetupCompletedSchema.parse({ result: owner.update_request ? "updated" : "initialized", request: owner, readiness }));
     }
     const record = await readM6SetupRecord(env, owner);
     if (!record) throw new Error("Runtime probe was not prepared");

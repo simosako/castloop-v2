@@ -148,7 +148,7 @@ describe("unreleased M6 management fetch integration", () => {
     const sent: unknown[] = [];
     const env = routeEnv(setup, sent, setup.versionId);
     const assets = cachedLoopback(setup);
-    for (const path of ["/admin/shows/reserve", "/admin/publications/claim", "/admin/jobs/retry", "/admin/lifecycle/delete"]) {
+    for (const path of ["/admin/shows/reserve", "/admin/publications/claim", "/admin/jobs/retry", "/admin/lifecycle/delete", "/admin/update/begin"]) {
       expect((await fetchM6Candidate(post(path, {}), env, assets)).status).toBe(409);
       expect((await fetchM6ManagementIntegration(post(path, {}), env, assets)).status).toBe(409);
     }

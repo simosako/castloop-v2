@@ -1,4 +1,4 @@
-import { buildM6WorkerUploadMetadata, parseServiceConfig, showMetadataSchema, validateId } from "@castloop/shared";
+import { buildM6WorkerUploadMetadata, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, parseServiceConfig, showMetadataSchema, validateId } from "@castloop/shared";
 import { CloudflareApi } from "./cloudflare-api";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { createFreshM6RestEffects } from "./m6-initialization-rest";
@@ -6,16 +6,22 @@ import { createM6LocalEpisodeDraft, createM6LocalShowDraft } from "./m6-local-dr
 import { publishLocalM6Draft, updateLocalM6Draft } from "./m6-local-update";
 import { M6ServiceClient } from "./m6-service-client";
 import { createFreshM6InitializationJournal, runFreshM6Initialization } from "./m6-service-initialization";
+import { createM6UpdateJournal, readLocalM6Update, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
+import { M6UpdateClient } from "./m6-update-client";
+import { createM6UpdateRestEffects } from "./m6-update-rest";
 import { createShowRegistrationJournal } from "./show-registration-journal";
 import { createShowRegistrationEffects, runShowRegistration } from "./show-registration-operation";
 import { TargetInspectionClient } from "./target-inspection-client";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
+import { workerPayloadHash } from "./worker-upload-hash";
 import { randomBytes } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const HELP = `Unreleased isolated M6 test binary. Requires castloop.toml in the working directory.
 init OPERATION_UUID
+update-service OPERATION_UUID (requires explicit pause and settled owners)
+update-service-verify OPERATION_UUID (only durable acknowledged deployment; never re-upload)
 service-status | service-pause PAUSE_UUID | service-resume PAUSE_UUID
 target-show SHOW_ID | target-episode SHOW_ID EPISODE_ID
 create-show SHOW_ID SITE_URL | create-episode SHOW_ID EPISODE_ID
@@ -31,7 +37,7 @@ function argumentsFor(args: string[], count: number): void {
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   if (!command || command === "--help") { console.log(HELP); return; }
-  const counts: Record<string, number> = { init: 1, "service-status": 0, "service-pause": 1, "service-resume": 1,
+  const counts: Record<string, number> = { init: 1, "update-service": 1, "update-service-verify": 1, "service-status": 0, "service-pause": 1, "service-resume": 1,
     "target-show": 1, "target-episode": 2,
     "create-show": 2, "create-episode": 2, "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3 };
   if (!Object.hasOwn(counts, command)) throw new Error("Unknown test command; use --help");
@@ -65,6 +71,35 @@ async function main(): Promise<void> {
     const journal = await createFreshM6InitializationJournal(root, config, args[0]!, source, metadata);
     await runFreshM6Initialization(journal, createFreshM6RestEffects(new CloudflareApi(config), key), source, metadata);
     console.log(JSON.stringify({ result: "initialized-paused", operation_id: args[0], runtime_readiness: journal.load().runtime_readiness }));
+    return;
+  }
+  if (command === "update-service" || command === "update-service-verify") {
+    const operationId = m6ServiceUpdateRequestSchema.shape.operation_id.parse(args[0]);
+    const api = new CloudflareApi(config);
+    const client = new M6UpdateClient(config, key, api);
+    const effects = createM6UpdateRestEffects(api, { begin: (input) => client.begin(input),
+      admission: () => client.admission(), complete: (input, target) => client.complete(input, target) });
+    if (command === "update-service-verify") {
+      const retained = readLocalM6Update(root, config, operationId);
+      if (!retained.state || retained.lockPresent) throw new Error("Verification requires its retained journal without an unknown lock");
+      const journal = await createM6UpdateJournal(root, config, retained.state.request);
+      if (retained.state.phase === "deploy_requested") await resumeM6UpdateDeploymentVerification(journal, effects);
+      else await resumeM6UpdateCompletion(journal, effects);
+      console.log(JSON.stringify({ result: "updated-paused", operation_id: operationId, runtime_readiness: journal.load().runtime_readiness }));
+      return;
+    }
+    const source = embeddedWorkerSource;
+    if (!source) throw new Error("Build the standalone --m6-test binary before a compatible update");
+    const status = await new M6ServiceClient(config, key).call({ service_id: config.service_id, action: "status" });
+    if (status.admission.state !== "paused" || status.admission.invocations.length) throw new Error("Explicitly pause and drain before a compatible update");
+    const metadata = await api.prepareCompatibleM6WorkerUpload(config, status.worker_version_id);
+    const request = m6ServiceUpdateRequestSchema.parse({ operation_id: operationId, service_id: config.service_id,
+      pause_id: status.admission.pause_id, expected_service_generation: status.admission.generation,
+      previous_worker_version_id: status.worker_version_id, service_config_sha256: await m6ServiceConfigHash(config),
+      worker_source_sha256: workerPayloadHash(source), worker_metadata_sha256: workerPayloadHash(metadata) });
+    const journal = await createM6UpdateJournal(root, config, request);
+    await runM6Update(journal, effects, source, metadata);
+    console.log(JSON.stringify({ result: "updated-paused", operation_id: operationId, runtime_readiness: journal.load().runtime_readiness }));
     return;
   }
   if (command.startsWith("service-")) {

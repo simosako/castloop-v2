@@ -25,6 +25,7 @@ import { handleM6SetupAdmin } from "./m6-setup-admin";
 import type { M6SetupRuntime } from "./m6-setup-runtime";
 import { handleM6ServiceAdmin } from "./m6-service-admin";
 import { readM6ServiceConfiguration } from "./m6-runtime-readiness";
+import { handleM6UpdateAdmin } from "./m6-update-admin";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -112,6 +113,8 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   if (!pathname.startsWith("/admin/")) return reply(request, { error: "not found" }, 404);
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply(request, { error: "unauthorized" }, 401);
   if (managementIntegration && options.setupRuntime) {
+    const update = await handleM6UpdateAdmin(request, env);
+    if (update) return update;
     const setup = await handleM6SetupAdmin(request, env, options.setupRuntime);
     if (setup) return setup;
   }

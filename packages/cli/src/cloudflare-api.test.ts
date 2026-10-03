@@ -290,7 +290,9 @@ test("fresh M6 refuses existing or unknown resources and name collisions without
   }
 });
 
-test("compatible REST updates preserve secrets/settings, reject unfrozen inputs and only replace the admitted Worker", async () => {
+test.each([null, "missing-receipt", "old-version", "foreign-content", "settings-drift", "foreign-deployment",
+  "unknown-latest", "intervening-version", "latest-drift", "missing-deployment-receipt", "deployment-id-drift"] as const)(
+  "compatible REST updates activate only an acknowledged version and preserve secrets/settings (%s)", async (failure) => {
   const service = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
   const previousVersion = crypto.randomUUID();
   const nextVersion = crypto.randomUUID();
@@ -301,27 +303,51 @@ test("compatible REST updates preserve secrets/settings, reject unfrozen inputs 
   oldMetadata.tags = ["preserved-tag"];
   const writes: string[] = [];
   let uploaded = false;
+  let deployed = false;
   let changed = false;
   let nextMetadata: typeof oldMetadata | undefined;
   await withCloudflare(async (request) => {
     const url = new URL(request.url);
     if (request.method !== "GET") writes.push(`${request.method} ${url.pathname}`);
-    if (url.pathname.endsWith(`/workers/scripts/${worker}`) && request.method === "PUT") {
+    if (url.pathname.endsWith("/versions") && request.method === "POST") {
+      expect(url.searchParams.get("bindings_inherit")).toBe("strict");
       const form = await request.formData();
-      expect(JSON.parse(String(form.get("metadata")))).toEqual(nextMetadata);
+      expect(JSON.parse(String(form.get("metadata")))).toEqual({ main_module: nextMetadata!.main_module,
+        compatibility_date: nextMetadata!.compatibility_date, compatibility_flags: nextMetadata!.compatibility_flags,
+        cache_options: nextMetadata!.cache_options, exports: nextMetadata!.exports,
+        bindings: nextMetadata!.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: "latest" } : binding) });
       expect(String(form.get("metadata"))).not.toContain("private-key");
       uploaded = true;
-      return reply({ etag: "compatible-script-content" });
+      return reply(failure === "missing-receipt" ? {} : { id: failure === "old-version" ? previousVersion : nextVersion,
+        number: failure === "intervening-version" ? 3 : 2, resources: { script: { etag: "compatible-script-content" } } });
     }
-    const runtime = uploaded ? { ...nextMetadata!, bindings: nextMetadata!.bindings.map((binding) => binding.type === "inherit" ?
-      oldMetadata.bindings.find((old) => old.name === binding.name)! : binding) } : oldMetadata;
-    const version = uploaded ? nextVersion : previousVersion;
-    if (url.pathname.endsWith("/settings")) return reply(changed ? { ...runtime, tags: ["changed-tag"] } : runtime);
-    if (url.pathname.endsWith("/deployments")) return reply({ deployments: [{ id: uploaded ? nextDeployment : previousDeployment,
-      strategy: "percentage", versions: [{ version_id: version, percentage: 100 }] }] });
-    if (url.pathname.endsWith(`/versions/${version}`)) return reply({ id: version, resources: { bindings: runtime.bindings,
-      script: { etag: "compatible-script-content", handlers: ["fetch", "queue"], named_handlers: [{ name: "CachedPublicAssets", handlers: ["fetch"] }] },
-      script_runtime: { compatibility_date: runtime.compatibility_date, compatibility_flags: runtime.compatibility_flags, exports: runtime.exports } } });
+    if (url.pathname.endsWith("/versions")) return reply({ items: uploaded ? [
+      { id: failure === "latest-drift" ? crypto.randomUUID() : nextVersion, number: 2 }, { id: previousVersion, number: 1 },
+    ] : [{ id: failure === "unknown-latest" && nextMetadata ? crypto.randomUUID() : previousVersion, number: 1 }] });
+    const nextRuntime = { ...nextMetadata!, bindings: nextMetadata?.bindings.map((binding) => binding.type === "inherit" ?
+      oldMetadata.bindings.find((old) => old.name === binding.name)! : binding) ?? [] };
+    const runtime = deployed ? nextRuntime : oldMetadata;
+    if (url.pathname.endsWith("/settings")) return reply(changed || uploaded && failure === "settings-drift" ? { ...runtime, tags: ["changed-tag"] } : runtime);
+    const deployment = { id: deployed ? nextDeployment : previousDeployment, strategy: "percentage",
+      versions: [{ version_id: deployed ? nextVersion : previousVersion, percentage: 100 }] };
+    if (url.pathname.endsWith("/deployments")) {
+      if (request.method === "POST") {
+        expect(uploaded).toBe(true);
+        expect(await request.json<unknown>()).toEqual({ strategy: "percentage", versions: [{ version_id: nextVersion, percentage: 100 }] });
+        deployed = true;
+        return reply(failure === "missing-deployment-receipt" ? {} : failure === "foreign-deployment" ?
+          { id: nextDeployment, strategy: "percentage", versions: [{ version_id: previousVersion, percentage: 100 }] } :
+          { id: failure === "deployment-id-drift" ? crypto.randomUUID() : nextDeployment });
+      }
+      return reply({ deployments: [deployment] });
+    }
+    for (const version of [previousVersion, ...(uploaded ? [nextVersion] : [])]) {
+      const value = version === previousVersion ? oldMetadata : nextRuntime;
+      if (url.pathname.endsWith(`/versions/${version}`)) return reply({ id: version, resources: { bindings: value.bindings,
+        script: { etag: version === nextVersion && failure === "foreign-content" ? "foreign-script" : "compatible-script-content",
+          handlers: ["fetch", "queue"], named_handlers: [{ name: "CachedPublicAssets", handlers: ["fetch"] }] },
+        script_runtime: { compatibility_date: value.compatibility_date, compatibility_flags: value.compatibility_flags, exports: value.exports } } });
+    }
     if (url.pathname.endsWith("/subdomain")) return reply({ enabled: true, previews_enabled: false });
     if (url.pathname.endsWith("/workers/domains")) return reply([]);
     throw new Error("Compatible updates cannot create resources or write content");
@@ -336,10 +362,12 @@ test("compatible REST updates preserve secrets/settings, reject unfrozen inputs 
       pause_id: crypto.randomUUID(), expected_service_generation: 1, previous_worker_version_id: previousVersion,
       service_config_sha256: await m6ServiceConfigHash(service), worker_source_sha256: migrationPayloadHash("new-worker"),
       worker_metadata_sha256: migrationPayloadHash(nextMetadata) });
-    await expect(api.uploadCompatibleM6Worker(service, request, "changed-worker", nextMetadata)).rejects.toThrow("frozen");
-    changed = true;
-    await expect(api.uploadCompatibleM6Worker(service, request, "new-worker", nextMetadata)).rejects.toThrow("metadata was frozen");
-    changed = false;
+    if (failure === null) {
+      await expect(api.uploadCompatibleM6Worker(service, request, "changed-worker", nextMetadata)).rejects.toThrow("frozen");
+      changed = true;
+      await expect(api.uploadCompatibleM6Worker(service, request, "new-worker", nextMetadata)).rejects.toThrow("metadata was frozen");
+      changed = false;
+    }
     const readiness = { operation_id: crypto.randomUUID(), deployment_id: previousDeployment, worker_version_id: previousVersion,
       service_config_sha256: request.service_config_sha256, default_cache_disabled: true, cached_entrypoint: "CachedPublicAssets",
       cutover_verified: true, publication_routes_verified: true };
@@ -348,13 +376,15 @@ test("compatible REST updates preserve secrets/settings, reject unfrozen inputs 
     let admission = paused;
     const effects = createM6UpdateRestEffects(api, { begin: async () => {}, complete: async () => { throw new Error("Separate runtime verification"); },
       admission: async () => admission });
-    await expect(effects.deploy(service, request, "new-worker", nextMetadata)).rejects.toThrow("admitted");
+    if (failure === null) await expect(effects.deploy(service, request, "new-worker", nextMetadata)).rejects.toThrow("admitted");
     expect(writes).toEqual([]);
     admission = serviceAdmissionSchema.parse({ ...paused, state: "updating", generation: 2, update: { request } });
-    expect(await effects.deploy(service, request, "new-worker", nextMetadata)).toEqual({ deployment_id: nextDeployment, worker_version_id: nextVersion });
+    if (failure) await expect(effects.deploy(service, request, "new-worker", nextMetadata)).rejects.toThrow();
+    else expect(await effects.deploy(service, request, "new-worker", nextMetadata)).toEqual({ deployment_id: nextDeployment, worker_version_id: nextVersion });
   });
-  expect(writes).toEqual([`PUT /client/v4/accounts/${accountId}/workers/scripts/${worker}`,
-    `POST /client/v4/accounts/${accountId}/workers/scripts/${worker}/subdomain`]);
+  const path = `/client/v4/accounts/${accountId}/workers/scripts/${worker}`;
+  expect(writes).toEqual([...(failure === "unknown-latest" ? [] : [`POST ${path}/versions`]),
+    ...(failure === null || ["foreign-deployment", "missing-deployment-receipt", "deployment-id-drift"].includes(failure) ? [`POST ${path}/deployments`] : [])]);
 });
 
 test("M6 uploads reject missing receipts or another script's content without replaying PUT or activating the deployment", async () => {

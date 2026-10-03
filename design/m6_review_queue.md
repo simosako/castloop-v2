@@ -50,7 +50,7 @@
 
 新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを実装した。認証付きHTTP/loopback/Queue起動検証と試験専用standaloneを接続し、別名Cloudflare環境で初期paused→明示再開→Show/Episode公開→GET/HEAD/Rangeを確認した。通常の公開CLI/entryは切り替えず、通常更新・全lifecycle/cache/300MB/unknown IO復旧の受け入れは残る。既存資源の削除/採用はしていない。[新規初期化](./m6_fresh_initialization.md)参照。
 
-保存形式を変えないM6更新の内部経路も追加した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通runtime検証は初期化と共有し、未知token/PUTを時間で終了扱いにしない。公開CLI/実機gateは残る。[通常更新](./m6_compatible_updates.md)参照。
+保存形式を変えないM6更新を、試験専用の認証HTTP/standaloneへ接続した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通HTTP/Queue/cache runtime検証は初期化と共有する。実機で二つのupload APIがinheritのUUID指定を拒否したため、最新upload/連番/履歴とacknowledged versionを照合する配備経路へ修正中である。失敗した専用環境はrequested/updatingを保持し、再送/採用/自動再開しない。公開CLI/実機gateは残る。[通常更新](./m6_compatible_updates.md)参照。
 
 2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](./m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
 

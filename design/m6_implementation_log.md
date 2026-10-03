@@ -1,5 +1,15 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 通常更新を試験HTTP/standaloneと共通runtime検証へ接続
+
+- 更新固有のpaused→updating→paused CASとjournalを維持し、認証付きbeginと初期化共通のHTTP/loopback/Queue/cache検証へ接続した。試験binaryの`update-service`は明示pause/drainが必要で、自動resume/legacy変換/新規資源作成はしない。既存runtime-checkのoperation IDは受付前に拒否する。
+- Script PUTとVersion POSTの両方が実機でinherit UUIDを拒否したため、UUID対応という公開referenceだけを信用して成功扱いにしない。凍結意図は旧version UUIDを保持し、実Version POSTには`latest`を使うが、最新uploadが旧versionであること、acknowledged ID/直後の連番/ETag/最新二件の履歴を照合してからDeployment POSTでそのversionだけを100%にする。外部Cloudflare操作を防ぐ原子的lockとは扱わない。
+- tags/監視等のscript設定はversion metadataから除いて非変更を確認する。欠落/旧ID/別script receipt、設定変更、未知最新version/途中upload/履歴変更、別deploymentを配備前またはreadiness前に拒否する。保持recordに任意exception本文は保存しない。
+- `castloop-m6-test-49c82745`と`castloop-m6-test-9fcbd823`は拒否後のrequested/updatingと凍結要求を保持した。再送/採用/rollback/resume/削除をしていない。別名の隔離環境で修正後の実機受け入れを継続する。
+- 次の`castloop-m6-test-7fefb49f`ではVersion/Deployment POSTまで進み、Deployment応答の省略項目で停止した。受領済みID/連番/ETagを後続検証前にjournalへ即時保存し、ID-only deployment応答をGETの同じdeploymentへ結び付けるよう改善した。中間receiptなしの旧要求は引き続き拒否し、保存済みreceiptが両方ある要求だけ明示`update-service-verify`から非再配備の検証を続行する。preview設定は保持を検査するだけに変更した。
+- `verify-compatible-update.ts`は既知の小さい10 objectのhash/ETag、target/current revision/GUID/URL、paused完了と明示再開/配信/再pauseを検査する。consumer処理中のreadonly照会競合は有限観測で扱い、mutationは再送しない。通常release gateは閉じたままで、unknown IO復旧と全lifecycle/cache/300MBの受け入れは後続。
+- 全881テスト/13370 assertionsとTypeScript/M6実証tsconfig、通常/試験Linux standalone build、四family local HTTPS status・試験binaryのproduction資源拒否が合格した。実機の修正後更新は引き続き受け入れ中であり、この自動テスト合格を実機合格とは扱わない。
+
 ## 2026-10-04: 試験用standaloneから新規M6初期化・コンテンツ公開を実機検証
 
 - 通常buildを維持し、明示`--m6-test`で別binary/Worker entryを作る。専用資源prefix制限、既存durable登録/draft/upload/publication runner、初期pausedからの明示service再開、非書込target照会を接続した。

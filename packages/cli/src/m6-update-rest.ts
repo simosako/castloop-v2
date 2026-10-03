@@ -8,12 +8,20 @@ export function createM6UpdateRestEffects(api: CloudflareApi, controls: Pick<M6U
   return {
     begin: controls.begin,
     complete: controls.complete,
-    deploy: async (config, request, source, metadata) => {
+    deploy: async (config, request, source, metadata, receipts) => {
       const admission = serviceAdmissionSchema.parse(await controls.admission());
       if (admission.state !== "updating" || JSON.stringify(admission.update?.request) !== JSON.stringify(request) || admission.update?.target) {
         throw new Error("Compatible REST upload requires its exact admitted, undeployed service owner");
       }
-      const evidence = await api.uploadCompatibleM6Worker(config, request, source, metadata);
+      const evidence = await api.uploadCompatibleM6Worker(config, request, source, metadata, receipts);
+      return { deployment_id: evidence.deployment_id, worker_version_id: evidence.worker_version_id };
+    },
+    verifyDeployment: async (config, request, upload, deployment) => {
+      const admission = serviceAdmissionSchema.parse(await controls.admission());
+      if (admission.state !== "updating" || JSON.stringify(admission.update?.request) !== JSON.stringify(request) || admission.update?.target) {
+        throw new Error("Compatible verification requires its exact retained, unverified update owner");
+      }
+      const evidence = await api.verifyCompatibleM6WorkerDeployment(config, request, upload, deployment);
       return { deployment_id: evidence.deployment_id, worker_version_id: evidence.worker_version_id };
     },
   };

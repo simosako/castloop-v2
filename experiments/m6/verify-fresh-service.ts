@@ -50,6 +50,10 @@ async function command(...args: string[]): Promise<string> {
   const child = Bun.spawn([binary, ...args], { cwd: directory, stdout: "pipe", stderr: "pipe" });
   const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
   if (code !== 0) {
+    if (["service-status", "target-show", "target-episode"].includes(args[0]!)) {
+      observations.push({ command: args[0]!, result: "readonly_observation_unconfirmed" });
+      return "";
+    }
     observations.push({ command: args[0]!, result: "binary_command_failed" });
     console.error(stderr);
     throw new Error("Binary command did not complete; retain workspace/resources without replay");
@@ -80,7 +84,9 @@ try {
   }
   const waitSettledService = async (state: "open" | "paused") => {
     for (let read = 0; read < 180; read += 1) {
-      const status = m6ServiceAdminResponseSchema.parse(JSON.parse(await command("service-status")));
+      const output = await command("service-status");
+      if (!output) { await Bun.sleep(5000); continue; }
+      const status = m6ServiceAdminResponseSchema.parse(JSON.parse(output));
       assert.equal(status.admission.state, state);
       if (retained) assert.deepEqual(status.admission.runtime_readiness, retained.state!.runtime_readiness);
       if (!status.admission.invocations.length) return status;
@@ -92,7 +98,9 @@ try {
   const waitPublishedTarget = async (kind: "show" | "episode") => {
     for (let read = 0; read < 180; read += 1) {
       const args = kind === "show" ? ["target-show", "fresh"] : ["target-episode", "fresh", "first"];
-      const target = targetInspectionResponseSchema.parse(JSON.parse(await command(...args)));
+      const output = await command(...args);
+      if (!output) { await Bun.sleep(5000); continue; }
+      const target = targetInspectionResponseSchema.parse(JSON.parse(output));
       if (!target.unfinished_show_operation && target.show?.lifecycle === "active" && (kind === "show" || target.episode?.lifecycle === "active")) return target;
       await Bun.sleep(5000);
     }

@@ -1,6 +1,6 @@
 import { inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE, m6ServiceConfigHash, m6SetupCompletedSchema,
   m6SetupHealthSchema, m6SetupProbeSchema, m6SetupRequestSchema, m6SetupStatusSchema, m6SnapshotReads } from "@castloop/shared";
-import type { M6RuntimeReadiness, M6RuntimeTarget, M6SetupRequest, ServiceConfig } from "@castloop/shared";
+import type { M6RuntimeReadiness, M6RuntimeTarget, M6ServiceUpdateRequest, M6SetupRequest, ServiceConfig } from "@castloop/shared";
 import type { CloudflareApi } from "./cloudflare-api";
 import { M6AdminJsonClient } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
@@ -25,7 +25,15 @@ export class M6SetupClient {
   }
 
   async initialize(input: M6RuntimeTarget, wait: M6SetupWait = DEFAULT_WAIT): Promise<M6RuntimeReadiness> {
-    const request = m6SetupRequestSchema.parse({ target: input });
+    return this.verify({ target: input }, wait);
+  }
+
+  async verifyUpdate(update: M6ServiceUpdateRequest, target: M6RuntimeTarget, wait: M6SetupWait = DEFAULT_WAIT): Promise<M6RuntimeReadiness> {
+    return this.verify({ target, update_request: update }, wait);
+  }
+
+  private async verify(input: M6SetupRequest, wait: M6SetupWait): Promise<M6RuntimeReadiness> {
+    const request = m6SetupRequestSchema.parse(input);
     const config = this.admin.config;
     if (request.target.service_config_sha256 !== await m6ServiceConfigHash(config)) throw new Error("Setup target has another service configuration");
     if (!Number.isSafeInteger(wait.maximumReads) || wait.maximumReads < 1 || wait.maximumReads > 120) throw new Error("Invalid setup observation limit");
@@ -67,9 +75,10 @@ export class M6SetupClient {
     const after = await inspect();
     const completed = m6SetupCompletedSchema.parse(await this.admin.post("setup/complete", { ...request, snapshots: [before, after] }));
     requireSameRequest(completed.request, request);
+    if (completed.result !== (request.update_request ? "updated" : "initialized")) throw new Error("Runtime completion acknowledged another operation kind");
     const { default_cache_disabled: _defaultCache, cached_entrypoint: _entrypoint, cutover_verified: _cutover,
       publication_routes_verified: _routes, ...target } = completed.readiness;
-    requireSameRequest({ target }, request);
+    requireSameRequest({ ...request, target }, request);
     return completed.readiness;
   }
 }

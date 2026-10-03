@@ -1,7 +1,9 @@
-import { collectM6DeploymentSnapshot, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
-  workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema } from "@castloop/shared";
+import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
+  workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema,
+  workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
-   M6DeploymentReads, M6DeploymentSnapshot, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
+   M6DeploymentReads, M6DeploymentSnapshot, M6RuntimeTarget, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ServiceConfig, WorkerVersionUploadReceipt } from "@castloop/shared";
+import type { M6UpdateDeployReceipts } from "./m6-service-update";
 import { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
   M6_WORKER_COMPATIBILITY_DATE, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
@@ -142,7 +144,8 @@ export class CloudflareApi {
     return evidence;
   }
 
-  async prepareCompatibleM6WorkerUpload(input: ServiceConfig, previousVersionId: string): Promise<M6WorkerUploadMetadata> {
+  async prepareCompatibleM6WorkerUpload(input: ServiceConfig, previousVersionId: string,
+    expectedLatestVersionId = previousVersionId): Promise<M6WorkerUploadMetadata> {
     const config = serviceConfigSchema.parse(input);
     const path = this.migrationWorkerPath(config);
     const previous = workerSettingsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/settings`));
@@ -155,12 +158,13 @@ export class CloudflareApi {
     if (migrationPayloadHash(current) !== migrationPayloadHash(metadata) || deployment.id !== evidence.deployment_id) {
       throw new Error("M6 settings or deployment changed during compatible upload preparation");
     }
+    await this.latestM6Version(path, expectedLatestVersionId);
     metadata.bindings = metadata.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: previousVersionId } : binding);
     return metadata;
   }
 
   async uploadCompatibleM6Worker(configInput: ServiceConfig, input: M6ServiceUpdateRequest, source: string,
-    metadata: object): Promise<M6WorkerDeploymentEvidence> {
+    metadata: object, receipts?: M6UpdateDeployReceipts): Promise<M6WorkerDeploymentEvidence> {
     const config = serviceConfigSchema.parse(configInput);
     const request = m6ServiceUpdateRequestSchema.parse(input);
     const metadataSource = JSON.stringify(metadata);
@@ -171,18 +175,63 @@ export class CloudflareApi {
     const path = this.migrationWorkerPath(config);
     const expected = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id);
     if (migrationPayloadHash(expected) !== request.worker_metadata_sha256) throw new Error("Compatible settings changed after metadata was frozen");
+    const previousDeployment = await this.singleMigrationDeployment(path, request.previous_worker_version_id);
     const form = new FormData();
-    form.set("metadata", metadataSource);
+    form.set("metadata", JSON.stringify({ main_module: expected.main_module, compatibility_date: expected.compatibility_date,
+      compatibility_flags: expected.compatibility_flags, cache_options: expected.cache_options, exports: expected.exports,
+      bindings: expected.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: "latest" } : binding) }));
     form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
-    const uploaded = await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
-    const deployment = workerDeploymentsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/deployments`)).deployments[0]!;
-    if (deployment.versions.length !== 1 || deployment.versions[0]!.percentage !== 100 ||
-      deployment.versions[0]!.version_id === request.previous_worker_version_id) throw new Error("Compatible upload has not acknowledged one new version at 100%");
-    const versionId = deployment.versions[0]!.version_id;
-    await this.requireUploadedM6Version(path, versionId, uploaded);
-    await this.disableMigrationWorkerPreviews(config, versionId);
-    const evidence = await this.inspectM6WorkerDeployment(config, versionId, expected.compatibility_date);
-    if (evidence.deployment_id !== deployment.id) throw new Error("Compatible deployment changed after upload");
+    const previousVersion = await this.latestM6Version(path, request.previous_worker_version_id);
+    const uploaded = workerVersionUploadReceiptSchema.parse(await this.jsonUpload(`${path}/versions?bindings_inherit=strict`, form, "POST"));
+    const versionId = uploaded.id;
+    if (versionId === request.previous_worker_version_id || uploaded.number !== previousVersion.number + 1) {
+      throw new Error("Compatible upload did not acknowledge the next version after its exact inheritance source");
+    }
+    receipts?.uploaded(uploaded);
+    await this.requireUploadedM6Version(path, versionId, uploaded.resources.script);
+    const current = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id, versionId);
+    if (migrationPayloadHash(current) !== request.worker_metadata_sha256 ||
+      (await this.singleMigrationDeployment(path, request.previous_worker_version_id)).id !== previousDeployment.id) {
+      throw new Error("Compatible settings or deployment changed before activation; preserve the acknowledged version");
+    }
+    const versions = workerVersionsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/versions?page=1&per_page=2`)).items;
+    if (versions[0]!.id !== versionId || versions[0]!.number !== uploaded.number ||
+      versions[1]?.id !== previousVersion.id || versions[1].number !== previousVersion.number) {
+      throw new Error("Compatible inheritance history changed; preserve the acknowledged version without deployment");
+    }
+    const deployment = workerDeploymentsSnapshotSchema.shape.deployments.element.partial({ strategy: true, versions: true }).parse(await this.json<unknown>("POST", `${path}/deployments`, {
+      strategy: "percentage", versions: [{ version_id: versionId, percentage: 100 }],
+    }));
+    if (deployment.versions && (deployment.versions.length !== 1 || deployment.versions[0]!.version_id !== versionId || deployment.versions[0]!.percentage !== 100)) {
+      throw new Error("Compatible deployment did not acknowledge the uploaded version at 100%");
+    }
+    receipts?.deployed({ deployment_id: deployment.id, worker_version_id: versionId });
+    return this.verifyCompatibleM6WorkerDeployment(config, request, uploaded, { deployment_id: deployment.id, worker_version_id: versionId,
+      operation_id: request.operation_id, service_config_sha256: request.service_config_sha256 });
+  }
+
+  async verifyCompatibleM6WorkerDeployment(configInput: ServiceConfig, input: M6ServiceUpdateRequest, upload: WorkerVersionUploadReceipt,
+    deploymentInput: M6RuntimeTarget): Promise<M6WorkerDeploymentEvidence> {
+    const config = serviceConfigSchema.parse(configInput);
+    const request = m6ServiceUpdateRequestSchema.parse(input);
+    const uploaded = workerVersionUploadReceiptSchema.parse(upload);
+    const deployment = m6RuntimeTargetSchema.parse(deploymentInput);
+    if (config.service_id !== request.service_id || await m6ServiceConfigHash(config) !== request.service_config_sha256 ||
+      deployment.operation_id !== request.operation_id || deployment.service_config_sha256 !== request.service_config_sha256 ||
+      deployment.worker_version_id !== uploaded.id || uploaded.id === request.previous_worker_version_id) throw new Error("Compatible verification has foreign receipts");
+    const path = this.migrationWorkerPath(config);
+    const versionId = uploaded.id;
+    await this.requireUploadedM6Version(path, versionId, uploaded.resources.script);
+    const versions = workerVersionsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/versions?page=1&per_page=2`)).items;
+    if (versions[0]!.id !== versionId || versions[0]!.number !== uploaded.number || versions[1]?.id !== request.previous_worker_version_id ||
+      versions[1].number !== uploaded.number - 1 || (await this.singleMigrationDeployment(path, versionId)).id !== deployment.deployment_id) {
+      throw new Error("Compatible version history or acknowledged deployment changed during verification");
+    }
+    const preserved = await this.prepareCompatibleM6WorkerUpload(config, versionId);
+    preserved.bindings = preserved.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: request.previous_worker_version_id } : binding);
+    if (migrationPayloadHash(preserved) !== request.worker_metadata_sha256) throw new Error("Compatible update changed the preserved Worker settings");
+    const evidence = await this.inspectM6WorkerDeployment(config, versionId, preserved.compatibility_date);
+    if (evidence.deployment_id !== deployment.deployment_id) throw new Error("Compatible deployment changed after upload");
     return evidence;
   }
 
@@ -462,10 +511,16 @@ export class CloudflareApi {
     }
   }
 
-  private async jsonUpload(path: string, body: FormData): Promise<unknown> {
-    const response = await this.request("PUT", path, body, undefined, 120000);
+  private async latestM6Version(path: string, expectedVersionId: string): Promise<{ id: string; number: number }> {
+    const latest = workerVersionsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/versions?page=1&per_page=2`)).items[0]!;
+    if (latest.id !== expectedVersionId) throw new Error("Compatible inheritance requires the exact previous version to be the latest upload");
+    return latest;
+  }
+
+  private async jsonUpload(path: string, body: FormData, method: "PUT" | "POST" = "PUT"): Promise<unknown> {
+    const response = await this.request(method, path, body, undefined, 120000);
     const data: ApiResult<unknown> = await response.json();
-    if (!data.success) throw new Error(`Cloudflare PUT ${path} did not succeed`);
+    if (!data.success) throw new Error(`Cloudflare ${method} ${path} did not succeed`);
     return data.result;
   }
 
