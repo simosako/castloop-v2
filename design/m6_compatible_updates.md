@@ -47,4 +47,6 @@ content/Show control/公開音源/revision/staging/job記録の非変更、live 
 
 `castloop-m6-test-7fefb49f`ではVersion/Deployment POSTまで進んだが、Deployment応答のstrategy/versions省略で停止した。改善前のjournalには中間receiptがないため、GETから自分の要求と推定して続行しない。修正後binaryの`update-service-verify`もこの要求（`38dc81dc-1ac5-42c1-ae78-320f405ec56e`）を拒否した。資源とupdating/requestedはそのまま保持している。
 
-修正後の専用Cloudflare受け入れとunknown outcomeの外部回復、M6全体のlifecycle/cache/300MB受け入れは継続する。旧形式変換の追加開発は、必要になった場合だけ行う。
+修正後の`castloop-m6-test-ff3bfd8c`（`/tmp/opencode/castloop-m6-test-ff3bfd8c`）でstandalone通常更新が合格した。operation `4a778ece-9d99-4993-b076-cf132ce99c40`、旧version `5fed1fdd-a4b9-49e3-ba07-7562bb1e94a4`から新version `1e29cc26-676a-430f-95a8-1040b84c6f9c`、deployment `3b5232b1-2d7d-4240-99a3-ec3bba31cc7e`を確認した。service/Show/Episode controls、metadata/revision/feed/cover/audioの既知10 objectはbytes/hash/ETagとも非変更、GUID/revision/URLも維持された。実HTTP/Queue/cache起動検証後にpausedで完了し、明示再開後のnew version配信と媒体checksum/再検証header、明示再pause・空invocation registryを確認した。記録はworkspaceの`compatible-update-acceptance.json`。
+
+これは小さいfixtureの通常更新受け入れであり、unknown outcomeの外部回復やM6全体のlifecycle/cache HIT/300MB受け入れ、正式releaseとは区別する。これらは④で継続する。旧形式変換の追加開発は、必要になった場合だけ行う。
