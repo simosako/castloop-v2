@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { m6WorkerDeploymentEvidenceSchema, serviceConfigSchema } from "@castloop/shared";
+import { collectM6DeploymentSnapshot, m6SnapshotReads, m6WorkerDeploymentEvidenceSchema, serviceConfigSchema } from "@castloop/shared";
 import { buildM6WorkerUploadMetadata, inspectM6WorkerDeployment, M6_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
 import type { M6DeploymentReads } from "./m6-worker-deployment";
 
@@ -81,6 +81,11 @@ describe("read-only M6 deployment and runtime inspection", () => {
       expect(JSON.stringify(value)).not.toContain(privateValue);
     }
     expect(m6WorkerDeploymentEvidenceSchema.safeParse({ ...value, old_cache_purged: true }).success).toBe(false);
+    const snapshot = await collectM6DeploymentSnapshot(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, setup.reads, M6_WORKER_COMPATIBILITY_DATE);
+    expect(await inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, m6SnapshotReads(snapshot))).toEqual(value);
+    for (const privateValue of ["private-admin-secret", "private@example.com", "Private deployment note", "unrelated"]) {
+      expect(JSON.stringify(snapshot)).not.toContain(privateValue);
+    }
   });
 
   test("partial rollout, wrong version and missing deployment are rejected before runtime reads", async () => {

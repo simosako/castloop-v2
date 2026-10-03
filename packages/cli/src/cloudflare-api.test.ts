@@ -259,6 +259,11 @@ test("fresh M6 REST provisioning creates isolated resources and verifies its fro
     const effects = createFreshM6RestEffects(api, "private-admin-key", async () => { throw new Error("Runtime verification is separate"); });
     await effects.createResources(fresh);
     expect(await effects.deploy(fresh, "export default {};", metadata)).toEqual({ deployment_id: deploymentId, worker_version_id: versionId });
+    const before = [...writes];
+    const observations = await api.collectM6DeploymentSnapshot(fresh, versionId);
+    expect(observations.deployments[0].deployments[0]!.id).toBe(deploymentId);
+    expect(JSON.stringify(observations)).not.toContain("private-admin-key");
+    expect(writes).toEqual(before);
   });
   expect(writes.filter((value) => value.includes(`/workers/scripts/${worker}`) && value.startsWith("PUT"))).toHaveLength(1);
   expect(writes.some((value) => value.startsWith("DELETE"))).toBe(false);

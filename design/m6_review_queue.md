@@ -48,7 +48,7 @@
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 
-新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを内部実装した。完了はpausedであり、公開CLI・HTTP入口・実runtime検証adapter/Cloudflare受け入れは残る。[新規初期化](./m6_fresh_initialization.md)参照。
+新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを内部実装した。認証付き初期化HTTP入口と実HTTP/loopback/Queue起動検証adapterも試験専用entryへ接続した。配備検査はCLI/Worker共通とし、account tokenをWorkerへ渡さない。完了はpausedであり、公開CLI/単一binary接続・実コンテンツ公開・Cloudflare受け入れは残る。[新規初期化](./m6_fresh_initialization.md)参照。
 
 保存形式を変えないM6更新の内部経路も追加した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通runtime検証は初期化と共有し、未知token/PUTを時間で終了扱いにしない。公開CLI/実機gateは残る。[通常更新](./m6_compatible_updates.md)参照。
 

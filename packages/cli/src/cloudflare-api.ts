@@ -1,7 +1,7 @@
-import { m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
+import { collectM6DeploymentSnapshot, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
   workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
-   M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
+   M6DeploymentReads, M6DeploymentSnapshot, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
 import { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
   M6_WORKER_COMPATIBILITY_DATE, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
@@ -328,14 +328,24 @@ export class CloudflareApi {
 
   async inspectM6WorkerDeployment(config: ServiceConfig, expectedVersionId: string,
     expectedCompatibilityDate = M6_WORKER_COMPATIBILITY_DATE): Promise<M6WorkerDeploymentEvidence> {
+    return inspectM6WorkerDeployment(config, expectedVersionId, this.m6DeploymentReads(config), expectedCompatibilityDate);
+  }
+
+  async collectM6DeploymentSnapshot(config: ServiceConfig, expectedVersionId: string,
+    expectedCompatibilityDate = M6_FRESH_WORKER_COMPATIBILITY_DATE): Promise<M6DeploymentSnapshot> {
+    return collectM6DeploymentSnapshot(config, expectedVersionId, this.m6DeploymentReads(config), expectedCompatibilityDate);
+  }
+
+  private m6DeploymentReads(input: ServiceConfig): M6DeploymentReads {
+    const config = serviceConfigSchema.parse(input);
     if (config.account_id !== this.accountId) throw new Error("Worker inspection targets another Cloudflare account");
     const path = `/workers/scripts/${encodeURIComponent(config.worker_name)}`;
-    return inspectM6WorkerDeployment(config, expectedVersionId, {
+    return {
       deployments: () => this.json<unknown>("GET", `${path}/deployments`),
       settings: () => this.json<unknown>("GET", `${path}/settings`),
       version: (versionId) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(versionId)}`),
       subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
-    }, expectedCompatibilityDate);
+    };
   }
 
   private migrationWorkerPath(input: ServiceConfig): string {

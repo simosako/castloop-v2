@@ -22,6 +22,8 @@ import { handleMigrationAdmin } from "./migration-admin";
 import type { BootstrapRuntime } from "./migration-bootstrap";
 import { handleM6ShowRegistrationAdmin } from "./show-registration-admin";
 import { handleM6TargetInspection } from "./target-inspection-admin";
+import { handleM6SetupAdmin } from "./m6-setup-admin";
+import type { M6SetupRuntime } from "./m6-setup-runtime";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -68,12 +70,6 @@ async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAs
   if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle" && pathname !== "/admin/shows" &&
     pathname !== "/admin/target") return null;
   if (request.method !== "POST") return reply(request, { error: "method not allowed" }, 405);
-  try {
-    await requireCandidateReadiness(env, await serviceConfig(env));
-  } catch {
-    console.error(JSON.stringify({ event: "m6_management_not_ready", reason_code: "runtime_not_ready" }));
-    return reply(request, { error: "M6 management requires verified runtime readiness for this Worker version" }, 409);
-  }
   const bindings = { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1" as const, cachedAssets };
   if (pathname === "/admin/target") return handleM6TargetInspection(request, env, bindings);
   if (pathname === "/admin/shows") return handleM6ShowRegistrationAdmin(request, env, bindings);
@@ -82,19 +78,19 @@ async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAs
   return handleM6LifecycleAdmin(request, env, bindings);
 }
 
-export async function fetchM6Candidate(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
+export async function fetchM6Candidate(request: Request, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, bootstrapRuntime?: BootstrapRuntime): Promise<Response> {
   return fetchM6Routes(request, env, cachedAssets, false, bootstrapRuntime);
 }
 
-export async function fetchM6ManagementIntegration(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
-  cachedAssets: M6CachedLoopback, options: { digest?: StageStreamDigest } = {}): Promise<Response> {
+export async function fetchM6ManagementIntegration(request: Request, env: M6CandidateEnv,
+  cachedAssets: M6CachedLoopback, options: { digest?: StageStreamDigest; setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   return fetchM6Routes(request, env, cachedAssets, true, undefined, options);
 }
 
-async function fetchM6Routes(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
+async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, managementIntegration: boolean, bootstrapRuntime?: BootstrapRuntime,
-  options: { digest?: StageStreamDigest } = {}): Promise<Response> {
+  options: { digest?: StageStreamDigest; setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const asset = parsePublicAssetPath(pathname);
   if (asset) {
@@ -115,6 +111,10 @@ async function fetchM6Routes(request: Request<unknown, IncomingRequestCfProperti
   }
   if (!pathname.startsWith("/admin/")) return reply(request, { error: "not found" }, 404);
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply(request, { error: "unauthorized" }, 401);
+  if (managementIntegration && options.setupRuntime) {
+    const setup = await handleM6SetupAdmin(request, env, options.setupRuntime);
+    if (setup) return setup;
+  }
   if (bootstrapRuntime) {
     const migration = await handleMigrationAdmin(request, env, bootstrapRuntime);
     if (migration) return migration;

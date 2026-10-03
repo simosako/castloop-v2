@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-03: 新規M6の認証付き初期化と起動時runtime検証を接続
+
+- 配備検査をsharedへ移し、CLIのCloudflare REST応答をsecret/author/未管理設定なしのsnapshotへ絞る。Workerも同じ検査を使用し、account API tokenはCLIに留める。
+- 試験専用`m6-setup-worker.ts`へprepare/status/probe/completeを接続した。実default loopback・外部HTTP・cache owner/purge・main Queue往復のCAS receiptを照合してから既存初期化CASでpausedへ進める。HTTPのready申告は許可せず、正常な管理mutationやpublication consumerの成功を模擬した証拠は作らない。
+- 一つのoperation IDと小さい永久記録を利用し、Queue重複をreadonlyにする。未知応答・有限回の観測待ちでは再送/owner解放/通常ゲート解除を行わない。管理共通境界でversion/readinessをtoken取得前に検査する。
+- 全863テスト/13156 assertions、TypeScript/M6実証tsconfig、試験Worker browser bundle、Linux binary buildが合格。ここまでCloudflare資源の変更はない。正常コンテンツ公開/cache HIT/GET-HEAD-Range/300MBの実機受け入れとは区別する。
+- 次は試験CLI/単一binaryへ新規初期化と明示再開を接続し、専用Cloudflare環境でShow/Episode公開を確認する。通常更新、unknown outcome復旧、M6全体の受け入れは後続。詳細は`m6_fresh_initialization.md`。
+
 ## 2026-10-02: 三種類の移行journalもbounded/no-follow読取・owned lock返却へ
 
 - 既存flat layoutを維持したままbridge deploy/migration setup/candidate deployの親directory検査、private一段create/fsync、dangling lock保持とmissing record再生成拒否、他所有lock非削除を接続した。record読取はstat+readFileからbounded/no-follow/regular-file/前後stat検査へ変更した。

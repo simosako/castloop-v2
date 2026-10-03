@@ -40,6 +40,13 @@ export type { CachedDeliveryRuntime } from "./delivery-runtime";
 export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVersionSnapshotSchema, workerSubdomainSnapshotSchema,
   workerScriptUploadReceiptSchema, m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
 export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
+export { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, collectM6DeploymentSnapshot,
+  m6DeploymentSnapshotSchema, m6SnapshotReads, M6_WORKER_COMPATIBILITY_DATE, M6_FRESH_WORKER_COMPATIBILITY_DATE,
+  requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
+export type { M6DeploymentReads, M6DeploymentSnapshot, M6WorkerUploadMetadata } from "./m6-worker-deployment";
+export { m6SetupRequestSchema, m6SetupRecordSchema, m6SetupQueueProbeSchema, m6SetupProbeSchema, m6SetupStatusSchema,
+  m6SetupCompleteSchema, m6SetupCompletedSchema } from "./m6-setup";
+export type { M6SetupRequest, M6SetupRecord, M6SetupProbe } from "./m6-setup";
 export { migrationCandidateUploadSchema } from "./worker-deployment";
 export type { MigrationCandidateUpload } from "./worker-deployment";
 export { migrationBridgeUploadSchema, migrationBridgePreparationSchema } from "./worker-deployment";
