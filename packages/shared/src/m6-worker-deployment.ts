@@ -146,7 +146,7 @@ function verifyExports(input: WorkerSettingsSnapshot["exports"]): void {
 function settingsEvidence(input: unknown, config: ServiceConfig, expectedCompatibilityDate: string): string {
   const settings = workerSettingsSnapshotSchema.parse(input);
   verifyBindings(settings.bindings, config);
-  verifyExports(settings.exports);
+  if (settings.exports !== undefined) verifyExports(settings.exports);
   if (settings.cache_options?.enabled !== true || settings.cache_options.cross_version_cache !== false) {
     throw new Error("M6 requires version-isolated Workers Caching");
   }
@@ -156,7 +156,8 @@ function settingsEvidence(input: unknown, config: ServiceConfig, expectedCompati
   if (settings.observability?.enabled !== true || settings.observability.logs?.enabled !== true || settings.observability.traces?.enabled !== true) {
     throw new Error("M6 requires Worker logs and traces enabled");
   }
-  return JSON.stringify({ date, flags: [...flags].sort(), exports: { default: false, CachedPublicAssets: true },
+  return JSON.stringify({ date, flags: [...flags].sort(), exports_present: settings.exports !== undefined,
+    exports: { default: false, CachedPublicAssets: true },
     cache_options: { enabled: true, cross_version_cache: false },
     bindings: settings.bindings.filter((binding) => MANAGED_BINDINGS.has(binding.name)).map((binding) => ({ name: binding.name,
       type: binding.type, ...(binding.name === "CASTLOOP_BUCKET" ? { bucket_name: binding.bucket_name } : {}),

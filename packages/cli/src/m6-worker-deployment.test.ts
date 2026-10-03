@@ -86,6 +86,14 @@ describe("read-only M6 deployment and runtime inspection", () => {
     for (const privateValue of ["private-admin-secret", "private@example.com", "Private deployment note", "unrelated"]) {
       expect(JSON.stringify(snapshot)).not.toContain(privateValue);
     }
+    const { exports: _exports, ...settingsWithoutExports } = setup.settings;
+    const observed = { ...setup.reads, settings: async () => settingsWithoutExports };
+    expect(await inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, observed)).toEqual(value);
+    const withoutExports = await collectM6DeploymentSnapshot(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, observed, M6_WORKER_COMPATIBILITY_DATE);
+    expect(withoutExports.settings[0].exports).toBeUndefined();
+    expect(await inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, m6SnapshotReads(withoutExports))).toEqual(value);
+    setup.version.resources.script_runtime.exports.default.cache.enabled = true;
+    await expect(inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, observed)).rejects.toThrow("uncached default");
   });
 
   test("partial rollout, wrong version and missing deployment are rejected before runtime reads", async () => {

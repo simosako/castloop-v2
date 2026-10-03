@@ -29,15 +29,19 @@ async function requireService(env: LifecycleControlEnv, serviceId: string): Prom
   return snapshot;
 }
 
-export async function requireM6ServiceRuntime(env: LifecycleReadEnv, serviceId: string, workerVersionId: string | undefined):
-  Promise<ServiceAdmissionSnapshot & { readiness: M6ServiceReadiness }> {
-  const snapshot = await readServiceAdmission(env, serviceId);
+function verifiedM6Snapshot(snapshot: ServiceAdmissionSnapshot | null, workerVersionId: string | undefined):
+  ServiceAdmissionSnapshot & { readiness: M6ServiceReadiness } {
   const readiness = snapshot?.value.runtime_readiness ?? snapshot?.value.readiness;
   if (!snapshot || snapshot.value.mode !== "m6" || !["open", "paused"].includes(snapshot.value.state) || !readiness) {
     throw new Error("M6 requires completed service migration readiness or verified runtime readiness");
   }
   if (readiness.worker_version_id !== workerVersionId) throw new Error("Executing Worker version does not match verified M6 cutover");
   return { ...snapshot, readiness };
+}
+
+export async function requireM6ServiceRuntime(env: LifecycleReadEnv, serviceId: string, workerVersionId: string | undefined):
+  Promise<ServiceAdmissionSnapshot & { readiness: M6ServiceReadiness }> {
+  return verifiedM6Snapshot(await readServiceAdmission(env, serviceId), workerVersionId);
 }
 
 async function write(env: LifecycleControlEnv, snapshot: ServiceAdmissionSnapshot, input: ServiceAdmission): Promise<boolean> {
@@ -99,10 +103,11 @@ export async function withServiceInvocation<T>(env: LifecycleControlEnv, service
   finally { await releaseServiceInvocation(env, invocation); }
 }
 
-export async function pauseServiceAdmission(env: LifecycleControlEnv, serviceId: string, pauseId: string): Promise<void> {
+export async function pauseServiceAdmission(env: LifecycleControlEnv, serviceId: string, pauseId: string, workerVersionId?: string): Promise<void> {
   serviceAdmissionSchema.shape.pause_id.unwrap().parse(pauseId);
   for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
     const snapshot = await requireService(env, serviceId);
+    if (workerVersionId !== undefined) verifiedM6Snapshot(snapshot, workerVersionId);
     if (snapshot.value.state !== "open") {
       if (snapshot.value.pause_id === pauseId) return;
       throw new Error("Service admission is paused by another operation");
@@ -113,12 +118,14 @@ export async function pauseServiceAdmission(env: LifecycleControlEnv, serviceId:
   throw new Error("Service pause conflicted; retry the same pause ID");
 }
 
-export async function resumeServiceAdmission(env: LifecycleControlEnv, serviceId: string, pauseId: string): Promise<void> {
+export async function resumeServiceAdmission(env: LifecycleControlEnv, serviceId: string, pauseId: string, workerVersionId?: string): Promise<void> {
   serviceAdmissionSchema.shape.pause_id.unwrap().parse(pauseId);
   for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
     const snapshot = await requireService(env, serviceId);
+    if (workerVersionId !== undefined) verifiedM6Snapshot(snapshot, workerVersionId);
     if (snapshot.value.state === "open" && snapshot.value.last_resumed_pause_id === pauseId) return;
     if (snapshot.value.state !== "paused" || snapshot.value.pause_id !== pauseId) throw new Error("Only the current pause owner can resume admission");
+    if (workerVersionId !== undefined && snapshot.value.invocations.length) throw new Error("Do not resume while M6 service invocations remain");
     const { pause_id: _pause, ...withoutPause } = snapshot.value;
     if (await write(env, snapshot, { ...withoutPause, state: "open", last_resumed_pause_id: pauseId })) return;
   }

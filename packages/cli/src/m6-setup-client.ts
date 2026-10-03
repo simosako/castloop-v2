@@ -1,5 +1,5 @@
 import { inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE, m6ServiceConfigHash, m6SetupCompletedSchema,
-  m6SetupProbeSchema, m6SetupRequestSchema, m6SetupStatusSchema, m6SnapshotReads } from "@castloop/shared";
+  m6SetupHealthSchema, m6SetupProbeSchema, m6SetupRequestSchema, m6SetupStatusSchema, m6SnapshotReads } from "@castloop/shared";
 import type { M6RuntimeReadiness, M6RuntimeTarget, M6SetupRequest, ServiceConfig } from "@castloop/shared";
 import type { CloudflareApi } from "./cloudflare-api";
 import { M6AdminJsonClient } from "./m6-admin-json";
@@ -36,6 +36,18 @@ export class M6SetupClient {
       return snapshot;
     };
     const before = await inspect();
+    let reachable = false;
+    for (let read = 0; read < wait.maximumReads; read += 1) {
+      try {
+        const health = m6SetupHealthSchema.parse(await this.admin.getRuntimeHealth());
+        if (health.worker_version_id !== request.target.worker_version_id) throw new Error("Another runtime version is reachable");
+        reachable = true;
+        break;
+      } catch {
+        if (read + 1 < wait.maximumReads) await wait.delay();
+      }
+    }
+    if (!reachable) throw new Error("Expected setup Worker is not reachable; no preparation was sent");
     let status = m6SetupStatusSchema.parse(await this.admin.post("setup/prepare", request));
     requireSameRequest(status.record.request, request);
     for (let read = 0; !status.record.queue_receipt && read < wait.maximumReads; read += 1) {

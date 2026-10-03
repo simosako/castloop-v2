@@ -21,6 +21,7 @@ export const m6SetupCompleteSchema = m6SetupRequestSchema.extend({
 }).strict();
 export const m6SetupCompletedSchema = z.object({ result: z.literal("initialized"), request: m6SetupRequestSchema,
   readiness: m6RuntimeReadinessSchema }).strict();
+export const m6SetupHealthSchema = z.object({ result: z.literal("candidate"), m6_ready: z.literal(false), worker_version_id: z.uuid() }).strict();
 export type M6SetupRequest = z.infer<typeof m6SetupRequestSchema>;
 export type M6SetupRecord = z.infer<typeof m6SetupRecordSchema>;
 export type M6SetupProbe = z.infer<typeof m6SetupProbeSchema>;

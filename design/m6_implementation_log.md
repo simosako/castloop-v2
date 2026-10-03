@@ -1,5 +1,15 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 試験用standaloneから新規M6初期化・コンテンツ公開を実機検証
+
+- 通常buildを維持し、明示`--m6-test`で別binary/Worker entryを作る。専用資源prefix制限、既存durable登録/draft/upload/publication runner、初期pausedからの明示service再開、非書込target照会を接続した。
+- 実RESTで確認したsettings.exports省略は、100% deployment前後照合とimmutable versionの明示exportsで裏付ける。R2 PUT decimal-string size receiptを厳密に受理し、全量GET checksumを維持する。abortedをstaged成功表示しない。
+- 認証付きservice pause/resumeのversion・drain条件をservice CAS snapshotへ置き、競合後も検査する。statusは初期化/更新未完了の観測も可能だが、昇格/再送/owner返却を行わない。既存helperのversion指定なしの呼出契約は維持する。
+- `castloop-m6-test-9c80a9b8`でstandalone初期化/実Queue往復/明示再開/Show・Episode公開、GUID/revision/checksum、feed/cover/GET/HEAD/Rangeと再検証headerが合格。feed本文の出現だけを完了とせず、active/owner解放/token通常返却まで待ち、明示pausedで保持した。ローカル修正後のacknowledged checkpoint続行を含み、300MB/cache HIT/六lifecycle/正式releaseとは区別する。
+- 最初の`castloop-m6-test-a3b60278`はdeploy_requestedを保持したまま資源を残す。unknown PUTの再送/GETからの採用/削除をしない。既存v0.1.1環境や有料planは変更しない。詳細・対象ID・保存記録は`m6_fresh_initialization.md`。
+- 全868テスト/13207 assertions、TypeScript/M6実証tsconfig、通常/試験Linux binary build、既存四family local HTTPS status回帰と試験binaryのproduction資源拒否が合格した。
+- 次は別branchでcompatible updateの実HTTP/runtime/standalone接続と更新前後の媒体/revision/GUID/URL保持を検証する。今回の配備には更新受付APIが未接続なので、未知の直接deployでそれを追加せず、更新対応entryを新規専用資源に配備してから更新を通す。旧形式変換は必要時だけとする。
+
 ## 2026-10-03: 新規M6の認証付き初期化と起動時runtime検証を接続
 
 - 配備検査をsharedへ移し、CLIのCloudflare REST応答をsecret/author/未管理設定なしのsnapshotへ絞る。Workerも同じ検査を使用し、account API tokenはCLIに留める。

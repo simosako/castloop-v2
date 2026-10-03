@@ -3,7 +3,7 @@ import type { ServiceConfig } from "@castloop/shared";
 
 export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
 const RESPONSE_BUDGET = 65536;
-const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection",
+const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection", service: "Service administration",
   "setup/prepare": "Setup preparation", "setup/status": "Setup status", "setup/complete": "Setup completion" };
 
 async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
@@ -64,6 +64,10 @@ export class M6AdminJsonClient {
     const url = new URL("/admin/setup/probe", this.config.public_base_url);
     url.searchParams.set("operation_id", operationId);
     return this.send(url, "Setup probe");
+  }
+
+  async getRuntimeHealth(): Promise<unknown> {
+    return this.send(new URL("/admin/health", this.config.public_base_url), "Runtime health");
   }
 
   private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {

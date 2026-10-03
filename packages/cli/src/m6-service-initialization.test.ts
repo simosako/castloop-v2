@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createFreshM6InitializationJournal, resumeFreshM6Initialization, runFreshM6Initialization } from "./m6-service-initialization";
+import { createFreshM6InitializationJournal, readLocalFreshM6Initialization, resumeFreshM6Initialization, runFreshM6Initialization } from "./m6-service-initialization";
 import { completeM6ServiceInitialization, prepareM6ServiceInitialization } from "../../../src/m6-service-initialization";
 import { readServiceAdmission } from "../../../src/service-admission";
 import { m6InitializationFixture } from "../../../src/test-support/m6-initialization";
@@ -14,6 +14,8 @@ test("fresh initialization journal drives only acknowledged steps, retains no se
   const root = mkdtempSync("/tmp/opencode/castloop-fresh-init-");
   const calls: string[] = [];
   try {
+    expect(readLocalFreshM6Initialization(root, setup.config)).toEqual({ state: null, lockPresent: false });
+    expect(existsSync(join(root, ".castloop"))).toBe(false);
     const journal = await createFreshM6InitializationJournal(root, setup.config, setup.target.operation_id, source, metadata);
     const effects = {
       createResources: async () => { calls.push("resources"); expect(journal.load().phase).toBe("resources_requested"); },
@@ -28,6 +30,8 @@ test("fresh initialization journal drives only acknowledged steps, retains no se
     await runFreshM6Initialization(journal, effects, source, metadata);
     expect(calls).toEqual(["resources", "deploy", "initialize"]);
     expect(journal.load().phase).toBe("initialized");
+    expect(readLocalFreshM6Initialization(root, setup.config)).toEqual({ state: journal.load(), lockPresent: false });
+    expect(() => readLocalFreshM6Initialization(root, { ...setup.config, worker_name: "another-worker" })).toThrow("another service configuration");
     expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("paused");
     const text = readFileSync(join(root, ".castloop", "service-initializations", `${setup.config.service_id}.json`), "utf8");
     expect(text).not.toContain(metadata.secret);
@@ -92,7 +96,8 @@ test("fresh initialization keeps its lock throughout live IO and resumes only an
     const running = runFreshM6Initialization(journal, effects, source, metadata);
     await ready;
     try {
-      expect(existsSync(join(root, ".castloop", "service-initializations", `${setup.config.service_id}.json.lock`))).toBe(true);
+       expect(existsSync(join(root, ".castloop", "service-initializations", `${setup.config.service_id}.json.lock`))).toBe(true);
+       expect(readLocalFreshM6Initialization(root, setup.config)).toEqual({ state: journal.load(), lockPresent: true });
       await expect(other.exclusively(async () => {})).rejects.toThrow();
     } finally { settled(); await running; }
     const secondRoot = mkdtempSync("/tmp/opencode/castloop-fresh-init-resume-");

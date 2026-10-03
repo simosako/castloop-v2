@@ -28,7 +28,11 @@ async function readReceipt(response: Response, length: number): Promise<void> {
     }
     const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks)));
     if (!value || typeof value !== "object" || !("success" in value) || value.success !== true || !("result" in value) ||
-      !value.result || typeof value.result !== "object" || !("size" in value.result) || value.result.size !== length) {
+      !value.result || typeof value.result !== "object" || !("size" in value.result)) {
+      throw new Error("Staging PUT receipt size/success was not verified");
+    }
+    const received = typeof value.result.size === "string" && /^\d+$/.test(value.result.size) ? Number(value.result.size) : value.result.size;
+    if (typeof received !== "number" || !Number.isSafeInteger(received) || received !== length) {
       throw new Error("Staging PUT receipt size/success was not verified");
     }
   } finally { await reader.cancel(); reader.releaseLock(); }

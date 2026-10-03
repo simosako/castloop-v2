@@ -1,6 +1,6 @@
 import { m6RuntimeReadinessSchema, m6ServiceConfigHash, m6WorkerDeploymentEvidenceSchema, parseServiceConfig } from "../packages/shared/src/index";
 import type { M6RuntimeReadiness, M6RuntimeTarget, ServiceConfig } from "../packages/shared/src/index";
-import type { LifecycleControlEnv } from "./lifecycle-control";
+import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 
 export type M6RuntimeEnv = LifecycleControlEnv & { CASTLOOP_VERSION_METADATA: Pick<WorkerVersionMetadata, "id"> };
 export type M6RuntimeChecks = {
@@ -14,13 +14,18 @@ export function matchesM6RuntimeTarget(value: M6RuntimeTarget | undefined, targe
     value.worker_version_id === target.worker_version_id && value.service_config_sha256 === target.service_config_sha256;
 }
 
-export async function readM6RuntimeConfiguration(env: M6RuntimeEnv, configHash: string, versionId: string): Promise<M6RuntimeConfiguration> {
-  if (versionId !== env.CASTLOOP_VERSION_METADATA.id) throw new Error("Runtime verification targets another executing Worker version");
+export async function readM6ServiceConfiguration(env: LifecycleReadEnv): Promise<M6RuntimeConfiguration> {
   const object = await env.CASTLOOP_BUCKET.get("system/service.toml");
   if (!object || object.size < 1 || object.size > 16384) throw new Error("M6 service configuration is missing or oversized");
   const config = parseServiceConfig(await object.text());
-  if (await m6ServiceConfigHash(config) !== configHash) throw new Error("M6 service configuration differs from its frozen target");
   return { config, etag: object.etag };
+}
+
+export async function readM6RuntimeConfiguration(env: M6RuntimeEnv, configHash: string, versionId: string): Promise<M6RuntimeConfiguration> {
+  if (versionId !== env.CASTLOOP_VERSION_METADATA.id) throw new Error("Runtime verification targets another executing Worker version");
+  const { config, etag } = await readM6ServiceConfiguration(env);
+  if (await m6ServiceConfigHash(config) !== configHash) throw new Error("M6 service configuration differs from its frozen target");
+  return { config, etag };
 }
 
 export async function verifyM6RuntimeReadiness(env: M6RuntimeEnv, target: M6RuntimeTarget,

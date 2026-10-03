@@ -34,7 +34,7 @@ async function fixture(kind: "show" | "audio" | "episode_metadata" = "audio") {
     if (request.method === "PUT") {
       const bytes = new Uint8Array(await request.arrayBuffer());
       await setup.bucket.put(key, bytes);
-      return Response.json({ success: true, result: { size: bytes.length } });
+      return Response.json({ success: true, result: { size: kind === "show" ? String(bytes.length) : bytes.length } });
     }
     const object = await setup.bucket.get(key);
     return new Response(object!.bytes);
@@ -241,7 +241,7 @@ test("REST credentials cannot target another account and session must match dura
   await setup.sources.dispose();
 });
 
-for (const failure of ["early", "lost", "http", "oversized", "receipt", "hash", "range"] as const) {
+for (const failure of ["early", "lost", "http", "oversized", "receipt", "receipt_exponent", "hash", "range"] as const) {
   test(`REST ${failure} failure never retries PUT or returns arbitrary API diagnostics`, async () => {
     const setup = await fixture();
     const calls: string[] = [];
@@ -253,7 +253,8 @@ for (const failure of ["early", "lost", "http", "oversized", "receipt", "hash", 
         if (failure === "lost") throw new Error("private-token arbitrary server exception");
         if (failure === "http") return new Response("private-token", { status: 403 });
         if (failure === "oversized") return new Response("x".repeat(65537));
-        return Response.json({ success: true, result: { size: failure === "receipt" ? 1 : setup.upload.payloads[0]!.length_bytes } });
+        const length = setup.upload.payloads[0]!.length_bytes;
+        return Response.json({ success: true, result: { size: failure === "receipt" ? 1 : failure === "receipt_exponent" ? `${length}e0` : length } });
       }
       return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(setup.upload.payloads[0]!.length_bytes)); if (failure !== "range") controller.close(); }, cancel() { cancelled = true; } }),
         failure === "range" ? { status: 206, headers: { "content-range": "bytes 0-1/2" } } : undefined);

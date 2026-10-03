@@ -45,8 +45,10 @@ export { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6Wo
   requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 export type { M6DeploymentReads, M6DeploymentSnapshot, M6WorkerUploadMetadata } from "./m6-worker-deployment";
 export { m6SetupRequestSchema, m6SetupRecordSchema, m6SetupQueueProbeSchema, m6SetupProbeSchema, m6SetupStatusSchema,
-  m6SetupCompleteSchema, m6SetupCompletedSchema } from "./m6-setup";
+  m6SetupCompleteSchema, m6SetupCompletedSchema, m6SetupHealthSchema } from "./m6-setup";
 export type { M6SetupRequest, M6SetupRecord, M6SetupProbe } from "./m6-setup";
+export { m6ServiceAdminRequestSchema, m6ServiceAdminResponseSchema } from "./m6-service-admin";
+export type { M6ServiceAdminRequest, M6ServiceAdminResponse } from "./m6-service-admin";
 export { migrationCandidateUploadSchema } from "./worker-deployment";
 export type { MigrationCandidateUpload } from "./worker-deployment";
 export { migrationBridgeUploadSchema, migrationBridgePreparationSchema } from "./worker-deployment";

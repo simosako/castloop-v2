@@ -21,7 +21,7 @@ test("setup client brackets authenticated HTTP/Queue checks with sanitized REST 
     await consumeM6SetupProbe(setup.batch(setup.sent[0]), setup.env);
   } });
   expect(readiness.worker_version_id).toBe(setup.versionId);
-  expect(calls).toEqual(["rest", "POST /admin/setup/prepare", "POST /admin/setup/status", "GET /admin/setup/probe", "GET /admin/setup/probe", "rest", "POST /admin/setup/complete"]);
+  expect(calls).toEqual(["rest", "GET /admin/health", "POST /admin/setup/prepare", "POST /admin/setup/status", "GET /admin/setup/probe", "GET /admin/setup/probe", "rest", "POST /admin/setup/complete"]);
   expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("paused");
   expect(setup.sent).toHaveLength(1);
 });
@@ -45,6 +45,24 @@ test("pending Queue observations and unknown HTTP outcomes never resend prepare 
     const admission = (await readServiceAdmission(setup.env, setup.config.service_id))!.value;
     expect(admission.state).toBe(failure === "complete" ? "paused" : "initializing");
     expect(admission.invocations).toHaveLength(0);
+  }
+});
+
+test("setup waits only for read-only health and never prepares against an unreachable or foreign runtime", async () => {
+  for (const failure of ["unreachable", "version"] as const) {
+    const setup = await m6SetupFixture();
+    const calls: string[] = [];
+    let delays = 0;
+    const client = new M6SetupClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => setup.snapshot }, async (url) => {
+      calls.push(url.pathname);
+      return failure === "unreachable" ? new Response(null, { status: 503 }) : Response.json({ result: "candidate", m6_ready: false,
+        worker_version_id: crypto.randomUUID() }, { headers: { "Cache-Control": "no-store" } });
+    });
+    await expect(client.initialize(setup.request.target, { maximumReads: 2, delay: async () => { delays++; } })).rejects.toThrow("no preparation was sent");
+    expect(calls).toEqual(["/admin/health", "/admin/health"]);
+    expect(delays).toBe(1);
+    expect(setup.sent).toEqual([]);
+    expect(await readServiceAdmission(setup.env, setup.config.service_id)).toBeNull();
   }
 });
 

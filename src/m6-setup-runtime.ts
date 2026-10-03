@@ -49,7 +49,7 @@ export async function verifyM6SetupRuntime(env: M6InitializationEnv & { CASTLOOP
   }
   if (probes[0]!.invocation_id === probes[1]!.invocation_id) throw new Error("Default entrypoint returned a repeated runtime probe invocation");
   for (const [route, reason] of [["staging", "staging_input_invalid"], ["publication", "publication_input_invalid"],
-    ["lifecycle", "lifecycle_input_invalid"], ["shows", "show_registration_input_invalid"], ["target", "target_input_invalid"]]) {
+    ["lifecycle", "lifecycle_input_invalid"], ["shows", "show_registration_input_invalid"], ["target", "target_input_invalid"], ["service", "service_input_invalid"]]) {
     const result = await readM6SetupReply(await runtime.defaultFetch(new Request(`https://castloop.internal/admin/${route}`, {
       method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "{}",
     })), 400);

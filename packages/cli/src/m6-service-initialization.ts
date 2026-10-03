@@ -2,7 +2,10 @@ import { z } from "zod";
 import { m6RuntimeReadinessSchema, m6RuntimeTargetSchema, m6ServiceConfigHash, serviceConfigSchema } from "@castloop/shared";
 import type { M6RuntimeReadiness, M6RuntimeTarget, ServiceConfig } from "@castloop/shared";
 import { createLocalJournalStorage } from "./local-journal-storage";
+import { readBoundedLocalJournal } from "./local-journal-read";
+import { ensureLocalJournalParents, localJournalEntryExists } from "./local-journal-path";
 import { workerPayloadHash as digest } from "./worker-upload-hash";
+import { join } from "node:path";
 
 const checksum = z.string().regex(/^[a-f0-9]{64}$/);
 const requestSchema = z.object({ config: serviceConfigSchema, operation_id: z.uuid(), service_config_sha256: checksum,
@@ -31,6 +34,15 @@ function validateState(input: unknown): FreshM6InitializationState {
       state.runtime_readiness.service_config_sha256 !== state.target.service_config_sha256 || state.runtime_readiness.deployment_id !== state.target.deployment_id ||
       state.runtime_readiness.worker_version_id !== state.target.worker_version_id)) throw new Error("Fresh M6 journal has inconsistent frozen target or receipts");
   return state;
+}
+
+export function readLocalFreshM6Initialization(root: string, input: ServiceConfig): { state: FreshM6InitializationState | null; lockPresent: boolean } {
+  const config = serviceConfigSchema.parse(input);
+  ensureLocalJournalParents(root, "service-initializations", undefined);
+  const file = join(root, ".castloop", "service-initializations", `${config.service_id}.json`);
+  const state = localJournalEntryExists(file) ? validateState(readBoundedLocalJournal(file)) : null;
+  if (state && JSON.stringify(state.request.config) !== JSON.stringify(config)) throw new Error("Local initialization has another service configuration");
+  return { state, lockPresent: localJournalEntryExists(`${file}.lock`) };
 }
 
 export async function createFreshM6InitializationJournal(root: string, input: ServiceConfig, operationId: string,

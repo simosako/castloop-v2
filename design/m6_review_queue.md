@@ -1,6 +1,6 @@
 # M6: 承認済み方針と残る技術ゲート
 
-更新日: 2026-10-03
+更新日: 2026-10-04
 
 管理者の指示に従い、判断待ちでも独立した開発は進める。確認待ちと明示的に承認されたpolicyを区別する。公開停止・再開・削除コマンドは未提供。現行REST単一PUTの維持と未解決懸念U1の非ブロッカー扱いは決定済みで、再承認を求めない。
 
@@ -48,7 +48,7 @@
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 
-新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを内部実装した。認証付き初期化HTTP入口と実HTTP/loopback/Queue起動検証adapterも試験専用entryへ接続した。配備検査はCLI/Worker共通とし、account tokenをWorkerへ渡さない。完了はpausedであり、公開CLI/単一binary接続・実コンテンツ公開・Cloudflare受け入れは残る。[新規初期化](./m6_fresh_initialization.md)参照。
+新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを実装した。認証付きHTTP/loopback/Queue起動検証と試験専用standaloneを接続し、別名Cloudflare環境で初期paused→明示再開→Show/Episode公開→GET/HEAD/Rangeを確認した。通常の公開CLI/entryは切り替えず、通常更新・全lifecycle/cache/300MB/unknown IO復旧の受け入れは残る。既存資源の削除/採用はしていない。[新規初期化](./m6_fresh_initialization.md)参照。
 
 保存形式を変えないM6更新の内部経路も追加した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通runtime検証は初期化と共有し、未知token/PUTを時間で終了扱いにしない。公開CLI/実機gateは残る。[通常更新](./m6_compatible_updates.md)参照。
 
