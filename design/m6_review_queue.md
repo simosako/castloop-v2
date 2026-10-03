@@ -46,6 +46,8 @@
 
 ## 管理者の判断待ちではない技術残件
 
+2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](./m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
+
 1. **upload/publication統合**: staging操作IDとdraft job IDの分離、単一PUT前の受付/一度限りの開始、明示的client終了確認、検証token、size/全量checksum/metadata/cover照合、完了/取消receiptとowner解放の基礎処理を追加した。凍結publication manifest・共通CAS受付・staging証拠/current ETag/base revision照合後のcommit準備も追加した。Show/Episode publication runner/実行token付きconsumer/内部purge effect、stream媒体保存と2種改訂の再開まで独立moduleで追加済み。管理API/既存CLIのREST PUTへの接続、状態喪失後の回復手順、本番publication routingを完成する。未知の検証tokenは時間で奪わない。
     staging/publication/lifecycleの3内部管理handlerを未公開の`fetchM6ManagementIntegration`へ接続した。認証/readiness/version照合後のrouteを結合testで検証し、通常candidateはmock readinessがあってもmanagement書込を拒否する。公開入口・CLI書込commandと実機受け入れは未完了である。`m6_management_api.md`参照。
     staging内部client/非書込status/privateなdurable upload journalも接続した。一度限りbegin/PUTと明示settlement/検証を記録し、未知応答/保存失敗/残存lockでは再送/終了認定しない。固定checksumのprivate一時snapshot・最新source照合・単一REST PUT/全量GET検証を内部runnerへ追加した。公開CLI、unknown outcomeの外部復旧、実Cloudflare REST/300MB受け入れは残る。`m6_staging_client.md`と`m6_staging_rest.md`参照。
