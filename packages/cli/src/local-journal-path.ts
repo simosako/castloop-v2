@@ -1,7 +1,7 @@
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-type JournalFamily = "staging-uploads" | "publication-jobs" | "lifecycle-jobs" | "show-registrations" | "drafts" |
+export type JournalFamily = "staging-uploads" | "publication-jobs" | "lifecycle-jobs" | "show-registrations" | "drafts" |
   "bridge-deployments" | "migration-setups" | "migrations";
 
 export function localJournalEntryExists(path: string): boolean {

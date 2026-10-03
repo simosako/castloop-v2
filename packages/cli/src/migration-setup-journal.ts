@@ -2,9 +2,9 @@ import { migrationSetupClientStateSchema, migrationSetupRequestSchema, serviceCo
 import type { MigrationSetupClientState, MigrationSetupRequest, ServiceConfig } from "@castloop/shared";
 import { migrationPayloadHash } from "./migration-deployment";
 import { readBoundedLocalJournal } from "./local-journal-read";
-import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
-import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
+import { createLocalJournalStorage } from "./local-journal-storage";
+import { join } from "node:path";
 
 export type MigrationSetupJournal = { load: () => MigrationSetupClientState; save: (state: MigrationSetupClientState) => void;
   exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
@@ -34,28 +34,18 @@ export function readLocalMigrationSetup(root: string, input: ServiceConfig): Mig
 
 export function createMigrationSetupJournal(root: string, input: MigrationSetupRequest): MigrationSetupJournal {
   const request = migrationSetupRequestSchema.parse(input);
-  const file = join(root, ".castloop", "migration-setups", `${request.bridge.service_id}.json`);
-  ensureLocalJournalParents(root, "migration-setups", undefined, true);
-  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
+  const storage = createLocalJournalStorage(root, "migration-setups", undefined, `${request.bridge.service_id}.json`);
   const load = (): MigrationSetupClientState => {
-    ensureLocalJournalParents(root, "migration-setups", undefined);
-    const state = readSetupRecord(file);
+    const state = validateMigrationSetupState(storage.read());
     if (JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("This service already has a different frozen migration setup request");
     return state;
   };
-  if (!existsSync(file)) {
-    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained migration setup lock without recreating its missing journal");
-    const fd = openSync(file, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify({ schema_version: 1, request, phase: "prepared" })); fsyncSync(fd); }
-    finally { closeSync(fd); }
-    syncDirectory();
-  }
+  storage.initialize({ schema_version: 1, request, phase: "prepared" });
   load();
-  let locked = false;
   return {
     load,
     save: (input) => {
-      if (!locked) throw new Error("Migration setup journal writes require its exclusive client lock");
+      storage.requireLock("Migration setup journal writes require its exclusive client lock");
       const state = validateMigrationSetupState(input);
       const previous = load();
       const phases = migrationSetupClientStateSchema.shape.phase.options;
@@ -78,19 +68,8 @@ export function createMigrationSetupJournal(root: string, input: MigrationSetupR
           throw new Error("Migration initialization cannot change or skip its frozen step");
         }
       }
-      const temp = `${file}.${crypto.randomUUID()}.tmp`;
-      const fd = openSync(temp, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify(state)); fsyncSync(fd); } finally { closeSync(fd); }
-      renameSync(temp, file);
-      syncDirectory();
+      storage.replace(state);
     },
-    exclusively: async (callback) => {
-      ensureLocalJournalParents(root, "migration-setups", undefined);
-      const lock = `${file}.lock`;
-      const fd = openSync(lock, "wx", 0o600);
-      locked = true;
-      try { fsyncSync(fd); syncDirectory(); return await callback(); }
-      finally { locked = false; releaseLocalJournalLock(root, "migration-setups", undefined, lock, fd); }
-    },
+    exclusively: storage.exclusively,
   };
 }

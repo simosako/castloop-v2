@@ -2,9 +2,9 @@ import { z } from "zod";
 import { serviceConfigSchema, showRegistrationRequestSchema, showRegistrationResponseSchema, validateId } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
-import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
-import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
+import { createLocalJournalStorage } from "./local-journal-storage";
+import { join } from "node:path";
 
 export const showRegistrationIdentitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
 const reserveSchema = showRegistrationRequestSchema.extend({ action: z.literal("reserve") });
@@ -55,28 +55,19 @@ export function readLocalShowRegistration(root: string, input: ServiceConfig, sh
 export function createShowRegistrationJournal(root: string, configInput: ServiceConfig, input: ShowRegistrationClientState["reserve"]): ShowRegistrationJournal {
   const config = serviceConfigSchema.parse(configInput);
   const prepared = validateShowRegistrationState({ schema_version: 1, identity: showRegistrationIdentity(config), reserve: input, phase: "prepared" });
-  const file = join(root, ".castloop", "show-registrations", config.service_id, `${prepared.reserve.show_id}.json`);
-  ensureLocalJournalParents(root, "show-registrations", config.service_id, true);
-  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
+  const storage = createLocalJournalStorage(root, "show-registrations", config.service_id, `${prepared.reserve.show_id}.json`);
   const load = (): ShowRegistrationClientState => {
-    ensureLocalJournalParents(root, "show-registrations", config.service_id);
-    const state = validateShowRegistrationState(readBoundedLocalJournal(file));
+    const state = validateShowRegistrationState(storage.read());
     if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || JSON.stringify(state.reserve) !== JSON.stringify(prepared.reserve)) {
       throw new Error("This Show already has a different frozen registration request");
     }
     return state;
   };
-  if (!existsSync(file)) {
-    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained Show registration lock without recreating its missing journal");
-    const fd = openSync(file, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(prepared)); fsyncSync(fd); } finally { closeSync(fd); }
-    syncDirectory();
-  }
+  storage.initialize(prepared);
   load();
-  let locked = false;
   return { load,
     save: (input) => {
-      if (!locked) throw new Error("Show registration journal writes require its exclusive client lock");
+      storage.requireLock("Show registration journal writes require its exclusive client lock");
       const next = validateShowRegistrationState(input);
       const previous = load();
       const phases = stateSchema.shape.phase.options;
@@ -86,19 +77,8 @@ export function createShowRegistrationJournal(root: string, configInput: Service
         previous.receipt && JSON.stringify(next.receipt) !== JSON.stringify(previous.receipt)) {
         throw new Error("Frozen Show registration cannot change, skip phases or replay an unknown request");
       }
-      const temp = `${file}.${crypto.randomUUID()}.tmp`;
-      const fd = openSync(temp, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
-      renameSync(temp, file);
-      syncDirectory();
+      storage.replace(next);
     },
-    exclusively: async (callback) => {
-      ensureLocalJournalParents(root, "show-registrations", config.service_id);
-      const lock = `${file}.lock`;
-      const fd = openSync(lock, "wx", 0o600);
-      locked = true;
-      try { fsyncSync(fd); syncDirectory(); return await callback(); }
-      finally { locked = false; releaseLocalJournalLock(root, "show-registrations", config.service_id, lock, fd); }
-    },
+    exclusively: storage.exclusively,
   };
 }

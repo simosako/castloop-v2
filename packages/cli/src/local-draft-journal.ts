@@ -2,12 +2,14 @@ import { z } from "zod";
 import { serviceConfigSchema, stageUploadRequestSchema } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
-import { releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
+import { ensureLocalJournalParents, localJournalEntryExists as present, syncLocalJournalDirectory as syncDirectory } from "./local-journal-path";
+import { createLocalJournalRecord, createLocalJournalStorage } from "./local-journal-storage";
+import type { LocalJournalStorage } from "./local-journal-storage";
 import { readLocalPublicationJob } from "./publication-journal";
 import { showRegistrationIdentity, showRegistrationIdentitySchema } from "./show-registration-journal";
 import { readLocalStagingOperation } from "./staging-journal";
-import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { lstatSync, mkdirSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 const targetSchema = z.object({ kind: stageUploadRequestSchema.shape.kind, show_id: stageUploadRequestSchema.shape.show_id,
   episode_id: stageUploadRequestSchema.shape.episode_id }).strict().superRefine((value, context) => {
@@ -45,32 +47,6 @@ export function validateLocalDraftState(input: unknown): LocalDraftState {
   return state;
 }
 
-function present(path: string): boolean {
-  try { lstatSync(path); return true; } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-    throw error;
-  }
-}
-
-function directories(root: string, config: ServiceConfig): string[] {
-  return [root, join(root, ".castloop"), join(root, ".castloop", "drafts"), join(root, ".castloop", "drafts", config.service_id)];
-}
-
-function checkDirectories(root: string, config: ServiceConfig, create: boolean): void {
-  for (const directory of directories(root, config)) {
-    if (!present(directory)) {
-      if (!create) return;
-      mkdirSync(directory, { mode: 0o700 });
-      syncDirectory(dirname(directory));
-    }
-    if (!lstatSync(directory).isDirectory()) throw new Error("Local draft parents must be real directories, not symlinks");
-  }
-}
-
-function syncDirectory(directory: string): void {
-  syncLocalJournalDirectory(directory);
-}
-
 function draftFile(root: string, config: ServiceConfig, target: LocalDraftTarget): string {
   return join(root, ".castloop", "drafts", config.service_id,
     target.kind === "show" ? `show-${target.show_id}.json` : `episode-${target.show_id}--${target.episode_id}.json`);
@@ -80,7 +56,7 @@ export function readLocalDraft(root: string, configInput: ServiceConfig, targetI
   { client_state: LocalDraftState | null; lock_present: boolean; remote_state_checked: false } {
   const config = serviceConfigSchema.parse(configInput);
   const target = targetSchema.parse(targetInput);
-  checkDirectories(root, config, false);
+  ensureLocalJournalParents(root, "drafts", config.service_id);
   const file = draftFile(root, config, target);
   const state = present(file) ? validateLocalDraftState(readBoundedLocalJournal(file)) : null;
   if (state && (JSON.stringify(state.identity) !== JSON.stringify(showRegistrationIdentity(config)) ||
@@ -90,11 +66,17 @@ export function readLocalDraft(root: string, configInput: ServiceConfig, targetI
 
 export function createLocalDraftJournal(root: string, configInput: ServiceConfig, target: LocalDraftTarget,
   draftJobId: string, baseRevisionId?: string): LocalDraftJournal {
+  return openLocalDraftJournal(root, configInput, target, draftJobId, baseRevisionId).journal;
+}
+
+function openLocalDraftJournal(root: string, configInput: ServiceConfig, target: LocalDraftTarget,
+  draftJobId: string, baseRevisionId?: string): { journal: LocalDraftJournal; storage: LocalJournalStorage } {
   const config = serviceConfigSchema.parse(configInput);
   const initial = validateLocalDraftState({ schema_version: 1, identity: showRegistrationIdentity(config), target,
     draft_job_id: draftJobId, ...(baseRevisionId !== undefined ? { base_revision_id: baseRevisionId } : {}), phase: "editable", uploads: [] });
-  checkDirectories(root, config, true);
+  ensureLocalJournalParents(root, "drafts", config.service_id, true);
   const file = draftFile(root, config, initial.target);
+  const storage = createLocalJournalStorage(root, "drafts", config.service_id, basename(file));
   if (present(`${file}.lock`)) throw new Error("Preserve the retained local draft lock; it cannot be stolen");
   if (!present(file)) {
     const history = join(dirname(file), "history");
@@ -103,10 +85,8 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
     if (present(join(history, `${initial.draft_job_id}.json`)) || publication.client_state || publication.lock_present) {
       throw new Error("A retained draft or publication identity cannot initialize a missing target head");
     }
-    const fd = openSync(file, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(initial)); fsyncSync(fd); } finally { closeSync(fd); }
-    syncDirectory(dirname(file));
   }
+  storage.initialize(initial);
   const load = (): LocalDraftState => {
     const state = readLocalDraft(root, config, initial.target).client_state;
     if (!state || state.draft_job_id !== initial.draft_job_id || state.base_revision_id !== initial.base_revision_id) {
@@ -115,16 +95,11 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
     return state;
   };
   load();
-  let locked = false;
   const save = (state: LocalDraftState) => {
-    if (!locked) throw new Error("Local draft writes require the exclusive target lock");
+    storage.requireLock("Local draft writes require the exclusive target lock");
     load();
     const next = validateLocalDraftState(state);
-    const temp = `${file}.${crypto.randomUUID()}.tmp`;
-    const fd = openSync(temp, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
-    renameSync(temp, file);
-    syncDirectory(dirname(file));
+    storage.replace(next);
   };
   const staging = (id: string) => {
     const snapshot = readLocalStagingOperation(root, config, id);
@@ -150,7 +125,7 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
   };
   const editor: LocalDraftEditor = { load,
     attachUpload: (operationId) => {
-      if (!locked) throw new Error("Local draft writes require the exclusive target lock");
+      storage.requireLock("Local draft writes require the exclusive target lock");
       const state = load();
       if (state.phase !== "editable") throw new Error("Publication preparation freezes local draft edits");
       const next = staging(operationId);
@@ -164,7 +139,7 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
       save({ ...state, uploads: [...state.uploads.filter((upload) => upload.slot !== slot), { slot, operation_id: operationId }] });
     },
     preparePublication: () => {
-      if (!locked) throw new Error("Local draft writes require the exclusive target lock");
+      storage.requireLock("Local draft writes require the exclusive target lock");
       const state = load();
       const job = publication(state);
       if (state.phase === "publication_prepared" && job.phase === "prepared") return;
@@ -176,7 +151,7 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
       save({ ...state, phase: "publication_prepared", publication_sha256: job.manifest_sha256 });
     },
     acknowledgeCommit: () => {
-      if (!locked) throw new Error("Local draft writes require the exclusive target lock");
+      storage.requireLock("Local draft writes require the exclusive target lock");
       const state = load();
       const job = publication(state);
       if (job.phase !== "committed" || !state.publication_sha256 || state.phase === "editable") {
@@ -184,13 +159,10 @@ export function createLocalDraftJournal(root: string, configInput: ServiceConfig
       }
       if (state.phase !== "frozen") save({ ...state, phase: "frozen" });
     } };
-  return { load, exclusively: async (callback) => {
-    checkDirectories(root, config, false);
-    const fd = openSync(`${file}.lock`, "wx", 0o600);
-    locked = true;
-    try { fsyncSync(fd); syncDirectory(dirname(file)); load(); return await callback(editor); }
-    finally { locked = false; releaseLocalJournalLock(root, "drafts", config.service_id, `${file}.lock`, fd); }
-  } };
+  return { storage, journal: { load, exclusively: (callback) => storage.exclusively(async () => {
+    load();
+    return await callback(editor);
+  }) } };
 }
 
 export async function rotateLocalDraft(root: string, configInput: ServiceConfig, targetInput: LocalDraftTarget,
@@ -203,7 +175,7 @@ export async function rotateLocalDraft(root: string, configInput: ServiceConfig,
   const previous = snapshot.client_state;
   if (!previous || snapshot.lock_present) throw new Error("Next draft requires its retained predecessor without a client lock");
   if (previous.draft_job_id === nextJobId) return createLocalDraftJournal(root, config, target, nextJobId, baseRevisionId);
-  const journal = createLocalDraftJournal(root, config, target, previous.draft_job_id, previous.base_revision_id);
+  const { journal, storage } = openLocalDraftJournal(root, config, target, previous.draft_job_id, previous.base_revision_id);
   await journal.exclusively(async (editor) => {
     if (editor.load().phase !== "frozen") throw new Error("Only an acknowledged frozen draft can become a predecessor");
     editor.acknowledgeCommit();
@@ -221,16 +193,9 @@ export async function rotateLocalDraft(root: string, configInput: ServiceConfig,
         throw new Error("Preserve the different retained draft history record");
       }
     } else {
-      const fd = openSync(archive, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify(frozen)); fsyncSync(fd); } finally { closeSync(fd); }
-      syncDirectory(archiveDirectory);
+      createLocalJournalRecord(archive, frozen);
     }
-    const file = draftFile(root, config, target);
-    const temp = `${file}.${crypto.randomUUID()}.tmp`;
-    const fd = openSync(temp, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
-    renameSync(temp, file);
-    syncDirectory(dirname(file));
+    storage.replace(next);
   });
   return createLocalDraftJournal(root, config, target, nextJobId, baseRevisionId);
 }

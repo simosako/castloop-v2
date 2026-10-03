@@ -2,10 +2,7 @@ import { migrationBridgeClientStateSchema, migrationBridgeDeploymentEvidenceSche
   migrationBridgeUploadSchema } from "@castloop/shared";
 import type { MigrationBridgeClientState, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest } from "@castloop/shared";
 import { migrationPayloadHash } from "./migration-deployment";
-import { readBoundedLocalJournal } from "./local-journal-read";
-import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
-import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { createLocalJournalStorage } from "./local-journal-storage";
 
 export type MigrationBridgeJournal = {
   load: () => MigrationBridgeClientState;
@@ -20,26 +17,16 @@ export type MigrationBridgeEffects = {
 
 export function createMigrationBridgeJournal(root: string, input: MigrationBridgeDeploymentRequest): MigrationBridgeJournal {
   const request = migrationBridgeDeploymentRequestSchema.parse(input);
-  const file = join(root, ".castloop", "bridge-deployments", `${request.preparation.service_id}.json`);
-  ensureLocalJournalParents(root, "bridge-deployments", undefined, true);
-  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
+  const storage = createLocalJournalStorage(root, "bridge-deployments", undefined, `${request.preparation.service_id}.json`);
   const load = (): MigrationBridgeClientState => {
-    ensureLocalJournalParents(root, "bridge-deployments", undefined);
-    const state = migrationBridgeClientStateSchema.parse(readBoundedLocalJournal(file));
+    const state = migrationBridgeClientStateSchema.parse(storage.read());
     if (JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("This service already has a different frozen initial bridge request");
     return state;
   };
-  if (!existsSync(file)) {
-    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained bridge lock without recreating its missing journal");
-    const fd = openSync(file, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify({ schema_version: 1, request, phase: "prepared" })); fsyncSync(fd); }
-    finally { closeSync(fd); }
-    syncDirectory();
-  }
+  storage.initialize({ schema_version: 1, request, phase: "prepared" });
   load();
-  let locked = false;
   return { load, save: (input) => {
-    if (!locked) throw new Error("Initial bridge journal writes require its exclusive client lock");
+    storage.requireLock("Initial bridge journal writes require its exclusive client lock");
     const state = migrationBridgeClientStateSchema.parse(input);
     const previous = load();
     const phases = ["prepared", "uploading", "rest_settled", "verified"];
@@ -49,19 +36,8 @@ export function createMigrationBridgeJournal(root: string, input: MigrationBridg
       previous.deployment && JSON.stringify(state.deployment) !== JSON.stringify(previous.deployment)) {
       throw new Error("Frozen initial bridge request/version/progress cannot change or skip phases");
     }
-    const temp = `${file}.${crypto.randomUUID()}.tmp`;
-    const fd = openSync(temp, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(state)); fsyncSync(fd); } finally { closeSync(fd); }
-    renameSync(temp, file);
-    syncDirectory();
-  }, exclusively: async (callback) => {
-    ensureLocalJournalParents(root, "bridge-deployments", undefined);
-    const lock = `${file}.lock`;
-    const fd = openSync(lock, "wx", 0o600);
-    locked = true;
-    try { fsyncSync(fd); syncDirectory(); return await callback(); }
-    finally { locked = false; releaseLocalJournalLock(root, "bridge-deployments", undefined, lock, fd); }
-  } };
+    storage.replace(state);
+  }, exclusively: storage.exclusively };
 }
 
 async function verifyBridge(journal: MigrationBridgeJournal, effects: MigrationBridgeEffects): Promise<void> {

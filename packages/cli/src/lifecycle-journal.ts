@@ -2,10 +2,10 @@ import { z } from "zod";
 import { lifecycleAdminRequestSchema, lifecycleCommitSchema, serviceConfigSchema } from "@castloop/shared";
 import type { LifecycleAdminRequest, ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
-import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
-import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
+import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
+import { createLocalJournalStorage } from "./local-journal-storage";
 import { createHash } from "node:crypto";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 const claimSchema = lifecycleAdminRequestSchema.transform((value, context) => {
   if (value.action !== "claim") {
@@ -79,29 +79,20 @@ export function readLocalLifecycleJob(root: string, input: ServiceConfig, jobId:
 export function createLifecycleJournal(root: string, configInput: ServiceConfig, input: Extract<LifecycleAdminRequest, { action: "claim" }>): LifecycleJournal {
   const config = serviceConfigSchema.parse(configInput);
   const prepared = validateLifecycleClientState({ schema_version: 1, identity: identityFromConfig(config), claim: input, phase: "prepared" });
-  const file = join(root, ".castloop", "lifecycle-jobs", config.service_id, `${prepared.claim.request.job_id}.json`);
-  ensureLocalJournalParents(root, "lifecycle-jobs", config.service_id, true);
-  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
+  const storage = createLocalJournalStorage(root, "lifecycle-jobs", config.service_id, `${prepared.claim.request.job_id}.json`);
   const load = (): LifecycleClientState => {
-    ensureLocalJournalParents(root, "lifecycle-jobs", config.service_id);
-    const state = readRecord(file);
+    const state = validateLifecycleClientState(storage.read());
     if (!matchesConfig(state, config) || JSON.stringify(state.claim) !== JSON.stringify(prepared.claim)) {
       throw new Error("This job already has a different frozen lifecycle request");
     }
     return state;
   };
-  if (!existsSync(file)) {
-    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained lifecycle lock without recreating its missing journal");
-    const fd = openSync(file, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(prepared)); fsyncSync(fd); } finally { closeSync(fd); }
-    syncDirectory();
-  }
+  storage.initialize(prepared);
   load();
-  let locked = false;
   return {
     load,
     save: (input) => {
-      if (!locked) throw new Error("Lifecycle journal writes require its exclusive client lock");
+      storage.requireLock("Lifecycle journal writes require its exclusive client lock");
       const next = validateLifecycleClientState(input);
       const previous = load();
       const phases = stateSchema.shape.phase.options;
@@ -119,19 +110,8 @@ export function createLifecycleJournal(root: string, configInput: ServiceConfig,
         distance !== 0 && retryChanged) {
         throw new Error("Frozen lifecycle journal cannot change, skip phases or replay an unknown request");
       }
-      const temp = `${file}.${crypto.randomUUID()}.tmp`;
-      const fd = openSync(temp, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
-      renameSync(temp, file);
-      syncDirectory();
+      storage.replace(next);
     },
-    exclusively: async (callback) => {
-      ensureLocalJournalParents(root, "lifecycle-jobs", config.service_id);
-      const lock = `${file}.lock`;
-      const fd = openSync(lock, "wx", 0o600);
-      locked = true;
-      try { fsyncSync(fd); syncDirectory(); return await callback(); }
-      finally { locked = false; releaseLocalJournalLock(root, "lifecycle-jobs", config.service_id, lock, fd); }
-    },
+    exclusively: storage.exclusively,
   };
 }

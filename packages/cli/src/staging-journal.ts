@@ -3,9 +3,9 @@ import { serviceConfigSchema, stageUploadRequestSchema, stagingOperationSchema }
 import type { ServiceConfig, StageUploadRequest } from "@castloop/shared";
 import { stagingClientOperation, stagingClientTargets } from "./staging-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
-import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
-import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
+import { createLocalJournalStorage } from "./local-journal-storage";
+import { join } from "node:path";
 
 const identitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, upload: stageUploadRequestSchema,
@@ -65,29 +65,20 @@ export function readLocalStagingOperation(root: string, input: ServiceConfig, op
 export function createStagingJournal(root: string, configInput: ServiceConfig, input: StageUploadRequest): StagingJournal {
   const config = serviceConfigSchema.parse(configInput);
   const prepared = validateStagingClientState({ schema_version: 1, identity: identityFromConfig(config), upload: input, phase: "prepared" });
-  const file = join(root, ".castloop", "staging-uploads", config.service_id, `${prepared.upload.operation_id}.json`);
-  ensureLocalJournalParents(root, "staging-uploads", config.service_id, true);
-  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
+  const storage = createLocalJournalStorage(root, "staging-uploads", config.service_id, `${prepared.upload.operation_id}.json`);
   const load = (): StagingClientState => {
-    ensureLocalJournalParents(root, "staging-uploads", config.service_id);
-    const state = readRecord(file);
+    const state = validateStagingClientState(storage.read());
     if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || JSON.stringify(state.upload) !== JSON.stringify(prepared.upload)) {
       throw new Error("This operation already has a different frozen staging request");
     }
     return state;
   };
-  if (!existsSync(file)) {
-    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained staging lock without recreating its missing journal");
-    const fd = openSync(file, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(prepared)); fsyncSync(fd); } finally { closeSync(fd); }
-    syncDirectory();
-  }
+  storage.initialize(prepared);
   load();
-  let locked = false;
   return {
     load,
     save: (input) => {
-      if (!locked) throw new Error("Staging journal writes require its exclusive client lock");
+      storage.requireLock("Staging journal writes require its exclusive client lock");
       const next = validateStagingClientState(input);
       const previous = load();
       const phases = stateSchema.shape.phase.options;
@@ -100,19 +91,8 @@ export function createStagingJournal(root: string, configInput: ServiceConfig, i
           next.reason_code !== previous.reason_code) || previous.finish_receipt && next.finish_receipt !== previous.finish_receipt) {
         throw new Error("Frozen staging journal cannot change, skip phases or reopen PUT permission");
       }
-      const temp = `${file}.${crypto.randomUUID()}.tmp`;
-      const fd = openSync(temp, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
-      renameSync(temp, file);
-      syncDirectory();
+      storage.replace(next);
     },
-    exclusively: async (callback) => {
-      ensureLocalJournalParents(root, "staging-uploads", config.service_id);
-      const lock = `${file}.lock`;
-      const fd = openSync(lock, "wx", 0o600);
-      locked = true;
-      try { fsyncSync(fd); syncDirectory(); return await callback(); }
-      finally { locked = false; releaseLocalJournalLock(root, "staging-uploads", config.service_id, lock, fd); }
-    },
+    exclusively: storage.exclusively,
   };
 }

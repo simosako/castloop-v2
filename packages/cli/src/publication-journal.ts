@@ -3,10 +3,10 @@ import { publicationCommitKey, publicationOperationSchema, publicationRequestSch
 import type { PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { publicationClientOperation } from "./publication-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
-import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
+import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
+import { createLocalJournalStorage } from "./local-journal-storage";
 import { createHash } from "node:crypto";
-import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 const identitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, publication: publicationRequestSchema,
@@ -64,29 +64,20 @@ export function createPublicationJournal(root: string, configInput: ServiceConfi
   const publication = publicationRequestSchema.parse(input);
   const prepared = validatePublicationClientState({ schema_version: 1, identity: identityFromConfig(config), publication, phase: "prepared",
     manifest_sha256: createHash("sha256").update(JSON.stringify(publication)).digest("hex") });
-  const file = join(root, ".castloop", "publication-jobs", config.service_id, `${publication.request.job_id}.json`);
-  ensureLocalJournalParents(root, "publication-jobs", config.service_id, true);
-  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
+  const storage = createLocalJournalStorage(root, "publication-jobs", config.service_id, `${publication.request.job_id}.json`);
   const load = (): PublicationClientState => {
-    ensureLocalJournalParents(root, "publication-jobs", config.service_id);
-    const state = readRecord(file);
+    const state = validatePublicationClientState(storage.read());
     if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || state.manifest_sha256 !== prepared.manifest_sha256) {
       throw new Error("This job already has a different frozen publication manifest");
     }
     return state;
   };
-  if (!existsSync(file)) {
-    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained publication lock without recreating its missing journal");
-    const fd = openSync(file, "wx", 0o600);
-    try { writeFileSync(fd, JSON.stringify(prepared)); fsyncSync(fd); } finally { closeSync(fd); }
-    syncDirectory();
-  }
+  storage.initialize(prepared);
   load();
-  let locked = false;
   return {
     load,
     save: (input) => {
-      if (!locked) throw new Error("Publication journal writes require its exclusive client lock");
+      storage.requireLock("Publication journal writes require its exclusive client lock");
       const next = validatePublicationClientState(input);
       const previous = load();
       const phases = stateSchema.shape.phase.options;
@@ -102,19 +93,8 @@ export function createPublicationJournal(root: string, configInput: ServiceConfi
         previous.commit_receipt && JSON.stringify(next.commit_receipt) !== JSON.stringify(previous.commit_receipt) || distance !== 0 && retryChanged) {
         throw new Error("Frozen publication journal cannot change, skip phases or replay an unknown request");
       }
-      const temp = `${file}.${crypto.randomUUID()}.tmp`;
-      const fd = openSync(temp, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
-      renameSync(temp, file);
-      syncDirectory();
+      storage.replace(next);
     },
-    exclusively: async (callback) => {
-      ensureLocalJournalParents(root, "publication-jobs", config.service_id);
-      const lock = `${file}.lock`;
-      const fd = openSync(lock, "wx", 0o600);
-      locked = true;
-      try { fsyncSync(fd); syncDirectory(); return await callback(); }
-      finally { locked = false; releaseLocalJournalLock(root, "publication-jobs", config.service_id, lock, fd); }
-    },
+    exclusively: storage.exclusively,
   };
 }

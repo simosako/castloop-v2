@@ -1,10 +1,7 @@
 import { migrationBootstrapRequestSchema, migrationDeploymentClientStateSchema, m6WorkerDeploymentEvidenceSchema } from "@castloop/shared";
 import type { M6WorkerDeploymentEvidence, MigrationBootstrapRequest, MigrationDeploymentClientState } from "@castloop/shared";
-import { readBoundedLocalJournal } from "./local-journal-read";
-import { ensureLocalJournalParents, localJournalEntryExists as existsSync, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
+import { createLocalJournalStorage } from "./local-journal-storage";
 import { createHash } from "node:crypto";
-import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 
 export type MigrationDeploymentJournal = {
   exclusively: <T>(callback: () => Promise<T>) => Promise<T>;
@@ -26,30 +23,18 @@ export function migrationPayloadHash(input: string | object): string {
 
 export function createMigrationDeploymentJournal(root: string, input: MigrationBootstrapRequest): MigrationDeploymentJournal {
   const request = migrationBootstrapRequestSchema.parse(input);
-  const file = join(root, ".castloop", "migrations", `${request.bootstrap_id}.json`);
-  ensureLocalJournalParents(root, "migrations", undefined, true);
-  const syncDirectory = () => syncLocalJournalDirectory(dirname(file));
+  const storage = createLocalJournalStorage(root, "migrations", undefined, `${request.bootstrap_id}.json`);
   const load = (): MigrationDeploymentClientState => {
-    ensureLocalJournalParents(root, "migrations", undefined);
-    const state = migrationDeploymentClientStateSchema.parse(readBoundedLocalJournal(file));
+    const state = migrationDeploymentClientStateSchema.parse(storage.read());
     if (JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("Local bootstrap ID already has a different frozen request");
     return state;
   };
-  if (!existsSync(file)) {
-    if (existsSync(`${file}.lock`)) throw new Error("Preserve the retained deployment lock without recreating its missing journal");
-    const fd = openSync(file, "wx", 0o600);
-    try {
-      writeFileSync(fd, JSON.stringify({ schema_version: 1, request, phase: "prepared" }));
-      fsyncSync(fd);
-    } finally { closeSync(fd); }
-    syncDirectory();
-  }
+  storage.initialize({ schema_version: 1, request, phase: "prepared" });
   load();
-  let locked = false;
   return {
     load,
     save: (input) => {
-      if (!locked) throw new Error("Local migration journal writes require its exclusive client lock");
+      storage.requireLock("Local migration journal writes require its exclusive client lock");
       const state = migrationDeploymentClientStateSchema.parse(input);
       const previous = load();
       const phases = ["prepared", "start_requested", "uploading", "rest_settled", "settled"];
@@ -58,20 +43,9 @@ export function createMigrationDeploymentJournal(root: string, input: MigrationB
         previous.deployment && JSON.stringify(state.deployment) !== JSON.stringify(previous.deployment)) {
         throw new Error("Frozen local request/version or deployment progress cannot regress");
       }
-      const temp = `${file}.${crypto.randomUUID()}.tmp`;
-      const fd = openSync(temp, "wx", 0o600);
-      try { writeFileSync(fd, JSON.stringify(state)); fsyncSync(fd); } finally { closeSync(fd); }
-      renameSync(temp, file);
-      syncDirectory();
+      storage.replace(state);
     },
-    exclusively: async (callback) => {
-      ensureLocalJournalParents(root, "migrations", undefined);
-      const lock = `${file}.lock`;
-      const fd = openSync(lock, "wx", 0o600);
-      locked = true;
-      try { fsyncSync(fd); syncDirectory(); return await callback(); }
-      finally { locked = false; releaseLocalJournalLock(root, "migrations", undefined, lock, fd); }
-    },
+    exclusively: storage.exclusively,
   };
 }
 
