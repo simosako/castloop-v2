@@ -29,4 +29,8 @@ export class M6UpdateClient {
     if (request.service_id !== this.admin.config.service_id) throw new Error("Compatible completion targets another service");
     return this.setup.verifyUpdate(request, target, wait);
   }
+  async observeCompleted(request: M6ServiceUpdateRequest, target: M6RuntimeTarget): Promise<M6RuntimeReadiness> {
+    if (request.service_id !== this.admin.config.service_id) throw new Error("Compatible reconciliation targets another service");
+    return this.setup.observeCompleted({ target, update_request: request });
+  }
 }

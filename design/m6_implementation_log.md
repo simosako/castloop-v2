@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 初期化・通常更新の完了応答喪失を共通の非書込証拠で照合
+
+- `M6SetupClient.observeCompleted`へ、REST前後検査・exact paused/pause owner/空registry/runtime readiness・永久request/Queue receipt・service前後非変更を集約した。初期化/更新のjournalは固有のrequested→completed遷移だけを持ち、再配備/Queue/purge/completeの再送や自動resumeはしない。
+- source bytesを再構築せず保存済み初期化journalを開くhelper、試験専用`init-reconcile`/`update-service-reconcile`を追加した。欠落receipt/未完了/別owner/途中変更/残存lockは解放せず、通常release gateも維持する。
+- 実handler/Queue/CASのlocal結合で両completion応答を失わせ、非書込照合後のlocal完了/paused維持を回帰した。Cloudflareでのfault受け入れ、実行中unknown IO/残存lockの外部終了確認、全lifecycle/cache/300MBは引き続き残る。詳細は`m6_completion_recovery.md`。
+- 全884テスト/13407 assertions、TypeScript/M6実証tsconfig、通常/試験Linux binary build、四family local HTTPS statusと新しい照合commandを含むproduction資源拒否が合格した。
+
 ## 2026-10-04: 通常更新を試験HTTP/standaloneと共通runtime検証へ接続
 
 - 更新固有のpaused→updating→paused CASとjournalを維持し、認証付きbeginと初期化共通のHTTP/loopback/Queue/cache検証へ接続した。試験binaryの`update-service`は明示pause/drainが必要で、自動resume/legacy変換/新規資源作成はしない。既存runtime-checkのoperation IDは受付前に拒否する。

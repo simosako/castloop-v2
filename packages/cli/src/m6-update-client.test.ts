@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { m6ServiceUpdateRequestSchema } from "@castloop/shared";
 import { M6UpdateClient } from "./m6-update-client";
-import { createM6UpdateJournal, runM6Update } from "./m6-service-update";
+import { createM6UpdateJournal, reconcileM6UpdateCompletion, runM6Update } from "./m6-service-update";
 import { workerPayloadHash } from "./worker-upload-hash";
 import { consumeM6SetupProbe } from "../../../src/m6-setup-queue";
 import { readServiceAdmission } from "../../../src/service-admission";
@@ -31,7 +31,7 @@ async function fixture() {
   const client = new M6UpdateClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => snapshot }, transport);
   const deployed = () => { setup.env.CASTLOOP_VERSION_METADATA.id = target.worker_version_id; };
   const wait = { maximumReads: 1, delay: async () => { await consumeM6SetupProbe(setup.batch(setup.sent.at(-1)), setup.env); } };
-  return { ...setup, source, metadata, update: request, target, client, paths, transport, deployed, wait };
+  return { ...setup, source, metadata, update: request, target, updatedSnapshot: snapshot, client, paths, transport, deployed, wait };
 }
 
 test("compatible update journal reaches authenticated CAS admission and reuses actual setup HTTP/Queue checks without changing payloads", async () => {
@@ -52,6 +52,29 @@ test("compatible update journal reaches authenticated CAS admission and reuses a
     expect(setup.paths.filter((path) => path === "/admin/update/begin")).toHaveLength(1);
     expect(setup.paths.filter((path) => path === "/admin/setup/prepare")).toHaveLength(1);
     expect(setup.sent).toHaveLength(2);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a lost update completion is reconciled from its permanent request/runtime receipt without replaying any writes", async () => {
+  const setup = await fixture();
+  const root = mkdtempSync("/tmp/opencode/castloop-update-http-reconcile-");
+  try {
+    const journal = await createM6UpdateJournal(root, setup.config, setup.update);
+    const client = new M6UpdateClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => setup.updatedSnapshot }, async (url, init) => {
+      const response = await setup.transport(url, init);
+      if (url.pathname.endsWith("/complete")) { await response.body?.cancel(); throw new Error("Completion response lost"); }
+      return response;
+    });
+    await expect(runM6Update(journal, { begin: (request) => client.begin(request), deploy: async () => { setup.deployed(); return setup.target; },
+      complete: (request, target) => client.complete(request, target, setup.wait) }, setup.source, setup.metadata)).rejects.toThrow("outcome is unknown");
+    expect(journal.load().phase).toBe("completion_requested");
+    const before = [...setup.writes];
+    const sent = setup.sent.length;
+    await reconcileM6UpdateCompletion(journal, (request, target) => setup.client.observeCompleted(request, target));
+    expect(journal.load().phase).toBe("completed");
+    expect(setup.writes).toEqual(before);
+    expect(setup.sent).toHaveLength(sent);
+    expect((await setup.client.admission()).state).toBe("paused");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

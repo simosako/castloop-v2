@@ -90,6 +90,7 @@ try {
   }
   if (m6TestBinary) {
     for (const args of [["service-status"], ["init", crypto.randomUUID()], ["update-service", crypto.randomUUID()], ["update-service-verify", crypto.randomUUID()],
+      ["init-reconcile", crypto.randomUUID()], ["update-service-reconcile", crypto.randomUUID()],
       ["delete-show", "daily"], ["create-show", "daily"], ["--help"]]) {
       const child = Bun.spawnSync([m6TestBinary, ...args], { cwd: root, env: { PATH: process.env.PATH ?? "" }, stdout: "pipe", stderr: "pipe" });
       requireCheck(child.exitCode === (args[0] === "--help" ? 0 : 1), "Test binary did not reject a production resource or unsupported command");

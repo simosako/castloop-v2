@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { m6ServiceAdminResponseSchema, m6SetupStatusSchema } from "@castloop/shared";
 import { M6SetupClient } from "./m6-setup-client";
 import { consumeM6SetupProbe } from "../../../src/m6-setup-queue";
 import { readServiceAdmission } from "../../../src/service-admission";
@@ -45,6 +46,41 @@ test("pending Queue observations and unknown HTTP outcomes never resend prepare 
     const admission = (await readServiceAdmission(setup.env, setup.config.service_id))!.value;
     expect(admission.state).toBe(failure === "complete" ? "paused" : "initializing");
     expect(admission.invocations).toHaveLength(0);
+    const writes = setup.writes.length;
+    const sent = setup.sent.length;
+    if (failure === "complete") expect(await client.observeCompleted(setup.request)).toEqual(admission.runtime_readiness!);
+    else await expect(client.observeCompleted(setup.request)).rejects.toThrow("already-completed paused");
+    expect(setup.writes).toHaveLength(writes);
+    expect(setup.sent).toHaveLength(sent);
+  }
+});
+
+test("completion reconciliation rejects missing/foreign receipts, another pause, live tokens and changing admission without writes", async () => {
+  for (const failure of ["receipt", "foreign", "pause", "live", "changing"] as const) {
+    const setup = await m6SetupFixture();
+    const original = new M6SetupClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => setup.snapshot },
+      (url, init) => setup.run(new Request(url, init)));
+    await original.initialize(setup.request.target, { maximumReads: 1, delay: async () => { await consumeM6SetupProbe(setup.batch(setup.sent[0]), setup.env); } });
+    let serviceReads = 0;
+    const client = new M6SetupClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => setup.snapshot }, async (url, init) => {
+      const response = await setup.run(new Request(url, init));
+      if (url.pathname.endsWith("/service")) {
+        const body = m6ServiceAdminResponseSchema.parse(await response.json());
+        serviceReads++;
+        if (failure === "pause") body.admission.pause_id = crypto.randomUUID();
+        if (failure === "live") body.admission.invocations.push({ token: crypto.randomUUID(), kind: "m6_consumer" });
+        if (failure === "changing" && serviceReads === 2) body.admission.generation++;
+        return Response.json(body, { headers: { "Cache-Control": "no-store" } });
+      }
+      const body = m6SetupStatusSchema.parse(await response.json());
+      if (failure === "receipt") delete body.record.queue_receipt;
+      else if (failure === "foreign") body.record.request.target.operation_id = crypto.randomUUID();
+      return Response.json(body, { headers: { "Cache-Control": "no-store" } });
+    });
+    const before = [...setup.writes];
+    await expect(client.observeCompleted(setup.request)).rejects.toThrow();
+    expect(setup.writes).toEqual(before);
+    expect(setup.sent).toHaveLength(1);
   }
 });
 

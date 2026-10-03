@@ -41,7 +41,7 @@ content/Show control/公開音源/revision/staging/job記録の非変更、live 
 
 認証付き`/admin/update/begin`と初期化共通のsetup検証、試験専用standaloneの`update-service OPERATION_UUID`を接続した。明示pause/drainが必要で、自動resumeやlegacy変換はしない。通常`deploy`や公開CLI/HTTP入口には未接続で、M6 ready=falseと公開書込gateを維持する。
 
-`update-service-verify OPERATION_UUID`は、保存済みのupload/deployment receiptが両方揃った`deploy_requested`だけをGET-only RESTで再検証し、その後に未実行のruntime completionへ進む。upload/deployment/subdomainは再送せず、旧version previewも既に無効であることを検査するだけで書き換えない。acknowledged `deployed`からのcompletion続行も可能である。応答喪失でreceiptが欠けた要求、completion応答喪失、残存lockは昇格せず、今回の続行経路の対象外である。
+`update-service-verify OPERATION_UUID`は、保存済みのupload/deployment receiptが両方揃った`deploy_requested`だけをGET-only RESTで再検証し、その後に未実行のruntime completionへ進む。upload/deployment/subdomainは再送せず、旧version previewも既に無効であることを検査するだけで書き換えない。acknowledged `deployed`からのcompletion続行も可能である。completion応答だけが失われた場合には、別の`update-service-reconcile`で初期化共通の永続完了証拠を非書込照合する。receiptが欠けた要求や残存lockは昇格しない。[完了応答喪失の照合](./m6_completion_recovery.md)参照。
 
 実機の最初の更新試験`castloop-m6-test-49c82745`では、Script PUT APIがinherit bindingの特定version UUIDを拒否した（HTTP 400/code 10057、`latest`のみ対応）。別名`castloop-m6-test-9fcbd823`でもVersion Upload APIが同じUUID指定を拒否した。公開API referenceのUUID対応記述だけを根拠にせず、上記の最新upload/直後の連番/履歴照合を伴うVersion Upload/Deployment APIへ修正した。両環境はserver `updating`/local `deploy_requested`と凍結要求を保持し、再送・GETからの採用・rollback・resume・削除はしていない。workspaceはそれぞれ`/tmp/opencode/<Worker名>`。拒否応答を受けたことだけで復旧済みとは扱わない。
 

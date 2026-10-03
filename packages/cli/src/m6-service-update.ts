@@ -123,6 +123,16 @@ export async function resumeM6UpdateCompletion(journal: M6UpdateJournal, effects
   await journal.exclusively(async () => { await complete(journal, effects); });
 }
 
+export async function reconcileM6UpdateCompletion(journal: M6UpdateJournal,
+  observe: (request: M6ServiceUpdateRequest, target: M6RuntimeTarget) => Promise<M6RuntimeReadiness>): Promise<void> {
+  await journal.exclusively(async () => {
+    const state = journal.load();
+    if (state.phase !== "completion_requested" || !state.target) throw new Error("Reconciliation requires its retained completion request and acknowledged target");
+    const readiness = await observe(state.request, state.target);
+    journal.save({ ...state, phase: "completed", runtime_readiness: readiness });
+  });
+}
+
 export async function resumeM6UpdateDeploymentVerification(journal: M6UpdateJournal, effects: M6UpdateEffects): Promise<void> {
   await journal.exclusively(async () => {
     const state = journal.load();

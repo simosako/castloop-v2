@@ -5,8 +5,9 @@ import { createFreshM6RestEffects } from "./m6-initialization-rest";
 import { createM6LocalEpisodeDraft, createM6LocalShowDraft } from "./m6-local-drafts";
 import { publishLocalM6Draft, updateLocalM6Draft } from "./m6-local-update";
 import { M6ServiceClient } from "./m6-service-client";
-import { createFreshM6InitializationJournal, runFreshM6Initialization } from "./m6-service-initialization";
-import { createM6UpdateJournal, readLocalM6Update, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
+import { createFreshM6InitializationJournal, openFreshM6InitializationJournal, reconcileFreshM6Initialization, runFreshM6Initialization } from "./m6-service-initialization";
+import { createM6UpdateJournal, readLocalM6Update, reconcileM6UpdateCompletion, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
+import { M6SetupClient } from "./m6-setup-client";
 import { M6UpdateClient } from "./m6-update-client";
 import { createM6UpdateRestEffects } from "./m6-update-rest";
 import { createShowRegistrationJournal } from "./show-registration-journal";
@@ -20,8 +21,10 @@ import { join, resolve } from "node:path";
 
 const HELP = `Unreleased isolated M6 test binary. Requires castloop.toml in the working directory.
 init OPERATION_UUID
+init-reconcile OPERATION_UUID (only an already-completed paused initialization)
 update-service OPERATION_UUID (requires explicit pause and settled owners)
 update-service-verify OPERATION_UUID (only durable acknowledged deployment; never re-upload)
+update-service-reconcile OPERATION_UUID (only an already-completed paused update)
 service-status | service-pause PAUSE_UUID | service-resume PAUSE_UUID
 target-show SHOW_ID | target-episode SHOW_ID EPISODE_ID
 create-show SHOW_ID SITE_URL | create-episode SHOW_ID EPISODE_ID
@@ -37,7 +40,8 @@ function argumentsFor(args: string[], count: number): void {
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   if (!command || command === "--help") { console.log(HELP); return; }
-  const counts: Record<string, number> = { init: 1, "update-service": 1, "update-service-verify": 1, "service-status": 0, "service-pause": 1, "service-resume": 1,
+  const counts: Record<string, number> = { init: 1, "init-reconcile": 1, "update-service": 1, "update-service-verify": 1,
+    "update-service-reconcile": 1, "service-status": 0, "service-pause": 1, "service-resume": 1,
     "target-show": 1, "target-episode": 2,
     "create-show": 2, "create-episode": 2, "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3 };
   if (!Object.hasOwn(counts, command)) throw new Error("Unknown test command; use --help");
@@ -73,17 +77,26 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ result: "initialized-paused", operation_id: args[0], runtime_readiness: journal.load().runtime_readiness }));
     return;
   }
-  if (command === "update-service" || command === "update-service-verify") {
+  if (command === "init-reconcile") {
+    const journal = await openFreshM6InitializationJournal(root, config);
+    if (journal.load().request.operation_id !== args[0]) throw new Error("Initialization reconciliation has another operation identity");
+    const client = new M6SetupClient(config, key, new CloudflareApi(config));
+    await reconcileFreshM6Initialization(journal, (_config, target) => client.observeCompleted({ target }));
+    console.log(JSON.stringify({ result: "initialized-paused", operation_id: args[0], runtime_readiness: journal.load().runtime_readiness }));
+    return;
+  }
+  if (["update-service", "update-service-verify", "update-service-reconcile"].includes(command)) {
     const operationId = m6ServiceUpdateRequestSchema.shape.operation_id.parse(args[0]);
     const api = new CloudflareApi(config);
     const client = new M6UpdateClient(config, key, api);
     const effects = createM6UpdateRestEffects(api, { begin: (input) => client.begin(input),
       admission: () => client.admission(), complete: (input, target) => client.complete(input, target) });
-    if (command === "update-service-verify") {
+    if (command !== "update-service") {
       const retained = readLocalM6Update(root, config, operationId);
       if (!retained.state || retained.lockPresent) throw new Error("Verification requires its retained journal without an unknown lock");
       const journal = await createM6UpdateJournal(root, config, retained.state.request);
-      if (retained.state.phase === "deploy_requested") await resumeM6UpdateDeploymentVerification(journal, effects);
+      if (command === "update-service-reconcile") await reconcileM6UpdateCompletion(journal, (request, target) => client.observeCompleted(request, target));
+      else if (retained.state.phase === "deploy_requested") await resumeM6UpdateDeploymentVerification(journal, effects);
       else await resumeM6UpdateCompletion(journal, effects);
       console.log(JSON.stringify({ result: "updated-paused", operation_id: operationId, runtime_readiness: journal.load().runtime_readiness }));
       return;
