@@ -29,8 +29,8 @@ export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, life
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
   showControlSchema, stringifyLifecycleToml } from "./lifecycle";
 export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
-export { serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
-export type { ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
+export { m6RuntimeTargetSchema, m6RuntimeReadinessSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
+export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
 export { frozenMigrationPlanSchema, migrationApplyProgressSchema, migrationRuntimeProofSchema } from "./migration-plan";
 export type { FrozenMigrationPlan, MigrationApplyProgress, MigrationRuntimeProof } from "./migration-plan";
 export { serviceCapabilitiesSchema } from "./service-capabilities";
@@ -176,6 +176,12 @@ function parseToml(source: string): unknown {
 
 export function parseServiceConfig(source: string): ServiceConfig {
   return serviceConfigSchema.parse(parseToml(source));
+}
+
+export async function m6ServiceConfigHash(config: ServiceConfig): Promise<string> {
+  const source = JSON.stringify(serviceConfigSchema.parse(config));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export function parseShowMetadata(source: string): ShowMetadata {

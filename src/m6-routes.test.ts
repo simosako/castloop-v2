@@ -192,7 +192,7 @@ describe("M6 candidate Queue routing and common service fence", () => {
     const key = `staging/shows/daily/${crypto.randomUUID()}/commit.json`;
     await expect(queueM6Candidate(batch(key, "unknown"), setup.env, setup.loopback)).rejects.toThrow("unknown Queue");
     setup.env.CASTLOOP_VERSION_METADATA.id = crypto.randomUUID();
-    await expect(queueM6Candidate(batch(key), setup.env, setup.loopback)).rejects.toThrow("readiness");
+    await expect(queueM6Candidate(batch(key), setup.env, setup.loopback)).rejects.toThrow("Worker version");
     expect(setup.entries).toEqual(before);
     expect(setup.events).toEqual([]);
   });

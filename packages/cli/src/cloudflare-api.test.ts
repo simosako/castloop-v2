@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { serviceConfigSchema, workerSettingsSnapshotSchema } from "@castloop/shared";
 import { CloudflareApi, normalizeHostname } from "./cloudflare-api";
-import { buildM6WorkerUploadMetadata } from "./m6-worker-deployment";
+import { buildM6WorkerUploadMetadata, M6_FRESH_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
+import { createFreshM6RestEffects } from "./m6-initialization-rest";
 
 const accountId = "a".repeat(32);
 const worker = "castloop-example";
@@ -195,5 +196,87 @@ test("legacy deploy refuses M6 cache exports or version metadata before any Work
       await expect(api.deployWorker(config, "export default {};", "private-secret", "2026-09-30")).rejects.toThrow("Legacy deploy cannot replace");
     });
     expect(calls).toBe(1);
+  }
+});
+
+test("fresh M6 REST provisioning creates isolated resources and verifies its frozen deployment without claiming runtime readiness", async () => {
+  const fresh = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
+  const metadata = buildM6WorkerUploadMetadata(fresh, null, "private-admin-key", M6_FRESH_WORKER_COMPATIBILITY_DATE);
+  const versionId = crypto.randomUUID();
+  const deploymentId = crypto.randomUUID();
+  const writes: string[] = [];
+  let claimed = false;
+  await withCloudflare(async (request) => {
+    const path = new URL(request.url).pathname;
+    expect(request.headers.get("Authorization")).toBe("Bearer test-token");
+    if (request.method !== "GET") writes.push(`${request.method} ${path}`);
+    if (request.method === "GET" && path.endsWith(`/r2/buckets/${fresh.bucket_name}`)) return new Response(null, { status: 404 });
+    if (request.method === "GET" && path.endsWith("/settings") && !claimed) return new Response(null, { status: 404 });
+    if (request.method === "POST" && path.endsWith("/r2/buckets")) {
+      expect(await request.json<unknown>()).toEqual({ name: fresh.bucket_name });
+      return reply({});
+    }
+    if (request.method === "POST" && path.endsWith("/queues")) return reply({});
+    if (request.method === "PUT" && path.endsWith("/objects/system/service.toml")) {
+      expect(request.headers.get("Content-Type")).toBe("application/toml");
+      const text = await request.text();
+      expect(text).toContain(`service_id = "${fresh.service_id}"`);
+      expect(text).not.toContain("private-admin-key");
+      return reply({});
+    }
+    if (request.method === "POST" && path.endsWith("/workers/workers")) {
+      expect(await request.json<unknown>()).toEqual({ name: worker });
+      claimed = true;
+      return reply({ id: crypto.randomUUID() });
+    }
+    if (request.method === "PUT" && path.endsWith(`/workers/scripts/${worker}`)) {
+      const form = await request.formData();
+      expect(JSON.parse(String(form.get("metadata")))).toEqual(metadata);
+      expect(await (form.get("index.js") as Blob).text()).toBe("export default {};");
+      return reply({});
+    }
+    if (path.endsWith("/deployments")) return reply({ deployments: [{ id: deploymentId, strategy: "percentage", versions: [{ version_id: versionId, percentage: 100 }] }] });
+    if (path.endsWith("/settings")) return reply(metadata);
+    if (path.endsWith(`/versions/${versionId}`)) return reply({ id: versionId, resources: { bindings: metadata.bindings,
+      script: { handlers: ["fetch", "queue"], named_handlers: [{ name: "CachedPublicAssets", handlers: ["fetch"] }] },
+      script_runtime: { compatibility_date: metadata.compatibility_date, compatibility_flags: metadata.compatibility_flags, exports: metadata.exports } } });
+    if (path.endsWith("/subdomain")) return reply({ enabled: true, previews_enabled: false });
+    if (path.endsWith("/queues")) return reply([{ queue_id: "main", queue_name: fresh.queue_name }, { queue_id: "dlq", queue_name: fresh.dlq_name }]);
+    if (path.endsWith("/consumers")) {
+      if (request.method === "GET") return reply([]);
+      const body = await request.json<{ settings: object; script_name: string }>();
+      expect(body.script_name).toBe(worker);
+      expect(body.settings).toMatchObject({ batch_size: 1, max_concurrency: 1 });
+      return reply({});
+    }
+    if (path.includes("/event_notifications/")) return reply({});
+    throw new Error(`Unexpected fresh initialization request: ${request.method} ${path}`);
+  }, async (api) => {
+    const effects = createFreshM6RestEffects(api, "private-admin-key", async () => { throw new Error("Runtime verification is separate"); });
+    await effects.createResources(fresh);
+    expect(await effects.deploy(fresh, "export default {};", metadata)).toEqual({ deployment_id: deploymentId, worker_version_id: versionId });
+  });
+  expect(writes.filter((value) => value.includes(`/workers/scripts/${worker}`) && value.startsWith("PUT"))).toHaveLength(1);
+  expect(writes.some((value) => value.startsWith("DELETE"))).toBe(false);
+});
+
+test("fresh M6 refuses existing or unknown resources and name collisions without adoption or replay", async () => {
+  const fresh = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
+  for (const scenario of ["bucket", "unknown", "worker", "collision", "metadata"]) {
+    const writes: string[] = [];
+    await withCloudflare((request) => {
+      const path = new URL(request.url).pathname;
+      if (request.method !== "GET") writes.push(request.method);
+      if (path.endsWith(`/r2/buckets/${fresh.bucket_name}`)) return new Response(null, { status: scenario === "bucket" ? 200 : scenario === "unknown" ? 403 : 404 });
+      if (path.endsWith("/settings")) return reply({ bindings: [] });
+      if (request.method === "POST" && path.endsWith("/workers/workers")) return Response.json({ success: false, result: null }, { status: 409 });
+      throw new Error("No further request is allowed");
+    }, async (api) => {
+      if (["bucket", "unknown", "worker"].includes(scenario)) await expect(api.createFreshM6Resources(fresh)).rejects.toThrow();
+      else await expect(api.uploadFreshM6Worker(fresh, "export default {};", "key",
+        scenario === "metadata" ? {} : buildM6WorkerUploadMetadata(fresh, null, "key", M6_FRESH_WORKER_COMPATIBILITY_DATE))).rejects.toThrow();
+      await expect(api.createFreshM6Resources({ ...fresh, account_id: "b".repeat(32) })).rejects.toThrow("this account");
+    });
+    expect(writes).toEqual(scenario === "collision" ? ["POST"] : []);
   }
 });

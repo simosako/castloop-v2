@@ -6,6 +6,7 @@ import { readLocalDraft } from "./local-draft-journal";
 import { createM6LocalEpisodeDraft, createM6LocalShowDraft } from "./m6-local-drafts";
 import { executeLocalM6Lifecycle, previewLocalM6Lifecycle } from "./m6-local-lifecycle";
 import { publishLocalM6Draft, updateLocalM6Draft } from "./m6-local-update";
+import { createFreshM6InitializationJournal, runFreshM6Initialization } from "./m6-service-initialization";
 import { PublicationAdminClient } from "./publication-client";
 import { createShowRegistrationJournal } from "./show-registration-journal";
 import { createShowRegistrationEffects, runShowRegistration } from "./show-registration-operation";
@@ -15,14 +16,16 @@ import { controlRequestHash, readEpisodeLifecycle, readShowControl } from "../..
 import type { LifecyclePurgeTarget } from "../../../src/lifecycle-cache";
 import { fetchM6Candidate, fetchM6ManagementIntegration, queueM6Candidate } from "../../../src/m6-routes";
 import type { M6CachedLoopback, M6CandidateEnv } from "../../../src/m6-routes";
+import { completeM6ServiceInitialization, prepareM6ServiceInitialization } from "../../../src/m6-service-initialization";
+import { readServiceAdmission, resumeServiceAdmission } from "../../../src/service-admission";
 import { parseQueueDelivery } from "../../../src/queue-delivery";
-import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
+import { m6InitializationFixture } from "../../../src/test-support/m6-initialization";
 import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-test("new Show registration and local drafts flow through staging, publication, revisions and all six lifecycle operations", async () => {
-  const setup = await stagingAdminFixture();
+test("fresh service initialization, Show registration and local drafts flow through staging, publication, revisions and all six lifecycle operations", async () => {
+  const setup = await m6InitializationFixture();
   const root = mkdtempSync("/tmp/opencode/castloop-m6-content-flow-");
   const queued: string[] = [];
   const purges: LifecyclePurgeTarget[] = [];
@@ -85,6 +88,25 @@ test("new Show registration and local drafts flow through staging, publication, 
     return invocations;
   };
   try {
+    const source = "simulated-m6-worker";
+    const metadata = { simulation: true };
+    const initialization = await createFreshM6InitializationJournal(root, setup.config, setup.target.operation_id, source, metadata);
+    await runFreshM6Initialization(initialization, {
+      createResources: async () => { expect([...setup.entries.keys()]).toEqual(["system/service.toml"]); },
+      deploy: async () => ({ deployment_id: setup.target.deployment_id, worker_version_id: setup.versionId }),
+      initialize: async (_config, target) => {
+        await prepareM6ServiceInitialization(setup.env, target);
+        return completeM6ServiceInitialization(setup.env, target, setup.checks);
+      },
+    }, source, metadata);
+    expect(initialization.load().phase).toBe("initialized");
+    expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("paused");
+    await resumeServiceAdmission(setup.env, setup.config.service_id, setup.target.operation_id);
+    expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.readiness).toBeUndefined();
+    const other = createShowRegistrationJournal(root, setup.config, { schema_version: 1, service_id: setup.config.service_id,
+      show_id: "daily", reservation_id: crypto.randomUUID(), action: "reserve" });
+    await runShowRegistration(other, createShowRegistrationEffects(setup.config, "private-secret", transport));
+    const otherShow = (await readShowControl(env, "daily"))!.value;
     const registration = createShowRegistrationJournal(root, setup.config, { schema_version: 1, service_id: setup.config.service_id,
       show_id: "fresh", reservation_id: crypto.randomUUID(), action: "reserve" });
     await runShowRegistration(registration, createShowRegistrationEffects(setup.config, "private-secret", transport));
@@ -179,6 +201,7 @@ test("new Show registration and local drafts flow through staging, publication, 
     await expect(updateLocalM6Draft(root, setup.config, showTarget, { asset: "show" }, "private-secret",
       { rest, client: stagingClient, inspector })).rejects.toThrow("blocks");
     expect(setup.writes).toEqual(before);
-    expect((await readShowControl(env, "daily"))!.value.lifecycle).toBe("active");
+    expect((await readShowControl(env, "daily"))!.value).toEqual(otherShow);
+    expect([...setup.entries.keys()].some((key) => key.startsWith("system/lifecycle-migrations/"))).toBe(false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

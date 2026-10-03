@@ -4,7 +4,7 @@ import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
-import { readServiceAdmission, withServiceInvocation } from "./service-admission";
+import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 
 export class M6ManagementServiceMismatch extends Error {
   constructor() { super("Management input targets another service"); }
@@ -30,10 +30,9 @@ export async function withM6ManagementRead<T>(env: LifecycleReadEnv, serviceId: 
   const configObject = await env.CASTLOOP_BUCKET.get("system/service.toml");
   if (!configObject || configObject.size < 1 || configObject.size > 16384) throw new Error("Invalid service configuration");
   if (parseServiceConfig(await configObject.text()).service_id !== serviceId) throw new M6ManagementServiceMismatch();
-  const snapshot = await readServiceAdmission(env, serviceId);
-  if (!snapshot || snapshot.value.mode !== "m6" || snapshot.value.state === "migrating" || !snapshot.value.readiness ||
-    bindings.gatewayProtocol !== "m6-uncached-gateway-v1") throw new Error("Management preview requires completed M6 runtime readiness");
-  const readiness = snapshot.value.readiness;
+  if (bindings.gatewayProtocol !== "m6-uncached-gateway-v1") throw new Error("Management preview requires the uncached gateway protocol");
+  const snapshot = await requireM6ServiceRuntime(env, serviceId, bindings.versionMetadata.id);
+  const readiness = snapshot.readiness;
   const checkRuntime = async () => {
     if (bindings.versionMetadata.id !== readiness.worker_version_id) throw new Error("Management preview has another executing Worker version");
     const cached = cachedDeliveryRuntimeSchema.parse(await bindings.cachedAssets.describeRuntime());

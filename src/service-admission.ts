@@ -1,5 +1,5 @@
 import { migrationApplyProgressSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "../packages/shared/src/index";
-import type { ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
+import type { M6ServiceReadiness, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 
 export const SERVICE_ADMISSION_KEY = "system/lifecycle-service.json";
@@ -29,6 +29,17 @@ async function requireService(env: LifecycleControlEnv, serviceId: string): Prom
   return snapshot;
 }
 
+export async function requireM6ServiceRuntime(env: LifecycleReadEnv, serviceId: string, workerVersionId: string | undefined):
+  Promise<ServiceAdmissionSnapshot & { readiness: M6ServiceReadiness }> {
+  const snapshot = await readServiceAdmission(env, serviceId);
+  const readiness = snapshot?.value.runtime_readiness ?? snapshot?.value.readiness;
+  if (!snapshot || snapshot.value.mode !== "m6" || !["open", "paused"].includes(snapshot.value.state) || !readiness) {
+    throw new Error("M6 requires completed service migration readiness or verified runtime readiness");
+  }
+  if (readiness.worker_version_id !== workerVersionId) throw new Error("Executing Worker version does not match verified M6 cutover");
+  return { ...snapshot, readiness };
+}
+
 async function write(env: LifecycleControlEnv, snapshot: ServiceAdmissionSnapshot, input: ServiceAdmission): Promise<boolean> {
   if (snapshot.value.generation === Number.MAX_SAFE_INTEGER) throw new Error("Service admission generation is exhausted");
   const value = serviceAdmissionSchema.parse({ ...input, generation: snapshot.value.generation + 1 });
@@ -53,7 +64,7 @@ export async function acquireServiceInvocation(env: LifecycleControlEnv, service
   for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
     const snapshot = await requireService(env, serviceId);
     const mode = kind.startsWith("legacy_") ? "legacy" : "m6";
-    if (snapshot.value.mode !== mode || snapshot.value.state === "migrating" ||
+    if (snapshot.value.mode !== mode || ["migrating", "initializing"].includes(snapshot.value.state) ||
       snapshot.value.state === "paused" && kind.endsWith("_admin")) throw new ServiceAdmissionBlocked();
     if (snapshot.value.invocations.length === 32) throw new Error("Service mutation registry is full; do not expire active invocations");
     if (await write(env, snapshot, { ...snapshot.value, invocations: [...snapshot.value.invocations, { token, kind }] })) {

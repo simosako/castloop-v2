@@ -1,8 +1,9 @@
-import { migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema,
+import { migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
   workerSubdomainSnapshotSchema } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
   M6WorkerDeploymentEvidence, ServiceConfig } from "@castloop/shared";
-import { buildMigrationCandidateUpload, inspectM6WorkerDeployment, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
+import { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
+  M6_WORKER_COMPATIBILITY_DATE, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
 import { migrationPayloadHash } from "./migration-deployment";
 import { inspectLegacyServiceDeployment, inspectMigrationBridgeDeployment, prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
 import type { MigrationBridgeReads } from "./migration-bridge-deployment";
@@ -93,6 +94,49 @@ export class CloudflareApi {
 
   async createQueue(name: string): Promise<void> {
     await this.json("POST", "/queues", { queue_name: name });
+  }
+
+  async createFreshM6Resources(input: ServiceConfig): Promise<void> {
+    const config = serviceConfigSchema.parse(input);
+    this.migrationWorkerPath(config);
+    const source = stringifyToml(config);
+    if (new TextEncoder().encode(source).length > 16384) throw new Error("Fresh M6 service configuration exceeds its runtime budget");
+    const path = `/r2/buckets/${encodeURIComponent(config.bucket_name)}`;
+    const bucket = await fetch(`${this.base}${path}`, { headers: { Authorization: `Bearer ${this.token}` },
+      signal: AbortSignal.timeout(30000), redirect: "error" });
+    if (bucket.body) await bucket.body.cancel();
+    if (bucket.status !== 404) throw new Error("Fresh M6 resources require a new bucket; existing or unknown resources are not adopted");
+    if (await this.existingWorker(config.worker_name)) throw new Error("Fresh M6 resources cannot adopt an existing Worker");
+    await this.createBucket(config.bucket_name);
+    await this.createQueue(config.queue_name);
+    await this.createQueue(config.dlq_name);
+    const response = await this.request("PUT", `/r2/buckets/${encodeURIComponent(config.bucket_name)}/objects/system/service.toml`, source, "application/toml");
+    const result: ApiResult<unknown> = await response.json();
+    if (!result.success) throw new Error("Fresh M6 service configuration upload did not succeed");
+  }
+
+  async uploadFreshM6Worker(input: ServiceConfig, source: string, adminKey: string, frozenMetadata: object): Promise<M6WorkerDeploymentEvidence> {
+    const config = serviceConfigSchema.parse(input);
+    const path = this.migrationWorkerPath(config);
+    const metadata = buildM6WorkerUploadMetadata(config, null, adminKey, M6_FRESH_WORKER_COMPATIBILITY_DATE);
+    if (!source || migrationPayloadHash(metadata) !== migrationPayloadHash(frozenMetadata)) {
+      throw new Error("Fresh M6 upload differs from its frozen runtime metadata");
+    }
+    await this.json("POST", "/workers/workers", { name: config.worker_name });
+    const form = new FormData();
+    form.set("metadata", JSON.stringify(frozenMetadata));
+    form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
+    await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
+    const deployment = workerDeploymentsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/deployments`)).deployments[0]!;
+    if (deployment.versions.length !== 1 || deployment.versions[0]!.percentage !== 100) throw new Error("Fresh M6 Worker is not serving one version at 100%");
+    const versionId = deployment.versions[0]!.version_id;
+    await this.disableMigrationWorkerPreviews(config, versionId);
+    await this.ensureConsumer(await this.queueId(config.queue_name), config, false);
+    await this.ensureConsumer(await this.queueId(config.dlq_name), config, true);
+    await this.createNotification(config, await this.queueId(config.queue_name));
+    const evidence = await this.inspectM6WorkerDeployment(config, versionId, M6_FRESH_WORKER_COMPATIBILITY_DATE);
+    if (evidence.deployment_id !== deployment.id) throw new Error("Fresh M6 deployment changed after upload");
+    return evidence;
   }
 
   private async page<T>(path: string, global = false): Promise<PaginatedResult<T>> {
@@ -187,6 +231,7 @@ export class CloudflareApi {
     const path = `/workers/scripts/${encodeURIComponent(name)}/settings`;
     const response = await fetch(`${this.base}${path}`, {
       headers: { Authorization: `Bearer ${this.token}` }, signal: AbortSignal.timeout(30000),
+      redirect: "error",
     });
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`Cloudflare GET ${path} failed: HTTP ${response.status}`);
@@ -234,7 +279,8 @@ export class CloudflareApi {
       { enabled: true, previews_enabled: false });
   }
 
-  async inspectM6WorkerDeployment(config: ServiceConfig, expectedVersionId: string): Promise<M6WorkerDeploymentEvidence> {
+  async inspectM6WorkerDeployment(config: ServiceConfig, expectedVersionId: string,
+    expectedCompatibilityDate = M6_WORKER_COMPATIBILITY_DATE): Promise<M6WorkerDeploymentEvidence> {
     if (config.account_id !== this.accountId) throw new Error("Worker inspection targets another Cloudflare account");
     const path = `/workers/scripts/${encodeURIComponent(config.worker_name)}`;
     return inspectM6WorkerDeployment(config, expectedVersionId, {
@@ -242,7 +288,7 @@ export class CloudflareApi {
       settings: () => this.json<unknown>("GET", `${path}/settings`),
       version: (versionId) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(versionId)}`),
       subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
-    });
+    }, expectedCompatibilityDate);
   }
 
   private migrationWorkerPath(input: ServiceConfig): string {

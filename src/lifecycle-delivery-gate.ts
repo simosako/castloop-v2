@@ -1,8 +1,8 @@
 import { cachedDeliveryRuntimeSchema, validateId } from "../packages/shared/src/index";
-import type { CachedDeliveryRuntime, ServiceAdmission } from "../packages/shared/src/index";
+import type { CachedDeliveryRuntime, M6ServiceReadiness } from "../packages/shared/src/index";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import type { LifecycleControlEnv } from "./lifecycle-control";
-import { readServiceAdmission } from "./service-admission";
+import { requireM6ServiceRuntime } from "./service-admission";
 import type { ServiceInvocation } from "./service-admission";
 
 export type M6DeliveryGateBindings = {
@@ -19,20 +19,14 @@ export function describeCachedDeliveryRuntime(versionMetadata: Pick<WorkerVersio
 }
 
 async function requireRuntimeAdmission(env: LifecycleControlEnv, invocation: ServiceInvocation,
-  bindings: M6DeliveryGateBindings): Promise<NonNullable<ServiceAdmission["readiness"]>> {
+  bindings: M6DeliveryGateBindings): Promise<M6ServiceReadiness> {
   if (!["m6_admin", "m6_consumer", "m6_recovery"].includes(invocation.kind)) throw new Error("M6 delivery requires a registered M6 invocation");
   if (bindings.gatewayProtocol !== "m6-uncached-gateway-v1") throw new Error("M6 delivery requires the uncached gateway protocol");
-  const snapshot = await readServiceAdmission(env, invocation.serviceId);
-  if (!snapshot || snapshot.value.mode !== "m6" || snapshot.value.state === "migrating" || !snapshot.value.readiness) {
-    throw new Error("M6 delivery requires completed service migration readiness");
-  }
+  const snapshot = await requireM6ServiceRuntime(env, invocation.serviceId, bindings.versionMetadata?.id);
   if (!snapshot.value.invocations.some((item) => item.token === invocation.token && item.kind === invocation.kind)) {
     throw new Error("M6 delivery invocation no longer owns its service token");
   }
-  if (snapshot.value.readiness.worker_version_id !== bindings.versionMetadata?.id) {
-    throw new Error("Executing Worker version does not match verified M6 cutover");
-  }
-  return snapshot.value.readiness;
+  return snapshot.readiness;
 }
 
 export function createM6DeliveryGate(env: LifecycleControlEnv, invocation: ServiceInvocation,

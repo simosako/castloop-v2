@@ -3,6 +3,7 @@ import { migrationBootstrapRequestSchema, migrationCandidateUploadSchema, m6Work
 import type { MigrationCandidateUpload, M6WorkerDeploymentEvidence, ServiceConfig, WorkerSettingsSnapshot } from "@castloop/shared";
 
 export const M6_WORKER_COMPATIBILITY_DATE = "2026-10-01";
+export const M6_FRESH_WORKER_COMPATIBILITY_DATE = "2026-10-03";
 const MANAGED_BINDINGS = new Set(["CASTLOOP_BUCKET", "CASTLOOP_QUEUE", "CASTLOOP_DLQ_NAME", "CASTLOOP_ADMIN_KEY", "CASTLOOP_VERSION_METADATA"]);
 
 export type M6WorkerUploadMetadata = {
@@ -15,7 +16,8 @@ export type M6WorkerUploadMetadata = {
   tags?: string[]; tail_consumers?: Array<Record<string, unknown>>; placement?: Record<string, unknown>; logpush?: boolean;
 };
 
-export function buildM6WorkerUploadMetadata(input: ServiceConfig, previousInput: unknown, adminKey: string): M6WorkerUploadMetadata {
+export function buildM6WorkerUploadMetadata(input: ServiceConfig, previousInput: unknown, adminKey: string,
+  compatibilityDate = M6_WORKER_COMPATIBILITY_DATE): M6WorkerUploadMetadata {
   const config = serviceConfigSchema.parse(input);
   const previous = previousInput === null ? null : workerSettingsSnapshotSchema.parse(previousInput);
   if (previous?.compatibility_flags?.includes("disable_ctx_exports")) throw new Error("M6 requires ctx.exports; inspect conflicting compatibility flags before migration");
@@ -24,7 +26,7 @@ export function buildM6WorkerUploadMetadata(input: ServiceConfig, previousInput:
   if (!existingAdmin && !adminKey) throw new Error("M6 Worker requires an administrator secret");
   const observability = previous?.observability;
   return {
-    main_module: "index.js", compatibility_date: M6_WORKER_COMPATIBILITY_DATE,
+    main_module: "index.js", compatibility_date: compatibilityDate,
     compatibility_flags: [...new Set([...(previous?.compatibility_flags ?? []), "enable_ctx_exports"])],
     cache_options: { enabled: true, cross_version_cache: false },
     exports: { default: { type: "worker", cache: { enabled: false } }, CachedPublicAssets: { type: "worker", cache: { enabled: true } } },
@@ -59,9 +61,9 @@ function latestDeployment(input: unknown, expectedVersionId: string) {
   return deployment;
 }
 
-function compatibilityDate(input: string): string {
+function compatibilityDate(input: string, expected: string): string {
   const date = /^\d{4}-\d{2}-\d{2}(?:T00:00:00Z)?$/.test(input) ? input.slice(0, 10) : "";
-  if (date !== M6_WORKER_COMPATIBILITY_DATE) throw new Error("M6 Worker compatibility date does not match this runtime build");
+  if (date !== expected) throw new Error("M6 Worker compatibility date does not match this runtime build");
   return date;
 }
 
@@ -88,14 +90,14 @@ function verifyExports(input: WorkerSettingsSnapshot["exports"]): void {
   }
 }
 
-function settingsEvidence(input: unknown, config: ServiceConfig): string {
+function settingsEvidence(input: unknown, config: ServiceConfig, expectedCompatibilityDate: string): string {
   const settings = workerSettingsSnapshotSchema.parse(input);
   verifyBindings(settings.bindings, config);
   verifyExports(settings.exports);
   if (settings.cache_options?.enabled !== true || settings.cache_options.cross_version_cache !== false) {
     throw new Error("M6 requires version-isolated Workers Caching");
   }
-  const date = compatibilityDate(settings.compatibility_date ?? "");
+  const date = compatibilityDate(settings.compatibility_date ?? "", expectedCompatibilityDate);
   const flags = settings.compatibility_flags ?? [];
   if (!flags.includes("enable_ctx_exports") || flags.includes("disable_ctx_exports")) throw new Error("M6 loopback compatibility flags do not match this runtime build");
   if (settings.observability?.enabled !== true || settings.observability.logs?.enabled !== true || settings.observability.traces?.enabled !== true) {
@@ -110,7 +112,8 @@ function settingsEvidence(input: unknown, config: ServiceConfig): string {
     observability: { enabled: true, logs: true, traces: true } });
 }
 
-export async function inspectM6WorkerDeployment(input: ServiceConfig, expectedVersionId: string, reads: M6DeploymentReads): Promise<M6WorkerDeploymentEvidence> {
+export async function inspectM6WorkerDeployment(input: ServiceConfig, expectedVersionId: string, reads: M6DeploymentReads,
+  expectedCompatibilityDate = M6_WORKER_COMPATIBILITY_DATE): Promise<M6WorkerDeploymentEvidence> {
   const config = serviceConfigSchema.parse(input);
   m6WorkerDeploymentEvidenceSchema.shape.worker_version_id.parse(expectedVersionId);
   const first = latestDeployment(await reads.deployments(), expectedVersionId);
@@ -119,7 +122,7 @@ export async function inspectM6WorkerDeployment(input: ServiceConfig, expectedVe
   verifyBindings(version.resources.bindings, config);
   verifyExports(version.resources.script_runtime.exports);
   const runtime = version.resources.script_runtime;
-  const date = compatibilityDate(runtime.compatibility_date);
+  const date = compatibilityDate(runtime.compatibility_date, expectedCompatibilityDate);
   if (!runtime.compatibility_flags.includes("enable_ctx_exports") || runtime.compatibility_flags.includes("disable_ctx_exports")) {
     throw new Error("M6 version does not enable the gateway loopback protocol");
   }
@@ -128,10 +131,10 @@ export async function inspectM6WorkerDeployment(input: ServiceConfig, expectedVe
     version.resources.script.named_handlers[0]?.name !== "CachedPublicAssets" || !version.resources.script.named_handlers[0].handlers.includes("fetch")) {
     throw new Error("M6 Worker does not export its gateway, consumer and named cache entrypoint");
   }
-  const settings = settingsEvidence(await reads.settings(), config);
+  const settings = settingsEvidence(await reads.settings(), config, expectedCompatibilityDate);
   const subdomain = workerSubdomainSnapshotSchema.parse(await reads.subdomain());
   if (!subdomain.enabled || subdomain.previews_enabled) throw new Error("M6 requires workers.dev enabled with old-version previews disabled");
-  const currentSettings = settingsEvidence(await reads.settings(), config);
+  const currentSettings = settingsEvidence(await reads.settings(), config, expectedCompatibilityDate);
   const currentSubdomain = workerSubdomainSnapshotSchema.parse(await reads.subdomain());
   const current = latestDeployment(await reads.deployments(), expectedVersionId);
   if (current.id !== first.id || JSON.stringify(current) !== JSON.stringify(first) || currentSettings !== settings ||
@@ -150,7 +153,7 @@ export function requireMigrationBridgeSettings(input: unknown, config: ServiceCo
     settings.cache_options?.enabled !== true || settings.cache_options.cross_version_cache === undefined) {
     throw new Error("Migration deploy requires explicit uncached bridge settings, not a legacy or M6 candidate Worker");
   }
-  compatibilityDate(settings.compatibility_date ?? "");
+  compatibilityDate(settings.compatibility_date ?? "", M6_WORKER_COMPATIBILITY_DATE);
   if (!settings.compatibility_flags?.includes("enable_ctx_exports") || settings.compatibility_flags.includes("disable_ctx_exports") ||
     settings.observability?.enabled !== true || settings.observability.logs?.enabled !== true || settings.observability.traces?.enabled !== true) {
     throw new Error("Migration bridge compatibility/telemetry does not match this build");
@@ -162,7 +165,7 @@ export function requireMigrationBridgeVersion(input: unknown, config: ServiceCon
   const version = workerVersionSnapshotSchema.parse(input);
   verifyBindings(version.resources.bindings, config);
   const runtime = version.resources.script_runtime;
-  compatibilityDate(runtime.compatibility_date);
+  compatibilityDate(runtime.compatibility_date, M6_WORKER_COMPATIBILITY_DATE);
   if (version.id !== expectedVersionId || Object.keys(runtime.exports).length !== 1 || runtime.exports.default?.cache.enabled !== false ||
     !runtime.compatibility_flags.includes("enable_ctx_exports") || runtime.compatibility_flags.includes("disable_ctx_exports") ||
     !version.resources.script.handlers.includes("fetch") || !version.resources.script.handlers.includes("queue") ||

@@ -13,7 +13,7 @@ import { parsePublicAssetPath } from "./public-assets";
 import { handleM6PublicationAdmin } from "./publication-admin";
 import { consumeOwnedPublication } from "./publication-consumer";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
-import { readServiceAdmission, withServiceInvocation } from "./service-admission";
+import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
 import { handleM6StagingAdmin } from "./staging-admin";
 import type { StageStreamDigest } from "./staging-verification";
@@ -50,11 +50,7 @@ async function serviceConfig(env: M6CandidateEnv): Promise<ServiceConfig> {
 }
 
 async function requireCandidateReadiness(env: M6CandidateEnv, config: ServiceConfig): Promise<void> {
-  const current = await readServiceAdmission(env, config.service_id);
-  if (current?.value.mode !== "m6" || current.value.state === "migrating" || !current.value.readiness ||
-    current.value.readiness.worker_version_id !== env.CASTLOOP_VERSION_METADATA?.id) {
-    throw new Error("M6 candidate requires verified migration readiness for this Worker version");
-  }
+  await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
 }
 
 async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Promise<string | undefined> {
@@ -75,8 +71,8 @@ async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAs
   try {
     await requireCandidateReadiness(env, await serviceConfig(env));
   } catch {
-    console.error(JSON.stringify({ event: "m6_management_not_ready", reason_code: "migration_not_completed" }));
-    return reply(request, { error: "M6 management requires a completed migration for this Worker version" }, 409);
+    console.error(JSON.stringify({ event: "m6_management_not_ready", reason_code: "runtime_not_ready" }));
+    return reply(request, { error: "M6 management requires verified runtime readiness for this Worker version" }, 409);
   }
   const bindings = { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1" as const, cachedAssets };
   if (pathname === "/admin/target") return handleM6TargetInspection(request, env, bindings);
