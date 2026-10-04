@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 承認済みMVP範囲で正式CLI/Workerへ接続
+
+- 既存runnerの呼出を`m6-commands.ts`へ共有し、正式CLIの旧state.json/直接PUT/公開処理を置き換えた。試験CLIは専用資源制限とfault injectionだけの薄いwrapperとし、状態機械・receipt検査は増やしていない。管理keyのprivate/fsync付き保存も一か所へ集約した。
+- 正式Worker entryを`src/worker.ts`へ接続し、試験entryはこれにnonce headerだけを加える。通常buildも同じruntime/admission/配信/consumerを使用し、初期化と通常更新はpaused完了・明示再開を維持する。正式入口にfault commandは含めない。
+- README/helpを現行CLIへ整理し、v0.1.2手順との混用、旧形式採用、未知IO/残存lockの強制復旧を禁止した。未確定Releaseは`0.2.0-dev`で区別し、草案を`docs/release-next.md`へ置く。新規fault harnessや網羅的matrixは追加しない。
+- 全893テスト/13526 assertions、TypeScript/M6試験tsconfig、正式/試験Linux buildが合格。追加は正式引数境界とlegacy workspace非変換の2テストだけ。正式バイナリの実機確認は専用の新規資源で進め、既存の300MB・六操作・通常更新の証拠は再利用する。
+
 ## 2026-10-04: 300MB公開・二種改訂・明示削除の実機合格
 
 - 新規専用`castloop-m6-test-7c97f1a0`でCLI全量SHA-256/ETag/version証拠とWorker HEAD照合、R2 SHA-256 stream PUT/native checksumを使い、正確な300MB公開・全量配信に合格した。300,000,001 bytesのlocal拒否、audio-only/metadata-only、GUID/date/history/旧音源保持、HEAD/suffix Range/304、実cache HIT、最後の明示Show delete/媒体404・公開410も合格した。

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, readdirSync, rmdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { COMMAND_HELP } from "./help";
@@ -39,4 +39,34 @@ test("unknown commands and missing ordinary option values still fail", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr.toString()).toContain(args.includes("unknown") ? "Unknown command" : "Invalid or missing value");
   }
+});
+
+test("formal commands reject test-only faults and malformed mutations without creating local state", () => {
+  const directory = mkdtempSync(join(tmpdir(), "castloop-entrypoint-"));
+  try {
+    for (const args of [["update-service-drop-completion", "id"], ["deploy", "--force", "true"],
+      ["lifecycle-execute", "plan.json", "hash"], ["service-resume"],
+      ["publish-episode", "first", "one.mp3", "two.mp3"], ["init", "--__proto__", "value"]]) {
+      const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: directory });
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout.toString()).toBe("");
+    }
+    expect(readdirSync(directory)).toEqual([]);
+  } finally { rmdirSync(directory); }
+});
+
+test("formal initialization does not convert a legacy workspace or create administrator credentials", () => {
+  const directory = mkdtempSync(join(tmpdir(), "castloop-legacy-entrypoint-"));
+  const stateDirectory = join(directory, ".castloop");
+  const state = join(stateDirectory, "state.json");
+  mkdirSync(stateDirectory);
+  writeFileSync(state, "retained legacy state");
+  try {
+    const result = Bun.spawnSync([process.execPath, entrypoint, "init"], { cwd: directory });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain("Legacy workspaces are not converted");
+    expect(readFileSync(state, "utf8")).toBe("retained legacy state");
+    expect(readdirSync(stateDirectory)).toEqual(["state.json"]);
+    expect(readdirSync(directory)).toEqual([".castloop"]);
+  } finally { unlinkSync(state); rmdirSync(stateDirectory); rmdirSync(directory); }
 });

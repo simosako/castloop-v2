@@ -46,6 +46,12 @@
 
 ## 管理者の判断待ちではない技術残件
 
+### 承認済みのMVP完成範囲（2026-10-04）
+
+管理者が開発量を抑える方針を承認した。既存runnerを正式CLI/Workerへ接続し、接続で変わる入口の回帰と正式バイナリでの一通りの実機確認、短い利用案内を完成する。既存の300MB・六lifecycle操作・通常更新の受け入れを再利用し、新規初期化専用fault harnessや網羅的な異常系matrixは追加しない。
+
+終了が不明なIO/残存lockは停止・ブロックを保持することをMVPのサポート境界とする。既存の完了照合・安全な同job retryを利用し、万能な外部復旧は完成条件にしない。時間経過やHEAD不在でのowner/token解放は引き続き禁止する。旧形式変換・無停止移行・将来versionの汎用基盤・大規模な再リファクタリングは追加しない。以下の過去の残件記述より、この完成範囲を優先する。
+
 ### Workers Paidは利用しない（2026-10-04）
 
 管理者がWorkers Paidの利用不可を明示した。Paidへの変更を再要求せず、無料枠を前提に検証処理の責務・実行場所を見直す。既存の300MB上限を勝手に下げず、全量contents照合・object identity/owner/generation照合を単純に省略しない。現行Worker内全量SHA-256のCPU超過は、この実装方式の問題であり、R2へ300MBを保存できないという実証ではない。
@@ -58,7 +64,7 @@ R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理RES
 
 通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。改修前の300MB Worker hashはCPU超過となり、元serviceはpaused/owner/token/payloadを保持する。管理者承認のCLI全量SHA-256証拠＋Worker HEAD照合＋R2公開時検証へ集約した後、新規`castloop-m6-test-7c97f1a0`で300MB公開・audio-only/metadata-only改訂・全量配信/HEAD/Range/304・明示削除まで合格した。試験CLIのmetadata-only引数制約は修正し、publication未開始の確認済みcheckpointだけを続行した。課金/CPU limitは変更しておらず、費用測定計画を通常開発のgateへ戻すものではない。
 
-残件は新規初期化fault、安全なunknown IO/残存lockの外部終了確認・復旧手順、公開CLI/利用案内・release gateである。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+残件は正式CLI/Workerへの接続、変更入口の検証と正式バイナリの実機確認、利用案内・release準備である。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 

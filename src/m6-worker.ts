@@ -4,12 +4,6 @@ import { migrationBootstrapRequestSchema } from "../packages/shared/src/index";
 
 export { CachedPublicAssets } from "./lifecycle-cached-entrypoint";
 
-declare global {
-  namespace Cloudflare {
-    interface GlobalProps { mainModule: typeof import("./m6-worker"); }
-  }
-}
-
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const bootstrapId = migrationBootstrapRequestSchema.shape.bootstrap_id.safeParse(env.CASTLOOP_VERSION_METADATA.tag);

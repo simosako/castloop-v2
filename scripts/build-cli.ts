@@ -1,4 +1,3 @@
-import { WORKER_COMPATIBILITY_DATE } from "../packages/cli/src/worker-payload";
 import { M6_FRESH_WORKER_COMPATIBILITY_DATE } from "../packages/shared/src/index";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -22,7 +21,7 @@ const target = requestedTarget as keyof typeof TARGETS | undefined;
 const name = m6Test ? "castloop-m6-test" : "castloop";
 const outfile = join(root, "dist", target
   ? `${name}-${target}${target === "windows-x64" ? ".exe" : ""}` : name);
-const worker = await Bun.build({ entrypoints: [join(root, m6Test ? "src/m6-setup-worker.ts" : "src/index.ts")],
+const worker = await Bun.build({ entrypoints: [join(root, m6Test ? "src/m6-setup-worker.ts" : "src/worker.ts")],
   target: "browser", minify: true, external: ["cloudflare:workers"] });
 if (!worker.success || worker.outputs.length !== 1) throw new Error("Worker bundle build failed");
 const source = await worker.outputs[0].text();
@@ -36,7 +35,7 @@ const result = await Bun.build({
     name: "castloop-worker-bundle",
     setup(build) {
       build.onLoad({ filter: /worker-payload\.ts$/ }, () => ({
-        contents: `export const WORKER_COMPATIBILITY_DATE = ${JSON.stringify(m6Test ? M6_FRESH_WORKER_COMPATIBILITY_DATE : WORKER_COMPATIBILITY_DATE)};\n` +
+        contents: `export const WORKER_COMPATIBILITY_DATE = ${JSON.stringify(M6_FRESH_WORKER_COMPATIBILITY_DATE)};\n` +
           `export const embeddedWorkerSource = ${JSON.stringify(source)};\n`,
         loader: "ts",
       }));

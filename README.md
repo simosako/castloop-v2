@@ -1,34 +1,28 @@
 # castloop
 
-castloop is a serverless podcast hosting program. Once deployed, it runs with minimal ops.
+Serverless podcast hosting on Cloudflare: one private R2 bucket and one public Worker per service, multiple Shows, managed through a standalone CLI.
 
-## Overview
-- Hosts public podcasts on CloudFlare.
-- One deployment can host multiple shows.
-- A CLI (`castloop`) manages shows and episodes.
+**This checkout is the unreleased M6 development version.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The published [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md).
 
-## Install the CLI (Linux x86-64)
+## Build and install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `THIRD_PARTY_NOTICES.md`, and `LICENSE` from the [v0.1.2 release](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2). Verify the checksum in the download directory and install the binary:
+The build machine needs Bun 1.4.2 and Node.js/npm:
 
 ```sh
-sha256sum --check SHA256SUMS
-mkdir -p "$HOME/.local/bin"
-install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop"
+npm ci
+npm run check
+bun test
+npm run build:cli -- linux-x64
+sha256sum dist/castloop-linux-x64
+install -m 0755 dist/castloop-linux-x64 "$HOME/.local/bin/castloop"
 castloop --version
 ```
 
-The binary includes the CLI and deployable Worker. **v0.1.2 is distributed for Linux x86-64 only.** The target machine needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in its environment; it needs no Node.js/npm, Wrangler, Bun, `ffprobe`, R2 S3 credentials, or source tree. Enable R2 and create an account-scoped API token in the Cloudflare Dashboard before running `init`. The tested management operations require Workers Scripts, Workers R2 Storage, and Queues permissions. Do not put the token in `castloop.toml` or Git. For an optional check on a separate Linux x86-64 machine, see the [smoke test guide](docs/linux_smoke_test.md).
+The target Linux x86-64 machine needs no Bun, Node.js, Wrangler, source tree, `ffprobe`, or R2 S3 credentials. Enable R2 and Queues and supply an account-scoped Cloudflare API token with Workers Scripts, Workers R2 Storage, and Queues permissions. Never store it in TOML or Git. Experimental macOS/Windows cross-builds are not distributed or runtime-verified.
 
-### Building from source
+## Initialize and publish
 
-The build machine needs Bun 1.4.2 and Node.js/npm for dependency installation and checks. Build from this checkout with `npm ci`, `npm run check`, `bun test`, and `npm run build:cli -- linux-x64`. The Worker bundle and CLI are built without Wrangler. The build script also supports experimental `macos-x64`, `macos-arm64`, and `windows-x64` cross-compilation, but those targets are not distributed.
-
-The [release workflow](.github/workflows/build-binaries.yml) checks the code, builds a Linux x86-64 binary, runs an on-runner smoke check, and attaches the executable, checksum, [LICENSE](LICENSE), and [third-party notices](THIRD_PARTY_NOTICES.md) to a GitHub Release on a `v*` tag. Include both license files with redistributed binaries.
-
-castloop is distributed under the [MIT License](LICENSE). Third-party dependency licenses are listed separately in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-### Initialize and publish
+Use unused resource names and a new workspace. Initialization verifies the deployed runtime and completes **paused**. It does not adopt existing resources or automatically resume.
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...
@@ -36,127 +30,78 @@ castloop init /path/to/workspace \
   --service-id my-service --bucket-name my-private-bucket \
   --workers-subdomain my-account-subdomain
 cd /path/to/workspace
+castloop service-status
+castloop service-resume PAUSE_UUID
 castloop create-show my-show --site-url https://your-real-site.example/podcast
 # Edit my-show/show.toml and provide the JPEG/PNG named in image_path.
 castloop update-show my-show
 castloop publish-show my-show
-castloop job-status SHOW_JOB_ID --show my-show
+castloop job-status SHOW_JOB_UUID
 cd my-show
-castloop create-episode first-episode
-# Edit episode-first-episode.toml and provide an MP3.
-castloop update-episode first-episode
-castloop update-episode-audio first-episode audio.mp3
-castloop publish-episode first-episode
+castloop create-episode first
+# Edit episode-first.toml and provide an MP3.
+castloop update-episode first
+castloop update-episode-audio first audio.mp3
+castloop publish-episode first audio.mp3
 cd ..
-castloop job-status EPISODE_JOB_ID --show my-show --episode first-episode
+castloop job-status EPISODE_JOB_UUID
 ```
 
-The publish commands print their job IDs. A publication is finished when `job-status` reports `status.state: "published"` **and** `owner.state: "free"`. The public feed is at `<public_base_url>/podcasts/my-show/feed.xml`; `public_base_url` is in `castloop.toml`. Staging with `update-show`, `update-episode`, or `update-episode-audio` does not publish anything. Replace the example site URL above with a real URL supplied by the administrator. See [`examples/show.toml`](examples/show.toml) and [`examples/episode.toml`](examples/episode.toml) for metadata shapes; `create-show` and `create-episode` generate working local drafts with unique IDs and timestamps.
+Use the `pause_id` from `service-status`, not a newly generated ID, to resume. Replace the example website with the administrator's real site URL. A publish receipt means submitted, not finished: wait for `server_status.status.state: "published"` and `server_status.ownership: "released"` before another operation on that Show. The feed is `<public_base_url>/podcasts/my-show/feed.xml`; settings are in `castloop.toml`.
 
-For a metadata-only Episode revision, edit the local Episode TOML and run `update-episode ID`, then `publish-episode ID`. For an audio-only revision, run `update-episode-audio ID file.mp3`, then `publish-episode ID`. Keep the Episode GUID and original `published_at` unchanged. Old public MP3s and revision history are retained. After a successful publication, `cleanup-job JOB_ID --show my-show --episode ID` removes only its redundant staged MP3.
+Updates stage inputs without publishing. For metadata-only Episode revisions, run `update-episode ID`, then `publish-episode ID` **without an MP3 argument**. For audio-only revisions, run `update-episode-audio ID file.mp3`, then `publish-episode ID file.mp3`. Whenever audio is staged, publication requires the unchanged original MP3. Keep GUID and `published_at` unchanged. Normal revisions retain immutable published media and history.
 
-### Update the executable and Worker
+MP3s are limited to 300,000,000 bytes. The CLI validates duration, uploads and reads back the complete object to verify its size/SHA-256 and identity. The Worker checks that evidence against R2 HEAD; R2 verifies SHA-256 when saving immutable published audio. Workers Paid is not required by this implementation. Staging audio has no automatic expiration or general cleanup command in this MVP.
 
-Download the new release binary and its checksum to a temporary directory, verify it, then replace the old binary and deploy the embedded Worker **for each service workspace**:
+## Unpublish, restore, or delete
+
+Run from the service workspace. Preview is read-only; save and review the exact target, action and request hash:
 
 ```sh
-mkdir -p /tmp/castloop-update
-cd /tmp/castloop-update
-curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.2/castloop-linux-x64
-curl -fLO https://github.com/simosako/castloop-v2/releases/download/v0.1.2/SHA256SUMS
-sha256sum --check SHA256SUMS
-install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop.next"
-mv "$HOME/.local/bin/castloop.next" "$HOME/.local/bin/castloop"
-cd /path/to/workspace
+castloop preview-episode-lifecycle my-show first unpublish > plan.json
+# Read plan.json and copy preview.request_sha256.
+castloop lifecycle-execute plan.json REQUEST_SHA256 confirm
+castloop operation-status lifecycle JOB_UUID
+```
+
+Replace `unpublish` with `restore` or `delete`. For a whole Show, use `preview-show-lifecycle my-show ACTION`. Delete requires **`confirm-delete-retain-records`** instead of `confirm`. Never substitute a new preview after confirmation; stale generations are rejected.
+
+- Unpublish hides content with HTTP 404; restore preserves GUID, revisions and media.
+- Delete physically removes payloads and is irreversible. Deleted IDs cannot be reused. Necessary small reservations, tombstones, frozen requests, commit markers and status/progress records are retained indefinitely without copying content text or secrets.
+- Deleting/deleted content returns 410. Public responses require cache revalidation; `system/` and `staging/` are never public.
+- Operations do not interrupt unfinished uploads/publications. Check lifecycle status for completed/released ownership, not just a commit receipt.
+
+## Compatible Worker updates
+
+Back up `castloop.toml` and the private `.castloop/` directory, replace the executable with the verified new build, then run from each **already initialized M6** workspace:
+
+```sh
+castloop service-pause NEW_PAUSE_UUID
+castloop service-status
+# Wait for invocations to settle and unfinished Show owners to complete.
 castloop deploy
+castloop service-status
+castloop service-resume NEW_PAUSE_UUID
 ```
 
-For source builds, use the commands in [Building from source](#building-from-source). Back up `castloop.toml` and the private `.castloop/` directory before moving a workspace. Do not replace `.castloop/secrets.json` or `.castloop/state.json` when updating. `castloop deploy` deploys the Worker bundled with the current binary through Cloudflare's API, preserving existing secret bindings. Re-running `init` in an existing workspace resumes unfinished initialization without recreating resources when the resource-creation steps have been recorded in `.castloop/state.json`.
+Pause temporarily stops delivery and new mutations. Paused does not necessarily mean drained. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update in this MVP.
 
-### Troubleshooting
+## Errors and recovery limits
 
-| Symptom | Action |
-| --- | --- |
-| Cloudflare API returns HTTP 403 | Check the API token's account scope and Workers Scripts, Workers R2 Storage, and Queues permissions. |
-| `init` stopped partway | After deployment, `init` waits up to two minutes for Worker health, retrying temporary failures every five seconds and printing progress. Bad credentials fail immediately. If it still fails, keep the workspace and run `castloop init /path/to/workspace` again without flags. Completed initialization steps are retained; resources are not automatically deleted. Inspect `.castloop/state.json` and Cloudflare resources if it still fails. The v0.1.1 Release binary uses the older six-attempt wait. |
-| Show ID already reserved | Use a new Show ID or inspect the existing reservation. A reservation alone does not publish a Show. |
-| Local TOML or MP3 changed after staging | Re-run the corresponding `update-*` command before `publish-*`. A committed job is frozen; later edits need a new job. |
-| `retrying` or `processing` with `dlq: true` | Inspect `job-status` and the Show admission; after resolving the transient issue, use `castloop retry-job JOB_ID --show my-show [--episode ID]` to resume the **same** job. A DLQ record remains as history even after recovery. |
-| `failed` or admission still held | `retry-job` only requeues a job whose status is `retrying` or `processing` and whose DLQ record exists. A permanent `failed` job cannot currently be repaired with that command. Preserve the workspace and inspect status, frozen commit, and published keys; do not start another job for the Show or delete its reservation while a partial publication may exist. Recovery may require manual R2 repair. |
+Preserve the workspace, journals, locks and remote owners after any error. Do not rerun unknown requests, delete locks, replace administrator secrets or release tokens because time elapsed or HEAD found no object. An unknown/forcibly interrupted invocation can remain blocked; universal recovery is outside this MVP.
 
-If a resource-creation request in `init` reaches Cloudflare but its response is lost before `.castloop/state.json` records completion, retrying may report that the bucket or Queue already exists. Keep the same workspace and inspect Cloudflare resources before attempting manual recovery; automatic reconciliation of this ambiguous case is not yet implemented.
+- `local-operation-status FAMILY ID` inspects local records without credentials or network access. `operation-status FAMILY ID` compares them with authenticated server status. Families: `staging`, `publication`, `lifecycle`, `show-registration`.
+- `retry-job JOB_UUID` and `lifecycle-retry JOB_UUID REQUEST_SHA256 ACK` explicitly retry the same acknowledged commit only when execution has safely settled; they refuse active/unknown execution.
+- `init-reconcile OPERATION_UUID` and `update-service-reconcile OPERATION_UUID` reconcile already completed, paused server operations with retained local requests. They do not repeat deployments. `update-service-verify OPERATION_UUID` continues only an acknowledged deployment's verification.
+- Initialization journals are `.castloop/service-initializations/SERVICE_ID.json`; update journals are `.castloop/service-updates/SERVICE_ID/OPERATION_UUID.json`. Retain these and their locks. Re-running `init` is not a recovery method for a started operation.
+- HTTP 403: check account/token scope and permissions. Local inputs changed after staging: restage only an editable, unclaimed draft; committed/unknown operations stay frozen.
 
-The CLI reports Cloudflare failures without printing API credentials. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) and [`design/m3_implementation_log.md`](design/m3_implementation_log.md) for publication and recovery behavior.
+The single REST PUT recovery model retains [unverified assumption U1](design/m6_upload_recovery_options.md): a PUT is assumed not to write later after client disconnection. This is not a Cloudflare guarantee. Owner/generation checks and explicit IO settlement remain required.
 
-## Development
+## Development and release scope
 
-The build machine needs Bun 1.4.2 and Node.js/npm. Wrangler is not a project dependency. From a checkout:
+Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.
 
-```sh
-mise install
-npm ci
-npm run check
-bun test
-npm run build:cli -- linux-x64
-```
+[M6 acceptance](design/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) distinguish verified behavior from remaining release preparation. Custom domains, old-format conversion, zero-downtime migration and cost/downtime measurement follow the MVP. Existing Cloudflare resources are not automatically deleted.
 
-Do not commit credentials, `.castloop/`, or unpublished media.
-
-## Source CLI (development)
-
-The source CLI runs with Bun. From this repository, use `bun packages/cli/src/index.ts` (or `npm run cli --`). Source mode bundles `src/index.ts` from this checkout; the compiled executable deploys its embedded Worker instead.
-
-```sh
-export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...
-bun packages/cli/src/index.ts init /path/to/workspace \
-  --service-id my-service --bucket-name my-private-bucket \
-  --workers-subdomain my-account-subdomain
-cd /path/to/workspace
-bun /path/to/castloop-v2/packages/cli/src/index.ts create-show my-show \
-  --site-url https://example.com/my-show
-cd my-show
-bun /path/to/castloop-v2/packages/cli/src/index.ts create-episode first-episode
-```
-
-Missing arguments are prompted for on an interactive terminal. Initialization creates a private R2 bucket, Queue, DLQ, Worker and commit-marker notification. It stores non-secret service settings in `castloop.toml`; `.castloop/` contains the local admin key and retry state and must remain private. An incomplete `init` or `create-show` can be rerun with the same workspace and ID. For details and verification, see [`design/m1_implementation_log.md`](design/m1_implementation_log.md).
-
-## Publication commands from the source checkout
-
-Run `deploy` from the workspace root after updating the Worker source. Edit the local Show TOML and cover first. The update commands only stage inputs; publication always requires an explicit publish command.
-
-```sh
-cd /path/to/workspace
-bun /path/to/castloop-v2/packages/cli/src/index.ts deploy
-bun /path/to/castloop-v2/packages/cli/src/index.ts update-show my-show
-bun /path/to/castloop-v2/packages/cli/src/index.ts publish-show my-show
-cd my-show
-bun /path/to/castloop-v2/packages/cli/src/index.ts create-episode first-episode
-# Edit episode-first-episode.toml and prepare an MP3.
-bun /path/to/castloop-v2/packages/cli/src/index.ts update-episode first-episode
-bun /path/to/castloop-v2/packages/cli/src/index.ts update-episode-audio first-episode audio.mp3
-bun /path/to/castloop-v2/packages/cli/src/index.ts publish-episode first-episode
-cd ..
-bun /path/to/castloop-v2/packages/cli/src/index.ts job-status JOB_ID --show my-show --episode first-episode
-```
-
-MP3 duration is analyzed by the CLI before upload; unreadable or unsupported input is rejected. A job showing `retrying` and `dlq: true` can be explicitly requeued with `retry-job JOB_ID --show my-show --episode first-episode`. Show jobs omit `--episode`. See [`design/m2_implementation_log.md`](design/m2_implementation_log.md) for the verified scope and recovery details.
-
-For subsequent Episode revisions, run `update-episode ID` only when TOML changed, or `update-episode-audio ID file.mp3` only when audio changed, then `publish-episode ID`. Unchanged published inputs are reused; GUID and the original `published_at` must stay the same. A stale base revision is rejected. To remove only the redundant staged MP3 after a job is published, use `cleanup-job JOB_ID --show my-show --episode ID` from the workspace root. Published media, revision metadata, and commit markers remain available. See [`design/m3_implementation_log.md`](design/m3_implementation_log.md).
-
-## Next milestone: M6 content lifecycle
-
-**v0.1.2 does not support Episode or Show deletion, unpublishing, or restoration.** Removing local files does not stop public delivery. `cleanup-job` only removes redundant staged audio, not published content.
-
-The next milestone is [M6: Episode and Show unpublishing and deletion](design/m6_content_lifecycle_plan.md). The R2 control-record approach is decided. Foundations include strict schemas, atomic admission, per-invocation execution tokens, reserved-only abandonment, versioned job status/progress with allowlisted diagnostics, guarded completion, read-only migration/deletion inventories, owner-gated payload deletion batches and verification passes, lifecycle-aware feed inputs, and an uncached public gateway. The Show/Episode unpublish state machine has automated failure/recovery tests with injected feed and purge effects. Dedicated Cloudflare tests previously verified the uncached gateway/cached inner entrypoint and R2 admission races. These modules are not connected to live routes yet. M6 deletion will remove payloads while retaining necessary small control/audit records without automatic expiration; it will not copy content text or secrets into those records. M6 will retain simple Cloudflare REST single-object PUT uploads, assuming that a PUT does not create or update an object later after client disconnection. This is an explicit design assumption, not a verified Cloudflare guarantee; the [unresolved concern U1](design/m6_upload_recovery_options.md) is retained without blocking M6 or requiring multipart uploads. Upload admission, verification and interruption recovery still need integration. Lifecycle commands require migration, recovery and production regression gates before becoming available. Progress is recorded in the [M6 implementation log](design/m6_implementation_log.md); [approved policies and remaining gates](design/m6_review_queue.md) distinguish policy decisions from technical work.
-
-Custom-domain work retains its approved plan and groundwork but follows M6. `domain add/list/remove` remain unavailable.
-
-The approved M6 delivery plan is to complete the full feature set and release it as the next version, using isolated test resources in the same Cloudflare account. Migration may temporarily stop public delivery and administrative writes during a planned maintenance window; zero-downtime migration is deferred. Cost and downtime measurement planning follows MVP construction and does not block implementation. Functional and safety acceptance still apply before destructive commands become available. This is not an immediate migration of an existing service or a claim of measured costs or downtime.
-
-Current source builds also include read-only `castloop migration-status` for a separately deployed migration bridge/candidate Worker. It does not deploy, migrate, resume writes or certify M6 readiness; legacy Workers and the released v0.1.2 binary do not provide this new diagnostic path. The [bootstrap contract](design/m6_migration_bootstrap.md) and [client journal contract](design/m6_migration_client.md) describe the isolated implementation and remaining release gates. Do not deploy these candidate modules to an existing service until the migration/cutover procedure and recovery gates are complete.
-
-Source builds additionally provide `castloop local-operation-status FAMILY ID` from the service workspace. Use `staging` with an upload operation ID, `publication`/`lifecycle` with a job ID, or `show-registration` with a Show ID. This reads only the local M6 journal and observes its lock, without credentials, network access, writes or lock removal. Missing records and local phases do not prove remote absence/completion or authorize recovery. The released v0.1.2 binary does not include this command. See the [offline diagnostic contract](design/m6_local_operation_status.md).
-
-Source builds also provide `castloop operation-status FAMILY ID` with the same families and IDs. It compares a frozen local journal with one authenticated read-only M6 server status request using the local administrator key, without Cloudflare API credentials or local changes. It never promotes phases, retries mutations or removes locks. Legacy Workers and unreleased candidate management routes reject this request; it does not enable those routes or certify readiness. The released v0.1.2 binary does not include it. See the [remote diagnostic contract](design/m6_remote_operation_status.md).
-
-Current source builds and binaries built from this checkout also provide `castloop migration-preflight LEGACY_VERSION_ID`. Run it from an existing service workspace with `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; it needs only `castloop.toml`, not the local admin secret or Wrangler. It checks the expected legacy Worker version at 100% traffic through Cloudflare GET requests, including bounded, non-executing script inspection when legacy API fields are omitted. It rejects deployment/settings/script drift and unsupported Custom Domains, returns only a read-only snapshot, and does not deploy, create journals, pause delivery, certify old I/O termination or authorize migration completion/recovery. The released v0.1.2 binary does not include this command. See the [preflight contract](design/m6_migration_bridge_preparation.md).
+The [release workflow](.github/workflows/build-binaries.yml) builds/checks Linux x86-64 artifacts and publishes on a matching `v*` tag. Include [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with redistributed binaries. castloop uses the MIT License.

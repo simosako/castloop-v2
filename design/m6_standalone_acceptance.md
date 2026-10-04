@@ -4,7 +4,7 @@
 
 ## 対象と公開制限
 
-初期の六lifecycle/更新応答喪失/cache試験は`castloop-m6-test-ff3bfd8c`で実施した。後述の300MB失敗後は未知owner/tokenを保持し、再利用・再配備・強制解放をしない。新しい完全性検証方式は別名`castloop-m6-test-7c97f1a0`で検証する。workspaceはそれぞれ`/tmp/opencode/<Worker名>`。既存v0.1.1環境・独自domain・有料planは変更せず、Worker/R2/Queue/DLQ資源自体も削除しない。通常binary/WorkerのM6公開gateは閉じたままである。
+初期の六lifecycle/更新応答喪失/cache試験は`castloop-m6-test-ff3bfd8c`で実施した。後述の300MB失敗後は未知owner/tokenを保持し、再利用・再配備・強制解放をしない。新しい完全性検証方式は別名`castloop-m6-test-7c97f1a0`で検証した。workspaceはそれぞれ`/tmp/opencode/<Worker名>`。既存v0.1.1環境・独自domain・有料planは変更せず、Worker/R2/Queue/DLQ資源自体も削除しない。承認済みMVP範囲で通常binary/Workerを既存runnerへ接続し、正式入口の実機確認を進める。配布済みv0.1.2や既存serviceを切り替えるものではない。
 
 実行scriptは`experiments/m6/README.md`参照。before/plan/acceptance/incompleteはprivate fileであり、secretを含むlocal manifestを報告へ添付しない。mutationは一度だけ、readonly観測は有限回とし、commitの受付とconsumer完了・owner解放・invocation返却を区別する。
 
@@ -65,7 +65,7 @@ CLIの全量SHA-256読み戻しとPUT receiptのETag/versionが、保存journal/
 
 ## 後続
 
-新規初期化のfault受け入れ、安全なunknown IO/残存lockの外部終了確認・復旧手順、通常CLI/README/help/version/releaseの完成は残る。費用/停止時間測定と無停止移行は承認済みのMVP後計画とし、旧形式変換は必要時だけ行う。下記の300MB合格を旧環境の未返却owner/token解放や、通常release gateの解除へ流用しない。
+管理者承認により、残件を正式CLI/Workerの接続、変更入口と正式バイナリの一通りの検証、短い利用案内・release準備へ絞る。新規初期化fault harnessや網羅的異常系は追加しない。unknown IO/残存lockは停止・ブロックを保持し、万能な外部復旧をMVP完成条件にしない。費用/停止時間測定・無停止移行・必要時の旧形式変換は後続とする。下記の300MB合格を旧環境の未返却owner/token解放へ流用しない。
 
 ## CLI/R2方式の300MB・二種改訂・明示削除: 合格
 
