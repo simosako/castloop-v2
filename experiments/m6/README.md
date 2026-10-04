@@ -63,13 +63,16 @@ bun scripts/build-cli.ts linux-x64 --m6-test
 bun experiments/m6/verify-lifecycle.ts /tmp/opencode/ACKNOWLEDGED_TEST_WORKSPACE
 bun experiments/m6/verify-completion-recovery.ts /tmp/opencode/ACKNOWLEDGED_TEST_WORKSPACE
 bun experiments/m6/verify-large-media.ts /tmp/opencode/ACKNOWLEDGED_TEST_WORKSPACE
+bun experiments/m6/verify-large-media.ts --fresh-acknowledged-workspace /tmp/opencode/ACKNOWLEDGED_FRESH_WORKSPACE
 ```
 
 - lifecycle: compatible-update受け入れ済みの小さい`fresh/first` fixtureで六操作を実行し、GET/HEAD/Range/304/416、404/410、GUID/revision保持、payload物理削除と永久記録保持を確認する。二回GETしただけでcache HIT合格とはしない。
 - completion recovery: lifecycle合格後の同じpaused環境を通常更新し、serverの成功completion応答だけを試験transportで破棄する。local requested/server pausedを確認し、別のbinary commandで非書込照合する。強制終了したIOの収束証明とは別である。
-- large media: recovery合格後に別Show `large`を作る。719424個の417-byte MPEG framesと192-byte ID3 prefixで正確な300,000,000-byte MP3をchunk書込・stream解析する。300,000,001 bytes拒否、audio-only/metadata-only改訂、全量stream checksum、GUID/date/history/旧音源保持、HEAD/suffix Range/304、最後に明示Show deleteを検証する。音声内容の聴取品質を検証するfixtureではない。
+- large media: recovery合格後、または明示fresh modeで初期化/公開のacknowledged journalと現在のpaused checkpointを確認した後に、別Show `large`を作る。未確認資源・別version・残存lock/tokenは採用しない。719424個の417-byte MPEG framesと192-byte ID3 prefixで正確な300,000,000-byte MP3をchunk書込・stream解析する。300,000,001 bytes拒否、audio-only/metadata-only改訂、全量stream checksum、GUID/date/history/旧音源保持、HEAD/suffix Range/304、最後に明示Show deleteを検証する。音声内容の聴取品質を検証するfixtureではない。途中失敗でも確認済みcache HIT/過大拒否/fixture checksumを記録する。
 - cache: 試験Workerだけが内部/外部invocation nonceとinner cache statusをresponse headerへ追加する。feed/cover/小さい音源で、内部HITの同じnonceと毎要求異なるgateway nonceを照合する。通常Worker/公開binaryへ計測headerを追加しない。
 
 mutationの自動再送、未知lock/tokenの解放、Worker/bucket/Queueの削除はしない。readonlyな観測競合だけ有限回待ち、失敗数を記録する。途中失敗は固定phase/codeだけ保存し、任意exception本文・secret・metadata本文は保存しない。before/incompleteを消して再実行してはいけない。既知の完了checkpointからの続行は個別に証拠を照合する。
 
 各試験は成功時もserviceを明示pausedで残す。これらのscriptの実装・local型検査だけをCloudflare合格として扱わず、実行結果を設計logへ別途記録する。複数colo・独自domain・請求額・無停止移行・unknown live IOの解放・正式releaseは対象外。
+
+2026-10-04、六lifecycle・completion recovery・実cache HITは合格したが、300MB stagingのWorker検証はCPU制限で未完了となった。元serviceはpaused/未収束owner/token/payload保持。native digest直結でもexceededCpuを実機観測したため、現方式をPaidで検証する場合は契約/利用承認が必要である。`usage_model=standard`をPaid証拠としない。具体的な証拠・残件は`design/m6_standalone_acceptance.md`。このharnessを既存failed workspaceで再実行してはいけない。

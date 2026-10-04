@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 実cache HIT合格と300MBのCPU制限を確認
+
+- NRTでfeed/cover/小さい音源の内部HIT・同じ内部nonceと毎回異なるgateway nonceを確認し、公開GET-onlyの再照合結果もprivate acceptanceへ保存した。
+- 正確な300MBのlocal解析/REST PUT/全量GETと過大入力のlocal拒否は成功したが、Worker staging検証の応答は未確認になった。local finish_requested/server verifying/token保持を観測し、明示pausedで新規配信/書込だけを閉じた。owner/token/payloadは回復可能性のため保持し、elapsed timeやHEADから解放しない。
+- 別名readonly診断Workerで同じR2 objectのnative digest直結と現行経路を各一回試し、両方のexceededCpuをsanitized tailで確認した。直結でもCPU 2068msを要し、現経路はCPU 10ms時点で終了した。契約照会403、課金/CPU limit変更なし。Paid利用に必要な判断と具体的な対象/記録は`m6_standalone_acceptance.md`へ記録した。
+- 300MB harnessへ初期化済みacknowledged workspaceからの独立開始と、途中で既に確認したcache/過大拒否/fixtureの記録を追加した。完了済み更新/六lifecycle試験を新環境で毎回重複させず、未知のfailed workspaceを採用しない。
+
 ## 2026-10-04: 六lifecycle操作のCloudflare/standalone受け入れ
 
 - 通常更新済みの専用`castloop-m6-test-ff3bfd8c`を再利用し、Show/Episode各unpublish/restore/deleteを試験binary→実HTTP→通知/Queue→consumerまで通した。GUID/revision/checksum保持、GET/HEAD/Range/304/416と停止404/削除410、payload物理不在と永久管理記録保持が合格した。

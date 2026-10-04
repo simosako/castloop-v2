@@ -1,22 +1,30 @@
 import { m6ServiceAdminResponseSchema, parseEpisodeDraft, parseServiceConfig, parseShowMetadata, stringifyToml, targetInspectionResponseSchema } from "../../packages/shared/src/index";
 import type { EpisodeRevision } from "../../packages/shared/src/index";
 import { validateM6LifecyclePlan } from "../../packages/cli/src/m6-local-lifecycle";
+import { readLocalFreshM6Initialization } from "../../packages/cli/src/m6-service-initialization";
+import { readLocalM6Update } from "../../packages/cli/src/m6-service-update";
 import { createAcceptanceMp3 } from "./acceptance-audio";
 import { digestAcceptanceResponse, expectStandaloneRejection, readAcceptanceBytes, standaloneCommand, standaloneOutput } from "./standalone-harness";
 import assert from "node:assert/strict";
 import { open, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-if (process.argv.length !== 3) throw new Error("Provide the explicitly acknowledged completion-recovery workspace");
-const root = resolve(process.argv[2]!);
+const freshWorkspace = process.argv[2] === "--fresh-acknowledged-workspace";
+if (process.argv.length !== (freshWorkspace ? 4 : 3)) throw new Error("Provide an acknowledged recovery workspace, or --fresh-acknowledged-workspace WORKSPACE");
+const root = resolve(process.argv[freshWorkspace ? 3 : 2]!);
 const config = parseServiceConfig(await readFile(join(root, "castloop.toml"), "utf8"));
-const previous = JSON.parse(await readFile(join(root, "completion-recovery-acceptance.json"), "utf8")) as {
-  result: string; name: string; pause_id: string; worker_version_id: string;
+const previous = JSON.parse(await readFile(join(root, freshWorkspace ? "acceptance.json" : "completion-recovery-acceptance.json"), "utf8")) as {
+  result: string; name: string; pause_id: string; worker_version_id?: string; operation_id: string;
 };
-assert.ok(previous.result === "completion_recovery_binary_passed" && previous.name === config.worker_name &&
+assert.ok(previous.result === (freshWorkspace ? "fresh_binary_publication_passed" : "completion_recovery_binary_passed") && previous.name === config.worker_name &&
   config.account_id === process.env.CLOUDFLARE_ACCOUNT_ID && config.service_id.startsWith("m6-test-") &&
   [config.worker_name, config.bucket_name, config.queue_name, config.dlq_name].every((name) => name.startsWith("castloop-m6-test-")),
   "Only the acknowledged isolated service is permitted");
+const retained = freshWorkspace ? readLocalFreshM6Initialization(root, config) : readLocalM6Update(root, config, previous.operation_id);
+assert.ok(retained.state?.phase === (freshWorkspace ? "initialized" : "completed") && !retained.lockPresent &&
+  retained.state.request.operation_id === previous.operation_id && retained.state.runtime_readiness);
+const workerVersionId = retained.state.runtime_readiness.worker_version_id;
+if (!freshWorkspace) assert.equal(workerVersionId, previous.worker_version_id);
 const command = (...args: string[]) => standaloneCommand(root, ...args);
 const status = async () => m6ServiceAdminResponseSchema.parse(await command("service-status"));
 const target = async () => targetInspectionResponseSchema.parse(await command("target-episode", "large", "boundary"));
@@ -24,6 +32,8 @@ const jobs: string[] = [];
 const cacheHits: string[] = [];
 let phase = "preflight";
 let readonlyFailures = 0;
+let oversizedRejected = false;
+let boundaryFixture: { bytes: number; sha256: string } | undefined;
 async function waitPublished(job: string, episode: boolean): Promise<EpisodeRevision | null> {
   for (let read = 0; read < 240; read += 1) {
     try {
@@ -47,7 +57,7 @@ const get = (path: string, method = "GET", headers: Record<string, string> = {})
 async function checkMedia(revision: EpisodeRevision, expected: { bytes: number; sha256: string }): Promise<void> {
   const response = await get(new URL(revision.enclosure_url).pathname);
   assert.equal(response.headers.get("Cache-Control"), "public, max-age=0, must-revalidate");
-  assert.equal(response.headers.get("X-Castloop-Worker-Version"), previous.worker_version_id);
+  assert.equal(response.headers.get("X-Castloop-Worker-Version"), workerVersionId);
   assert.deepEqual(await digestAcceptanceResponse(response, expected.bytes), expected);
 }
 async function warmCache(path: string): Promise<void> {
@@ -73,7 +83,8 @@ try {
   const before = await status();
   assert.equal(before.admission.state, "paused");
   assert.equal(before.admission.pause_id, previous.pause_id);
-  assert.equal(before.worker_version_id, previous.worker_version_id);
+  assert.equal(before.worker_version_id, workerVersionId);
+  assert.deepEqual(before.admission.runtime_readiness, retained.state.runtime_readiness);
   assert.equal(before.admission.invocations.length, 0);
   const missing = targetInspectionResponseSchema.parse(await command("target-show", "large"));
   assert.equal(missing.show, null);
@@ -115,10 +126,12 @@ try {
   assert.ok(rejection.includes("300000000") || rejection.includes("300,000,000"), "Rejection must identify the local size limit");
   assert.deepEqual(await target(), targetBefore);
   assert.equal((await status()).admission.invocations.length, 0);
+  oversizedRejected = true;
   phase = "boundary-fixture";
   const largeFile = join(directory, "boundary.mp3");
   const large = await createAcceptanceMp3(largeFile, 719424, 182);
   assert.equal(large.bytes, 300_000_000);
+  boundaryFixture = large;
   phase = "boundary-audio-staging";
   console.log(JSON.stringify({ phase, bytes: large.bytes, result: "starting" }));
   await command("update-episode-audio", "large", "boundary", largeFile);
@@ -192,13 +205,14 @@ try {
   await command("service-pause", pauseId);
   assert.equal((await status()).admission.invocations.length, 0);
   await writeFile(join(root, "large-media-acceptance.json"), JSON.stringify({ result: "large_media_binary_acceptance_passed", name: config.worker_name,
-    worker_version_id: previous.worker_version_id, maximum_audio: large, oversized_rejected: true, guid_date_history_preserved: true,
+    worker_version_id: workerVersionId, maximum_audio: large, oversized_rejected: true, guid_date_history_preserved: true,
     audio_only_and_metadata_only_verified: true, get_head_suffix_range_conditional_verified: true, cache_hit_paths: cacheHits, publication_jobs: jobs,
     deletion_job: plan.request.job_id, pause_id: pauseId, payloads_deleted: true, resources_retained_paused: true,
     readonly_observation_failures: readonlyFailures, authorizes_release: false }, null, 2), { mode: 0o600, flag: "wx" });
   console.log(JSON.stringify({ result: "large_media_binary_acceptance_passed", workspace: root, resources_retained_paused: true }));
 } catch {
   await writeFile(join(root, "large-media-incomplete.json"), JSON.stringify({ result: "large_media_acceptance_incomplete", phase, publication_jobs: jobs,
+    cache_hit_paths: cacheHits, oversized_rejected: oversizedRejected, boundary_fixture: boundaryFixture,
     readonly_observation_failures: readonlyFailures, resources_not_deleted: true, authorizes_recovery: false }, null, 2), { mode: 0o600, flag: "wx" });
   console.error(`Large media acceptance did not complete (${phase}); preserve journals, streams and owners without replay or automatic release.`);
   process.exitCode = 1;

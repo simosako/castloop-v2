@@ -50,7 +50,9 @@
 
 下記の各module詳細には実装当時の未接続項目も残る。最新の到達点は新規初期化・通常更新の試験HTTP/standalone接続と実Cloudflare合格、Show/Episode六lifecycle操作の実機合格まで進んでいる。後者は配信404/410・復元時GUID/revision保持・物理削除・永久記録保持・owner/token通常返却を含む。通常公開CLI/entryはまだ切り替えていない。
 
-通常更新の完了応答喪失→別standaloneの非書込照合も実機合格した。残件は実cache HIT、300MBと二種改訂の受け入れ、新規初期化fault、安全なunknown IO/残存lockの外部終了確認・復旧手順、公開CLI/利用案内・release gateである。専用試験harnessを追加して継続し、未実行のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。300MBはREST PUT/全量GETまで成功したが、WorkerのCPU制限で未合格となった。独立readonly診断でもnative digestと現行経路が`exceededCpu`で終了し、元serviceはpaused/owner/token保持とした。契約照会は403で、Paid契約/適用profileの確認と必要な利用承認は管理者の判断が必要。課金変更はしていない。費用測定計画を通常開発のgateへ戻すものではない。
+
+残件は300MBと二種改訂の受け入れ、新規初期化fault、安全なunknown IO/残存lockの外部終了確認・復旧手順、公開CLI/利用案内・release gateである。未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 

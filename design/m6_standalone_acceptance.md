@@ -37,8 +37,24 @@
 
 全884テスト/13409 assertions、TypeScript/M6試験tsconfig、通常/試験Linux build、local HTTPS四family statusとproduction資源拒否も合格した。
 
-## 後続の受け入れ
+## 実cache HIT: 合格
 
-- `verify-large-media.ts`: 正確な300,000,000-byte MP3、過大入力のlocal拒否、audio-only/metadata-only改訂、全量stream照合、GUID/date/history/旧媒体保持、配信・明示deleteを検証する。試験Workerだけのnonce/headerでfeed/cover/小さい音源の実cache HITとdefault gatewayの毎回実行を確認する。
+version `756ab58d-9289-4fbd-a0df-cdc9377b71f4`で`large` Showと小さい`boundary` Episodeを公開し、feed/cover/音源の内部HITを確認した。NRTで同じ内部nonceが返り、gateway nonceは変わった。300MB試験失敗後にも公開GETだけで再照合し、`cache-hit-acceptance.json`へ記録した。実測を複数coloや300MB cache HITまで一般化しない。
 
-これらのscriptの実装・型検査は実機合格を意味しない。実行結果は別途追記する。unknown live PUT/consumerや残存lockを安全に解放する外部終了確認、復旧手順、通常CLI/README/help/version/releaseの完成は引き続き残る。elapsed time・HEAD不在・traceの終了通知だけを旧IO収束の保証として扱わない。
+## 300MB: WorkerのCPU制限で未合格
+
+正確な300,000,000-byte MP3のlocal stream解析とREST単一PUT/全量GET照合は成功した。300,000,001 bytesはlocal size limitで拒否され、remote targetが非変更であることも確認した。続くWorker検証の応答は未確認となった。
+
+- staging operation: `4156d1e5-3e22-4b19-b842-b0135fc56cdb`、draft: `d05d71fc-0c58-463d-904c-20704be807ae`。
+- local `finish_requested`/`put_outcome=staged`/acknowledged PUT 1件、server `verifying`/`verification_active=true`/service invocation保持。成功扱い・再送・token奪取はしていない。
+- 明示pause `cd7922c5-3103-4000-9e7d-198613b3dfd9`で新規配信/書込を閉じた。registryには未収束tokenを保持し、pausedをdrainedと表示しない。300MB staging payloadも回復可能性のあるdraftとして保持する。
+- 独立した`castloop-m6-test-digest-e975e1b4`は同じ既知objectを条件付きGETするだけの診断Worker。R2/control/Queueには書き込まない。native DigestStream直結と現行byte-count付き経路を各一回試し、両方の503と`exceededCpu`をsanitized realtime tailで観測した。直結はCPU 2068ms/wall 3215ms、現行経路はCPU 10ms/wall 50msで終了した。直結だけに変えても現CPU制限を回避できない。
+- Worker settingsの`usage_model=standard`はPaid契約の証拠ではない。契約照会は403/code10000であり、billing権限の追加・契約変更・CPU limit変更をしていない。
+
+Cloudflareの[limits](https://developers.cloudflare.com/workers/platform/limits/)ではFree HTTP CPUは10ms、Paidは既定30s。[pricing](https://developers.cloudflare.com/workers/platform/pricing/)ではPaidの最低料金はaccountあたり月$5 USD、超過は従量課金。**現方式の300MB受け入れをPaid環境で続ける場合、管理者の契約/利用承認が必要**。これは後回しにした費用測定計画の承認待ちではなく、実際の契約変更の判断である。すでにPaidなら現在の適用profileを確認する。
+
+診断結果は`/tmp/opencode/castloop-m6-test-digest-e975e1b4/results-2.json`。tailの終了通知を旧IOがすべて収束した保証として扱わず、元のserviceのtoken/ownerは保持する。既存資源・診断資源の削除もしていない。
+
+## 後続
+
+300MB/audio-only/metadata-only/配信/明示deleteの未完了受け入れ、安全なunknown IO/残存lockの外部終了確認、復旧手順、通常CLI/README/help/version/releaseの完成は残る。harnessは新規初期化のacknowledged journal/paused checkpointからも開始可能にし、既に確認した通常更新と六lifecycleを300MB試験のたびに再実行しない。failed workspaceの再送/採用/強制解放を許可するmodeではない。
