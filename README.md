@@ -55,6 +55,24 @@ Updates stage inputs without publishing. For metadata-only Episode revisions, ru
 
 MP3s are limited to 300,000,000 bytes. The CLI validates duration, uploads and reads back the complete object to verify its size/SHA-256 and identity. The Worker checks that evidence against R2 HEAD; R2 verifies SHA-256 when saving immutable published audio. Workers Paid is not required by this implementation. Staging audio has no automatic expiration or general cleanup command in this MVP.
 
+## List Shows and Episodes (unreleased development feature)
+
+These commands are included in the development source, **not in the published v0.2.0 binary**. They require a Worker built from the updated source too; updating only the CLI is insufficient. Use the compatible-update procedure below when installing that build. No Cloudflare resources are updated merely by listing.
+
+Run from the service workspace with its retained administrator key. Listing does not require `CLOUDFLARE_API_TOKEN`:
+
+```sh
+castloop list-shows
+castloop list-episodes my-show
+castloop list-shows --include-deleted
+castloop list-episodes my-show --json
+castloop list-shows --cursor 'TOKEN_FROM_PREVIOUS_PAGE'
+```
+
+`SHOW_ID` is required for `list-episodes`. Default output is a concise table; `--json` returns the structured response. Both commands inspect server control records, including drafts, unpublished content and deletion in progress. Deleted IDs are hidden unless `--include-deleted` is supplied. Local-only Episode TOML drafts are not included.
+
+Each request scans at most 20 control records in ID order. Continue with the returned `next_cursor` and the same Show/options; a page can be empty after filtering deleted entries while still having a next cursor. Titles are summaries of published metadata, limited to 100 characters; metadata larger than 16 KiB, missing/invalid metadata, unfinished operations, never-published drafts and removed payloads can leave a title/date unavailable. Episode state, parent Show state and service pause are distinct. Feed URLs and snapshot states do not certify delivery or authorize mutations. No audio, revision history or job inventory is scanned, and no locks or owners are released.
+
 ## Unpublish, restore, or delete
 
 Run from the service workspace. Preview is read-only; save and review the exact target, action and request hash:

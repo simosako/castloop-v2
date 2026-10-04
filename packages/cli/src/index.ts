@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 
-import { parseServiceConfig, serviceConfigSchema, stringifyToml, validateId } from "@castloop/shared";
+import { contentListResponseSchema, parseServiceConfig, serviceConfigSchema, stringifyToml, validateId } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { version } from "../../../package.json";
 import { administratorKey } from "./administrator-key";
 import { CloudflareApi } from "./cloudflare-api";
+import { formatContentList } from "./content-list";
 import { COMMAND_HELP, commandHelp } from "./help";
 import { readLocalOperationStatus } from "./local-operation-status";
 import { M6_COMMAND_ARGUMENTS, runM6Command } from "./m6-commands";
@@ -110,7 +111,8 @@ async function main(): Promise<unknown> {
   if (rest.includes("--help") || rest.includes("-h")) return commandHelp(command);
   if (["version", "--version"].includes(command) && !rest.length) return CLI_VERSION;
   if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`Unknown command: ${command}`);
-  const { positional, flags } = argsOf(rest, command === "migration-status" ? ["local"] : []);
+  const listing = command === "list-shows" || command === "list-episodes";
+  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : command === "migration-status" ? ["local"] : []);
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
     return init(positional[0] ?? ".", flags);
@@ -125,6 +127,8 @@ async function main(): Promise<unknown> {
     if (positional.length) throw new Error(commandHelp(command));
     command = "update-service";
     positional.push(flags["operation-id"] ?? randomUUID());
+  } else if (listing) {
+    allowedFlags(flags, ["json", "include-deleted", "cursor"]);
   } else {
     allowedFlags(flags, command === "migration-status" ? ["local"] : []);
   }
@@ -136,8 +140,10 @@ async function main(): Promise<unknown> {
   if (command === "retry-job") command = "publication-retry";
   if (Object.hasOwn(M6_COMMAND_ARGUMENTS, command)) {
     const count = command === "publish-episode" && positional.length === 2 ? 2 : M6_COMMAND_ARGUMENTS[command];
-    if (positional.length !== count) throw new Error("Invalid command arguments; use --help");
-    return runM6Command(root, loadConfig(root), command, positional, { workerSource });
+    if (positional.length !== count) throw new Error(listing ? commandHelp(command) : "Invalid command arguments; use --help");
+    const result = await runM6Command(root, loadConfig(root), command, positional, { workerSource,
+      ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
+    return listing && !flags.json ? formatContentList(contentListResponseSchema.parse(result)) : result;
   }
   const config = loadConfig(root);
   if (command === "local-operation-status" && positional.length === 2) return readLocalOperationStatus(root, config, positional[0]!, positional[1]!);

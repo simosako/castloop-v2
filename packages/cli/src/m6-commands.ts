@@ -5,6 +5,7 @@ import {
 import type { ServiceConfig } from "@castloop/shared";
 import { administratorKey } from "./administrator-key";
 import { CloudflareApi } from "./cloudflare-api";
+import { ContentListClient } from "./content-list";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { createLifecycleJournal, readLocalLifecycleJob } from "./lifecycle-journal";
 import { createLifecycleOperationEffects, runLifecycleRetry } from "./lifecycle-operation";
@@ -33,6 +34,7 @@ import { join, resolve } from "node:path";
 export const M6_COMMAND_ARGUMENTS: Record<string, number> = {
   init: 1, "init-reconcile": 1, "update-service": 1, "update-service-verify": 1, "update-service-reconcile": 1,
   "service-status": 0, "service-pause": 1, "service-resume": 1, "target-show": 1, "target-episode": 2,
+  "list-shows": 0, "list-episodes": 1,
   "preview-show-lifecycle": 2, "preview-episode-lifecycle": 3, "lifecycle-execute": 3, "lifecycle-retry": 3,
   "publication-retry": 1, "operation-status": 2, "create-show": 2, "create-episode": 2,
   "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3,
@@ -41,6 +43,7 @@ export const M6_COMMAND_ARGUMENTS: Record<string, number> = {
 export async function runM6Command(root: string, config: ServiceConfig, command: string, args: string[], options: {
   workerSource: () => Promise<string>;
   updateClient?: (api: CloudflareApi, key: string) => M6UpdateClient;
+  listOptions?: { cursor?: string; includeDeleted?: boolean };
 }): Promise<unknown> {
   const count = command === "publish-episode" && args.length === 2 ? 2 : M6_COMMAND_ARGUMENTS[command];
   if (!Object.hasOwn(M6_COMMAND_ARGUMENTS, command) || args.length !== count || args.some((arg) => !arg || arg.startsWith("--"))) {
@@ -48,6 +51,12 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
   }
   if (!lstatSync(root).isDirectory()) throw new Error("Workspace must be a real directory");
   const key = administratorKey(root, command === "init");
+  if (command === "list-shows" || command === "list-episodes") {
+    const target = command === "list-shows" ? { kind: "show" as const } : { kind: "episode" as const, show_id: validateId(args[0]!, "show") };
+    return new ContentListClient(config, key).list({ schema_version: 1, service_id: config.service_id,
+      include_deleted: options.listOptions?.includeDeleted ?? false, ...target,
+      ...(options.listOptions?.cursor === undefined ? {} : { cursor: options.listOptions.cursor }) });
+  }
   if (command === "publication-retry") {
     const retained = readLocalPublicationJob(root, config, args[0]!);
     if (!retained.client_state || retained.lock_present) throw new Error("Retry requires its retained publication journal without an unknown lock");

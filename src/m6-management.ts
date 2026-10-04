@@ -1,5 +1,5 @@
 import { cachedDeliveryRuntimeSchema, parseServiceConfig } from "../packages/shared/src/index";
-import type { ServiceAdmission } from "../packages/shared/src/index";
+import type { ServiceAdmission, ServiceConfig } from "../packages/shared/src/index";
 import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
@@ -27,10 +27,11 @@ export async function withM6ManagementInvocation<T>(env: LifecycleControlEnv, se
 }
 
 export async function withM6ManagementRead<T>(env: LifecycleReadEnv, serviceId: string, bindings: M6DeliveryGateBindings,
-  callback: (admission: ServiceAdmission) => Promise<T>): Promise<T> {
+  callback: (admission: ServiceAdmission, config: ServiceConfig) => Promise<T>): Promise<T> {
   const configObject = await env.CASTLOOP_BUCKET.get("system/service.toml");
   if (!configObject || configObject.size < 1 || configObject.size > 16384) throw new Error("Invalid service configuration");
-  if (parseServiceConfig(await configObject.text()).service_id !== serviceId) throw new M6ManagementServiceMismatch();
+  const config = parseServiceConfig(await configObject.text());
+  if (config.service_id !== serviceId) throw new M6ManagementServiceMismatch();
   if (bindings.gatewayProtocol !== "m6-uncached-gateway-v1") throw new Error("Management preview requires the uncached gateway protocol");
   const snapshot = await requireM6ServiceRuntime(env, serviceId, bindings.versionMetadata.id);
   const readiness = snapshot.readiness;
@@ -42,7 +43,7 @@ export async function withM6ManagementRead<T>(env: LifecycleReadEnv, serviceId: 
     }
   };
   await checkRuntime();
-  const result = await callback(snapshot.value);
+  const result = await callback(snapshot.value, config);
   await checkRuntime();
   const current = await readServiceAdmission(env, serviceId);
   const currentConfig = await env.CASTLOOP_BUCKET.head("system/service.toml");
