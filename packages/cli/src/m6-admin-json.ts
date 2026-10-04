@@ -4,9 +4,11 @@ import type { ServiceConfig } from "@castloop/shared";
 export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
 const RESPONSE_BUDGET = 65536;
 const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection", catalog: "Catalog listing", service: "Service administration",
-  "setup/prepare": "Setup preparation", "setup/status": "Setup status", "setup/complete": "Setup completion", "update/begin": "Compatible update admission" };
+  domain: "Domain administration", "setup/prepare": "Setup preparation", "setup/status": "Setup status", "setup/complete": "Setup completion", "update/begin": "Compatible update admission" };
 
-async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
+export class M6AdminOperationRejected extends Error {}
+
+export async function readM6JsonResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
   const length = response.headers.get("Content-Length");
   if (response.headers.get("Cache-Control") !== "no-store" ||
     !/^application\/json(?:\s*;|$)/i.test(response.headers.get("Content-Type") ?? "") ||
@@ -80,11 +82,18 @@ export class M6AdminJsonClient {
     }
     try {
       if (response.status !== 200) {
+        if (label === ROUTE_LABELS.domain && response.status === 409) {
+          const value = await readM6JsonResponse(response);
+          if (value && typeof value === "object" && "reason_code" in value && value.reason_code === "domain_operation_blocked") {
+            throw new M6AdminOperationRejected("Domain operation was rejected after its server invocation returned; inspect retained ownership before retrying");
+          }
+        }
         if (response.body) await response.body.cancel();
         throw new Error("Management operation was not confirmed");
       }
-      return await readResponse(response, maximumBytes);
-    } catch {
+      return await readM6JsonResponse(response, maximumBytes);
+    } catch (error) {
+      if (error instanceof M6AdminOperationRejected) throw error;
       throw new Error(`${label} response was not verified; inspect retained ownership/progress without automatic retry`);
     }
   }

@@ -23,6 +23,9 @@ export type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from
 export { showRegistrationRequestSchema, showRegistrationResponseSchema, showReservationSchema } from "./show-registration";
 export type { ShowRegistrationRequest, ShowRegistrationResponse, ShowReservation } from "./show-registration";
 export { validateId } from "./ids";
+export { normalizeHostname } from "./hostname";
+export { domainAdminRequestSchema, domainAdminResponseSchema, domainOperationRequestSchema, domainRuntimeProbeSchema } from "./domain-admin";
+export type { DomainAdminRequest, DomainAdminResponse, DomainOperationRequest, DomainConnectionReceipt } from "./domain-admin";
 export { parsePublicAssetPath } from "./public-assets";
 export type { PublicAsset } from "./public-assets";
 export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,

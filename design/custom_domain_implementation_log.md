@@ -1,5 +1,13 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-04: 共通coreへの管理API接続と秘密を送らないTLS確認
+
+認証・request上限・no-store・固定要求照合を既存管理経路で共有し、`/admin/domain`からURL切替coreを呼べるようにした。読み取り専用statusはURL ownerや未知のtokenが残っていても照会できる。CLIからのCloudflare接続/切断中にも同じservice admission上のtokenを保持し、Worker側のstep/completeと並行しないようにした。接続receiptは固定要求と一致するものだけを保持し、別token・別action・receiptの書き換えを拒否する。
+
+`/.well-known/castloop/runtime`はnonce・service/Worker/versionだけを返すno-storeの読み取り専用probeとした。独自hostのHTTPS到達確認に管理鍵・API tokenを送らず、管理APIは常にworkers.devを使う。probeは公開feed/媒体の停止gateを迂回せず、system/stagingを公開しない。
+
+変更箇所のテストで認証・strict/上限・candidate経路の拒否、connection排他とreceipt、停止中probe/private領域を確認し、既存URL切替の7テストも成功。`npm run check`が成功。domain CLIとlocal journalへの接続は続けて実装する。Cloudflare/DNSの変更はしていない。
+
 ## 2026-10-04: 共通の停止中URL切替core
 
 `src/service-url-change.ts`に、add/removeが同じ処理を使うserver coreを実装した。まだ公開管理APIやdomain CLIには接続していない。

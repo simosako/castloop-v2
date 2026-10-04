@@ -1,4 +1,4 @@
-import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, serviceManagementBaseUrl, stringifyToml, workerDeploymentsSnapshotSchema,
+import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, normalizeHostname, serviceConfigSchema, serviceManagementBaseUrl, stringifyToml, workerDeploymentsSnapshotSchema,
   workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema,
   workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
@@ -28,22 +28,13 @@ type WorkerSettings = {
   tags?: string[];
   tail_consumers?: object[];
 };
-type WorkerDomain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
+export type WorkerDomain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
 type ZoneRecord = { id: string; name: string; status: string; type: string;
   account?: { id?: string }; paused?: boolean };
 type DnsRecord = { name: string; type: string };
 type PaginatedResult<T> = ApiResult<T[]> & { result_info?: { total_pages?: number } };
 
-export function normalizeHostname(value: string): string {
-  const hostname = value.toLowerCase();
-  const labels = hostname.split(".");
-  if (hostname.length > 253 || labels.length < 2 || labels.some((label) =>
-    label.length === 0 || label.length > 63 || !/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/.test(label)) ||
-    !/[a-z]/.test(labels.at(-1)!)) {
-    throw new Error("Expected a DNS hostname without a URL scheme, path, or port");
-  }
-  return hostname;
-}
+export { normalizeHostname } from "@castloop/shared";
 
 export class CloudflareApi {
   private readonly base: string;

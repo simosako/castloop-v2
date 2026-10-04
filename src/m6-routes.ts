@@ -1,6 +1,7 @@
 import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { handleM6ContentList } from "./content-list-admin";
+import { handleDomainAdmin, serveDomainRuntimeProbe } from "./domain-admin";
 import legacyWorker from "./index";
 import { createCachedPublicFetch } from "./lifecycle-cache";
 import type { CachedAssetBinding, LifecyclePurgeTarget } from "./lifecycle-cache";
@@ -68,10 +69,11 @@ async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAs
   options: { setupRuntime?: M6SetupRuntime }): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
   if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle" && pathname !== "/admin/shows" &&
-    pathname !== "/admin/target" && pathname !== "/admin/service" && pathname !== "/admin/catalog") return null;
+    pathname !== "/admin/target" && pathname !== "/admin/service" && pathname !== "/admin/catalog" && pathname !== "/admin/domain") return null;
   if (request.method !== "POST") return reply(request, { error: "method not allowed" }, 405);
   const bindings = { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1" as const, cachedAssets };
   if (pathname === "/admin/service") return handleM6ServiceAdmin(request, env);
+  if (pathname === "/admin/domain") return handleDomainAdmin(request, env, bindings);
   if (pathname === "/admin/target") return handleM6TargetInspection(request, env, bindings);
   if (pathname === "/admin/catalog") return handleM6ContentList(request, env, bindings);
   if (pathname === "/admin/shows") return handleM6ShowRegistrationAdmin(request, env, bindings);
@@ -94,6 +96,8 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, managementIntegration: boolean, bootstrapRuntime?: BootstrapRuntime,
   options: { setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   const pathname = new URL(request.url).pathname;
+  if (managementIntegration && pathname === "/.well-known/castloop/runtime") return serveDomainRuntimeProbe(request, env,
+    { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1", cachedAssets });
   const asset = parsePublicAssetPath(pathname);
   if (asset) {
     if (request.method !== "GET" && request.method !== "HEAD") return reply(request, { error: "method not allowed" }, 405);

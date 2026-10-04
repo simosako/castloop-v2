@@ -1,6 +1,6 @@
 import { m6ServiceConfigHash, serviceConfigSchema, serviceManagementBaseUrl,
   serviceUrlChangeProgressSchema, serviceUrlChangeRequestSchema, stringifyToml } from "../packages/shared/src/index";
-import type { ServiceUrlChangeProgress, ServiceUrlChangeRequest } from "../packages/shared/src/index";
+import type { DomainConnectionReceipt, ServiceUrlChangeProgress, ServiceUrlChangeRequest } from "../packages/shared/src/index";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
 import { readActiveShowFeedInputs, readPublishedFeedSource, writePublishedFeed } from "./lifecycle-feed";
@@ -46,6 +46,15 @@ async function configuration(env: ServiceUrlChangeEnv, request: ServiceUrlChange
     workers_dev_base_url: request.workers_dev_base_url });
   if (new TextEncoder().encode(stringifyToml(target)).length > 16384) throw new Error("URL change configuration exceeds its record budget");
   if (await m6ServiceConfigHash(target) !== request.target_service_config_sha256) throw new Error("URL change may change only its canonical URL and saved management origin");
+  if (request.domain_change) {
+    const { action, hostname } = request.domain_change;
+    const domainUrl = `https://${hostname}`;
+    if (hostname === "workers.dev" || hostname.endsWith(".workers.dev") || request.public_base_url !== (action === "add" ? domainUrl : request.workers_dev_base_url) ||
+      hash === request.service_config_sha256 && new URL(current.config.public_base_url).origin !==
+        (action === "add" ? request.workers_dev_base_url : domainUrl)) {
+      throw new Error("Domain change requires one custom hostname and its exact workers.dev source or destination");
+    }
+  }
   return { ...current, hash, target };
 }
 
@@ -99,15 +108,58 @@ export async function beginServiceUrlChange(env: ServiceUrlChangeEnv, input: Ser
   return progress;
 }
 
-async function withExecution<T>(env: ServiceUrlChangeEnv, request: ServiceUrlChangeRequest, bindings: ServiceUrlChangeBindings,
-  callback: (guard: () => Promise<ServiceAdmissionSnapshot>) => Promise<T>): Promise<T> {
+async function claimExecution(env: ServiceUrlChangeEnv, request: ServiceUrlChangeRequest, executionId: string,
+  kind: "worker" | "connection"): Promise<void> {
   const hash = await requestHash(request);
   const snapshot = await requireOwner(env, request, hash);
   if (snapshot.value.url_change!.execution_id) throw new Error("URL change has an active or unknown execution; never expire it");
-  const executionId = crypto.randomUUID();
-  if (!await compareAndSetServiceAdmission(env, snapshot, { ...snapshot.value, url_change: { ...snapshot.value.url_change!, execution_id: executionId } })) {
+  if (!await compareAndSetServiceAdmission(env, snapshot, { ...snapshot.value,
+    url_change: { ...snapshot.value.url_change!, execution_id: executionId, execution_kind: kind } })) {
     throw new Error("URL change execution conflicted; retry explicitly");
   }
+}
+
+async function returnExecution(env: ServiceUrlChangeEnv, request: ServiceUrlChangeRequest, executionId: string,
+  kind: "worker" | "connection"): Promise<void> {
+  const owned = await requireOwner(env, request, await requestHash(request), executionId);
+  if (owned.value.url_change!.execution_kind !== kind) throw new Error("URL execution belongs to another kind of IO");
+  const { execution_id: _execution, execution_kind: _kind, ...owner } = owned.value.url_change!;
+  if (!await compareAndSetServiceAdmission(env, owned, { ...owned.value, url_change: owner })) {
+    throw new Error("URL change execution return conflicted; retain its token");
+  }
+}
+
+export async function claimDomainConnection(env: ServiceUrlChangeEnv, request: ServiceUrlChangeRequest,
+  executionId: string): Promise<void> {
+  await configuration(env, request);
+  const progress = await readServiceUrlChange(env, request);
+  if (!request.domain_change || !progress || progress.value.connection_receipt ||
+    progress.value.phase !== (request.domain_change.action === "add" ? "feeds" : "configured")) {
+    throw new Error("Domain connection requires its matching unfinished phase without a previous receipt");
+  }
+  await claimExecution(env, request, executionId, "connection");
+}
+
+export async function returnDomainConnection(env: ServiceUrlChangeEnv, request: ServiceUrlChangeRequest,
+  receipt: DomainConnectionReceipt): Promise<void> {
+  const progress = await readServiceUrlChange(env, request);
+  if (!progress || receipt.action !== request.domain_change?.action) throw new Error("Domain connection has another frozen action");
+  if (progress.value.connection_receipt && JSON.stringify(progress.value.connection_receipt) !== JSON.stringify(receipt)) {
+    throw new Error("Preserve the different permanent connection receipt");
+  }
+  const admission = await requireOwner(env, request, await requestHash(request));
+  if (!admission.value.url_change!.execution_id && progress.value.connection_receipt) return;
+  const owned = await requireOwner(env, request, await requestHash(request), receipt.execution_id);
+  if (owned.value.url_change!.execution_kind !== "connection") throw new Error("Connection receipt cannot release Worker IO");
+  if (!progress.value.connection_receipt) await saveProgress(env, progress, { ...progress.value, connection_receipt: receipt });
+  await returnExecution(env, request, receipt.execution_id, "connection");
+}
+
+async function withExecution<T>(env: ServiceUrlChangeEnv, request: ServiceUrlChangeRequest, bindings: ServiceUrlChangeBindings,
+  callback: (guard: () => Promise<ServiceAdmissionSnapshot>) => Promise<T>): Promise<T> {
+  const hash = await requestHash(request);
+  const executionId = crypto.randomUUID();
+  await claimExecution(env, request, executionId, "worker");
   const guard = async () => {
     const owned = await requireOwner(env, request, hash, executionId);
     await requireM6ManagementRuntime(bindings, (owned.value.runtime_readiness ?? owned.value.readiness)!);
@@ -119,11 +171,7 @@ async function withExecution<T>(env: ServiceUrlChangeEnv, request: ServiceUrlCha
   } finally {
     const current = await readServiceAdmission(env, request.service_id);
     if (current?.value.url_change) {
-      const owned = await requireOwner(env, request, hash, executionId);
-      const { execution_id: _execution, ...owner } = owned.value.url_change!;
-      if (!await compareAndSetServiceAdmission(env, owned, { ...owned.value, url_change: owner })) {
-        throw new Error("URL change execution return conflicted; retain its token");
-      }
+      await returnExecution(env, request, executionId, "worker");
     }
   }
 }
@@ -142,6 +190,9 @@ export async function stepServiceUrlChange(env: ServiceUrlChangeEnv, input: Serv
   return withExecution(env, request, bindings, async (guard) => {
     const progress = await readServiceUrlChange(env, request);
     if (!progress) throw new Error("URL change lost its permanent record");
+    if (request.domain_change?.action === "add" && !progress.value.connection_receipt) {
+      throw new Error("Add requires an acknowledged domain connection before changing feeds");
+    }
     const current = await configuration(env, request);
     if (progress.value.phase !== "feeds") return progress.value;
     const controls = await readSettledShowControls(env);
@@ -179,6 +230,7 @@ export async function completeServiceUrlChange(env: ServiceUrlChangeEnv, input: 
   const request = serviceUrlChangeRequestSchema.parse(input);
   const progress = await readServiceUrlChange(env, request);
   if (!progress || progress.value.phase === "feeds") throw new Error("URL change feeds, purge and settings are unfinished");
+  if (request.domain_change && !progress.value.connection_receipt) throw new Error("Domain connection has no retained receipt");
   if ((await configuration(env, request)).hash !== request.target_service_config_sha256) throw new Error("URL change has not reached its target configuration");
   const admission = await readServiceAdmission(env, request.service_id);
   if (!admission?.value.url_change) {
