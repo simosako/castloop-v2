@@ -25,6 +25,8 @@ jobs:
           bun-version: "1.4.2"
       - run: npm ci
       - run: npm run check
+      - name: Prepare private test workspace
+        run: mkdir -p -m 700 /tmp/opencode
       - run: bun test
       - name: Verify tag version
         if: github.ref_type == 'tag'
