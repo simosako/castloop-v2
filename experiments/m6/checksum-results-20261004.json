@@ -1,0 +1,45 @@
+{
+  "observed_at": "2026-10-04",
+  "bucket": "castloop-m6-test-ff3bfd8c",
+  "diagnostic_worker": "castloop-m6-test-checksum-913cb489",
+  "probe_prefix": "probe/checksum/8057dd2f-ff18-466a-8a83-ad2cc53c5db6/",
+  "rest_put": {
+    "body_bytes": 28,
+    "cases": [
+      { "header": "none", "status": 200, "body_matches": true },
+      { "header": "Content-MD5", "checksum_valid": true, "status": 200, "body_matches": true },
+      { "header": "Content-MD5", "checksum_valid": false, "status": 200, "body_matches": true },
+      { "header": "x-amz-checksum-sha256", "checksum_valid": true, "status": 200, "body_matches": true },
+      { "header": "x-amz-checksum-sha256", "checksum_valid": false, "status": 200, "body_matches": true }
+    ],
+    "binding_head_native_md5_matches": true,
+    "binding_head_native_sha256_present": false
+  },
+  "binding_put": {
+    "valid_sha256": { "bytes": 28, "succeeded": true, "head_native_sha256_matches": true },
+    "invalid_sha256": { "bytes": 28, "rejected": true, "reason_code": 10037, "head_exists": false },
+    "large_sha256": {
+      "source_key": "staging/episodes/large/boundary/d05d71fc-0c58-463d-904c-20704be807ae/audio.mp3",
+      "bytes": 300000000,
+      "source_native_md5_matches_local": true,
+      "source_native_sha256_present": false,
+      "target_suffix": "binding_large_sha256",
+      "status": 200,
+      "outcome": "ok",
+      "worker_cpu_ms": 2,
+      "worker_wall_ms": 16449,
+      "head_native_sha256": "acef6ef0a2fc8e6ee74e7218eaccfc013a0f89e3e56c1723ab99e5ac6457adee",
+      "cli_full_readback_size_sha256_matches": true
+    }
+  },
+  "cleanup": {
+    "own_successful_probe_payloads_deleted": 7,
+    "all_get_status": 404,
+    "source_staging_payload_retained": true,
+    "resources_deleted": false
+  },
+  "paid_or_cpu_limit_changed": false,
+  "application_records_written": false,
+  "authorizes_owner_release": false,
+  "m6_full_300mb_acceptance_complete": false
+}

@@ -55,6 +55,8 @@ Cloudflareの[limits](https://developers.cloudflare.com/workers/platform/limits/
 
 診断結果は`/tmp/opencode/castloop-m6-test-digest-e975e1b4/results-2.json`。tailの終了通知を旧IOがすべて収束した保証として扱わず、元のserviceのtoken/ownerは保持する。既存資源・診断資源の削除もしていない。
 
+後続の独立試験では、R2 bindingにSHA-256を渡す300MB stream保存とHEAD native checksum照合がCPU 2msで成功し、CLI全量読み戻しとも一致した。管理REST PUTへのchecksumヘッダー追加は誤ったhashを拒否しなかった。[完全性検証調査](./m6_upload_integrity_review.md)参照。これは代替機能の実証であり、現行M6 staging/publicationの実装変更や全受け入れ合格ではない。元serviceの未知owner/tokenは保持する。
+
 ## 後続
 
 300MB/audio-only/metadata-only/配信/明示deleteの未完了受け入れ、安全なunknown IO/残存lockの外部終了確認、復旧手順、通常CLI/README/help/version/releaseの完成は残る。harnessは新規初期化のacknowledged journal/paused checkpointからも開始可能にし、既に確認した通常更新と六lifecycleを300MB試験のたびに再実行しない。failed workspaceの再送/採用/強制解放を許可するmodeではない。

@@ -21,6 +21,8 @@
 - runnerはIO終了後も明示settlement/finishを別途要求する。GET成功はserver側の検証tokenやpublicationを代替しない。HTTP handlerの独立検証・owner/generation照合を維持する。
 - 接続終了をCloudflare側の遅延確定不在の証明にはしない。承認済みの未検証仮定U1を維持する。native runtimeの一般的なretry/切断保証を新たに主張しない。
 
+2026-10-04の[完全性検証調査](./m6_upload_integrity_review.md)では、上記の現行契約を、CLIの全量照合証拠＋Worker HEADのidentity照合とR2の公開保存時checksum検証へ集約する案を推奨した。まだ証拠伝達を実装しておらず、現在のHTTP独立hashを削除済みとは扱わない。
+
 ## 検証と残件
 
 mock RESTと実Bun/loopback HTTPでexact path/header、3種stagingの明示完了、8MiB snapshot転送、転送中の元ファイル変更、checksum/size/過大応答/早期応答/Range/応答喪失、取消await、live IO中dispose拒否、symlink/foreign account/再送拒否を確認した。Cloudflare RESTの実経路・300MB資源使用量・CLI公開・最新draft/publication照合・unknown outcomeの安全な外部復旧は別の残件である。

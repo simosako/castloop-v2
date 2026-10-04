@@ -75,4 +75,8 @@ mutationの自動再送、未知lock/tokenの解放、Worker/bucket/Queueの削�
 
 各試験は成功時もserviceを明示pausedで残す。これらのscriptの実装・local型検査だけをCloudflare合格として扱わず、実行結果を設計logへ別途記録する。複数colo・独自domain・請求額・無停止移行・unknown live IOの解放・正式releaseは対象外。
 
-2026-10-04、六lifecycle・completion recovery・実cache HITは合格したが、300MB stagingのWorker検証はCPU制限で未完了となった。元serviceはpaused/未収束owner/token/payload保持。native digest直結でもexceededCpuを実機観測したため、現方式をPaidで検証する場合は契約/利用承認が必要である。`usage_model=standard`をPaid証拠としない。具体的な証拠・残件は`design/m6_standalone_acceptance.md`。このharnessを既存failed workspaceで再実行してはいけない。
+2026-10-04、六lifecycle・completion recovery・実cache HITは合格したが、300MB stagingのWorker検証はCPU制限で未完了となった。元serviceはpaused/未収束owner/token/payload保持。native digest直結でもexceededCpuを実機観測した。管理者がWorkers Paid利用不可を決定したため、Paidへの変更ではなくR2/CLIの検証能力へ責務を集約する。`usage_model=standard`をPaid証拠としない。具体的な証拠・残件は`design/m6_standalone_acceptance.md`。このharnessを既存failed workspaceで再実行してはいけない。
+
+## R2 native checksumの調査（2026-10-04）
+
+[sanitized結果](./checksum-results-20261004.json)と[調査報告](../../design/m6_upload_integrity_review.md)を参照。管理REST PUTは誤ったchecksumヘッダーを拒否せず、binding PUTは誤ったSHA-256を拒否した。300MBのbinding stream保存/HEAD native SHA-256とCLI全量読み戻しが一致し、単独保存のCPUは2msだった。既存service/control/Queueは変更せず、今回作成したprobe payload七件だけをexact keyで削除した。旧token解放・M6全体の300MB受け入れ合格を許可する証拠ではない。private診断script/manifestを消してmutationを再送しない。
