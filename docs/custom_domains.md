@@ -2,6 +2,8 @@
 
 この機能は`feature/custom-domains`のCLIと同じbuildのWorkerが必要です。公開済みv0.2.1バイナリにはありません。ローカル実装・自動テストは完了していますが、Cloudflare上のDNS/TLS・配信受け入れは未実施です。
 
+実機検証は[専用hostnameでの受け入れ手順](custom_domain_live_acceptance.md)を参照してください。
+
 ## 前提
 
 - 初期化済みM6サービスに、1つの専用hostnameを接続します。複数domain・Show別domain・他サービスの接続の採用はしません。
