@@ -89,3 +89,15 @@ CLIの全量SHA-256読み戻しとPUT receiptのETag/versionが、保存journal/
 続行は`--metadata-staged-workspace`でexact version/readiness・同じbase・finished local/remote released staging・読戻し証拠一致・publication未作成・lock/token不在を照合したcheckpointに限る。別の`wx` before fileを作り、元incompleteを保持する。再PUT/再staging/未知POSTの再送・ownerの強制解放はしていない。
 
 最終pauseは`d89332da-8564-42c9-b605-e37a5af0596d`。private `large-media-acceptance.json`と[sanitized結果](../experiments/m6/large-media-results-20261004.json)を保存した。readonly snapshot競合は9件を有限観測で扱い、mutationは再送していない。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、Linux binaryとlocal HTTPS readonly/production拒否も合格した。
+
+## 正式CLI/WorkerのMVP walkthrough: 合格
+
+既存runnerを共有した通常Linuxバイナリで、新規`castloop-m6-test-d5fd9895-4fe3e736`/bucket `castloop-m6-test-formal-d5fd9895`を使用した。workspaceは`/tmp/opencode/castloop-m6-test-formal-d5fd9895`。初期化operation `fe060824-fd94-483d-891e-311499aa3a68`のpaused完了・明示再開、サービスrootのShow commandとShow directoryのEpisode command、MP3引数付き初回公開と引数なしmetadata-only公開、GET全量SHA-256/HEAD/Range/304、private path非公開・管理API認証、試験nonce header不在を確認した。
+
+通常更新operation `82aff843-2621-4521-a318-23af97a15629`はpausedで完了し、明示再開後のcurrent revision全体（GUID/日時/音源URL/hashを含む）が同じであった。六lifecycle操作の配信404/復元200/削除410と、全jobのcompleted/finished/purge確認・execution非稼働を確認した。終了後のreadonly R2監査で既知8 payloadの404、永久reservation identity・Episode tombstone・Show/Episode publication marker保持、service snapshot非変更が合格した。より広いimmutable object/300MB/cache HIT検証は上記の既存受け入れを再利用し、今回の小さい合成音源試験を聴取品質・複数colo・費用/停止時間測定へ一般化しない。
+
+試験scriptは当初create-showのfile path出力をJSONとして読んで停止し、その後は処理中のreadonly照会未確認で停止した。初期化/登録または公開のlocal acknowledged receipt、remote完了・owner/lock/token不在、未開始の次工程を照合したcheckpointだけから続行した。mutationを再送せず、元incompleteを保持した。最後のrunではreadonly未確認16件を有限再照会で扱った。公開完了stateは`published`、lifecycle完了stateは`completed`であることもREADME/helpへ正しく反映した。
+
+最終versionは`c2d68ee0-d81a-4d70-99b4-539751c88904`、pause `c626b2f5-94ed-48a5-b8d2-8903126f4446`、generation 146、空registry。正式Workerの最終source hashは試験済みbundleと同じ`ae052ebb5d6aa279ba5a14c97449ef14d1e9cdbfadc493813335f24c52a9bfdc`で、test headerは含まない。資源はpausedで保持し、既存環境/Paid/未知ownerには手を加えない。[sanitized結果](../experiments/m6/formal-entry-results-20261004.json)を保存した。
+
+全893テスト/13526 assertions、両TypeScript検査、正式/試験Linux build、認証情報・ソースのないcwdで正式standaloneのversion/全27 help・fault command拒否も合格した。CLI実行権限を保持し、checksum/license同梱の候補artifactをローカルへ用意した。README/help/Release notes草案は完成したが、正式version/tag/GitHub Releaseはまだ作成していない。

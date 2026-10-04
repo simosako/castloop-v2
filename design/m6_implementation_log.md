@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 正式バイナリのMVP実機確認とRelease準備
+
+- 正式入口で新規初期化・Show/Episode公開・metadata-only・通常更新・六lifecycle操作が合格した。known checkpointでのみ試験scriptの出力parser/readonly未確認から続行し、未知mutationの再送や強制解放はしない。
+- 最後のreadonly監査で六jobの完了/purge、既知8 payload物理不在、永久reservation/tombstone/commit marker保持を確認した。専用資源はversion `c2d68ee0-d81a-4d70-99b4-539751c88904`、paused/generation146/空registryで保持する。既存300MB/cache/広い非変更検証は再利用した。
+- 最終Worker sourceは実機bundleとbyte hashが一致し、test nonce headerは含まない。全893テスト/13526 assertions・両TypeScript検査・Linux buildと、認証情報なしstandaloneの全27 help/fault command拒否が合格。CLI sourceの実行権限も維持する。
+- 承認済みMVP範囲の残実装・検証は完了。README/helpと次期Release notes草案、checksum/license付きローカルartifactを用意した。正式version/tag/GitHub Releaseとmainへの反映はまだ行っていない。詳細は`m6_standalone_acceptance.md`、`experiments/m6/formal-entry-results-20261004.json`。
+
 ## 2026-10-04: 承認済みMVP範囲で正式CLI/Workerへ接続
 
 - 既存runnerの呼出を`m6-commands.ts`へ共有し、正式CLIの旧state.json/直接PUT/公開処理を置き換えた。試験CLIは専用資源制限とfault injectionだけの薄いwrapperとし、状態機械・receipt検査は増やしていない。管理keyのprivate/fsync付き保存も一か所へ集約した。

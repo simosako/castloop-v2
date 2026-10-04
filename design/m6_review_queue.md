@@ -60,11 +60,11 @@ R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理RES
 
 ### 現在の到達点（2026-10-04）
 
-下記の各module詳細には実装当時の未接続項目も残る。最新の到達点は新規初期化・通常更新の試験HTTP/standalone接続と実Cloudflare合格、Show/Episode六lifecycle操作の実機合格まで進んでいる。後者は配信404/410・復元時GUID/revision保持・物理削除・永久記録保持・owner/token通常返却を含む。通常公開CLI/entryはまだ切り替えていない。
+下記の各module詳細には実装当時の未接続項目も残る。正式CLI/Worker entryを既存runnerへ切り替え、専用新規環境でLinuxバイナリの初期化→明示再開→Show/Episode公開→metadata-only改訂→通常更新→六lifecycle操作→paused終了が合格した。GET/HEAD/Range/304、停止404/削除410、既知payload物理不在、永久記録保持、空registryまで確認した。正式version/tag/GitHub Releaseは未作成である。
 
 通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。改修前の300MB Worker hashはCPU超過となり、元serviceはpaused/owner/token/payloadを保持する。管理者承認のCLI全量SHA-256証拠＋Worker HEAD照合＋R2公開時検証へ集約した後、新規`castloop-m6-test-7c97f1a0`で300MB公開・audio-only/metadata-only改訂・全量配信/HEAD/Range/304・明示削除まで合格した。試験CLIのmetadata-only引数制約は修正し、publication未開始の確認済みcheckpointだけを続行した。課金/CPU limitは変更しておらず、費用測定計画を通常開発のgateへ戻すものではない。
 
-残件は正式CLI/Workerへの接続、変更入口の検証と正式バイナリの実機確認、利用案内・release準備である。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+承認済みMVP範囲の実装・検証・利用案内とRelease notes草案は完成した。残るのは正式version/tagと公開操作の確定・実施であり、万能なunknown IO復旧や追加fault matrixをgateへ戻さない。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 

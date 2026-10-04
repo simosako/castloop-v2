@@ -91,6 +91,8 @@ Pause temporarily stops delivery and new mutations. Paused does not necessarily 
 Preserve the workspace, journals, locks and remote owners after any error. Do not rerun unknown requests, delete locks, replace administrator secrets or release tokens because time elapsed or HEAD found no object. An unknown/forcibly interrupted invocation can remain blocked; universal recovery is outside this MVP.
 
 - `local-operation-status FAMILY ID` inspects local records without credentials or network access. `operation-status FAMILY ID` compares them with authenticated server status. Families: `staging`, `publication`, `lifecycle`, `show-registration`.
+- Historical jobs may report `ownership: "superseded"` after a later operation. Use `target-show ID` or `target-episode SHOW_ID EPISODE_ID` for current ownership; this does not authorize retrying an old job.
+- Read-only inspections can be unverified while progress changes. Repeat only read-only inspection; never replay a mutation or release ownership on that basis.
 - `retry-job JOB_UUID` and `lifecycle-retry JOB_UUID REQUEST_SHA256 ACK` explicitly retry the same acknowledged commit only when execution has safely settled; they refuse active/unknown execution.
 - `init-reconcile OPERATION_UUID` and `update-service-reconcile OPERATION_UUID` reconcile already completed, paused server operations with retained local requests. They do not repeat deployments. `update-service-verify OPERATION_UUID` continues only an acknowledged deployment's verification.
 - Initialization journals are `.castloop/service-initializations/SERVICE_ID.json`; update journals are `.castloop/service-updates/SERVICE_ID/OPERATION_UUID.json`. Retain these and their locks. Re-running `init` is not a recovery method for a started operation.
