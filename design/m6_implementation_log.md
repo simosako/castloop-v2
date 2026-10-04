@@ -1,5 +1,11 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 明示確認付きlifecycle操作を試験専用standaloneへ接続
+
+- 既存preview/claim/commit/retry/statusを薄いCLI adapterへ接続した。共通confirmation helperは入力されたhashとaction別の明示確認文字列を渡すだけで、状態遷移・receipt検査をCLIへ複製しない。
+- deleteは不可逆payload削除と永久管理記録保持の両方を示す確認文字列が必要。planはbounded/no-followで読み、通常binaryとproduction資源は拒否する。commitとconsumer完了を区別し、unknown outcome/残存lock/live tokenの解除・Cloudflare資源削除は追加しない。
+- TypeScript、関連6テスト/39 assertions、通常/試験Linux binary build、local HTTPSの四family非書込statusと新commandのproduction資源拒否が合格した。実Cloudflareの六lifecycle/配信/cache/300MBと安全な外部復旧は後続であり、通常release gateは維持する。
+
 ## 2026-10-04: 初期化・通常更新の完了応答喪失を共通の非書込証拠で照合
 
 - `M6SetupClient.observeCompleted`へ、REST前後検査・exact paused/pause owner/空registry/runtime readiness・永久request/Queue receipt・service前後非変更を集約した。初期化/更新のjournalは固有のrequested→completed遷移だけを持ち、再配備/Queue/purge/completeの再送や自動resumeはしない。

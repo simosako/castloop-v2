@@ -1,14 +1,18 @@
-import { buildM6WorkerUploadMetadata, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, parseServiceConfig, showMetadataSchema, validateId } from "@castloop/shared";
+import { buildM6WorkerUploadMetadata, lifecycleOperationRequestSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, parseServiceConfig, showMetadataSchema, validateId } from "@castloop/shared";
 import { CloudflareApi } from "./cloudflare-api";
 import { readBoundedLocalJournal } from "./local-journal-read";
+import { createLifecycleJournal, readLocalLifecycleJob } from "./lifecycle-journal";
+import { createLifecycleOperationEffects, runLifecycleRetry } from "./lifecycle-operation";
 import { createFreshM6RestEffects } from "./m6-initialization-rest";
 import { createM6LocalEpisodeDraft, createM6LocalShowDraft } from "./m6-local-drafts";
+import { confirmLocalM6Lifecycle, executeLocalM6Lifecycle, previewLocalM6Lifecycle, validateM6LifecyclePlan } from "./m6-local-lifecycle";
 import { publishLocalM6Draft, updateLocalM6Draft } from "./m6-local-update";
 import { M6ServiceClient } from "./m6-service-client";
 import { createFreshM6InitializationJournal, openFreshM6InitializationJournal, reconcileFreshM6Initialization, runFreshM6Initialization } from "./m6-service-initialization";
 import { createM6UpdateJournal, readLocalM6Update, reconcileM6UpdateCompletion, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
 import { M6SetupClient } from "./m6-setup-client";
 import { M6UpdateClient } from "./m6-update-client";
+import { readRemoteOperationStatus } from "./remote-operation-status";
 import { createM6UpdateRestEffects } from "./m6-update-rest";
 import { createShowRegistrationJournal } from "./show-registration-journal";
 import { createShowRegistrationEffects, runShowRegistration } from "./show-registration-operation";
@@ -31,7 +35,13 @@ create-show SHOW_ID SITE_URL | create-episode SHOW_ID EPISODE_ID
 update-show SHOW_ID | update-episode SHOW_ID EPISODE_ID
 update-episode-audio SHOW_ID EPISODE_ID MP3_PATH
 publish-show SHOW_ID | publish-episode SHOW_ID EPISODE_ID MP3_PATH
-No production release, adoption, deletion, automatic resume or unknown-outcome replay.`;
+preview-show-lifecycle SHOW_ID unpublish|restore|delete
+preview-episode-lifecycle SHOW_ID EPISODE_ID unpublish|restore|delete
+lifecycle-execute PLAN_JSON REQUEST_SHA256 confirm|confirm-delete-retain-records
+lifecycle-retry JOB_UUID REQUEST_SHA256 confirm|confirm-delete-retain-records
+operation-status FAMILY ID
+Deletion physically removes payloads and permanently retains operational records/IDs.
+No production release, resource adoption/deletion, automatic resume or unknown-outcome replay.`;
 
 function argumentsFor(args: string[], count: number): void {
   if (args.length !== count || args.some((arg) => !arg || arg.startsWith("--"))) throw new Error("Invalid test command arguments; use --help");
@@ -43,6 +53,7 @@ async function main(): Promise<void> {
   const counts: Record<string, number> = { init: 1, "init-reconcile": 1, "update-service": 1, "update-service-verify": 1,
     "update-service-reconcile": 1, "service-status": 0, "service-pause": 1, "service-resume": 1,
     "target-show": 1, "target-episode": 2,
+    "preview-show-lifecycle": 2, "preview-episode-lifecycle": 3, "lifecycle-execute": 3, "lifecycle-retry": 3, "operation-status": 2,
     "create-show": 2, "create-episode": 2, "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3 };
   if (!Object.hasOwn(counts, command)) throw new Error("Unknown test command; use --help");
   argumentsFor(args, counts[command]!);
@@ -69,6 +80,34 @@ async function main(): Promise<void> {
   const secret = readBoundedLocalJournal(secretFile);
   if (!secret || typeof secret !== "object" || !("CASTLOOP_ADMIN_KEY" in secret) || typeof secret.CASTLOOP_ADMIN_KEY !== "string") throw new Error("Missing local administrator key");
   const key = secret.CASTLOOP_ADMIN_KEY;
+  if (command === "operation-status") {
+    console.log(JSON.stringify(await readRemoteOperationStatus(root, config, args[0]!, args[1]!, () => key)));
+    return;
+  }
+  if (command === "lifecycle-execute") {
+    const plan = validateM6LifecyclePlan(config, readBoundedLocalJournal(resolve(args[0]!)));
+    const confirmation = confirmLocalM6Lifecycle(plan.request.action, args[1]!, args[2]!);
+    const state = await executeLocalM6Lifecycle(root, config, plan, confirmation, key);
+    console.log(JSON.stringify({ result: "lifecycle-committed", job_id: state.claim.request.job_id }));
+    return;
+  }
+  if (command === "lifecycle-retry") {
+    const retained = readLocalLifecycleJob(root, config, args[0]!);
+    if (!retained.client_state || retained.lock_present) throw new Error("Retry requires its retained confirmed journal without an unknown lock");
+    const claim = retained.client_state.claim;
+    const journal = createLifecycleJournal(root, config, { ...claim, confirmation: confirmLocalM6Lifecycle(claim.request.action, args[1]!, args[2]!) });
+    await runLifecycleRetry(journal, createLifecycleOperationEffects(config, journal.load(), key));
+    console.log(JSON.stringify({ result: "lifecycle-requeued", job_id: claim.request.job_id }));
+    return;
+  }
+  if (command.startsWith("preview-")) {
+    const showId = validateId(args[0]!, "show");
+    const episode = command === "preview-episode-lifecycle";
+    const target = episode ? { kind: "episode" as const, show_id: showId, episode_id: validateId(args[1]!, "episode") } : { kind: "show" as const, show_id: showId };
+    const action = lifecycleOperationRequestSchema.shape.action.parse(args[episode ? 2 : 1]);
+    console.log(JSON.stringify(await previewLocalM6Lifecycle(config, target, action, key)));
+    return;
+  }
   if (command === "init") {
     const source = embeddedWorkerSource!;
     const metadata = buildM6WorkerUploadMetadata(config, null, key, WORKER_COMPATIBILITY_DATE);
