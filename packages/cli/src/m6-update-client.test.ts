@@ -3,6 +3,7 @@ import { m6ServiceUpdateRequestSchema } from "@castloop/shared";
 import { M6UpdateClient } from "./m6-update-client";
 import { createM6UpdateJournal, reconcileM6UpdateCompletion, runM6Update } from "./m6-service-update";
 import { workerPayloadHash } from "./worker-upload-hash";
+import { dropSetupCompletion } from "./test-support/drop-setup-completion";
 import { consumeM6SetupProbe } from "../../../src/m6-setup-queue";
 import { readServiceAdmission } from "../../../src/service-admission";
 import { m6SetupFixture } from "../../../src/test-support/m6-setup";
@@ -60,11 +61,7 @@ test("a lost update completion is reconciled from its permanent request/runtime 
   const root = mkdtempSync("/tmp/opencode/castloop-update-http-reconcile-");
   try {
     const journal = await createM6UpdateJournal(root, setup.config, setup.update);
-    const client = new M6UpdateClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => setup.updatedSnapshot }, async (url, init) => {
-      const response = await setup.transport(url, init);
-      if (url.pathname.endsWith("/complete")) { await response.body?.cancel(); throw new Error("Completion response lost"); }
-      return response;
-    });
+    const client = new M6UpdateClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => setup.updatedSnapshot }, dropSetupCompletion(setup.transport));
     await expect(runM6Update(journal, { begin: (request) => client.begin(request), deploy: async () => { setup.deployed(); return setup.target; },
       complete: (request, target) => client.complete(request, target, setup.wait) }, setup.source, setup.metadata)).rejects.toThrow("outcome is unknown");
     expect(journal.load().phase).toBe("completion_requested");

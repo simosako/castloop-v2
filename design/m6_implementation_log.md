@@ -1,5 +1,13 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 六lifecycle操作のCloudflare/standalone受け入れ
+
+- 通常更新済みの専用`castloop-m6-test-ff3bfd8c`を再利用し、Show/Episode各unpublish/restore/deleteを試験binary→実HTTP→通知/Queue→consumerまで通した。GUID/revision/checksum保持、GET/HEAD/Range/304/416と停止404/削除410、payload物理不在と永久管理記録保持が合格した。
+- owner解放・invocation返却まで確認し、最後に明示pausedで残した。旧環境/Cloudflare資源の削除・通常release gate解除はしていない。試験harnessだけのbounded stream/process処理を共有し、operation固有の受付条件は既存moduleへ残す。
+- 後続の応答喪失fault・300MB/audio-only/metadata-only・実cache HITの有限受け入れharnessを追加した。正確な300MB fixtureのlocal stream解析は合格。試験Workerだけにcache/gateway nonceを追加し、公開Workerには追加しない。試験専用publication retryも既存runnerへ接続し、live/unknown tokenを奪わない。
+- 更新operation `6bb77144-ded9-427e-88c9-171ba5be8735`で成功completion応答だけを破棄し、local requested/server paused→別standalone commandの非書込照合→local completedも実機合格した。照合前後のservice statusとruntime-check ETag/checksumを維持した。全884テスト/13409 assertions、TypeScript/M6試験tsconfig、試験Linux build/local HTTPS production拒否も合格。
+- 実機証拠と残件は`m6_standalone_acceptance.md`。六操作の合格をcache HIT/300MB/強制終了IO収束やM6正式release全体の合格と混同しない。
+
 ## 2026-10-04: 明示確認付きlifecycle操作を試験専用standaloneへ接続
 
 - 既存preview/claim/commit/retry/statusを薄いCLI adapterへ接続した。共通confirmation helperは入力されたhashとaction別の明示確認文字列を渡すだけで、状態遷移・receipt検査をCLIへ複製しない。

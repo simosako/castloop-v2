@@ -12,11 +12,14 @@ import { createFreshM6InitializationJournal, openFreshM6InitializationJournal, r
 import { createM6UpdateJournal, readLocalM6Update, reconcileM6UpdateCompletion, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
 import { M6SetupClient } from "./m6-setup-client";
 import { M6UpdateClient } from "./m6-update-client";
+import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
+import { createPublicationOperationEffects, runPublicationRetry } from "./publication-operation";
 import { readRemoteOperationStatus } from "./remote-operation-status";
 import { createM6UpdateRestEffects } from "./m6-update-rest";
 import { createShowRegistrationJournal } from "./show-registration-journal";
 import { createShowRegistrationEffects, runShowRegistration } from "./show-registration-operation";
 import { TargetInspectionClient } from "./target-inspection-client";
+import { dropSetupCompletion } from "./test-support/drop-setup-completion";
 import { embeddedWorkerSource, WORKER_COMPATIBILITY_DATE } from "./worker-payload";
 import { workerPayloadHash } from "./worker-upload-hash";
 import { randomBytes } from "node:crypto";
@@ -27,6 +30,7 @@ const HELP = `Unreleased isolated M6 test binary. Requires castloop.toml in the 
 init OPERATION_UUID
 init-reconcile OPERATION_UUID (only an already-completed paused initialization)
 update-service OPERATION_UUID (requires explicit pause and settled owners)
+update-service-drop-completion OPERATION_UUID (isolated fault test; deliberately loses the completion response)
 update-service-verify OPERATION_UUID (only durable acknowledged deployment; never re-upload)
 update-service-reconcile OPERATION_UUID (only an already-completed paused update)
 service-status | service-pause PAUSE_UUID | service-resume PAUSE_UUID
@@ -35,6 +39,7 @@ create-show SHOW_ID SITE_URL | create-episode SHOW_ID EPISODE_ID
 update-show SHOW_ID | update-episode SHOW_ID EPISODE_ID
 update-episode-audio SHOW_ID EPISODE_ID MP3_PATH
 publish-show SHOW_ID | publish-episode SHOW_ID EPISODE_ID MP3_PATH
+publication-retry JOB_UUID (same acknowledged commit; refuses active or unknown execution)
 preview-show-lifecycle SHOW_ID unpublish|restore|delete
 preview-episode-lifecycle SHOW_ID EPISODE_ID unpublish|restore|delete
 lifecycle-execute PLAN_JSON REQUEST_SHA256 confirm|confirm-delete-retain-records
@@ -50,10 +55,10 @@ function argumentsFor(args: string[], count: number): void {
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   if (!command || command === "--help") { console.log(HELP); return; }
-  const counts: Record<string, number> = { init: 1, "init-reconcile": 1, "update-service": 1, "update-service-verify": 1,
+  const counts: Record<string, number> = { init: 1, "init-reconcile": 1, "update-service": 1, "update-service-drop-completion": 1, "update-service-verify": 1,
     "update-service-reconcile": 1, "service-status": 0, "service-pause": 1, "service-resume": 1,
     "target-show": 1, "target-episode": 2,
-    "preview-show-lifecycle": 2, "preview-episode-lifecycle": 3, "lifecycle-execute": 3, "lifecycle-retry": 3, "operation-status": 2,
+    "preview-show-lifecycle": 2, "preview-episode-lifecycle": 3, "lifecycle-execute": 3, "lifecycle-retry": 3, "publication-retry": 1, "operation-status": 2,
     "create-show": 2, "create-episode": 2, "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3 };
   if (!Object.hasOwn(counts, command)) throw new Error("Unknown test command; use --help");
   argumentsFor(args, counts[command]!);
@@ -80,6 +85,14 @@ async function main(): Promise<void> {
   const secret = readBoundedLocalJournal(secretFile);
   if (!secret || typeof secret !== "object" || !("CASTLOOP_ADMIN_KEY" in secret) || typeof secret.CASTLOOP_ADMIN_KEY !== "string") throw new Error("Missing local administrator key");
   const key = secret.CASTLOOP_ADMIN_KEY;
+  if (command === "publication-retry") {
+    const retained = readLocalPublicationJob(root, config, args[0]!);
+    if (!retained.client_state || retained.lock_present) throw new Error("Retry requires its retained publication journal without an unknown lock");
+    const journal = createPublicationJournal(root, config, retained.client_state.publication);
+    await runPublicationRetry(journal, createPublicationOperationEffects(config, journal.load(), key));
+    console.log(JSON.stringify({ result: "publication-requeued", job_id: args[0] }));
+    return;
+  }
   if (command === "operation-status") {
     console.log(JSON.stringify(await readRemoteOperationStatus(root, config, args[0]!, args[1]!, () => key)));
     return;
@@ -124,13 +137,13 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ result: "initialized-paused", operation_id: args[0], runtime_readiness: journal.load().runtime_readiness }));
     return;
   }
-  if (["update-service", "update-service-verify", "update-service-reconcile"].includes(command)) {
+  if (["update-service", "update-service-drop-completion", "update-service-verify", "update-service-reconcile"].includes(command)) {
     const operationId = m6ServiceUpdateRequestSchema.shape.operation_id.parse(args[0]);
     const api = new CloudflareApi(config);
-    const client = new M6UpdateClient(config, key, api);
+    const client = new M6UpdateClient(config, key, api, command === "update-service-drop-completion" ? dropSetupCompletion() : undefined);
     const effects = createM6UpdateRestEffects(api, { begin: (input) => client.begin(input),
       admission: () => client.admission(), complete: (input, target) => client.complete(input, target) });
-    if (command !== "update-service") {
+    if (command === "update-service-verify" || command === "update-service-reconcile") {
       const retained = readLocalM6Update(root, config, operationId);
       if (!retained.state || retained.lockPresent) throw new Error("Verification requires its retained journal without an unknown lock");
       const journal = await createM6UpdateJournal(root, config, retained.state.request);

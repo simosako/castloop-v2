@@ -46,6 +46,12 @@
 
 ## 管理者の判断待ちではない技術残件
 
+### 現在の到達点（2026-10-04）
+
+下記の各module詳細には実装当時の未接続項目も残る。最新の到達点は新規初期化・通常更新の試験HTTP/standalone接続と実Cloudflare合格、Show/Episode六lifecycle操作の実機合格まで進んでいる。後者は配信404/410・復元時GUID/revision保持・物理削除・永久記録保持・owner/token通常返却を含む。通常公開CLI/entryはまだ切り替えていない。
+
+通常更新の完了応答喪失→別standaloneの非書込照合も実機合格した。残件は実cache HIT、300MBと二種改訂の受け入れ、新規初期化fault、安全なunknown IO/残存lockの外部終了確認・復旧手順、公開CLI/利用案内・release gateである。専用試験harnessを追加して継続し、未実行のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 
 新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを実装した。認証付きHTTP/loopback/Queue起動検証と試験専用standaloneを接続し、別名Cloudflare環境で初期paused→明示再開→Show/Episode公開→GET/HEAD/Rangeを確認した。通常の公開CLI/entryは切り替えず、通常更新・全lifecycle/cache/300MB/unknown IO復旧の受け入れは残る。既存資源の削除/採用はしていない。[新規初期化](./m6_fresh_initialization.md)参照。

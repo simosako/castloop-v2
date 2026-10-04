@@ -24,4 +24,6 @@ file保存とlockは既存共通storageへ置き、初期化/更新固有のphas
 
 実HTTP handler/Queue/CASを使うlocal結合で、初期化・更新のcompletion応答喪失→永続証拠の非書込照合→local完了→paused維持を確認した。未完了、欠落/別request receipt、別pause、live token、途中generation変更を拒否し、remote writes/Queue送信が増えないことを回帰する。
 
-専用Cloudflareでの応答喪失/強制終了受け入れ、未知の実行中PUT/consumer、残存lockの外部終了確認は残る。この実装を任意のunknown IOの安全な解放や、M6全体の受け入れ合格とは扱わない。
+専用Cloudflareで通常更新のcompletion応答だけを失わせたstandalone照合が合格した。local requested/server pausedからの非書込照合で、service generation/readinessと永久runtime-checkのETag/checksumを保持した。対象operation/versionは`m6_standalone_acceptance.md`。新規初期化の同種fault実機試験、強制終了受け入れ、未知の実行中PUT/consumer、残存lockの外部終了確認は残る。この実装を任意のunknown IOの安全な解放や、M6全体の受け入れ合格とは扱わない。
+
+試験binaryの`update-service-drop-completion`は通常更新を一度実行し、serverの200 completion応答だけを消費して破棄する専用fault入口。production資源prefixを先に拒否し、通常binaryには含めない。`verify-completion-recovery.ts`がlocal requested・server pausedと新targetを検査してから別commandで照合する。通信障害の結果を捏造したreceiptや、強制終了したIOのsettlement申告は作らない。
