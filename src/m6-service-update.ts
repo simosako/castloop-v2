@@ -1,11 +1,10 @@
 import { m6RuntimeTargetSchema, m6ServiceUpdateRequestSchema, m6SetupRecordKey, serviceAdmissionSchema } from "../packages/shared/src/index";
 import type { M6RuntimeReadiness, M6RuntimeTarget, M6ServiceUpdateRequest } from "../packages/shared/src/index";
-import { readShowControl } from "./lifecycle-control";
 import { matchesM6RuntimeTarget, readM6RuntimeConfiguration, verifyM6RuntimeReadiness } from "./m6-runtime-readiness";
 import type { M6RuntimeChecks, M6RuntimeConfiguration, M6RuntimeEnv } from "./m6-runtime-readiness";
 import { readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import type { ServiceAdmissionSnapshot } from "./service-admission";
-import { requireShowReservationReady } from "./show-reservation-record";
+import { readSettledShowControls } from "./service-quiescence";
 
 export type M6UpdateEnv = M6RuntimeEnv & { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head" | "put" | "list"> };
 
@@ -14,19 +13,6 @@ export async function requireFrozenUpdateRequest(env: M6UpdateEnv, request: M6Se
   if (!object || object.size < 1 || object.size > 16384 ||
     JSON.stringify(m6ServiceUpdateRequestSchema.parse(await object.json<unknown>())) !== JSON.stringify(request)) {
     throw new Error("Compatible update differs from its permanent frozen request");
-  }
-}
-
-async function requireSettledShowOwners(env: M6UpdateEnv): Promise<void> {
-  const prefix = "system/show-publications/";
-  const page = await env.CASTLOOP_BUCKET.list({ prefix, limit: 100 });
-  if (page.truncated) throw new Error("Compatible update exceeds its bounded Show-control inspection budget");
-  for (const object of page.objects) {
-    const showId = object.key.slice(prefix.length, -5);
-    if (object.key !== `${prefix}${showId}.json`) throw new Error("Unknown Show-control key blocks compatible updates");
-    const control = await readShowControl(env, showId);
-    if (!control || control.value.owner || control.value.lifecycle === "deleting") throw new Error("Compatible update requires settled Show owners; unknown uploads or publications are not expired");
-    await requireShowReservationReady(env, control.value);
   }
 }
 
@@ -40,14 +26,14 @@ export async function beginM6ServiceUpdate(env: M6UpdateEnv, input: M6ServiceUpd
     return;
   }
   if (!snapshot || snapshot.value.mode !== "m6" || snapshot.value.state !== "paused" || snapshot.value.pause_id !== request.pause_id ||
-    snapshot.value.invocations.length || snapshot.value.generation !== request.expected_service_generation ||
+    snapshot.value.invocations.length || snapshot.value.url_change || snapshot.value.generation !== request.expected_service_generation ||
     (snapshot.value.runtime_readiness ?? snapshot.value.readiness)?.worker_version_id !== request.previous_worker_version_id) {
     throw new Error("Compatible update requires its exact paused M6 service, previous runtime and no live invocations");
   }
   if (await env.CASTLOOP_BUCKET.head(m6SetupRecordKey(request.operation_id))) {
     throw new Error("Compatible update ID already belongs to permanent runtime verification");
   }
-  await requireSettledShowOwners(env);
+  await readSettledShowControls(env);
   if ((await readM6RuntimeConfiguration(env, request.service_config_sha256, request.previous_worker_version_id)).etag !== configuration.etag) {
     throw new Error("Service configuration changed before compatible update admission");
   }

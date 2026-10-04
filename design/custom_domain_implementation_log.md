@@ -1,5 +1,20 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-04: 共通の停止中URL切替core
+
+`src/service-url-change.ts`に、add/removeが同じ処理を使うserver coreを実装した。まだ公開管理APIやdomain CLIには接続していない。
+
+- 既存service admissionのpaused recordに小さな`url_change` ownerを追加し、同じCASで実行tokenを管理する。状態enum・別のShow lock・consumer・deployは追加しない。処理中は通常mutation/consumer/recovery/resume/deployを共通層で拒否する。
+- Show所有者の終了確認を通常更新と共有した。最大100 controlを確認し、unfinished/deleting/登録不完全なら拒否する。invocationがないだけで変更を始めない。
+- feed選別・immutable音源HEAD検証・公開済みShow/coverの読み出し・bounded RSS生成・条件付きfeed保存を既存lifecycle処理と共有した。1 stepにつき1 Showを進め、activeなShow/Episodeだけを新URLへ再生成してpurgeする。非公開/削除/draftの不復活と、媒体・revision/current metadata・GUID・公開日時・`site_url`の不変を維持する。
+- 全feed/purgeの成功後にR2設定を同期する。進捗は`feeds`→`configured`→`complete`の小さなrecordに固定要求とShow cursorだけを保存し、コンテンツやsecretを複製しない。設定PUTの応答喪失後はtarget hashから確認し、同じPUTを繰り返さず収束できる。
+- `configured`でもownerを解放しない。domain接続/TLS、remove時のDetach、ローカル設定同期を将来のCLIで確認してから完了関数を呼ぶ。完了時は同じWorker/version/deploymentのまま設定hashだけを合わせ、pausedでownerを解放する。サービス再開は既存resumeだけを使う。
+- purge失敗は進捗を進めず明示再試行できる。稼働中/未知の実行tokenはstatus・同じ要求の再実行でも解放・失効させない。receiptの`complete`表示だけでなくowner解放も確認する管理APIへ接続する予定。
+
+変更箇所の7テストで両方向、複数Show、既存の新項目なし設定・Show 0件、purge失敗、設定応答喪失、live/residual token、早すぎるresume/deployと公開GET停止を確認した。`bun test`全919件、`npm run check`、試験用TypeScript検証とLinuxバイナリbuildが成功。既存M6の安全条件・300 MB受け入れを別の大規模試験群へ複製していない。
+
+残りはCloudflareの接続照会とTLS確認をこのcoreへ接続し、共有local journal保存によるCLI・設定同期・復旧を完成すること。その後に承認された専用hostnameで実機検証する。Cloudflareリソース/DNSの変更はしていない。
+
 ## 2026-10-04: 公開URLから操作記録のidentityを分離
 
 Show登録・local draft・staging・publication・lifecycleのidentity生成を共通の`serviceOperationIdentity`へ統一した。照合するのはservice/account/Workerと固定のworkers.dev管理originであり、変更可能なPodcast正規URLではない。既存journalのwire形式を変えず、identity内の従来の`public_base_url`欄には固定originを入れる。独自ドメイン未提供だった既存M6のworkers.dev identityはそのまま一致し、過去のrecordやfrozen要求を書き換えない。

@@ -3,7 +3,7 @@
 作成日: 2026-09-25
 方針確定: 2026-09-26
 改訂日: 2026-10-04（v0.2.1 / M6完成後）
-状態: 基礎実装済み、公開CLI未提供。以下は既存の共通処理を再利用する改訂計画であり、追加実装の完了報告ではない。
+状態: 基礎API、管理URL分離・通常更新、停止中の正規URL切替coreを実装・自動検証済み。domain CLI接続・実機受け入れは未完了。
 
 ## 目的とスコープ
 
@@ -20,7 +20,7 @@
 - `CloudflareApi.ensureWorkerDomain`は、Workerに別のCustom Domainがある場合やhostnameが他Workerに属する場合に拒否する。**1サービス1ドメインの制限は基礎APIで実装済み**。同じhostnameの再実行、zone/DNS競合確認、所有Workerを確認した切断もある。
 - `src/media-url.ts`の`canonicalEnclosureUrl`と`src/feed.ts`は、既存音源pathを現在の正規URLへ組み直す。履歴の絶対URLをそのままRSSへ出す問題は解消済み。
 - M6にはサービス停止、invocationとShow所有者の確認、CAS、lifecycle判定、feed生成、cache purge、ローカルjournal保存がある。新しい独自ドメイン専用の同等実装は作らない。
-- 未実装なのはCLIへの接続、TLS/到達確認、正規URLと既存feedの変更・復旧、および通常deployの制限解除と確認。
+- 管理URL分離、通常deployの接続保持、正規URLとactive feedの変更・purge・R2設定同期のserver coreは実装済み。残るのはdomain CLI/管理API、接続・TLSの確認、ローカル設定同期とその復旧、実機受け入れ。
 
 ## 一つの責務を一か所へ置く
 
@@ -48,7 +48,7 @@ castloop domain remove
 - listは想定される0件または1件の接続、正規URL、処理中/要再試行を示す。「list」は複数ドメイン対応を意味しない。外部操作で複数接続や設定不一致が生じた場合も隠さず報告し、変更操作は拒否する。
 - hostnameはscheme・path・port・wildcardなし。別hostnameへ変更する場合はremove後にaddする。
 - `public_base_url`は正規URLのまま維持する。管理・復帰先は保存したworkers.dev URLへ固定し、CLIの共通管理クライアントで解決する。DNS障害時に公開URLへ管理鍵を送るfallbackはしない。
-- workers.dev URLの保存項目は`workers_dev_base_url`を追加する方針。未設定のM6サービスは、既存workers.dev URLの対象Worker/accountを確認してから保持する。strict schemaを維持し、対応Workerへ通常deployしてから新項目・domain操作を使う。
+- workers.dev URLの保存項目はoptionalな`workers_dev_base_url`を追加済み。未設定のM6サービスは、既存workers.dev URLの対象Worker/accountを確認してから、所有されたURL切替の中で保持する。strict schemaを維持し、対応Workerへ通常deployしてから新項目・domain操作を使う。
 - 設定はローカル`castloop.toml`とR2 `system/service.toml`へ保存する。操作進捗・実行tokenはservice TOMLではなく運用recordへ置き、管理鍵・API tokenは保存しない。
 
 ## 切替・復旧の最小手順
@@ -70,7 +70,7 @@ castloop domain remove
 
 ## 通常deployはドメインから独立させる
 
-`prepareCompatibleM6WorkerUpload`の「Custom Domainが1件でもあれば拒否」は未提供機能用の制限であり、今回解除する。別のdomain専用deployは作らない。
+`prepareCompatibleM6WorkerUpload`の「Custom Domainが1件でもあれば拒否」は未提供機能用の制限であり、今回解除済み。別のdomain専用deployは作らない。
 
 - 現在は`migrationWorkerPath`にも`public_base_url`をworkers.devへ限定する条件があり、1行の拒否だけを消すと独自URLで失敗する。通常deployのREST対象はaccount/worker identityで決め、公開URLのhostnameから分離する。旧形式変換・新規initの制約まで一律に緩めない。
 - 同じ既存deployでCustom Domain・正規URL・workers.dev有効化を保持し、更新前後に接続先を確認する。停止、所有者、version、receipt、runtime検証は既存のまま使う。
@@ -86,8 +86,8 @@ castloop domain remove
 
 ## 開発順・受け入れ
 
-1. 共通管理URLの解決と通常deployの拒否解除・接続保持を実装する。既存設定を読めるstrict schemaと、変更箇所のテストを追加する。
-2. 共通admissionを最小限拡張し、同じ正規URL変更処理でadd/remove、feed/cache/設定の収束・再開を実装する。ファイル保存・lock・feed選別・purgeの重複を作らない。
+1. 共通管理URLの解決と通常deployの拒否解除・接続保持を実装する。既存設定を読めるstrict schemaと、変更箇所のテストを追加する。**完了。**
+2. 共通admissionを最小限拡張し、同じ正規URL変更処理でadd/remove、feed/cache/設定の収束・再開を実装する。ファイル保存・lock・feed選別・purgeの重複を作らない。**server core完了、domain接続との統合とローカル同期は③で接続。**
 3. domain CLIを接続し、TLS待ち、API応答喪失、feed/purge失敗、設定片側更新からの再開と、早すぎるresume/deployの拒否を変更箇所で検証する。既存のM6全安全条件を別のテスト群へ複製しない。
 4. 承認された専用hostnameとM6サービスで、単一バイナリによるadd→明示再開→公開・停止/restore→通常deploy→remove→明示再開を確認し、READMEを更新する。
 
