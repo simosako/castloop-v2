@@ -166,7 +166,7 @@ describe("durable Show registration without unknown-outcome replay", () => {
       const before = readdirSync(dirname(setup.file)).sort();
       expect(readLocalShowRegistration(setup.root, setup.config, "other-show")).toEqual({ client_state: null, lock_present: false, remote_state_checked: false });
       expect(readdirSync(dirname(setup.file)).sort()).toEqual(before);
-      expect(() => readLocalShowRegistration(setup.root, { ...setup.config, public_base_url: "https://another.example" }, "new-show")).toThrow("another service");
+      expect(() => readLocalShowRegistration(setup.root, { ...setup.config, workers_dev_base_url: "https://test-worker.foreign.workers.dev" }, "new-show")).toThrow("another service");
       const original = readFileSync(setup.file);
       symlinkSync(setup.file, join(dirname(setup.file), "linked-show.json"));
       expect(() => readLocalOperationStatus(setup.root, setup.config, "show-registration", "linked-show")).toThrow("could not be verified");

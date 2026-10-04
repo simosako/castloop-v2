@@ -368,7 +368,7 @@ test("offline inspection is non-writing and frozen identity/manifest changes are
   expect(readLocalPublicationJob(empty, setup.config, setup.frozen.request.job_id)).toEqual({ client_state: null, lock_present: false, remote_state_checked: false });
   expect(existsSync(join(empty, ".castloop"))).toBe(false);
   for (const config of [{ ...setup.config, account_id: "f".repeat(32) }, { ...setup.config, worker_name: "foreign", workers_dev_base_url: "https://foreign.example.workers.dev" },
-    { ...setup.config, public_base_url: "https://foreign.example" }]) {
+    { ...setup.config, workers_dev_base_url: "https://test-worker.foreign.workers.dev" }]) {
     expect(() => readLocalPublicationJob(setup.root, config, setup.frozen.request.job_id)).toThrow("another service");
     expect(() => createPublicationOperationEffects(config, setup.journal.load(), "private-secret", setup.client)).toThrow("another service");
   }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseStageReadbackReceipts, serviceConfigSchema, serviceIdentitySchema as identitySchema, stageReadbackReceiptSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
+import { parseStageReadbackReceipts, serviceConfigSchema, serviceIdentitySchema as identitySchema, serviceOperationIdentity as identityFromConfig, stageReadbackReceiptSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
 import type { ServiceConfig, StageUploadRequest } from "@castloop/shared";
 import { stagingClientOperation, stagingClientTargets } from "./staging-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
@@ -42,11 +42,6 @@ export function validateStagingClientState(input: unknown): StagingClientState {
     throw new Error("Staging journal has inconsistent frozen identity, phase or receipts");
   }
   return state;
-}
-
-function identityFromConfig(config: ServiceConfig): z.infer<typeof identitySchema> {
-  return identitySchema.parse({ service_id: config.service_id, account_id: config.account_id,
-    worker_name: config.worker_name, public_base_url: config.public_base_url });
 }
 
 function readRecord(file: string): StagingClientState {

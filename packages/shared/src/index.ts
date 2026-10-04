@@ -188,6 +188,7 @@ export const publicationJobStatusSchema = z.object({
 export const jobStatusSchema = z.discriminatedUnion("schema_version", [publicationJobStatusSchema, lifecycleJobStatusSchema]);
 
 export type ServiceConfig = z.infer<typeof serviceConfigSchema>;
+export type ServiceIdentity = z.infer<typeof serviceIdentitySchema>;
 export type ShowMetadata = z.infer<typeof showMetadataSchema>;
 export type EpisodeDraft = z.infer<typeof episodeDraftSchema>;
 export type ShowCommit = z.infer<typeof showCommitSchema>;
@@ -198,6 +199,11 @@ export type PublicationJobStatus = z.infer<typeof publicationJobStatusSchema>;
 
 export function serviceManagementBaseUrl(config: ServiceConfig): string {
   return workersDevOrigin(config.workers_dev_base_url ?? config.public_base_url, config.worker_name);
+}
+
+export function serviceOperationIdentity(config: ServiceConfig): ServiceIdentity {
+  return serviceIdentitySchema.parse({ service_id: config.service_id, account_id: config.account_id,
+    worker_name: config.worker_name, public_base_url: serviceManagementBaseUrl(config) });
 }
 
 export function episodeDraftFromRevision(revision: EpisodeRevision): EpisodeDraft {

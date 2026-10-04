@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { serviceConfigSchema, serviceIdentitySchema, showRegistrationRequestSchema, showRegistrationResponseSchema, validateId } from "@castloop/shared";
+import { serviceConfigSchema, serviceIdentitySchema, serviceOperationIdentity, showRegistrationRequestSchema, showRegistrationResponseSchema, validateId } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
@@ -23,16 +23,13 @@ export type ShowRegistrationJournal = { load: () => ShowRegistrationClientState;
   exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
 
 export function showRegistrationIdentity(config: ServiceConfig): z.infer<typeof showRegistrationIdentitySchema> {
-  return showRegistrationIdentitySchema.parse({ service_id: config.service_id, account_id: config.account_id,
-    worker_name: config.worker_name, public_base_url: config.public_base_url });
+  return serviceOperationIdentity(config);
 }
 
 export function validateShowRegistrationState(input: unknown): ShowRegistrationClientState {
   const state = stateSchema.parse(input);
-  const origin = new URL(state.identity.public_base_url);
   const receipt = state.receipt;
-  if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" ||
-    state.reserve.service_id !== state.identity.service_id || (state.phase === "registered") !== (receipt !== undefined) ||
+  if (state.reserve.service_id !== state.identity.service_id || (state.phase === "registered") !== (receipt !== undefined) ||
     receipt && (receipt.service_id !== state.reserve.service_id || receipt.show_id !== state.reserve.show_id || receipt.reservation_id !== state.reserve.reservation_id)) {
     throw new Error("Show registration journal has inconsistent identity, phase or receipt");
   }

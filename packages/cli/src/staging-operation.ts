@@ -1,4 +1,4 @@
-import { parseStageReadbackReceipts, serviceConfigSchema, stageControlRequest, stageUploadRequestSchema, stagingAdminRequestSchema, stagingAdminResponseSchema } from "@castloop/shared";
+import { parseStageReadbackReceipts, serviceConfigSchema, serviceOperationIdentity, stageControlRequest, stageUploadRequestSchema, stagingAdminRequestSchema, stagingAdminResponseSchema } from "@castloop/shared";
 import type { ServiceConfig, StageReadbackReceipt, StageSettlement, StageUploadRequest, StagingAdminResponse } from "@castloop/shared";
 import { StagingAdminClient, stagingClientOperation, stagingClientTargets } from "./staging-client";
 import type { StagePutTarget } from "./staging-client";
@@ -133,8 +133,7 @@ export function createStagingOperationEffects(configInput: ServiceConfig, input:
   put: StagingOperationEffects["put"], client?: Pick<StagingAdminClient, "claim" | "begin" | "settle" | "finish" | "status">): StagingOperationEffects {
   const config = serviceConfigSchema.parse(configInput);
   const state = validateStagingClientState(input);
-  if (state.identity.service_id !== config.service_id || state.identity.account_id !== config.account_id ||
-    state.identity.worker_name !== config.worker_name || state.identity.public_base_url !== config.public_base_url) {
+  if (JSON.stringify(state.identity) !== JSON.stringify(serviceOperationIdentity(config))) {
     throw new Error("Staging effects target another service/account/Worker/origin");
   }
   const api = client ?? new StagingAdminClient(config, adminKey);

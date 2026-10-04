@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicationCommitKey, publicationOperationSchema, publicationRequestSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema } from "@castloop/shared";
+import { publicationCommitKey, publicationOperationSchema, publicationRequestSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema, serviceOperationIdentity as identityFromConfig } from "@castloop/shared";
 import type { PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { publicationClientOperation } from "./publication-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
@@ -35,10 +35,6 @@ export function validatePublicationClientState(input: unknown): PublicationClien
   }
   publicationClientOperation(state.publication);
   return state;
-}
-
-function identityFromConfig(config: ServiceConfig): z.infer<typeof identitySchema> {
-  return identitySchema.parse({ service_id: config.service_id, account_id: config.account_id, worker_name: config.worker_name, public_base_url: config.public_base_url });
 }
 
 function readRecord(file: string): PublicationClientState {

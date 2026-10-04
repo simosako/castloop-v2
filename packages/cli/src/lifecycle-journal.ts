@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { lifecycleAdminRequestSchema, lifecycleCommitSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema } from "@castloop/shared";
+import { lifecycleAdminRequestSchema, lifecycleCommitSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema, serviceOperationIdentity as identityFromConfig } from "@castloop/shared";
 import type { LifecycleAdminRequest, ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
@@ -57,11 +57,6 @@ function readRecord(file: string): LifecycleClientState {
 
 function matchesConfig(state: LifecycleClientState, config: ServiceConfig): boolean {
   return JSON.stringify(state.identity) === JSON.stringify(identityFromConfig(config));
-}
-
-function identityFromConfig(config: ServiceConfig): z.infer<typeof identitySchema> {
-  return identitySchema.parse({ service_id: config.service_id, account_id: config.account_id,
-    worker_name: config.worker_name, public_base_url: config.public_base_url });
 }
 
 export function readLocalLifecycleJob(root: string, input: ServiceConfig, jobId: string):

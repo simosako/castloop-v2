@@ -307,7 +307,7 @@ test("journal refuses foreign config, changed manifest, phase skipping and inval
   const initial = setup.journal.load();
   const bytes = readFileSync(setup.file, "utf8");
   for (const config of [{ ...setup.config, account_id: "f".repeat(32) }, { ...setup.config, worker_name: "foreign", workers_dev_base_url: "https://foreign.example.workers.dev" },
-    { ...setup.config, public_base_url: "https://foreign.example" }]) {
+    { ...setup.config, workers_dev_base_url: "https://test-worker.foreign.workers.dev" }]) {
     expect(() => readLocalStagingOperation(setup.root, config, setup.upload.operation_id)).toThrow("another service");
     expect(() => createStagingOperationEffects(config, initial, "private-secret", setup.effects.put, setup.client)).toThrow("another service");
   }

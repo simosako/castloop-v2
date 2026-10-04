@@ -100,6 +100,26 @@ describe("read-only M6 operation-status", () => {
     } finally { setup.dispose(); }
   });
 
+  test("canonical URL changes preserve frozen operations and unknown locks at the same management origin", async () => {
+    const setup = await fixture();
+    try {
+      await setup.staging.exclusively(async () => setup.staging.save({ ...setup.staging.load(), phase: "claim_requested" }));
+      for (const operation of setup.operations) writeFileSync(`${operation.file}.lock`, "keep unknown lock");
+      const before = snapshot(setup.root);
+      const config = { ...setup.config, public_base_url: "https://podcasts.example.com" };
+      for (const operation of setup.operations) {
+        const report = await readRemoteOperationStatus(setup.root, config, operation.family, operation.id, () => "private-secret", setup.transport);
+        expect(report.client_state?.identity.public_base_url).toBe(setup.config.workers_dev_base_url!);
+        expect(report.lock_present).toBe(true);
+        expect(report.authorizes_recovery).toBe(false);
+        if (operation.family === "staging") expect(report.client_state?.phase).toBe("claim_requested");
+      }
+      expect(snapshot(setup.root)).toEqual(before);
+      expect(setup.calls).toHaveLength(4);
+      for (const request of setup.calls) expect(new URL(request.url).origin).toBe(config.workers_dev_base_url!);
+    } finally { setup.dispose(); }
+  });
+
   test("missing, invalid, foreign and symlink records fail before secrets or network access", async () => {
     const setup = await fixture();
     try {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { episodeCommitSchema, parseEpisodeDraft, parseServiceConfig, parseShowMetadata,
-  m6ServiceConfigHash, serviceManagementBaseUrl, stringifyToml, validateId } from "./index";
+  m6ServiceConfigHash, serviceManagementBaseUrl, serviceOperationIdentity, stringifyToml, validateId } from "./index";
 
 const show = {
   schema_version: 1 as const, show_id: "daily-show", title: "Daily", description: "Description",
@@ -48,6 +48,9 @@ test("management origins stay on the matching workers.dev host without changing 
   const config = { ...original, public_base_url: "https://podcasts.example.com", workers_dev_base_url: original.public_base_url };
   expect(parseServiceConfig(stringifyToml(config))).toEqual(config);
   expect(serviceManagementBaseUrl(config)).toBe(original.public_base_url);
+  expect(serviceOperationIdentity(config)).toEqual(serviceOperationIdentity(original));
+  expect(serviceOperationIdentity(original)).toEqual({ service_id: original.service_id, account_id: original.account_id,
+    worker_name: original.worker_name, public_base_url: original.public_base_url });
   expect(() => serviceManagementBaseUrl({ ...original, public_base_url: config.public_base_url })).toThrow("matching workers.dev");
   for (const workers_dev_base_url of ["https://podcasts.example.com", "https://other.example.workers.dev",
     "https://castloop-worker.workers.dev", "https://castloop-worker.example.workers.dev.evil.example",

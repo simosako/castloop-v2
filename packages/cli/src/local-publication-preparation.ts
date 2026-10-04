@@ -1,4 +1,4 @@
-import { episodeRevisionSchema, parseShowMetadata, publicationRequestSchema, serviceConfigSchema } from "@castloop/shared";
+import { episodeRevisionSchema, parseShowMetadata, publicationRequestSchema, serviceConfigSchema, serviceOperationIdentity } from "@castloop/shared";
 import type { EpisodeRevision, PublicationRequest, ServiceConfig, StageAsset, StagePayload } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
 import { readLocalMetadata } from "./local-metadata-read";
@@ -82,8 +82,7 @@ export async function prepareLocalPublication(root: string, configInput: Service
       committed_at: request.created_at };
   }
   const publication = publicationRequestSchema.parse({ schema_version: 1, request, commit, staged_uploads: ids });
-  const prepared = validatePublicationClientState({ schema_version: 1, identity: { service_id: config.service_id, account_id: config.account_id,
-    worker_name: config.worker_name, public_base_url: config.public_base_url }, publication, phase: "prepared",
+  const prepared = validatePublicationClientState({ schema_version: 1, identity: serviceOperationIdentity(config), publication, phase: "prepared",
     manifest_sha256: createHash("sha256").update(JSON.stringify(publication)).digest("hex") });
   const guarded = createLocalPublicationEffects(config, prepared, adminKey, local, client);
   const checkStages = () => {

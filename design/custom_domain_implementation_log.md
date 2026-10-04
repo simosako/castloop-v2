@@ -1,5 +1,11 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-04: 公開URLから操作記録のidentityを分離
+
+Show登録・local draft・staging・publication・lifecycleのidentity生成を共通の`serviceOperationIdentity`へ統一した。照合するのはservice/account/Workerと固定のworkers.dev管理originであり、変更可能なPodcast正規URLではない。既存journalのwire形式を変えず、identity内の従来の`public_base_url`欄には固定originを入れる。独自ドメイン未提供だった既存M6のworkers.dev identityはそのまま一致し、過去のrecordやfrozen要求を書き換えない。
+
+公開URL変更後にも全4操作familyを読み取り専用で照会でき、未知のphaseやlockを修復・昇格しないことを既存fixtureで検証した。異なるaccount/Worker/管理originの拒否は維持する。`bun test` 912件と`npm run check`が成功。
+
 ## 2026-10-04: 管理URL分離と通常更新の接続保持
 
 開発順①を実装した。管理操作は同じWorkerの`workers.dev`へ固定し、`public_base_url`はRSS/公開URLとして維持する。
