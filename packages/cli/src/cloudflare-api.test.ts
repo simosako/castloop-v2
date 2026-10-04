@@ -50,6 +50,7 @@ test("accepts a single DNS hostname, not a URL or wildcard", () => {
 test("attaches only after zone and DNS preflight, then reconciles and detaches its own hostname", async () => {
   let existing: Domain | null = null;
   const methods: string[] = [];
+  let connectionClaimed = false;
   await withCloudflare(async (request) => {
     const url = new URL(request.url);
     methods.push(`${request.method} ${url.pathname}`);
@@ -58,6 +59,7 @@ test("attaches only after zone and DNS preflight, then reconciles and detaches i
     if (url.pathname.endsWith("/dns_records")) return reply([]);
     if (url.pathname.endsWith("/workers/domains")) {
       if (request.method === "PUT") {
+        expect(connectionClaimed).toBe(true);
         const input = await request.json() as { hostname: string; service: string; zone_id: string };
         expect(input).toEqual({ hostname: "podcasts.example.com", service: worker, zone_id: zone.id });
         existing = { ...input, id: "domain-id", zone_name: zone.name };
@@ -73,9 +75,11 @@ test("attaches only after zone and DNS preflight, then reconciles and detaches i
     }
     throw new Error(`Unexpected request ${request.method} ${url}`);
   }, async (api) => {
-    expect((await api.ensureWorkerDomain("Podcasts.Example.COM", worker)).hostname).toBe("podcasts.example.com");
+    expect((await api.ensureWorkerDomain("Podcasts.Example.COM", worker, async () => { connectionClaimed = true; })).hostname).toBe("podcasts.example.com");
     expect((await api.ensureWorkerDomain("podcasts.example.com", worker)).id).toBe("domain-id");
-    await api.removeWorkerDomain("podcasts.example.com", worker);
+    await expect(api.ensureWorkerDomain("podcasts.example.com", worker, async () => { throw new Error("Never claim an unowned existing domain"); })).rejects.toThrow("Do not adopt");
+    await expect(api.removeWorkerDomain("podcasts.example.com", worker, "foreign-id")).rejects.toThrow("not owned");
+    await api.removeWorkerDomain("podcasts.example.com", worker, "domain-id");
     await api.removeWorkerDomain("podcasts.example.com", worker);
   });
   expect(methods.filter((method) => method.startsWith("PUT"))).toHaveLength(1);

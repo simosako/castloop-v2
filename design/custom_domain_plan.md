@@ -3,7 +3,7 @@
 作成日: 2026-09-25
 方針確定: 2026-09-26
 改訂日: 2026-10-04（v0.2.1 / M6完成後）
-状態: 基礎API、管理URL分離・通常更新、停止中の正規URL切替coreを実装・自動検証済み。domain CLI接続・実機受け入れは未完了。
+状態: 基礎API、管理URL分離・通常更新、停止中の正規URL切替、domain CLI/管理API・ローカル復旧を実装済み。Cloudflare/DNSを変更する実機受け入れは未実施・未リリース。
 
 ## 目的とスコープ
 
@@ -20,7 +20,7 @@
 - `CloudflareApi.ensureWorkerDomain`は、Workerに別のCustom Domainがある場合やhostnameが他Workerに属する場合に拒否する。**1サービス1ドメインの制限は基礎APIで実装済み**。同じhostnameの再実行、zone/DNS競合確認、所有Workerを確認した切断もある。
 - `src/media-url.ts`の`canonicalEnclosureUrl`と`src/feed.ts`は、既存音源pathを現在の正規URLへ組み直す。履歴の絶対URLをそのままRSSへ出す問題は解消済み。
 - M6にはサービス停止、invocationとShow所有者の確認、CAS、lifecycle判定、feed生成、cache purge、ローカルjournal保存がある。新しい独自ドメイン専用の同等実装は作らない。
-- 管理URL分離、通常deployの接続保持、正規URLとactive feedの変更・purge・R2設定同期のserver coreは実装済み。残るのはdomain CLI/管理API、接続・TLSの確認、ローカル設定同期とその復旧、実機受け入れ。
+- 管理URL分離、通常deployの接続保持、正規URLとactive feedの変更・purge・R2設定同期、domain CLI/管理API、接続・TLSの確認、ローカル設定同期とその復旧を実装した。残るのは承認された専用環境での実機受け入れ。
 
 ## 一つの責務を一か所へ置く
 
@@ -47,6 +47,7 @@ castloop domain remove
 - add/removeは既存の`service-pause <pause_uuid>`と処理終了確認後に実行し、完了後もpausedのままにする。再開は既存の`service-resume <pause_uuid>`へ一本化する。listは停止不要・読み取り専用。
 - listは想定される0件または1件の接続、正規URL、処理中/要再試行を示す。「list」は複数ドメイン対応を意味しない。外部操作で複数接続や設定不一致が生じた場合も隠さず報告し、変更操作は拒否する。
 - hostnameはscheme・path・port・wildcardなし。別hostnameへ変更する場合はremove後にaddする。
+- add/removeはunfinishedなlocal journalを自動再利用する。必要なら`--operation-id UUID`で同じ要求を指定する。別要求・残存lockがある場合は新規操作を開始しない。操作記録は`.castloop/domain-changes/SERVICE_ID/OPERATION_UUID.json`に保持する。
 - `public_base_url`は正規URLのまま維持する。管理・復帰先は保存したworkers.dev URLへ固定し、CLIの共通管理クライアントで解決する。DNS障害時に公開URLへ管理鍵を送るfallbackはしない。
 - workers.dev URLの保存項目はoptionalな`workers_dev_base_url`を追加済み。未設定のM6サービスは、既存workers.dev URLの対象Worker/accountを確認してから、所有されたURL切替の中で保持する。strict schemaを維持し、対応Workerへ通常deployしてから新項目・domain操作を使う。
 - 設定はローカル`castloop.toml`とR2 `system/service.toml`へ保存する。操作進捗・実行tokenはservice TOMLではなく運用recordへ置き、管理鍵・API tokenは保存しない。
@@ -55,17 +56,18 @@ castloop domain remove
 
 1. 対象サービス、旧/新URL、hostname、pause IDを固定する。M6のpaused状態、invocation終了、全Showの登録完了・所有者解放を確認する。停止中も既存consumerは収束できるため、invocationが0というだけで完了と扱わない。
 2. 同じservice admission上でCASにより操作所有者を確保する。変更中のconsumer/recovery、別deploy/domain操作、早すぎる`service-resume`を共通層で拒否する。別markerの非原子的チェックやShowごとの新しいdomain lockは使わない。
-3. addでは既存APIで接続し、DNS/TLSと同じWorker・serviceへの到達を確認する。管理鍵を送る前にCloudflare側の所有・接続先を確認し、redirectは追わない。未準備なら完了を報告せず再試行待ちにする。
+3. addでは既存APIで接続し、DNS/TLSと同じWorker・serviceへの到達を確認する。独自hostへ管理鍵を送らず、Cloudflare側の所有・接続先と秘密のないnonce probeを確認する。redirectは追わない。未準備なら完了を報告せず再試行待ちにする。
 4. active Showのfeedだけを新URLで再生成し、共通cache処理でpurgeする。active Episodeだけを載せ、draft/unpublished/deleting/deletedを復活させない。音源・revision/current Episode metadata・GUID・公開日時・Showの`site_url`は変更しない。
 5. 全対象feedとpurgeの完了を確認してからR2の正規URLを変更し、ローカル設定を揃える。設定hashを持つ稼働証跡も整合させるが、同じWorkerのversion・bindingsを架空の再配備で更新しない。
 6. removeではworkers.devへの到達、保存済みfeed/媒体、cache・設定の収束を確認してから、対象WorkerのCustom Domainだけを切断する。
 7. 完了を記録し、操作所有者を解放する。サービスはpausedのままとし、明示再開後に両ホストの実配信を確認する（remove後の独自ホストは対象外）。
 
-通常の公開GETはpaused中に503を返す。停止中の到達確認は管理API、feed/媒体の確認は認証済み管理経路で行い、「停止中にも公開GETで200を確認する」ための配信gate迂回は作らない。対象Showが0件でも設定変更は行う。
+通常の公開GETはpaused中に503を返す。停止中のHTTPS到達確認には`/.well-known/castloop/runtime`のno-store nonce probeを使い、service/Worker/versionだけを確認する。管理APIは常にworkers.devへ送る。feed/媒体の確認は既存の認証済み管理・feed生成経路で行い、「停止中にも公開GETで200を確認する」ための配信gate迂回は作らない。対象Showが0件でも設定変更は行う。
 
 - R2の小さな操作recordには、固定要求、全体の進捗、所有者・実行token、確認済みreceiptだけを残す。タイトル・説明・emailを複製せず、音源やrevisionの移行inventoryも作らない。
 - 同じadd/removeで同じ操作を再開する。成功済みfeedの再確認・再生成とpurgeの再試行を許し、全Show分の大きな計画や最適化用履歴は不要とする。処理量には既存同様の明示的上限を設ける。
-- Attach/Detachの応答喪失はCloudflareの照会で確認し、ローカル設定だけが未更新なら同じ要求のremote完了記録から同期する。公開feedが途中で新旧混在しても、全体確認までは再開を拒否する。
+- 接続/切断成功のreceiptを保存してからWorkerへtokenを返す。管理API応答が失われても、その固定要求・receipt・ownerと進捗からsettledと確認できる範囲だけを続行する。ローカル設定だけが未更新なら同じ要求のremote完了記録から同期する。公開feedが途中で新旧混在しても、全体確認までは再開を拒否する。
+- Cloudflare PUT/DELETEそのものの結果が不明なら、照会で想定結果が見えても将来の書き込み終了とは扱わない。connection tokenとpending記録を保持し、再送・強制解放を提供しない。これは既存MVPの未知IOをblockedに保つ範囲と同じであり、接続APIの応答喪失を万能に復旧できるとは主張しない。
 - ただし生存不明の実行・IO・lockは経過時間やHEAD不在で解放しない。同じコマンドの再実行でも、古い書き手が残る可能性があれば停止したままにする。
 
 ## 通常deployはドメインから独立させる
@@ -87,8 +89,8 @@ castloop domain remove
 ## 開発順・受け入れ
 
 1. 共通管理URLの解決と通常deployの拒否解除・接続保持を実装する。既存設定を読めるstrict schemaと、変更箇所のテストを追加する。**完了。**
-2. 共通admissionを最小限拡張し、同じ正規URL変更処理でadd/remove、feed/cache/設定の収束・再開を実装する。ファイル保存・lock・feed選別・purgeの重複を作らない。**server core完了、domain接続との統合とローカル同期は③で接続。**
-3. domain CLIを接続し、TLS待ち、API応答喪失、feed/purge失敗、設定片側更新からの再開と、早すぎるresume/deployの拒否を変更箇所で検証する。既存のM6全安全条件を別のテスト群へ複製しない。
+2. 共通admissionを最小限拡張し、同じ正規URL変更処理でadd/remove、feed/cache/設定の収束・再開を実装する。ファイル保存・lock・feed選別・purgeの重複を作らない。**完了。**
+3. domain CLIを接続し、TLS待ち、API応答喪失、feed/purge失敗、設定片側更新からの再開と、早すぎるresume/deployの拒否を変更箇所で検証する。既存のM6全安全条件を別のテスト群へ複製しない。**ローカル実装・変更箇所テスト完了。**
 4. 承認された専用hostnameとM6サービスで、単一バイナリによるadd→明示再開→公開・停止/restore→通常deploy→remove→明示再開を確認し、READMEを更新する。
 
 実機では複数Show、非公開/削除Episodeの不復活、両hostのfeed/cover/audio、GET/HEAD/Range、cache purge、GUID・媒体・revision不変を確認する。300 MB uploadの既存受け入れは再利用し、URL切替で音源再uploadやWorker全量hash計算は追加しない。

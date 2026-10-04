@@ -6,6 +6,7 @@ import { version } from "../../../package.json";
 import { administratorKey } from "./administrator-key";
 import { CloudflareApi } from "./cloudflare-api";
 import { formatContentList } from "./content-list";
+import { runDomainCommand } from "./domain-operation";
 import { COMMAND_HELP, commandHelp } from "./help";
 import { readLocalOperationStatus } from "./local-operation-status";
 import { M6_COMMAND_ARGUMENTS, runM6Command } from "./m6-commands";
@@ -117,6 +118,13 @@ async function main(): Promise<unknown> {
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
     return init(positional[0] ?? ".", flags);
+  }
+  if (command === "domain") {
+    allowedFlags(flags, ["operation-id"]);
+    const action = positional[0];
+    if (!["add", "list", "remove"].includes(action ?? "") || positional.length !== (action === "add" ? 2 : 1) ||
+      action === "list" && flags["operation-id"]) throw new Error(commandHelp(command));
+    return runDomainCommand(process.cwd(), loadConfig(process.cwd()), action as "add" | "list" | "remove", positional[1], flags["operation-id"]);
   }
   let root = process.cwd();
   if (command === "create-show") {

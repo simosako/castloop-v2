@@ -1,5 +1,21 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-04: domain CLI・ローカル同期と限定的な復旧の接続
+
+開発buildの`domain add HOSTNAME`・`domain list`・`domain remove`を正式CLI entrypointへ接続した。既存のservice-pause/resumeを使い、操作完了後もpausedのままにする。別のdomain deploy、consumer、Show lock、汎用状態機械は追加していない。
+
+- 1つのURL変更runnerから両方向のfeed/cache/R2同期を呼ぶ。addは接続と秘密を送らないHTTPS probeを先に確認し、removeはworkers.devへの収束後に一致するdomain IDだけを切断する。通常deployは接続を保持する既存経路のまま。
+- `createLocalJournalStorage`の保存・fsync・exclusive lockを再利用した。TOML同期も同じ同期書き込みhelperを使い、rename前後のsource/target hashとローカル編集を確認する。無関係な編集、違う固定要求、異なるreceipt、unknown lockは上書きしない。
+- 接続API成功のreceiptをlocalに保存してからremoteへ渡す。TLS待ちや確認済みのpurge失敗は同じコマンドで続行する。管理API応答喪失は、固定要求とsettledなremote receipt/progressで確認できる場合だけ続行し、RESTを繰り返さない。
+- connection claim後の応答生成失敗やreceipt-returnのCAS競合でも、claim/returnのpendingとexact tokenを失わない。確認済みreceiptと一致するtokenだけを返す明示続行を検証し、エラーを理由に未知のconnection/Worker IOを解放しない。
+- Cloudflare PUT/DELETEそのものが不明ならconnection tokenとpendingを保持する。読み取りで想定接続が見えてもtokenを返さない。これは万能な外部IO復旧を追加しないというMVP範囲を維持するもので、応答喪失の安全をCloudflare保証として扱わない。
+- listは接続の全件・正規/管理URL・設定不一致・admission・unfinishedなlocal操作/lockを読み取り専用で返す。想定外の接続を隠さず、add/removeは採用を拒否する。操作記録は必要な小さな固定要求/receiptだけを保持し、秘密やコンテンツ診断文を複製しない。
+- CLI/管理API間の変更箇所を既存M6 fixtureで検証した。両方向、秘密の送信先、読み取り不変、TLS待ち、purge失敗、管理receipt喪失、実行中/未知REST、設定片側更新、lockと不一致を確認した。formal CLIの引数/helpとlistのREST GET接続も検証した。既存lifecycle/300 MB試験を別の大規模試験群へ複製していない。
+
+検証: **`bun test` 932件成功 / 0失敗**（101 files、14,065 assertions）、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuildと資格情報なしのdomain help/不正引数拒否が成功。全体試験で共通保存helperの変更による失敗時temp保持の差分を検出し、従来の保存契約を維持するよう修正した。試験結果は`/tmp/opencode/castloop-domain-cli-final-tests.log`。
+
+[`docs/custom_domains.md`](../docs/custom_domains.md)に未リリースbuildの利用・復旧制限を記載した。ローカル実装・自動検証は完了し、残るのは承認された専用hostname/M6サービスでのDNS/TLS・両host配信・lifecycle・通常deploy・removeの実機受け入れ。今回はユーザー指定に従い**Cloudflare/DNS設定を一切変更していない**。未リリースであり、v0.2.1バイナリに提供済みとは扱わない。
+
 ## 2026-10-04: 共通coreへの管理API接続と秘密を送らないTLS確認
 
 認証・request上限・no-store・固定要求照合を既存管理経路で共有し、`/admin/domain`からURL切替coreを呼べるようにした。読み取り専用statusはURL ownerや未知のtokenが残っていても照会できる。CLIからのCloudflare接続/切断中にも同じservice admission上のtokenを保持し、Worker側のstep/completeと並行しないようにした。接続receiptは固定要求と一致するものだけを保持し、別token・別action・receiptの書き換えを拒否する。

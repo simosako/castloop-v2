@@ -57,6 +57,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Explicitly pause and drain first. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
       "Completes paused; resume explicitly. Does not adopt legacy services or replay unknown deployments.",
   },
+  domain: {
+    usage: "domain add HOSTNAME [--operation-id UUID] | domain list | domain remove [--operation-id UUID]",
+    description: "Run from the service workspace. Use one Custom Domain in an active/full Cloudflare zone owned by this account.\n" +
+      "Add/remove require explicit service-pause and drained owners, and finish paused; resume explicitly.\n" +
+      "Keep workers.dev for administration. TLS probes send no administrator key or API token.\n" +
+      "Repeat the same command to continue acknowledged progress/TLS waiting. Preserve unknown REST outcomes, execution tokens and locks.\n" +
+      "List is read-only and reports connections, settings mismatches and unfinished operations. Set Cloudflare account/API token and the local administrator key.",
+  },
   "init-reconcile": {
     usage: "init-reconcile OPERATION_UUID",
     description: "Reconcile a retained initialization only when the server already completed it paused. Does not redeploy or replay initialization.",

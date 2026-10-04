@@ -262,7 +262,7 @@ export class CloudflareApi {
     return data.result;
   }
 
-  async ensureWorkerDomain(hostname: string, service: string): Promise<WorkerDomain> {
+  async ensureWorkerDomain(hostname: string, service: string, beforeMutation?: () => Promise<void>): Promise<WorkerDomain> {
     hostname = normalizeHostname(hostname);
     const [existing, forService] = await Promise.all([
       this.workerDomains("hostname", hostname), this.workerDomains("service", service),
@@ -274,8 +274,13 @@ export class CloudflareApi {
     if (forService.some((domain) => domain.hostname !== hostname) || existing.some((domain) => domain.service !== service)) {
       throw new Error("The hostname or Worker already has a different Custom Domain");
     }
+    if (existing.length > 1 || forService.length !== existing.length || existing[0] &&
+      (existing[0].id !== forService[0]?.id || existing[0].zone_id !== forService[0]?.zone_id)) {
+      throw new Error("Custom Domain lookups are inconsistent or ambiguous; do not adopt or overwrite them");
+    }
     const zone = await this.zoneForHostname(hostname);
     if (existing.length) {
+      if (beforeMutation) throw new Error("Do not adopt an existing domain without this operation's acknowledged receipt");
       if (existing.length !== 1 || existing[0].zone_id !== zone.id) {
         throw new Error("The Custom Domain is attached to a different zone");
       }
@@ -287,16 +292,18 @@ export class CloudflareApi {
       record.name === hostname && ["A", "AAAA", "CNAME", "NS"].includes(record.type))) {
       throw new Error(`DNS records for ${hostname} conflict with a new Custom Domain`);
     }
+    if (beforeMutation) await beforeMutation();
     return this.json<WorkerDomain>("PUT", "/workers/domains", {
       hostname, service, zone_id: zone.id,
     });
   }
 
-  async removeWorkerDomain(hostname: string, service: string): Promise<void> {
+  async removeWorkerDomain(hostname: string, service: string, expectedId?: string): Promise<void> {
     hostname = normalizeHostname(hostname);
     const domains = await this.workerDomains("hostname", hostname);
-    if (!domains.length) return;
-    if (domains.length !== 1 || domains[0].hostname !== hostname || domains[0].service !== service) {
+    if (!domains.length && expectedId === undefined) return;
+    if (domains.length !== 1 || domains[0].hostname !== hostname || domains[0].service !== service ||
+      expectedId !== undefined && domains[0].id !== expectedId) {
       throw new Error(`Custom Domain ${hostname} is not owned by this Worker`);
     }
     await this.json("DELETE", `/workers/domains/${encodeURIComponent(domains[0].id)}`);

@@ -13,9 +13,13 @@ export type LocalJournalStorage = {
   exclusively: <T>(callback: () => Promise<T>) => Promise<T>;
 };
 
-function writeRecord(file: string, value: unknown): void {
+export function writeSyncedLocalFile(file: string, source: () => string): void {
   const fd = openSync(file, "wx", 0o600);
-  try { writeFileSync(fd, JSON.stringify(value)); fsyncSync(fd); } finally { closeSync(fd); }
+  try { writeFileSync(fd, source()); fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function writeRecord(file: string, value: unknown): void {
+  writeSyncedLocalFile(file, () => JSON.stringify(value));
 }
 
 export function createLocalJournalRecord(file: string, value: unknown): void {

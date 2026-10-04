@@ -53,6 +53,16 @@ test("list commands reject missing Show IDs, excess arguments and invalid flags 
   }
 });
 
+test("domain rejects malformed actions and options before workspace access", () => {
+  for (const args of [["domain"], ["domain", "add"], ["domain", "list", "extra"], ["domain", "remove", "hostname"],
+    ["domain", "unknown"], ["domain", "list", "--operation-id", "id"], ["domain", "remove", "--force", "true"]]) {
+    const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: "/tmp/opencode" });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout.toString()).toBe("");
+    expect(result.stderr.toString()).not.toContain("ENOENT");
+  }
+});
+
 test("formal list commands pass options, format text/JSON and leave workspace state unchanged", () => {
   const directory = mkdtempSync("/tmp/opencode/castloop-list-entrypoint-");
   const state = join(directory, ".castloop");
@@ -107,6 +117,50 @@ globalThis.fetch = async (url, init) => {
     unlinkSync(join(directory, "castloop.toml"));
     unlinkSync(preload);
     rmdirSync(directory);
+  }
+});
+
+test("formal domain list uses workers.dev administration and Cloudflare GET without changing the workspace", () => {
+  const directory = mkdtempSync("/tmp/opencode/castloop-domain-entrypoint-");
+  const state = join(directory, ".castloop");
+  const preload = join(directory, "mock-fetch.ts");
+  mkdirSync(state, { mode: 0o700 });
+  writeFileSync(join(state, "secrets.json"), JSON.stringify({ CASTLOOP_ADMIN_KEY: "private-secret" }));
+  writeFileSync(join(directory, "castloop.toml"), PUBLICATION_SERVICE_TEXT);
+  const fixture = join(import.meta.dir, "../../../src/test-support/domain-admin.ts");
+  const routes = join(import.meta.dir, "../../../src/m6-routes.ts");
+  writeFileSync(preload, `import assert from "node:assert/strict";
+import { domainAdminFixture } from ${JSON.stringify(fixture)};
+import { fetchM6ManagementIntegration } from ${JSON.stringify(routes)};
+const setup = await domainAdminFixture();
+globalThis.fetch = async (input, init) => {
+  const request = new Request(input, init);
+  const url = new URL(request.url);
+  if (url.origin === "https://api.cloudflare.com") {
+    assert.equal(request.method, "GET");
+    assert.equal(url.pathname, "/client/v4/accounts/" + setup.config.account_id + "/workers/domains");
+    assert.equal(url.searchParams.get("service"), setup.config.worker_name);
+    assert.equal(request.headers.get("Authorization"), "Bearer test-token");
+    return Response.json({ success: true, result: [], result_info: { total_pages: 1 } });
+  }
+  assert.equal(url.origin, setup.management);
+  assert.deepEqual(JSON.parse(init.body), { action: "inspect", service_id: "service" });
+  return fetchM6ManagementIntegration(request, setup.env, setup.cachedAssets);
+};
+`);
+  try {
+    const result = Bun.spawnSync([process.execPath, "--preload", preload, entrypoint, "domain", "list"], {
+      cwd: directory, env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: "a".repeat(32), CLOUDFLARE_API_TOKEN: "test-token" },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr.toString()).toBe("");
+    expect(JSON.parse(result.stdout.toString())).toMatchObject({ result: "domains", connections_match: true,
+      configuration_matches: false, domains: [], local_operations: [] });
+    expect(readFileSync(join(directory, "castloop.toml"), "utf8")).toBe(PUBLICATION_SERVICE_TEXT);
+    expect(readdirSync(state)).toEqual(["secrets.json"]);
+  } finally {
+    unlinkSync(join(state, "secrets.json")); rmdirSync(state);
+    unlinkSync(join(directory, "castloop.toml")); unlinkSync(preload); rmdirSync(directory);
   }
 });
 

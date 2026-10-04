@@ -34,7 +34,7 @@ export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, life
 export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
 export { CONTENT_LIST_PAGE_SIZE, contentListRequestSchema, contentListResponseSchema } from "./content-list";
 export type { ContentListRequest, ContentListResponse } from "./content-list";
-export { m6RuntimeTargetSchema, m6RuntimeReadinessSchema, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema,
+export { domainConnectionReceiptSchema, m6RuntimeTargetSchema, m6RuntimeReadinessSchema, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema,
   serviceUrlChangeProgressSchema, serviceUrlChangeRequestSchema } from "./service-admission";
 export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, M6ServiceUpdateRequest, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest,
   ServiceUrlChangeProgress, ServiceUrlChangeRequest } from "./service-admission";

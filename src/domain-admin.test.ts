@@ -1,23 +1,12 @@
 import { expect, test } from "bun:test";
-import { domainAdminResponseSchema, domainOperationRequestSchema, m6ServiceConfigHash, serviceManagementBaseUrl, stringifyToml } from "../packages/shared/src/index";
+import { domainAdminResponseSchema } from "../packages/shared/src/index";
 import { fetchM6Candidate, fetchM6ManagementIntegration } from "./m6-routes";
-import { pauseServiceAdmission, readServiceAdmission, resumeServiceAdmission } from "./service-admission";
-import { lifecycleAdminFixture } from "./test-support/lifecycle-admin";
+import { resumeServiceAdmission } from "./service-admission";
+import { domainAdminFixture } from "./test-support/domain-admin";
 
 async function fixture() {
-  const setup = await lifecycleAdminFixture();
-  const env = setup.candidateEnv;
-  const config = { ...setup.config, public_base_url: serviceManagementBaseUrl(setup.config) };
-  await setup.bucket.put("system/service.toml", stringifyToml(config));
-  const pauseId = crypto.randomUUID();
-  await pauseServiceAdmission(env, "service", pauseId, setup.versionId);
-  const admission = (await readServiceAdmission(env, "service"))!.value;
-  const management = serviceManagementBaseUrl(config);
-  const request = domainOperationRequestSchema.parse({ operation_id: crypto.randomUUID(), service_id: "service", pause_id: pauseId,
-    expected_service_generation: admission.generation, worker_version_id: setup.versionId,
-    service_config_sha256: await m6ServiceConfigHash(config), workers_dev_base_url: management,
-    public_base_url: "https://podcasts.example.com", domain_change: { action: "add", hostname: "podcasts.example.com" },
-    target_service_config_sha256: await m6ServiceConfigHash({ ...config, public_base_url: "https://podcasts.example.com", workers_dev_base_url: management }) });
+  const setup = await domainAdminFixture();
+  const { env, management } = setup;
   const call = (input: unknown, key = "private-secret", method = "POST") => fetchM6ManagementIntegration(new Request(`${management}/admin/domain`, {
     method, headers: { "X-Castloop-Key": key }, ...(method === "POST" ? { body: JSON.stringify(input) } : {}),
   }), env, setup.cachedAssets);
@@ -27,7 +16,7 @@ async function fixture() {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     return domainAdminResponseSchema.parse(await response.json());
   };
-  return { ...setup, config, env, request, pauseId, management, call, success };
+  return { ...setup, call, success };
 }
 
 test("domain route authenticates bounded strict inputs and remains absent from migration-only candidates", async () => {
