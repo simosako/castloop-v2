@@ -3,7 +3,7 @@ import type { ServiceConfig } from "@castloop/shared";
 
 export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
 const RESPONSE_BUDGET = 65536;
-const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection", service: "Service administration",
+const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection", catalog: "Catalog listing", service: "Service administration",
   "setup/prepare": "Setup preparation", "setup/status": "Setup status", "setup/complete": "Setup completion", "update/begin": "Compatible update admission" };
 
 async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {

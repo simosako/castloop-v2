@@ -29,6 +29,8 @@ export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, life
   parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
   showControlSchema, stringifyLifecycleToml } from "./lifecycle";
 export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
+export { CONTENT_LIST_PAGE_SIZE, contentListRequestSchema, contentListResponseSchema } from "./content-list";
+export type { ContentListRequest, ContentListResponse } from "./content-list";
 export { m6RuntimeTargetSchema, m6RuntimeReadinessSchema, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
 export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, M6ServiceUpdateRequest, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
 export { frozenMigrationPlanSchema, migrationApplyProgressSchema, migrationRuntimeProofSchema } from "./migration-plan";

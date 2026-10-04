@@ -85,6 +85,18 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "target-show SHOW_ID",
     description: "Read a Show's current lifecycle, generations and unfinished ownership without mutations.",
   },
+  "list-shows": {
+    usage: "list-shows [--include-deleted] [--cursor TOKEN] [--json]",
+    description: "Run from the service workspace. List server-side Shows, states, titles and feed URLs without mutations.\n" +
+      "Returns up to 20 control records per page; repeat with the returned cursor for more. Deleted IDs are hidden unless requested.\n" +
+      "Local-only drafts are not included. Snapshot only; feed URLs do not prove delivery. Requires the administrator key, not a Cloudflare API token.",
+  },
+  "list-episodes": {
+    usage: "list-episodes SHOW_ID [--include-deleted] [--cursor TOKEN] [--json]",
+    description: "Run from the service workspace. SHOW_ID is required. List server-side Episodes, states, titles and publication dates.\n" +
+      "Returns up to 20 control records per page; repeat with the returned cursor for more. Deleted IDs are hidden unless requested.\n" +
+      "Local-only Episode TOML drafts are not included. Parent Show/service state is reported separately. Requires the administrator key.",
+  },
   "target-episode": {
     usage: "target-episode SHOW_ID EPISODE_ID",
     description: "Read an Episode's current lifecycle, revision and unfinished ownership without mutations.",
