@@ -1,5 +1,19 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-04: v0.2.1に合わせた計画の縮小・更新
+
+[`custom_domain_plan.md`](./custom_domain_plan.md)をM6完成後の共通処理へ合わせて改訂した。今回は文書のみを変更し、以下は実装済み機能と追加予定の区別である。以下の2026-09-30以前の記述は履歴として保持する。
+
+- `ensureWorkerDomain`は既存の別hostname/別Workerを拒否し、1サービス1ドメインをすでに制限している。domain listはこの0/1件の状態確認であり、複数ドメイン実装は不要。
+- 通常の配信・公開・削除・restoreはドメインに依存させない。別の停止・CAS・lock・cache・consumerを作るのではなく、M6の共通層を利用する。
+- 独自処理はCloudflareの接続/切断とDNS/TLS確認だけに絞る。正規URLの切替・逆方向の復帰は同じ処理にし、既存feed生成・lifecycle選別・journal保存を再利用する。
+- 通常deployのCustom Domain拒否は解除予定。ただし`migrationWorkerPath`のworkers.dev限定条件と、管理APIが`public_base_url`へ接続する前提も修正が必要。旧形式変換・新規initの安全条件まで緩めない。
+- 改訂計画では既存service-pause/resumeを使い、一時停止下で切替を完了する。stagingを並行継続する機構、無停止移行、旧形式変換、一般的な操作状態機械は追加しない。
+- URL変更はWorker再配備・音源コピー・revision変更ではない。現行のcompatible updateは新Worker version前提なので偽装転用せず、必要なURL変更所有者を共通service admissionへ最小限追加する計画とした。
+- 接続/TLS、feed・cache・R2/ローカル設定の収束を確認し、未完了の変更中は通常resume/deployを拒否する。操作完了後もpausedを保持し、明示再開後に公開配信を確認する。
+
+直前のコード調査では関連テスト61件と`npm run check`が成功。今回、実サービス・DNS・Cloudflareリソースの変更や新CLI公開は行っていない。
+
 ## 2026-09-30: M6を先行する開発順へ変更
 
 公開済みv0.1.2の次マイルストーンを[Episode・Showの公開停止と削除（M6）](./m6_content_lifecycle_plan.md)とした。独自ドメインの承認済み方針とD0/D1基礎コードは維持し、完成・CLI公開・実機受け入れはM6の後続へ回す。domainコマンドは引き続き未公開。
