@@ -1,6 +1,6 @@
-# 次期M6版 Release notes（草案）
+# castloop v0.2.0
 
-正式version番号・tag・GitHub Releaseは未確定です。checkoutは`0.2.0-dev`として、配布済みv0.1.2と区別します。
+M6機能を備えたLinux x86-64向けCLIのリリースです。
 
 ## 変更
 
@@ -19,4 +19,4 @@
 - 不明なIO/残存lockは停止・ブロックを保持します。万能な復旧、強制unlock、時間経過によるtoken解放はありません。
 - staging音源の一般cleanup、旧形式変換、独自domain、無停止更新、費用/停止時間測定は今回の範囲外です。
 
-操作例・復旧可能な範囲は[README](../README.md)、検証の証拠と限定条件は[M6受け入れ記録](../design/m6_standalone_acceptance.md)を参照してください。Linux x86-64のみを配布対象とし、MIT Licenseと第三者ライセンス通知を同梱します。
+操作例・復旧可能な範囲は[README](https://github.com/simosako/castloop-v2/blob/v0.2.0/README.md)、検証の証拠と限定条件は[M6受け入れ記録](https://github.com/simosako/castloop-v2/blob/v0.2.0/design/m6_standalone_acceptance.md)を参照してください。Linux x86-64のみを配布対象とし、MIT Licenseと第三者ライセンス通知を同梱します。
