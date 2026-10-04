@@ -101,6 +101,10 @@ try {
       requireCheck(child.exitCode === (args[0] === "--help" ? 0 : 1), "Test binary did not reject a production resource or unsupported command");
       requireCheck(!Buffer.concat([child.stdout, child.stderr]).toString().includes("private-secret"), "Test binary printed a secret");
     }
+    const metadataOnly = Bun.spawnSync([m6TestBinary, "publish-episode", "daily", "first"], { cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, stdout: "pipe", stderr: "pipe" });
+    requireCheck(metadataOnly.exitCode === 1 && metadataOnly.stderr.toString().includes("Only explicitly named isolated M6 test resources"),
+      "Metadata-only publication arguments must pass parsing without bypassing production rejection");
     requireCheck(JSON.stringify(snapshot(root)) === before, "Test binary changed a rejected workspace");
   }
   requireCheck(calls.length === 4 && calls.every((call) => call.action === "status"), "Standalone inspection sent an unexpected request");

@@ -65,4 +65,27 @@ CLIの全量SHA-256読み戻しとPUT receiptのETag/versionが、保存journal/
 
 ## 後続
 
-300MB/audio-only/metadata-only/配信/明示deleteの未完了受け入れ、安全なunknown IO/残存lockの外部終了確認、復旧手順、通常CLI/README/help/version/releaseの完成は残る。harnessは新規初期化のacknowledged journal/paused checkpointからも開始可能にし、既に確認した通常更新と六lifecycleを300MB試験のたびに再実行しない。failed workspaceの再送/採用/強制解放を許可するmodeではない。
+新規初期化のfault受け入れ、安全なunknown IO/残存lockの外部終了確認・復旧手順、通常CLI/README/help/version/releaseの完成は残る。費用/停止時間測定と無停止移行は承認済みのMVP後計画とし、旧形式変換は必要時だけ行う。下記の300MB合格を旧環境の未返却owner/token解放や、通常release gateの解除へ流用しない。
+
+## CLI/R2方式の300MB・二種改訂・明示削除: 合格
+
+`castloop-m6-test-7c97f1a0`、version `77775577-cf6f-47e1-be97-a271f9d618e5`で`verify-large-media.ts`を実行し、以下が合格した。Paid契約/CPU limitは変更していない。
+
+- 正確な300,000,000-byte MP3の解析・REST単一PUT・CLI全量SHA-256読み戻し・ETag/version証拠伝達・Worker HEAD照合と、R2 SHA-256付きstream PUT/native checksum照合による公開。
+- 300,000,001-byte入力のlocal拒否とremote target非変更、音源だけの改訂、metadataだけの改訂、GUID/公開日時/immutable履歴と旧音源の保持。
+- 公開音源の全量GET/size/SHA-256、HEAD、末尾Range、304。feed/cover/小さい旧音源の実cache HITとgateway毎要求実行。300MB音源自体のcache HIT・複数colo・聴取品質の合格とはしない。
+- 明示Show delete後の既知音源R2 GET 404と公開410、owner/token通常終了、明示pause。最終generationは149、registryは空。Worker/R2/Queue/DLQ資源は保持する。
+
+| 操作 | job ID |
+| --- | --- |
+| Show公開 | `1a091043-e620-4e97-9cc5-adcf1070ebf6` |
+| 小さいEpisode公開 | `ee7a258e-8a20-4cdf-a811-2ed39749a4c9` |
+| 300MB audio-only改訂 | `5f4a2cb8-4b3f-4c8b-b191-a3487c1e0a56` |
+| metadata-only改訂 | `d0811f94-52ac-43ed-9d27-e667f726d750` |
+| Show明示削除 | `28b77bf2-cf57-4f8a-8a53-8f2182d2701c` |
+
+初回は300MB公開/全量配信後、試験CLIがmetadata-onlyにもMP3 pathを必須にしていたため送信前guardで停止した。metadata upload `542eb77e-2099-45ed-b805-c0d64a957dad`は正常finished/staged、publication journalは未作成、service registryとShow ownerも空であった。CLIをoptional pathへ修正し、既存の「changed audioだけsource path必須」検査は緩めていない。
+
+続行は`--metadata-staged-workspace`でexact version/readiness・同じbase・finished local/remote released staging・読戻し証拠一致・publication未作成・lock/token不在を照合したcheckpointに限る。別の`wx` before fileを作り、元incompleteを保持する。再PUT/再staging/未知POSTの再送・ownerの強制解放はしていない。
+
+最終pauseは`d89332da-8564-42c9-b605-e37a5af0596d`。private `large-media-acceptance.json`と[sanitized結果](../experiments/m6/large-media-results-20261004.json)を保存した。readonly snapshot競合は9件を有限観測で扱い、mutationは再送していない。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、Linux binaryとlocal HTTPS readonly/production拒否も合格した。

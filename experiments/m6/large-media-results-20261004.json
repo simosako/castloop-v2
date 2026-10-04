@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-04",
+  "result": "large_media_binary_acceptance_passed",
+  "worker_name": "castloop-m6-test-7c97f1a0",
+  "worker_version_id": "77775577-cf6f-47e1-be97-a271f9d618e5",
+  "maximum_audio": {
+    "bytes": 300000000,
+    "sha256": "acef6ef0a2fc8e6ee74e7218eaccfc013a0f89e3e56c1723ab99e5ac6457adee"
+  },
+  "staging_integrity": "CLI full SHA-256 readback and Worker HEAD size/ETag/version",
+  "publication_integrity": "R2 SHA-256 stream PUT and HEAD native checksum",
+  "oversized_rejected": true,
+  "guid_date_history_preserved": true,
+  "audio_only_and_metadata_only_verified": true,
+  "get_head_suffix_range_conditional_verified": true,
+  "cache_hit_paths": [
+    "/podcasts/large/feed.xml",
+    "/podcasts/large/cover.png",
+    "/podcasts/large/episodes/boundary/ee7a258e-8a20-4cdf-a811-2ed39749a4c9.mp3"
+  ],
+  "publication_jobs": [
+    "1a091043-e620-4e97-9cc5-adcf1070ebf6",
+    "ee7a258e-8a20-4cdf-a811-2ed39749a4c9",
+    "5f4a2cb8-4b3f-4c8b-b191-a3487c1e0a56",
+    "d0811f94-52ac-43ed-9d27-e667f726d750"
+  ],
+  "continuation": {
+    "checkpoint": "finished-metadata-staging",
+    "cause": "Test CLI required an audio path even for metadata-only publication",
+    "staging_operation_id": "542eb77e-2099-45ed-b805-c0d64a957dad",
+    "publication_journal_absent_before_continuation": true,
+    "finished_local_and_released_remote_staging_verified": true,
+    "current_base_and_empty_registry_verified": true,
+    "original_incomplete_record_retained": true,
+    "unknown_request_replayed": false
+  },
+  "deletion_job": "28b77bf2-cf57-4f8a-8a53-8f2182d2701c",
+  "payloads_deleted": true,
+  "pause_id": "d89332da-8564-42c9-b605-e37a5af0596d",
+  "final_service_generation": 149,
+  "final_invocations": 0,
+  "resources_retained_paused": true,
+  "readonly_observation_failures": 9,
+  "paid_plan_or_cpu_limit_changed": false,
+  "multi_colo_verified": false,
+  "audio_listening_quality_verified": false,
+  "authorizes_release": false
+}

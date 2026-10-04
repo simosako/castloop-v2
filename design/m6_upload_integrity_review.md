@@ -2,7 +2,7 @@
 
 更新日: 2026-10-04
 
-状態: **管理者が案Bを承認し、M6試験用CLI/Workerへ実装した。ローカル全891テスト・型検査に合格。接続後の実機受け入れは下記へ別途記録する。通常release gateは維持し、Workers Paidは使用しない。**
+状態: **管理者が案Bを承認し、M6試験用CLI/Workerへ実装した。ローカル全891テスト・型検査と、専用Cloudflareでの300MB公開・二種改訂・配信・明示削除が合格。通常release gateは維持し、Paid契約/CPU limitは変更していない。**
 
 ## 結論
 
@@ -81,4 +81,4 @@ checksumは原本との同一性検査であり、原本自体のMP3破損・再
 - 元serviceのpaused状態・未返却owner/token・回復可能な300MB staging payloadは維持する。この試験は旧IO収束/強制解放の証拠ではない。[U1](./m6_upload_recovery_options.md)の扱いも変更しない。
 - Bの証拠伝達を実装し、receipt/GET/HEADのidentity一致・途中差替え・証拠欠落/不一致・manifest/owner/generation不一致を各責務の層で回帰した。音源stagingのbody GETと公開後のbody GETを行わないこと、native checksum欠落/不一致を拒否すること、live IO/token保持も検査する。native checksumの実動作は今回の実機証拠を使い、各層へ同じ大容量検証testを重複させない。
 - 新規`castloop-m6-test-7c97f1a0`で試験standaloneの初期化→明示再開→Show/20,850-byte Episode公開→GET/HEAD/Range→明示pauseまで合格した。REST PUT receipt→CLI journal/GET→管理settlement→Worker HEADのETag/version一致、公開native checksum検査を実経路で通した。証拠は`/tmp/opencode/castloop-m6-test-7c97f1a0/acceptance.json`。旧環境は採用・再配備・解放しない。
-- 300MBのM6 publication全体、二種改訂、配信、明示deleteまでの受け入れは別に残る。今回の成功はその合格の代わりではない。
+- 同じ新規専用環境で300MBのM6 publication全体、二種改訂、全量配信/HEAD/Range/304、明示deleteが合格した。[sanitized結果](../experiments/m6/large-media-results-20261004.json)と[checkpoint/残件](./m6_standalone_acceptance.md)参照。旧IOの収束、全colo、聴取品質、通常release全体の合格とは区別する。

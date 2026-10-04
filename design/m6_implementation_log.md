@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 300MB公開・二種改訂・明示削除の実機合格
+
+- 新規専用`castloop-m6-test-7c97f1a0`でCLI全量SHA-256/ETag/version証拠とWorker HEAD照合、R2 SHA-256 stream PUT/native checksumを使い、正確な300MB公開・全量配信に合格した。300,000,001 bytesのlocal拒否、audio-only/metadata-only、GUID/date/history/旧音源保持、HEAD/suffix Range/304、実cache HIT、最後の明示Show delete/媒体404・公開410も合格した。
+- metadata-only試験で判明した試験CLIの不要なMP3 path必須制約を修正した。既存source guardは維持し、正常finished/staged upload・remote released証拠・同じbase/version・空registry・publication journal未作成を照合する限定checkpointだけから続行した。元incompleteを保持し、再PUT/再staging/未知POSTの再送・owner/token強制解放はしない。
+- 最終pause `d89332da-8564-42c9-b605-e37a5af0596d`、service generation 149、空registry。資源はpausedで保持し、Paid/CPU limit/通常release gateは変更しない。旧`ff3bfd8c`の未収束owner/token/payloadにも手を加えない。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、Linux standaloneのlocal HTTPS readonly/production拒否に合格した。
+- 詳細は`m6_standalone_acceptance.md`、sanitized結果は`experiments/m6/large-media-results-20261004.json`。残件は新規初期化fault、unknown IO/残存lockの安全な外部終了確認と復旧案内、通常CLI/README/help/version/releaseであり、旧形式変換は必要時だけとする。
+
 ## 2026-10-04: 音源のSHA-256検証をCLI/R2へ集約
 
 - 管理者が承認した案Bを実装した。REST単一PUT後のCLI全量GET/size/SHA-256照合を維持し、固定key・strong ETag・versionを確認した小さいreceiptを既存journal/settlementへ保存する。証拠の順序/manifest一致はshared helperへ集約し、終了後の変更・legacy証拠の捏造・local/server不一致を拒否する。

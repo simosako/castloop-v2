@@ -38,7 +38,8 @@ target-show SHOW_ID | target-episode SHOW_ID EPISODE_ID
 create-show SHOW_ID SITE_URL | create-episode SHOW_ID EPISODE_ID
 update-show SHOW_ID | update-episode SHOW_ID EPISODE_ID
 update-episode-audio SHOW_ID EPISODE_ID MP3_PATH
-publish-show SHOW_ID | publish-episode SHOW_ID EPISODE_ID MP3_PATH
+publish-show SHOW_ID | publish-episode SHOW_ID EPISODE_ID [MP3_PATH]
+MP3_PATH is required only when audio has been staged for this draft.
 publication-retry JOB_UUID (same acknowledged commit; refuses active or unknown execution)
 preview-show-lifecycle SHOW_ID unpublish|restore|delete
 preview-episode-lifecycle SHOW_ID EPISODE_ID unpublish|restore|delete
@@ -61,7 +62,7 @@ async function main(): Promise<void> {
     "preview-show-lifecycle": 2, "preview-episode-lifecycle": 3, "lifecycle-execute": 3, "lifecycle-retry": 3, "publication-retry": 1, "operation-status": 2,
     "create-show": 2, "create-episode": 2, "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3 };
   if (!Object.hasOwn(counts, command)) throw new Error("Unknown test command; use --help");
-  argumentsFor(args, counts[command]!);
+  argumentsFor(args, command === "publish-episode" && args.length === 2 ? 2 : counts[command]!);
   const root = process.cwd();
   if (!lstatSync(root).isDirectory()) throw new Error("Test workspace must be a real directory");
   const config = parseServiceConfig(readFileSync(join(root, "castloop.toml"), "utf8"));

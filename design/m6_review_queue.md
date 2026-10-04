@@ -56,9 +56,9 @@ R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理RES
 
 下記の各module詳細には実装当時の未接続項目も残る。最新の到達点は新規初期化・通常更新の試験HTTP/standalone接続と実Cloudflare合格、Show/Episode六lifecycle操作の実機合格まで進んでいる。後者は配信404/410・復元時GUID/revision保持・物理削除・永久記録保持・owner/token通常返却を含む。通常公開CLI/entryはまだ切り替えていない。
 
-通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。300MBはREST PUT/全量GETまで成功したが、WorkerのCPU制限で未合格となった。独立readonly診断でもnative digestと現行経路が`exceededCpu`で終了し、元serviceはpaused/owner/token保持とした。契約照会は403で課金変更はしていない。管理者のPaid利用不可の決定に従い、無料枠に適合する検証方式の見直しを技術残件として進める。費用測定計画を通常開発のgateへ戻すものではない。
+通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。改修前の300MB Worker hashはCPU超過となり、元serviceはpaused/owner/token/payloadを保持する。管理者承認のCLI全量SHA-256証拠＋Worker HEAD照合＋R2公開時検証へ集約した後、新規`castloop-m6-test-7c97f1a0`で300MB公開・audio-only/metadata-only改訂・全量配信/HEAD/Range/304・明示削除まで合格した。試験CLIのmetadata-only引数制約は修正し、publication未開始の確認済みcheckpointだけを続行した。課金/CPU limitは変更しておらず、費用測定計画を通常開発のgateへ戻すものではない。
 
-残件は300MBと二種改訂の受け入れ、新規初期化fault、安全なunknown IO/残存lockの外部終了確認・復旧手順、公開CLI/利用案内・release gateである。未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+残件は新規初期化fault、安全なunknown IO/残存lockの外部終了確認・復旧手順、公開CLI/利用案内・release gateである。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 
