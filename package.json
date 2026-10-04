@@ -1,6 +1,6 @@
 {
   "name": "castloop-v2",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "castloop is a serverless podcast hosting program. Once deployed, it runs with minimal ops.",
   "private": true,
   "workspaces": [

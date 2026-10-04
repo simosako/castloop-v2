@@ -2,11 +2,11 @@
 
 Serverless podcast hosting on Cloudflare: one private R2 bucket and one public Worker per service, multiple Shows, managed through a standalone CLI.
 
-**v0.2.0 includes the M6 lifecycle features.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md).
+**v0.2.1 adds Show and Episode listings to the M6 lifecycle features released in v0.2.0.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md).
 
 ## Build and install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.2.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.2.0). Run `sha256sum --check SHA256SUMS` in the download directory before installing the binary. `castloop --version` must report `0.2.0`.
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.2.1 release](https://github.com/simosako/castloop-v2/releases/tag/v0.2.1). Run `sha256sum --check SHA256SUMS` in the download directory before installing the binary. `castloop --version` must report `0.2.1`.
 
 The build machine needs Bun 1.4.2 and Node.js/npm:
 
@@ -55,9 +55,9 @@ Updates stage inputs without publishing. For metadata-only Episode revisions, ru
 
 MP3s are limited to 300,000,000 bytes. The CLI validates duration, uploads and reads back the complete object to verify its size/SHA-256 and identity. The Worker checks that evidence against R2 HEAD; R2 verifies SHA-256 when saving immutable published audio. Workers Paid is not required by this implementation. Staging audio has no automatic expiration or general cleanup command in this MVP.
 
-## List Shows and Episodes (unreleased development feature)
+## List Shows and Episodes
 
-These commands are included in the development source, **not in the published v0.2.0 binary**. They require a Worker built from the updated source too; updating only the CLI is insufficient. Use the compatible-update procedure below when installing that build. No Cloudflare resources are updated merely by listing.
+These commands require **both the v0.2.1 CLI and a Worker deployed from that build**; updating only the CLI is insufficient. For an existing v0.2.0 M6 service, use the compatible-update procedure below. No Cloudflare resources are updated merely by listing or installing the executable.
 
 Run from the service workspace with its retained administrator key. Listing does not require `CLOUDFLARE_API_TOKEN`:
 
@@ -124,6 +124,6 @@ The single REST PUT recovery model retains [unverified assumption U1](design/m6_
 
 Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.
 
-[M6 acceptance](design/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Custom domains, old-format conversion, zero-downtime migration and cost/downtime measurement follow the MVP. Existing Cloudflare resources are not automatically deleted.
+[M6 acceptance](design/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.2.1 release notes](docs/release-v0.2.1.md) and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Custom domains, old-format conversion, zero-downtime migration and cost/downtime measurement follow the MVP. Existing Cloudflare resources are not automatically deleted.
 
 The [release workflow](.github/workflows/build-binaries.yml) builds/checks Linux x86-64 artifacts and publishes on a matching `v*` tag. Include [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with redistributed binaries. castloop uses the MIT License.
