@@ -1,6 +1,6 @@
 import { stageControlRequest, stagePayloadKey, stageUploadRequestSchema, stagingAdminRequestSchema,
   stagingAdminResponseSchema, stagingOperationSchema } from "@castloop/shared";
-import type { ServiceConfig, StageUploadRequest, StagingAdminRequest, StagingAdminResponse, StagingOperation } from "@castloop/shared";
+import type { ServiceConfig, StageReadbackReceipt, StageSettlement, StageUploadRequest, StagingAdminRequest, StagingAdminResponse, StagingOperation } from "@castloop/shared";
 import { M6AdminJsonClient } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
 import { createHash } from "node:crypto";
@@ -26,7 +26,7 @@ export class StagingAdminClient {
   }
 
   private async call(input: StageUploadRequest, action: StagingAdminRequest["action"],
-    fields: { outcome?: "staged" | "aborted"; put_requests_settled?: true; no_more_puts?: true } = {}): Promise<StagingAdminResponse> {
+    fields: { outcome?: "staged" | "aborted"; put_requests_settled?: true; no_more_puts?: true; readback_receipts?: StageReadbackReceipt[] } = {}): Promise<StagingAdminResponse> {
     const upload = stageUploadRequestSchema.parse(input);
     const operation = stagingClientOperation(upload);
     const identity = { schema_version: 1, service_id: this.http.config.service_id, action };
@@ -65,7 +65,7 @@ export class StagingAdminClient {
     return value;
   }
 
-  async settle(upload: StageUploadRequest, evidence: { put_requests_settled: true; no_more_puts: true }): Promise<Result<"settled">> {
+  async settle(upload: StageUploadRequest, evidence: StageSettlement): Promise<Result<"settled">> {
     const value = await this.call(upload, "settle", evidence);
     if (value.result !== "settled") throw new Error("Invalid staging settlement result");
     return value;

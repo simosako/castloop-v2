@@ -38,6 +38,12 @@ export const workerVersionSnapshotSchema = z.object({ id: z.uuid(), resources: z
   script_runtime: z.object({ compatibility_date: z.string(), compatibility_flags: z.array(z.string()), exports: exportsSchema }),
 }) });
 export const workerScriptUploadReceiptSchema = z.object({ etag: z.string().min(1).max(256) });
+const workerVersionIdentitySchema = z.object({ id: z.uuid(), number: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER) });
+export const workerVersionsSnapshotSchema = z.object({ items: z.array(workerVersionIdentitySchema).min(1).max(2) });
+export const workerVersionUploadReceiptSchema = workerVersionIdentitySchema.extend({ resources: z.object({
+  script: workerScriptUploadReceiptSchema,
+}) });
+export type WorkerVersionUploadReceipt = z.infer<typeof workerVersionUploadReceiptSchema>;
 export const workerSubdomainSnapshotSchema = z.object({ enabled: z.boolean(), previews_enabled: z.boolean() });
 
 export const m6WorkerDeploymentEvidenceSchema = z.object({

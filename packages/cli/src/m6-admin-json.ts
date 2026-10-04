@@ -1,8 +1,10 @@
-import { serviceConfigSchema } from "@castloop/shared";
+import { m6RuntimeTargetSchema, serviceConfigSchema } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 
 export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
 const RESPONSE_BUDGET = 65536;
+const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection", service: "Service administration",
+  "setup/prepare": "Setup preparation", "setup/status": "Setup status", "setup/complete": "Setup completion", "update/begin": "Compatible update admission" };
 
 async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
   const length = response.headers.get("Content-Length");
@@ -49,15 +51,30 @@ export class M6AdminJsonClient {
     this.transport = transport;
   }
 
-  async post(route: "staging" | "publication" | "lifecycle" | "shows" | "target", input: object): Promise<unknown> {
-    if (!["staging", "publication", "lifecycle", "shows", "target"].includes(route)) throw new Error("Unknown M6 administration route");
-    const label = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection" }[route];
+  async post(route: keyof typeof ROUTE_LABELS, input: object): Promise<unknown> {
+    if (!Object.hasOwn(ROUTE_LABELS, route)) throw new Error("Unknown M6 administration route");
+    const label = ROUTE_LABELS[route];
     const body = JSON.stringify(input);
     if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
+    return this.send(new URL(`/admin/${route}`, this.config.public_base_url), label, body, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
+  }
+
+  async getSetupProbe(operationId: string): Promise<unknown> {
+    m6RuntimeTargetSchema.shape.operation_id.parse(operationId);
+    const url = new URL("/admin/setup/probe", this.config.public_base_url);
+    url.searchParams.set("operation_id", operationId);
+    return this.send(url, "Setup probe");
+  }
+
+  async getRuntimeHealth(): Promise<unknown> {
+    return this.send(new URL("/admin/health", this.config.public_base_url), "Runtime health");
+  }
+
+  private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
     let response: Response;
     try {
-      response = await this.transport(new URL(`/admin/${route}`, this.config.public_base_url), {
-        method: "POST", redirect: "error", signal: AbortSignal.timeout(120000), cache: "no-store",
+      response = await this.transport(url, {
+        method: body === undefined ? "GET" : "POST", redirect: "error", signal: AbortSignal.timeout(120000), cache: "no-store",
         headers: { "X-Castloop-Key": this.adminKey, "User-Agent": "castloop-cli/0.1", "Content-Type": "application/json" }, body,
       });
     } catch {
@@ -68,7 +85,7 @@ export class M6AdminJsonClient {
         if (response.body) await response.body.cancel();
         throw new Error("Management operation was not confirmed");
       }
-      return await readResponse(response, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
+      return await readResponse(response, maximumBytes);
     } catch {
       throw new Error(`${label} response was not verified; inspect retained ownership/progress without automatic retry`);
     }

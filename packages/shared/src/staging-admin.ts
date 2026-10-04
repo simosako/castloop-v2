@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { serviceAdmissionSchema } from "./service-admission";
 import { lifecycleJobStatusSchema } from "./lifecycle-job";
-import { stagePayloadSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "./staging";
+import { stagePayloadSchema, stageSettlementSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "./staging";
 
 export const stagingOperationSchema = z.object({
   show_id: stageUploadRequestSchema.shape.show_id,
@@ -18,8 +18,7 @@ export const stagingAdminRequestSchema = z.discriminatedUnion("action", [
   z.object({ ...identity, action: z.literal("claim"), upload: stageUploadRequestSchema }).strict(),
   z.object({ ...identity, action: z.literal("status"), upload: stageUploadRequestSchema }).strict(),
   z.object({ ...identity, action: z.literal("begin"), operation: stagingOperationSchema }).strict(),
-  z.object({ ...identity, action: z.literal("settle"), operation: stagingOperationSchema,
-    put_requests_settled: z.literal(true), no_more_puts: z.literal(true) }).strict(),
+  stageSettlementSchema.extend({ ...identity, action: z.literal("settle"), operation: stagingOperationSchema }),
   z.object({ ...identity, action: z.literal("finish"), operation: stagingOperationSchema,
     outcome: z.enum(["staged", "aborted"]) }).strict(),
 ]);

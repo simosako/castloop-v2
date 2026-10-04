@@ -8,30 +8,10 @@ import { readStageUploadProgress, requireStageUpload, stageManifestHash, writeSt
 import type { StageOperation, StageUploadSnapshot } from "./staging-upload";
 
 export type StageVerification = StageOperation & { verificationId: string };
-export type StageStreamDigest = (body: ReadableStream<Uint8Array>, length: number) => Promise<string>;
 
 async function hashBytes(bytes: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-export async function digestStageStream(body: ReadableStream<Uint8Array>, length: number): Promise<string> {
-  if (!Number.isSafeInteger(length) || length < 1 || length > 300_000_000) throw new Error("Invalid staging digest size");
-  if (typeof crypto.DigestStream !== "function") throw new Error("Streaming checksum verification is unavailable");
-  const digest = new crypto.DigestStream("SHA-256");
-  let received = 0;
-  const measured = new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      received += chunk.byteLength;
-      if (received > length) throw new Error("Staging stream exceeds the expected size");
-      controller.enqueue(chunk);
-    },
-    flush() { if (received !== length) throw new Error("Staging stream ended before the expected size"); },
-  });
-  const results = await Promise.allSettled([body.pipeThrough(measured).pipeTo(digest), digest.digest]);
-  if (results[0].status === "rejected") throw results[0].reason;
-  if (results[1].status === "rejected") throw results[1].reason;
-  return [...new Uint8Array(results[1].value)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export async function acquireStageVerification(env: LifecycleControlEnv, operation: StageOperation): Promise<StageVerification> {
@@ -69,59 +49,65 @@ export async function releaseStageVerification(env: LifecycleControlEnv, verific
 }
 
 async function verifyPayload(env: LifecycleControlEnv, verification: StageVerification, snapshot: StageUploadSnapshot,
-  payload: StagePayload, digest: StageStreamDigest): Promise<StageUploadProgress["verified_assets"][number]> {
+  payload: StagePayload): Promise<StageUploadProgress["verified_assets"][number]> {
   await requireStageVerification(env, verification);
   const key = stagePayloadKey(snapshot.request, payload.asset);
   const head = await env.CASTLOOP_BUCKET.head(key);
   if (!head || head.size !== payload.length_bytes) throw new Error("Uploaded staging size does not match its manifest");
+  const progress = (await readStageUploadProgress(env, verification, snapshot))!.value;
+  const receipt = progress.readback_receipts?.find((item) => item.asset === payload.asset);
+  if (!receipt || receipt.sha256 !== payload.sha256 || receipt.length_bytes !== payload.length_bytes ||
+    head.etag !== receipt.etag || head.version !== receipt.version) {
+    throw new Error("Uploaded staging object does not match its retained full readback receipt");
+  }
+  if (payload.asset === "audio") {
+    await requireStageVerification(env, verification);
+    return receipt;
+  }
   const object = await env.CASTLOOP_BUCKET.get(key, { onlyIf: { etagMatches: head.etag } });
-  if (!object || !("body" in object) || !object.body || object.etag !== head.etag || object.size !== payload.length_bytes) {
+  if (!object || !("body" in object) || !object.body || object.etag !== head.etag || object.version !== head.version || object.size !== payload.length_bytes) {
+    if (object && "body" in object && object.body) await object.body.cancel();
     throw new Error("Uploaded staging object changed before verification");
   }
-  let checksum: string;
-  if (payload.asset === "audio") checksum = await digest(object.body, payload.length_bytes);
-  else {
-    const bytes = await object.arrayBuffer();
-    if (bytes.byteLength !== payload.length_bytes) throw new Error("Uploaded staging contents have a different size");
-    checksum = await hashBytes(bytes);
-    if (checksum !== payload.sha256) throw new Error("Uploaded staging checksum does not match its manifest");
-    if (payload.asset === "show_metadata") {
-      const show = parseShowMetadata(new TextDecoder().decode(bytes));
-      if (show.show_id !== snapshot.request.show_id) throw new Error("Staged Show metadata targets another Show");
-      const extension = show.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg";
-      if (!snapshot.request.payloads.some((item) => item.asset === `cover_${extension}`)) throw new Error("Staged Show metadata and cover extension differ");
-      const published = await env.CASTLOOP_BUCKET.get(`system/shows/${snapshot.request.show_id}/show.toml`);
-      if (!published && snapshot.control.value.lifecycle === "active") throw new Error("Active Show has no published snapshot");
-      if (published) {
-        if (published.size > 1_000_000) throw new Error("Published Show metadata is oversized");
-        const previous = parseShowMetadata(await published.text());
-        if (previous.show_id !== show.show_id || (previous.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg") !== extension) {
-          throw new Error("Changing a published Show cover extension is not supported");
-        }
-      }
-    } else if (payload.asset === "episode_metadata") {
-      const episode = parseEpisodeDraft(new TextDecoder().decode(bytes));
-      if (episode.episode_id !== snapshot.request.episode_id) throw new Error("Staged Episode metadata targets another Episode");
-      const published = await env.CASTLOOP_BUCKET.get(`public/episodes/${snapshot.request.show_id}/${snapshot.request.episode_id}/metadata.toml`);
-      const lifecycle = await readEpisodeLifecycle(env, snapshot.request.show_id, snapshot.request.episode_id!);
-      if (!published && lifecycle?.lifecycle === "active") throw new Error("Active Episode has no published snapshot");
-      if (published) {
-        if (published.size > 1_000_000) throw new Error("Published Episode metadata is oversized");
-        const previous = parseEpisodeRevision(await published.text());
-        if (previous.episode_id !== episode.episode_id || previous.guid !== episode.guid || previous.published_at !== episode.published_at) {
-          throw new Error("Episode identity and published_at must remain unchanged");
-        }
-      }
-    } else {
-      const cover = new Uint8Array(bytes);
-      const valid = payload.asset === "cover_jpg" ? cover.length >= 3 && cover[0] === 255 && cover[1] === 216 && cover[2] === 255 :
-        cover.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => cover[index] === byte);
-      if (!valid) throw new Error("Staged cover contents do not match their image type");
-    }
-  }
+  const bytes = await object.arrayBuffer();
+  if (bytes.byteLength !== payload.length_bytes) throw new Error("Uploaded staging contents have a different size");
+  const checksum = await hashBytes(bytes);
   if (checksum !== payload.sha256) throw new Error("Uploaded staging checksum does not match its manifest");
+  if (payload.asset === "show_metadata") {
+    const show = parseShowMetadata(new TextDecoder().decode(bytes));
+    if (show.show_id !== snapshot.request.show_id) throw new Error("Staged Show metadata targets another Show");
+    const extension = show.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg";
+    if (!snapshot.request.payloads.some((item) => item.asset === `cover_${extension}`)) throw new Error("Staged Show metadata and cover extension differ");
+    const published = await env.CASTLOOP_BUCKET.get(`system/shows/${snapshot.request.show_id}/show.toml`);
+    if (!published && snapshot.control.value.lifecycle === "active") throw new Error("Active Show has no published snapshot");
+    if (published) {
+      if (published.size > 1_000_000) throw new Error("Published Show metadata is oversized");
+      const previous = parseShowMetadata(await published.text());
+      if (previous.show_id !== show.show_id || (previous.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg") !== extension) {
+        throw new Error("Changing a published Show cover extension is not supported");
+      }
+    }
+  } else if (payload.asset === "episode_metadata") {
+    const episode = parseEpisodeDraft(new TextDecoder().decode(bytes));
+    if (episode.episode_id !== snapshot.request.episode_id) throw new Error("Staged Episode metadata targets another Episode");
+    const published = await env.CASTLOOP_BUCKET.get(`public/episodes/${snapshot.request.show_id}/${snapshot.request.episode_id}/metadata.toml`);
+    const lifecycle = await readEpisodeLifecycle(env, snapshot.request.show_id, snapshot.request.episode_id!);
+    if (!published && lifecycle?.lifecycle === "active") throw new Error("Active Episode has no published snapshot");
+    if (published) {
+      if (published.size > 1_000_000) throw new Error("Published Episode metadata is oversized");
+      const previous = parseEpisodeRevision(await published.text());
+      if (previous.episode_id !== episode.episode_id || previous.guid !== episode.guid || previous.published_at !== episode.published_at) {
+        throw new Error("Episode identity and published_at must remain unchanged");
+      }
+    }
+  } else {
+    const cover = new Uint8Array(bytes);
+    const valid = payload.asset === "cover_jpg" ? cover.length >= 3 && cover[0] === 255 && cover[1] === 216 && cover[2] === 255 :
+      cover.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => cover[index] === byte);
+    if (!valid) throw new Error("Staged cover contents do not match their image type");
+  }
   await requireStageVerification(env, verification);
-  return { asset: payload.asset, etag: object.etag, length_bytes: payload.length_bytes, sha256: checksum };
+  return { asset: payload.asset, etag: object.etag, version: object.version, length_bytes: payload.length_bytes, sha256: checksum };
 }
 
 function matchesStatus(status: LifecycleJobStatus, verification: StageVerification, snapshot: StageUploadSnapshot): boolean {
@@ -175,7 +161,9 @@ async function finishVerification(env: LifecycleControlEnv, verification: StageV
       const verified = progress.verified_assets.find((item) => item.asset === payload.asset);
       const head = await env.CASTLOOP_BUCKET.head(stagePayloadKey(snapshot.request, payload.asset));
       if (!verified || verified.sha256 !== payload.sha256 || verified.length_bytes !== payload.length_bytes ||
-        !head || head.size !== payload.length_bytes || head.etag !== verified.etag) throw new Error("Verified staging payload changed before completion");
+        !head || head.size !== payload.length_bytes || head.etag !== verified.etag || !verified.version || head.version !== verified.version) {
+        throw new Error("Verified staging payload changed before completion");
+      }
     }
   }
   const latest = await requireStageVerification(env, verification);
@@ -202,8 +190,7 @@ async function finishedOutcome(env: LifecycleControlEnv, operation: StageOperati
   return receipt.outcome;
 }
 
-export async function runStageVerification(env: LifecycleControlEnv, operation: StageOperation, outcome: "staged" | "aborted",
-  options: { digest?: StageStreamDigest } = {}): Promise<void> {
+export async function runStageVerification(env: LifecycleControlEnv, operation: StageOperation, outcome: "staged" | "aborted"): Promise<void> {
   if (outcome !== "staged" && outcome !== "aborted") throw new Error("Invalid staging outcome");
   const finished = await finishedOutcome(env, operation);
   if (finished) {
@@ -221,7 +208,7 @@ export async function runStageVerification(env: LifecycleControlEnv, operation: 
       if (outcome === "staged" && progress.phase !== "verified") {
         await writeStageUploadProgress(env, verification, { ...progress, phase: "verifying", verified_assets: [] }, verification.verificationId);
         const verified: StageUploadProgress["verified_assets"] = [];
-        for (const payload of snapshot.request.payloads) verified.push(await verifyPayload(env, verification, snapshot, payload, options.digest ?? digestStageStream));
+        for (const payload of snapshot.request.payloads) verified.push(await verifyPayload(env, verification, snapshot, payload));
         progress = stageUploadProgressSchema.parse({ ...progress, phase: "verified", verified_assets: verified });
         await writeStageUploadProgress(env, verification, progress, verification.verificationId);
       }

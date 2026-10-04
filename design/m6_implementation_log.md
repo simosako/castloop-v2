@@ -1,5 +1,90 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 正式バイナリのMVP実機確認とRelease準備
+
+- 正式入口で新規初期化・Show/Episode公開・metadata-only・通常更新・六lifecycle操作が合格した。known checkpointでのみ試験scriptの出力parser/readonly未確認から続行し、未知mutationの再送や強制解放はしない。
+- 最後のreadonly監査で六jobの完了/purge、既知8 payload物理不在、永久reservation/tombstone/commit marker保持を確認した。専用資源はversion `c2d68ee0-d81a-4d70-99b4-539751c88904`、paused/generation146/空registryで保持する。既存300MB/cache/広い非変更検証は再利用した。
+- 最終Worker sourceは実機bundleとbyte hashが一致し、test nonce headerは含まない。全893テスト/13526 assertions・両TypeScript検査・Linux buildと、認証情報なしstandaloneの全27 help/fault command拒否が合格。CLI sourceの実行権限も維持する。
+- 承認済みMVP範囲の残実装・検証は完了。README/helpと次期Release notes草案、checksum/license付きローカルartifactを用意した。正式version/tag/GitHub Releaseとmainへの反映はまだ行っていない。詳細は`m6_standalone_acceptance.md`、`experiments/m6/formal-entry-results-20261004.json`。
+
+## 2026-10-04: 承認済みMVP範囲で正式CLI/Workerへ接続
+
+- 既存runnerの呼出を`m6-commands.ts`へ共有し、正式CLIの旧state.json/直接PUT/公開処理を置き換えた。試験CLIは専用資源制限とfault injectionだけの薄いwrapperとし、状態機械・receipt検査は増やしていない。管理keyのprivate/fsync付き保存も一か所へ集約した。
+- 正式Worker entryを`src/worker.ts`へ接続し、試験entryはこれにnonce headerだけを加える。通常buildも同じruntime/admission/配信/consumerを使用し、初期化と通常更新はpaused完了・明示再開を維持する。正式入口にfault commandは含めない。
+- README/helpを現行CLIへ整理し、v0.1.2手順との混用、旧形式採用、未知IO/残存lockの強制復旧を禁止した。未確定Releaseは`0.2.0-dev`で区別し、草案を`docs/release-next.md`へ置く。新規fault harnessや網羅的matrixは追加しない。
+- 全893テスト/13526 assertions、TypeScript/M6試験tsconfig、正式/試験Linux buildが合格。追加は正式引数境界とlegacy workspace非変換の2テストだけ。正式バイナリの実機確認は専用の新規資源で進め、既存の300MB・六操作・通常更新の証拠は再利用する。
+
+## 2026-10-04: 300MB公開・二種改訂・明示削除の実機合格
+
+- 新規専用`castloop-m6-test-7c97f1a0`でCLI全量SHA-256/ETag/version証拠とWorker HEAD照合、R2 SHA-256 stream PUT/native checksumを使い、正確な300MB公開・全量配信に合格した。300,000,001 bytesのlocal拒否、audio-only/metadata-only、GUID/date/history/旧音源保持、HEAD/suffix Range/304、実cache HIT、最後の明示Show delete/媒体404・公開410も合格した。
+- metadata-only試験で判明した試験CLIの不要なMP3 path必須制約を修正した。既存source guardは維持し、正常finished/staged upload・remote released証拠・同じbase/version・空registry・publication journal未作成を照合する限定checkpointだけから続行した。元incompleteを保持し、再PUT/再staging/未知POSTの再送・owner/token強制解放はしない。
+- 最終pause `d89332da-8564-42c9-b605-e37a5af0596d`、service generation 149、空registry。資源はpausedで保持し、Paid/CPU limit/通常release gateは変更しない。旧`ff3bfd8c`の未収束owner/token/payloadにも手を加えない。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、Linux standaloneのlocal HTTPS readonly/production拒否に合格した。
+- 詳細は`m6_standalone_acceptance.md`、sanitized結果は`experiments/m6/large-media-results-20261004.json`。残件は新規初期化fault、unknown IO/残存lockの安全な外部終了確認と復旧案内、通常CLI/README/help/version/releaseであり、旧形式変換は必要時だけとする。
+
+## 2026-10-04: 音源のSHA-256検証をCLI/R2へ集約
+
+- 管理者が承認した案Bを実装した。REST単一PUT後のCLI全量GET/size/SHA-256照合を維持し、固定key・strong ETag・versionを確認した小さいreceiptを既存journal/settlementへ保存する。証拠の順序/manifest一致はshared helperへ集約し、終了後の変更・legacy証拠の捏造・local/server不一致を拒否する。
+- Worker stagingは音源HEAD size/ETag/versionとexact owner/generation/終了申告を照合し、音源GET/全量hashをしない。metadata/coverのbounded内容検査・token・進捗・取消は維持する。公開immutable音源は既存のR2 SHA-256付きstream PUTとHEAD native checksum照合を使い、公開後のGET/再hashを除いた。native checksumなしの旧媒体を自動採用・上書きしない。
+- 既存のfault/live IO/再実行テストを新境界へ更新し、新しいidentity/証拠欠落/差替え/native checksum検査を適切な層へ追加した。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、通常/試験Linux binary、local HTTPS readonly/production拒否に合格した。
+- 新規専用`castloop-m6-test-7c97f1a0`の初期化→Show/小さいEpisode公開→GET/HEAD/Range→明示pauseが合格し、実REST versionとWorker HEADの対応も確認した。300MB全体の結果は後続受け入れへ別記する。Paid/CPU limit/通常release gateは変更せず、`ff3bfd8c`の旧owner/token/payloadも保持する。詳細は`m6_upload_integrity_review.md`。
+
+## 2026-10-04: 実cache HIT合格と300MBのCPU制限を確認
+
+- NRTでfeed/cover/小さい音源の内部HIT・同じ内部nonceと毎回異なるgateway nonceを確認し、公開GET-onlyの再照合結果もprivate acceptanceへ保存した。
+- 正確な300MBのlocal解析/REST PUT/全量GETと過大入力のlocal拒否は成功したが、Worker staging検証の応答は未確認になった。local finish_requested/server verifying/token保持を観測し、明示pausedで新規配信/書込だけを閉じた。owner/token/payloadは回復可能性のため保持し、elapsed timeやHEADから解放しない。
+- 別名readonly診断Workerで同じR2 objectのnative digest直結と現行経路を各一回試し、両方のexceededCpuをsanitized tailで確認した。直結でもCPU 2068msを要し、現経路はCPU 10ms時点で終了した。契約照会403、課金/CPU limit変更なし。Paid利用に必要な判断と具体的な対象/記録は`m6_standalone_acceptance.md`へ記録した。
+- 300MB harnessへ初期化済みacknowledged workspaceからの独立開始と、途中で既に確認したcache/過大拒否/fixtureの記録を追加した。完了済み更新/六lifecycle試験を新環境で毎回重複させず、未知のfailed workspaceを採用しない。
+
+## 2026-10-04: 六lifecycle操作のCloudflare/standalone受け入れ
+
+- 通常更新済みの専用`castloop-m6-test-ff3bfd8c`を再利用し、Show/Episode各unpublish/restore/deleteを試験binary→実HTTP→通知/Queue→consumerまで通した。GUID/revision/checksum保持、GET/HEAD/Range/304/416と停止404/削除410、payload物理不在と永久管理記録保持が合格した。
+- owner解放・invocation返却まで確認し、最後に明示pausedで残した。旧環境/Cloudflare資源の削除・通常release gate解除はしていない。試験harnessだけのbounded stream/process処理を共有し、operation固有の受付条件は既存moduleへ残す。
+- 後続の応答喪失fault・300MB/audio-only/metadata-only・実cache HITの有限受け入れharnessを追加した。正確な300MB fixtureのlocal stream解析は合格。試験Workerだけにcache/gateway nonceを追加し、公開Workerには追加しない。試験専用publication retryも既存runnerへ接続し、live/unknown tokenを奪わない。
+- 更新operation `6bb77144-ded9-427e-88c9-171ba5be8735`で成功completion応答だけを破棄し、local requested/server paused→別standalone commandの非書込照合→local completedも実機合格した。照合前後のservice statusとruntime-check ETag/checksumを維持した。全884テスト/13409 assertions、TypeScript/M6試験tsconfig、試験Linux build/local HTTPS production拒否も合格。
+- 実機証拠と残件は`m6_standalone_acceptance.md`。六操作の合格をcache HIT/300MB/強制終了IO収束やM6正式release全体の合格と混同しない。
+
+## 2026-10-04: 明示確認付きlifecycle操作を試験専用standaloneへ接続
+
+- 既存preview/claim/commit/retry/statusを薄いCLI adapterへ接続した。共通confirmation helperは入力されたhashとaction別の明示確認文字列を渡すだけで、状態遷移・receipt検査をCLIへ複製しない。
+- deleteは不可逆payload削除と永久管理記録保持の両方を示す確認文字列が必要。planはbounded/no-followで読み、通常binaryとproduction資源は拒否する。commitとconsumer完了を区別し、unknown outcome/残存lock/live tokenの解除・Cloudflare資源削除は追加しない。
+- TypeScript、関連6テスト/39 assertions、通常/試験Linux binary build、local HTTPSの四family非書込statusと新commandのproduction資源拒否が合格した。実Cloudflareの六lifecycle/配信/cache/300MBと安全な外部復旧は後続であり、通常release gateは維持する。
+
+## 2026-10-04: 初期化・通常更新の完了応答喪失を共通の非書込証拠で照合
+
+- `M6SetupClient.observeCompleted`へ、REST前後検査・exact paused/pause owner/空registry/runtime readiness・永久request/Queue receipt・service前後非変更を集約した。初期化/更新のjournalは固有のrequested→completed遷移だけを持ち、再配備/Queue/purge/completeの再送や自動resumeはしない。
+- source bytesを再構築せず保存済み初期化journalを開くhelper、試験専用`init-reconcile`/`update-service-reconcile`を追加した。欠落receipt/未完了/別owner/途中変更/残存lockは解放せず、通常release gateも維持する。
+- 実handler/Queue/CASのlocal結合で両completion応答を失わせ、非書込照合後のlocal完了/paused維持を回帰した。Cloudflareでのfault受け入れ、実行中unknown IO/残存lockの外部終了確認、全lifecycle/cache/300MBは引き続き残る。詳細は`m6_completion_recovery.md`。
+- 全884テスト/13407 assertions、TypeScript/M6実証tsconfig、通常/試験Linux binary build、四family local HTTPS statusと新しい照合commandを含むproduction資源拒否が合格した。
+
+## 2026-10-04: 通常更新を試験HTTP/standaloneと共通runtime検証へ接続
+
+- 更新固有のpaused→updating→paused CASとjournalを維持し、認証付きbeginと初期化共通のHTTP/loopback/Queue/cache検証へ接続した。試験binaryの`update-service`は明示pause/drainが必要で、自動resume/legacy変換/新規資源作成はしない。既存runtime-checkのoperation IDは受付前に拒否する。
+- Script PUTとVersion POSTの両方が実機でinherit UUIDを拒否したため、UUID対応という公開referenceだけを信用して成功扱いにしない。凍結意図は旧version UUIDを保持し、実Version POSTには`latest`を使うが、最新uploadが旧versionであること、acknowledged ID/直後の連番/ETag/最新二件の履歴を照合してからDeployment POSTでそのversionだけを100%にする。外部Cloudflare操作を防ぐ原子的lockとは扱わない。
+- tags/監視等のscript設定はversion metadataから除いて非変更を確認する。欠落/旧ID/別script receipt、設定変更、未知最新version/途中upload/履歴変更、別deploymentを配備前またはreadiness前に拒否する。保持recordに任意exception本文は保存しない。
+- `castloop-m6-test-49c82745`と`castloop-m6-test-9fcbd823`は拒否後のrequested/updatingと凍結要求を保持した。再送/採用/rollback/resume/削除をしていない。別名の隔離環境で修正後の実機受け入れを継続する。
+- 次の`castloop-m6-test-7fefb49f`ではVersion/Deployment POSTまで進み、Deployment応答の省略項目で停止した。受領済みID/連番/ETagを後続検証前にjournalへ即時保存し、ID-only deployment応答をGETの同じdeploymentへ結び付けるよう改善した。中間receiptなしの旧要求は引き続き拒否し、保存済みreceiptが両方ある要求だけ明示`update-service-verify`から非再配備の検証を続行する。preview設定は保持を検査するだけに変更した。
+- `verify-compatible-update.ts`は既知の小さい10 objectのhash/ETag、target/current revision/GUID/URL、paused完了と明示再開/配信/再pauseを検査する。consumer処理中のreadonly照会競合は有限観測で扱い、mutationは再送しない。通常release gateは閉じたままで、unknown IO復旧と全lifecycle/cache/300MBの受け入れは後続。
+- 全881テスト/13370 assertionsとTypeScript/M6実証tsconfig、通常/試験Linux standalone build、四family local HTTPS status・試験binaryのproduction資源拒否が合格した。
+- 修正後の`castloop-m6-test-ff3bfd8c`でstandalone更新→共通runtime検証→paused完了→明示再開/配信→再pauseが合格した。既知10 objectのbytes/hash/ETag、GUID/revision/URLを維持した。資源と小さいfixtureはpausedで保持し、失敗した旧要求は採用しない。詳細・対象IDは`m6_compatible_updates.md`。次は④のunknown IO復旧と全lifecycle/cache/300MB/CLI利用案内へ進み、通常release gateは維持する。
+
+## 2026-10-04: 試験用standaloneから新規M6初期化・コンテンツ公開を実機検証
+
+- 通常buildを維持し、明示`--m6-test`で別binary/Worker entryを作る。専用資源prefix制限、既存durable登録/draft/upload/publication runner、初期pausedからの明示service再開、非書込target照会を接続した。
+- 実RESTで確認したsettings.exports省略は、100% deployment前後照合とimmutable versionの明示exportsで裏付ける。R2 PUT decimal-string size receiptを厳密に受理し、全量GET checksumを維持する。abortedをstaged成功表示しない。
+- 認証付きservice pause/resumeのversion・drain条件をservice CAS snapshotへ置き、競合後も検査する。statusは初期化/更新未完了の観測も可能だが、昇格/再送/owner返却を行わない。既存helperのversion指定なしの呼出契約は維持する。
+- `castloop-m6-test-9c80a9b8`でstandalone初期化/実Queue往復/明示再開/Show・Episode公開、GUID/revision/checksum、feed/cover/GET/HEAD/Rangeと再検証headerが合格。feed本文の出現だけを完了とせず、active/owner解放/token通常返却まで待ち、明示pausedで保持した。ローカル修正後のacknowledged checkpoint続行を含み、300MB/cache HIT/六lifecycle/正式releaseとは区別する。
+- 最初の`castloop-m6-test-a3b60278`はdeploy_requestedを保持したまま資源を残す。unknown PUTの再送/GETからの採用/削除をしない。既存v0.1.1環境や有料planは変更しない。詳細・対象ID・保存記録は`m6_fresh_initialization.md`。
+- 全868テスト/13207 assertions、TypeScript/M6実証tsconfig、通常/試験Linux binary build、既存四family local HTTPS status回帰と試験binaryのproduction資源拒否が合格した。
+- 次は別branchでcompatible updateの実HTTP/runtime/standalone接続と更新前後の媒体/revision/GUID/URL保持を検証する。今回の配備には更新受付APIが未接続なので、未知の直接deployでそれを追加せず、更新対応entryを新規専用資源に配備してから更新を通す。旧形式変換は必要時だけとする。
+
+## 2026-10-03: 新規M6の認証付き初期化と起動時runtime検証を接続
+
+- 配備検査をsharedへ移し、CLIのCloudflare REST応答をsecret/author/未管理設定なしのsnapshotへ絞る。Workerも同じ検査を使用し、account API tokenはCLIに留める。
+- 試験専用`m6-setup-worker.ts`へprepare/status/probe/completeを接続した。実default loopback・外部HTTP・cache owner/purge・main Queue往復のCAS receiptを照合してから既存初期化CASでpausedへ進める。HTTPのready申告は許可せず、正常な管理mutationやpublication consumerの成功を模擬した証拠は作らない。
+- 一つのoperation IDと小さい永久記録を利用し、Queue重複をreadonlyにする。未知応答・有限回の観測待ちでは再送/owner解放/通常ゲート解除を行わない。管理共通境界でversion/readinessをtoken取得前に検査する。
+- 全863テスト/13156 assertions、TypeScript/M6実証tsconfig、試験Worker browser bundle、Linux binary buildが合格。ここまでCloudflare資源の変更はない。正常コンテンツ公開/cache HIT/GET-HEAD-Range/300MBの実機受け入れとは区別する。
+- 次は試験CLI/単一binaryへ新規初期化と明示再開を接続し、専用Cloudflare環境でShow/Episode公開を確認する。通常更新、unknown outcome復旧、M6全体の受け入れは後続。詳細は`m6_fresh_initialization.md`。
+
 ## 2026-10-02: 三種類の移行journalもbounded/no-follow読取・owned lock返却へ
 
 - 既存flat layoutを維持したままbridge deploy/migration setup/candidate deployの親directory検査、private一段create/fsync、dangling lock保持とmissing record再生成拒否、他所有lock非削除を接続した。record読取はstat+readFileからbounded/no-follow/regular-file/前後stat検査へ変更した。

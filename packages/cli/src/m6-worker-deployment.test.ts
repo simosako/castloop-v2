@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { m6WorkerDeploymentEvidenceSchema, serviceConfigSchema } from "@castloop/shared";
+import { collectM6DeploymentSnapshot, m6SnapshotReads, m6WorkerDeploymentEvidenceSchema, serviceConfigSchema } from "@castloop/shared";
 import { buildM6WorkerUploadMetadata, inspectM6WorkerDeployment, M6_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
 import type { M6DeploymentReads } from "./m6-worker-deployment";
 
@@ -81,6 +81,19 @@ describe("read-only M6 deployment and runtime inspection", () => {
       expect(JSON.stringify(value)).not.toContain(privateValue);
     }
     expect(m6WorkerDeploymentEvidenceSchema.safeParse({ ...value, old_cache_purged: true }).success).toBe(false);
+    const snapshot = await collectM6DeploymentSnapshot(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, setup.reads, M6_WORKER_COMPATIBILITY_DATE);
+    expect(await inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, m6SnapshotReads(snapshot))).toEqual(value);
+    for (const privateValue of ["private-admin-secret", "private@example.com", "Private deployment note", "unrelated"]) {
+      expect(JSON.stringify(snapshot)).not.toContain(privateValue);
+    }
+    const { exports: _exports, ...settingsWithoutExports } = setup.settings;
+    const observed = { ...setup.reads, settings: async () => settingsWithoutExports };
+    expect(await inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, observed)).toEqual(value);
+    const withoutExports = await collectM6DeploymentSnapshot(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, observed, M6_WORKER_COMPATIBILITY_DATE);
+    expect(withoutExports.settings[0].exports).toBeUndefined();
+    expect(await inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, m6SnapshotReads(withoutExports))).toEqual(value);
+    setup.version.resources.script_runtime.exports.default.cache.enabled = true;
+    await expect(inspectM6WorkerDeployment(M6_DEPLOYMENT_CONFIG, setup.workerVersionId, observed)).rejects.toThrow("uncached default");
   });
 
   test("partial rollout, wrong version and missing deployment are rejected before runtime reads", async () => {

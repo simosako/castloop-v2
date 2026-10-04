@@ -2,7 +2,10 @@ import { z } from "zod";
 import { m6RuntimeReadinessSchema, m6RuntimeTargetSchema, m6ServiceConfigHash, serviceConfigSchema } from "@castloop/shared";
 import type { M6RuntimeReadiness, M6RuntimeTarget, ServiceConfig } from "@castloop/shared";
 import { createLocalJournalStorage } from "./local-journal-storage";
+import { readBoundedLocalJournal } from "./local-journal-read";
+import { ensureLocalJournalParents, localJournalEntryExists } from "./local-journal-path";
 import { workerPayloadHash as digest } from "./worker-upload-hash";
+import { join } from "node:path";
 
 const checksum = z.string().regex(/^[a-f0-9]{64}$/);
 const requestSchema = z.object({ config: serviceConfigSchema, operation_id: z.uuid(), service_config_sha256: checksum,
@@ -33,18 +36,40 @@ function validateState(input: unknown): FreshM6InitializationState {
   return state;
 }
 
+export function readLocalFreshM6Initialization(root: string, input: ServiceConfig): { state: FreshM6InitializationState | null; lockPresent: boolean } {
+  const config = serviceConfigSchema.parse(input);
+  ensureLocalJournalParents(root, "service-initializations", undefined);
+  const file = join(root, ".castloop", "service-initializations", `${config.service_id}.json`);
+  const state = localJournalEntryExists(file) ? validateState(readBoundedLocalJournal(file)) : null;
+  if (state && JSON.stringify(state.request.config) !== JSON.stringify(config)) throw new Error("Local initialization has another service configuration");
+  return { state, lockPresent: localJournalEntryExists(`${file}.lock`) };
+}
+
 export async function createFreshM6InitializationJournal(root: string, input: ServiceConfig, operationId: string,
   source: string, metadata: object): Promise<FreshM6InitializationJournal> {
   const config = serviceConfigSchema.parse(input);
   const request = requestSchema.parse({ config, operation_id: operationId, service_config_sha256: await m6ServiceConfigHash(config),
     worker_source_sha256: digest(source), worker_metadata_sha256: digest(metadata) });
+  return initializationJournal(root, request, true);
+}
+
+export async function openFreshM6InitializationJournal(root: string, config: ServiceConfig): Promise<FreshM6InitializationJournal> {
+  const retained = readLocalFreshM6Initialization(root, config);
+  if (!retained.state || retained.state.request.service_config_sha256 !== await m6ServiceConfigHash(config)) {
+    throw new Error("Initialization reconciliation requires its retained frozen configuration");
+  }
+  return initializationJournal(root, retained.state.request, false);
+}
+
+function initializationJournal(root: string, request: FreshM6InitializationState["request"], initialize: boolean): FreshM6InitializationJournal {
+  const config = request.config;
   const storage = createLocalJournalStorage(root, "service-initializations", undefined, `${config.service_id}.json`);
   const load = (): FreshM6InitializationState => {
     const state = validateState(storage.read());
     if (JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("This workspace already has a different frozen fresh M6 initialization");
     return state;
   };
-  storage.initialize({ schema_version: 1, request, phase: "prepared" });
+  if (initialize) storage.initialize({ schema_version: 1, request, phase: "prepared" });
   load();
   return { load, exclusively: storage.exclusively, save: (input) => {
     storage.requireLock();
@@ -92,4 +117,14 @@ export async function runFreshM6Initialization(journal: FreshM6InitializationJou
 
 export async function resumeFreshM6Initialization(journal: FreshM6InitializationJournal, effects: FreshM6InitializationEffects): Promise<void> {
   await journal.exclusively(async () => { await initialize(journal, effects); });
+}
+
+export async function reconcileFreshM6Initialization(journal: FreshM6InitializationJournal,
+  observe: (config: ServiceConfig, target: M6RuntimeTarget) => Promise<M6RuntimeReadiness>): Promise<void> {
+  await journal.exclusively(async () => {
+    const state = journal.load();
+    if (state.phase !== "initialization_requested" || !state.target) throw new Error("Reconciliation requires its retained initialization request and acknowledged target");
+    const readiness = await observe(state.request.config, state.target);
+    journal.save({ ...state, phase: "initialized", runtime_readiness: readiness });
+  });
 }

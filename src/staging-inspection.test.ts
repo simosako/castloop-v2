@@ -13,7 +13,7 @@ test("staging status observes ready/uploading/settled/finished without writes or
     if (phase === "uploading") await setup.success(setup.input("begin", { operation: setup.operation }));
     if (phase === "settled") {
       await setup.putPayloads();
-      await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+      await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }));
     }
     if (phase === "finished") await setup.success(setup.input("finish", { operation: setup.operation, outcome: "staged" }));
     const writes = setup.writes.length;
@@ -45,7 +45,7 @@ test("partial claim manifest can be inspected but cannot authorize a PUT or adop
 test("paused service and retained verification tokens can be observed without releasing them", async () => {
   const setup = await stagingAdminFixture();
   await setup.success(setup.input("claim", { upload: setup.upload }));
-  await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+  await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: [] }));
   const token = await acquireStageVerification(setup.env, { showId: "daily", operationId: setup.upload.operation_id, generation: setup.operation.show_generation });
   await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify({ ...setup.service, state: "paused", pause_id: crypto.randomUUID(),
     invocations: [{ token: crypto.randomUUID(), kind: "m6_recovery" }] }));
@@ -66,7 +66,7 @@ test("archived staging status remains available after newer uploads replace its 
     const operation = { show_id: upload.show_id, operation_id: upload.operation_id, show_generation: upload.expected_show_generation + 1 };
     await setup.success(setup.input("claim", { upload }));
     await setup.success(setup.input("begin", { operation }));
-    await setup.success(setup.input("settle", { operation, put_requests_settled: true, no_more_puts: true }));
+    await setup.success(setup.input("settle", { operation, put_requests_settled: true, no_more_puts: true, readback_receipts: [] }));
     await setup.success(setup.input("finish", { operation, outcome: "aborted" }));
   };
   await stage(setup.upload);

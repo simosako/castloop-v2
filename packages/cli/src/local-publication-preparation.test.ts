@@ -12,7 +12,6 @@ import { handleM6PublicationAdmin } from "../../../src/publication-admin";
 import { consumeOwnedPublication } from "../../../src/publication-consumer";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -36,7 +35,7 @@ async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "show",
   const selections = mode === "show" ? ["show"] : mode === "episode" ? (audioFirst ? ["audio", "episode_metadata"] : ["episode_metadata", "audio"]) :
     [mode === "metadata" ? "episode_metadata" : "audio"];
   const stagingClient = new StagingAdminClient(setup.config, "private-secret", async (input, init) => {
-    const response = await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings, { digest: publicationTestDigest });
+    const response = await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings);
     if (!response) throw new Error("Unexpected staging route");
     return response;
   });
@@ -51,6 +50,7 @@ async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "show",
     try {
       const effects = { ...createStagingOperationEffects(setup.config, prepared.journal.load(), "private-secret", async (target, index) => {
         await prepared.sources.withPayload(index, async (body, consumed) => { await setup.bucket.put(target.key, body); consumed(); });
+        return setup.readbacks(prepared.journal.load().upload, index + 1)[index]!;
       }, stagingClient), checkLocalInputs: prepared.sources.assertCurrent };
       await runStagingClaim(prepared.journal, effects);
       await runStagingBeginAndUpload(prepared.journal, effects);
@@ -107,8 +107,7 @@ describe("prepare publication from acknowledged local staging journals", () => {
         const key = publicationCommitKey(state.publication.commit);
         expect(setup.sent).toEqual([]);
         expect(await setup.bucket.head(key)).not.toBeNull();
-        expect(await consumeOwnedPublication(setup.env, key, { async checkDeliveryGate() {}, async purge() {} },
-          { digest: publicationTestDigest })).toEqual({ state: "completed" });
+        expect(await consumeOwnedPublication(setup.env, key, { async checkDeliveryGate() {}, async purge() {} })).toEqual({ state: "completed" });
         expect(setup.actions).toEqual(["claim", "status", "commit"]);
         if (mode !== "show") {
           const metadata = parseEpisodeRevision(setup.text("public/episodes/daily/next/metadata.toml"));
@@ -160,7 +159,7 @@ describe("prepare publication from acknowledged local staging journals", () => {
       writeFileSync(setup.stageFiles[0]!, JSON.stringify(prepared));
       await expect(setup.prepare()).rejects.toThrow("finished staged");
       writeFileSync(setup.stageFiles[0]!, JSON.stringify({ ...state, finish_receipt: "aborted", put_outcome: "aborted",
-        acknowledged_puts: 0, reason_code: "put_failed" }));
+        acknowledged_puts: 0, readback_receipts: [], reason_code: "put_failed" }));
       await expect(setup.prepare()).rejects.toThrow("finished staged");
       rmSync(setup.stageFiles[0]!);
       await expect(setup.prepare()).rejects.toThrow("finished staged");

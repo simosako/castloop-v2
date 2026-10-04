@@ -97,7 +97,7 @@ async function claimPublication(env: Env, showId: string, jobId: string): Promis
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request: Request, env): Promise<Response> {
     const pathname = new URL(request.url).pathname;
     const asset = await publicAsset(request, env, pathname);
     if (asset) return asset;

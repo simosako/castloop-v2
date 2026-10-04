@@ -7,7 +7,6 @@ import { queueM6Candidate } from "../../../src/m6-routes";
 import { acquireShowExecution } from "../../../src/lifecycle-control";
 import { SERVICE_ADMISSION_KEY } from "../../../src/service-admission";
 import { publicationAdminFixture } from "../../../src/test-support/publication-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { PublicationAdminClient } from "./publication-client";
 import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
 import type { PublicationJournal } from "./publication-journal";
@@ -33,7 +32,7 @@ async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "show")
   });
   const effects = createPublicationOperationEffects(setup.config, journal.load(), "private-secret", client);
   const consume = (key: string) => queueM6Candidate({ queue: "test-queue", messages: [{ id: "publication", body: { object: { key } } }] } as never,
-    setup.candidateEnv, setup.cachedAssets, { digest: publicationTestDigest });
+    setup.candidateEnv, setup.cachedAssets);
   return { ...setup, root, journal, file, calls, client, effects, consume };
 }
 
@@ -412,7 +411,7 @@ test("historical publication status remains readable after a later Show publicat
   await setup.success(setup.input("claim", { upload }));
   await setup.success(setup.input("begin", { operation }));
   for (const { asset, bytes } of setup.contents) await setup.bucket.put(stagePayloadKey(upload, asset), bytes);
-  await setup.success(setup.input("settle", { operation, put_requests_settled: true, no_more_puts: true }));
+  await setup.success(setup.input("settle", { operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks(upload) }));
   await setup.success(setup.input("finish", { operation, outcome: "staged" }));
   const next = publicationRequestSchema.parse({ ...setup.frozen,
     request: { ...setup.frozen.request, job_id: draftId, expected_show_generation: (await readShowControl(setup.env, "daily"))!.value.generation },

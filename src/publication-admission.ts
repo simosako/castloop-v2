@@ -7,6 +7,7 @@ import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOw
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
 import { canonicalEnclosureUrl } from "./media-url";
 import { parsePublicAssetPath } from "./public-assets";
+import { matchesPublishedAudio } from "./publication-inputs";
 import { stageManifestHash } from "./staging-upload";
 
 export { publicationCommitKey, publicationRequestSchema } from "../packages/shared/src/index";
@@ -150,7 +151,7 @@ export async function verifyPublicationStaging(env: LifecycleControlEnv, operati
           throw new Error("Publication base revision has an invalid immutable audio reference");
         }
         const audio = await env.CASTLOOP_BUCKET.head(asset.key);
-        if (!audio || audio.size !== current.length_bytes || audio.customMetadata?.sha256 !== current.sha256) {
+        if (!matchesPublishedAudio(audio, current.length_bytes, current.sha256)) {
           throw new Error("Publication base audio is missing or inconsistent");
         }
       }
@@ -167,7 +168,9 @@ export async function verifyPublicationStaging(env: LifecycleControlEnv, operati
         throw new Error("Publication payload does not match its staging verification evidence");
       }
       const head = await env.CASTLOOP_BUCKET.head(stagePayloadKey(proof.request, payload.asset));
-      if (!head || head.etag !== verified.etag || head.size !== verified.length_bytes) throw new Error("Staged payload changed after verification");
+      if (!head || head.etag !== verified.etag || !verified.version || head.version !== verified.version || head.size !== verified.length_bytes) {
+        throw new Error("Staged payload changed after verification");
+      }
       checked.add(payload.asset);
     }
   }

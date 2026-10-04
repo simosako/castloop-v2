@@ -16,6 +16,7 @@ export async function withM6ManagementInvocation<T>(env: LifecycleControlEnv, se
   if (!object || object.size < 1 || object.size > 16384) throw new Error("Invalid service configuration");
   const config = parseServiceConfig(await object.text());
   if (config.service_id !== serviceId) throw new M6ManagementServiceMismatch();
+  await requireM6ServiceRuntime(env, config.service_id, bindings.versionMetadata.id);
   return withServiceInvocation(env, config.service_id, kind, async (invocation) => {
     const gate = createM6DeliveryGate(env, invocation, bindings);
     await gate(target);

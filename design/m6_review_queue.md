@@ -1,6 +1,6 @@
 # M6: 承認済み方針と残る技術ゲート
 
-更新日: 2026-10-03
+更新日: 2026-10-04
 
 管理者の指示に従い、判断待ちでも独立した開発は進める。確認待ちと明示的に承認されたpolicyを区別する。公開停止・再開・削除コマンドは未提供。現行REST単一PUTの維持と未解決懸念U1の非ブロッカー扱いは決定済みで、再承認を求めない。
 
@@ -46,11 +46,31 @@
 
 ## 管理者の判断待ちではない技術残件
 
+### 承認済みのMVP完成範囲（2026-10-04）
+
+管理者が開発量を抑える方針を承認した。既存runnerを正式CLI/Workerへ接続し、接続で変わる入口の回帰と正式バイナリでの一通りの実機確認、短い利用案内を完成する。既存の300MB・六lifecycle操作・通常更新の受け入れを再利用し、新規初期化専用fault harnessや網羅的な異常系matrixは追加しない。
+
+終了が不明なIO/残存lockは停止・ブロックを保持することをMVPのサポート境界とする。既存の完了照合・安全な同job retryを利用し、万能な外部復旧は完成条件にしない。時間経過やHEAD不在でのowner/token解放は引き続き禁止する。旧形式変換・無停止移行・将来versionの汎用基盤・大規模な再リファクタリングは追加しない。以下の過去の残件記述より、この完成範囲を優先する。
+
+### Workers Paidは利用しない（2026-10-04）
+
+管理者がWorkers Paidの利用不可を明示した。Paidへの変更を再要求せず、無料枠を前提に検証処理の責務・実行場所を見直す。既存の300MB上限を勝手に下げず、全量contents照合・object identity/owner/generation照合を単純に省略しない。現行Worker内全量SHA-256のCPU超過は、この実装方式の問題であり、R2へ300MBを保存できないという実証ではない。
+
+R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理REST PUTは誤ったchecksumヘッダーでも保存する一方、binding PUTは誤ったSHA-256を拒否し、300MBの検証付きstream保存/HEAD native checksumがCPU 2msで成功することを確認した。管理者が案Bを承認し、既存CLIの全量SHA-256読み戻し結果をexact objectへ結び付け、公開保存時のSHA-256をR2へ任せる方式を実装した。Worker内の二箇所の全量再ハッシュを除き、owner/generation/IO終了確認とnative checksum照合は維持する。接続後の実機受け入れは別記し、旧IO収束の合格とは区別する。
+
+### 現在の到達点（2026-10-04）
+
+下記の各module詳細には実装当時の未接続項目も残る。正式CLI/Worker entryを既存runnerへ切り替え、専用新規環境でLinuxバイナリの初期化→明示再開→Show/Episode公開→metadata-only改訂→通常更新→六lifecycle操作→paused終了が合格した。GET/HEAD/Range/304、停止404/削除410、既知payload物理不在、永久記録保持、空registryまで確認した。正式version/tag/GitHub Releaseは未作成である。
+
+通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。改修前の300MB Worker hashはCPU超過となり、元serviceはpaused/owner/token/payloadを保持する。管理者承認のCLI全量SHA-256証拠＋Worker HEAD照合＋R2公開時検証へ集約した後、新規`castloop-m6-test-7c97f1a0`で300MB公開・audio-only/metadata-only改訂・全量配信/HEAD/Range/304・明示削除まで合格した。試験CLIのmetadata-only引数制約は修正し、publication未開始の確認済みcheckpointだけを続行した。課金/CPU limitは変更しておらず、費用測定計画を通常開発のgateへ戻すものではない。
+
+承認済みMVP範囲の実装・検証・利用案内とRelease notes草案は完成した。残るのは正式version/tagと公開操作の確定・実施であり、万能なunknown IO復旧や追加fault matrixをgateへ戻さない。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 
-新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを内部実装した。完了はpausedであり、公開CLI・HTTP入口・実runtime検証adapter/Cloudflare受け入れは残る。[新規初期化](./m6_fresh_initialization.md)参照。
+新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを実装した。認証付きHTTP/loopback/Queue起動検証と試験専用standaloneを接続し、別名Cloudflare環境で初期paused→明示再開→Show/Episode公開→GET/HEAD/Rangeを確認した。通常の公開CLI/entryは切り替えず、通常更新・全lifecycle/cache/300MB/unknown IO復旧の受け入れは残る。既存資源の削除/採用はしていない。[新規初期化](./m6_fresh_initialization.md)参照。
 
-保存形式を変えないM6更新の内部経路も追加した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通runtime検証は初期化と共有し、未知token/PUTを時間で終了扱いにしない。公開CLI/実機gateは残る。[通常更新](./m6_compatible_updates.md)参照。
+保存形式を変えないM6更新を、試験専用の認証HTTP/standaloneへ接続した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通HTTP/Queue/cache runtime検証は初期化と共有する。実機で二つのupload APIがinheritのUUID指定を拒否したため、最新upload/連番/履歴とacknowledged versionを照合する配備経路へ修正し、中間receiptもdurable保存する。`castloop-m6-test-ff3bfd8c`で通常更新・10 object非変更・GUID/revision/URL保持・明示再開/再pauseが合格した。失敗した専用環境はrequested/updatingを保持し、再送/採用/自動再開しない。全lifecycle/cache/300MB/unknown IO復旧と公開CLI gateは残る。[通常更新](./m6_compatible_updates.md)参照。
 
 2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](./m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
 

@@ -5,26 +5,8 @@ import { claimPublicationOperation, commitOwnedPublication, publicationRequestSc
 import { consumeOwnedPublication } from "../publication-consumer";
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "../staging-upload";
 import { runStageVerification } from "../staging-verification";
-import type { StageStreamDigest } from "../staging-verification";
 import { publicationFixture } from "./publication";
 import { createHash } from "node:crypto";
-
-export const publicationTestDigest: StageStreamDigest = async (body, length) => {
-  const hash = createHash("sha256");
-  const reader = body.getReader();
-  let bytes = 0;
-  try {
-    for (;;) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > length) throw new Error("Audio stream exceeds its expected size");
-      hash.update(chunk.value);
-    }
-  } finally { reader.releaseLock(); }
-  if (bytes !== length) throw new Error("Audio stream has an unexpected size");
-  return hash.digest("hex");
-};
 
 export async function episodePublicationFixture(update?: "metadata" | "audio") {
   const setup = await publicationFixture({ active: true, episodes: true });
@@ -51,8 +33,8 @@ export async function episodePublicationFixture(update?: "metadata" | "audio") {
     const operation = await claimStageUpload(setup.env, request);
     await beginStageUpload(setup.env, operation);
     await setup.bucket.put(stagePayloadKey(request, content.asset), content.bytes);
-    await settleStageUpload(setup.env, operation, { put_requests_settled: true, no_more_puts: true });
-    await runStageVerification(setup.env, operation, "staged", { digest: publicationTestDigest });
+    await settleStageUpload(setup.env, operation, { put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks(request) });
+    await runStageVerification(setup.env, operation, "staged");
     stages.push(request);
   }
   const frozen = publicationRequestSchema.parse({ schema_version: 1,

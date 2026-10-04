@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { parseShowControl, serviceAdmissionSchema } from "../packages/shared/src/index";
+import { m6SetupRecordKey, parseShowControl, serviceAdmissionSchema } from "../packages/shared/src/index";
 import { beginM6ServiceUpdate, completeM6ServiceUpdate } from "./m6-service-update";
 import { acquireServiceInvocation, readServiceAdmission, releaseServiceInvocation, requireM6ServiceRuntime,
   resumeServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
@@ -37,9 +37,10 @@ test("compatible update closes IO, verifies the new runtime, preserves every con
 });
 
 test("compatible updates retain unknown invocation/upload/publication owners and refuse incomplete registration", async () => {
-  for (const state of ["token", "uploading", "reserved", "processing", "registration", "deleting"] as const) {
+  for (const state of ["token", "uploading", "reserved", "processing", "registration", "deleting", "runtime-id"] as const) {
     const setup = await fixture();
     if (state === "token") await acquireServiceInvocation(setup.env, setup.config.service_id, "m6_consumer");
+    else if (state === "runtime-id") await setup.bucket.put(m6SetupRecordKey(setup.request.operation_id), "retained-runtime-check");
     else await setup.bucket.put("system/show-publications/daily.json", JSON.stringify(parseShowControl({ schema_version: 2,
       show_id: "daily", lifecycle: state === "deleting" ? "deleting" : "active", generation: 0, feed_generation: 0,
       ...(state === "registration" ? { reservation_id: crypto.randomUUID() } : state === "deleting" ? {} : { owner: { job_id: crypto.randomUUID(), kind: "show",

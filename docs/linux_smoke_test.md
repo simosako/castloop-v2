@@ -1,5 +1,7 @@
 # 別環境での簡易動作確認（Linux x86-64）
 
+**この文書のコマンドは配布済みv0.1.2向けの過去の手順です。現在のcheckoutからビルドするM6版には、そのまま適用しないでください。** M6の初期paused・明示再開、MP3引数付きpublish、停止/再開/削除、通常更新と復旧上限は[README](../README.md)を参照してください。以下のsource buildで得られるものも現在はM6版であり、v0.1.2の再現には対応tagのcheckoutが必要です。
+
 この手順では、ソースコードのない別のLinuxマシンで配布バイナリを実行します。**第1段階**で`workers.dev`を使って専用の検証サービス・Show・Episodeを公開し、**第2段階**で同じworkspaceを独自ドメインへ移行して戻します。Cloudflare上にWorker、private R2 bucket、Queue、DLQと公開コンテンツが作成されます。通常運用中のworkspaceや既存のShow IDは使わないでください。
 
 **現在の状態:** v0.1.2で実施できるのは第1段階までです。独自ドメインの`domain add/list/remove`はまだCLIに公開されていません。第2段階は両コマンドと安全な復帰が実装・受け入れ済みの**将来の配布版**を入手してから実施してください。現時点で手動でWorkerにCustom Domainを付けたり、`castloop.toml`の`public_base_url`だけを書き換えたりしても、feedの移行試験にはなりません。

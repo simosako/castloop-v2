@@ -9,7 +9,6 @@ import { beginStageUpload, claimStageUpload, settleStageUpload } from "./staging
 import type { StageOperation } from "./staging-upload";
 import type { StageEpisodeDraftEnv } from "./staging-episode-draft";
 import { runStageVerification } from "./staging-verification";
-import type { StageStreamDigest } from "./staging-verification";
 
 export type StagingAdminEnv = StageEpisodeDraftEnv & { CASTLOOP_ADMIN_KEY: string };
 
@@ -21,8 +20,7 @@ function wireOperation(operation: StageOperation): StagingOperation {
   return { show_id: operation.showId, operation_id: operation.operationId, show_generation: operation.generation };
 }
 
-export async function handleM6StagingAdmin(request: Request, env: StagingAdminEnv, bindings: M6DeliveryGateBindings,
-  options: { digest?: StageStreamDigest } = {}): Promise<Response | null> {
+export async function handleM6StagingAdmin(request: Request, env: StagingAdminEnv, bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/staging") return null;
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
   if (request.method !== "POST") return reply({ error: "method not allowed" }, 405);
@@ -48,7 +46,7 @@ export async function handleM6StagingAdmin(request: Request, env: StagingAdminEn
           await settleStageUpload(env, operation, input);
           response = { ...identity, result: "settled", operation: input.operation };
         } else {
-          await runStageVerification(env, operation, input.outcome, options);
+          await runStageVerification(env, operation, input.outcome);
           response = { ...identity, result: input.outcome, operation: input.operation };
         }
       }

@@ -53,3 +53,34 @@ bun experiments/m6/verify-admission.ts
 **2026-10-01の方針更新**: 上記の「uploadゲート未通過」は条件付きREST PUT fenceを検討した時点の判断。この試験はクライアント切断後の保存継続を検証していない。M6では管理者判断によりREST単一PUTを維持し、切断後の遅延object作成がないと仮定する。[未解決懸念U1](../../design/m6_upload_recovery_options.md)として記録し、その解消・分割upload実証を公開条件にしない。既存JSON/試験コードは変更せず、方針決定を実測合格として扱わない。通常のupload排他・照合・回復ゲートは残る。
 
 `abandonReservedShowOperation`は凍結requestとreserved ownerを同じCASで失効させる基礎関数だけ。processing/uploadingは拒否し、CLI/管理APIにはまだ接続していない。bindingでのCAS成功をREST object PUTの条件付き動作の根拠として流用しない。
+
+## M6 standaloneの全体受け入れ（2026-10-04）
+
+以下は上のseed/prefix cleanup試験とは別経路で、実M6管理API/consumerを試験専用binaryから使う。既存サービスを対象にしない。全resourceの専用prefixと同account、直前のacknowledged acceptance・paused owner・空registryを検査し、privateなbefore fileを`wx`で作ってから一度だけmutationする。
+
+```sh
+bun scripts/build-cli.ts linux-x64 --m6-test
+bun experiments/m6/verify-lifecycle.ts /tmp/opencode/ACKNOWLEDGED_TEST_WORKSPACE
+bun experiments/m6/verify-completion-recovery.ts /tmp/opencode/ACKNOWLEDGED_TEST_WORKSPACE
+bun experiments/m6/verify-large-media.ts /tmp/opencode/ACKNOWLEDGED_TEST_WORKSPACE
+bun experiments/m6/verify-large-media.ts --fresh-acknowledged-workspace /tmp/opencode/ACKNOWLEDGED_FRESH_WORKSPACE
+bun experiments/m6/verify-large-media.ts --metadata-staged-workspace /tmp/opencode/ACKNOWLEDGED_METADATA_CHECKPOINT
+```
+
+- lifecycle: compatible-update受け入れ済みの小さい`fresh/first` fixtureで六操作を実行し、GET/HEAD/Range/304/416、404/410、GUID/revision保持、payload物理削除と永久記録保持を確認する。二回GETしただけでcache HIT合格とはしない。
+- completion recovery: lifecycle合格後の同じpaused環境を通常更新し、serverの成功completion応答だけを試験transportで破棄する。local requested/server pausedを確認し、別のbinary commandで非書込照合する。強制終了したIOの収束証明とは別である。
+- large media: recovery合格後、または明示fresh modeで初期化/公開のacknowledged journalと現在のpaused checkpointを確認した後に、別Show `large`を作る。未確認資源・別version・残存lock/tokenは採用しない。719424個の417-byte MPEG framesと192-byte ID3 prefixで正確な300,000,000-byte MP3をchunk書込・stream解析する。300,000,001 bytes拒否、audio-only/metadata-only改訂、全量stream checksum、GUID/date/history/旧音源保持、HEAD/suffix Range/304、最後に明示Show deleteを検証する。音声内容の聴取品質を検証するfixtureではない。途中失敗でも確認済みcache HIT/過大拒否/fixture checksumを記録する。
+- metadata checkpoint: fresh modeの300MB公開後、metadata stagingだけが正常完了し、publication journalがまだ存在しない場合の限定続行。実行version/readiness・空registry・同じbase revision・editable draft・finished/staged receipt・remote released status・local/server読戻し証拠を照合し、別の`wx` before fileを作る。元のincompleteを保持し、unknown publication/lock/tokenを採用・再送しない。試験CLIの`publish-episode`は変更音源をstagingした場合だけMP3 pathを必要とする。
+- cache: 試験Workerだけが内部/外部invocation nonceとinner cache statusをresponse headerへ追加する。feed/cover/小さい音源で、内部HITの同じnonceと毎要求異なるgateway nonceを照合する。通常Worker/公開binaryへ計測headerを追加しない。
+
+mutationの自動再送、未知lock/tokenの解放、Worker/bucket/Queueの削除はしない。readonlyな観測競合だけ有限回待ち、失敗数を記録する。途中失敗は固定phase/codeだけ保存し、任意exception本文・secret・metadata本文は保存しない。before/incompleteを消して再実行してはいけない。既知の完了checkpointからの続行は個別に証拠を照合する。
+
+各試験は成功時もserviceを明示pausedで残す。これらのscriptの実装・local型検査だけをCloudflare合格として扱わず、実行結果を設計logへ別途記録する。複数colo・独自domain・請求額・無停止移行・unknown live IOの解放・正式releaseは対象外。
+
+2026-10-04、六lifecycle・completion recovery・実cache HITは合格したが、300MB stagingのWorker検証はCPU制限で未完了となった。元serviceはpaused/未収束owner/token/payload保持。native digest直結でもexceededCpuを実機観測した。管理者がWorkers Paid利用不可を決定したため、Paidへの変更ではなくR2/CLIの検証能力へ責務を集約する。`usage_model=standard`をPaid証拠としない。具体的な証拠・残件は`design/m6_standalone_acceptance.md`。このharnessを既存failed workspaceで再実行してはいけない。
+
+## R2 native checksumの調査（2026-10-04）
+
+[sanitized結果](./checksum-results-20261004.json)と[調査報告](../../design/m6_upload_integrity_review.md)を参照。管理REST PUTは誤ったchecksumヘッダーを拒否せず、binding PUTは誤ったSHA-256を拒否した。300MBのbinding stream保存/HEAD native SHA-256とCLI全量読み戻しが一致し、単独保存のCPUは2msだった。既存service/control/Queueは変更せず、今回作成したprobe payload七件だけをexact keyで削除した。旧token解放・M6全体の300MB受け入れ合格を許可する証拠ではない。private診断script/manifestを消してmutationを再送しない。
+
+管理者承認の案Bを実装し、CLI全量SHA-256読戻しのETag/version証拠とWorker HEAD照合、公開時のR2 SHA-256検証/native checksum照合へ集約した。Workerの音源全量再hashは行わない。新規`castloop-m6-test-7c97f1a0`で初期化・小さい公開・300MB公開/全量配信・二種改訂・明示削除まで合格した。途中の試験CLI引数制約を修正し、正常metadata staging/publication未開始のcheckpointだけから続行した。最終pause/空registryを確認し、旧未知owner/tokenと資源は解放・削除しない。[sanitized結果](./large-media-results-20261004.json)と[受け入れ記録](../../design/m6_standalone_acceptance.md)参照。

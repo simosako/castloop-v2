@@ -2,9 +2,10 @@ type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
   init: {
-    usage: "init [dir] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME]",
+    usage: "init [dir] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
     description: "Create a service workspace and Cloudflare resources. Missing values are prompted on a terminal.\n" +
-      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Resume an existing workspace with init [dir] without flags.",
+      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Creates only new resources and completes paused.\n" +
+      "Use service-status, then service-resume with its pause ID. Never rerun an initialization with an unknown outcome.",
   },
   "create-show": {
     usage: "create-show ID [--site-url URL]",
@@ -23,7 +24,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "publish-show": {
     usage: "publish-show ID",
     description: "Run from the service workspace after update-show. Submit the staged Show for publication.\n" +
-      "Check the returned job ID with job-status until published and owner free.",
+      "Check the returned job ID with job-status until published and ownership released.",
   },
   "update-episode": {
     usage: "update-episode ID",
@@ -35,29 +36,77 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "This does not publish. Initial publication also requires update-episode.",
   },
   "publish-episode": {
-    usage: "publish-episode ID",
+    usage: "publish-episode ID [MP3]",
     description: "Run from the Show directory. Submit staged Episode changes for publication.\n" +
-      "Initial publication requires metadata and audio. Later revisions can reuse unchanged published inputs.",
+      "Initial publication requires metadata and audio. Supply the original MP3 path whenever audio was staged.\n" +
+      "For metadata-only revisions omit MP3; unchanged published audio is reused.",
   },
   "job-status": {
-    usage: "job-status JOB --show ID [--episode ID]",
-    description: "Run from the service workspace. Print publication status, admission owner, commit marker and DLQ state.\n" +
-      "Supply --episode for Episode jobs. Complete means status published and owner free.",
+    usage: "job-status JOB",
+    description: "Run from the service workspace. Compare the retained publication journal with server status.\n" +
+      "Complete means published status and released ownership; a commit receipt only means queued.",
   },
   "retry-job": {
-    usage: "retry-job JOB --show ID [--episode ID]",
-    description: "Run from the service workspace. Requeue the same processing/retrying job only when its DLQ record exists.\n" +
-      "Supply --episode for Episode jobs. Permanently failed jobs cannot be retried with this command.",
-  },
-  "cleanup-job": {
-    usage: "cleanup-job JOB --show ID --episode ID",
-    description: "Run from the service workspace. Remove staged audio only after successful Episode publication.\n" +
-      "Published audio, revision history and commit markers are retained.",
+    usage: "retry-job JOB",
+    description: "Run from the service workspace. Explicitly retry the same acknowledged publication commit.\n" +
+      "Requires its retained journal and settled execution; active or unknown owners/locks are not released.",
   },
   deploy: {
-    usage: "deploy",
-    description: "Run from the service workspace. Deploy this executable's embedded Worker and preserve existing secrets.\n" +
-      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.",
+    usage: "deploy [--operation-id UUID]",
+    description: "Run from the service workspace. Update an already initialized M6 service without converting data.\n" +
+      "Explicitly pause and drain first. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
+      "Completes paused; resume explicitly. Does not adopt legacy services or replay unknown deployments.",
+  },
+  "init-reconcile": {
+    usage: "init-reconcile OPERATION_UUID",
+    description: "Reconcile a retained initialization only when the server already completed it paused. Does not redeploy or replay initialization.",
+  },
+  "update-service-verify": {
+    usage: "update-service-verify OPERATION_UUID",
+    description: "Continue verification of an acknowledged deployment using its retained journal. Never re-upload an unknown deployment.",
+  },
+  "update-service-reconcile": {
+    usage: "update-service-reconcile OPERATION_UUID",
+    description: "Reconcile an already completed paused update without repeating remote mutations.",
+  },
+  "service-status": {
+    usage: "service-status",
+    description: "Read service admission, pause ID, worker version and unsettled invocations. Paused does not necessarily mean drained.",
+  },
+  "service-pause": {
+    usage: "service-pause PAUSE_UUID",
+    description: "Explicitly pause delivery and new mutations. Existing owners must finish; no elapsed-time release is performed.",
+  },
+  "service-resume": {
+    usage: "service-resume PAUSE_UUID",
+    description: "Resume only the exact paused service after runtime verification and settlement of existing owners.",
+  },
+  "target-show": {
+    usage: "target-show SHOW_ID",
+    description: "Read a Show's current lifecycle, generations and unfinished ownership without mutations.",
+  },
+  "target-episode": {
+    usage: "target-episode SHOW_ID EPISODE_ID",
+    description: "Read an Episode's current lifecycle, revision and unfinished ownership without mutations.",
+  },
+  "preview-show-lifecycle": {
+    usage: "preview-show-lifecycle SHOW_ID unpublish|restore|delete",
+    description: "Print a non-mutating lifecycle plan. Save JSON, review target/action/request hash, then use lifecycle-execute.\n" +
+      "Unpublish is reversible; deletion removes payloads permanently while retaining operational records and IDs.",
+  },
+  "preview-episode-lifecycle": {
+    usage: "preview-episode-lifecycle SHOW_ID EPISODE_ID unpublish|restore|delete",
+    description: "Print a non-mutating Episode lifecycle plan. Save JSON and review it before lifecycle-execute.\n" +
+      "Deletion is irreversible and retains operational records and IDs.",
+  },
+  "lifecycle-execute": {
+    usage: "lifecycle-execute PLAN_JSON REQUEST_SHA256 confirm|confirm-delete-retain-records",
+    description: "Execute the exact reviewed plan with explicit acknowledgement. Delete requires confirm-delete-retain-records.\n" +
+      "The returned job ID is queued, not completed; inspect operation-status lifecycle JOB until settled.",
+  },
+  "lifecycle-retry": {
+    usage: "lifecycle-retry JOB_UUID REQUEST_SHA256 confirm|confirm-delete-retain-records",
+    description: "Retry the same confirmed lifecycle job only with its retained journal and settled execution. No force unlock or owner release.",
   },
   "migration-status": {
     usage: "migration-status [--local]",
@@ -85,7 +134,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "FAMILY must be staging, publication, lifecycle or show-registration; IDs match local-operation-status.\n" +
       "Requires the local administrator key and an M6 management status route. No Cloudflare API token is required.\n" +
       "This does not send mutations, update local phases, remove locks, release tokens, authorize recovery or certify M6 readiness.\n" +
-      "Legacy Workers and unreleased candidate management routes reject this inspection.",
+      "Legacy Workers and migration-only candidate routes reject this inspection.",
   },
 };
 

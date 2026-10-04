@@ -7,7 +7,6 @@ import { consumeOwnedPublication } from "../publication-consumer";
 import { SERVICE_ADMISSION_KEY } from "../service-admission";
 import { handleM6StagingAdmin } from "../staging-admin";
 import type { StagingAdminEnv } from "../staging-admin";
-import { publicationTestDigest } from "./episode-publication";
 import { publicationFixture, PUBLICATION_SHOW_TEXT } from "./publication";
 import { createHash } from "node:crypto";
 
@@ -42,7 +41,7 @@ export async function stagingAdminFixture(kind: "show" | "audio" | "episode_meta
     method, headers: { "X-Castloop-Key": secret }, ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
   });
   const call = async (body: unknown) => {
-    const response = await handleM6StagingAdmin(http(body), env, bindings, { digest: publicationTestDigest });
+    const response = await handleM6StagingAdmin(http(body), env, bindings);
     if (!response) throw new Error("Staging route was not handled");
     return response;
   };
@@ -52,5 +51,6 @@ export async function stagingAdminFixture(kind: "show" | "audio" | "episode_meta
     return stagingAdminResponseSchema.parse(await response.json<unknown>());
   };
   return { ...setup, config, versionId, service, env, bindings, contents, upload, operation, input, http, call, success,
+    readbacks: (request = upload, count = request.payloads.length) => setup.readbacks(request, count),
     putPayloads: async () => { for (const { asset, bytes } of contents) await setup.bucket.put(stagePayloadKey(upload, asset), bytes); } };
 }

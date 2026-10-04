@@ -9,6 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, u
 import { join, resolve } from "node:path";
 
 const binary = resolve(process.argv[2] ?? "dist/castloop-linux-x64");
+const m6TestBinary = process.argv[3] ? resolve(process.argv[3]) : undefined;
 if (!existsSync(binary)) throw new Error("Build the Linux CLI binary before this local-only verification");
 const root = mkdtempSync("/tmp/opencode/castloop-status-binary-");
 const cert = join(root, "localhost-cert.pem");
@@ -87,13 +88,33 @@ try {
       report.server_status.result === "status" && !output.includes("private-secret"), "Standalone report did not preserve read-only boundaries");
     requireCheck(JSON.stringify(snapshot(root)) === before, "Standalone inspection changed local files or old locks");
   }
+  if (m6TestBinary) {
+    for (const args of [["service-status"], ["init", crypto.randomUUID()], ["update-service", crypto.randomUUID()], ["update-service-verify", crypto.randomUUID()],
+    ["init-reconcile", crypto.randomUUID()], ["update-service-reconcile", crypto.randomUUID()],
+    ["update-service-drop-completion", crypto.randomUUID()],
+    ["publication-retry", crypto.randomUUID()],
+      ["preview-show-lifecycle", "daily", "delete"], ["preview-episode-lifecycle", "daily", "first", "delete"],
+      ["lifecycle-execute", "plan.json", "a".repeat(64), "confirm-delete-retain-records"],
+      ["lifecycle-retry", crypto.randomUUID(), "a".repeat(64), "confirm-delete-retain-records"], ["operation-status", "lifecycle", crypto.randomUUID()],
+      ["delete-show", "daily"], ["create-show", "daily"], ["--help"]]) {
+      const child = Bun.spawnSync([m6TestBinary, ...args], { cwd: root, env: { PATH: process.env.PATH ?? "" }, stdout: "pipe", stderr: "pipe" });
+      requireCheck(child.exitCode === (args[0] === "--help" ? 0 : 1), "Test binary did not reject a production resource or unsupported command");
+      requireCheck(!Buffer.concat([child.stdout, child.stderr]).toString().includes("private-secret"), "Test binary printed a secret");
+    }
+    const metadataOnly = Bun.spawnSync([m6TestBinary, "publish-episode", "daily", "first"], { cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, stdout: "pipe", stderr: "pipe" });
+    requireCheck(metadataOnly.exitCode === 1 && metadataOnly.stderr.toString().includes("Only explicitly named isolated M6 test resources"),
+      "Metadata-only publication arguments must pass parsing without bypassing production rejection");
+    requireCheck(JSON.stringify(snapshot(root)) === before, "Test binary changed a rejected workspace");
+  }
   requireCheck(calls.length === 4 && calls.every((call) => call.action === "status"), "Standalone inspection sent an unexpected request");
   requireCheck(setup.writes.length === writes && JSON.stringify(setup.sent) === sent && JSON.stringify(setup.purges) === purges &&
     JSON.stringify([...setup.entries].map(([name, value]) => ({ name, etag: value.etag,
       hash: new Bun.CryptoHasher("sha256").update(value.bytes).digest("hex") }))) === remoteBefore, "Standalone inspection changed simulated remote records");
   console.log(JSON.stringify({ result: "standalone_readonly_operation_status_passed", families: operations.map((operation) => operation.family),
     transport: "local_https", remote: "simulated_m6_management", requests: calls.length, cloudflare_credentials_present: false,
-    local_files_unchanged: true, old_locks_preserved: true, remote_records_unchanged: true, authorizes_mutation: false, authorizes_recovery: false }));
+    local_files_unchanged: true, old_locks_preserved: true, remote_records_unchanged: true,
+    ...(m6TestBinary ? { test_binary_production_resources_rejected: true } : {}), authorizes_mutation: false, authorizes_recovery: false }));
 } finally {
   server?.stop(true);
   rmSync(root, { recursive: true, force: true });

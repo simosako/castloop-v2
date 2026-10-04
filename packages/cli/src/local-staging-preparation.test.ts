@@ -8,7 +8,6 @@ import { createStagingRestPut } from "./staging-rest";
 import { inspectLocalStagingSource } from "./staging-sources";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -76,18 +75,18 @@ describe("prepare M6 staging requests from current local drafts", () => {
             calls.push(init?.method ?? "GET");
             if (init?.method === "PUT") {
               const bytes = new Uint8Array(await new Response(init.body).arrayBuffer());
-              await setup.bucket.put(key, bytes);
-              return Response.json({ success: true, result: { size: bytes.length } });
+              const object = (await setup.bucket.put(key, bytes))!;
+              return Response.json({ success: true, result: { key, size: object.size, etag: object.etag, version: object.version } });
             }
             const object = await setup.bucket.get(key);
             if (!object) return new Response(null, { status: 404 });
-            return new Response(object.bytes);
+            return new Response(object.bytes, { headers: { ETag: `"${object.etag}"` } });
           } });
         const actions: string[] = [];
         const client = new StagingAdminClient(setup.config, "private-secret", async (input, init) => {
           const request = new Request(input, init);
           actions.push((await request.clone().json() as { action: string }).action);
-          const response = await handleM6StagingAdmin(request, setup.env, setup.bindings, { digest: publicationTestDigest });
+          const response = await handleM6StagingAdmin(request, setup.env, setup.bindings);
           if (!response) throw new Error("Unexpected route");
           return response;
         });

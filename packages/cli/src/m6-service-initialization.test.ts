@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { createFreshM6InitializationJournal, resumeFreshM6Initialization, runFreshM6Initialization } from "./m6-service-initialization";
+import { createFreshM6InitializationJournal, openFreshM6InitializationJournal, readLocalFreshM6Initialization, reconcileFreshM6Initialization,
+  resumeFreshM6Initialization, runFreshM6Initialization } from "./m6-service-initialization";
+import { M6SetupClient } from "./m6-setup-client";
+import { consumeM6SetupProbe } from "../../../src/m6-setup-queue";
+import { m6SetupFixture } from "../../../src/test-support/m6-setup";
 import { completeM6ServiceInitialization, prepareM6ServiceInitialization } from "../../../src/m6-service-initialization";
 import { readServiceAdmission } from "../../../src/service-admission";
 import { m6InitializationFixture } from "../../../src/test-support/m6-initialization";
@@ -14,6 +18,8 @@ test("fresh initialization journal drives only acknowledged steps, retains no se
   const root = mkdtempSync("/tmp/opencode/castloop-fresh-init-");
   const calls: string[] = [];
   try {
+    expect(readLocalFreshM6Initialization(root, setup.config)).toEqual({ state: null, lockPresent: false });
+    expect(existsSync(join(root, ".castloop"))).toBe(false);
     const journal = await createFreshM6InitializationJournal(root, setup.config, setup.target.operation_id, source, metadata);
     const effects = {
       createResources: async () => { calls.push("resources"); expect(journal.load().phase).toBe("resources_requested"); },
@@ -28,6 +34,8 @@ test("fresh initialization journal drives only acknowledged steps, retains no se
     await runFreshM6Initialization(journal, effects, source, metadata);
     expect(calls).toEqual(["resources", "deploy", "initialize"]);
     expect(journal.load().phase).toBe("initialized");
+    expect(readLocalFreshM6Initialization(root, setup.config)).toEqual({ state: journal.load(), lockPresent: false });
+    expect(() => readLocalFreshM6Initialization(root, { ...setup.config, worker_name: "another-worker" })).toThrow("another service configuration");
     expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("paused");
     const text = readFileSync(join(root, ".castloop", "service-initializations", `${setup.config.service_id}.json`), "utf8");
     expect(text).not.toContain(metadata.secret);
@@ -56,6 +64,30 @@ test("lost resource/deploy/initialization responses retain requested phases with
       expect(calls).toEqual(before);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
+});
+
+test("fresh initialization reconciles a lost completion using retained target and read-only server receipts, not current source bytes", async () => {
+  const setup = await m6SetupFixture();
+  const root = mkdtempSync("/tmp/opencode/castloop-fresh-reconcile-");
+  try {
+    const journal = await createFreshM6InitializationJournal(root, setup.config, setup.request.target.operation_id, source, metadata);
+    const client = new M6SetupClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => setup.snapshot }, async (url, init) => {
+      const response = await setup.run(new Request(url, init));
+      if (url.pathname.endsWith("/complete")) { await response.body?.cancel(); throw new Error("Response lost"); }
+      return response;
+    });
+    await expect(runFreshM6Initialization(journal, { createResources: async () => {}, deploy: async () => setup.request.target,
+      initialize: (_config, target) => client.initialize(target, { maximumReads: 1,
+        delay: async () => { await consumeM6SetupProbe(setup.batch(setup.sent[0]), setup.env); } }) }, source, metadata)).rejects.toThrow("outcome is unknown");
+    expect(journal.load().phase).toBe("initialization_requested");
+    const retained = await openFreshM6InitializationJournal(root, setup.config);
+    const writes = [...setup.writes];
+    await reconcileFreshM6Initialization(retained, (_config, target) => client.observeCompleted({ target }));
+    expect(retained.load().phase).toBe("initialized");
+    expect(setup.writes).toEqual(writes);
+    expect(setup.sent).toHaveLength(1);
+    expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("paused");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("source/metadata changes and a different operation identity cannot change a frozen fresh initialization", async () => {
@@ -92,7 +124,8 @@ test("fresh initialization keeps its lock throughout live IO and resumes only an
     const running = runFreshM6Initialization(journal, effects, source, metadata);
     await ready;
     try {
-      expect(existsSync(join(root, ".castloop", "service-initializations", `${setup.config.service_id}.json.lock`))).toBe(true);
+       expect(existsSync(join(root, ".castloop", "service-initializations", `${setup.config.service_id}.json.lock`))).toBe(true);
+       expect(readLocalFreshM6Initialization(root, setup.config)).toEqual({ state: journal.load(), lockPresent: true });
       await expect(other.exclusively(async () => {})).rejects.toThrow();
     } finally { settled(); await running; }
     const secondRoot = mkdtempSync("/tmp/opencode/castloop-fresh-init-resume-");

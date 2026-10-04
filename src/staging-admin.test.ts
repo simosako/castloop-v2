@@ -4,7 +4,6 @@ import { readShowControl } from "./lifecycle-control";
 import { fetchM6Candidate } from "./m6-routes";
 import { acquireServiceInvocation, pauseServiceAdmission, readServiceAdmission, releaseServiceInvocation, SERVICE_ADMISSION_KEY } from "./service-admission";
 import { handleM6StagingAdmin } from "./staging-admin";
-import { publicationTestDigest } from "./test-support/episode-publication";
 import { stagingAdminFixture } from "./test-support/staging-admin";
 
 describe("unreleased M6 staging management boundary", () => {
@@ -26,7 +25,7 @@ describe("unreleased M6 staging management boundary", () => {
       await setup.putPayloads();
       expect((await setup.call(setup.input("finish", { operation: setup.operation, outcome: "staged" }))).status).toBe(409);
       expect((await readShowControl(setup.env, "daily"))?.value.owner).toBeDefined();
-      const settle = await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+      const settle = await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }));
       expect(settle.result).toBe("settled");
       expect((await setup.success(setup.input("finish", { operation: setup.operation, outcome: "staged" }))).result).toBe("staged");
       expect((await readShowControl(setup.env, "daily"))?.value.owner).toBeUndefined();
@@ -51,7 +50,7 @@ describe("unreleased M6 staging management boundary", () => {
     for (const input of [{ ...setup.input("claim", { upload: setup.upload }), title: "private" },
       { ...setup.input("claim", { upload: setup.upload }), service_id: "foreign" },
       { ...setup.input("claim", { upload: setup.upload }), upload: { ...setup.upload, secret: "private" } },
-      { ...setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }), no_more_puts: false },
+      { ...setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: [] }), no_more_puts: false },
       setup.input("begin", { operation: { ...setup.operation, show_id: "../daily" } })]) {
       const result = await setup.call(input);
       expect(result.status).toBe(400);
@@ -102,7 +101,7 @@ describe("unreleased M6 staging management boundary", () => {
     await pauseServiceAdmission(setup.env, "service", pauseId);
     expect((await setup.call(setup.input("claim", { upload: { ...setup.upload, operation_id: crypto.randomUUID() } }))).status).toBe(409);
     expect((await setup.call(setup.input("begin", { operation: setup.operation }))).status).toBe(409);
-    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }));
     await setup.success(setup.input("finish", { operation: setup.operation, outcome: "staged" }));
     const service = (await readServiceAdmission(setup.env, "service"))!.value;
     expect(service.state).toBe("paused");
@@ -117,7 +116,7 @@ describe("unreleased M6 staging management boundary", () => {
     await setup.putPayloads();
     expect((await setup.call(setup.input("finish", { operation: setup.operation, outcome: "aborted" }))).status).toBe(409);
     expect((await readShowControl(setup.env, "daily"))?.value.owner?.state).toBe("uploading");
-    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }));
     expect((await setup.success(setup.input("finish", { operation: setup.operation, outcome: "aborted" }))).result).toBe("aborted");
     expect(setup.entries.has(stagePayloadKey(setup.upload, "audio"))).toBe(true);
     const progress = setup.text(`system/jobs/${setup.upload.operation_id}/upload-progress.json`);
@@ -130,22 +129,24 @@ describe("unreleased M6 staging management boundary", () => {
   test("settling a ready upload permits explicit abort without ever granting PUT permission", async () => {
     const setup = await stagingAdminFixture();
     await setup.success(setup.input("claim", { upload: setup.upload }));
-    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: [] }));
     expect((await setup.call(setup.input("begin", { operation: setup.operation }))).status).toBe(409);
     expect((await setup.success(setup.input("finish", { operation: setup.operation, outcome: "aborted" }))).result).toBe("aborted");
   });
 
-  test("while verification streams are live, service and Show tokens remain held despite pause", async () => {
+  test("while verification HEAD is live, service and Show tokens remain held despite pause", async () => {
     const setup = await stagingAdminFixture("audio");
     await setup.success(setup.input("claim", { upload: setup.upload }));
     await setup.success(setup.input("begin", { operation: setup.operation }));
     await setup.putPayloads();
-    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }));
     const started = Promise.withResolvers<void>();
     const ended = Promise.withResolvers<void>();
-    const pending = handleM6StagingAdmin(setup.http(setup.input("finish", { operation: setup.operation, outcome: "staged" })), setup.env, setup.bindings, {
-      digest: async (body, length) => { started.resolve(); await ended.promise; return publicationTestDigest(body, length); },
-    });
+    const env = { ...setup.env, CASTLOOP_BUCKET: { ...setup.bucket, async head(key: string) {
+      if (key === stagePayloadKey(setup.upload, "audio")) { started.resolve(); await ended.promise; }
+      return setup.bucket.head(key);
+    } } } as never;
+    const pending = handleM6StagingAdmin(setup.http(setup.input("finish", { operation: setup.operation, outcome: "staged" })), env, setup.bindings);
     await started.promise;
     const held = (await readServiceAdmission(setup.env, "service"))!.value.invocations;
     expect(held).toHaveLength(1);
@@ -165,8 +166,9 @@ describe("unreleased M6 staging management boundary", () => {
     const setup = await stagingAdminFixture("audio");
     await setup.success(setup.input("claim", { upload: setup.upload }));
     await setup.success(setup.input("begin", { operation: setup.operation }));
+    await setup.putPayloads();
+    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }));
     await setup.bucket.put(stagePayloadKey(setup.upload, "audio"), "bad");
-    await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
     const result = await setup.call(setup.input("finish", { operation: setup.operation, outcome: "staged" }));
     expect(result.status).toBe(409);
     expect(await result.text()).not.toContain("size");
@@ -211,7 +213,7 @@ describe("unreleased M6 staging management boundary", () => {
       await setup.success(setup.input("claim", { upload: setup.upload }));
       await setup.success(setup.input("begin", { operation: setup.operation }));
       await setup.putPayloads();
-      await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true }));
+      await setup.success(setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }));
       const original = setup.env.CASTLOOP_BUCKET.put.bind(setup.env.CASTLOOP_BUCKET);
       setup.env.CASTLOOP_BUCKET.put = (async (key: string, value: string, options?: R2PutOptions) => {
         const written = await original(key, value, options);
@@ -279,7 +281,7 @@ describe("unreleased M6 staging management boundary", () => {
 
   test("shared response schemas reject arbitrary/foreign/traversal/oversized/duplicated PUT locations", async () => {
     const setup = await stagingAdminFixture();
-    const request = setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true });
+    const request = setup.input("settle", { operation: setup.operation, put_requests_settled: true, no_more_puts: true, readback_receipts: [] });
     expect(stagingAdminRequestSchema.safeParse({ ...request, put_requests_settled: false }).success).toBe(false);
     const payload = { key: stagePayloadKey(setup.upload, "show_metadata"), length: 1, sha256: "a".repeat(64) };
     const response = { schema_version: 1, service_id: "service", result: "started", operation: setup.operation, payloads: [payload] };

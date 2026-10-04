@@ -42,6 +42,29 @@ export type StageUploadRequest = z.infer<typeof stageUploadRequestSchema>;
 export type StagePayload = z.infer<typeof stagePayloadSchema>;
 export type StageAsset = z.infer<typeof stageAssetSchema>;
 
+export const stageReadbackReceiptSchema = stagePayloadSchema.safeExtend({
+  etag: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
+  version: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
+});
+export type StageReadbackReceipt = z.infer<typeof stageReadbackReceiptSchema>;
+export const stageSettlementSchema = z.object({
+  put_requests_settled: z.literal(true), no_more_puts: z.literal(true),
+  readback_receipts: z.array(stageReadbackReceiptSchema).max(2),
+}).strict();
+export type StageSettlement = z.infer<typeof stageSettlementSchema>;
+
+export function parseStageReadbackReceipts(input: StageUploadRequest, receipts: unknown): StageReadbackReceipt[] {
+  const request = stageUploadRequestSchema.parse(input);
+  const values = z.array(stageReadbackReceiptSchema).max(2).parse(receipts);
+  for (const [index, receipt] of values.entries()) {
+    const payload = request.payloads[index];
+    if (!payload || payload.asset !== receipt.asset || payload.length_bytes !== receipt.length_bytes || payload.sha256 !== receipt.sha256) {
+      throw new Error("Staging readback receipt differs from its frozen payload");
+    }
+  }
+  return values;
+}
+
 export function stageControlRequest(input: StageUploadRequest): ControlRequest {
   const request = stageUploadRequestSchema.parse(input);
   return controlRequestSchema.parse({ schema_version: 1, job_id: request.operation_id, show_id: request.show_id, kind: request.kind,
@@ -70,16 +93,21 @@ export const stageUploadProgressSchema = z.object({
   manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/),
   phase: z.enum(["ready", "uploading", "settled", "verifying", "verified", "finished"]),
   client_settled: z.boolean(),
+  readback_receipts: z.array(stageReadbackReceiptSchema).max(2).optional(),
   outcome: z.enum(["staged", "aborted"]).optional(),
   verified_assets: z.array(z.object({
     asset: stageAssetSchema,
     etag: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
+    version: stageReadbackReceiptSchema.shape.version.optional(),
     length_bytes: z.number().int().positive().max(300_000_000),
     sha256: z.string().regex(/^[a-f0-9]{64}$/),
   }).strict()).max(2),
   reason_code: z.literal("validation_failed").optional(),
 }).strict().superRefine((value, context) => {
   const settled = !["ready", "uploading"].includes(value.phase);
+  if (!settled && value.readback_receipts !== undefined) {
+    context.addIssue({ code: "custom", message: "Staging readback receipts require client settlement" });
+  }
   if (settled !== value.client_settled) context.addIssue({ code: "custom", message: "Staging progress requires explicit client settlement" });
   if ((value.phase === "finished") !== (value.outcome !== undefined)) {
     context.addIssue({ code: "custom", message: "Only finished staging progress has an outcome" });

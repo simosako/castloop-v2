@@ -15,7 +15,6 @@ import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { handleM6TargetInspection } from "../../../src/target-inspection-admin";
 import { consumeOwnedPublication } from "../../../src/publication-consumer";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -46,7 +45,7 @@ async function fixture(mode: "show" | "initial" | "metadata" | "audio" = "show")
     const http = new Request(input, init);
     const action = (await http.clone().json() as { action: string }).action;
     requests.push(`stage:${action}`);
-    const response = await handleM6StagingAdmin(http, setup.env, setup.bindings, { digest: publicationTestDigest });
+    const response = await handleM6StagingAdmin(http, setup.env, setup.bindings);
     if (!response) throw new Error("Unexpected staging route");
     if (action === "claim") await afterClaim?.();
     if (loseAction === `stage:${action}`) throw new Error("Simulated lost acknowledgement");
@@ -76,13 +75,13 @@ async function fixture(mode: "show" | "initial" | "metadata" | "audio" = "show")
     requests.push(`rest:${method}`);
     if (method === "PUT") {
       const body = new Uint8Array(await new Response(init?.body).arrayBuffer());
-      await setup.bucket.put(key, body);
+      const written = (await setup.bucket.put(key, body))!;
       if (loseAction === "rest:PUT") throw new Error("Simulated lost PUT acknowledgement after local IO settled");
-      return Response.json({ success: true, result: { size: body.length } });
+      return Response.json({ success: true, result: { key, size: written.size, etag: written.etag, version: written.version } });
     }
     const object = await setup.bucket.get(key);
     if (!object) return new Response(null, { status: 404 });
-    return new Response(new Uint8Array(object.bytes));
+    return new Response(new Uint8Array(object.bytes), { headers: { ETag: `"${object.etag}"` } });
   } };
   const header = async () => ({ schema_version: 1 as const, expected_show_generation: (await readShowControl(setup.env, "daily"))!.value.generation,
     ...(episode ? { expected_episode_generation: 0 } : {}), created_at: "2026-10-02T12:00:00Z" });

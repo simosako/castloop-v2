@@ -15,9 +15,9 @@ export { lifecycleCommitKey, lifecycleCommitSchema, parseLifecycleCommitKey } fr
 export type { LifecycleCommit, LifecycleCommitTarget } from "./lifecycle-commit";
 export { lifecycleAdminRequestSchema, lifecycleAdminResponseSchema, lifecycleOperationRequestSchema } from "./lifecycle-admin";
 export type { LifecycleAdminRequest, LifecycleAdminResponse, LifecycleOperationRequest } from "./lifecycle-admin";
-export { stageAssetSchema, stageControlRequest, stageDraftPrefix, stagePayloadKey, stagePayloadSchema,
-  stageUploadProgressSchema, stageUploadRequestSchema } from "./staging";
-export type { StageAsset, StagePayload, StageUploadProgress, StageUploadRequest } from "./staging";
+export { parseStageReadbackReceipts, stageAssetSchema, stageControlRequest, stageDraftPrefix, stagePayloadKey, stagePayloadSchema,
+  stageReadbackReceiptSchema, stageSettlementSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "./staging";
+export type { StageAsset, StagePayload, StageReadbackReceipt, StageSettlement, StageUploadProgress, StageUploadRequest } from "./staging";
 export { stagingAdminRequestSchema, stagingAdminResponseSchema, stagingOperationSchema } from "./staging-admin";
 export type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from "./staging-admin";
 export { showRegistrationRequestSchema, showRegistrationResponseSchema, showReservationSchema } from "./show-registration";
@@ -38,8 +38,18 @@ export type { ServiceCapabilities } from "./service-capabilities";
 export { cachedDeliveryRuntimeSchema } from "./delivery-runtime";
 export type { CachedDeliveryRuntime } from "./delivery-runtime";
 export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVersionSnapshotSchema, workerSubdomainSnapshotSchema,
-  workerScriptUploadReceiptSchema, m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
+  workerScriptUploadReceiptSchema, workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema, m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
 export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
+export { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, collectM6DeploymentSnapshot,
+  m6DeploymentSnapshotSchema, m6SnapshotReads, M6_WORKER_COMPATIBILITY_DATE, M6_FRESH_WORKER_COMPATIBILITY_DATE,
+  requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
+export type { M6DeploymentReads, M6DeploymentSnapshot, M6WorkerUploadMetadata } from "./m6-worker-deployment";
+export { m6SetupRecordKey, m6SetupRequestSchema, m6SetupRecordSchema, m6SetupQueueProbeSchema, m6SetupProbeSchema, m6SetupStatusSchema,
+  m6SetupCompleteSchema, m6SetupCompletedSchema, m6SetupHealthSchema, m6UpdateBeginSchema, m6UpdateAdmittedSchema } from "./m6-setup";
+export type { M6SetupRequest, M6SetupRecord, M6SetupProbe } from "./m6-setup";
+export type { WorkerVersionUploadReceipt } from "./worker-deployment";
+export { m6ServiceAdminRequestSchema, m6ServiceAdminResponseSchema } from "./m6-service-admin";
+export type { M6ServiceAdminRequest, M6ServiceAdminResponse } from "./m6-service-admin";
 export { migrationCandidateUploadSchema } from "./worker-deployment";
 export type { MigrationCandidateUpload } from "./worker-deployment";
 export { migrationBridgeUploadSchema, migrationBridgePreparationSchema } from "./worker-deployment";

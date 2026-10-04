@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { LifecycleAdminClient } from "./lifecycle-client";
 import { readLocalLifecycleJob } from "./lifecycle-journal";
-import { executeLocalM6Lifecycle, prepareLocalM6Lifecycle, previewLocalM6Lifecycle, validateM6LifecyclePlan } from "./m6-local-lifecycle";
+import { confirmLocalM6Lifecycle, executeLocalM6Lifecycle, prepareLocalM6Lifecycle, previewLocalM6Lifecycle, validateM6LifecyclePlan } from "./m6-local-lifecycle";
 import { TargetInspectionClient } from "./target-inspection-client";
 import { handleM6TargetInspection } from "../../../src/target-inspection-admin";
 import { lifecycleAdminFixture } from "../../../src/test-support/lifecycle-admin";
@@ -41,7 +41,8 @@ test("lifecycle planning performs only bounded reads and dry-run, with a canonic
     expect(setup.writes).toEqual(writes);
     expect([...setup.entries]).toEqual(before);
     expect(existsSync(join(setup.root, ".castloop"))).toBe(false);
-    const confirmation = { operator_confirmed: true as const, request_sha256: plan.preview.request_sha256 };
+    expect(() => confirmLocalM6Lifecycle(plan.request.action, plan.preview.request_sha256, "")).toThrow("Explicit confirmation");
+    const confirmation = confirmLocalM6Lifecycle(plan.request.action, plan.preview.request_sha256, "confirm");
     const journal = prepareLocalM6Lifecycle(setup.root, setup.config, plan, confirmation);
     expect(journal.load().phase).toBe("prepared");
     expect(journal.load().claim.request).toEqual(plan.request);
@@ -57,6 +58,7 @@ test("deletion planning cannot become a journal without explicit irreversible an
   const setup = await fixture();
   try {
     const plan = await setup.preview("delete");
+    expect(() => confirmLocalM6Lifecycle("delete", plan.preview.request_sha256, "confirm")).toThrow("irreversible");
     expect(plan.preview.deletion_page?.authorizes_deletion).toBe(false);
     expect(() => prepareLocalM6Lifecycle(setup.root, setup.config, plan,
       { operator_confirmed: true, request_sha256: plan.preview.request_sha256 })).toThrow();
@@ -65,7 +67,7 @@ test("deletion planning cannot become a journal without explicit irreversible an
       { operator_confirmed: true, request_sha256: "0".repeat(64), irreversible_delete_acknowledged: true, retained_records_acknowledged: true })).toThrow();
     expect(existsSync(join(setup.root, ".castloop"))).toBe(false);
     const journal = prepareLocalM6Lifecycle(setup.root, setup.config, plan,
-      { operator_confirmed: true, request_sha256: plan.preview.request_sha256, irreversible_delete_acknowledged: true, retained_records_acknowledged: true });
+      confirmLocalM6Lifecycle("delete", plan.preview.request_sha256, "confirm-delete-retain-records"));
     expect(journal.load().phase).toBe("prepared");
     expect(setup.requestCount()).toBe(1);
   } finally { setup.dispose(); }

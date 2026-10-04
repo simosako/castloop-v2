@@ -1,4 +1,3 @@
-import { parseServiceConfig } from "../packages/shared/src/index";
 import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import legacyWorker from "./index";
@@ -16,12 +15,16 @@ import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
 import { handleM6StagingAdmin } from "./staging-admin";
-import type { StageStreamDigest } from "./staging-verification";
 import { readBootstrapDeliveryWindow } from "./migration-bootstrap";
 import { handleMigrationAdmin } from "./migration-admin";
 import type { BootstrapRuntime } from "./migration-bootstrap";
 import { handleM6ShowRegistrationAdmin } from "./show-registration-admin";
 import { handleM6TargetInspection } from "./target-inspection-admin";
+import { handleM6SetupAdmin } from "./m6-setup-admin";
+import type { M6SetupRuntime } from "./m6-setup-runtime";
+import { handleM6ServiceAdmin } from "./m6-service-admin";
+import { readM6ServiceConfiguration } from "./m6-runtime-readiness";
+import { handleM6UpdateAdmin } from "./m6-update-admin";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -42,9 +45,7 @@ function reply(request: Request, data: object, status: number): Response {
 }
 
 async function serviceConfig(env: M6CandidateEnv): Promise<ServiceConfig> {
-  const object = await env.CASTLOOP_BUCKET.get("system/service.toml");
-  if (!object || object.size < 1 || object.size > 16384) throw new Error("M6 service configuration is missing or oversized");
-  const config = parseServiceConfig(await object.text());
+  const { config } = await readM6ServiceConfiguration(env);
   if (config.dlq_name !== env.CASTLOOP_DLQ_NAME) throw new Error("M6 dead-letter binding does not match this service");
   return config;
 }
@@ -63,38 +64,33 @@ async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Pr
 }
 
 async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
-  options: { digest?: StageStreamDigest }): Promise<Response | null> {
+  options: { setupRuntime?: M6SetupRuntime }): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
   if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle" && pathname !== "/admin/shows" &&
-    pathname !== "/admin/target") return null;
+    pathname !== "/admin/target" && pathname !== "/admin/service") return null;
   if (request.method !== "POST") return reply(request, { error: "method not allowed" }, 405);
-  try {
-    await requireCandidateReadiness(env, await serviceConfig(env));
-  } catch {
-    console.error(JSON.stringify({ event: "m6_management_not_ready", reason_code: "runtime_not_ready" }));
-    return reply(request, { error: "M6 management requires verified runtime readiness for this Worker version" }, 409);
-  }
   const bindings = { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1" as const, cachedAssets };
+  if (pathname === "/admin/service") return handleM6ServiceAdmin(request, env);
   if (pathname === "/admin/target") return handleM6TargetInspection(request, env, bindings);
   if (pathname === "/admin/shows") return handleM6ShowRegistrationAdmin(request, env, bindings);
-  if (pathname === "/admin/staging") return handleM6StagingAdmin(request, env, bindings, options);
+  if (pathname === "/admin/staging") return handleM6StagingAdmin(request, env, bindings);
   if (pathname === "/admin/publication") return handleM6PublicationAdmin(request, env, bindings);
   return handleM6LifecycleAdmin(request, env, bindings);
 }
 
-export async function fetchM6Candidate(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
+export async function fetchM6Candidate(request: Request, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, bootstrapRuntime?: BootstrapRuntime): Promise<Response> {
   return fetchM6Routes(request, env, cachedAssets, false, bootstrapRuntime);
 }
 
-export async function fetchM6ManagementIntegration(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
-  cachedAssets: M6CachedLoopback, options: { digest?: StageStreamDigest } = {}): Promise<Response> {
+export async function fetchM6ManagementIntegration(request: Request, env: M6CandidateEnv,
+  cachedAssets: M6CachedLoopback, options: { setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   return fetchM6Routes(request, env, cachedAssets, true, undefined, options);
 }
 
-async function fetchM6Routes(request: Request<unknown, IncomingRequestCfProperties>, env: M6CandidateEnv,
+async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, managementIntegration: boolean, bootstrapRuntime?: BootstrapRuntime,
-  options: { digest?: StageStreamDigest } = {}): Promise<Response> {
+  options: { setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const asset = parsePublicAssetPath(pathname);
   if (asset) {
@@ -115,6 +111,12 @@ async function fetchM6Routes(request: Request<unknown, IncomingRequestCfProperti
   }
   if (!pathname.startsWith("/admin/")) return reply(request, { error: "not found" }, 404);
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply(request, { error: "unauthorized" }, 401);
+  if (managementIntegration && options.setupRuntime) {
+    const update = await handleM6UpdateAdmin(request, env);
+    if (update) return update;
+    const setup = await handleM6SetupAdmin(request, env, options.setupRuntime);
+    if (setup) return setup;
+  }
   if (bootstrapRuntime) {
     const migration = await handleMigrationAdmin(request, env, bootstrapRuntime);
     if (migration) return migration;
@@ -124,7 +126,8 @@ async function fetchM6Routes(request: Request<unknown, IncomingRequestCfProperti
     if (management) return management;
   }
   if (request.method !== "GET") return reply(request, { error: "Mutation routes are not released on the M6 candidate" }, 409);
-  if (pathname === "/admin/health") return reply(request, { result: "candidate", m6_ready: false }, 200);
+  if (pathname === "/admin/health") return reply(request, { result: "candidate", m6_ready: false,
+    ...(options.setupRuntime ? { worker_version_id: env.CASTLOOP_VERSION_METADATA.id } : {}) }, 200);
   if (pathname === "/admin/capabilities") {
     try {
       return reply(request, await readServiceCapabilities(env, (await serviceConfig(env)).service_id, "m6_candidate"), 200);
@@ -139,7 +142,7 @@ async function fetchM6Routes(request: Request<unknown, IncomingRequestCfProperti
 }
 
 export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
-  options: { digest?: StageStreamDigest; maximumObjects?: number } = {}): Promise<void> {
+  options: { maximumObjects?: number } = {}): Promise<void> {
   if (batch.messages.length > 1) throw new Error("M6 candidate requires one-message Queue batches");
   if (!batch.messages.length) return;
   const config = await serviceConfig(env);
@@ -156,7 +159,7 @@ export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6Cand
         await recordDeadLetterDelivery(env, message);
       } else if (delivery?.family === "publication") {
         await consumeOwnedPublication(env, delivery.key, (execution) => createPublicationWorkerEffects(env, execution,
-          { cachedAssets, checkDeliveryGate: gate }), options);
+          { cachedAssets, checkDeliveryGate: gate }));
       } else if (delivery) {
         await consumeLifecycleCommit(env, delivery.key, (execution) => createLifecycleWorkerEffects(env, execution,
           { cachedAssets, checkDeliveryGate: gate, queue: env.CASTLOOP_QUEUE }), options);

@@ -5,7 +5,6 @@ import { handleM6LifecycleAdmin } from "../lifecycle-admin";
 import type { LifecycleAdminEnv } from "../lifecycle-admin";
 import { queueM6Candidate } from "../m6-routes";
 import { parseQueueDelivery } from "../queue-delivery";
-import { publicationTestDigest } from "./episode-publication";
 import { publicationAdminFixture } from "./publication-admin";
 
 export async function lifecycleAdminFixture() {
@@ -13,7 +12,7 @@ export async function lifecycleAdminFixture() {
   await setup.publicationSuccess(setup.body("claim"));
   await setup.publicationSuccess(setup.body("commit"));
   await queueM6Candidate({ queue: "test-queue", messages: [{ id: "publication", body: { object: { key: setup.markerKey } } }] } as never,
-    setup.candidateEnv, setup.cachedAssets, { digest: publicationTestDigest });
+    setup.candidateEnv, setup.cachedAssets);
   await setup.addEpisode("untouched", "active");
   const continuations: string[] = [];
   const candidateEnv = { ...setup.candidateEnv, CASTLOOP_QUEUE: { send: async (body: unknown) => {

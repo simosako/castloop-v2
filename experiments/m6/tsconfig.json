@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["./cache-worker.ts", "./verify-cache.ts", "./admission-worker.ts", "./verify-admission.ts", "./probe-harness.ts"],
+  "include": ["./cache-worker.ts", "./verify-cache.ts", "./admission-worker.ts", "./verify-admission.ts", "./probe-harness.ts", "./verify-fresh-service.ts", "./verify-compatible-update.ts"],
   "compilerOptions": { "types": ["../../worker-configuration.d.ts", "node", "bun"] }
 }

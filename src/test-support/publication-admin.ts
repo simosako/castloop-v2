@@ -25,7 +25,7 @@ export async function publicationAdminFixture(mode: "show" | "episode" | "metada
     await setup.success(setup.input("claim", { upload }));
     await setup.success(setup.input("begin", { operation }));
     for (const { asset, bytes } of contents) await setup.bucket.put(stagePayloadKey(upload, asset), bytes);
-    await setup.success(setup.input("settle", { operation, put_requests_settled: true, no_more_puts: true }));
+    await setup.success(setup.input("settle", { operation, put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks(upload) }));
     await setup.success(setup.input("finish", { operation, outcome: "staged" }));
     stages.push(upload);
   };

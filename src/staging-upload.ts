@@ -1,5 +1,5 @@
-import { stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema } from "../packages/shared/src/index";
-import type { StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
+import { parseStageReadbackReceipts, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageSettlementSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "../packages/shared/src/index";
+import type { StageSettlement, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
 import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
 import { initializeOwnedEpisodeDraft, prepareNewEpisodeDraft } from "./staging-episode-draft";
@@ -75,6 +75,9 @@ export async function writeStageUploadProgress(env: LifecycleControlEnv, operati
     if (!transitions[existing.value.phase].includes(value.phase) || existing.value.client_settled && !value.client_settled) {
       throw new Error("Staging progress cannot reopen PUT permission");
     }
+    if (existing.value.client_settled && JSON.stringify(existing.value.readback_receipts) !== JSON.stringify(value.readback_receipts)) {
+      throw new Error("Settled staging readback receipts cannot change");
+    }
   }
   const latest = await requireStageUpload(env, operation);
   if (latest.control.value.owner.verification_id !== verificationId) throw new Error("Staging verification token changed before progress was written");
@@ -120,12 +123,17 @@ export async function beginStageUpload(env: LifecycleControlEnv, operation: Stag
 }
 
 export async function settleStageUpload(env: LifecycleControlEnv, operation: StageOperation,
-  evidence: { put_requests_settled: true; no_more_puts: true }): Promise<void> {
+  evidence: StageSettlement): Promise<void> {
   if (evidence.put_requests_settled !== true || evidence.no_more_puts !== true) throw new Error("Staging PUT completion and no further writes must be explicitly confirmed");
   const snapshot = await requireStageUpload(env, operation);
+  const readbacks = parseStageReadbackReceipts(snapshot.request, stageSettlementSchema.parse({
+    put_requests_settled: evidence.put_requests_settled, no_more_puts: evidence.no_more_puts, readback_receipts: evidence.readback_receipts }).readback_receipts);
   const progress = await readStageUploadProgress(env, operation, snapshot);
   if (!progress) throw new Error("Staging upload has no durable progress");
-  if (progress.value.client_settled) return;
+  if (progress.value.client_settled) {
+    if (JSON.stringify(progress.value.readback_receipts) !== JSON.stringify(readbacks)) throw new Error("Settled staging readback receipts cannot change");
+    return;
+  }
   if (progress.value.phase !== "ready" && progress.value.phase !== "uploading") throw new Error("Staging upload cannot be settled from this phase");
-  await writeStageUploadProgress(env, operation, { ...progress.value, phase: "settled", client_settled: true });
+  await writeStageUploadProgress(env, operation, { ...progress.value, phase: "settled", client_settled: true, readback_receipts: readbacks });
 }

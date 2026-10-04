@@ -8,7 +8,6 @@ import type { LifecycleControlEnv } from "./lifecycle-control";
 import { runOwnedShowPublication } from "./publication-show-runner";
 import { runOwnedEpisodePublication } from "./publication-episode-runner";
 import type { PublicationEffects } from "./publication-inputs";
-import type { StageStreamDigest } from "./staging-verification";
 
 export type PublicationConsumerResult = { state: "completed" } |
   { state: "ignored"; reason: "unmatched_path" | "missing_marker" | "stale_operation" } |
@@ -30,7 +29,7 @@ export async function requeuePublicationOperation(env: LifecycleControlEnv, oper
 }
 
 export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string,
-  source: PublicationEffects | PublicationEffectFactory, options: { digest?: StageStreamDigest } = {}): Promise<PublicationConsumerResult> {
+  source: PublicationEffects | PublicationEffectFactory): Promise<PublicationConsumerResult> {
   const target = parsePublicationCommitKey(key);
   if (!target) return { state: "ignored", reason: "unmatched_path" };
   let frozen;
@@ -51,7 +50,7 @@ export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string
   try {
     const effects = typeof source === "function" ? await source(execution) : source;
     if (request.kind === "show") await runOwnedShowPublication(env, execution, effects);
-    else await runOwnedEpisodePublication(env, execution, effects, options);
+    else await runOwnedEpisodePublication(env, execution, effects);
   } catch (error) {
     if (await releaseSettledExecution(env, execution) === "completed") return { state: "completed" };
     throw error;

@@ -17,6 +17,15 @@ export type M6LifecyclePlanningOptions = { inspector?: Pick<TargetInspectionClie
   client?: Pick<LifecycleAdminClient, "dryRun">; now?: () => Date };
 const planSchema = z.object({ request: lifecycleOperationRequestSchema, preview: lifecycleAdminResponseSchema }).strict();
 
+export function confirmLocalM6Lifecycle(action: LifecycleOperationRequest["action"], requestSha256: string, acknowledgement: string): Confirmation {
+  const deletion = action === "delete";
+  if (acknowledgement !== (deletion ? "confirm-delete-retain-records" : "confirm")) {
+    throw new Error("Explicit confirmation is required; deletion must acknowledge irreversible payload deletion and retained operational records");
+  }
+  return { operator_confirmed: true, request_sha256: requestSha256,
+    ...(deletion ? { irreversible_delete_acknowledged: true, retained_records_acknowledged: true } : {}) };
+}
+
 function requestHash(request: LifecycleOperationRequest): string {
   return createHash("sha256").update(JSON.stringify(request)).digest("hex");
 }

@@ -1,5 +1,5 @@
-import { serviceConfigSchema, stageControlRequest, stageUploadRequestSchema, stagingAdminRequestSchema, stagingAdminResponseSchema } from "@castloop/shared";
-import type { ServiceConfig, StageUploadRequest, StagingAdminResponse } from "@castloop/shared";
+import { parseStageReadbackReceipts, serviceConfigSchema, stageControlRequest, stageUploadRequestSchema, stagingAdminRequestSchema, stagingAdminResponseSchema } from "@castloop/shared";
+import type { ServiceConfig, StageReadbackReceipt, StageSettlement, StageUploadRequest, StagingAdminResponse } from "@castloop/shared";
 import { StagingAdminClient, stagingClientOperation, stagingClientTargets } from "./staging-client";
 import type { StagePutTarget } from "./staging-client";
 import { validateStagingClientState } from "./staging-journal";
@@ -8,8 +8,8 @@ import { createHash } from "node:crypto";
 
 type Receipt<Result extends StagingAdminResponse["result"]> = Extract<StagingAdminResponse, { result: Result }>;
 export type StagingOperationEffects = { upload: StageUploadRequest; claim: () => Promise<Receipt<"claimed">>;
-  begin: () => Promise<Receipt<"started">>; put: (target: StagePutTarget, index: number) => Promise<void>;
-  settle: (evidence: { put_requests_settled: true; no_more_puts: true }) => Promise<Receipt<"settled">>;
+  begin: () => Promise<Receipt<"started">>; put: (target: StagePutTarget, index: number) => Promise<StageReadbackReceipt>;
+  settle: (evidence: StageSettlement) => Promise<Receipt<"settled">>;
   finish: (outcome: "staged" | "aborted") => Promise<Receipt<"staged" | "aborted">>; status: () => Promise<Receipt<"status">>;
   checkLocalInputs?: () => Promise<void> };
 
@@ -40,6 +40,10 @@ async function requireOwner(state: StagingClientState, effects: StagingOperation
     status.progress.client_settled !== (phase === "settled") || status.status?.state === "completed") {
     throw new Error("Staging operation requires its current unfinished owner, phase and idle verification");
   }
+  if (phase === "settled" && (!state.readback_receipts ||
+    JSON.stringify(status.progress.readback_receipts) !== JSON.stringify(state.readback_receipts))) {
+    throw new Error("Staging settlement readback receipts differ from its local journal");
+  }
 }
 
 export async function runStagingClaim(journal: StagingJournal, effects: StagingOperationEffects): Promise<void> {
@@ -67,15 +71,18 @@ export async function runStagingBeginAndUpload(journal: StagingJournal, effects:
     journal.save(acknowledged);
     journal.save({ ...acknowledged, phase: "puts_running" });
     let acknowledgedPuts = 0;
+    const readbacks: StageReadbackReceipt[] = [];
     let failed = false;
     try {
       for (const target of value.payloads) {
-        await effects.put(target, acknowledgedPuts);
+        const proof = await effects.put(target, acknowledgedPuts);
+        parseStageReadbackReceipts(state.upload, [...readbacks, proof]);
+        readbacks.push(proof);
         acknowledgedPuts += 1;
       }
     } catch { failed = true; }
     const outcome = failed ? "aborted" : "staged";
-    journal.save({ ...acknowledged, phase: "puts_settled", put_outcome: outcome, acknowledged_puts: acknowledgedPuts,
+    journal.save({ ...acknowledged, phase: "puts_settled", put_outcome: outcome, acknowledged_puts: acknowledgedPuts, readback_receipts: readbacks,
       ...(failed ? { reason_code: "put_failed" } : {}) });
     return outcome;
   });
@@ -86,11 +93,16 @@ export async function runStagingSettle(journal: StagingJournal, effects: Staging
   await journal.exclusively(async () => {
     const state = load(journal, effects);
     if (state.phase !== "puts_settled") throw new Error("Staging settlement requires acknowledged local PUT termination; never replay an unknown POST");
+    const readbacks = parseStageReadbackReceipts(state.upload, state.readback_receipts ?? []);
+    if (state.put_outcome === "staged" && readbacks.length !== state.upload.payloads.length) {
+      throw new Error("Staging settlement requires retained full readback receipts; never fabricate legacy evidence");
+    }
+    const settlement = { ...evidence, readback_receipts: readbacks };
     stagingAdminRequestSchema.parse({ schema_version: 1, service_id: state.identity.service_id, action: "settle",
-      operation: stagingClientOperation(state.upload), ...evidence });
+      operation: stagingClientOperation(state.upload), ...settlement });
     await requireOwner(state, effects, "uploading");
     journal.save({ ...state, phase: "settlement_requested" });
-    receipt(state, await effects.settle(evidence), "settled");
+    receipt(state, await effects.settle(settlement), "settled");
     journal.save({ ...state, phase: "settled" });
   });
 }

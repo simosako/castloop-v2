@@ -1,4 +1,4 @@
-export async function readBoundedAdminJson(request: Request, maximumBytes = 16384): Promise<unknown> {
+export async function readBoundedAdminJson(request: Pick<Request, "headers" | "body">, maximumBytes = 16384): Promise<unknown> {
   if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1) throw new Error("Invalid administrator body budget");
   const declared = request.headers.get("Content-Length");
   if (declared !== null && (!/^\d+$/.test(declared) || !Number.isSafeInteger(Number(declared)) || Number(declared) > maximumBytes)) {
