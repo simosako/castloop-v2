@@ -290,10 +290,13 @@ test("fresh M6 refuses existing or unknown resources and name collisions without
   }
 });
 
-test.each([null, "missing-receipt", "old-version", "foreign-content", "settings-drift", "foreign-deployment",
+test.each([null, "custom-domain", "domain-drift", "missing-receipt", "old-version", "foreign-content", "settings-drift", "foreign-deployment",
   "unknown-latest", "intervening-version", "latest-drift", "missing-deployment-receipt", "deployment-id-drift"] as const)(
-  "compatible REST updates activate only an acknowledged version and preserve secrets/settings (%s)", async (failure) => {
-  const service = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
+  "compatible REST updates activate only an acknowledged version and preserve secrets/settings (%s)", async (scenario) => {
+  const failure = scenario === "custom-domain" ? null : scenario;
+  const withDomain = scenario === "custom-domain" || scenario === "domain-drift";
+  const service = { ...config, public_base_url: withDomain ? "https://podcasts.example.com" : `https://${worker}.example.workers.dev`,
+    ...(withDomain ? { workers_dev_base_url: `https://${worker}.example.workers.dev` } : {}) };
   const previousVersion = crypto.randomUUID();
   const nextVersion = crypto.randomUUID();
   const previousDeployment = crypto.randomUUID();
@@ -349,7 +352,8 @@ test.each([null, "missing-receipt", "old-version", "foreign-content", "settings-
         script_runtime: { compatibility_date: value.compatibility_date, compatibility_flags: value.compatibility_flags, exports: value.exports } } });
     }
     if (url.pathname.endsWith("/subdomain")) return reply({ enabled: true, previews_enabled: false });
-    if (url.pathname.endsWith("/workers/domains")) return reply([]);
+    if (url.pathname.endsWith("/workers/domains")) return reply(withDomain ? [{ id: "domain-id", service: worker, zone_id: zone.id, zone_name: zone.name,
+      hostname: scenario === "domain-drift" && uploaded ? "changed.example.com" : "podcasts.example.com" }] : []);
     throw new Error("Compatible updates cannot create resources or write content");
   }, async (api) => {
     nextMetadata = await api.prepareCompatibleM6WorkerUpload(service, previousVersion);
@@ -385,6 +389,23 @@ test.each([null, "missing-receipt", "old-version", "foreign-content", "settings-
   const path = `/client/v4/accounts/${accountId}/workers/scripts/${worker}`;
   expect(writes).toEqual([...(failure === "unknown-latest" ? [] : [`POST ${path}/versions`]),
     ...(failure === null || ["foreign-deployment", "missing-deployment-receipt", "deployment-id-drift"].includes(failure) ? [`POST ${path}/deployments`] : [])]);
+});
+
+test("compatible domain preflight rejects missing, multiple or foreign connections without any Worker write", async () => {
+  const service = { ...config, public_base_url: "https://podcasts.example.com", workers_dev_base_url: `https://${worker}.example.workers.dev` };
+  const domain = { id: "domain-id", hostname: "podcasts.example.com", service: worker, zone_id: zone.id };
+  for (const domains of [[], [domain, domain], [{ ...domain, hostname: "other.example.com" }], [{ ...domain, service: "another-worker" }]]) {
+    let calls = 0;
+    await withCloudflare((request) => {
+      calls++;
+      expect(request.method).toBe("GET");
+      expect(new URL(request.url).pathname.endsWith("/workers/domains")).toBe(true);
+      return reply(domains);
+    }, async (api) => {
+      await expect(api.prepareCompatibleM6WorkerUpload(service, crypto.randomUUID())).rejects.toThrow("connections differ");
+    });
+    expect(calls).toBe(1);
+  }
 });
 
 test("M6 uploads reject missing receipts or another script's content without replaying PUT or activating the deployment", async () => {

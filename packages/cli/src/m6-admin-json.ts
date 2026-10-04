@@ -1,4 +1,4 @@
-import { m6RuntimeTargetSchema, serviceConfigSchema } from "@castloop/shared";
+import { m6RuntimeTargetSchema, serviceConfigSchema, serviceManagementBaseUrl } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 
 export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
@@ -37,15 +37,13 @@ async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET):
 
 export class M6AdminJsonClient {
   readonly config: ServiceConfig;
+  readonly managementBaseUrl: string;
   private readonly adminKey: string;
   private readonly transport: M6AdminTransport;
 
   constructor(config: ServiceConfig, adminKey: string, transport: M6AdminTransport = fetch) {
     this.config = serviceConfigSchema.parse(config);
-    const origin = new URL(this.config.public_base_url);
-    if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
-      throw new Error("M6 administration requires an HTTPS service origin without credentials or path");
-    }
+    this.managementBaseUrl = serviceManagementBaseUrl(this.config);
     if (!adminKey || /[\u0000-\u001f\u007f]/.test(adminKey)) throw new Error("M6 administration requires a valid local administrator key");
     this.adminKey = adminKey;
     this.transport = transport;
@@ -56,18 +54,18 @@ export class M6AdminJsonClient {
     const label = ROUTE_LABELS[route];
     const body = JSON.stringify(input);
     if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
-    return this.send(new URL(`/admin/${route}`, this.config.public_base_url), label, body, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
+    return this.send(new URL(`/admin/${route}`, this.managementBaseUrl), label, body, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
   }
 
   async getSetupProbe(operationId: string): Promise<unknown> {
     m6RuntimeTargetSchema.shape.operation_id.parse(operationId);
-    const url = new URL("/admin/setup/probe", this.config.public_base_url);
+    const url = new URL("/admin/setup/probe", this.managementBaseUrl);
     url.searchParams.set("operation_id", operationId);
     return this.send(url, "Setup probe");
   }
 
   async getRuntimeHealth(): Promise<unknown> {
-    return this.send(new URL("/admin/health", this.config.public_base_url), "Runtime health");
+    return this.send(new URL("/admin/health", this.managementBaseUrl), "Runtime health");
   }
 
   private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {

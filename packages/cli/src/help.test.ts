@@ -63,7 +63,7 @@ test("formal list commands pass options, format text/JSON and leave workspace st
   writeFileSync(join(directory, "castloop.toml"), PUBLICATION_SERVICE_TEXT);
   writeFileSync(preload, `import assert from "node:assert/strict";
 globalThis.fetch = async (url, init) => {
-  assert.equal(String(url), "https://current.example/admin/catalog");
+  assert.equal(String(url), "https://test-worker.example.workers.dev/admin/catalog");
   assert.equal(init.method, "POST");
   assert.equal(init.headers["X-Castloop-Key"], "private-secret");
   assert.deepEqual(JSON.parse(init.body), JSON.parse(process.env.CASTLOOP_TEST_REQUEST));

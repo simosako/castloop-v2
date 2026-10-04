@@ -126,4 +126,6 @@ Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/ind
 
 [M6 acceptance](design/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.2.1 release notes](docs/release-v0.2.1.md) and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Custom domains, old-format conversion, zero-downtime migration and cost/downtime measurement follow the MVP. Existing Cloudflare resources are not automatically deleted.
 
+The unreleased custom-domain branch separates `workers_dev_base_url` (CLI administration, always the same Worker's HTTPS workers.dev origin) from `public_base_url` (canonical Podcast URLs). Existing M6 workspaces without the new field retain their original workers.dev URL and configuration hash. Compatible updates preserve a matching Custom Domain connection; domain commands and canonical-URL switching are not available yet. Do not manually change these settings on a running service.
+
 The [release workflow](.github/workflows/build-binaries.yml) builds/checks Linux x86-64 artifacts and publishes on a matching `v*` tag. Include [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with redistributed binaries. castloop uses the MIT License.

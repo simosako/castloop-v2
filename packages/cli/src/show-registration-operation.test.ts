@@ -120,7 +120,7 @@ describe("durable Show registration without unknown-outcome replay", () => {
       const prepared = setup.journal.load();
       expect(() => setup.journal.save(prepared)).toThrow("exclusive client lock");
       expect(() => createShowRegistrationJournal(setup.root, setup.config, { ...setup.request, reservation_id: crypto.randomUUID() })).toThrow("different frozen");
-      expect(() => createShowRegistrationJournal(setup.root, { ...setup.config, worker_name: "another-worker" }, setup.request)).toThrow("different frozen");
+      expect(() => createShowRegistrationJournal(setup.root, { ...setup.config, worker_name: "another-worker", workers_dev_base_url: "https://another-worker.example.workers.dev" }, setup.request)).toThrow("different frozen");
       await setup.journal.exclusively(async () => {
         expect(() => setup.journal.save({ ...prepared, phase: "registered", receipt: { schema_version: 1, service_id: "service",
           show_id: "new-show", reservation_id: setup.request.reservation_id, result: "reserved", control_ready: true } })).toThrow("skip phases");

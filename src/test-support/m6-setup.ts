@@ -6,9 +6,9 @@ import type { M6CachedLoopback, M6CandidateEnv } from "../m6-routes";
 import type { M6SetupRuntime } from "../m6-setup-runtime";
 import { m6InitializationFixture } from "./m6-initialization";
 
-export async function m6SetupFixture() {
+export async function m6SetupFixture(options: { publicBaseUrl?: string } = {}) {
   const setup = await m6InitializationFixture();
-  const config = { ...setup.config, public_base_url: `https://${setup.config.worker_name}.example.workers.dev` };
+  const config = { ...setup.config, public_base_url: options.publicBaseUrl ?? `https://${setup.config.worker_name}.example.workers.dev` };
   await setup.bucket.put("system/service.toml", stringifyToml(config));
   const request = { target: { ...setup.target, service_config_sha256: await m6ServiceConfigHash(config) } };
   const sent: unknown[] = [];

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { lifecycleAdminRequestSchema, lifecycleCommitSchema, serviceConfigSchema } from "@castloop/shared";
+import { lifecycleAdminRequestSchema, lifecycleCommitSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema } from "@castloop/shared";
 import type { LifecycleAdminRequest, ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
@@ -14,7 +14,6 @@ const claimSchema = lifecycleAdminRequestSchema.transform((value, context) => {
   }
   return value;
 });
-const identitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, claim: claimSchema,
   phase: z.enum(["prepared", "claim_requested", "claimed", "commit_requested", "committed"]),
   claim_receipt: lifecycleCommitSchema.optional(),

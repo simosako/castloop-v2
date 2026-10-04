@@ -199,7 +199,7 @@ describe("prepare M6 staging requests from current local drafts", () => {
       expect(existsSync(join(setup.root, ".castloop"))).toBe(false);
       const prepared = await setup.prepare();
       const before = prepared.journal.load();
-      await expect(prepareLocalStagingUpload(setup.root, { ...setup.config, worker_name: "foreign-worker" }, setup.request, setup.selection)).rejects.toThrow("another service");
+      await expect(prepareLocalStagingUpload(setup.root, { ...setup.config, worker_name: "foreign-worker", workers_dev_base_url: "https://foreign-worker.example.workers.dev" }, setup.request, setup.selection)).rejects.toThrow("another service");
       expect(prepared.journal.load()).toEqual(before);
     } finally { await setup.dispose(); }
   });

@@ -81,9 +81,10 @@ async function init(target: string, flags: Record<string, string>): Promise<unkn
     const subdomain = await ask(flags["workers-subdomain"], "workers-subdomain", "workers.dev subdomain");
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subdomain)) throw new Error("Invalid workers.dev subdomain");
     const workerName = `castloop-${serviceId}-${suffix}`;
+    const workersDevBaseUrl = `https://${workerName}.${subdomain}.workers.dev`;
     const config = serviceConfigSchema.parse({ schema_version: 1, service_id: serviceId, account_id: accountId,
       bucket_name: bucketName, worker_name: workerName, queue_name: workerName,
-      dlq_name: `castloop-${serviceId}-dlq-${suffix}`, public_base_url: `https://${workerName}.${subdomain}.workers.dev` });
+      dlq_name: `castloop-${serviceId}-dlq-${suffix}`, public_base_url: workersDevBaseUrl, workers_dev_base_url: workersDevBaseUrl });
     writeFileSync(file, stringifyToml(config), { flag: "wx" });
   } else if (Object.keys(flags).some((name) => name !== "operation-id")) {
     throw new Error("Workspace configuration already exists; do not change its initialization inputs");

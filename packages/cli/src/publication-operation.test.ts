@@ -22,7 +22,7 @@ async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "show")
   const calls: string[] = [];
   const client = new PublicationAdminClient(setup.config, "private-secret", async (input, init) => {
     const request = new Request(input, init);
-    expect(request.url).toBe(new URL("/admin/publication", setup.config.public_base_url).href);
+    expect(request.url).toBe(new URL("/admin/publication", setup.config.workers_dev_base_url!).href);
     expect(request.redirect).toBe("error");
     const body = publicationAdminRequestSchema.parse(await request.clone().json());
     calls.push(body.action);
@@ -367,7 +367,7 @@ test("offline inspection is non-writing and frozen identity/manifest changes are
   const empty = mkdtempSync("/tmp/opencode/castloop-publication-empty-");
   expect(readLocalPublicationJob(empty, setup.config, setup.frozen.request.job_id)).toEqual({ client_state: null, lock_present: false, remote_state_checked: false });
   expect(existsSync(join(empty, ".castloop"))).toBe(false);
-  for (const config of [{ ...setup.config, account_id: "f".repeat(32) }, { ...setup.config, worker_name: "foreign" },
+  for (const config of [{ ...setup.config, account_id: "f".repeat(32) }, { ...setup.config, worker_name: "foreign", workers_dev_base_url: "https://foreign.example.workers.dev" },
     { ...setup.config, public_base_url: "https://foreign.example" }]) {
     expect(() => readLocalPublicationJob(setup.root, config, setup.frozen.request.job_id)).toThrow("another service");
     expect(() => createPublicationOperationEffects(config, setup.journal.load(), "private-secret", setup.client)).toThrow("another service");

@@ -14,6 +14,7 @@ export async function bootstrapFixture(initialize = true, publicBaseUrl?: string
   const setup = await migrationFixture();
   if (publicBaseUrl) await setup.bucket.put("system/service.toml", stringifyToml({
     ...parseServiceConfig(setup.entries.get("system/service.toml")!.data), public_base_url: publicBaseUrl,
+    ...(new URL(publicBaseUrl).hostname.endsWith(".workers.dev") ? { workers_dev_base_url: publicBaseUrl } : {}),
   }));
   const bridgeVersion = crypto.randomUUID();
   const candidateVersion = crypto.randomUUID();

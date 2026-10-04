@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { serviceConfigSchema, showRegistrationRequestSchema, showRegistrationResponseSchema, validateId } from "@castloop/shared";
+import { serviceConfigSchema, serviceIdentitySchema, showRegistrationRequestSchema, showRegistrationResponseSchema, validateId } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { join } from "node:path";
 
-export const showRegistrationIdentitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
+export const showRegistrationIdentitySchema = serviceIdentitySchema;
 const reserveSchema = showRegistrationRequestSchema.extend({ action: z.literal("reserve") });
 const receiptSchema = showRegistrationResponseSchema.transform((value, context) => {
   if (value.result !== "reserved") {

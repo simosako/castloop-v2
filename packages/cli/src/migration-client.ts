@@ -1,5 +1,5 @@
 import { migrationAdminStatusSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema,
-  serviceConfigSchema, migrationBridgeDeploymentEvidenceSchema, migrationQuiescenceSchema, serviceMigrationRequestSchema,
+  serviceConfigSchema, serviceManagementBaseUrl, migrationBridgeDeploymentEvidenceSchema, migrationQuiescenceSchema, serviceMigrationRequestSchema,
   migrationServiceIdentitySchema, migrationPauseRequestSchema, migrationOperationIdentitySchema,
   migrationInitializationRequestSchema, migrationInitializationResultSchema, migrationActionResponseSchema } from "@castloop/shared";
 import type { MigrationAdminStatus, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationQuiescence,
@@ -7,22 +7,20 @@ import type { MigrationAdminStatus, MigrationBootstrapRequest, MigrationBridgeDe
 
 export class MigrationAdminClient {
   private readonly config: ServiceConfig;
+  private readonly managementBaseUrl: string;
   private readonly adminKey: string;
   private readonly transport: typeof fetch;
 
   constructor(config: ServiceConfig, adminKey: string, transport: typeof fetch = fetch) {
     this.config = serviceConfigSchema.parse(config);
-    const base = new URL(this.config.public_base_url);
-    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/") {
-      throw new Error("Migration administration requires an HTTPS service origin without credentials or path");
-    }
+    this.managementBaseUrl = serviceManagementBaseUrl(this.config);
     if (!adminKey) throw new Error("Migration administration requires the local administrator key");
     this.adminKey = adminKey;
     this.transport = transport;
   }
 
   private async call(route: string, input?: object): Promise<unknown> {
-    const response = await this.transport(new URL(`/admin/migration/${route}`, this.config.public_base_url), {
+    const response = await this.transport(new URL(`/admin/migration/${route}`, this.managementBaseUrl), {
       method: input ? "POST" : "GET", redirect: "error", signal: AbortSignal.timeout(120000),
       headers: { "X-Castloop-Key": this.adminKey, "User-Agent": "castloop-cli/0.1",
         ...(input ? { "Content-Type": "application/json" } : {}) },

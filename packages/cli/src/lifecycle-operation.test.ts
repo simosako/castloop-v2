@@ -166,7 +166,7 @@ test("offline inspection never creates files or needs credentials and rejects fo
   const empty = mkdtempSync("/tmp/opencode/castloop-empty-lifecycle-");
   expect(readLocalLifecycleJob(empty, setup.config, setup.request.job_id)).toEqual({ client_state: null, lock_present: false, remote_state_checked: false });
   expect(existsSync(join(empty, ".castloop"))).toBe(false);
-  for (const config of [{ ...setup.config, account_id: "f".repeat(32) }, { ...setup.config, worker_name: "foreign-worker" },
+  for (const config of [{ ...setup.config, account_id: "f".repeat(32) }, { ...setup.config, worker_name: "foreign-worker", workers_dev_base_url: "https://foreign-worker.example.workers.dev" },
     { ...setup.config, public_base_url: "https://foreign.example" }]) {
     expect(() => readLocalLifecycleJob(setup.root, config, setup.request.job_id)).toThrow("another service");
     expect(() => createLifecycleOperationEffects(config, setup.journal.load(), "private-secret", setup.client)).toThrow("another service");

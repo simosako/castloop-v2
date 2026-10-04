@@ -35,7 +35,7 @@ test("fresh initialization journal drives only acknowledged steps, retains no se
     expect(calls).toEqual(["resources", "deploy", "initialize"]);
     expect(journal.load().phase).toBe("initialized");
     expect(readLocalFreshM6Initialization(root, setup.config)).toEqual({ state: journal.load(), lockPresent: false });
-    expect(() => readLocalFreshM6Initialization(root, { ...setup.config, worker_name: "another-worker" })).toThrow("another service configuration");
+    expect(() => readLocalFreshM6Initialization(root, { ...setup.config, worker_name: "another-worker", workers_dev_base_url: "https://another-worker.example.workers.dev" })).toThrow("another service configuration");
     expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("paused");
     const text = readFileSync(join(root, ".castloop", "service-initializations", `${setup.config.service_id}.json`), "utf8");
     expect(text).not.toContain(metadata.secret);

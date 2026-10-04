@@ -8,7 +8,7 @@ import { reserveM6Show } from "../show-registration";
 import { createHash } from "node:crypto";
 
 export const PUBLICATION_SHOW_TEXT = "schema_version = 1\nshow_id = 'daily'\ntitle = 'New Show title'\ndescription = 'Private description'\nlanguage = 'en'\nauthor = 'Author'\nowner_name = 'Owner'\nowner_email = 'owner@example.com'\ncategories = ['Arts']\nexplicit = false\nsite_url = 'https://example.com'\nimage_path = 'cover.jpg'\n";
-export const PUBLICATION_SERVICE_TEXT = "schema_version = 1\nservice_id = 'service'\naccount_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\nbucket_name = 'test-bucket'\nworker_name = 'test-worker'\nqueue_name = 'test-queue'\ndlq_name = 'test-dlq'\npublic_base_url = 'https://current.example'\n";
+export const PUBLICATION_SERVICE_TEXT = "schema_version = 1\nservice_id = 'service'\naccount_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\nbucket_name = 'test-bucket'\nworker_name = 'test-worker'\nqueue_name = 'test-queue'\ndlq_name = 'test-dlq'\npublic_base_url = 'https://current.example'\nworkers_dev_base_url = 'https://test-worker.example.workers.dev'\n";
 
 type Entry = { bytes: Uint8Array; size: number; etag: string; version: string; checksums: { sha256?: ArrayBuffer };
   customMetadata?: Record<string, string>; httpMetadata?: R2HTTPMetadata };

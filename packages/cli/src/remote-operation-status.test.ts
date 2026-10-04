@@ -178,7 +178,7 @@ describe("read-only M6 operation-status", () => {
         writeFileSync(`${operation.file}.lock`, "keep old lock");
         const report = await setup.inspect(index);
         const request = await setup.calls[index]!.json();
-        writeFileSync(join(setup.root, "status-http-fixture.json"), JSON.stringify({ url: `https://current.example/admin/${operation.route}`,
+        writeFileSync(join(setup.root, "status-http-fixture.json"), JSON.stringify({ url: `${setup.config.workers_dev_base_url}/admin/${operation.route}`,
           request, response: report.server_status }));
         const before = snapshot(setup.root);
         const result = Bun.spawnSync([process.execPath, "--preload", preload, join(import.meta.dir, "index.ts"),

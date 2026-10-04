@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicationCommitKey, publicationOperationSchema, publicationRequestSchema, serviceConfigSchema } from "@castloop/shared";
+import { publicationCommitKey, publicationOperationSchema, publicationRequestSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema } from "@castloop/shared";
 import type { PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { publicationClientOperation } from "./publication-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
@@ -8,7 +8,6 @@ import { createLocalJournalStorage } from "./local-journal-storage";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 
-const identitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, publication: publicationRequestSchema,
   manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), phase: z.enum(["prepared", "claim_requested", "claimed", "commit_requested", "committed"]),
   claim_receipt: publicationOperationSchema.optional(),

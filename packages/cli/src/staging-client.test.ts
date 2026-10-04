@@ -10,7 +10,7 @@ type Setup = Awaited<ReturnType<typeof stagingAdminFixture>>;
 function transport(setup: Setup, calls: string[]): M6AdminTransport {
   return async (input, init) => {
     const request = new Request(input, init);
-    expect(request.url).toBe(new URL("/admin/staging", setup.config.public_base_url).href);
+    expect(request.url).toBe(new URL("/admin/staging", setup.config.workers_dev_base_url!).href);
     expect(request.redirect).toBe("error");
     expect(request.cache).toBe("no-store");
     expect(request.headers.get("X-Castloop-Key")).toBe("private-secret");

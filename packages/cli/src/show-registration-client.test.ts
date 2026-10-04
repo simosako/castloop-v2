@@ -27,7 +27,7 @@ async function fixture() {
     const http = new Request<unknown, IncomingRequestCfProperties>(input, { method: init.method, headers: init.headers, body: init.body,
       signal: init.signal, redirect: init.redirect, cache: init.cache });
     calls.push(http.clone());
-    expect(new URL(http.url).origin).toBe(setup.config.public_base_url);
+    expect(new URL(http.url).origin).toBe(setup.config.workers_dev_base_url!);
     expect(new URL(http.url).pathname).toBe("/admin/shows");
     expect(http.method).toBe("POST");
     expect(init.redirect).toBe("error");

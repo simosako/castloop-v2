@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseStageReadbackReceipts, serviceConfigSchema, stageReadbackReceiptSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
+import { parseStageReadbackReceipts, serviceConfigSchema, serviceIdentitySchema as identitySchema, stageReadbackReceiptSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
 import type { ServiceConfig, StageUploadRequest } from "@castloop/shared";
 import { stagingClientOperation, stagingClientTargets } from "./staging-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
@@ -7,7 +7,6 @@ import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { join } from "node:path";
 
-const identitySchema = serviceConfigSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, upload: stageUploadRequestSchema,
   phase: z.enum(["prepared", "claim_requested", "claimed", "begin_requested", "begin_acknowledged", "puts_running", "puts_settled",
     "settlement_requested", "settled", "finish_requested", "finished"]),

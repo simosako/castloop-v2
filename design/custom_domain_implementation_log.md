@@ -1,5 +1,19 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-04: 管理URL分離と通常更新の接続保持
+
+開発順①を実装した。管理操作は同じWorkerの`workers.dev`へ固定し、`public_base_url`はRSS/公開URLとして維持する。
+
+- optionalな`workers_dev_base_url`をstrict service schemaへ追加。対象Worker名とHTTPS originを検証し、新規initで保存する。未設定の既存M6設定では元のworkers.dev URLを使い、設定値や稼働証跡のhashを自動変更しない。
+- 共通管理クライアントと旧形式の調査用クライアントで管理URLを解決する。独自ドメインへのfallback、redirect追跡、失敗時の自動再送はしない。
+- 通常deployのREST対象をaccount/Worker identityで決める。設定どおりの0/1件の接続を事前・更新中・検証時に照会し、別hostname/別Worker/複数接続/接続消失なら拒否する。DomainのPUT/DELETEは通常更新では行わない。
+- 既存の停止・所有者・version receipt・HTTP/Queue/runtime検証をそのまま使い、独自ドメイン付き更新も完了後はpausedを維持する。新規initと旧形式変換のworkers.dev限定条件は維持する。
+- journal identity schemaは同じwire形式のまま共有定義へまとめた。操作固有の状態遷移・receipt検証は変更していない。
+
+検証: `bun test` 911件成功、`npm run check`、試験用TypeScript検証、Linux単一バイナリのbuildと資格情報なしのhelpが成功。追加テストは管理先の固定、既存hash互換、接続保持/不一致拒否と独自ドメイン付き既存更新フローに絞った。既存テストのHTTP期待値を管理先へ合わせ、安全条件のテストを重複追加していない。
+
+`domain add/list/remove`はまだ公開していない。次は共通admissionでの正規URL切替、active feed再生成・purgeと設定同期を接続する。実サービス・DNS・Cloudflareリソースは変更していない。
+
 ## 2026-10-04: v0.2.1に合わせた計画の縮小・更新
 
 [`custom_domain_plan.md`](./custom_domain_plan.md)をM6完成後の共通処理へ合わせて改訂した。今回は文書のみを変更し、以下は実装済み機能と追加予定の区別である。以下の2026-09-30以前の記述は履歴として保持する。

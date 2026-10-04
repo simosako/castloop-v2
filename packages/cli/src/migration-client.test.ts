@@ -14,7 +14,7 @@ test("migration client uses authenticated fixed-origin requests without redirect
     expect(init?.redirect).toBe("error");
     const request = new Request(input, init);
     calls.push(request);
-    expect(new URL(request.url).origin).toBe(new URL(config.public_base_url).origin);
+    expect(new URL(request.url).origin).toBe(config.workers_dev_base_url!);
     expect(request.headers.get("X-Castloop-Key")).toBe("private-key");
     const response = await handleMigrationAdmin(request, setup.env, calls.length > 3 ? setup.candidate : setup.bridge);
     if (!response) throw new Error("Unexpected migration request");

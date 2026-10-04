@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { episodeCommitSchema, parseEpisodeDraft, parseServiceConfig, parseShowMetadata,
-  stringifyToml, validateId } from "./index";
+  m6ServiceConfigHash, serviceManagementBaseUrl, stringifyToml, validateId } from "./index";
 
 const show = {
   schema_version: 1 as const, show_id: "daily-show", title: "Daily", description: "Description",
@@ -31,11 +31,30 @@ describe("M1 TOML metadata", () => {
       queue_name: "castloop-demo-queue", dlq_name: "castloop-demo-dlq",
       public_base_url: "https://castloop-demo-worker.example.workers.dev" };
     expect(parseServiceConfig(stringifyToml(config))).toEqual(config);
+    expect(serviceManagementBaseUrl(config)).toBe(config.public_base_url);
     expect(() => parseServiceConfig(stringifyToml(config) + "token = \"secret\"\n")).toThrow();
     expect(validateId("a".repeat(32), "show")).toBe("a".repeat(32));
     expect(() => validateId("a".repeat(33), "show")).toThrow();
     expect(() => validateId("a--b", "show")).toThrow();
   });
+});
+
+test("management origins stay on the matching workers.dev host without changing old configuration hashes", async () => {
+  const original = { schema_version: 1 as const, service_id: "castloop", account_id: "a".repeat(32),
+    bucket_name: "castloop-bucket", worker_name: "castloop-worker", queue_name: "castloop-queue", dlq_name: "castloop-dlq",
+    public_base_url: "https://castloop-worker.example.workers.dev" };
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(original)));
+  expect(await m6ServiceConfigHash(parseServiceConfig(stringifyToml(original)))).toBe(Buffer.from(digest).toString("hex"));
+  const config = { ...original, public_base_url: "https://podcasts.example.com", workers_dev_base_url: original.public_base_url };
+  expect(parseServiceConfig(stringifyToml(config))).toEqual(config);
+  expect(serviceManagementBaseUrl(config)).toBe(original.public_base_url);
+  expect(() => serviceManagementBaseUrl({ ...original, public_base_url: config.public_base_url })).toThrow("matching workers.dev");
+  for (const workers_dev_base_url of ["https://podcasts.example.com", "https://other.example.workers.dev",
+    "https://castloop-worker.workers.dev", "https://castloop-worker.example.workers.dev.evil.example",
+    "http://castloop-worker.example.workers.dev", `${original.public_base_url}:8443`, `${original.public_base_url}/admin`,
+    `${original.public_base_url}?token=private`, `${original.public_base_url}#fragment`, "https://user@castloop-worker.example.workers.dev"]) {
+    expect(() => parseServiceConfig(stringifyToml({ ...config, workers_dev_base_url }))).toThrow();
+  }
 });
 
 test("Episode commits require both inputs initially and at least one input for revisions", () => {
