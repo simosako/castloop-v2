@@ -11,7 +11,6 @@ import { handleM6PublicationAdmin } from "../../../src/publication-admin";
 import { readShowControl } from "../../../src/lifecycle-control";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -31,7 +30,7 @@ async function fixture(episode = false) {
   const journal = createLocalDraftJournal(root, setup.config, target, id);
   const file = join(root, ".castloop", "drafts", setup.config.service_id, episode ? "episode-daily--next.json" : "show-daily.json");
   const client = new StagingAdminClient(setup.config, "private-secret", async (input, init) => {
-    const response = await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings, { digest: publicationTestDigest });
+    const response = await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings);
     if (!response) throw new Error("Unexpected staging route");
     return response;
   });
@@ -42,6 +41,7 @@ async function fixture(episode = false) {
       asset === "audio" ? { asset, audio_path: "audio.mp3" } : { asset });
     const effects = { ...createStagingOperationEffects(setup.config, prepared.journal.load(), "private-secret", async (remote, index) => {
       await prepared.sources.withPayload(index, async (body, consumed) => { await setup.bucket.put(remote.key, body); consumed(); });
+      return setup.readbacks(prepared.journal.load().upload, index + 1)[index]!;
     }, client), checkLocalInputs: prepared.sources.assertCurrent };
     return { ...prepared, effects, finish: async () => {
       await runStagingClaim(prepared.journal, effects);

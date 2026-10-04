@@ -5,7 +5,6 @@ import { SERVICE_ADMISSION_KEY } from "../../../src/service-admission";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { acquireStageVerification } from "../../../src/staging-verification";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { StagingAdminClient } from "./staging-client";
 import { createStagingJournal, readLocalStagingOperation } from "./staging-journal";
 import type { StagingJournal } from "./staging-journal";
@@ -25,13 +24,14 @@ async function fixture(kind: "show" | "audio" | "episode_metadata" = "show") {
   const client = new StagingAdminClient(setup.config, "private-secret", async (input, init) => {
     const request = new Request(input, init);
     calls.push(stagingAdminRequestSchema.parse(await request.clone().json()).action);
-    const response = await handleM6StagingAdmin(request, setup.env, setup.bindings, { digest: publicationTestDigest });
+    const response = await handleM6StagingAdmin(request, setup.env, setup.bindings);
     if (!response) throw new Error("Expected staging internal API");
     return response;
   });
   const effects = createStagingOperationEffects(setup.config, journal.load(), "private-secret", async (target, index) => {
     puts.push(target.key);
     await setup.bucket.put(target.key, setup.contents[index]!.bytes);
+    return setup.readbacks(setup.upload, index + 1)[index]!;
   }, client);
   return { ...setup, root, journal, file, client, calls, puts, effects };
 }
@@ -64,6 +64,7 @@ for (const kind of ["show", "audio", "episode_metadata"] as const) {
     expect(await runStagingBeginAndUpload(setup.journal, setup.effects)).toBe("staged");
     expect(setup.journal.load().phase).toBe("puts_settled");
     expect(setup.journal.load().acknowledged_puts).toBe(setup.upload.payloads.length);
+    expect(setup.journal.load().readback_receipts).toEqual(setup.readbacks());
     expect((await readShowControl(setup.env, "daily"))!.value.owner?.state).toBe("uploading");
     await runStagingSettle(setup.journal, setup.effects, settlement);
     await runStagingFinish(setup.journal, setup.effects);
@@ -104,6 +105,29 @@ test("known PUT exception stops remaining writes, retains payload and permits ex
   expect(await setup.bucket.head(payload)).not.toBeNull();
   expect(readFileSync(setup.file, "utf8")).not.toContain("private-secret");
   expect((await readShowControl(setup.env, "daily"))!.value.owner).toBeUndefined();
+});
+
+test("legacy missing readbacks and divergent server settlement never authorize finish or fabricated evidence", async () => {
+  const setup = await fixture("audio");
+  try {
+    await runStagingClaim(setup.journal, setup.effects);
+    await runStagingBeginAndUpload(setup.journal, setup.effects);
+    const saved = readFileSync(setup.file, "utf8");
+    const { readback_receipts: _receipts, ...legacy } = setup.journal.load();
+    writeFileSync(setup.file, JSON.stringify(legacy));
+    expect(setup.journal.load().phase).toBe("puts_settled");
+    await expect(runStagingSettle(setup.journal, setup.effects, settlement)).rejects.toThrow("never fabricate legacy evidence");
+    expect(setup.calls).not.toContain("settle");
+    writeFileSync(setup.file, saved);
+    await runStagingSettle(setup.journal, setup.effects, settlement);
+    const effects = { ...setup.effects, status: async () => {
+      const value = await setup.effects.status();
+      return { ...value, progress: { ...value.progress!, readback_receipts: [] } };
+    } };
+    await expect(runStagingFinish(setup.journal, effects)).rejects.toThrow("differ from its local journal");
+    expect(setup.journal.load().phase).toBe("settled");
+    expect(setup.calls).not.toContain("finish");
+  } finally { rmSync(setup.root, { recursive: true, force: true }); }
 });
 
 test("claim response loss is held even after owner observation", async () => {
@@ -163,7 +187,7 @@ test("live PUT holds local and Show owners and prevents settlement until its pro
   const entered = new Promise<void>((resolve) => { enter = resolve; });
   const released = new Promise<void>((resolve) => { release = resolve; });
   const running = runStagingBeginAndUpload(setup.journal, { ...setup.effects, put: async (target, index) => {
-    enter(); await released; await setup.effects.put(target, index);
+    enter(); await released; return setup.effects.put(target, index);
   } });
   await entered;
   expect(setup.journal.load().phase).toBe("puts_running");
@@ -304,6 +328,7 @@ test("journal refuses foreign config, changed manifest, phase skipping and inval
   await runStagingBeginAndUpload(setup.journal, setup.effects);
   await setup.journal.exclusively(async () => {
     expect(() => setup.journal.save({ ...setup.journal.load(), phase: "claimed" })).toThrow();
-    expect(() => setup.journal.save({ ...setup.journal.load(), put_outcome: "aborted", acknowledged_puts: 0, reason_code: "put_failed" })).toThrow("cannot change");
+    expect(() => setup.journal.save({ ...setup.journal.load(), put_outcome: "aborted", acknowledged_puts: 0,
+      readback_receipts: [], reason_code: "put_failed" })).toThrow("cannot change");
   });
 });

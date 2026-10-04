@@ -2,7 +2,7 @@
 
 更新日: 2026-10-04
 
-状態: **公式仕様と専用Cloudflare環境で代替手段を確認。方式の提案であり、現行runtimeの変更・M6受け入れ完了ではない。Workers Paidは使用しない。**
+状態: **管理者が案Bを承認し、M6試験用CLI/Workerへ実装した。ローカル全891テスト・型検査に合格。接続後の実機受け入れは下記へ別途記録する。通常release gateは維持し、Workers Paidは使用しない。**
 
 ## 結論
 
@@ -12,7 +12,7 @@ Workerで300MBのSHA-256を再計算する必要はない。目的は「凍結�
 
 さらにCLIの読み戻しもなくす候補として、R2が自動保存するMD5とlocal MD5の比較も成立する。ただしこれはstaging時点のSHA-256照合と同じ保証ではないため、最小改修の第一案とは分ける。
 
-## 現行の重複
+## 改修前の重複
 
 | 区間 | 現行処理 | 見直し対象 |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Workerで300MBのSHA-256を再計算する必要はない。目的は「凍結�
 | staging→公開immutable音源 | Workerの`bucket.put(..., { sha256 })`でR2へ検証を要求 | 既に利用している機能。保存済みのnative checksumを確認すればよい |
 | 公開保存後 | Workerが公開音源をGETし、さらに全量SHA-256を再計算 | R2の検証済みchecksum/sizeをHEADで確認する処理に置き換える |
 
-対象コードは`packages/cli/src/staging-rest.ts`、`src/staging-verification.ts`、`src/publication-episode-runner.ts`。publication admissionは既に検証記録とHEADのETag/sizeを照合しており、ここへ別の全量検証を追加しない。
+対象コードは`packages/cli/src/staging-rest.ts`、`src/staging-verification.ts`、`src/publication-episode-runner.ts`。publication admissionのHEAD照合にはversionを加え、別の全量検証は追加しない。
 
 ## R2機能: アクセス経路を区別する
 
@@ -57,14 +57,18 @@ CPU limitやPaid契約は変更していない。2msはこの単独保存試験�
 
 Aでも公開時のR2 SHA-256検証は維持できるため、MD5を全量SHA-256の代用品として最終公開証拠へ流用する必要はない。Bの全量読み戻しは転送時間を増やすが、既に実機300MBで成功している。R2の保存耐久性やHTTP 200だけをlocal入力との照合の代わりにはしない。
 
-## 推奨Bの最小実装契約
+## 承認済みBの実装契約
 
-1. `createStagingRestPut`は成功申告だけでなく、固定asset/key、PUT receiptのsize/ETag/versionと、全量GETの実測size/SHA-256/ETagを返す。PUT結果のidentityとGETのidentityを照合する。REST receiptのversion提供・binding HEADとの対応は接続時の実機検証事項とし、欠落/不一致を成功として補完しない。
+1. `createStagingRestPut`は成功申告だけでなく、固定asset/key、PUT receiptのsize/ETag/versionと、全量GETの実測size/SHA-256/ETagを返す。PUT結果のidentityとGETのidentityを照合する。REST receiptのversion提供・binding HEADとの対応は新しい専用環境の小さいShow/Episode公開で確認した。欠落/不一致を成功として補完しない。
 2. その小さい証拠だけを既存local journalと認証付きsettlement要求へ保存する。操作ID・draft ID・凍結manifestへ厳密に結び付け、 arbitrary keyや`verified: true`だけの要求を受け付けない。本文・source path・secretは保持記録へ追加しない。
 3. Workerはexact owner/generation・client終了確認と証拠を照合し、音源のHEADでsize/ETag/versionを確認する。音源のGET/全量hashはしない。metadataのschema/identityとcoverの形式検証は別責務として維持する。
 4. verified assetsへidentityと照合済みSHA-256を残し、publication admissionとsource取得時にも同じobjectであることを確認する。サイズだけ・ETagだけ・任意のcustom metadataだけを内容証明にしない。
 5. `persistAudio`は既存のSHA-256付きR2 PUTを維持する。成功後と再実行時はHEADのsize/**native** `checksums.sha256`を凍結commitに照合する。native checksumがない既存objectをcustom metadataだけで成功扱いせず、安全な互換/回復の扱いを別途決める。
 6. 受付/token/既存phaseは使い続ける。未返却PUT/consumerをHEADや時間だけで解放しない。新規の巨大な汎用状態機械や分割upload sessionは作らない。
+
+`readback_receipts`はasset/length/SHA-256/ETag/versionだけを保存する。keyは凍結manifestから導出し、証拠のpayload順序と一致をshared helperで検査する。部分成功の後に失敗した場合は成功済みprefixだけを保持し、明示abortへ進む。全payloadの証拠がないstaged settlement/finishは成功させない。終了申告後の証拠差替えとlocal/serverの証拠不一致を拒否する。
+
+改修前のjournal/progressはreadonly inspectionのために読み取れるが、欠けた証拠やversionを自動補完しない。新しいpublication admissionはverified versionを必須とする。公開音源の再利用/再実行はnative SHA-256を必須とし、checksumを持たない旧形式媒体の変換・採用は今回実装しない。既存immutable keyへ検証のための上書きもしない。
 
 BのCLI証拠は、認証された準拠管理CLIの観測結果であり、悪意ある管理者から独立した暗号学的証明ではない。現行管理者はCloudflare tokenでbucketへ直接書け、現在もPUT終了を自己申告する信頼モデルである。この境界を明示し、Workerが実際にSHA-256を再計算したように表示しない。一方、公開先のSHA-256はR2が実内容を検証するため、異なる内容は公開保存に成功しない。
 
@@ -75,5 +79,6 @@ checksumは原本との同一性検査であり、原本自体のMP3破損・再
 - [sanitized結果](../experiments/m6/checksum-results-20261004.json)。raw観測とprivate実行記録は`/tmp/opencode/castloop-m6-checksum-8057dd2f/`。secretを含む`binding-before.json`を外部報告へ添付しない。
 - 新規診断Workerは`castloop-m6-test-checksum-913cb489`。既存service Worker/control/Queueには書き込まず、既知staging音源は読取だけ。今回作った成功済みprobe payload七件のみexact keyで削除し、GET 404を確認した。資源自体は削除していない。
 - 元serviceのpaused状態・未返却owner/token・回復可能な300MB staging payloadは維持する。この試験は旧IO収束/強制解放の証拠ではない。[U1](./m6_upload_recovery_options.md)の扱いも変更しない。
-- Bの証拠伝達はまだ未実装。接続後はreceipt/GET/HEADのidentity一致・途中差替え・証拠欠落/不一致・manifest/owner/generation不一致を適切な層で検証する。native checksumの実動作は今回の実機証拠を使い、各層へ同じ大容量検証testを重複させない。
+- Bの証拠伝達を実装し、receipt/GET/HEADのidentity一致・途中差替え・証拠欠落/不一致・manifest/owner/generation不一致を各責務の層で回帰した。音源stagingのbody GETと公開後のbody GETを行わないこと、native checksum欠落/不一致を拒否すること、live IO/token保持も検査する。native checksumの実動作は今回の実機証拠を使い、各層へ同じ大容量検証testを重複させない。
+- 新規`castloop-m6-test-7c97f1a0`で試験standaloneの初期化→明示再開→Show/20,850-byte Episode公開→GET/HEAD/Range→明示pauseまで合格した。REST PUT receipt→CLI journal/GET→管理settlement→Worker HEADのETag/version一致、公開native checksum検査を実経路で通した。証拠は`/tmp/opencode/castloop-m6-test-7c97f1a0/acceptance.json`。旧環境は採用・再配備・解放しない。
 - 300MBのM6 publication全体、二種改訂、配信、明示deleteまでの受け入れは別に残る。今回の成功はその合格の代わりではない。

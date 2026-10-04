@@ -7,7 +7,7 @@ import { requireOwnedPublication } from "./publication-admission";
 import { consumeOwnedPublication } from "./publication-consumer";
 import { runOwnedEpisodePublication } from "./publication-episode-runner";
 import type { PublicationEffects } from "./publication-inputs";
-import { episodePublicationFixture, publicationTestDigest } from "./test-support/episode-publication";
+import { episodePublicationFixture } from "./test-support/episode-publication";
 
 function effects(setup: Awaited<ReturnType<typeof episodePublicationFixture>>) {
   const events: string[] = [];
@@ -30,7 +30,9 @@ describe("M6 owned Episode publication runner", () => {
       const bound = effects(setup);
       const before = new Map([...setup.entries].filter(([key]) => key.endsWith(".mp3") || key.includes("/revisions/") || key.includes("/stopped/")));
       const feedGeneration = (await readShowControl(setup.env, "daily"))!.value.feed_generation;
-      expect(await consumeOwnedPublication(setup.env, setup.key, bound.effects, { digest: publicationTestDigest })).toEqual({ state: "completed" });
+      const reads = setup.bodyReads.length;
+      expect(await consumeOwnedPublication(setup.env, setup.key, bound.effects)).toEqual({ state: "completed" });
+      expect(setup.bodyReads.slice(reads)).not.toContain(setup.mediaKey);
       const revision = parseEpisodeRevision(setup.text(setup.metadataKey));
       expect(revision.guid).toBe(setup.base?.guid ?? setup.draft.guid);
       expect(revision.published_at).toBe(setup.base?.published_at ?? setup.draft.published_at);
@@ -65,12 +67,11 @@ describe("M6 owned Episode publication runner", () => {
   test("new Episode stays private on purge failure and resumes without duplicating audio or history", async () => {
     const setup = await episodePublicationFixture();
     const bound = effects(setup);
-    await expect(consumeOwnedPublication(setup.env, setup.key, { ...bound.effects, async purge() { throw new Error("Purge unavailable"); } },
-      { digest: publicationTestDigest })).rejects.toThrow("Purge unavailable");
+    await expect(consumeOwnedPublication(setup.env, setup.key, { ...bound.effects, async purge() { throw new Error("Purge unavailable"); } })).rejects.toThrow("Purge unavailable");
     expect(await readPublicVisibility(setup.env, "daily", setup.episodeId)).toBe("not_found");
     expect((await readShowControl(setup.env, "daily"))?.value.owner?.execution_id).toBeUndefined();
     const before = new Map(setup.entries);
-    await consumeOwnedPublication(setup.env, setup.key, bound.effects, { digest: publicationTestDigest });
+    await consumeOwnedPublication(setup.env, setup.key, bound.effects);
     for (const key of [setup.mediaKey, setup.historyKey, setup.metadataKey, setup.feedKey]) expect(setup.entries.get(key)).toEqual(before.get(key));
     expect(await readPublicVisibility(setup.env, "daily", setup.episodeId)).toBe("public");
   });
@@ -94,9 +95,9 @@ describe("M6 owned Episode publication runner", () => {
         if (!lost && written && matches) { lost = true; throw new Error("Episode response lost"); }
         return written;
       } } } as never;
-      if (fault === "release") expect(await consumeOwnedPublication(env, setup.key, bound.effects, { digest: publicationTestDigest })).toEqual({ state: "completed" });
-      else await expect(consumeOwnedPublication(env, setup.key, bound.effects, { digest: publicationTestDigest })).rejects.toThrow("response lost");
-      await consumeOwnedPublication(env, setup.key, bound.effects, { digest: publicationTestDigest });
+      if (fault === "release") expect(await consumeOwnedPublication(env, setup.key, bound.effects)).toEqual({ state: "completed" });
+      else await expect(consumeOwnedPublication(env, setup.key, bound.effects)).rejects.toThrow("response lost");
+      await consumeOwnedPublication(env, setup.key, bound.effects);
       expect((await readShowControl(setup.env, "daily"))?.value.owner).toBeUndefined();
       expect((await readShowControl(setup.env, "daily"))?.value.feed_generation).toBe(generation + 1);
       expect(parseEpisodeLifecycle(setup.text(setup.lifecycleKey)).generation).toBe(1);
@@ -106,18 +107,20 @@ describe("M6 owned Episode publication runner", () => {
     }
   });
 
-  test("a live streamed digest holds its execution token and blocks deletion or duplicate publication", async () => {
+  test("a live R2 stream PUT holds its execution token and blocks deletion or duplicate publication", async () => {
     const setup = await episodePublicationFixture();
     const bound = effects(setup);
     const started = Promise.withResolvers<void>();
     const ended = Promise.withResolvers<void>();
+    const env = { CASTLOOP_BUCKET: { ...setup.bucket, async put(...args: Parameters<typeof setup.bucket.put>) {
+      if (args[0] === setup.mediaKey) { started.resolve(); await ended.promise; }
+      return setup.bucket.put(...args);
+    } } } as never;
     const outcome = (async () => {
-      try { await consumeOwnedPublication(setup.env, setup.key, bound.effects, { digest: async (body, length) => {
-        started.resolve(); await ended.promise; return publicationTestDigest(body, length);
-      } }); return null; } catch (error) { return error; }
+      try { await consumeOwnedPublication(env, setup.key, bound.effects); return null; } catch (error) { return error; }
     })();
     await started.promise;
-    await expect(consumeOwnedPublication(setup.env, setup.key, bound.effects, { digest: publicationTestDigest })).rejects.toThrow("still owns");
+    await expect(consumeOwnedPublication(setup.env, setup.key, bound.effects)).rejects.toThrow("still owns");
     await expect(claimShowOperation(setup.env, { schema_version: 1, job_id: crypto.randomUUID(), show_id: "daily", kind: "show", action: "delete",
       expected_show_generation: setup.operation.generation, created_at: "2026-10-01T12:00:00Z" })).rejects.toThrow("unfinished");
     expect(setup.entries.has(setup.historyKey)).toBe(false);
@@ -126,20 +129,25 @@ describe("M6 owned Episode publication runner", () => {
   });
 
   test("conflicting immutable media/history are retained and never overwritten", async () => {
-    for (const fault of ["media", "history", "checksum"] as const) {
+    for (const fault of ["media", "history", "checksum", "missing-native", "wrong-native"] as const) {
       const setup = await episodePublicationFixture();
       const bound = effects(setup);
       if (fault === "media") await setup.bucket.put(setup.mediaKey, "foreign audio", { customMetadata: { sha256: "a".repeat(64) } });
       if (fault === "checksum") await setup.bucket.put(setup.mediaKey, new Uint8Array(setup.audio.length), {
         customMetadata: { sha256: setup.frozen.commit.kind === "episode" ? setup.frozen.commit.audio_sha256! : "" },
       });
+      if (fault === "missing-native" || fault === "wrong-native") {
+        const sha256 = setup.frozen.commit.kind === "episode" ? setup.frozen.commit.audio_sha256! : "";
+        await setup.bucket.put(setup.mediaKey, setup.audio, { customMetadata: { sha256 } });
+        if (fault === "wrong-native") setup.entries.get(setup.mediaKey)!.checksums.sha256 = new Uint8Array(32).buffer;
+      }
       if (fault === "history") {
         const other = parseEpisodeRevision(setup.text("public/episodes/daily/second/metadata.toml"));
         await setup.bucket.put(setup.historyKey, stringifyToml({ ...other, episode_id: setup.episodeId, revision_id: setup.operation.jobId }));
       }
       const key = fault === "history" ? setup.historyKey : setup.mediaKey;
       const before = setup.entries.get(key);
-      await expect(consumeOwnedPublication(setup.env, setup.key, bound.effects, { digest: publicationTestDigest })).rejects.toThrow();
+      await expect(consumeOwnedPublication(setup.env, setup.key, bound.effects)).rejects.toThrow();
       expect(setup.entries.get(key)).toEqual(before);
       expect(parseJobStatus(setup.text(setup.statusKey)).state).toBe("retrying");
       expect(parseEpisodeLifecycle(setup.text(setup.lifecycleKey)).lifecycle).toBe("draft");
@@ -152,7 +160,7 @@ describe("M6 owned Episode publication runner", () => {
     const stoppedKey = "public/episodes/daily/stopped/metadata.toml";
     const stopped = parseEpisodeRevision(setup.text(stoppedKey));
     await setup.bucket.put(stoppedKey, stringifyToml({ ...stopped, guid: setup.draft.guid }));
-    await expect(consumeOwnedPublication(setup.env, setup.key, effects(setup).effects, { digest: publicationTestDigest })).rejects.toThrow("GUID is already used");
+    await expect(consumeOwnedPublication(setup.env, setup.key, effects(setup).effects)).rejects.toThrow("GUID is already used");
     expect(setup.entries.has(setup.mediaKey)).toBe(false);
     expect(setup.entries.has(setup.historyKey)).toBe(false);
   });
@@ -160,12 +168,12 @@ describe("M6 owned Episode publication runner", () => {
   test("Episode activation replay requires durable purge progress and cannot free a later owner", async () => {
     const setup = await episodePublicationFixture();
     const execution = await acquireShowExecution(setup.env, "daily", setup.operation.jobId, setup.operation.generation);
-    await runOwnedEpisodePublication(setup.env, execution, effects(setup).effects, { digest: publicationTestDigest });
+    await runOwnedEpisodePublication(setup.env, execution, effects(setup).effects);
     const jobId = crypto.randomUUID();
     await claimShowOperation(setup.env, { schema_version: 1, job_id: jobId, show_id: "daily", kind: "show", action: "unpublish",
       expected_show_generation: setup.operation.generation, created_at: "2026-10-01T12:00:00Z" });
     const before = new Map(setup.entries);
-    await runOwnedEpisodePublication(setup.env, execution, effects(setup).effects, { digest: publicationTestDigest });
+    await runOwnedEpisodePublication(setup.env, execution, effects(setup).effects);
     expect(setup.entries).toEqual(before);
     const other = await episodePublicationFixture();
     const state = parseEpisodeLifecycle(other.text(other.lifecycleKey));
@@ -179,24 +187,26 @@ describe("M6 owned Episode publication runner", () => {
     expect(await consumeOwnedPublication(setup.env, setup.key, (execution) => createPublicationWorkerEffects(setup.env, execution, {
       async checkDeliveryGate(target) { expect(target).toEqual({ showId: "daily", episodeId: setup.episodeId }); },
       cachedAssets: { async invalidate(target) { purged.push(target); } },
-    }), { digest: publicationTestDigest })).toEqual({ state: "completed" });
+    }))).toEqual({ state: "completed" });
     expect(purged).toEqual([{ showId: "daily", episodeId: setup.episodeId }]);
   });
 
-  test("stream verification failure retains the job with fixed diagnostics and retry reuses the same media", async () => {
+  test("native checksum HEAD failure retains the job with fixed diagnostics and retry reuses the same media", async () => {
     const setup = await episodePublicationFixture();
     const bound = effects(setup);
     const originalFeed = setup.entries.get(setup.feedKey);
-    await expect(consumeOwnedPublication(setup.env, setup.key, bound.effects, { async digest() {
-      throw new Error("Private Episode description owner@example.com Bearer secret");
-    } })).rejects.toThrow("Bearer secret");
+    const env = { CASTLOOP_BUCKET: { ...setup.bucket, async head(key: string) {
+      if (key === setup.mediaKey && setup.entries.has(key)) throw new Error("Private Episode description owner@example.com Bearer secret");
+      return setup.bucket.head(key);
+    } } } as never;
+    await expect(consumeOwnedPublication(env, setup.key, bound.effects)).rejects.toThrow("Bearer secret");
     expect(setup.entries.get(setup.feedKey)).toEqual(originalFeed);
     expect(setup.entries.has(setup.historyKey)).toBe(false);
     expect(setup.entries.has(setup.metadataKey)).toBe(false);
     expect(setup.text(setup.statusKey)).not.toContain("Bearer secret");
     expect(setup.text(setup.statusKey)).not.toContain("owner@example.com");
     expect((await readShowControl(setup.env, "daily"))?.value.owner?.execution_id).toBeUndefined();
-    await consumeOwnedPublication(setup.env, setup.key, bound.effects, { digest: publicationTestDigest });
+    await consumeOwnedPublication(setup.env, setup.key, bound.effects);
     expect(setup.writes.filter((key) => key === setup.mediaKey)).toHaveLength(1);
     expect(await readPublicVisibility(setup.env, "daily", setup.episodeId)).toBe("public");
   });
@@ -210,10 +220,10 @@ describe("M6 owned Episode publication runner", () => {
       if (!lost && written && args[0] === setup.metadataKey) { lost = true; throw new Error("Current metadata response lost"); }
       return written;
     } } } as never;
-    await expect(consumeOwnedPublication(env, setup.key, bound.effects, { digest: publicationTestDigest })).rejects.toThrow("response lost");
+    await expect(consumeOwnedPublication(env, setup.key, bound.effects)).rejects.toThrow("response lost");
     const history = setup.entries.get(setup.historyKey);
     const media = setup.entries.get(setup.mediaKey);
-    await consumeOwnedPublication(env, setup.key, bound.effects, { digest: publicationTestDigest });
+    await consumeOwnedPublication(env, setup.key, bound.effects);
     expect(setup.entries.get(setup.historyKey)).toEqual(history);
     expect(setup.entries.get(setup.mediaKey)).toEqual(media);
     const current = parseEpisodeRevision(setup.text(setup.metadataKey));
@@ -233,7 +243,7 @@ describe("M6 owned Episode publication runner", () => {
         const episode = parseEpisodeLifecycle(setup.text(setup.lifecycleKey));
         await setup.bucket.put(setup.lifecycleKey, stringifyLifecycleToml({ ...episode, lifecycle: "unpublished" }));
       }
-      await expect(consumeOwnedPublication(setup.env, setup.key, effects(setup).effects, { digest: publicationTestDigest })).rejects.toThrow();
+      await expect(consumeOwnedPublication(setup.env, setup.key, effects(setup).effects)).rejects.toThrow();
       for (const [key, entry] of before) expect(setup.entries.get(key)).toEqual(entry);
       expect((await readShowControl(setup.env, "daily"))?.value.owner?.job_id).toBe(setup.operation.jobId);
       expect((await readShowControl(setup.env, "daily"))?.value.owner?.execution_id).toBeUndefined();

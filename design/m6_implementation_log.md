@@ -1,5 +1,12 @@
 # M6: 公開停止・削除 実装ログ
 
+## 2026-10-04: 音源のSHA-256検証をCLI/R2へ集約
+
+- 管理者が承認した案Bを実装した。REST単一PUT後のCLI全量GET/size/SHA-256照合を維持し、固定key・strong ETag・versionを確認した小さいreceiptを既存journal/settlementへ保存する。証拠の順序/manifest一致はshared helperへ集約し、終了後の変更・legacy証拠の捏造・local/server不一致を拒否する。
+- Worker stagingは音源HEAD size/ETag/versionとexact owner/generation/終了申告を照合し、音源GET/全量hashをしない。metadata/coverのbounded内容検査・token・進捗・取消は維持する。公開immutable音源は既存のR2 SHA-256付きstream PUTとHEAD native checksum照合を使い、公開後のGET/再hashを除いた。native checksumなしの旧媒体を自動採用・上書きしない。
+- 既存のfault/live IO/再実行テストを新境界へ更新し、新しいidentity/証拠欠落/差替え/native checksum検査を適切な層へ追加した。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、通常/試験Linux binary、local HTTPS readonly/production拒否に合格した。
+- 新規専用`castloop-m6-test-7c97f1a0`の初期化→Show/小さいEpisode公開→GET/HEAD/Range→明示pauseが合格し、実REST versionとWorker HEADの対応も確認した。300MB全体の結果は後続受け入れへ別記する。Paid/CPU limit/通常release gateは変更せず、`ff3bfd8c`の旧owner/token/payloadも保持する。詳細は`m6_upload_integrity_review.md`。
+
 ## 2026-10-04: 実cache HIT合格と300MBのCPU制限を確認
 
 - NRTでfeed/cover/小さい音源の内部HIT・同じ内部nonceと毎回異なるgateway nonceを確認し、公開GET-onlyの再照合結果もprivate acceptanceへ保存した。

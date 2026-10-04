@@ -6,7 +6,6 @@ import type { M6CandidateEnv, M6CachedLoopback } from "./m6-routes";
 import { readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import { stagingAdminFixture } from "./test-support/staging-admin";
 import { publicationAdminFixture } from "./test-support/publication-admin";
-import { publicationTestDigest } from "./test-support/episode-publication";
 import { createHash } from "node:crypto";
 
 type StagingSetup = Awaited<ReturnType<typeof stagingAdminFixture>>;
@@ -30,7 +29,7 @@ const post = (path: string, body: unknown, key = "private-secret") =>
   });
 
 const run = async (env: M6CandidateEnv, assets: M6CachedLoopback, path: string, body: unknown) => {
-  const response = await fetchM6ManagementIntegration(post(path, body), env, assets, { digest: publicationTestDigest });
+  const response = await fetchM6ManagementIntegration(post(path, body), env, assets);
   return { response, body: await response.json<unknown>() };
 };
 
@@ -65,7 +64,7 @@ describe("unreleased M6 management fetch integration", () => {
       const early = await run(env, assets, "/admin/staging", setup.input("finish", { operation: setup.operation, outcome: "staged" }));
       expect(early.response.status).toBe(409);
       expect((await run(env, assets, "/admin/staging", setup.input("settle", { operation: setup.operation,
-        put_requests_settled: true, no_more_puts: true }))).response.status).toBe(200);
+        put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() }))).response.status).toBe(200);
       expect((await run(env, assets, "/admin/staging", setup.input("finish", { operation: setup.operation, outcome: "staged" }))).response.status).toBe(200);
       expect((await readShowControl(setup.env, "daily"))!.value.owner).toBeUndefined();
       expect((await readServiceAdmission(setup.env, "service"))!.value.invocations).toEqual([]);
@@ -97,7 +96,7 @@ describe("unreleased M6 management fetch integration", () => {
     expect((await readShowControl(setup.env, "daily"))!.value.owner?.state).toBe("reserved");
     expect((await run(env, assets, "/admin/publication", { ...setup.body("commit"), action: "unknown" })).response.status).toBe(400);
     await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: "message-1", body: { object: { key: setup.markerKey } } }] } as never,
-      env, assets, { digest: publicationTestDigest });
+      env, assets);
     expect((await readShowControl(setup.env, "daily"))!.value.owner).toBeUndefined();
     expect(setup.text(setup.statusKey)).toContain("published");
     expect((await run(env, assets, "/admin/publication", setup.body("commit"))).response.status).toBe(409);
@@ -112,7 +111,7 @@ describe("unreleased M6 management fetch integration", () => {
     expect((await run(env, assets, "/admin/publication", setup.body("claim"))).response.status).toBe(200);
     expect((await run(env, assets, "/admin/publication", setup.body("commit"))).response.status).toBe(200);
     await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: "message-1", body: { object: { key: setup.markerKey } } }] } as never,
-      env, assets, { digest: publicationTestDigest });
+      env, assets);
     const request = { schema_version: 1 as const, job_id: crypto.randomUUID(), show_id: "daily", kind: "episode" as const, episode_id: "next",
       action: "unpublish" as const, expected_show_generation: (await readShowControl(setup.env, "daily"))!.value.generation,
       expected_episode_generation: (await readEpisodeLifecycle(setup.env, "daily", "next"))!.generation, created_at: "2026-10-02T12:00:00Z" };

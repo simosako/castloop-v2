@@ -3,7 +3,6 @@ import { stageUploadRequestSchema, stagingAdminRequestSchema, stagingAdminRespon
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { readShowControl } from "../../../src/lifecycle-control";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { StagingAdminClient } from "./staging-client";
 import type { M6AdminTransport } from "./m6-admin-json";
 
@@ -17,7 +16,7 @@ function transport(setup: Setup, calls: string[]): M6AdminTransport {
     expect(request.headers.get("X-Castloop-Key")).toBe("private-secret");
     const body = stagingAdminRequestSchema.parse(await request.clone().json());
     calls.push(body.action);
-    const response = await handleM6StagingAdmin(request, setup.env, setup.bindings, { digest: publicationTestDigest });
+    const response = await handleM6StagingAdmin(request, setup.env, setup.bindings);
     if (!response) throw new Error("Expected internal staging route");
     return response;
   };
@@ -37,7 +36,7 @@ for (const kind of ["show", "audio", "episode_metadata"] as const) {
     expect(status.authorizes_put).toBe(false);
     expect(setup.writes.length).toBe(writes);
     await setup.putPayloads();
-    await client.settle(setup.upload, { put_requests_settled: true, no_more_puts: true });
+    await client.settle(setup.upload, { put_requests_settled: true, no_more_puts: true, readback_receipts: setup.readbacks() });
     expect((await client.finish(setup.upload, "staged")).result).toBe("staged");
     expect((await client.status(setup.upload)).ownership).toBe("released");
     expect((await readShowControl(setup.env, "daily"))!.value.owner).toBeUndefined();

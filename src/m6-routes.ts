@@ -15,7 +15,6 @@ import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
 import { handleM6StagingAdmin } from "./staging-admin";
-import type { StageStreamDigest } from "./staging-verification";
 import { readBootstrapDeliveryWindow } from "./migration-bootstrap";
 import { handleMigrationAdmin } from "./migration-admin";
 import type { BootstrapRuntime } from "./migration-bootstrap";
@@ -65,7 +64,7 @@ async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Pr
 }
 
 async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
-  options: { digest?: StageStreamDigest }): Promise<Response | null> {
+  options: { setupRuntime?: M6SetupRuntime }): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
   if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle" && pathname !== "/admin/shows" &&
     pathname !== "/admin/target" && pathname !== "/admin/service") return null;
@@ -74,7 +73,7 @@ async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAs
   if (pathname === "/admin/service") return handleM6ServiceAdmin(request, env);
   if (pathname === "/admin/target") return handleM6TargetInspection(request, env, bindings);
   if (pathname === "/admin/shows") return handleM6ShowRegistrationAdmin(request, env, bindings);
-  if (pathname === "/admin/staging") return handleM6StagingAdmin(request, env, bindings, options);
+  if (pathname === "/admin/staging") return handleM6StagingAdmin(request, env, bindings);
   if (pathname === "/admin/publication") return handleM6PublicationAdmin(request, env, bindings);
   return handleM6LifecycleAdmin(request, env, bindings);
 }
@@ -85,13 +84,13 @@ export async function fetchM6Candidate(request: Request, env: M6CandidateEnv,
 }
 
 export async function fetchM6ManagementIntegration(request: Request, env: M6CandidateEnv,
-  cachedAssets: M6CachedLoopback, options: { digest?: StageStreamDigest; setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
+  cachedAssets: M6CachedLoopback, options: { setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   return fetchM6Routes(request, env, cachedAssets, true, undefined, options);
 }
 
 async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, managementIntegration: boolean, bootstrapRuntime?: BootstrapRuntime,
-  options: { digest?: StageStreamDigest; setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
+  options: { setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const asset = parsePublicAssetPath(pathname);
   if (asset) {
@@ -143,7 +142,7 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
 }
 
 export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
-  options: { digest?: StageStreamDigest; maximumObjects?: number } = {}): Promise<void> {
+  options: { maximumObjects?: number } = {}): Promise<void> {
   if (batch.messages.length > 1) throw new Error("M6 candidate requires one-message Queue batches");
   if (!batch.messages.length) return;
   const config = await serviceConfig(env);
@@ -160,7 +159,7 @@ export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6Cand
         await recordDeadLetterDelivery(env, message);
       } else if (delivery?.family === "publication") {
         await consumeOwnedPublication(env, delivery.key, (execution) => createPublicationWorkerEffects(env, execution,
-          { cachedAssets, checkDeliveryGate: gate }), options);
+          { cachedAssets, checkDeliveryGate: gate }));
       } else if (delivery) {
         await consumeLifecycleCommit(env, delivery.key, (execution) => createLifecycleWorkerEffects(env, execution,
           { cachedAssets, checkDeliveryGate: gate, queue: env.CASTLOOP_QUEUE }), options);

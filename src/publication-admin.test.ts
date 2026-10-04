@@ -5,7 +5,6 @@ import { readShowControl } from "./lifecycle-control";
 import { fetchM6Candidate, queueM6Candidate } from "./m6-routes";
 import { handleM6PublicationAdmin } from "./publication-admin";
 import { pauseServiceAdmission, readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
-import { publicationTestDigest } from "./test-support/episode-publication";
 import { publicationAdminFixture } from "./test-support/publication-admin";
 
 describe("unreleased M6 publication admission and commit boundary", () => {
@@ -27,7 +26,7 @@ describe("unreleased M6 publication admission and commit boundary", () => {
       expect([...setup.entries].filter(([key]) => key.startsWith("public/") || key.startsWith("system/shows/"))).toEqual(publicBefore);
       expect((await readServiceAdmission(setup.env, "service"))?.value.invocations).toEqual([]);
       await queueM6Candidate({ queue: "test-queue", messages: [{ id: "publication", body: { object: { key: setup.markerKey } } }] } as never,
-        setup.candidateEnv, setup.cachedAssets, { digest: publicationTestDigest });
+        setup.candidateEnv, setup.cachedAssets);
       expect(parseJobStatus(setup.text(`system/jobs/${setup.publicationOperation.job_id}/status.toml`)).state).toBe("published");
       expect((await readShowControl(setup.env, "daily"))?.value.owner).toBeUndefined();
       expect((await readServiceAdmission(setup.env, "service"))?.value.invocations).toEqual([]);

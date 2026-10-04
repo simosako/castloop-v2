@@ -10,10 +10,8 @@ import { readLifecycleJobJournal, writeLifecycleJobStatus, writeLifecycleProgres
 import { advanceLifecycleFeedGeneration } from "./lifecycle-mutations";
 import { canonicalEnclosureUrl } from "./media-url";
 import { publicationCommitKey, readFrozenPublicationCommit, requireOwnedPublication, verifyPublicationStaging } from "./publication-admission";
-import { publicationChecksum, readPublicationBytes, renderPublicationFeed } from "./publication-inputs";
+import { matchesPublishedAudio, publicationChecksum, readPublicationBytes, renderPublicationFeed } from "./publication-inputs";
 import type { PublicationEffects } from "./publication-inputs";
-import { digestStageStream } from "./staging-verification";
-import type { StageStreamDigest } from "./staging-verification";
 
 function text(bytes: Uint8Array): string {
   return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
@@ -52,8 +50,7 @@ async function uniqueGuid(env: LifecycleFeedEnv, execution: ShowExecution, revis
   } while (true);
 }
 
-async function persistAudio(env: LifecycleFeedEnv, execution: ShowExecution, commit: EpisodeCommit,
-  digest: StageStreamDigest): Promise<void> {
+async function persistAudio(env: LifecycleFeedEnv, execution: ShowExecution, commit: EpisodeCommit): Promise<void> {
   if (!commit.audio_sha256 || !commit.audio_length_bytes) return;
   const key = `public/podcasts/${execution.showId}/episodes/${commit.episode_id}/${execution.jobId}.mp3`;
   await requireShowExecution(env, execution);
@@ -62,7 +59,7 @@ async function persistAudio(env: LifecycleFeedEnv, execution: ShowExecution, com
     const source = await env.CASTLOOP_BUCKET.head(sourceKey);
     if (!source || source.size !== commit.audio_length_bytes) throw new Error("Episode staging audio has an unexpected size");
     const object = await env.CASTLOOP_BUCKET.get(sourceKey, { onlyIf: { etagMatches: source.etag } });
-    if (!object || !("body" in object) || !object.body || object.etag !== source.etag || object.size !== source.size) {
+    if (!object || !("body" in object) || !object.body || object.etag !== source.etag || object.version !== source.version || object.size !== source.size) {
       throw new Error("Episode staging audio changed before streaming");
     }
     await requireShowExecution(env, execution);
@@ -70,21 +67,14 @@ async function persistAudio(env: LifecycleFeedEnv, execution: ShowExecution, com
       httpMetadata: { contentType: "audio/mpeg" }, customMetadata: { sha256: commit.audio_sha256 } });
   }
   const head = await env.CASTLOOP_BUCKET.head(key);
-  if (!head || head.size !== commit.audio_length_bytes || head.customMetadata?.sha256 !== commit.audio_sha256) {
+  if (!matchesPublishedAudio(head, commit.audio_length_bytes, commit.audio_sha256)) {
     throw new Error("Immutable published audio is missing or inconsistent");
   }
-  const object = await env.CASTLOOP_BUCKET.get(key, { onlyIf: { etagMatches: head.etag } });
-  if (!object || !("body" in object) || !object.body || object.etag !== head.etag || object.size !== head.size) {
-    throw new Error("Immutable published audio changed before verification");
-  }
-  if (await digest(object.body, commit.audio_length_bytes) !== commit.audio_sha256) throw new Error("Immutable published audio checksum does not match its commit");
-  const latest = await env.CASTLOOP_BUCKET.head(key);
-  if (!latest || latest.etag !== head.etag || latest.size !== head.size) throw new Error("Immutable published audio changed during verification");
   await requireShowExecution(env, execution);
 }
 
 export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, execution: ShowExecution,
-  effects: PublicationEffects, options: { digest?: StageStreamDigest } = {}): Promise<void> {
+  effects: PublicationEffects): Promise<void> {
   const existing = await readShowControl(env, execution.showId);
   const receipt = existing?.value.last_finished_operation;
   if (receipt?.job_id === execution.jobId && receipt.generation === execution.generation && receipt.execution_id === execution.executionId) {
@@ -157,7 +147,7 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
       failurePhase = "feed";
       await recordProgress("feed");
       await guard();
-      await persistAudio(env, execution, commit, options.digest ?? digestStageStream);
+      await persistAudio(env, execution, commit);
       const inputs = await readLifecycleFeedInputs(env, execution, { candidate: revision });
       if (!inputs.writeFeed) throw new Error("Episode lifecycle does not permit publication feed writing");
       const feed = renderPublicationFeed(show, inputs.episodes, service.public_base_url, extension);

@@ -6,7 +6,6 @@ import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
 import { handleM6PublicationAdmin } from "../../../src/publication-admin";
 import { queueM6Candidate } from "../../../src/m6-routes";
 import { publicationAdminFixture } from "../../../src/test-support/publication-admin";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { PublicationAdminClient } from "./publication-client";
 import { createPublicationJournal } from "./publication-journal";
 import { inspectPublicationOperation, runPublicationClaim, runPublicationCommit, runPublicationRetry } from "./publication-operation";
@@ -49,7 +48,7 @@ async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "show")
   });
   const effects = createLocalPublicationEffects(setup.config, journal.load(), "private-secret", local, client);
   const consume = (key: string) => queueM6Candidate({ queue: setup.config.queue_name,
-    messages: [{ id: "publication", body: { object: { key } } }] } as never, setup.candidateEnv, setup.cachedAssets, { digest: publicationTestDigest });
+    messages: [{ id: "publication", body: { object: { key } } }] } as never, setup.candidateEnv, setup.cachedAssets);
   return { ...setup, root, journal, stages, local, calls, client, effects, consume };
 }
 
@@ -194,15 +193,16 @@ test("real local staging journal and REST/source effects feed guarded publicatio
   const sources = await freezeStagingSources(root, setup.upload, [metadataPath, coverPath]);
   const stageJournal = createStagingJournal(root, setup.config, setup.upload);
   const client = new StagingAdminClient(setup.config, "private-secret", async (input, init) =>
-    (await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings, { digest: publicationTestDigest }))!);
+    (await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings))!);
   const transport: StagingRestTransport = async (input, init) => {
     const key = new URL(String(input)).pathname.split("/objects/")[1]!;
     if (init?.method === "PUT") {
       const bytes = new Uint8Array(await new Request(input, init).arrayBuffer());
-      await setup.bucket.put(key, bytes);
-      return Response.json({ success: true, result: { size: bytes.length } });
+      const object = (await setup.bucket.put(key, bytes))!;
+      return Response.json({ success: true, result: { key, size: object.size, etag: object.etag, version: object.version } });
     }
-    return new Response((await setup.bucket.get(key))!.bytes);
+    const object = (await setup.bucket.get(key))!;
+    return new Response(object.bytes, { headers: { ETag: `"${object.etag}"` } });
   };
   const stageEffects = createStagingRestEffects(setup.config, stageJournal.load(), "private-secret", sources,
     { accountId: setup.config.account_id, apiToken: "private-token", transport }, client);
@@ -230,7 +230,7 @@ test("real local staging journal and REST/source effects feed guarded publicatio
     await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: "show", body: { object: { key } } }] } as never,
       { ...env, CASTLOOP_BUCKET: setup.bucket as never, CASTLOOP_QUEUE: env.CASTLOOP_QUEUE as never,
         CASTLOOP_VERSION_METADATA: { id: setup.versionId, tag: "", timestamp: "2026-10-02T12:00:00Z" }, CASTLOOP_DLQ_NAME: setup.config.dlq_name },
-      cachedAssets, { digest: publicationTestDigest });
+      cachedAssets);
     expect((await inspectPublicationOperation(journal, effects)).server_status.status?.state).toBe("published");
     expect(stageJournal.load().phase).toBe("finished");
     expect(await readFile(metadataPath)).toEqual(Buffer.from(setup.contents[0]!.bytes));

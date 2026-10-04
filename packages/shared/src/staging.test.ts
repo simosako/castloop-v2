@@ -1,11 +1,29 @@
 import { describe, expect, test } from "bun:test";
-import { parseShowControl, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema } from "./index";
+import { parseShowControl, parseStageReadbackReceipts, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema } from "./index";
 
 const base = { schema_version: 1, operation_id: crypto.randomUUID(), draft_job_id: crypto.randomUUID(), kind: "episode", show_id: "daily",
   episode_id: "first", expected_show_generation: 0, expected_episode_generation: 0, created_at: "2026-10-01T12:00:00Z",
   payloads: [{ asset: "audio", length_bytes: 300_000_000, sha256: "a".repeat(64) }] };
 
 describe("M6 staging manifest and settlement", () => {
+  test("readback receipts are strict, ordered evidence for the frozen payloads", () => {
+    const request = stageUploadRequestSchema.parse(base);
+    const receipt = { ...request.payloads[0]!, etag: "saved-etag", version: "saved-version" };
+    expect(parseStageReadbackReceipts(request, [])).toEqual([]);
+    expect(parseStageReadbackReceipts(request, [receipt])).toEqual([receipt]);
+    for (const change of [{ asset: "episode_metadata" }, { length_bytes: 1 }, { sha256: "b".repeat(64) },
+      { etag: "" }, { version: "" }, { secret: "private" }]) {
+      expect(() => parseStageReadbackReceipts(request, [{ ...receipt, ...change }])).toThrow();
+    }
+    expect(() => parseStageReadbackReceipts(request, [receipt, receipt])).toThrow();
+    const show = stageUploadRequestSchema.parse({ ...base, kind: "show", episode_id: undefined, expected_episode_generation: undefined,
+      payloads: [{ asset: "show_metadata", length_bytes: 100, sha256: "a".repeat(64) },
+        { asset: "cover_png", length_bytes: 10, sha256: "b".repeat(64) }] });
+    const receipts = show.payloads.map((payload) => ({ ...payload, etag: "e1", version: "v1" }));
+    expect(parseStageReadbackReceipts(show, receipts.slice(0, 1))).toEqual(receipts.slice(0, 1));
+    expect(() => parseStageReadbackReceipts(show, receipts.toReversed())).toThrow();
+  });
+
   test("operation and draft IDs are distinct and keys are derived from frozen targets", () => {
     const request = stageUploadRequestSchema.parse(base);
     expect(stageControlRequest(request).job_id).toBe(base.operation_id);

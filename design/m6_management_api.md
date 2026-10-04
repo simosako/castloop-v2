@@ -27,12 +27,14 @@ CLIが期待generation/current/baseを取得するための読み取り専用`PO
 | `claim` | 凍結済み`upload` manifest | `claimed`とshow/operation ID・取得generation |
 | `status` | 同じ完全な`upload` manifest | 読み取り専用status/progress/owner/検証稼働/draft commit観測。PUT/復旧許可なし |
 | `begin` | `operation` | `started`と許可されたkey/length/checksum。開始は一回限り |
-| `settle` | `operation`、明示的`put_requests_settled=true`、`no_more_puts=true` | `settled`。PUT permissionを再発行しない |
+| `settle` | `operation`、明示的`put_requests_settled=true`、`no_more_puts=true`、`readback_receipts` | `settled`。PUT permissionを再発行せず、保存後の証拠変更も拒否 |
 | `finish` | `operation`、`outcome=staged/aborted` | 全副作用終了後に同outcomeを返す。settlement前は拒否 |
 
 認証は既存の`X-Castloop-Key`照合を使い、認証/method/schema/対象serviceの検査を副作用より前に行う。bodyを16,384 bytesへ制限し、宣言長・実stream長・UTF-8・JSONを検査する。過大streamのcancelはawaitし、readerを解放する。responseは常にno-storeで、本文や任意exceptionを返さず、失敗にはallowlistの固定診断だけを使う。
 
 操作identityはsnake_caseで、入力manifestのoperation IDとdraft job IDを分離したまま返す。PUT locationsはstagingの許可keyだけに限定し、show ID/UUID/size/重複を検査する。responseを任意prefix書込の許可へ使わない。payload uploadは引き続きCLIの別REST接続で行う構成であり、Worker handlerで媒体を受信/バッファしない。
+
+2026-10-04、settlementへCLI全量SHA-256読み戻し証拠（asset/size/hash/ETag/version）を追加した。凍結manifestの順序に一致する成功済みprefixだけを受け付け、staged finishは全payloadの証拠を要求する。Workerの音源検証はHEAD identity照合であり、独立した全量hashではない。metadata/coverのbounded内容検証・owner/generation・未収束token保持は維持する。詳細は[完全性検証契約](./m6_upload_integrity_review.md)。
 
 未公開staging client/durable journalを追加し、exact PUT key/size/hash/order照合、送信前requested保存、一度限りPUT、全PUT終了保存後の明示settlement/検証を接続した。statusは共通read-only runtime/snapshot boundaryから保持manifest/request/progress/statusを照合し、payloadを読まずtokenを登録しない。unknown response/保存失敗では観測から再送/終了認定しない。詳細と実REST source adapter/公開CLI/外部復旧の残件は[`m6_staging_client.md`](./m6_staging_client.md)参照。
 

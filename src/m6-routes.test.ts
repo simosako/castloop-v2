@@ -9,7 +9,7 @@ import type { M6CachedLoopback, M6CandidateEnv } from "./m6-routes";
 import { readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import { migrationFixture } from "./test-support/migration";
 import { publicationFixture } from "./test-support/publication";
-import { episodePublicationFixture, publicationTestDigest } from "./test-support/episode-publication";
+import { episodePublicationFixture } from "./test-support/episode-publication";
 
 const feedPath = "/podcasts/daily/feed.xml";
 const request = (path = feedPath, method = "GET", headers: HeadersInit = {}) =>
@@ -217,7 +217,7 @@ describe("M6 candidate Queue routing and common service fence", () => {
       const publication = await episodePublicationFixture(update);
       await publication.bucket.put(SERVICE_ADMISSION_KEY, setup.entries.get(SERVICE_ADMISSION_KEY)!.data);
       const env: M6CandidateEnv = { ...setup.env, CASTLOOP_BUCKET: publication.bucket } as never;
-      await queueM6Candidate(batch(publication.key), env, setup.loopback, { digest: publicationTestDigest });
+      await queueM6Candidate(batch(publication.key), env, setup.loopback);
       expect(parseJobStatus(publication.text(publication.statusKey)).state).toBe("published");
       expect(parseEpisodeLifecycle(publication.text(publication.lifecycleKey)).lifecycle).toBe("active");
       const revision = parseEpisodeRevision(publication.text(publication.metadataKey));

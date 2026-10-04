@@ -4,7 +4,7 @@
 
 ## 対象と公開制限
 
-新規初期化・通常更新が確認済みの`castloop-m6-test-ff3bfd8c`を再利用する。workspaceは`/tmp/opencode/castloop-m6-test-ff3bfd8c`。既存v0.1.1環境・独自domain・有料planは変更せず、Worker/R2/Queue/DLQ資源自体も削除しない。通常binary/WorkerのM6公開gateは閉じたままである。
+初期の六lifecycle/更新応答喪失/cache試験は`castloop-m6-test-ff3bfd8c`で実施した。後述の300MB失敗後は未知owner/tokenを保持し、再利用・再配備・強制解放をしない。新しい完全性検証方式は別名`castloop-m6-test-7c97f1a0`で検証する。workspaceはそれぞれ`/tmp/opencode/<Worker名>`。既存v0.1.1環境・独自domain・有料planは変更せず、Worker/R2/Queue/DLQ資源自体も削除しない。通常binary/WorkerのM6公開gateは閉じたままである。
 
 実行scriptは`experiments/m6/README.md`参照。before/plan/acceptance/incompleteはprivate fileであり、secretを含むlocal manifestを報告へ添付しない。mutationは一度だけ、readonly観測は有限回とし、commitの受付とconsumer完了・owner解放・invocation返却を区別する。
 
@@ -41,7 +41,7 @@
 
 version `756ab58d-9289-4fbd-a0df-cdc9377b71f4`で`large` Showと小さい`boundary` Episodeを公開し、feed/cover/音源の内部HITを確認した。NRTで同じ内部nonceが返り、gateway nonceは変わった。300MB試験失敗後にも公開GETだけで再照合し、`cache-hit-acceptance.json`へ記録した。実測を複数coloや300MB cache HITまで一般化しない。
 
-## 300MB: WorkerのCPU制限で未合格
+## 改修前の300MB: WorkerのCPU制限で未合格
 
 正確な300,000,000-byte MP3のlocal stream解析とREST単一PUT/全量GET照合は成功した。300,000,001 bytesはlocal size limitで拒否され、remote targetが非変更であることも確認した。続くWorker検証の応答は未確認となった。
 
@@ -56,6 +56,12 @@ Cloudflareの[limits](https://developers.cloudflare.com/workers/platform/limits/
 診断結果は`/tmp/opencode/castloop-m6-test-digest-e975e1b4/results-2.json`。tailの終了通知を旧IOがすべて収束した保証として扱わず、元のserviceのtoken/ownerは保持する。既存資源・診断資源の削除もしていない。
 
 後続の独立試験では、R2 bindingにSHA-256を渡す300MB stream保存とHEAD native checksum照合がCPU 2msで成功し、CLI全量読み戻しとも一致した。管理REST PUTへのchecksumヘッダー追加は誤ったhashを拒否しなかった。[完全性検証調査](./m6_upload_integrity_review.md)参照。これは代替機能の実証であり、現行M6 staging/publicationの実装変更や全受け入れ合格ではない。元serviceの未知owner/tokenは保持する。
+
+## CLI/R2完全性検証への改修: 小さい公開が合格
+
+管理者承認の案Bを実装し、試験専用Linux standaloneを新規`castloop-m6-test-7c97f1a0`で実行した。初期化operation `0cbab4d5-7b15-4ee2-a199-630b2c8cad79`からpaused初期化→明示再開→Show job `412ce195-33b3-40f2-a20a-09bb603100d0`/Episode job `d359f27a-7f8c-4a02-9be9-c2898a5da61f`の公開→GET/HEAD/Range→明示pauseまで通した。
+
+CLIの全量SHA-256読み戻しとPUT receiptのETag/versionが、保存journal/認証付きsettlement/Worker HEADへ一致した。公開音源のR2 native SHA-256検査も実経路で成功した。音源のWorker staging/publication全量再hashは除き、owner/generation/IO終了確認は維持する。結果は`acceptance.json`。pause `ab089857-d110-429a-8b4f-f16647b00348`はこの小さい試験の終了checkpointであり、後続300MB試験の現在状態を示さない。
 
 ## 後続
 

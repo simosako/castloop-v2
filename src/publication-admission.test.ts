@@ -18,7 +18,8 @@ async function fixture(kind: "show" | "episode" = "show", update?: "metadata" | 
     lifecycle: kind === "show" ? "draft" : "active", generation: 0, feed_generation: 0 }));
   if (kind === "episode") await setup.bucket.put("system/episode-lifecycle/daily/first.toml", stringifyLifecycleToml({ schema_version: 1,
     show_id: "daily", episode_id: "first", lifecycle: update ? "active" : "draft", generation: 0 }));
-  const payloads = new Map<string, { bytes: Uint8Array; etag: string; size: number; customMetadata?: Record<string, string> }>();
+  const payloads = new Map<string, { bytes: Uint8Array; etag: string; version: string; size: number;
+    customMetadata?: Record<string, string>; checksums?: { sha256: ArrayBuffer } }>();
   let version = 0;
   const bucket = { ...setup.bucket,
     async head(key: string) { const payload = payloads.get(key); return payload ? { key, ...payload } : setup.bucket.head(key); },
@@ -41,17 +42,18 @@ async function fixture(kind: "show" | "episode" = "show", update?: "metadata" | 
     const current = episodeRevisionSchema.parse({ schema_version: 1,
     episode_id: "first", guid, title: "Current title", description: "Current description", published_at: "2026-10-01T12:00:00Z",
     revision_id: baseRevisionId, enclosure_url: `https://example.com/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`,
-      content_type: "audio/mpeg", length_bytes: 1, duration_seconds: 1, sha256: "a".repeat(64), updated_at: "2026-10-01T12:00:00Z" });
+      content_type: "audio/mpeg", length_bytes: 1, duration_seconds: 1, sha256: checksum(Uint8Array.from([1])), updated_at: "2026-10-01T12:00:00Z" });
     await bucket.put("public/episodes/daily/first/metadata.toml", stringifyToml(current));
     await bucket.put(`public/episodes/daily/first/revisions/${baseRevisionId}.toml`, stringifyToml(current));
-    payloads.set(`public${new URL(current.enclosure_url).pathname}`, { bytes: Uint8Array.from([1]), size: 1, etag: "base-audio", customMetadata: { sha256: current.sha256 } });
+    payloads.set(`public${new URL(current.enclosure_url).pathname}`, { bytes: Uint8Array.from([1]), size: 1, etag: "base-audio", version: "base-upload",
+      customMetadata: { sha256: current.sha256 }, checksums: { sha256: Uint8Array.from(createHash("sha256").update(Uint8Array.from([1])).digest()).buffer } });
   }
   const inputs: Array<Array<{ asset: StageAsset; bytes: Uint8Array }>> = kind === "show" ? [[
     { asset: "show_metadata", bytes: metadata }, { asset: "cover_jpg", bytes: media },
   ]] : update === "metadata" ? [[{ asset: "episode_metadata", bytes: metadata }]] : update === "audio" ? [[{ asset: "audio", bytes: media }]] :
     [[{ asset: "episode_metadata", bytes: metadata }], [{ asset: "audio", bytes: media }]];
   const staged: StageUploadRequest[] = [];
-  function putPayload(key: string, bytes: Uint8Array) { payloads.set(key, { bytes, size: bytes.byteLength, etag: `payload-${++version}` }); }
+  function putPayload(key: string, bytes: Uint8Array) { payloads.set(key, { bytes, size: bytes.byteLength, etag: `payload-${++version}`, version: `upload-${version}` }); }
   for (const input of inputs) {
     const generation = (await readShowControl(env, "daily"))!.value.generation;
     const request = stageUploadRequestSchema.parse({ schema_version: 1, operation_id: crypto.randomUUID(), draft_job_id: draftJobId,
@@ -62,8 +64,12 @@ async function fixture(kind: "show" | "episode" = "show", update?: "metadata" | 
     const operation = await claimStageUpload(env, request);
     await beginStageUpload(env, operation);
     for (const { asset, bytes } of input) putPayload(stagePayloadKey(request, asset), bytes);
-    await settleStageUpload(env, operation, { put_requests_settled: true, no_more_puts: true });
-    await runStageVerification(env, operation, "staged", { async digest(body) { return checksum(new Uint8Array(await new Response(body).arrayBuffer())); } });
+    await settleStageUpload(env, operation, { put_requests_settled: true, no_more_puts: true,
+      readback_receipts: request.payloads.map((payload) => {
+        const object = payloads.get(stagePayloadKey(request, payload.asset))!;
+        return { asset: payload.asset, length_bytes: object.size, sha256: checksum(object.bytes), etag: object.etag, version: object.version };
+      }) });
+    await runStageVerification(env, operation, "staged");
   }
   const generation = (await readShowControl(env, "daily"))!.value.generation;
   const frozen = publicationRequestSchema.parse({ schema_version: 1,
@@ -132,8 +138,8 @@ describe("M6 publication admission from verified staging", () => {
     }
   });
 
-  test("missing, aborted, foreign or checksum/ETag-mismatched staging proofs cannot create a marker", async () => {
-    for (const fault of ["missing-status", "aborted", "foreign-draft", "hash", "etag", "size"] as const) {
+  test("missing, aborted, foreign or checksum/object-identity-mismatched staging proofs cannot create a marker", async () => {
+    for (const fault of ["missing-status", "aborted", "foreign-draft", "hash", "etag", "version", "missing-version", "size"] as const) {
       const setup = await fixture();
       const request = setup.staged[0]!;
       const operation = await claimPublicationOperation(setup.env, setup.frozen);
@@ -153,6 +159,15 @@ describe("M6 publication admission from verified staging", () => {
       if (fault === "etag" || fault === "size") {
         const key = stagePayloadKey(request, "show_metadata");
         setup.putPayload(key, fault === "etag" ? setup.payloads.get(key)!.bytes : new Uint8Array(1));
+      }
+      if (fault === "version") setup.payloads.get(stagePayloadKey(request, "show_metadata"))!.version = "replacement-upload";
+      if (fault === "missing-version") {
+        const key = `system/jobs/${request.operation_id}/upload-progress.json`;
+        const progress = JSON.parse(setup.entries.get(key)!.data);
+        await setup.bucket.put(key, JSON.stringify({ ...progress, verified_assets: progress.verified_assets.map((asset: { version: string }) => {
+          const { version: _version, ...legacy } = asset;
+          return legacy;
+        }) }));
       }
       await expect(commitOwnedPublication(setup.env, operation)).rejects.toThrow();
       expect(setup.entries.has(setup.markerKey)).toBe(false);

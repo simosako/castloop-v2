@@ -24,6 +24,12 @@ export async function publicationChecksum(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export function matchesPublishedAudio(object: R2Object | null, length: number, sha256: string): boolean {
+  if (!object || object.size !== length || object.customMetadata?.sha256 !== sha256 || !object.checksums?.sha256) return false;
+  const checksum = [...new Uint8Array(object.checksums.sha256)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return checksum === sha256;
+}
+
 export function renderPublicationFeed(show: ShowMetadata, episodes: EpisodeRevision[], baseUrl: string, extension: "jpg" | "png"): string {
   const sourceBytes = new TextEncoder().encode(JSON.stringify({ show, episodes, baseUrl })).byteLength;
   if (sourceBytes * 6 + episodes.length * 1024 + 4096 > 32_000_000) throw new Error("Publication feed exceeds its conservative rendering budget");

@@ -20,7 +20,6 @@ import { completeM6ServiceInitialization, prepareM6ServiceInitialization } from 
 import { readServiceAdmission, resumeServiceAdmission } from "../../../src/service-admission";
 import { parseQueueDelivery } from "../../../src/queue-delivery";
 import { m6InitializationFixture } from "../../../src/test-support/m6-initialization";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -40,7 +39,7 @@ test("fresh service initialization, Show registration and local drafts flow thro
       queued.push(delivery.key);
     } } as never };
   const transport = async (input: URL, init: RequestInit) => fetchM6ManagementIntegration(
-    new Request<unknown, IncomingRequestCfProperties>(new Request(input, init)), env, cachedAssets, { digest: publicationTestDigest });
+    new Request<unknown, IncomingRequestCfProperties>(new Request(input, init)), env, cachedAssets);
   const inspector = new TargetInspectionClient(setup.config, "private-secret", transport);
   const stagingClient = new StagingAdminClient(setup.config, "private-secret", transport);
   const publicationClient = new PublicationAdminClient(setup.config, "private-secret", transport);
@@ -50,16 +49,16 @@ test("fresh service initialization, Show registration and local drafts flow thro
     const key = path.slice(path.indexOf("/objects/") + "/objects/".length);
     if (init?.method === "PUT") {
       const bytes = new Uint8Array(await new Response(init.body).arrayBuffer());
-      await setup.bucket.put(key, bytes);
-      return Response.json({ success: true, result: { size: bytes.length } });
+      const object = (await setup.bucket.put(key, bytes))!;
+      return Response.json({ success: true, result: { key, size: object.size, etag: object.etag, version: object.version } });
     }
     const object = await setup.bucket.get(key);
-    return object ? new Response(new Uint8Array(object.bytes)) : new Response(null, { status: 404 });
+    return object ? new Response(new Uint8Array(object.bytes), { headers: { ETag: `"${object.etag}"` } }) : new Response(null, { status: 404 });
   } };
   const consume = async (key: string) => {
     const deliver = async (next: string) => queueM6Candidate({ queue: setup.config.queue_name,
       messages: [{ id: crypto.randomUUID(), body: { object: { key: next } } }] } as never,
-    env, cachedAssets, { digest: publicationTestDigest, maximumObjects: 2 });
+    env, cachedAssets, { maximumObjects: 2 });
     await deliver(key);
     let count = 1;
     while (queued.length) {

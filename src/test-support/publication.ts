@@ -1,5 +1,5 @@
-import { episodeRevisionSchema, stagePayloadKey, stageUploadRequestSchema, stringifyLifecycleToml, stringifyToml } from "../../packages/shared/src/index";
-import type { LifecycleState } from "../../packages/shared/src/index";
+import { episodeRevisionSchema, stagePayloadKey, stageReadbackReceiptSchema, stageUploadRequestSchema, stringifyLifecycleToml, stringifyToml } from "../../packages/shared/src/index";
+import type { LifecycleState, StageReadbackReceipt, StageUploadRequest } from "../../packages/shared/src/index";
 import { readShowControl } from "../lifecycle-control";
 import { claimPublicationOperation, commitOwnedPublication, publicationRequestSchema } from "../publication-admission";
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "../staging-upload";
@@ -10,7 +10,8 @@ import { createHash } from "node:crypto";
 export const PUBLICATION_SHOW_TEXT = "schema_version = 1\nshow_id = 'daily'\ntitle = 'New Show title'\ndescription = 'Private description'\nlanguage = 'en'\nauthor = 'Author'\nowner_name = 'Owner'\nowner_email = 'owner@example.com'\ncategories = ['Arts']\nexplicit = false\nsite_url = 'https://example.com'\nimage_path = 'cover.jpg'\n";
 export const PUBLICATION_SERVICE_TEXT = "schema_version = 1\nservice_id = 'service'\naccount_id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\nbucket_name = 'test-bucket'\nworker_name = 'test-worker'\nqueue_name = 'test-queue'\ndlq_name = 'test-dlq'\npublic_base_url = 'https://current.example'\n";
 
-type Entry = { bytes: Uint8Array; size: number; etag: string; customMetadata?: Record<string, string>; httpMetadata?: R2HTTPMetadata };
+type Entry = { bytes: Uint8Array; size: number; etag: string; version: string; checksums: { sha256?: ArrayBuffer };
+  customMetadata?: Record<string, string>; httpMetadata?: R2HTTPMetadata };
 type PutOptions = Pick<R2PutOptions, "onlyIf" | "customMetadata" | "httpMetadata" | "sha256">;
 
 export async function publicationFixture(options: { active?: boolean; episodes?: boolean } = {}) {
@@ -39,7 +40,8 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
       if (options?.onlyIf instanceof Headers && previous) return null;
       if (options?.onlyIf && !(options.onlyIf instanceof Headers) && options.onlyIf.etagMatches !== previous?.etag) return null;
       if (typeof options?.sha256 === "string" && createHash("sha256").update(bytes).digest("hex") !== options.sha256) throw new Error("Checksum mismatch");
-      const entry: Entry = { bytes, size: bytes.length, etag: String(++version),
+      const entry: Entry = { bytes, size: bytes.length, etag: String(++version), version: `upload-${version}`,
+        checksums: typeof options?.sha256 === "string" ? { sha256: Uint8Array.from(createHash("sha256").update(bytes).digest()).buffer } : {},
         ...(options?.customMetadata ? { customMetadata: options.customMetadata } : {}),
         ...(options?.httpMetadata && !(options.httpMetadata instanceof Headers) ? { httpMetadata: options.httpMetadata } : {}) };
       entries.set(key, entry);
@@ -75,7 +77,7 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
       content_type: "audio/mpeg", length_bytes: 1, duration_seconds: 1, sha256: createHash("sha256").update("x").digest("hex"), updated_at: "2026-09-02T00:00:00Z" });
     await bucket.put(`public/episodes/daily/${episodeId}/metadata.toml`, stringifyToml(revision));
     await bucket.put(`public/episodes/daily/${episodeId}/revisions/${revision.revision_id}.toml`, stringifyToml(revision));
-    await bucket.put(`public${new URL(revision.enclosure_url).pathname}`, "x", { customMetadata: { sha256: revision.sha256 } });
+    await bucket.put(`public${new URL(revision.enclosure_url).pathname}`, "x", { sha256: revision.sha256, customMetadata: { sha256: revision.sha256 } });
     return revision;
   }
   if (options.episodes) for (const [episodeId, lifecycle] of [["first", "active"], ["second", "active"], ["stopped", "unpublished"],
@@ -91,7 +93,15 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
   await beginStageUpload(env, upload);
   await bucket.put(stagePayloadKey(stage, "show_metadata"), metadata);
   await bucket.put(stagePayloadKey(stage, "cover_jpg"), cover);
-  await settleStageUpload(env, upload, { put_requests_settled: true, no_more_puts: true });
+  function readbacks(request: StageUploadRequest = stage, count = request.payloads.length): StageReadbackReceipt[] {
+    return request.payloads.slice(0, count).map((payload) => {
+      const object = entries.get(stagePayloadKey(request, payload.asset));
+      if (!object) throw new Error("Test readback object is missing");
+      return stageReadbackReceiptSchema.parse({ asset: payload.asset, length_bytes: object.size,
+        sha256: sha256(object.bytes), etag: object.etag, version: object.version });
+    });
+  }
+  await settleStageUpload(env, upload, { put_requests_settled: true, no_more_puts: true, readback_receipts: readbacks(stage) });
   await runStageVerification(env, upload, "staged");
   const frozen = publicationRequestSchema.parse({ schema_version: 1,
     request: { schema_version: 1, job_id: stage.draft_job_id, show_id: "daily", kind: "show", action: "publish",
@@ -100,7 +110,7 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
       cover_sha256: sha256(cover), cover_extension: "jpg" }, staged_uploads: [stage.operation_id] });
   const operation = await claimPublicationOperation(env, frozen);
   const { key } = await commitOwnedPublication(env, operation);
-  return { bucket, env, entries, writes, bodyReads, addEpisode, operation, key, frozen, stage,
+  return { bucket, env, entries, writes, bodyReads, addEpisode, readbacks, operation, key, frozen, stage,
     text: (key: string) => new TextDecoder().decode(entries.get(key)?.bytes), feedKey: "public/podcasts/daily/feed.xml",
     statusKey: `system/jobs/${operation.jobId}/status.toml`, progressKey: `system/jobs/${operation.jobId}/progress.toml` };
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { serviceConfigSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
+import { parseStageReadbackReceipts, serviceConfigSchema, stageReadbackReceiptSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
 import type { ServiceConfig, StageUploadRequest } from "@castloop/shared";
 import { stagingClientOperation, stagingClientTargets } from "./staging-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
@@ -15,6 +15,7 @@ const stateSchema = z.object({ schema_version: z.literal(1), identity: identityS
   begin_receipt: z.array(z.object({ key: z.string().min(1).max(256), length: z.number().int().positive().max(300000000),
     sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict()).min(1).max(2).optional(),
   put_outcome: z.enum(["staged", "aborted"]).optional(), acknowledged_puts: z.number().int().min(0).max(2).optional(),
+  readback_receipts: z.array(stageReadbackReceiptSchema).max(2).optional(),
   reason_code: z.literal("put_failed").optional(), finish_receipt: z.enum(["staged", "aborted"]).optional(),
 }).strict();
 
@@ -27,6 +28,10 @@ export function validateStagingClientState(input: unknown): StagingClientState {
   const origin = new URL(state.identity.public_base_url);
   const phase = stateSchema.shape.phase.options.indexOf(state.phase);
   const operation = stagingClientOperation(state.upload);
+  if (state.readback_receipts !== undefined && (phase < 6 ||
+    parseStageReadbackReceipts(state.upload, state.readback_receipts).length !== state.acknowledged_puts)) {
+    throw new Error("Staging journal readback receipts do not match its acknowledged PUTs");
+  }
   if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" ||
     (phase >= 2) !== (state.claim_receipt !== undefined) || (phase >= 4) !== (state.begin_receipt !== undefined) ||
     (phase >= 6) !== (state.put_outcome !== undefined) || (phase >= 6) !== (state.acknowledged_puts !== undefined) ||
@@ -88,7 +93,8 @@ export function createStagingJournal(root: string, configInput: ServiceConfig, i
         previous.claim_receipt && JSON.stringify(next.claim_receipt) !== JSON.stringify(previous.claim_receipt) ||
         previous.begin_receipt && JSON.stringify(next.begin_receipt) !== JSON.stringify(previous.begin_receipt) ||
         previous.put_outcome && (next.put_outcome !== previous.put_outcome || next.acknowledged_puts !== previous.acknowledged_puts ||
-          next.reason_code !== previous.reason_code) || previous.finish_receipt && next.finish_receipt !== previous.finish_receipt) {
+          next.reason_code !== previous.reason_code || JSON.stringify(next.readback_receipts) !== JSON.stringify(previous.readback_receipts)) ||
+        previous.finish_receipt && next.finish_receipt !== previous.finish_receipt) {
         throw new Error("Frozen staging journal cannot change, skip phases or reopen PUT permission");
       }
       storage.replace(next);

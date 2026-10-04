@@ -50,7 +50,7 @@
 
 管理者がWorkers Paidの利用不可を明示した。Paidへの変更を再要求せず、無料枠を前提に検証処理の責務・実行場所を見直す。既存の300MB上限を勝手に下げず、全量contents照合・object identity/owner/generation照合を単純に省略しない。現行Worker内全量SHA-256のCPU超過は、この実装方式の問題であり、R2へ300MBを保存できないという実証ではない。
 
-R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理REST PUTは誤ったchecksumヘッダーでも保存する一方、binding PUTは誤ったSHA-256を拒否し、300MBの検証付きstream保存/HEAD native checksumがCPU 2msで成功することを確認した。推奨は既存CLIの全量SHA-256読み戻し結果をexact objectへ結び付け、公開保存時のSHA-256をR2へ任せる方式。Worker内の二箇所の全量再ハッシュを省く案であり、証拠伝達はまだ未実装。全M6の300MB受け入れや旧IO収束の合格とは区別する。
+R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理REST PUTは誤ったchecksumヘッダーでも保存する一方、binding PUTは誤ったSHA-256を拒否し、300MBの検証付きstream保存/HEAD native checksumがCPU 2msで成功することを確認した。管理者が案Bを承認し、既存CLIの全量SHA-256読み戻し結果をexact objectへ結び付け、公開保存時のSHA-256をR2へ任せる方式を実装した。Worker内の二箇所の全量再ハッシュを除き、owner/generation/IO終了確認とnative checksum照合は維持する。接続後の実機受け入れは別記し、旧IO収束の合格とは区別する。
 
 ### 現在の到達点（2026-10-04）
 

@@ -1,5 +1,5 @@
-import { serviceConfigSchema, stageUploadRequestSchema } from "@castloop/shared";
-import type { ServiceConfig } from "@castloop/shared";
+import { serviceConfigSchema, stageReadbackReceiptSchema, stageUploadRequestSchema } from "@castloop/shared";
+import type { ServiceConfig, StageReadbackReceipt } from "@castloop/shared";
 import { stagingClientTargets } from "./staging-client";
 import type { StagePutTarget } from "./staging-client";
 import type { FrozenStagingSources } from "./staging-sources";
@@ -13,7 +13,7 @@ export type StagingRestOptions = {
   timeoutMs?: number;
 };
 
-async function readReceipt(response: Response, length: number): Promise<void> {
+async function readReceipt(response: Response, target: StagePutTarget): Promise<Pick<StageReadbackReceipt, "etag" | "version">> {
   if (!response.body) throw new Error("Staging PUT receipt is missing");
   const reader = response.body.getReader();
   try {
@@ -32,16 +32,20 @@ async function readReceipt(response: Response, length: number): Promise<void> {
       throw new Error("Staging PUT receipt size/success was not verified");
     }
     const received = typeof value.result.size === "string" && /^\d+$/.test(value.result.size) ? Number(value.result.size) : value.result.size;
-    if (typeof received !== "number" || !Number.isSafeInteger(received) || received !== length) {
+    if (typeof received !== "number" || !Number.isSafeInteger(received) || received !== target.length ||
+      !("key" in value.result) || value.result.key !== target.key || !("etag" in value.result) || !("version" in value.result)) {
       throw new Error("Staging PUT receipt size/success was not verified");
     }
+    return { etag: stageReadbackReceiptSchema.shape.etag.parse(value.result.etag),
+      version: stageReadbackReceiptSchema.shape.version.parse(value.result.version) };
   } finally { await reader.cancel(); reader.releaseLock(); }
 }
 
-async function verifyResponse(response: Response, target: StagePutTarget): Promise<void> {
+async function verifyResponse(response: Response, target: StagePutTarget, etag: string): Promise<string> {
   if (!response.body || response.status !== 200 || response.headers.has("content-range")) throw new Error("Staging verification requires a complete object response");
   const reader = response.body.getReader();
   try {
+    if (response.headers.get("ETag") !== `"${etag}"`) throw new Error("Staging readback differs from its PUT object identity");
     const hash = createHash("sha256");
     let size = 0;
     for (;;) {
@@ -51,13 +55,15 @@ async function verifyResponse(response: Response, target: StagePutTarget): Promi
       if (size > target.length) throw new Error("Staging verification size exceeds its frozen manifest");
       hash.update(chunk.value);
     }
-    if (size !== target.length || hash.digest("hex") !== target.sha256) throw new Error("Staging verification checksum/size differs from its frozen manifest");
+    const sha256 = hash.digest("hex");
+    if (size !== target.length || sha256 !== target.sha256) throw new Error("Staging verification checksum/size differs from its frozen manifest");
+    return sha256;
   } finally { await reader.cancel(); reader.releaseLock(); }
 }
 
 export function createStagingRestPut(configInput: ServiceConfig, sources: FrozenStagingSources,
   options: StagingRestOptions = { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" }):
-  (target: StagePutTarget, index: number) => Promise<void> {
+  (target: StagePutTarget, index: number) => Promise<StageReadbackReceipt> {
   const config = serviceConfigSchema.parse(configInput);
   const upload = stageUploadRequestSchema.parse(sources.upload);
   if (options.accountId !== config.account_id || !options.apiToken || /[\r\n]/.test(options.apiToken)) throw new Error("Staging REST credentials do not match the service account");
@@ -73,6 +79,7 @@ export function createStagingRestPut(configInput: ServiceConfig, sources: Frozen
       throw new Error("Staging REST PUT requires its exact one-time key, size and checksum");
     }
     used.add(index);
+    let readback: StageReadbackReceipt | undefined;
     await sources.withPayload(index, async (body, requireConsumed) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -82,11 +89,12 @@ export function createStagingRestPut(configInput: ServiceConfig, sources: Frozen
         response = await transport(url, { method: "PUT", body, redirect: "error", signal: controller.signal,
           headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": types[upload.payloads[index]!.asset], "Content-Length": String(target.length) } });
         if (response.status !== 200) throw new Error("Staging REST PUT failed or has an unknown outcome");
-        await readReceipt(response, target.length);
+        const receipt = await readReceipt(response, target);
         requireConsumed();
         response = await transport(url, { method: "GET", redirect: "error", cache: "no-store", signal: controller.signal,
           headers: { Authorization: `Bearer ${apiToken}`, "Accept-Encoding": "identity" } });
-        await verifyResponse(response, target);
+        const sha256 = await verifyResponse(response, target, receipt.etag);
+        readback = stageReadbackReceiptSchema.parse({ ...upload.payloads[index], sha256, ...receipt });
       } catch {
         throw new Error("Staging REST PUT/verification failed; no automatic retry or remote termination proof");
       } finally {
@@ -97,5 +105,7 @@ export function createStagingRestPut(configInput: ServiceConfig, sources: Frozen
         }
       }
     });
+    if (!readback) throw new Error("Staging readback receipt is missing");
+    return readback;
   };
 }

@@ -65,12 +65,15 @@ describe("M6 staging admission and one-time PUT permission", () => {
     const operation = await claimStageUpload(setup.env, setup.request);
     await beginStageUpload(setup.env, operation);
     await expect(settleStageUpload(setup.env, operation, { put_requests_settled: false, no_more_puts: true } as never)).rejects.toThrow("explicitly confirmed");
-    await settleStageUpload(setup.env, operation, { put_requests_settled: true, no_more_puts: true });
+    await settleStageUpload(setup.env, operation, { put_requests_settled: true, no_more_puts: true, readback_receipts: [] });
     const snapshot = await requireStageUpload(setup.env, operation);
     const progress = (await readStageUploadProgress(setup.env, operation, snapshot))!.value;
     expect(progress.phase).toBe("settled");
     expect(snapshot.control.value.owner.state).toBe("uploading");
-    await expect(writeStageUploadProgress(setup.env, operation, { ...progress, phase: "ready", client_settled: false })).rejects.toThrow("reopen");
+    await expect(settleStageUpload(setup.env, operation, { put_requests_settled: true, no_more_puts: true,
+      readback_receipts: setup.request.payloads.map((payload) => ({ ...payload, etag: "e1", version: "v1" })) })).rejects.toThrow("cannot change");
+    await expect(writeStageUploadProgress(setup.env, operation, { ...progress, phase: "ready", client_settled: false,
+      readback_receipts: undefined })).rejects.toThrow("reopen");
     await expect(beginStageUpload(setup.env, operation)).rejects.toThrow("already started");
   });
 
@@ -92,8 +95,8 @@ describe("M6 staging admission and one-time PUT permission", () => {
         await expect(beginStageUpload(env, operation)).rejects.toThrow("already started");
       } else {
         await beginStageUpload(env, operation);
-        await expect(settleStageUpload(env, operation, { put_requests_settled: true, no_more_puts: true })).rejects.toThrow("response lost");
-        await settleStageUpload(env, operation, { put_requests_settled: true, no_more_puts: true });
+        await expect(settleStageUpload(env, operation, { put_requests_settled: true, no_more_puts: true, readback_receipts: [] })).rejects.toThrow("response lost");
+        await settleStageUpload(env, operation, { put_requests_settled: true, no_more_puts: true, readback_receipts: [] });
       }
       expect((await readShowControl(setup.env, "daily"))?.value.owner?.job_id).toBe(operation.operationId);
     }

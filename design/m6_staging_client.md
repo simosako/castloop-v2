@@ -1,12 +1,12 @@
 # M6: Staging内部client・状態照会・durable upload journal
 
-更新日: 2026-10-02
+更新日: 2026-10-04
 
 ## 範囲と公開gate
 
 未公開`StagingAdminClient`を内部管理APIへ接続した。Show metadata+cover、Episode metadata、Episode audioの受付/一度限りbegin/明示settlement/検証・取消と、読み取り専用statusを使う。`.castloop/staging-uploads/<serviceId>/<operationId>.json`のdurable journalから各操作を実行する内部runnerも追加した。
 
-現行Worker/bridge/candidate fetchや公開CLI書込commandには接続していない。`m6_ready=false`を維持し、Cloudflare書込/deployや既存v0.1.1環境への適用は行っていない。既存の通常upload/publication経路を置き換えてはいない。
+通常Worker/bridge/candidate fetchや公開CLI書込commandのgateは維持し、既存の通常upload/publication経路を置き換えていない。後続開発でM6試験専用Worker/standaloneへ接続し、2026-10-04には小さいShow/EpisodeのCloudflare実機受け入れも通した。既存v0.1.1環境の変更・採用・未知ownerの解放は行わない。最新の実機結果は[受け入れ記録](./m6_standalone_acceptance.md)参照。
 
 ## Strict clientと読み取り専用status
 
@@ -26,7 +26,7 @@ statusはpayload本文を読まず、owner/token/progressを変更せず、常�
 
 private directoryは0700、record/temp/lockは0600で作る。recordはexclusive新規作成、更新は一意temp→file fsync→rename→directory fsyncとし、新規directory階層もfsyncする。strict schema/16KB上限/identity/manifest/phase/receiptを毎回検査する。
 
-保存するのはservice/account/Worker/origin、凍結manifest、最小claim/begin receipt、phase、成功応答を受けたPUT数、予定finish outcome、固定`put_failed`診断とfinish receiptだけである。本文/タイトル/メール/管理key/API token/任意exceptionをコピーせず、service TOMLにjob IDを書かない。operationとdraft IDの変更、foreign identity、phase飛ばし/後退、PUT許可の再開は拒否する。
+保存するのはservice/account/Worker/origin、凍結manifest、最小claim/begin receipt、phase、全量読み戻しが成功したPUT数とasset/size/SHA-256/ETag/versionの証拠、予定finish outcome、固定`put_failed`診断とfinish receiptだけである。本文/タイトル/メール/管理key/API token/任意exceptionをコピーせず、service TOMLにjob IDを書かない。operationとdraft IDの変更、foreign identity、phase飛ばし/後退、PUT許可の再開、終了後の証拠差替えは拒否する。
 
 | phase | 意味 |
 | --- | --- |
@@ -51,7 +51,9 @@ PUTが正常/例外で終了したら、それ以上PUTしない。例外では�
 
 begin応答が不明、permission保存が不明、PUT稼働中または終了保存が不明なら、再begin/再PUT/自動settlementしない。時間やHEAD不在で終了と認定しない。正常に記録されたputs_settledからだけ、callerの明示的`put_requests_settled=true`/`no_more_puts=true`を要求する`runStagingSettle`が可能になる。
 
-`runStagingFinish`はsettledからidle verificationと同ownerを照会して、一回だけ予定staged/abortedを送る。payload検証とowner解放はserverが再度検査する。abortはpayloadを削除しない。pause中でも既受付のsettlement/finishは収束できる。
+`runStagingSettle`は保存済みの読み戻し証拠を送る。成功予定なら全payload分を必須とし、改修前のjournalに欠けた証拠を捏造しない。部分成功/失敗なら確認済みprefixだけを送る。serverもmanifestとの一致と終了後の証拠不変を検査する。
+
+`runStagingFinish`はsettledからidle verification・同owner・local/server証拠一致を照会して、一回だけ予定staged/abortedを送る。serverは音源HEADのsize/ETag/versionと証拠を照合し、音源を全量再hashしない。metadata/coverの内容検査とowner解放は維持する。abortはpayloadを削除しない。pause中でも既受付のsettlement/finishは収束できる。
 
 この終了申告はserverによるREST接続終了の直接観測ではない。承認済みREST単一PUT方針と未確認のU1仮定を維持し、切断後書込がないことをCloudflare保証として扱わない。U1をM6 release blockerへ追加せず、supportへ連絡しない。
 

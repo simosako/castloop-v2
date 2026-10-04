@@ -4,7 +4,6 @@ import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { readShowControl } from "../../../src/lifecycle-control";
 import { fetchM6ManagementIntegration } from "../../../src/m6-routes";
-import { publicationTestDigest } from "../../../src/test-support/episode-publication";
 import { StagingAdminClient, stagingClientTargets } from "./staging-client";
 import { createStagingJournal } from "./staging-journal";
 import { runStagingBeginAndUpload, runStagingClaim, runStagingFinish, runStagingSettle } from "./staging-operation";
@@ -33,11 +32,12 @@ async function fixture(kind: "show" | "audio" | "episode_metadata" = "audio") {
     const key = decodeURI(new URL(request.url).pathname.split("/objects/")[1]!);
     if (request.method === "PUT") {
       const bytes = new Uint8Array(await request.arrayBuffer());
-      await setup.bucket.put(key, bytes);
-      return Response.json({ success: true, result: { size: kind === "show" ? String(bytes.length) : bytes.length } });
+      const object = (await setup.bucket.put(key, bytes))!;
+      return Response.json({ success: true, result: { key, etag: object.etag, version: object.version,
+        size: kind === "show" ? String(bytes.length) : bytes.length } });
     }
     const object = await setup.bucket.get(key);
-    return new Response(object!.bytes);
+    return new Response(object!.bytes, { headers: { ETag: `"${object!.etag}"` } });
   };
   const options = { accountId: setup.config.account_id, apiToken: "private-token", transport };
   return { ...setup, root, paths, sources, calls, options };
@@ -48,7 +48,7 @@ for (const kind of ["show", "audio", "episode_metadata"] as const) {
     const setup = await fixture(kind);
     const journal = createStagingJournal(setup.root, setup.config, setup.upload);
     const client = new StagingAdminClient(setup.config, "private-secret", async (input, init) => {
-      const response = await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings, { digest: publicationTestDigest });
+      const response = await handleM6StagingAdmin(new Request(input, init), setup.env, setup.bindings);
       return response!;
     });
     const effects = createStagingRestEffects(setup.config, journal.load(), "private-secret", setup.sources, setup.options, client);
@@ -122,8 +122,7 @@ test("pre-send input rejection permits explicit same-journal claim and begin aft
     return fetchM6ManagementIntegration(request, {
       CASTLOOP_BUCKET: setup.bucket as never, CASTLOOP_ADMIN_KEY: "private-secret", CASTLOOP_DLQ_NAME: setup.config.dlq_name,
       CASTLOOP_VERSION_METADATA: { id: setup.versionId, tag: "", timestamp: "2026-10-02T12:00:00Z" }, CASTLOOP_QUEUE: {} as never,
-    }, Object.assign(() => ({ fetch: async () => new Response() }), { invalidate: async () => {}, ...setup.bindings.cachedAssets }),
-    { digest: publicationTestDigest });
+    }, Object.assign(() => ({ fetch: async () => new Response() }), { invalidate: async () => {}, ...setup.bindings.cachedAssets }));
   });
   const effects = createStagingRestEffects(setup.config, journal.load(), "private-secret", setup.sources, setup.options, client);
   try {
@@ -188,7 +187,7 @@ test("begin rechecks local sources after the read-only owner check and keeps unk
     const request = new Request(input, init);
     const action = (await request.clone().json<{ action: string }>()).action;
     actions.push(action);
-    const response = await handleM6StagingAdmin(request, setup.env, setup.bindings, { digest: publicationTestDigest });
+    const response = await handleM6StagingAdmin(request, setup.env, setup.bindings);
     if (action === "status" && changeAfterStatus) await writeFile(setup.paths[0]!, new Uint8Array(setup.upload.payloads[0]!.length_bytes));
     return response!;
   });
@@ -241,7 +240,8 @@ test("REST credentials cannot target another account and session must match dura
   await setup.sources.dispose();
 });
 
-for (const failure of ["early", "lost", "http", "oversized", "receipt", "receipt_exponent", "hash", "range"] as const) {
+for (const failure of ["early", "lost", "http", "oversized", "receipt", "receipt_exponent", "hash", "range",
+  "receipt_key", "receipt_etag", "receipt_version", "readback_etag", "readback_weak_etag"] as const) {
   test(`REST ${failure} failure never retries PUT or returns arbitrary API diagnostics`, async () => {
     const setup = await fixture();
     const calls: string[] = [];
@@ -254,10 +254,14 @@ for (const failure of ["early", "lost", "http", "oversized", "receipt", "receipt
         if (failure === "http") return new Response("private-token", { status: 403 });
         if (failure === "oversized") return new Response("x".repeat(65537));
         const length = setup.upload.payloads[0]!.length_bytes;
-        return Response.json({ success: true, result: { size: failure === "receipt" ? 1 : failure === "receipt_exponent" ? `${length}e0` : length } });
+        return Response.json({ success: true, result: { key: failure === "receipt_key" ? "system/service.toml" : stagingClientTargets(setup.upload)[0]!.key,
+          etag: failure === "receipt_etag" ? undefined : "object-etag", version: failure === "receipt_version" ? undefined : "upload-version",
+          size: failure === "receipt" ? 1 : failure === "receipt_exponent" ? `${length}e0` : length } });
       }
-      return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(setup.upload.payloads[0]!.length_bytes)); if (failure !== "range") controller.close(); }, cancel() { cancelled = true; } }),
-        failure === "range" ? { status: 206, headers: { "content-range": "bytes 0-1/2" } } : undefined);
+      const bytes = failure === "hash" ? new Uint8Array(setup.upload.payloads[0]!.length_bytes) : setup.contents[0]!.bytes;
+      return new Response(new ReadableStream({ start(controller) { controller.enqueue(bytes); if (failure !== "range") controller.close(); }, cancel() { cancelled = true; } }),
+        failure === "range" ? { status: 206, headers: { "content-range": "bytes 0-1/2" } } : { headers: {
+          ETag: failure === "readback_etag" ? '"replacement-etag"' : failure === "readback_weak_etag" ? 'W/"object-etag"' : '"object-etag"' } });
     };
     const put = createStagingRestPut(setup.config, setup.sources, { ...setup.options, transport, timeoutMs: 20 });
     await expect(put(stagingClientTargets(setup.upload)[0]!, 0)).rejects.toThrow("no automatic retry");
@@ -277,7 +281,7 @@ test("owned network/GET cancellation remains awaited and snapshots cannot be dis
   const transport: StagingRestTransport = async (input, init) => {
     if (init!.method === "PUT") return setup.options.transport(input, init);
     return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(setup.upload.payloads[0]!.length_bytes + 1)); },
-      async cancel() { enter(); await released; } }));
+      async cancel() { enter(); await released; } }), { headers: { ETag: `"${(await setup.bucket.head(stagingClientTargets(setup.upload)[0]!.key))!.etag}"` } });
   };
   const put = createStagingRestPut(setup.config, setup.sources, { ...setup.options, transport });
   const running = put(stagingClientTargets(setup.upload)[0]!, 0);
@@ -310,10 +314,10 @@ test("native Bun streaming HTTP uses a pinned snapshot even when the editable or
       expect(request.headers.get("content-length")).toBe(String(bytes.length));
       await writeFile(setup.paths[0]!, new Uint8Array(bytes.length));
       received = new Uint8Array(await request.arrayBuffer());
-      return Response.json({ success: true, result: { size: received.length } });
+      return Response.json({ success: true, result: { key: stagingClientTargets(upload)[0]!.key, size: received.length, etag: "native-etag", version: "native-version" } });
     }
     reads += 1;
-    return new Response(received);
+    return new Response(received, { headers: { ETag: '"native-etag"' } });
   } });
   try {
     const transport: StagingRestTransport = (input, init) => fetch(new URL(new URL(String(input)).pathname, server.url), init);
