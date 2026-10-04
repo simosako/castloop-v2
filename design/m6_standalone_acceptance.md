@@ -51,7 +51,7 @@ version `756ab58d-9289-4fbd-a0df-cdc9377b71f4`で`large` Showと小さい`bounda
 - 独立した`castloop-m6-test-digest-e975e1b4`は同じ既知objectを条件付きGETするだけの診断Worker。R2/control/Queueには書き込まない。native DigestStream直結と現行byte-count付き経路を各一回試し、両方の503と`exceededCpu`をsanitized realtime tailで観測した。直結はCPU 2068ms/wall 3215ms、現行経路はCPU 10ms/wall 50msで終了した。直結だけに変えても現CPU制限を回避できない。
 - Worker settingsの`usage_model=standard`はPaid契約の証拠ではない。契約照会は403/code10000であり、billing権限の追加・契約変更・CPU limit変更をしていない。
 
-Cloudflareの[limits](https://developers.cloudflare.com/workers/platform/limits/)ではFree HTTP CPUは10ms、Paidは既定30s。[pricing](https://developers.cloudflare.com/workers/platform/pricing/)ではPaidの最低料金はaccountあたり月$5 USD、超過は従量課金。**現方式の300MB受け入れをPaid環境で続ける場合、管理者の契約/利用承認が必要**。これは後回しにした費用測定計画の承認待ちではなく、実際の契約変更の判断である。すでにPaidなら現在の適用profileを確認する。
+Cloudflareの[limits](https://developers.cloudflare.com/workers/platform/limits/)ではFree HTTP CPUは10ms。2026-10-04、管理者が**Workers Paidは利用不可**と決定した。Paid環境への変更ではなく、CLIの既存全量照合とR2の検証能力、Workerで保持するidentity/size/owner検査の責務を無料枠前提で見直す。代替方式はまだ実証済みではなく、単にchecksum検査を削除する承認でもない。300MB保存/CLI全量照合は成功しており、今回の失敗を無料枠での300MB運用そのものが不可能という証明にしない。
 
 診断結果は`/tmp/opencode/castloop-m6-test-digest-e975e1b4/results-2.json`。tailの終了通知を旧IOがすべて収束した保証として扱わず、元のserviceのtoken/ownerは保持する。既存資源・診断資源の削除もしていない。
 

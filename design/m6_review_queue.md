@@ -46,11 +46,15 @@
 
 ## 管理者の判断待ちではない技術残件
 
+### Workers Paidは利用しない（2026-10-04）
+
+管理者がWorkers Paidの利用不可を明示した。Paidへの変更を再要求せず、無料枠を前提に検証処理の責務・実行場所を見直す。既存の300MB上限を勝手に下げず、全量contents照合・object identity/owner/generation照合を単純に省略しない。現行Worker内全量SHA-256のCPU超過は、この実装方式の問題であり、R2へ300MBを保存できないという実証ではない。
+
 ### 現在の到達点（2026-10-04）
 
 下記の各module詳細には実装当時の未接続項目も残る。最新の到達点は新規初期化・通常更新の試験HTTP/standalone接続と実Cloudflare合格、Show/Episode六lifecycle操作の実機合格まで進んでいる。後者は配信404/410・復元時GUID/revision保持・物理削除・永久記録保持・owner/token通常返却を含む。通常公開CLI/entryはまだ切り替えていない。
 
-通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。300MBはREST PUT/全量GETまで成功したが、WorkerのCPU制限で未合格となった。独立readonly診断でもnative digestと現行経路が`exceededCpu`で終了し、元serviceはpaused/owner/token保持とした。契約照会は403で、Paid契約/適用profileの確認と必要な利用承認は管理者の判断が必要。課金変更はしていない。費用測定計画を通常開発のgateへ戻すものではない。
+通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。300MBはREST PUT/全量GETまで成功したが、WorkerのCPU制限で未合格となった。独立readonly診断でもnative digestと現行経路が`exceededCpu`で終了し、元serviceはpaused/owner/token保持とした。契約照会は403で課金変更はしていない。管理者のPaid利用不可の決定に従い、無料枠に適合する検証方式の見直しを技術残件として進める。費用測定計画を通常開発のgateへ戻すものではない。
 
 残件は300MBと二種改訂の受け入れ、新規初期化fault、安全なunknown IO/残存lockの外部終了確認・復旧手順、公開CLI/利用案内・release gateである。未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
 
