@@ -1,57 +1,42 @@
 # 独自ドメインの実機検証手順（専用hostname）
 
-作成日: 2026-10-05
+更新日: 2026-10-09。対象は`feature/custom-domains`でビルドしたCLI／Worker。実機検証は未実施。
 
-状態: **実行前の手順書。実機検証は未実施。**
+新しい試験サービスと未使用のhostnameで、**ドメイン追加 → 配信・公開・非公開化・復元 → Worker更新 → ドメイン削除**を確認します。
 
-対象: `feature/custom-domains`のCLI／Worker（実装commit `4877da0`以降）。
+各節の確認を終えてから次へ進みます。失敗・不一致があれば第9節に従って停止してください。
 
-## 1. 目的・範囲
+## 1. 事前準備
 
-専用M6サービスで **workers.dev公開 → 独自domain追加 → 明示再開 → 公開・停止／restore → 通常deploy → domain削除 → 明示再開** を確認します。
-
-- 本番・既存利用者のhostnameは使いません。原則、新しい試験サービスと未使用のhostnameを使います。
-- 実行前にaccount・Zone・hostname・workspace・作成するリソースを管理者が確認してください。この文書の作成では実環境を変更していません。
-- Workers Paid、有料オプション、無停止移行、旧形式変換、網羅的な障害注入は対象外です。R2／Queues等の利用料がゼロという保証ではありません。
-- 小さいMP3で実施します。既存の[M6の300 MB受け入れ](../design/m6_standalone_acceptance.md)を再利用し、300 MBを再uploadする必要はありません。
-- unknown owner／token／lockがある環境は再利用・更新・解放しません。特に`castloop-m6-test-ff3bfd8c`は対象外です。
-
-コードブロックは一括実行用scriptではありません。確認点ごとに止め、コマンドが非0終了・HTTP確認が不一致なら先へ進まず第10節へ移ります。
-
-## 2. 事前準備
-
-### 対象を決める
-
-| 項目 | 条件／記録する値 |
+| 項目 | 条件 |
 | --- | --- |
-| Cloudflare account | 既存の試験と同じ、管理者自身のaccount |
-| Zone | 同accountのactive/full Zone。Cloudflareが権威DNS |
+| Cloudflare account | 管理者のaccount（既存試験と同じ） |
+| Zone | 同accountのactive/full Zone。Cloudflareが権威DNSを提供していること |
 | 専用hostname | 例: `castloop-test.YOUR_ZONE`。scheme・path・port・wildcardなし |
-| hostnameの空き | 既存のA/AAAA/CNAME/NS、Custom Domain、他サービスのWorker RouteがないことをDashboardで確認 |
-| Service／bucket | 未使用の名前。既存v0.1.xサービスを変換・採用しない |
-| 素材 | 公開してよいJPEG／PNG、短い正規のMP3（1 KiB以上）、管理者の実在するサイトURL |
+| hostnameの空き | Dashboardで、同名のA/AAAA/CNAME/NS、Custom Domain、他サービスのWorker Routeがないことを確認 |
+| Service／bucket | 未使用の名前 |
+| 素材 | 公開してよいJPEG画像、短いMP3（1 KiB以上）、管理者の実在するサイトURL |
 
-DNS recordやCustom DomainをDashboardから先に作らないでください。接続／切断はcastloopに行わせます。別hostnameへの切替・www/apex aliasは試しません。
+ドメイン接続はcastloopで行います。DNS recordやCustom DomainをDashboardで先に作成しないでください。
 
-API tokenは既存のWorkers／R2／Queues管理権限に加え、domain操作のWorkers Scripts Write、対象ZoneのZone Read／DNS Readを確認します。権限不足ならtokenの範囲を見直し、既存DNSや有料planは変更しません。
+API tokenにはWorkers／R2／Queuesの管理権限と、Workers Scripts Write、対象ZoneのZone Read／DNS Readが必要です。
 
-### バイナリと証拠保存先
+### ビルドと結果の保存先
 
-ビルド元で対象commitを固定し、ソース差分がないことを確認して実行します。
+対象ブランチに未コミット変更がないことを確認し、ビルドします。commit IDとSHA-256を記録してください。
 
 ```sh
+git status --short --branch
 git rev-parse HEAD
-npm run check
-bun test
 npm run build:cli -- linux-x64
 sha256sum dist/castloop-linux-x64
 ```
 
-Linux x86-64の試験先にバイナリを置き、ビルド元とSHA-256を照合します。試験先の管理操作はこの単一バイナリのみで行い、Bun／Node.js／Wranglerは不要です。HTTP確認用にBash、curl、jq、uuidgen、sha256sum、cmpを用意します。
+Linux x86-64の試験先へバイナリを配置し、SHA-256がビルド元と一致することを確認します。試験先にはBash、curl、jq、uuidgen、sha256sum、cmpを用意してください。
 
-**現時点の開発buildもversion表示は`0.2.1`です。versionだけで判定せず、commit・バイナリSHA-256・`help domain`を記録してください。公開済みv0.2.1バイナリでは実施できません。**
+公開済みv0.2.1にはdomainコマンドがありません。開発版もversion表示は`0.2.1`なので、commit IDとSHA-256で識別します。
 
-以下の値を自分の値へ置き換え、以後は同じBashセッションで実行します。
+以下のplaceholderを実際の値に置き換え、同じBashセッションで実行します。
 
 ```sh
 CASTLOOP="/absolute/path/to/castloop-linux-x64"
@@ -76,11 +61,9 @@ printf '\n'
 export CLOUDFLARE_API_TOKEN
 ```
 
-`SERVICE_ID`は20文字以内の英小文字・数字・ハイフンです。上の大文字placeholderをそのまま使わないでください。workspace／証拠保存先はGit管理外とし、`set -x`は使いません。token、管理鍵、`.castloop/secrets.json`を報告やGitへ添付しません。
+`SERVICE_ID`は20文字以内で、英小文字・数字をハイフンで区切った名前にします。`WORKSPACE`と`EVIDENCE`はGit管理外に置き、tokenや`.castloop/secrets.json`を報告・Gitへ添付しないでください。`set -x`は使いません。
 
-## 3. 対応Workerを用意する
-
-推奨は新しい試験サービスです。**initは一度だけ**実行します。
+## 2. 試験サービスを作成する
 
 ```sh
 "$CASTLOOP" init "$WORKSPACE" \
@@ -88,34 +71,33 @@ export CLOUDFLARE_API_TOKEN
   --workers-subdomain "$WORKERS_SUBDOMAIN"
 cd "$WORKSPACE"
 "$CASTLOOP" service-status > "$EVIDENCE/initialized-service.json"
+"$CASTLOOP" domain list > "$EVIDENCE/initialized-domains.json"
 ```
 
-合格条件: initialized／paused、`admission.invocations`が空、runtime readinessが保存済み。`castloop.toml`から`workers_dev_base_url`を読み、`WORKERS_BASE`へ**同じWorkerのHTTPS origin**を設定します。以後これを変更しません。
+`initialized-service.json`で、`admission.state = paused`、`admission.invocations = []`、`admission.runtime_readiness.worker_version_id = worker_version_id`を確認します。管理URLを`WORKERS_BASE`へ保存して再開します。
 
 ```sh
-WORKERS_BASE="https://ACTUAL_WORKER.ACTUAL_SUBDOMAIN.workers.dev"
+WORKERS_BASE="$(jq -r '.workers_dev_base_url' "$EVIDENCE/initialized-domains.json")"
 INIT_PAUSE_ID="$(jq -r '.admission.pause_id' "$EVIDENCE/initialized-service.json")"
 "$CASTLOOP" service-resume "$INIT_PAUSE_ID"
 ```
 
-既存の**利用許可済み・正常終了した専用M6サービス**を使う場合はinitしません。workspaceを保持し、後述の停止・終了確認を行ってから対象buildの`deploy`を一度実行し、検証済みruntimeで明示再開します。CLIだけを更新してdomain操作を始めないでください。
+CLIの管理操作は常に`WORKERS_BASE`へ接続します。この値は以後変更しません。
 
-init／deployの結果が不明なら、この段階で停止します。再実行やworkspace作り直しで回避しません。
+## 3. 試験コンテンツを作成する
 
-## 4. 小さい試験コンテンツを用意する
+以下のShow／Episodeを作成します。公開・非公開化・削除は、処理完了を確認してから次の操作へ進みます。
 
-次のfixtureをこのサービス内だけで作ります。各公開／lifecycle jobの終了を確認してから次の操作へ進んでください。
-
-| Show | Episode | domain追加前の状態 |
+| Show | Episode | ドメイン追加前の状態 |
 | --- | --- | --- |
-| `domain-a` | `keep` | active。音源／metadata／revisionの不変確認用 |
-| `domain-a` | `hidden` | 一度公開後、unpublishしておく |
-| `domain-a` | `gone` | 一度公開後、**この試験データだけを**明示deleteしておく |
+| `domain-a` | `keep` | 公開中 |
+| `domain-a` | `hidden` | 公開後、unpublishで非公開化 |
+| `domain-a` | `gone` | 公開後、deleteで削除 |
 | `domain-a` | `draft` | create-episodeのみ。未公開 |
-| `domain-b` | `keep` | active。複数Showのfeed切替確認用 |
-| `domain-idle` | なし | create-showのみ。未公開Showの不復活確認用 |
+| `domain-b` | `keep` | 公開中 |
+| `domain-idle` | なし | create-showのみ。未公開 |
 
-公開方法の例です。Show TOMLの内容と`image_path`、Episode TOMLを編集し、GUID／`published_at`は維持します。
+`domain-a/keep`の作成例です。Showの`image_path`は`cover.jpg`にします。
 
 ```sh
 "$CASTLOOP" create-show domain-a --site-url "$SITE_URL"
@@ -125,50 +107,43 @@ cp "$COVER_FILE" domain-a/cover.jpg
 "$CASTLOOP" publish-show domain-a
 "$CASTLOOP" job-status SHOW_JOB_UUID
 
-cd "$WORKSPACE/domain-a"
-"$CASTLOOP" create-episode keep
-# Edit episode-keep.toml before staging.
-"$CASTLOOP" update-episode keep
-"$CASTLOOP" update-episode-audio keep "$MP3_FILE"
-"$CASTLOOP" publish-episode keep "$MP3_FILE"
-cd "$WORKSPACE"
+"$CASTLOOP" create-episode domain-a keep
+# Edit domain-a/episode-keep.toml before staging.
+"$CASTLOOP" update-episode domain-a keep
+"$CASTLOOP" update-episode-audio domain-a keep "$MP3_FILE"
+"$CASTLOOP" publish-episode domain-a keep "$MP3_FILE"
 "$CASTLOOP" job-status EPISODE_JOB_UUID
 ```
 
-UUIDは直前の結果からコピーします。publicationの完了は`server_status.status.state = published`かつ`server_status.ownership = released`です。受付結果だけで次へ進みません。`domain-b/keep`等も同じ手順で作ります。PNGを使う場合は拡張子と`image_path`を揃えます。
+UUIDは各publishの出力にある`job_id`へ置き換えます。公開完了は`job-status`の`server_status.status.state = published`かつ`server_status.ownership = released`です。他のShow／Episodeも表のIDで作成します。
 
-`hidden`／`gone`の公開が完了した時点で、**非公開化／削除する前に**音源pathとGUIDを保存します。削除後はmetadataが失われるため後から取得する前提にしません。
+`hidden`／`gone`は、公開完了後、非公開化／削除する前に音源URLとGUIDを保存します。
 
 ```sh
 "$CASTLOOP" target-episode domain-a hidden > "$EVIDENCE/fixture-hidden-published.json"
 "$CASTLOOP" target-episode domain-a gone > "$EVIDENCE/fixture-gone-published.json"
 ```
 
-lifecycleは次の形で固定planを確認して実行します。`hidden`はunpublish、`gone`はdeleteへ置き換えます。
+非公開化の例です。planの対象・actionを確認し、`REQUEST_SHA256`を`preview.request_sha256`、UUIDを実行結果の`job_id`へ置き換えます。
 
 ```sh
 "$CASTLOOP" preview-episode-lifecycle domain-a hidden unpublish > "$EVIDENCE/hidden-plan.json"
-# Review the target/action and copy preview.request_sha256.
 "$CASTLOOP" lifecycle-execute "$EVIDENCE/hidden-plan.json" REQUEST_SHA256 confirm
 "$CASTLOOP" operation-status lifecycle LIFECYCLE_JOB_UUID
 ```
 
-deleteの承認文字列は`confirm-delete-retain-records`です。対象がこの試験の`gone`であることを確認してから使います。lifecycle完了はstate `completed`、phase `finished`、ownership `released`、`execution_active = false`、`progress.purge_confirmed = true`です。
+`gone`の削除では対象を`gone`、actionを`delete`、planファイル名を`gone-plan.json`、承認文字列を`confirm-delete-retain-records`にします。非公開化・削除・復元の完了条件は、`operation-status`の`server_status`が以下をすべて満たすことです。
 
-## 5. 変更前の基準を保存する
+- `status.state = completed`、`status.phase = finished`
+- `ownership = released`、`execution_active = false`、`progress.purge_confirmed = true`
+
+## 4. 変更前の設定・RSS・画像・音源を保存する
 
 ```sh
 "$CASTLOOP" service-status > "$EVIDENCE/before-service.json"
-"$CASTLOOP" domain list > "$EVIDENCE/before-domains.json"
-"$CASTLOOP" target-episode domain-a keep > "$EVIDENCE/before-a.json"
-"$CASTLOOP" target-episode domain-b keep > "$EVIDENCE/before-b.json"
-"$CASTLOOP" list-shows --include-deleted --json > "$EVIDENCE/before-shows.json"
-"$CASTLOOP" list-episodes domain-a --include-deleted --json > "$EVIDENCE/before-episodes.json"
 ```
 
-domain listは0接続、`configuration_matches = true`、`connections_match = true`、`local_operations = []`であることを確認します。Show／Episode照会に未完了ownerがないことも確認します。一覧が複数ページなら最後まで照会してください。
-
-以下のHTTP記録helperは**公開アクセスだけ**に使います。認証header、`-k`、redirect追跡、mutationの自動retryは付けません。
+以下の関数はHTTP statusを確認し、headerとbodyを`EVIDENCE`へ保存します。公開URLだけに使い、認証header・証明書検査の無効化・redirect追跡は付けません。
 
 ```sh
 check_http() {
@@ -183,81 +158,78 @@ check_http() {
   test "$code" = "$expected"
 }
 
-AUDIO_PATH="$(jq -r '.current_revision.enclosure_url | sub("^https?://[^/]+"; "")' "$EVIDENCE/before-a.json")"
-check_http before-worker-feed-a 200 "$WORKERS_BASE/podcasts/domain-a/feed.xml"
-check_http before-worker-feed-a-warm 200 "$WORKERS_BASE/podcasts/domain-a/feed.xml"
-check_http before-worker-audio 200 "$WORKERS_BASE$AUDIO_PATH"
-sha256sum "$EVIDENCE/before-worker-audio.body" > "$EVIDENCE/before-audio.sha256"
+for SHOW_ID in domain-a domain-b; do
+  "$CASTLOOP" target-episode "$SHOW_ID" keep > "$EVIDENCE/before-$SHOW_ID.json" || exit 1
+  AUDIO_PATH="$(jq -er '.current_revision.enclosure_url | sub("^https?://[^/]+"; "")' "$EVIDENCE/before-$SHOW_ID.json")" || exit 1
+  check_http "before-$SHOW_ID-feed" 200 "$WORKERS_BASE/podcasts/$SHOW_ID/feed.xml" || exit 1
+  check_http "before-$SHOW_ID-cover" 200 "$WORKERS_BASE/podcasts/$SHOW_ID/cover.jpg" || exit 1
+  check_http "before-$SHOW_ID-audio" 200 "$WORKERS_BASE$AUDIO_PATH" || exit 1
+done
+
+AUDIO_PATH="$(jq -r '.current_revision.enclosure_url | sub("^https?://[^/]+"; "")' "$EVIDENCE/before-domain-a.json")"
 ```
 
-同様に`domain-b`のfeed、cover、音源も取得して基準を保存します。音源pathはRSS／`current_revision.enclosure_url`から取得し、job IDから推測しません。実データのSHA-256／サイズが`current_revision.sha256`／`length_bytes`と一致することを確認します。
+各音源の`sha256sum`と`wc -c`の結果を、対応するJSONの`current_revision.sha256`／`length_bytes`と比較してください。
 
-R2 Dashboardの**読み取りのみ**で、2つの`keep`の`metadata.toml`、`revisions/`配下のキーと内容のhash、音源キー／サイズ／checksumも保存します。checksumが表示されない場合は短い音源をdownloadしてSHA-256を計算し、ETagをSHA-256の代用にしません。domain操作後とdeploy後に比較します。CLI target照会は`payloads_verified = false`であり、それだけを全履歴・音源の不変証明にはしません。
+R2 Dashboardから、両Showの`public/episodes/<showId>/keep/metadata.toml`と、その隣の`revisions/`内の全TOMLをダウンロードします。キー一覧と、キーと同じディレクトリ構造のファイルを`$EVIDENCE/r2-before/`へ保存してください。各変更後に同じキーを取得し、一覧と各TOMLの内容を比較します。
 
-HTTPを2回取得しただけでは内部cache HITの証明にはなりません。今回は変更前に取得したfeedが変更後に残らないことを確認し、内部HITの実証は既存M6受け入れを再利用します。
-
-## 6. 停止・domain追加・明示再開
+## 5. 停止してドメインを追加する
 
 ```sh
 ADD_PAUSE_ID="$(uuidgen)"
 ADD_OPERATION_ID="$(uuidgen)"
 "$CASTLOOP" service-pause "$ADD_PAUSE_ID"
 "$CASTLOOP" service-status > "$EVIDENCE/add-paused.json"
+"$CASTLOOP" domain list > "$EVIDENCE/add-paused-domains.json"
 ```
 
-**domain addの前に止めて確認すること:** state `paused`、pause ID一致、invocations空、全Showの登録完了・owner終了、local lock不在。statusが未確認なら読み取りだけを有限回再照会します。pausedや時間経過だけでdrainedとしません。
+**共通確認（各変更前・再開前・試験終了時）:**
+
+- `service-status`の`admission.state = paused`、`pause_id`が今回のID、`invocations = []`。
+- `target-show domain-a`／`domain-b`／`domain-idle`で`unfinished_show_operation = false`。直前の処理は第3節の完了条件を満たすこと。
+- `domain list`の`configuration_matches = connections_match = true`、`local_operations = []`、`admission.url_change`なし。
+
+処理中なら照会を続け、終了を確認してから進みます。
 
 ```sh
-check_http add-paused-feed 503 "$WORKERS_BASE/podcasts/domain-a/feed.xml"
+check_http add-paused-feed 503 "$WORKERS_BASE/podcasts/domain-a/feed.xml" || exit 1
 "$CASTLOOP" domain add "$DOMAIN_HOST" --operation-id "$ADD_OPERATION_ID" > "$EVIDENCE/add-result.json"
 "$CASTLOOP" domain list > "$EVIDENCE/added-domains.json"
 "$CASTLOOP" service-status > "$EVIDENCE/added-service.json"
 ```
 
-追加後の合格条件:
+共通確認に加え、追加結果を確認します。
 
-- `result = domain-changed-paused`、操作ID一致。接続は指定hostname／対象Worker／対象Zoneの1件だけ。
-- 正規URLは`DOMAIN_BASE`、管理URLは元の`WORKERS_BASE`。設定一致／接続一致がtrue。
-- `admission.url_change`なし、invocations空、unfinishedなlocal操作なし。local journalは`completed = true`、remote進捗は`complete`、必要なreceiptを保持。
-- Worker version／deploymentは追加前と同じ。R2とlocal設定のhashが整合し、必要なruntime readinessの設定hashだけが更新。
-- 公開feed／cover／音源は**両hostとも503のまま**。勝手に再開しない。
+- `add-result.json`は`result = domain-changed-paused`。`operation_id`は`$ADD_OPERATION_ID`と一致。
+- `added-domains.json`の接続は指定hostname／Worker／Zoneの1件。`public_base_url`は`$DOMAIN_BASE`、`workers_dev_base_url`は`$WORKERS_BASE`。
+- `added-service.json`の`worker_version_id`は`before-service.json`と同じ。
+- 両hostの公開feed／画像／音源は503。
 
-TLS準備待ちで終了した場合は第10節に従い、再開しません。追加済みのhostへの秘密なしprobeは次の形で確認できます。
-
-```sh
-PROBE_NONCE="$(uuidgen)"
-check_http added-probe 200 "$DOMAIN_BASE/.well-known/castloop/runtime?nonce=$PROBE_NONCE"
-```
-
-probeのnonce、service ID、Worker名、Worker versionが今回の値と一致し、`Cache-Control: no-store`であることを確認します。証明書検査を無効化した成功やredirect先の200は合格ではありません。
+確認後に再開します。
 
 ```sh
 "$CASTLOOP" service-resume "$ADD_PAUSE_ID"
-"$CASTLOOP" service-status > "$EVIDENCE/added-open-service.json"
-check_http added-worker-feed-a 200 "$WORKERS_BASE/podcasts/domain-a/feed.xml"
-check_http added-domain-feed-a 200 "$DOMAIN_BASE/podcasts/domain-a/feed.xml"
-cmp "$EVIDENCE/added-worker-feed-a.body" "$EVIDENCE/added-domain-feed-a.body"
 ```
 
-## 7. 両hostの配信・公開・lifecycleを確認する
+## 6. 両hostの配信・公開・非公開化・復元を確認する
 
-次の表を**両host**で確認します。`check_http`に一意なlabelを付け、header／body／statusを保存してください。
+`WORKERS_BASE`と`DOMAIN_BASE`の両方で以下を確認します。`check_http`のlabelは重複しない名前にしてください。
 
 | 対象／要求 | 期待値 |
 | --- | --- |
-| activeな2 Showのfeed GET／HEAD | 200。両hostのRSS本文が一致 |
-| activeなcover GET／HEAD | 200。画像の内容／サイズが基準と同じ |
-| `keep`音源のGET／HEAD | 200。全量hash／サイズ／Content-Typeが基準と同じ |
-| `keep`音源 `--range 0-1023` | 206、1024 bytes、Content-Rangeが整合。先頭bytesが全量GETと一致 |
+| 2 Showのfeed GET／HEAD | 200。GETのRSS本文が両hostで一致 |
+| 2 Showのcover GET／HEAD | 200。GETの画像が`before-<showId>-cover.body`と`cmp`で一致 |
+| 両Showの`keep`音源 GET／HEAD | 200。GETの音源が`before-<showId>-audio.body`と`cmp`で一致。Content-Length／Content-Typeは`current_revision.length_bytes`／`content_type`と一致 |
+| `keep`音源 `--range 0-1023` | 206。本文1024 bytes、`Content-Range: bytes 0-1023/<全体サイズ>`。本文は全量GETの先頭1024 bytesと一致 |
 | 取得したETagを`If-None-Match`へ指定 | 304、本文なし |
-| 変更前feedのETagをworker側feedへ指定 | 200。新しい独自domain正規URLの本文であり、古いfeedを304で返さない |
+| 変更前feedのETagをworkers.devのfeedへ指定 | 200。feed自己参照・画像・全音源URLは`$DOMAIN_BASE/`で始まる |
 | `hidden`の保存済み音源path | 404。RSSから当該GUIDが除外 |
 | `gone`の保存済み音源path | 410。RSSから当該GUIDが除外 |
-| `domain-idle`のfeed、未公開`draft` | RSSに現れず、未公開Showのfeedは404。R2にdraft用の公開feed／音源を新規作成しない |
-| `/system/service.toml`・既知staging path | 404。private内容なし |
+| `domain-idle`のfeed、未公開`draft` | 未公開Showのfeedは404。RSSに`draft`なし。R2に`domain-idle`の公開feedや`draft`の公開音源がない |
+| `/system/service.toml`・試験jobの`/staging/`配下URL | 404。非公開ファイルの本文を返さない |
 | 管理鍵なしの`/admin/health` | 401 |
 
-HEAD／Range／条件付きGETの例です。ETagは保存したheaderから、二重引用符を含む実際の値へ置き換えます。
+HEAD／Range／条件付きGETの例です。ETagは対応する`.headers`ファイルの値（二重引用符を含む）へ置き換えます。変更前feedのETagは`before-domain-a-feed.headers`から読みます。
 
 ```sh
 check_http added-domain-audio 200 "$DOMAIN_BASE$AUDIO_PATH"
@@ -269,43 +241,48 @@ OLD_FEED_ETAG='"PASTE_BEFORE_WORKER_FEED_ETAG"'
 check_http added-worker-changed-feed 200 --header "If-None-Match: $OLD_FEED_ETAG" "$WORKERS_BASE/podcasts/domain-a/feed.xml"
 ```
 
-`hidden`／`gone`の音源pathとGUIDは非公開化／削除前に保存してください。`draft`には公開音源URLがないため、URLを捏造して不変を判定しません。
+両ShowのRSSを`before-<showId>-feed.body`と比較します。`atom:link`のfeed自己参照、画像、全`enclosure`のURLは、先頭の`$WORKERS_BASE`だけが`$DOMAIN_BASE`へ置き換わること。既存EpisodeのGUID／pubDateとShowのサイトURLは変わらないことを確認してください。
 
-RSSはXMLとして確認し、feed自己参照・cover・**全enclosure**のoriginが`DOMAIN_BASE`であること、GUID／pubDate／ShowのサイトURLが基準と同じことを確認します。保存済みmetadataに古いenclosure originが残ることは仕様です。RSSが現在の正規URLへ組み直されているかを判定します。
+両`keep`の`target-episode`を再取得し、変更前・変更後のJSONそれぞれから`jq -S '.current_revision'`で抜き出した出力を比較します。R2のキー一覧・TOMLも第4節の保存内容と一致すること。metadata内の音源URLは変えず、RSSだけが新しいドメインのURLを使います。
 
-追加後の`target-episode`を取り直し、`jq -S '.current_revision'`で変更前と比較します。R2の媒体・metadata・revision inventory／hashも一致させます。世代やservice状態が異なるため、target応答全体の一致は要求しません。
+続けて以下を実施し、各処理の完了を第3節の条件で確認します。
 
-続けて次の**変更入口だけ**を一度ずつ確認します。M6全操作の異常系は再実施しません。
+1. `domain-a/after-domain`を新規公開。RSSの新しい音源URLが独自ドメインになること。
+2. `domain-a/keep`をunpublishして両hostの音源が404になること。その後restoreして、同じ音源／GUID／revisionで200へ戻ること。
+3. `domain-b`をShow unpublishして両hostのfeed／画像／音源が404になること。その後restoreして元の200へ戻ること。
 
-1. 独自domain稼働中に`domain-a/after-domain`を新規公開する。管理操作はworkers.devで成功し、RSSの新enclosureは独自domainになる。
-2. `domain-a/keep`をunpublish → 完了確認 → restore → 完了確認。warm済み音源が両hostで404になり、restore後に同じbytes／GUID／revisionで200へ戻る。
-3. `domain-b`をShow unpublish → 完了確認 → restore → 完了確認。両hostのfeed／cover／音源が404 → 元の200へ戻る。
+Showのplanは`preview-show-lifecycle domain-b unpublish`／`restore`で作成します。実行方法は第3節と同じです。各操作後、`hidden`は404、`gone`は410、`draft`はRSSにないことも確認してください。
 
-Show操作は`preview-show-lifecycle domain-b unpublish`または`preview-show-lifecycle domain-b restore`でplanを作ります。各操作後に上のHTTP確認を繰り返し、`hidden`／`gone`／`draft`は復活していないことを確認します。headerのcache HIT表示だけでpurge成功を判定せず、変更後の状態／内容も確認します。
-
-## 8. 独自domainを保持した通常deploy
+## 7. ドメインを保持したWorker更新
 
 ```sh
 "$CASTLOOP" domain list > "$EVIDENCE/pre-deploy-domains.json"
-"$CASTLOOP" target-episode domain-a keep > "$EVIDENCE/pre-deploy-a.json"
 DEPLOY_PAUSE_ID="$(uuidgen)"
 DEPLOY_OPERATION_ID="$(uuidgen)"
 "$CASTLOOP" service-pause "$DEPLOY_PAUSE_ID"
 "$CASTLOOP" service-status > "$EVIDENCE/deploy-paused.json"
 ```
 
-第6節と同じ終了確認をしてから実行します。
+第5節の共通確認を行ってから更新します。
 
 ```sh
 "$CASTLOOP" deploy --operation-id "$DEPLOY_OPERATION_ID" > "$EVIDENCE/deploy-result.json"
 "$CASTLOOP" service-status > "$EVIDENCE/deployed-service.json"
 "$CASTLOOP" domain list > "$EVIDENCE/deployed-domains.json"
+```
+
+共通確認に加え、以下を確認して再開します。
+
+- `deployed-service.json`の`worker_version_id`が更新前と異なり、`admission.runtime_readiness.worker_version_id`と一致。
+- `pre-deploy-domains.json`と`deployed-domains.json`の`domains`（`id/hostname/service/zone_id`）、`public_base_url`、`workers_dev_base_url`が一致。
+
+```sh
 "$CASTLOOP" service-resume "$DEPLOY_PAUSE_ID"
 ```
 
-合格条件: 新しいWorker versionと検証済みreadinessでpaused完了し、明示再開できること。domainの`id/hostname/service/zone_id`、正規URL／管理URL、Episode current revision全体、媒体／履歴が維持されること。第7節の配信表を再確認します。domainの再接続やデータ変換はしません。
+両hostからRSS・画像・音源をGETして200を確認します。RSSのfeed自己参照・画像・全音源URLは`$DOMAIN_BASE/`で始まり、画像・音源は第4節の保存ファイルと`cmp`で一致すること。両`keep`の`current_revision`とR2のキー一覧・TOMLも比較します。
 
-## 9. domain削除・workers.devへの復帰
+## 8. ドメインを削除してworkers.devへ戻す
 
 ```sh
 REMOVE_PAUSE_ID="$(uuidgen)"
@@ -314,47 +291,53 @@ REMOVE_OPERATION_ID="$(uuidgen)"
 "$CASTLOOP" service-status > "$EVIDENCE/remove-paused.json"
 ```
 
-同じ終了確認をしてから進めます。
+第5節の共通確認を行ってから削除します。
 
 ```sh
 "$CASTLOOP" domain remove --operation-id "$REMOVE_OPERATION_ID" > "$EVIDENCE/remove-result.json"
 "$CASTLOOP" domain list > "$EVIDENCE/removed-domains.json"
 "$CASTLOOP" service-status > "$EVIDENCE/removed-service.json"
 check_http removed-paused-feed 503 "$WORKERS_BASE/podcasts/domain-a/feed.xml"
+```
+
+共通確認に加え、以下を確認して再開します。
+
+- `remove-result.json`は`result = domain-changed-paused`。`operation_id`は`$REMOVE_OPERATION_ID`と一致。
+- `removed-domains.json`は`domains = []`。`public_base_url`と`workers_dev_base_url`はともに`$WORKERS_BASE`。
+- `removed-service.json`の`worker_version_id`は削除前と同じ。
+
+```sh
 "$CASTLOOP" service-resume "$REMOVE_PAUSE_ID"
 ```
 
-合格条件:
+workers.devからRSS・画像・音源をGETして200を確認します。RSSのfeed自己参照・画像・全音源URLは`$WORKERS_BASE/`で始まること。独自ドメイン中に公開した`after-domain`も確認してください。両`keep`の`current_revision`、画像・音源、R2のキー一覧・TOMLは変更前と一致すること。`hidden`は404、`gone`は410、未公開コンテンツは公開されていないことも確認します。
 
-- 接続0件、正規URL／管理URLは`WORKERS_BASE`、設定／接続一致、URL owner／invocation／unfinished local操作なし。
-- 削除操作ではWorker versionが変わらず、paused完了 → 明示再開となる。
-- worker側の全feed URLはworkers.devへ戻る。**独自domain中に公開した`after-domain`も含む全enclosure**が戻る。
-- 音源path／bytes、metadata／revision／GUID／pubDate／サイトURLを維持し、非公開／削除／draftは復活しない。
-- 第7節のworker側HTTP確認が合格する。独自hostnameは対象Workerへ到達しなくなる。
+DashboardでCustom Domainの接続がなくなったことを確認します。次のURLへ認証なしでGETし、対象Workerの`service_id`／`worker_name`が返らないことを確認してください。DNS未解決やTLSエラーでも構いません。
 
-切断後の独自hostはDNS未解決、TLSエラー等もあり得るため、HTTP 404だけを必須にしません。Dashboardの接続解除と新しいnonceのprobeで確認し、反映待ちは読み取りだけを有限回行います。同じWorker probeが返り続ける場合は不合格です。削除操作の再送、残った証明書の手動削除、Zone全体のDNS変更は行いません。
+```sh
+curl --disable --silent --show-error --connect-timeout 10 --max-time 60 \
+  "$DOMAIN_BASE/.well-known/castloop/runtime?nonce=$(uuidgen)"
+```
 
-試験終了時は、新しいpause IDでサービスを停止し、invocations／ownerが空であることを記録します。**Worker／bucket／Queue／DLQ／操作記録は保持します。** リソース一式の削除は別途対象を確認した操作で行い、本手順の完了処理には含めません。
+試験終了時は新しいpause IDで停止し、第5節の共通確認を行います。Worker／bucket／Queue／DLQと操作記録は保持します。
 
-## 10. 失敗時の停止・続行条件
+## 9. 失敗した場合
 
-| 状況 | 対応 |
-| --- | --- |
-| TLS待ち。接続receipt確認済み、pending／execution token／lockなし | DNS/TLSの読み取り確認後、同じhostname・操作IDのaddを明示再実行。resumeしない |
-| 確認済みpurge失敗 | 原因解消後、同じ固定要求を続行。別job／新hostnameで回避しない |
-| 管理API応答喪失／local設定未同期 | domain listとjournalを保存。同じ要求のsettledなreceipt／進捗をCLIが検証できる場合だけ同じコマンドで続行 |
-| Cloudflare PUT／DELETEそのものが不明、Worker実行token／lock残存 | **停止・保持。再送／強制解放／時間による失効／設定書換えをしない** |
-| 未知のinit／deploy、期待と違う接続／設定／Worker | 停止し証拠を保存。採用・再初期化・再配備・自動rollbackしない |
+サービスを再開せず、`service-status`と`domain list`の出力を保存します。workspaceと`.castloop/`を保持してください。
 
-自然発生した失敗だけを扱います。実機で通信切断、強制終了、purge権限の剥奪等を意図的に行う試験は今回は不要です。復旧に失敗してblockedのままなら、合格扱いせず未完了として報告してください。
+- TLS準備待ち・確認済みのcache purge失敗は、原因解消後に同じhostname・操作IDのコマンドを再実行します。CLIが続行を拒否した場合は停止します。
+- 接続／切断要求の結果が不明、lock／実行tokenが残っている、init／deployの結果が不明な場合は、再実行や強制解放を行いません。時間経過だけで終了と判断しないでください。
+- HTTPや保存データの比較が不一致なら、そのファイルと操作IDを残して調査します。
 
-## 11. 実施結果の最小記録
+応答喪失・設定同期の復旧条件は[利用・復旧手順の「エラー時」](custom_domains.md#エラー時)を参照してください。
 
-- 実施日、account／Zone／専用hostname／Worker／bucket、build commit／バイナリSHA-256。
-- init（または事前更新）、add、通常deploy、removeの操作ID・pause ID・Worker version。
-- 2 Showの切替、両host GET／HEAD／Range／304、private経路、非公開・削除データの不復活。
-- 媒体／metadata／revision／GUID／pubDateの不変、canonical URLの往復、lifecycle／新規公開、完了時のowner解放。
-- エラーがあれば、allowlistedなreason codeと未完了状態。秘密や任意例外文、公開metadata本文をGitの結果報告へ複製しない。
-- 最後のpaused状態、保持リソース、未解決事項。実施していない項目を合格としない。
+## 10. 結果を記録する
 
-参照: [利用・復旧手順](custom_domains.md)、[実装計画](../design/custom_domain_plan.md)、[M6既存受け入れ](../design/m6_standalone_acceptance.md)、[Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)。
+`$EVIDENCE/result.md`に以下を記録します。
+
+- 実施日、account／Zone／hostname／Worker／bucket、commit ID／バイナリSHA-256。
+- init・add・deploy・removeの操作ID、pause ID、Worker version。
+- 第5〜8節の各確認項目の合格／不合格／未実施と、対応する保存ファイル名。
+- 最後の停止状態、保持したリソース、未解決事項。エラーは`reason_code`を記録し、秘密やmetadata本文を報告へ転載しないこと。
+
+参照: [利用・復旧手順](custom_domains.md)、[実装計画](../design/custom_domain_plan.md)。
