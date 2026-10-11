@@ -1,0 +1,9 @@
+{
+  "method": "GET",
+  "path": "/zones/[REDACTED_RESOURCE_ID]/dns_records?name.exact=castloop-test.otftalk.com&page=1&per_page=100",
+  "http_status": 403,
+  "cloudflare_error_codes": [
+    10000
+  ],
+  "remote_mutations_performed": false
+}

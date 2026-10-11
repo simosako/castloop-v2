@@ -1,0 +1,29 @@
+{
+  "result": "domains",
+  "public_base_url": "https://castloop-domtest-1011-r2-a42a0a3e.simosako.workers.dev",
+  "workers_dev_base_url": "https://castloop-domtest-1011-r2-a42a0a3e.simosako.workers.dev",
+  "configuration_matches": true,
+  "connections_match": true,
+  "domains": [],
+  "admission": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r2",
+    "generation": 159,
+    "mode": "m6",
+    "state": "paused",
+    "invocations": [],
+    "pause_id": "75c97a30-a20d-4fb1-9208-fde02a144b4d",
+    "last_resumed_pause_id": "124b4afd-f16a-4ad2-a681-21fb138024f0",
+    "runtime_readiness": {
+      "operation_id": "c57962d8-70b4-4495-87c1-5cf503f2d1b8",
+      "deployment_id": "8fa6f3f3-3149-4a26-af7f-293f303adea1",
+      "worker_version_id": "29af13fd-8487-48da-abb0-15ec7c280745",
+      "service_config_sha256": "343758151c1985b4045b0eb3b67683539c12e106cb8a1c0a75384a0b222f7af7",
+      "default_cache_disabled": true,
+      "cached_entrypoint": "CachedPublicAssets",
+      "cutover_verified": true,
+      "publication_routes_verified": true
+    }
+  },
+  "local_operations": []
+}

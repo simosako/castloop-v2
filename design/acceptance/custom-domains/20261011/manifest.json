@@ -1,0 +1,266 @@
+[
+  {
+    "published_path": "logs/test-20261010.log",
+    "local_source": "test-20261010.log",
+    "treatment": "sanitized copy; local originals retained",
+    "published_sha256": "68a4674836e40ccda0fce6bbf7a4f51cfcfdfd0d86afdeff6eb56124754d6f28"
+  },
+  {
+    "published_path": "logs/test-20261011.log",
+    "local_source": "test-20261011.log",
+    "treatment": "sanitized copy; local originals retained",
+    "published_sha256": "31598756bdf8e124bc9898b55330b4511d7af4de7f70aa7dd41bed84f8725f87"
+  },
+  {
+    "published_path": "run1/result.md",
+    "local_source": "evidence/domain-acceptance-20261011-685cd81c/result.md",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "4981f624e5046775ef90ad193457ab3c6992eb18b9ea78bd823847b153823c50"
+  },
+  {
+    "published_path": "run1/preflight-failure.json",
+    "local_source": "evidence/domain-acceptance-20261011-685cd81c/preflight-failure.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "893d932be03de16d1cf98f27f7bcf9086746e65f15590e8b4eeae9f5ccd2489c"
+  },
+  {
+    "published_path": "run1/init-corrected-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-685cd81c/init-corrected-result.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "18898e5a796c906dc05146ff027ddf001203531b16055bc8dcbadf323f64c549"
+  },
+  {
+    "published_path": "run1/recovery-readonly-20261011T105049-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-685cd81c/recovery-readonly-20261011T105049-service.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "24ef0730a04115c0b1c487a11977cd3ab7c31bf180981f4c8274daeee60de377"
+  },
+  {
+    "published_path": "run1/recovery-readonly-20261011T105049-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-685cd81c/recovery-readonly-20261011T105049-domains.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "e0b6cd0221b466cca9ab99d0dfebd38e68a12a544b96e8741f3dc56b745c3f33"
+  },
+  {
+    "published_path": "run1/recovery-readonly-20261011T105049-gone-job.json",
+    "local_source": "evidence/domain-acceptance-20261011-685cd81c/recovery-readonly-20261011T105049-gone-job.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "64b287bc857007e330b1d8d49a96e3641d75a49d39c76536a5545c2b4c63b360"
+  },
+  {
+    "published_path": "run1/recovery-readonly-20261011T105049-show.json",
+    "local_source": "evidence/domain-acceptance-20261011-685cd81c/recovery-readonly-20261011T105049-show.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "20d56a73e9a34b0ea238aea4760f971db0c3993f3a298c7c7b853579961ab9d4"
+  },
+  {
+    "published_path": "run2/result.md",
+    "local_source": "evidence/domain-acceptance-20261011-run2/result.md",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "057039a0100f03441aa4522a9ae66cbf80d6afdb479ee9f7c2315826641dc040"
+  },
+  {
+    "published_path": "run2/diagnosis.md",
+    "local_source": "evidence/domain-acceptance-20261011-run2/diagnosis.md",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "0dddecd66ecb25cce0f6ca8fdfa27541cb695a3ccec4fb055d0c2dd9c1670f0b"
+  },
+  {
+    "published_path": "run2/init-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/init-result.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "0c5324c23b5680439bcd38bf0e093a7bfbbe6abf317d36bbfd54e733fc374792"
+  },
+  {
+    "published_path": "run2/initialized-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/initialized-service.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "125097177ee645f630cf6e2a6490b6053b8841ea6aca847721fce30360889d0a"
+  },
+  {
+    "published_path": "run2/initialized-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/initialized-domains.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "1eb3d8b900a6b78c8e0728d2b0c3d2f31f15e182f9c02616434535f9cda6d389"
+  },
+  {
+    "published_path": "run2/diagnosis-status-read-race.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/diagnosis-status-read-race.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "cad3ca6be5a138c330cc9e92d066c6cc0cef725549f5a353168d48fd43c38301"
+  },
+  {
+    "published_path": "run2/diagnosis-concurrent-status-test.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run2/diagnosis-concurrent-status-test.txt",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "82b13db5f349bcaa75c8fefab9c5617ed236887249c25d3effad68dab93b3f68"
+  },
+  {
+    "published_path": "run2/paused-public-local-repro.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/paused-public-local-repro.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "af9c295b2870e78089eabfd60e55cadf3e0bcdacc0db6bd4d33209c98a5095f1"
+  },
+  {
+    "published_path": "run2/add-paused-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-service.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "64e389da298743e5c132f409d72e8313657eb852a083b93b7a3c1cdf9439dac1"
+  },
+  {
+    "published_path": "run2/add-paused-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-domains.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "5fd36b6fc3b458135d98fe7fbbb4675196f24df0e83fd8e369f198c77dcc41cf"
+  },
+  {
+    "published_path": "run2/add-paused-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-domain-a.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "4b65bdabb08018911f8a5f8520e5525ee053e3ca6e783146a18bb87f868a00a0"
+  },
+  {
+    "published_path": "run2/add-paused-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-domain-b.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "5bf13472ae16dc6a74baa3200432a248941b49b8fa3ba18cf2569d118a9de932"
+  },
+  {
+    "published_path": "run2/add-paused-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-domain-idle.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "15817225b0ca036d03b4672bc90b1ec4959bb93710f72fdf12eb08f577f4dc67"
+  },
+  {
+    "published_path": "run2/paused-delivery-final-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/paused-delivery-final-service.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "64e389da298743e5c132f409d72e8313657eb852a083b93b7a3c1cdf9439dac1"
+  },
+  {
+    "published_path": "run2/paused-delivery-final-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/paused-delivery-final-domains.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "5fd36b6fc3b458135d98fe7fbbb4675196f24df0e83fd8e369f198c77dcc41cf"
+  },
+  {
+    "published_path": "run2/before-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/before-domain-a.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "58dd83753e2c326408ad013286c216443a77a00d08440216e4ed0f1190823827"
+  },
+  {
+    "published_path": "run2/before-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/before-domain-b.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "639c526ccff673d4ac76ba4ffe1a0f91e19624c902b7e67bd91327e7414051ce"
+  },
+  {
+    "published_path": "run2/hidden-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/hidden-completed.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "10f778a93089e2d76cc01dd2a8de963bee96e13f84d43ad4e0718b97d83400b1"
+  },
+  {
+    "published_path": "run2/gone-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/gone-completed.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "e2be9dbd3976b773863bfe2dde321d93d3357230ff8073f042ead7f9d7d21fd8"
+  },
+  {
+    "published_path": "run2/publish-domain-a-hidden-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/publish-domain-a-hidden-completed.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "328d72fb68e2e94405645d7ae5fcf22d276336137894afb35d8bbb6afcb5aec1"
+  },
+  {
+    "published_path": "run2/publish-domain-a-gone-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/publish-domain-a-gone-completed.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "90258a5fc00a170cfaa89853f777d3295465a1b7e65b930711725de438a186a2"
+  },
+  {
+    "published_path": "run2/publish-domain-b-keep-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/publish-domain-b-keep-completed.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "ab06ef57743165eaca7e1fc0f2a3d237aedbdfdcba45641d0bd30cb6b726a552"
+  },
+  {
+    "published_path": "run2/r2-before/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/r2-before/keys.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "15361eefdaffc413bc27bc74aea6eb8fc9985e6ad0a19d25d703829626254277"
+  },
+  {
+    "published_path": "run2/r2-before/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/r2-before/unpublished-check.json",
+    "treatment": "sanitized selected evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run2/http/add-paused-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-feed.headers",
+    "treatment": "allowlisted headers only; reporting identifiers omitted; trailing whitespace normalized",
+    "published_sha256": "a4bd131ade4ef5aeb33b55557f2aa6b4e5342bc8a2d7b7f58eb31d693bbacf76"
+  },
+  {
+    "published_path": "run2/http/add-paused-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run2/http/add-paused-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/add-paused-feed.body",
+    "treatment": "hash/length only; body not copied",
+    "published_sha256": "ebf240b8e2bcd06749d4d32c1d0ca3d828047bd11cead2d2e5b020fe4a8b09bf"
+  },
+  {
+    "published_path": "run2/http/pause-recheck-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run2/pause-recheck-feed.headers",
+    "treatment": "allowlisted headers only; reporting identifiers omitted; trailing whitespace normalized",
+    "published_sha256": "9aa1eb92f0863efad2bc34d80e45ceb11ce52eadb8fdd86f87bb73d62574a114"
+  },
+  {
+    "published_path": "run2/http/pause-recheck-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run2/pause-recheck-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run2/http/pause-recheck-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/pause-recheck-feed.body",
+    "treatment": "hash/length only; body not copied",
+    "published_sha256": "ebf240b8e2bcd06749d4d32c1d0ca3d828047bd11cead2d2e5b020fe4a8b09bf"
+  },
+  {
+    "published_path": "run2/http/pause-nonce-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run2/pause-nonce-feed.headers",
+    "treatment": "allowlisted headers only; reporting identifiers omitted; trailing whitespace normalized",
+    "published_sha256": "3fa4a4e4579cd52ec3d08f3b71072f36d13fbc5f212ef973ed0d6d58814c2916"
+  },
+  {
+    "published_path": "run2/http/pause-nonce-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run2/pause-nonce-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run2/http/pause-nonce-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run2/pause-nonce-feed.body",
+    "treatment": "hash/length only; body not copied",
+    "published_sha256": "ebf240b8e2bcd06749d4d32c1d0ca3d828047bd11cead2d2e5b020fe4a8b09bf"
+  },
+  {
+    "published_path": "repro/paused-public.ts",
+    "local_source": "diagnostics/paused-public.ts",
+    "treatment": "imports adjusted for repository location; local fake-only repro",
+    "published_sha256": "ec5096aa3543b60f20f33f6b2f1c2afd29659f3470ce791029962cde5642c389"
+  },
+  {
+    "published_path": "repro/status-read-race.ts",
+    "local_source": "diagnostics/status-read-race.ts",
+    "treatment": "imports adjusted for repository location; local fake-only repro",
+    "published_sha256": "42c18832e1bab0db55efcb6c00f87923c1ad9d7d0894f0cedbf7f22a7925f839"
+  }
+]

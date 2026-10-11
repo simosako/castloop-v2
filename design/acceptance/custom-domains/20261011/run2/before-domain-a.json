@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "result": "target",
+  "request": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r2",
+    "kind": "episode",
+    "show_id": "domain-a",
+    "episode_id": "keep"
+  },
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "payloads_verified": false,
+  "admission_state": "open",
+  "show": {
+    "lifecycle": "active",
+    "generation": 13
+  },
+  "episode": {
+    "lifecycle": "active",
+    "generation": 1
+  },
+  "unfinished_show_operation": false,
+  "current_revision": {
+    "revision_id": "dafb76fc-9dd2-4a6e-85f9-69b1a927af12",
+    "enclosure_url": "https://castloop-domtest-1011-r2-a42a0a3e.simosako.workers.dev/podcasts/domain-a/episodes/keep/dafb76fc-9dd2-4a6e-85f9-69b1a927af12.mp3",
+    "content_type": "audio/mpeg",
+    "length_bytes": 962185,
+    "duration_seconds": 30,
+    "sha256": "cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87"
+  }
+}

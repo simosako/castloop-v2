@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "result": "target",
+  "request": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r2",
+    "kind": "show",
+    "show_id": "domain-idle"
+  },
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "payloads_verified": false,
+  "admission_state": "paused",
+  "show": {
+    "lifecycle": "draft",
+    "generation": 0
+  },
+  "episode": null,
+  "unfinished_show_operation": false,
+  "current_revision": null
+}

@@ -1,0 +1,103 @@
+{
+  "family": "publication",
+  "operation_id": "e4d22094-70ab-45fa-a19c-b58b4b183549",
+  "client_state": {
+    "schema_version": 1,
+    "identity": {
+      "service_id": "domtest-685cd81c",
+      "account_id": "[REDACTED_RESOURCE_ID]",
+      "worker_name": "castloop-domtest-685cd81c-7ce82b9c",
+      "public_base_url": "https://castloop-domtest-685cd81c-7ce82b9c.simosako.workers.dev"
+    },
+    "publication": {
+      "schema_version": 1,
+      "request": {
+        "schema_version": 1,
+        "job_id": "e4d22094-70ab-45fa-a19c-b58b4b183549",
+        "show_id": "domain-a",
+        "kind": "episode",
+        "episode_id": "gone",
+        "action": "publish",
+        "expected_show_generation": 10,
+        "expected_episode_generation": 0,
+        "created_at": "2026-10-11T01:45:00Z"
+      },
+      "commit": {
+        "schema_version": 1,
+        "kind": "episode",
+        "show_id": "domain-a",
+        "episode_id": "gone",
+        "job_id": "e4d22094-70ab-45fa-a19c-b58b4b183549",
+        "metadata_sha256": "ee972db11bc8cd4455b5825467163c1ee1aa45f9126fba0e8a26ebab4fd4c894",
+        "audio_sha256": "cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87",
+        "audio_length_bytes": 962185,
+        "duration_seconds": 30,
+        "committed_at": "2026-10-11T01:45:00Z"
+      },
+      "staged_uploads": [
+        "240fa607-01be-4072-bb03-fea9cc6e487c",
+        "631fc2d8-b313-4b29-a1d5-5fca595b3978"
+      ]
+    },
+    "manifest_sha256": "6e3e7f2557c4390aa697c96cff017a99741a0edb53021e0a0ca07852de175aec",
+    "phase": "commit_requested",
+    "claim_receipt": {
+      "show_id": "domain-a",
+      "job_id": "e4d22094-70ab-45fa-a19c-b58b4b183549",
+      "show_generation": 11
+    }
+  },
+  "lock_present": true,
+  "remote_state_checked": true,
+  "authorizes_mutation": false,
+  "authorizes_recovery": false,
+  "server_status": {
+    "schema_version": 1,
+    "service_id": "domtest-685cd81c",
+    "result": "status",
+    "publication": {
+      "schema_version": 1,
+      "request": {
+        "schema_version": 1,
+        "job_id": "e4d22094-70ab-45fa-a19c-b58b4b183549",
+        "show_id": "domain-a",
+        "kind": "episode",
+        "episode_id": "gone",
+        "action": "publish",
+        "expected_show_generation": 10,
+        "expected_episode_generation": 0,
+        "created_at": "2026-10-11T01:45:00Z"
+      },
+      "commit": {
+        "schema_version": 1,
+        "kind": "episode",
+        "show_id": "domain-a",
+        "episode_id": "gone",
+        "job_id": "e4d22094-70ab-45fa-a19c-b58b4b183549",
+        "metadata_sha256": "ee972db11bc8cd4455b5825467163c1ee1aa45f9126fba0e8a26ebab4fd4c894",
+        "audio_sha256": "cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87",
+        "audio_length_bytes": 962185,
+        "duration_seconds": 30,
+        "committed_at": "2026-10-11T01:45:00Z"
+      },
+      "staged_uploads": [
+        "240fa607-01be-4072-bb03-fea9cc6e487c",
+        "631fc2d8-b313-4b29-a1d5-5fca595b3978"
+      ]
+    },
+    "operation": {
+      "show_id": "domain-a",
+      "job_id": "e4d22094-70ab-45fa-a19c-b58b4b183549",
+      "show_generation": 11
+    },
+    "manifest_sha256": "6e3e7f2557c4390aa697c96cff017a99741a0edb53021e0a0ca07852de175aec",
+    "request_sha256": "005d1122babcf0ea49474e3bbd91dd6f01ff8ca434d523f13dd916efb2241af4",
+    "status": null,
+    "progress": null,
+    "ownership": "held",
+    "execution_active": false,
+    "marker_present": false,
+    "staging_verified": false,
+    "authorizes_recovery": false
+  }
+}

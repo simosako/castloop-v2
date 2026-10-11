@@ -1,0 +1,11 @@
+{
+  "local_only": true,
+  "cloudflare_requests": 0,
+  "stable_before": "status",
+  "worker_internal_error": "Publication records changed during their read-only inspection",
+  "http_status": 409,
+  "reason_code": "publication_operation_blocked",
+  "client_error": "Publication response was not verified; inspect retained ownership/progress without automatic retry",
+  "cli_error": "Operation status could not be verified; preserve records, locks and ownership without automatic retry or recovery",
+  "stable_after": "status"
+}

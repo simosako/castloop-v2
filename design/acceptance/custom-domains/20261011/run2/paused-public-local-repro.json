@@ -1,0 +1,9 @@
+{
+  "local_only": true,
+  "cloudflare_requests": 0,
+  "admission_state": "paused",
+  "invocations": [],
+  "expected_status": 503,
+  "actual_status": 200,
+  "cache_calls": 1
+}

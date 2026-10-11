@@ -1,0 +1,92 @@
+独自ドメイン実機受け入れ試験：準備記録
+準備開始: 2026-10-10 00:00 JST（日付が10/9から10/10へ切り替わったため本ファイルへ記録）
+手順: https://github.com/simosako/castloop-v2/blob/feature/custom-domains/docs/custom_domain_live_acceptance.md
+手順更新日: 2026-10-09
+
+試験範囲:
+  新規サービス → 試験コンテンツ → 停止してdomain add → 両hostで配信・lifecycle確認
+  → domainを保持してdeploy → domain remove → 最後に新しいpause IDで停止。
+  各節の確認後に進行。不一致・失敗時は再開せず、状態と操作記録を保持。
+  Worker/bucket/Queue/DLQは試験終了後も保持。既存サービスは変更しない。
+
+ソース:
+  既存 [LOCAL_SOURCE_ROOT] は main のため変更せず。
+  build/castloop-v2 に feature/custom-domains を新規clone。
+  commit: 685cd81c0287d7c82204eeb4773d16f2f5c63c1c
+  clone直後 git status --short --branch は未コミット変更なし。
+  Node v26.7.0 / npm 11.19.0 / Bun 1.4.2 / Linux x86_64。
+  npm ci 成功、auditで脆弱性0件。
+  npm run build:cli -- linux-x64 成功。
+
+素材:
+  materials/otftalk/SHA256SUMS 検証: cover.jpg / episode-35.mp3 / episode-36.mp3 全件一致。
+  cover.jpg: JPEG 3000x3000、2,173,207 bytes。
+  episode-35.mp3: MP3 44.1 kHz stereo、約1964秒、62,853,537 bytes。
+  episode-36.mp3: MP3 44.1 kHz stereo、約1452秒、46,472,044 bytes。
+  metadata.json 内の絶対パスは旧test-castloop-v2を指すため使用しない（原本は変更しない）。
+  試験用短音源: episode-36.mp3の先頭をprepared/short.mp3へstream copy済み。
+  prepared/short.mp3: MP3 44.1 kHz stereo、30.027755秒、962,185 bytes（1 KiB以上）。
+  短音源SHA-256: cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87
+  site_url候補: https://www.otftalk.com/ （素材metadataの値）。
+
+ローカル準備:
+  Bash/curl/jq/uuidgen/sha256sum/cmp/git/ffmpeg/ffprobe 使用可能。
+  CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN は設定済み（値は表示・保存しない）。
+  test-env.sh: パス・未使用service/bucket名候補・HTTP証跡保存関数。
+  SERVICE_ID: domtest-1010-685cd81c （19文字）。
+  BUCKET_NAME: castloop-domain-20261010-685cd81c。
+  WORKSPACE: [LOCAL_TEST_ROOT]/workspaces/domain-20261010-685cd81c
+  EVIDENCE: /tmp/opencode/domain-acceptance-20261010-685cd81c
+  workspaceはinit時に作成し、Git管理外に保持する。
+
+未確認・実機試験開始前の確認事項:
+  - 管理者指定のZoneと専用hostname、workers.dev subdomain。
+  - 同accountのactive/full Zone、Cloudflare権威DNS。
+  - Dashboardで同名A/AAAA/CNAME/NS、Custom Domain、他Worker Routeがないこと。
+  - tokenにWorkers/R2/Queues管理、Workers Scripts Write、Zone Read/DNS Readがあること。
+  - SERVICE_ID/bucket名のremote上の未使用確認。
+  - JPEGと短縮音源を試験サービスへ公開してよいこと、site_urlの承認。
+  - R2 Dashboardからmetadata/revision TOMLとキー一覧を取得する担当・方法。
+  DNS record/Custom DomainはDashboardで先に作成しない。
+
+実機試験: 未実施。Cloudflareへの変更操作は未実行。
+
+準備完了確認:
+  bin/castloop-linux-x64へ配置し、ビルド元とcmp一致。
+  バイナリSHA-256: 6ab45ca24be4059d7697b4214b5b6ab839aced2e8b3a5ab77771aa51fa92a93d
+  help domain 成功、独自ドメイン対応開発版であることを確認。
+  npm run check 成功。
+  bun test: 932 pass / 0 fail、101ファイル、22.04秒。
+  bash -n test-env.sh 成功。
+  証跡ディレクトリは700、短音源は600、バイナリは700。
+  EVIDENCEに手順snapshot、commit、ソースstatus、バイナリ/素材hash、domain help、
+  ffprobe結果、型検査、自動テストの出力、result.mdを保存。
+  認証情報はファイルへ保存せず、set -xは使用していない。
+
+管理者からの前提確認:
+  otftalk.comは管理者保有かつCloudflare管理。試験用サブドメインを使用し、全試験完了後に削除予定。
+  専用hostnameの具体名は未決定。DNS/Custom Domainは事前に手動作成しない。
+  https://www.otftalk.com/ をFeedのsite_urlとして含めることは承認済み。
+  workers.dev subdomainの意味と短縮音源の内容を説明し、画像/音源の公開許可は引き続き確認する。
+
+追加承認:
+  hostname: castloop-test.otftalk.com を承認。test-env.shへ反映。
+  prepared/short.mp3（episode-36の冒頭約30秒）の試験利用を承認。
+  workers.dev subdomainはDashboardのWorkers & Pagesで確認予定。
+
+実機試験着手・事前確認で停止（2026-10-10）:
+  管理者指定のworkers.dev subdomain: simosako。test-env.shへ反映。
+  管理者より指示書に従う動作試験の実行を承認。
+  preflight.pyでCloudflare APIのGETのみを実行（token値は表示/保存しない）。
+  otftalk.com: 同accountのZoneでactive/full、pausedではないことを確認。
+  次のDNS record照会が拒否され、第1節で停止:
+    GET /zones/<zone_id>/dns_records?name.exact=castloop-test.otftalk.com&page=1&per_page=100
+    HTTP 403 / Cloudflare error code 10000。
+  診断コードを保存するため、同じ読み取り専用の事前確認を1回再実行。結果は同じ。
+  推定原因: API tokenの対象Zoneに対するDNS Read権限/リソース指定が不足。
+  hostname空き、workers.dev実値、remoteリソース名の確認は未完了。
+  証跡: preflight-zone.json / preflight-failure.json / preflight-output.txt。
+  Dashboard目視は未実施。読み取りAPIで確認する方針。
+  init/domain add/deploy/removeは未実行。新規remoteリソースなし。
+  WORKSPACE未作成のためservice-status/domain listの取得対象はまだない。
+  tokenの対象ZoneへのZone Read/DNS Read、およびWorkers/R2/Queues管理権限を確認して再開する。
