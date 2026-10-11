@@ -1,5 +1,18 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-11: run4実機受け入れ完了・mainへの統合判断
+
+[Issue #6](https://github.com/simosako/castloop-v2/issues/6)・[Issue #7](https://github.com/simosako/castloop-v2/issues/7)の再検証コメントと、[run4の固定commit](https://github.com/simosako/castloop-v2/tree/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4)の結果・活動記録・選別証跡を確認した。試験対象は開発branchの最新コード `da6b6ea8309a87508dc7e7d0b4b70d84bba040d8`。manifestの全hashとJSON、公開HTTP結果、R2 metadata／revisionのsnapshot一致を確認した。
+
+- 追加、両hostのGET／HEAD／Range／ETag、非公開化／復元、独自ドメイン保持deployが合格。pause中は温めたcacheを含め503、明示resume後は正常配信となった。
+- removeは1回で正常完了。local/server receipt一致、journal完了、pending／lock／url_change不在を確認し、明示resume後のworkers.dev配信・RSS正規URL復帰・媒体／revision／GUID保持と最終pauseまで合格した。DELETE生応答は未採取のため、成功した応答形式は断定しない。
+- 試験process限定の1.1.1.1名前解決を使用し、TLS検証と通常の管理API経路を維持した。読み取り照会の一時失敗17件は記録後に照会のみ続行し、変更要求を再送せず明示完了を確認した。原因は未確定。
+- Issue #6・#7はclose済み。run3の旧操作の復旧は別であり、完了receiptのないtokenを解放しない。run1〜4の記録と保持環境、証跡branchは変更しない。
+
+承認済みの独自ドメイン対応は実装・受け入れ完了と判断し、mainへのPR統合対象とした。公開済みv0.2.1には含まれず、version変更・tag・バイナリリリースは今回行わない。
+
+統合前の再検証: `bun test` **937件成功 / 0失敗**（101 files、14,404 assertions）、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuild・domain helpが成功。更新文書の27 shell blockと22相対リンク、`git diff --check`も合格。コードは実機合格commitから変更していない。
+
 ## 2026-10-11: Issue #7 — Custom Domain削除の完了応答を専用処理へ分離
 
 [Issue #7](https://github.com/simosako/castloop-v2/issues/7)と[run3証跡の固定commit](https://github.com/simosako/castloop-v2/tree/5658f60aece35822296d23451c3c1c96f4c7ffa2/design/acceptance/custom-domains/20261011-run3)を確認した。run3は第5〜7節が合格し、Issue #6の停止中503も実機で確認済み。第8節のDELETEは、共通JSON処理がtop-level nullの`success`へアクセスして失敗する経路と一致した。ただし生HTTP status／bodyは保存されておらず、実機の応答形式は断定しない。

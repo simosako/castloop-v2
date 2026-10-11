@@ -1,8 +1,8 @@
 # 独自ドメインの実機検証手順（専用hostname）
 
-更新日: 2026-10-11。対象は`feature/custom-domains`でビルドしたCLI／Worker。
+更新日: 2026-10-11。対象は独自ドメイン対応を含むソースからビルドしたCLI／Worker。
 
-2026-10-11のrun3は、第5〜7節が合格し、停止中配信の[Issue #6](https://github.com/simosako/castloop-v2/issues/6)も解消を確認しました。第8節は削除応答の処理エラー（[Issue #7](https://github.com/simosako/castloop-v2/issues/7)）で中断しました。削除応答の修正版は実機未検証です。
+2026-10-11の[run4](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)で、commit `da6b6ea8309a87508dc7e7d0b4b70d84bba040d8`のCLI／Workerによる全手順が合格しました。[Issue #6](https://github.com/simosako/castloop-v2/issues/6)・[Issue #7](https://github.com/simosako/castloop-v2/issues/7)の修正を実機で確認済みです。run3の残留操作は復旧せず保持しています。
 
 新しい試験サービスと未使用のhostnameで、**ドメイン追加 → 配信・公開・非公開化・復元 → Worker更新 → ドメイン削除**を確認します。
 

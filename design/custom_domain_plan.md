@@ -3,7 +3,7 @@
 作成日: 2026-09-25
 方針確定: 2026-09-26
 改訂日: 2026-10-11（v0.2.1 / M6完成後）
-状態: 基礎API、管理URL分離・通常更新、停止中の正規URL切替、domain CLI/管理API・ローカル復旧を実装済み。run3の実機受け入れは第5〜7節が合格し、停止中配信のIssue #6も解消を確認。第8節の削除応答処理（[Issue #7](https://github.com/simosako/castloop-v2/issues/7)）はローカル修正済み。削除の修正版実機確認、復帰配信・最終停止確認とリリースは未完了。
+状態: 承認済みスコープの実装・実機受け入れ完了。run4で追加・配信・非公開化／復元・通常deploy・削除・workers.dev復帰・最終停止まで合格し、Issue #6・#7の修正も確認済み。リリースは別途実施する。run3の残留操作は復旧せず保持する。
 
 ## 目的とスコープ
 
@@ -20,7 +20,7 @@
 - `CloudflareApi.ensureWorkerDomain`は、Workerに別のCustom Domainがある場合やhostnameが他Workerに属する場合に拒否する。**1サービス1ドメインの制限は基礎APIで実装済み**。同じhostnameの再実行、zone/DNS競合確認、所有Workerを確認した切断もある。
 - `src/media-url.ts`の`canonicalEnclosureUrl`と`src/feed.ts`は、既存音源pathを現在の正規URLへ組み直す。履歴の絶対URLをそのままRSSへ出す問題は解消済み。
 - M6にはサービス停止、invocationとShow所有者の確認、CAS、lifecycle判定、feed生成、cache purge、ローカルjournal保存がある。新しい独自ドメイン専用の同等実装は作らない。
-- 管理URL分離、通常deployの接続保持、正規URLとactive feedの変更・purge・R2設定同期、domain CLI/管理API、接続・TLSの確認、ローカル設定同期とその復旧を実装した。残るのは承認された専用環境での実機受け入れ。
+- 管理URL分離、通常deployの接続保持、正規URLとactive feedの変更・purge・R2設定同期、domain CLI/管理API、接続・TLSの確認、ローカル設定同期とその復旧を実装し、専用環境での実機受け入れを完了した。
 
 ## 一つの責務を一か所へ置く
 
@@ -91,9 +91,9 @@ castloop domain remove
 1. 共通管理URLの解決と通常deployの拒否解除・接続保持を実装する。既存設定を読めるstrict schemaと、変更箇所のテストを追加する。**完了。**
 2. 共通admissionを最小限拡張し、同じ正規URL変更処理でadd/remove、feed/cache/設定の収束・再開を実装する。ファイル保存・lock・feed選別・purgeの重複を作らない。**完了。**
 3. domain CLIを接続し、TLS待ち、API応答喪失、feed/purge失敗、設定片側更新からの再開と、早すぎるresume/deployの拒否を変更箇所で検証する。既存のM6全安全条件を別のテスト群へ複製しない。**ローカル実装・変更箇所テスト完了。**
-4. 承認された専用hostnameとM6サービスで、単一バイナリによるadd→明示再開→公開・停止/restore→通常deploy→remove→明示再開を確認し、READMEを更新する。
+4. 承認された専用hostnameとM6サービスで、単一バイナリによるadd→明示再開→公開・停止/restore→通常deploy→remove→明示再開を確認し、READMEを更新する。**run4で完了。**
 
-実行方法と合格条件は[専用hostnameでの実機検証手順](../docs/custom_domain_live_acceptance.md)にまとめた。手順書の作成は実機検証の実施・合格を意味しない。
+実行方法と合格条件は[専用hostnameでの実機検証手順](../docs/custom_domain_live_acceptance.md)、合格結果は[run4の固定commit](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)を参照する。
 
 実機では複数Show、非公開/削除Episodeの不復活、両hostのfeed/cover/audio、GET/HEAD/Range、cache purge、GUID・媒体・revision不変を確認する。300 MB uploadの既存受け入れは再利用し、URL切替で音源再uploadやWorker全量hash計算は追加しない。
 

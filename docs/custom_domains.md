@@ -1,6 +1,6 @@
-# 独自ドメイン（開発ブランチ・未リリース）
+# 独自ドメイン（未リリース）
 
-この機能は`feature/custom-domains`のCLIと同じbuildのWorkerが必要です。公開済みv0.2.1バイナリにはありません。実機受け入れはドメイン追加・配信・通常deployまで合格し、削除で[Issue #7](https://github.com/simosako/castloop-v2/issues/7)が発生しました。削除応答の修正版は実機未検証です。
+この機能は独自ドメイン対応を含むCLIと同じbuildのWorkerが必要です。公開済みv0.2.1バイナリにはありません。[run4の実機受け入れ](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)で、追加・配信・非公開化／復元・通常deploy・削除・workers.devへの復帰・最終停止まで合格しました。[Issue #6](https://github.com/simosako/castloop-v2/issues/6)・[Issue #7](https://github.com/simosako/castloop-v2/issues/7)の修正も確認済みです。
 
 実機検証は[専用hostnameでの受け入れ手順](custom_domain_live_acceptance.md)を参照してください。
 
