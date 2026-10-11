@@ -1,0 +1,71 @@
+{
+  "result": "passed",
+  "canonical_base": "https://castloop-domtest-1011-r4-48dcc965.simosako.workers.dev",
+  "requests": [
+    {
+      "request": "removed-worker-domain-a-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "removed-worker-domain-a-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "removed-worker-domain-a-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "removed-worker-after-domain-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "removed-worker-hidden-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "removed-worker-gone-denied",
+      "expected_http": 410,
+      "actual_http": 410
+    },
+    {
+      "request": "removed-worker-domain-b-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "removed-worker-domain-b-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "removed-worker-domain-b-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "removed-worker-idle-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "removed-worker-system-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "removed-worker-staging-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "removed-worker-admin-no-key",
+      "expected_http": 401,
+      "actual_http": 401
+    }
+  ]
+}

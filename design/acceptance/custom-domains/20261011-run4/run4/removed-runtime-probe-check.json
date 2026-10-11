@@ -1,0 +1,7 @@
+{
+  "result": "passed",
+  "http_status": "000",
+  "curl_exit_code": 7,
+  "target_service_returned": false,
+  "target_worker_returned": false
+}

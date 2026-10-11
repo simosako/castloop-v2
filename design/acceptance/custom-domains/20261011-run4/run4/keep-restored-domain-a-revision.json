@@ -1,0 +1,15 @@
+{
+  "content_type": "audio/mpeg",
+  "description": "[OMITTED_METADATA]",
+  "duration_seconds": 30,
+  "enclosure_url": "https://castloop-domtest-1011-r4-48dcc965.simosako.workers.dev/podcasts/domain-a/episodes/keep/18c2bf43-0753-46ec-af32-770e06a9d5d7.mp3",
+  "episode_id": "keep",
+  "guid": "e6bbbeea-b29b-4b0b-af43-e5622b2d1995",
+  "length_bytes": 962185,
+  "published_at": "2026-10-11T09:26:26Z",
+  "revision_id": "18c2bf43-0753-46ec-af32-770e06a9d5d7",
+  "schema_version": 1,
+  "sha256": "cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87",
+  "title": "[OMITTED_METADATA]",
+  "updated_at": "2026-10-11T09:27:03Z"
+}

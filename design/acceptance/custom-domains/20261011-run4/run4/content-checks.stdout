@@ -1,0 +1,3 @@
+Public checks passed: after-publish 26 HTTP requests
+Public checks passed: keep-restored 26 HTTP requests
+R2 snapshot and unpublished-content checks passed: r2-keep-restored

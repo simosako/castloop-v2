@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "result": "target",
+  "request": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r4",
+    "kind": "episode",
+    "show_id": "domain-a",
+    "episode_id": "after-domain"
+  },
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "payloads_verified": false,
+  "admission_state": "open",
+  "show": {
+    "lifecycle": "active",
+    "generation": 18
+  },
+  "episode": {
+    "lifecycle": "active",
+    "generation": 1
+  },
+  "unfinished_show_operation": false,
+  "current_revision": {
+    "revision_id": "9d2be539-cbbb-4ff1-8f97-a8d5e5c468de",
+    "enclosure_url": "https://castloop-test-r4.otftalk.com/podcasts/domain-a/episodes/after-domain/9d2be539-cbbb-4ff1-8f97-a8d5e5c468de.mp3",
+    "content_type": "audio/mpeg",
+    "length_bytes": 962185,
+    "duration_seconds": 30,
+    "sha256": "cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87"
+  }
+}

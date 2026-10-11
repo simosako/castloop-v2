@@ -1,0 +1,8 @@
+da6b6ea fix: handle completed Worker domain deletion responses
+ design/custom_domain_implementation_log.md |  13 ++++
+ design/custom_domain_plan.md               |   2 +-
+ docs/custom_domain_live_acceptance.md      |   6 +-
+ docs/custom_domains.md                     |   4 +-
+ packages/cli/src/cloudflare-api.test.ts    | 120 +++++++++++++++++++++++++++--
+ packages/cli/src/cloudflare-api.ts         |  24 +++++-
+ 6 files changed, 155 insertions(+), 14 deletions(-)

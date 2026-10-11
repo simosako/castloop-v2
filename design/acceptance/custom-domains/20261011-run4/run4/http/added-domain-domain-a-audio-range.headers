@@ -1,0 +1,12 @@
+HTTP/1.1 200 Connection Established
+HTTP/2 206
+date: Sun, 11 Oct 2026 09:41:54 GMT
+content-type: audio/mpeg
+content-length: 1024
+content-range: bytes 0-1023/962185
+cf-cache-status: HIT
+age: 4
+cache-control: public, max-age=0, must-revalidate
+etag: "763fb1bc50a09f3f09c76a3bf44daf6a"
+last-modified: Sun, 11 Oct 2026 09:27:33 GMT
+x-castloop-worker-version: 41df0f31-4968-4ac3-91f8-b73e52c9e3b8

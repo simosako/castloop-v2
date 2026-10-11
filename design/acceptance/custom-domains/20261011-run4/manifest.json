@@ -1,0 +1,1784 @@
+[
+  {
+    "published_path": "logs/test-20261010.log",
+    "local_source": "test-20261010.log",
+    "treatment": "sanitized activity log or plan snapshot",
+    "published_sha256": "68a4674836e40ccda0fce6bbf7a4f51cfcfdfd0d86afdeff6eb56124754d6f28"
+  },
+  {
+    "published_path": "logs/test-20261011.log",
+    "local_source": "test-20261011.log",
+    "treatment": "sanitized activity log or plan snapshot",
+    "published_sha256": "21dc5df5699867a3556ebb19531ab0e7b74472c1fdd00b2252cd9bd803f0cedb"
+  },
+  {
+    "published_path": "logs/test-plan-run4.md",
+    "local_source": "test-plan-run4.md",
+    "treatment": "sanitized activity log or plan snapshot",
+    "published_sha256": "48855c80f56c5d5ecd234dbe8b91027fc4da2951942444135b755675314ffa47"
+  },
+  {
+    "published_path": "run4/add-continued-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-continued-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a7963353f981a805802cb969f75d7744467efa36b66d74d282be185a08fee156"
+  },
+  {
+    "published_path": "run4/add-continued.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-continued.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/add-dns-direct.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-dns-direct.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "5800358909a9cfdb2a76c6afb7d91f5aa0fc9488e777033b4e67e14e70ea8e40"
+  },
+  {
+    "published_path": "run4/add-operation-id.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-operation-id.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "61e00aa809b0834e03c208645f5fa09bb01e6bc4ee2cf98ba02566df6fae5722"
+  },
+  {
+    "published_path": "run4/add-pause-id.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-pause-id.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4b7e5d26d9f64c13fc3e272163fb351289f0b1f0e950719485801621dc710d30"
+  },
+  {
+    "published_path": "run4/add-pause-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-pause-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a24706f2ee31f720e264302fe2c8e5aceb2befc7a0fa6a697d311cbae8995793"
+  },
+  {
+    "published_path": "run4/add-paused-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4baed6cf358278b38d85491d31e8a6cb6efa0f4a12d7524c0cc0c62d78cae9fd"
+  },
+  {
+    "published_path": "run4/add-paused-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c5a475fb21cd35fc7ea8846fb088525f04c8fd41c9bdc6e5f48abbb106bbb97a"
+  },
+  {
+    "published_path": "run4/add-paused-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "80d1439bf976fef784dc369ba0fd0adee861509ff77be6a80045792ca9b49a50"
+  },
+  {
+    "published_path": "run4/add-paused-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ac97809cc291770dfb579485c013ecfd9f34d975250a0c60a8973a816a11e58b"
+  },
+  {
+    "published_path": "run4/add-paused-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a759913b922c7b61d04cf10662ab311fe403675106b69722131a9a0d1cb60cca"
+  },
+  {
+    "published_path": "run4/add-result.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-result.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/add-resume.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-resume.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8ba3b5577eb678a6784abf93eb03922c0984c4242511691a4f3e6b7767e4705f"
+  },
+  {
+    "published_path": "run4/add-wait-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-wait-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "756f2470cf70640ab96fce7858bdf97f59f380f90727a2bf9d792d9f38886769"
+  },
+  {
+    "published_path": "run4/add-wait-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-wait-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a454e0ef34075dd184639b2670698798a6bd5071a6c1488f151d0a7a5783480b"
+  },
+  {
+    "published_path": "run4/add.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "published_path": "run4/add.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "de49304dfb2d4b95e0723f049f59ff966f557921918b84483b91ee3e3c58d226"
+  },
+  {
+    "published_path": "run4/added-config-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-config-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "963e7729142b3530162010efbfc078afca53920142955649b87a2d07421c49a4"
+  },
+  {
+    "published_path": "run4/added-domain-a-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-a-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8a495d41438f93d8aaf75ed82af68dcce8719468df6614334890999753b8e62c"
+  },
+  {
+    "published_path": "run4/added-domain-a-revision.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-a-revision.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ba55c94cb88fba3043fd19c4fcd3b6dc699005623ea3be915087f6b8f6d69420"
+  },
+  {
+    "published_path": "run4/added-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4baed6cf358278b38d85491d31e8a6cb6efa0f4a12d7524c0cc0c62d78cae9fd"
+  },
+  {
+    "published_path": "run4/added-domain-b-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-b-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "10d7fb4474f4399a230f2c73eefa5cbc33706768e632ff3b7fda2e2da4302b2f"
+  },
+  {
+    "published_path": "run4/added-domain-b-revision.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-b-revision.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6f591c1ad1451eaec1bb173454005dfad94cb1a6b3e074106af509f501832d3f"
+  },
+  {
+    "published_path": "run4/added-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c5a475fb21cd35fc7ea8846fb088525f04c8fd41c9bdc6e5f48abbb106bbb97a"
+  },
+  {
+    "published_path": "run4/added-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "80d1439bf976fef784dc369ba0fd0adee861509ff77be6a80045792ca9b49a50"
+  },
+  {
+    "published_path": "run4/added-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7b86902d3684890e457068b89b467e9ad0e79a9697cd112c825e23fce0c4164a"
+  },
+  {
+    "published_path": "run4/added-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7c86ebf77721de88bdbf071bfba45f8b2bcf42553c73f9efbdac530adf9a0f1a"
+  },
+  {
+    "published_path": "run4/added-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "fb4b3fc5da146265b00e3a9badd81c65386b424570654efe43fe844f66da1bf8"
+  },
+  {
+    "published_path": "run4/after-domain-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/after-domain-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f18540c3b5879a0e13787d4ae1ddc1f6dfe40f5ccec2cdda57cfa91c51a4f989"
+  },
+  {
+    "published_path": "run4/after-domain-published.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/after-domain-published.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "735b0160dbf188954e531b83cd0428ced4c96bf9f0f24bd960d609a3bf8b545b"
+  },
+  {
+    "published_path": "run4/after-publish-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/after-publish-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d78f4baf815ba98cf265745f1b600cc1106cc4715b69cbc12130db92e49e077c"
+  },
+  {
+    "published_path": "run4/audio-after-domain.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/audio-after-domain.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "983b708fe3a76c94da90b8c40df4985cbe082389b959809c315ee50399cb3154"
+  },
+  {
+    "published_path": "run4/audio-domain-a-gone.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/audio-domain-a-gone.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0279afb3b75d3f9cbf2294ff4add15f96a8576ef23e712e3542ad127e30b2cce"
+  },
+  {
+    "published_path": "run4/audio-domain-a-hidden.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/audio-domain-a-hidden.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "05f2c8d74ae489fd792471ef7a6ba40ef04b572ddc27901f287bec059b51d743"
+  },
+  {
+    "published_path": "run4/audio-domain-a-keep.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/audio-domain-a-keep.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "dcda6973a5e6780c5da202a5cce582cacaf3c4e06610c11f1af268f701cbe920"
+  },
+  {
+    "published_path": "run4/audio-domain-b-keep.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/audio-domain-b-keep.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "879a437f24a5dc00027215930dfdf00c89e97dae9496653a908d1565c873af44"
+  },
+  {
+    "published_path": "run4/before-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/before-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "654ecb2465261bb7efdc2453a73716a31f03851b6fc54477601fceb1224a78dc"
+  },
+  {
+    "published_path": "run4/before-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/before-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "fbe04209234df8981df8ed507bc3bbb6a7b916dbd2b3091259d8572e8890f7b4"
+  },
+  {
+    "published_path": "run4/before-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/before-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "909fb691e108229cc74dd0d897ef046185125a6bc88bb7bebc573cb107f0dffd"
+  },
+  {
+    "published_path": "run4/binary-final.sha256",
+    "local_source": "evidence/domain-acceptance-20261011-run4/binary-final.sha256",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "03c257eb752e06595fba46ad4e8ae7cd022924127d9fcac610745225188344e3"
+  },
+  {
+    "published_path": "run4/binary-version.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/binary-version.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "71015c979ccb0fc8a0be7ca0ae83046ab045cdc2c8faa09fb2f0f7e440f9b4a6"
+  },
+  {
+    "published_path": "run4/binary.sha256",
+    "local_source": "evidence/domain-acceptance-20261011-run4/binary.sha256",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "49c91c6da1200a8c50942c059395a4a855d0183f1b8d0024089252aff841b253"
+  },
+  {
+    "published_path": "run4/build-summary.md",
+    "local_source": "evidence/domain-acceptance-20261011-run4/build-summary.md",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "690fff3194565e9c54807034859418e5474bdce645d117820d9a3bec5cfb173b"
+  },
+  {
+    "published_path": "run4/build.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/build.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "published_path": "run4/build.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/build.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/build.stdout",
+    "local_source": "evidence/domain-acceptance-20261011-run4/build.stdout",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "67b9510508f6b988d7d8bedb7a93e50bc8bd98371d2391c019e7d60b6f149096"
+  },
+  {
+    "published_path": "run4/bun-test.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/bun-test.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "published_path": "run4/check.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/check.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "published_path": "run4/check.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/check.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/check.stdout",
+    "local_source": "evidence/domain-acceptance-20261011-run4/check.stdout",
+    "treatment": "selected sanitized evidence; not a complete raw archive; trailing blank line normalized",
+    "published_sha256": "5a960c70b41464f7cb9f08caed1ce12d4c3be356526f3f5d60329ec979322635"
+  },
+  {
+    "published_path": "run4/content-checks.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/content-checks.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "published_path": "run4/content-checks.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/content-checks.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "878f1a81ed489dc21e6496d90376dc2813fd4f2946d7597ce71ebb5e10e5a23b"
+  },
+  {
+    "published_path": "run4/content-checks.stdout",
+    "local_source": "evidence/domain-acceptance-20261011-run4/content-checks.stdout",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "06ab24b76d557c5030715df5274182b2191af79392c9c4be2ed8ecacb9e44a67"
+  },
+  {
+    "published_path": "run4/content-continued.stdout",
+    "local_source": "evidence/domain-acceptance-20261011-run4/content-continued.stdout",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a9951ac7d3b1e57e11c7fcdb2f1c1fd616f1a365914f4829ce1d0802d75b7950"
+  },
+  {
+    "published_path": "run4/create-after-domain.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-after-domain.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "bf7ec0e4e0c570579c7c4349aa65f6bae5bfddb8e9cd58a803d9893c9bbcc1fe"
+  },
+  {
+    "published_path": "run4/create-domain-a-gone.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-domain-a-gone.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "6fe275c0829f8a3c459a80a114761695183427432913935c7ecf0324e533339e"
+  },
+  {
+    "published_path": "run4/create-domain-a-hidden.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-domain-a-hidden.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "4f4f19e6cfaccbbc84be8071734f73bc5b23f902fd7b7e64c73a18f9a0b63492"
+  },
+  {
+    "published_path": "run4/create-domain-a-keep.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-domain-a-keep.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "35453e3c0bc40ec20422f7999a8bab34be0b838674e605d663eb6ed533b99a42"
+  },
+  {
+    "published_path": "run4/create-domain-a.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-domain-a.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "99c4e41c69d6dde46585b29d4fbf02d365d652838cfabcfbaa3d32ed3afe012b"
+  },
+  {
+    "published_path": "run4/create-domain-b-keep.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-domain-b-keep.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "8a86ac21feddc9eefbea7a664852a7be7821c4d57e7be3b2189b1a3559744dd9"
+  },
+  {
+    "published_path": "run4/create-domain-b.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-domain-b.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "c8bcdc609bc8d621dfd1c21f225083086095612ce89fcd66090b518337a27854"
+  },
+  {
+    "published_path": "run4/create-domain-idle.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-domain-idle.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "5aefe15190786b7a9b280f125a5fcdb0cb985cc82aef4c99571c82cf9b61773f"
+  },
+  {
+    "published_path": "run4/create-draft.json.stdout.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/create-draft.json",
+    "treatment": "CLI stdout text or empty acknowledged DNS/TLS wait; original .json label was not parsed JSON",
+    "published_sha256": "97fcaf3f9e1dc055d81b83595f02938aedf047b222980edc432c71c9012b1ddc"
+  },
+  {
+    "published_path": "run4/custom_domain_live_acceptance.md",
+    "local_source": "evidence/domain-acceptance-20261011-run4/custom_domain_live_acceptance.md",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4640df8a209fb292dbd66f6dd9b3d036e3886088cec8a4472afc08a84a07aafe"
+  },
+  {
+    "published_path": "run4/deploy-operation-id.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-operation-id.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e5e71859c0155191a2f26b9d4a5aeca425e36c1e0cfda749f3e973be7f561f21"
+  },
+  {
+    "published_path": "run4/deploy-pause-id.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-pause-id.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "27d96bbc6733e639e9cfa1eb86e45299b9e2c305f4b99d6a87be8d7babc8b6d3"
+  },
+  {
+    "published_path": "run4/deploy-pause-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-pause-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "66b99e7d7ddaf9c5f51e055fe7d56b81f9c05268f78b5b830d1071f332600053"
+  },
+  {
+    "published_path": "run4/deploy-paused-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-paused-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "576c9ce09be2abee8c294ced12ba335de3f3ffcf7fb3a5cdaa78ba9ae81c22e8"
+  },
+  {
+    "published_path": "run4/deploy-paused-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-paused-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d0ec367b4718779e98c5365092e281c29b85cf58a062672edc0f50e590eee955"
+  },
+  {
+    "published_path": "run4/deploy-paused-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-paused-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "80d1439bf976fef784dc369ba0fd0adee861509ff77be6a80045792ca9b49a50"
+  },
+  {
+    "published_path": "run4/deploy-paused-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-paused-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0d4332f528cce85cb38e8f0da1ec82059f068e03bafd71c961d303b398a6c0cc"
+  },
+  {
+    "published_path": "run4/deploy-paused-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-paused-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "da907a5cf0376121b15e97990cb217482ce0f772dca1329d3738de8740a4c9a5"
+  },
+  {
+    "published_path": "run4/deploy-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3f01aed4a85d0e523d77b61fd38a17d4fd402eb9bd8421c763dadd62509b31ae"
+  },
+  {
+    "published_path": "run4/deploy-resume.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy-resume.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "154694c9e763c77545559099a4bac29de3b9e4a2a6754cce031b7181369a88c0"
+  },
+  {
+    "published_path": "run4/deploy.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deploy.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/deployed-config-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-config-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "1bee91782e52a93c7b462f7b62802c06f58e30c60a4665ab17e4b5aebf50b2e4"
+  },
+  {
+    "published_path": "run4/deployed-domain-a-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-a-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8a495d41438f93d8aaf75ed82af68dcce8719468df6614334890999753b8e62c"
+  },
+  {
+    "published_path": "run4/deployed-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "576c9ce09be2abee8c294ced12ba335de3f3ffcf7fb3a5cdaa78ba9ae81c22e8"
+  },
+  {
+    "published_path": "run4/deployed-domain-b-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-b-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "10d7fb4474f4399a230f2c73eefa5cbc33706768e632ff3b7fda2e2da4302b2f"
+  },
+  {
+    "published_path": "run4/deployed-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d0ec367b4718779e98c5365092e281c29b85cf58a062672edc0f50e590eee955"
+  },
+  {
+    "published_path": "run4/deployed-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "80d1439bf976fef784dc369ba0fd0adee861509ff77be6a80045792ca9b49a50"
+  },
+  {
+    "published_path": "run4/deployed-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "2fe2de094a9970a873dc41242d8becc64fa296ff9fb32a7588496c661ef7739d"
+  },
+  {
+    "published_path": "run4/deployed-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "df86f3ba5715746ccf64d58bb9710f5bc30ec0391563938d28108a892602dcf1"
+  },
+  {
+    "published_path": "run4/deployed-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e94b2f1a6ed8c9c891686d62cdff3fa438479e376e9aed5d80c544cc0336d1b6"
+  },
+  {
+    "published_path": "run4/dns-proxy-ready.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/dns-proxy-ready.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "2611abdaf9f3f6d14824a432086ddb9a9bee2c5415f1bc4a2ff5dbbcfb0a68ed"
+  },
+  {
+    "published_path": "run4/dns-proxy-stop.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/dns-proxy-stop.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "cf7604b3d5f37bf4b328149d99471131c49f5379ec96e1f399e13fc44006a0c8"
+  },
+  {
+    "published_path": "run4/domain-a-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-a-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4816f357c9485ad0a1ca6e21688b46b4d3247b39ef975ad27c794e2e8eea16e1"
+  },
+  {
+    "published_path": "run4/domain-a-gone-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-a-gone-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4f9ed12b0d444274f944ca0148f951babb9436917828ba5582a22f2593cee01f"
+  },
+  {
+    "published_path": "run4/domain-a-hidden-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-a-hidden-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d73bd60c72e8e6f04ce972f1664d19737aeb3334bcec378bbeb3d43641e660fc"
+  },
+  {
+    "published_path": "run4/domain-a-keep-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-a-keep-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "da85af2a863c66d26571734fe8788bad7c0fffcd0f80cd2cf1426a599ec8b516"
+  },
+  {
+    "published_path": "run4/domain-b-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-b-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "607f2de0604ba109f1ada276c30e825bafeddeaa22fbad24fb7392de2405baf4"
+  },
+  {
+    "published_path": "run4/domain-b-keep-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-b-keep-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6b0622e5f75c0e201c9d2e6ab2d70c7669b65ffe2e48876c5f7ab28d0502d568"
+  },
+  {
+    "published_path": "run4/domain-help.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-help.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "834cd230a343e127318b1a1447d3d429f4db1491711a365576f8de2a70832b20"
+  },
+  {
+    "published_path": "run4/final-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "576c9ce09be2abee8c294ced12ba335de3f3ffcf7fb3a5cdaa78ba9ae81c22e8"
+  },
+  {
+    "published_path": "run4/final-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d0ec367b4718779e98c5365092e281c29b85cf58a062672edc0f50e590eee955"
+  },
+  {
+    "published_path": "run4/final-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "80d1439bf976fef784dc369ba0fd0adee861509ff77be6a80045792ca9b49a50"
+  },
+  {
+    "published_path": "run4/final-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f8d2553b0f57a9f34ff621b6fb1362957f4be7290dc7da1265a5dc6af2fb0330"
+  },
+  {
+    "published_path": "run4/final-pause-id.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-pause-id.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "fe2c44df55b654fc2e2b5e6d485b44dd43744f0a4a54f66eaf2a7c025e55e7df"
+  },
+  {
+    "published_path": "run4/final-pause-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-pause-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "fdb892da290fe3e0ca7795f9a5e4e87d7c1f3c451679b4a2212833bf886cef69"
+  },
+  {
+    "published_path": "run4/final-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0119023d9757abec636084452da167b8046a906eadf05f15dac7c8c0e2b5a6db"
+  },
+  {
+    "published_path": "run4/fix-commit-stat.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fix-commit-stat.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d15b7ad0f707e36d3fbd48bcc77eaa61124c99e33fc30a550830c0ff5fed37e4"
+  },
+  {
+    "published_path": "run4/fixture-gone-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "fb0c94e45b827c2675e03208c9a4522ac95b4b4654e384b05756615b3a6912db"
+  },
+  {
+    "published_path": "run4/fixture-gone-plan.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-plan.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "1f758f266e00c39f8aa0408b1d3ad1c17a8e19a3cadada6589400c38a88be015"
+  },
+  {
+    "published_path": "run4/fixture-gone-published.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-published.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8de05e3ac0b5426e72c60ae4f1214b16bbee889dbca3af30c852ad5bb9c6e7b1"
+  },
+  {
+    "published_path": "run4/fixture-gone-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "43b110540bac62d9db616af2cd5208cd91c1723a0e5d93d35bd46c02d497635e"
+  },
+  {
+    "published_path": "run4/fixture-hidden-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-hidden-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "54470506a3661d21b7febe43dd9365e640bb8f462ec689f4ada22f855ae6a7c1"
+  },
+  {
+    "published_path": "run4/fixture-hidden-plan.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-hidden-plan.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "caac0c651c47e61f21984f94b2d268e348b874eb5273f86e1893ff73e1803650"
+  },
+  {
+    "published_path": "run4/fixture-hidden-published.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-hidden-published.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f262223bcd7497a6eb2406549c1216fbb92811a42d3415b8794fd9ff98f9ee50"
+  },
+  {
+    "published_path": "run4/fixture-hidden-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-hidden-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "af32b238f90a36d8fbcd2466bda5dfb6796838dc535045f85f2150cea67451e1"
+  },
+  {
+    "published_path": "run4/fixtures.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixtures.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "published_path": "run4/fixtures.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixtures.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/fixtures.stdout",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixtures.stdout",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7385c1780e558f0cc2d27ac9459c970e85c3c96998c1da33d64bbf4b662946b8"
+  },
+  {
+    "published_path": "run4/init-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/init-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "73df4a3c8d2688e0d52ce6ecf697a43dbcda08de4e6da6bd42101b6467134041"
+  },
+  {
+    "published_path": "run4/init-resume.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/init-resume.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b6e463a40992fe8a963b6feef408d5b4a6d09f5d8380d96d92ce313a70bf9aae"
+  },
+  {
+    "published_path": "run4/initialized-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/initialized-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "2b3cc6621d8cbb6686e1a8d710ef693da10cce8611e16273ab614236dc76ddd7"
+  },
+  {
+    "published_path": "run4/initialized-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/initialized-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "954c379a1d9fbdf145a6d81dea79286c5136a04f8748fdd6dfc9d08dcf035343"
+  },
+  {
+    "published_path": "run4/keep-restore-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restore-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "388eeacf76636bfd6215d4e2dbccd0744087626d31ea5c0f60834ec4a2eb3101"
+  },
+  {
+    "published_path": "run4/keep-restore-plan.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restore-plan.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0880f0898c75af7687762c7e32e43e739800756a78f5938bf228ed923da188c8"
+  },
+  {
+    "published_path": "run4/keep-restore-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restore-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "416bdda57d194e1739a4b37176b182e3cff6ad922541cf6924fde4f5970b2db5"
+  },
+  {
+    "published_path": "run4/keep-restored-domain-a-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restored-domain-a-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8a495d41438f93d8aaf75ed82af68dcce8719468df6614334890999753b8e62c"
+  },
+  {
+    "published_path": "run4/keep-restored-domain-a-revision.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restored-domain-a-revision.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ba55c94cb88fba3043fd19c4fcd3b6dc699005623ea3be915087f6b8f6d69420"
+  },
+  {
+    "published_path": "run4/keep-restored-domain-b-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restored-domain-b-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "10d7fb4474f4399a230f2c73eefa5cbc33706768e632ff3b7fda2e2da4302b2f"
+  },
+  {
+    "published_path": "run4/keep-restored-domain-b-revision.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restored-domain-b-revision.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6f591c1ad1451eaec1bb173454005dfad94cb1a6b3e074106af509f501832d3f"
+  },
+  {
+    "published_path": "run4/keep-restored-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restored-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9f63fa7e20289cbb73d3aec9b0085fc02017047813517bd78f64788ec676db3f"
+  },
+  {
+    "published_path": "run4/keep-unpublish-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublish-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ed699c7b7ecd6c68b074e3cb723b7befb1bdba0427ac84c3991cc155d2f3156e"
+  },
+  {
+    "published_path": "run4/keep-unpublish-plan.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublish-plan.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "078d4a49e71971589198062a75a59ea28f0739b63882ea0d825df9c8dd979e90"
+  },
+  {
+    "published_path": "run4/keep-unpublish-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublish-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "993f1513d56644050104e2add8770bc1b1c9da61553521db936960e362fc1df9"
+  },
+  {
+    "published_path": "run4/npm-ci.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/npm-ci.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "published_path": "run4/npm-ci.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/npm-ci.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/npm-ci.stdout",
+    "local_source": "evidence/domain-acceptance-20261011-run4/npm-ci.stdout",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "84e210a975023a7cff7c4e6baecbb32a496e339f770436e68ab738ce19ad7851"
+  },
+  {
+    "published_path": "run4/pre-deploy-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/pre-deploy-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "cefba7f8aac692c439815ce99842df9b4c93b64c615a428c23e34409912dffc8"
+  },
+  {
+    "published_path": "run4/pre-deploy-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/pre-deploy-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "5b2561ee5a29fc3f2f76c49f8ae68916fae652bc02a327dca2d3c745acb90ade"
+  },
+  {
+    "published_path": "run4/pre-remove-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/pre-remove-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4bc753802f8fff9d75f7404875f5f49a246bd06b948176b283a51e085f18943d"
+  },
+  {
+    "published_path": "run4/preflight-zone.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/preflight-zone.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "cb7e99717dc974e66199db5fdf737ce147748a9715f3142e728a8b4006119ddd"
+  },
+  {
+    "published_path": "run4/preflight.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/preflight.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6596a5755834dea285ec685ae37c9074a43cecca30ccabc16e0042ebb73d8620"
+  },
+  {
+    "published_path": "run4/publish-after-domain.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/publish-after-domain.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c20c5ce1f68faaf602eaf1fd66668ad2667f96777c280d18f1c178bf57ada056"
+  },
+  {
+    "published_path": "run4/publish-domain-a-gone.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/publish-domain-a-gone.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "84648481643ec7841b5f34df98bf04c7b22378d0459748fe4e3230667db744dd"
+  },
+  {
+    "published_path": "run4/publish-domain-a-hidden.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/publish-domain-a-hidden.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f8f343180eea0225b2fec6ba977de2e6049e747b6f5623ee4c63416f68caf96d"
+  },
+  {
+    "published_path": "run4/publish-domain-a-keep.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/publish-domain-a-keep.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f4fb7ff36af2bf9dfdabff86dca8b1f48f2020e04c2e5be8a0a5fe923c366042"
+  },
+  {
+    "published_path": "run4/publish-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/publish-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "2a0b49ddc47d5cb73be2cb67adbdc2ab91e6bdca4bfb3dd2e45e0d162f96f9ae"
+  },
+  {
+    "published_path": "run4/publish-domain-b-keep.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/publish-domain-b-keep.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b15314e2478dc441daa7d5587c3ed0a6032b1345b3bb47dace2371c42753a5d7"
+  },
+  {
+    "published_path": "run4/publish-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/publish-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "cf394c20a864c00f8d94382fc898ea1f160101316126abaa253cc6cacad7e05a"
+  },
+  {
+    "published_path": "run4/r2-added/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-added/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c3980200b130818f8a68442b7d92111740712f0150b9056e2d2958ffd21c5016"
+  },
+  {
+    "published_path": "run4/r2-added/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-added/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run4/r2-before/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-before/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c3980200b130818f8a68442b7d92111740712f0150b9056e2d2958ffd21c5016"
+  },
+  {
+    "published_path": "run4/r2-before/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-before/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run4/r2-deployed/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-deployed/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c3980200b130818f8a68442b7d92111740712f0150b9056e2d2958ffd21c5016"
+  },
+  {
+    "published_path": "run4/r2-deployed/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-deployed/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run4/r2-keep-restored/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-keep-restored/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c3980200b130818f8a68442b7d92111740712f0150b9056e2d2958ffd21c5016"
+  },
+  {
+    "published_path": "run4/r2-keep-restored/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-keep-restored/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run4/r2-removed/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-removed/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c3980200b130818f8a68442b7d92111740712f0150b9056e2d2958ffd21c5016"
+  },
+  {
+    "published_path": "run4/r2-removed/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-removed/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run4/r2-show-b-restored/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-show-b-restored/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c3980200b130818f8a68442b7d92111740712f0150b9056e2d2958ffd21c5016"
+  },
+  {
+    "published_path": "run4/r2-show-b-restored/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-show-b-restored/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run4/remove-journal-completion.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-journal-completion.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7e315d849a217ecc4974a5bdce2f5edd65ea476d686dfce59e60ed4916fb4e71"
+  },
+  {
+    "published_path": "run4/remove-journal-final-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-journal-final-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ef869dabb90bcfe3d413c011b272ec614882a30b7100ef7d70c90d27ee3eb26d"
+  },
+  {
+    "published_path": "run4/remove-observed-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-observed-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "175195198b3dc779e3bde1bac858d50324717b2a79e3ba520536368176bf7773"
+  },
+  {
+    "published_path": "run4/remove-observed-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-observed-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "cfa5153c400d7695a2543655580749796cd474c76e25bdb9a3b6da7d034afa48"
+  },
+  {
+    "published_path": "run4/remove-operation-id.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-operation-id.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7ebfd0deb8ba9bfc754583dd683399913191d7cc901ac7acc44dd14255ca0fea"
+  },
+  {
+    "published_path": "run4/remove-pause-id.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-pause-id.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f0860b77dd7a9b8fa9d00cea0815aed6ccf1056976cd4b9caae1cec27ebc6d8a"
+  },
+  {
+    "published_path": "run4/remove-pause-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-pause-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ef0c824a1df512da17416631242ba6b82eb40bd9f90f7ef20b0cf5c6478dc079"
+  },
+  {
+    "published_path": "run4/remove-paused-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-paused-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "576c9ce09be2abee8c294ced12ba335de3f3ffcf7fb3a5cdaa78ba9ae81c22e8"
+  },
+  {
+    "published_path": "run4/remove-paused-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-paused-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d0ec367b4718779e98c5365092e281c29b85cf58a062672edc0f50e590eee955"
+  },
+  {
+    "published_path": "run4/remove-paused-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-paused-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "80d1439bf976fef784dc369ba0fd0adee861509ff77be6a80045792ca9b49a50"
+  },
+  {
+    "published_path": "run4/remove-paused-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-paused-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "17e9cd167e2c2addc190959bc320ef784d2a58e8847e3372d7607d9d31871df0"
+  },
+  {
+    "published_path": "run4/remove-paused-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-paused-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6fedcba547426bcda7c1f662868330280e6d43f78a66f15a6b4097e349aa9dc2"
+  },
+  {
+    "published_path": "run4/remove-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "09a6392a37f493b8ededd538c7cb479aded30088af1034a33b4db0f95541f949"
+  },
+  {
+    "published_path": "run4/remove-resume.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove-resume.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b9b27eedb3b2f0b40438278be83adea891f1071a78da103be5a96bce4e97d707"
+  },
+  {
+    "published_path": "run4/remove.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "published_path": "run4/remove.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/remove.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "published_path": "run4/removed-after-domain-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-after-domain-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "1096401017005d12cabbec660fd2933696881b4c4f38eaae084bab9888b89aa9"
+  },
+  {
+    "published_path": "run4/removed-custom-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-custom-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b3e19a091cb8118f69c53d3e67350a053e3b33e0f5d536ec4e619046ee8efc34"
+  },
+  {
+    "published_path": "run4/removed-dns-records.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-dns-records.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "5f325c997147877af4caaf461189ce2827ede701a7aa5ccf785978dbe7483dfd"
+  },
+  {
+    "published_path": "run4/removed-domain-a-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-domain-a-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8a495d41438f93d8aaf75ed82af68dcce8719468df6614334890999753b8e62c"
+  },
+  {
+    "published_path": "run4/removed-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "576c9ce09be2abee8c294ced12ba335de3f3ffcf7fb3a5cdaa78ba9ae81c22e8"
+  },
+  {
+    "published_path": "run4/removed-domain-b-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-domain-b-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "10d7fb4474f4399a230f2c73eefa5cbc33706768e632ff3b7fda2e2da4302b2f"
+  },
+  {
+    "published_path": "run4/removed-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d0ec367b4718779e98c5365092e281c29b85cf58a062672edc0f50e590eee955"
+  },
+  {
+    "published_path": "run4/removed-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "80d1439bf976fef784dc369ba0fd0adee861509ff77be6a80045792ca9b49a50"
+  },
+  {
+    "published_path": "run4/removed-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "175195198b3dc779e3bde1bac858d50324717b2a79e3ba520536368176bf7773"
+  },
+  {
+    "published_path": "run4/removed-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f8981692898c444c7d39fe4946a075cc814f1700dafa787b7df30a6225111ff3"
+  },
+  {
+    "published_path": "run4/removed-runtime-probe-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-runtime-probe-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "52589ed54e0d46f238f3778261fda84182cab85184c098b38c6872d4ea3cdf1b"
+  },
+  {
+    "published_path": "run4/removed-runtime-probe.exit-code",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-runtime-probe.exit-code",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "10159baf262b43a92d95db59dae1f72c645127301661e0a3ce4e38b295a97c58"
+  },
+  {
+    "published_path": "run4/removed-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "cfa5153c400d7695a2543655580749796cd474c76e25bdb9a3b6da7d034afa48"
+  },
+  {
+    "published_path": "run4/result.md",
+    "local_source": "evidence/domain-acceptance-20261011-run4/result.md",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3554cf487d9f3e37d8aaf2b74a228ff45b159de40d5083c03a5469bffd7a85b9"
+  },
+  {
+    "published_path": "run4/show-b-restore-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restore-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "120f5ddec7013b201900bf427076d52b07b0f3efd2caa6fe15d6c843334a97fb"
+  },
+  {
+    "published_path": "run4/show-b-restore-plan.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restore-plan.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e297681a2ccaf2430b8ea876dbf59be5c987293f3cf9163ac14fe36f2cd58a7d"
+  },
+  {
+    "published_path": "run4/show-b-restore-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restore-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "2b920e2561d8de6bd2b17b65b91c3b2cbd0ad2d02bcf2a0e912ea34ebb2ba220"
+  },
+  {
+    "published_path": "run4/show-b-restored-domain-a-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restored-domain-a-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8a495d41438f93d8aaf75ed82af68dcce8719468df6614334890999753b8e62c"
+  },
+  {
+    "published_path": "run4/show-b-restored-domain-a-revision.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restored-domain-a-revision.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ba55c94cb88fba3043fd19c4fcd3b6dc699005623ea3be915087f6b8f6d69420"
+  },
+  {
+    "published_path": "run4/show-b-restored-domain-b-current.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restored-domain-b-current.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "10d7fb4474f4399a230f2c73eefa5cbc33706768e632ff3b7fda2e2da4302b2f"
+  },
+  {
+    "published_path": "run4/show-b-restored-domain-b-revision.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restored-domain-b-revision.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6f591c1ad1451eaec1bb173454005dfad94cb1a6b3e074106af509f501832d3f"
+  },
+  {
+    "published_path": "run4/show-b-restored-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restored-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3022529a23bf8af3b0bcb24ea67cdb7fab84f1db5248e45982589cc2a231646e"
+  },
+  {
+    "published_path": "run4/show-b-unpublish-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-unpublish-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6b47a355bf46128024d36302775620d604dfe52d935807fd97d4eedbaacc0432"
+  },
+  {
+    "published_path": "run4/show-b-unpublish-plan.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-unpublish-plan.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "2755fd8e44de1128a1ce89cdc51bdec036dee7b28583101d1a3e81b3d9cacdf6"
+  },
+  {
+    "published_path": "run4/show-b-unpublish-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-unpublish-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0aefbc624c4aaa70978a8858649fd1a4fd627a7dad5ba857fe140af208ab1f54"
+  },
+  {
+    "published_path": "run4/source-commit.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/source-commit.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6a6556963f670028c031b9ecadb24e19a96085918a345881ce79df852d1967ab"
+  },
+  {
+    "published_path": "run4/source-status-after.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/source-status-after.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ba051334ebc33f3162a4fd5be48615e03c8dac8ec7977e7c2752dbc1cf981841"
+  },
+  {
+    "published_path": "run4/source-status-before.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/source-status-before.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ba051334ebc33f3162a4fd5be48615e03c8dac8ec7977e7c2752dbc1cf981841"
+  },
+  {
+    "published_path": "run4/tool-versions.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/tool-versions.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "1606a2c8f88732554796b45c6c6c2d78a2dc1d74f600a1c65cae808c50eb44aa"
+  },
+  {
+    "published_path": "run4/update-after-domain.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/update-after-domain.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f5326c731a85e3e5f146dca36d60c38125542bd9071c53db65a9dafaefe20b3b"
+  },
+  {
+    "published_path": "run4/update-domain-a-gone.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/update-domain-a-gone.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "fcca66c12aca9207a73983cfbf9a06ddc4fa3ae45fb771cf646c913f43cb5d1e"
+  },
+  {
+    "published_path": "run4/update-domain-a-hidden.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/update-domain-a-hidden.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a81954fdb1bbd34121410ecb164afa8f0071db4237d562f8e1d33259e11a8164"
+  },
+  {
+    "published_path": "run4/update-domain-a-keep.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/update-domain-a-keep.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0570d014effc78dd0114cc0c972781c7a88d7ea0fd4b23e6e6a07ab3c9f2f07f"
+  },
+  {
+    "published_path": "run4/update-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/update-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "10f35e4a8e259aabfe28382c0fe8779576f17f43f3091d04bc22e32a47098c25"
+  },
+  {
+    "published_path": "run4/update-domain-b-keep.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/update-domain-b-keep.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9ba3edf5ede16c759852f43b3c84498eecaa2baf39598a19b84646da8b23c861"
+  },
+  {
+    "published_path": "run4/update-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/update-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "21b6a2425c6c2ce239469e767fc8bfe596ad3002464e366e61264e6ff9a68fee"
+  },
+  {
+    "published_path": "run4/unit-tests-summary.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run4/bun-test.stderr",
+    "treatment": "aggregate counts only",
+    "published_sha256": "15cd8ecfc0e3ce86d35083066eca7007c4f116a759d8d51e9d8b2e951163efcf"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/domain-a-gone-status-22.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-a-gone-status-22.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/domain-b-status-10.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/domain-b-status-10.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-10.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-10.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-13.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-13.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-17.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-17.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-3.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-3.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-37.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-37.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-48.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-48.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-5.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-5.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-53.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-53.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-gone-status-58.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-gone-status-58.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/fixture-hidden-status-11.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/fixture-hidden-status-11.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/keep-restore-status-3.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-restore-status-3.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/keep-unpublish-status-10.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublish-status-10.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/keep-unpublish-status-3.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublish-status-3.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/keep-unpublish-status-8.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublish-status-8.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/read-only-status-errors/show-b-restore-status-2.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-restore-status-2.stderr",
+    "treatment": "read-only poll failure; later explicit completion confirmed; no mutation replay",
+    "published_sha256": "2e44fca6cfdd0795520337b18737347ebb85c17d77db88b53a80b8bbea4ed734"
+  },
+  {
+    "published_path": "run4/http/add-paused-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-domain-a-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "29504a35fb5e2002adcfbde85a962fb708bfc6731460e28bdeae5ac42575b064"
+  },
+  {
+    "published_path": "run4/http/add-paused-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run4/http/add-paused-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-paused-domain-a-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "a9749f6d8a3afdf76e8065bdacd49e823f7d0d148fffddd8ce0aa3eecd937f7b"
+  },
+  {
+    "published_path": "run4/http/added-paused-domain-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-paused-domain-domain-a-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "2cd108191ddbc4b7a7dd36f507f12945ac1b4cfa3716c28a40ed481d760a9300"
+  },
+  {
+    "published_path": "run4/http/added-paused-domain-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-paused-domain-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run4/http/added-paused-domain-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-paused-domain-domain-a-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "a9749f6d8a3afdf76e8065bdacd49e823f7d0d148fffddd8ce0aa3eecd937f7b"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "0e589e4e389c12d94ec1614a0d8bd41e5679a8962710f66e4508a95721717763"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "a94e9e0c391048d69b5019a333288bd72fe6d6d7ef8731dc7e0b8395e2f2d93f"
+  },
+  {
+    "published_path": "run4/http/added-worker-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-worker-domain-a-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "9e1ed080d1dbc5bc337698303eeb5bddeeac20ec82ba41f6894b4fea138459a5"
+  },
+  {
+    "published_path": "run4/http/added-worker-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-worker-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run4/http/added-worker-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-worker-domain-a-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "a94e9e0c391048d69b5019a333288bd72fe6d6d7ef8731dc7e0b8395e2f2d93f"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-audio-range.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-audio-range.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "0540edf18a7eda991d193cb5d94a7b21b56c72c857e334e42e37c01b4d8c1a9f"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-audio-range.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-audio-range.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "5d5a4c108c8c7450f948d9e81796228b5d72d5e1d24389465c170ae0ea8608f1"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-audio-range.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-audio-range.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "92b587ae10f1d8f5a6757ec37cd2cde67b1313f62a35da0b1daeea3505aa7a36"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-audio-304.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-audio-304.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "9c8d669a3ccb375289eb98039acd856e4702812a403e8af34543e2a56775867f"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-audio-304.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-audio-304.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c81a329be1379ebdd494f4341ba5bb2bc61e61b8a3bdf4983e54197701cb3aa7"
+  },
+  {
+    "published_path": "run4/http/added-domain-domain-a-audio-304.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/added-domain-domain-a-audio-304.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "6f2b6e679a9515d7f5e6e2e2a7f63ed384ce07e2e4d3162e22f4f6a42af0ea57"
+  },
+  {
+    "published_path": "run4/http/keep-unpublished-domain.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublished-domain.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "86b9189f8fa725379d4d4b89ab56040ffda2d9195c4a4f46686dbf9f11421a5c"
+  },
+  {
+    "published_path": "run4/http/keep-unpublished-domain.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublished-domain.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "f8bf41177a5f5e808a7ccb648b51080b031f15ca8018d91a576263d6cc626eb6"
+  },
+  {
+    "published_path": "run4/http/keep-unpublished-domain.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/keep-unpublished-domain.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "c6d2903518e2354dc8e028086c96208e6ca119cb45db3e553662d6bcf4712762"
+  },
+  {
+    "published_path": "run4/http/show-b-unpublished-domain-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-unpublished-domain-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "032043e180ef3da61d6d4980f1f96eb556cb6d402e6a5cb002013d08b4fdc8bb"
+  },
+  {
+    "published_path": "run4/http/show-b-unpublished-domain-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-unpublished-domain-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "f8bf41177a5f5e808a7ccb648b51080b031f15ca8018d91a576263d6cc626eb6"
+  },
+  {
+    "published_path": "run4/http/show-b-unpublished-domain-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/show-b-unpublished-domain-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "c6d2903518e2354dc8e028086c96208e6ca119cb45db3e553662d6bcf4712762"
+  },
+  {
+    "published_path": "run4/http/deployed-domain-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-domain-a-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "a95f43238587997055503beed75fc80e6c459a68cdb941a367c52fa6a87b79a2"
+  },
+  {
+    "published_path": "run4/http/deployed-domain-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run4/http/deployed-domain-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/deployed-domain-domain-a-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "ae342a1f56841eaf8e847739ff8b02c96b658b47087383b41cca116caf1c7a62"
+  },
+  {
+    "published_path": "run4/http/removed-paused-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-paused-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "3c85201e25e8901daeffa831e4c7148c600ac6505aae27b49f4dbe5708cd93c5"
+  },
+  {
+    "published_path": "run4/http/removed-paused-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-paused-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run4/http/removed-paused-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-paused-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "a9749f6d8a3afdf76e8065bdacd49e823f7d0d148fffddd8ce0aa3eecd937f7b"
+  },
+  {
+    "published_path": "run4/http/removed-worker-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-worker-domain-a-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "76e68b786a408826e818e3dab811b4372b471da137c3503d197e88753efcaa00"
+  },
+  {
+    "published_path": "run4/http/removed-worker-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-worker-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run4/http/removed-worker-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-worker-domain-a-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "33dfdbafa1c3119f0d71abe74d83fe1af6e7e668becb6f22df3cbe1f0107cdb4"
+  },
+  {
+    "published_path": "run4/http/removed-worker-after-domain-audio.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-worker-after-domain-audio.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "a47c7ad86e153a943a5b2d07937a1520dec85569980eb740db567e04943ef41a"
+  },
+  {
+    "published_path": "run4/http/removed-worker-after-domain-audio.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-worker-after-domain-audio.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run4/http/removed-worker-after-domain-audio.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-worker-after-domain-audio.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "411556593ebc9982f67bfd48ebbf5db3d6cfb0a15ecd2113962fba6558dc91ca"
+  },
+  {
+    "published_path": "run4/http/final-paused-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-paused-feed.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "0aef2d69068794ab9c3d9f71db4ae16ceb1ac5d1319faf0c32d46bafc0c25e14"
+  },
+  {
+    "published_path": "run4/http/final-paused-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-paused-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run4/http/final-paused-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/final-paused-feed.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "a9749f6d8a3afdf76e8065bdacd49e823f7d0d148fffddd8ce0aa3eecd937f7b"
+  },
+  {
+    "published_path": "run4/http/removed-runtime-probe.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-runtime-probe.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "83917c9c2304254c28eb42e69eb572aceb45e85c484564bc1a8fc1a138e24d35"
+  },
+  {
+    "published_path": "run4/http/removed-runtime-probe.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-runtime-probe.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "945e4893567554e68f6f28d5652917269341a5f3d295a16b7c708c9bfd95dc5d"
+  },
+  {
+    "published_path": "run4/http/removed-runtime-probe.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/removed-runtime-probe.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "5a31cdbc9166d0eccb3a35d01fe2a7f7dade10941c80568dfe73e2e13c64d91a"
+  },
+  {
+    "published_path": "run4/http/add-runtime-probe.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-runtime-probe.headers",
+    "treatment": "allowlisted headers; no reporting IDs",
+    "published_sha256": "cecf80fdf5f9bf7e6d181f7383eea42680c0b507a392c893d6cffb52164c7895"
+  },
+  {
+    "published_path": "run4/http/add-runtime-probe.status",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-runtime-probe.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run4/http/add-runtime-probe.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/add-runtime-probe.body",
+    "treatment": "body hash/length only; no RSS/media",
+    "published_sha256": "d34c13816738636f3a216870b40c3ce33f4c146dbf024682d167be31f8c6da2a"
+  },
+  {
+    "published_path": "run4/r2-before/public/episodes/domain-a/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-before/public/episodes/domain-a/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-before/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-before/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-before/public/episodes/domain-b/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-before/public/episodes/domain-b/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-before/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-before/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-added/public/episodes/domain-a/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-added/public/episodes/domain-a/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-added/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-added/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-added/public/episodes/domain-b/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-added/public/episodes/domain-b/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-added/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-added/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-keep-restored/public/episodes/domain-a/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-keep-restored/public/episodes/domain-a/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-keep-restored/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-keep-restored/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-keep-restored/public/episodes/domain-b/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-keep-restored/public/episodes/domain-b/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-keep-restored/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-keep-restored/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-show-b-restored/public/episodes/domain-a/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-show-b-restored/public/episodes/domain-a/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-show-b-restored/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-show-b-restored/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-show-b-restored/public/episodes/domain-b/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-show-b-restored/public/episodes/domain-b/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-show-b-restored/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-show-b-restored/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-deployed/public/episodes/domain-a/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-deployed/public/episodes/domain-a/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-deployed/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-deployed/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-deployed/public/episodes/domain-b/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-deployed/public/episodes/domain-b/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-deployed/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-deployed/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-removed/public/episodes/domain-a/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-removed/public/episodes/domain-a/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-removed/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-removed/public/episodes/domain-a/keep/revisions/18c2bf43-0753-46ec-af32-770e06a9d5d7.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "fe07c917783a25c98ef31430a100751393d7fd7c0a37bdc6a6fd686745612eee"
+  },
+  {
+    "published_path": "run4/r2-removed/public/episodes/domain-b/keep/metadata.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-removed/public/episodes/domain-b/keep/metadata.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "run4/r2-removed/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml.summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run4/r2-removed/public/episodes/domain-b/keep/revisions/f6c08562-a439-4471-8952-cf9deb19d2ee.toml",
+    "treatment": "R2 TOML hash/length only; compare snapshots without publishing metadata",
+    "published_sha256": "584d07d8463b59960dacde7dbde6cda5a510d84111cf2c5f32dd68eb0dee3e12"
+  },
+  {
+    "published_path": "README.md",
+    "local_source": "publication-only README",
+    "treatment": "publication overview and issue closure assessment",
+    "published_sha256": "b8011e2c155c9d7eb8396a8d6b80578a9a65956ae683fe3e499c512093c5c550"
+  }
+]

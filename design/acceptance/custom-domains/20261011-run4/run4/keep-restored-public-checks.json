@@ -1,0 +1,136 @@
+{
+  "result": "passed",
+  "canonical_base": "https://castloop-test-r4.otftalk.com",
+  "requests": [
+    {
+      "request": "keep-restored-worker-domain-a-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-worker-domain-a-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-worker-domain-a-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-worker-after-domain-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-worker-hidden-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-worker-gone-denied",
+      "expected_http": 410,
+      "actual_http": 410
+    },
+    {
+      "request": "keep-restored-domain-domain-a-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-domain-domain-a-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-domain-domain-a-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-domain-after-domain-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-domain-hidden-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-domain-gone-denied",
+      "expected_http": 410,
+      "actual_http": 410
+    },
+    {
+      "request": "keep-restored-worker-domain-b-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-worker-domain-b-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-worker-domain-b-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-domain-domain-b-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-domain-domain-b-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-domain-domain-b-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "keep-restored-worker-idle-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-worker-system-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-worker-staging-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-worker-admin-no-key",
+      "expected_http": 401,
+      "actual_http": 401
+    },
+    {
+      "request": "keep-restored-domain-idle-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-domain-system-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-domain-staging-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "keep-restored-domain-admin-no-key",
+      "expected_http": 401,
+      "actual_http": 401
+    }
+  ]
+}

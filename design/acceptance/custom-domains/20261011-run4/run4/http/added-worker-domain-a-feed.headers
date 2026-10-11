@@ -1,0 +1,10 @@
+HTTP/2 200
+date: Sun, 11 Oct 2026 09:41:47 GMT
+content-type: application/rss+xml; charset=utf-8
+content-length: 1650
+cf-cache-status: MISS
+accept-ranges: bytes
+cache-control: public, max-age=0, must-revalidate
+etag: "cc3607b3c86b8bf5bc59e32480334d4e"
+last-modified: Sun, 11 Oct 2026 09:41:12 GMT
+x-castloop-worker-version: 41df0f31-4968-4ac3-91f8-b73e52c9e3b8

@@ -1,0 +1,13 @@
+{
+  "operation_id": "0dac870e-2a03-4bb5-9251-c82291a0eeab",
+  "phase": "complete",
+  "pending_present": false,
+  "connection_receipt": {
+    "action": "remove",
+    "execution_id": "[REDACTED]",
+    "domain_id": "c56472b8f653efedbd8ad6b395a6f83220a21c4a"
+  },
+  "lock_present": false,
+  "url_change_present": false,
+  "result": "passed"
+}

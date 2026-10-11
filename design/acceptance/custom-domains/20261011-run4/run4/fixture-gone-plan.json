@@ -1,0 +1,54 @@
+{
+  "request": {
+    "schema_version": 1,
+    "job_id": "93e444cd-8e62-4f00-95a6-2073c58decb6",
+    "show_id": "domain-a",
+    "kind": "episode",
+    "episode_id": "gone",
+    "action": "delete",
+    "expected_show_generation": 12,
+    "expected_episode_generation": 1,
+    "created_at": "2026-10-11T09:35:46Z"
+  },
+  "preview": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r4",
+    "result": "preview",
+    "request": {
+      "schema_version": 1,
+      "job_id": "93e444cd-8e62-4f00-95a6-2073c58decb6",
+      "show_id": "domain-a",
+      "kind": "episode",
+      "episode_id": "gone",
+      "action": "delete",
+      "expected_show_generation": 12,
+      "expected_episode_generation": 1,
+      "created_at": "2026-10-11T09:35:46Z"
+    },
+    "request_sha256": "d77b951cedde809f5ace76f3d3665968c44b8b07117c22b2492f2ce95225bc2b",
+    "snapshot_only": true,
+    "authorizes_operation": false,
+    "payloads_verified": false,
+    "eligible": true,
+    "admission_state": "open",
+    "show": {
+      "lifecycle": "active",
+      "generation": 12
+    },
+    "episode": {
+      "lifecycle": "active",
+      "generation": 1
+    },
+    "blockers": [],
+    "deletion_page": {
+      "scope_index": 0,
+      "payload_objects": 1,
+      "payload_bytes": 962185,
+      "retained_marker_objects": 0,
+      "unknown_objects": 0,
+      "scope_complete": true,
+      "authorizes_deletion": false,
+      "retains_operational_records": true
+    }
+  }
+}

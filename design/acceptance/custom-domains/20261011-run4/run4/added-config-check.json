@@ -1,0 +1,4 @@
+{
+  "result": "passed",
+  "worker_source": "initialized workers_dev_base_url; service-status has no worker_name"
+}

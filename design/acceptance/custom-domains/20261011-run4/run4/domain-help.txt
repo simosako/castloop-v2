@@ -1,0 +1,10 @@
+Usage: castloop domain add HOSTNAME [--operation-id UUID] | domain list | domain remove [--operation-id UUID]
+
+Run from the service workspace. Use one Custom Domain in an active/full Cloudflare zone owned by this account.
+Add/remove require explicit service-pause and drained owners, and finish paused; resume explicitly.
+Keep workers.dev for administration. TLS probes send no administrator key or API token.
+Repeat the same command to continue acknowledged progress/TLS waiting. Preserve unknown REST outcomes, execution tokens and locks.
+List is read-only and reports connections, settings mismatches and unfinished operations. Set Cloudflare account/API token and the local administrator key.
+
+Options:
+  --help, -h  Show this help

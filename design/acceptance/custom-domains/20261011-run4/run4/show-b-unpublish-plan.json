@@ -1,0 +1,37 @@
+{
+  "request": {
+    "schema_version": 1,
+    "job_id": "e0ba8545-af55-4544-b8b8-342ef9579b63",
+    "show_id": "domain-b",
+    "kind": "show",
+    "action": "unpublish",
+    "expected_show_generation": 5,
+    "created_at": "2026-10-11T09:46:27Z"
+  },
+  "preview": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r4",
+    "result": "preview",
+    "request": {
+      "schema_version": 1,
+      "job_id": "e0ba8545-af55-4544-b8b8-342ef9579b63",
+      "show_id": "domain-b",
+      "kind": "show",
+      "action": "unpublish",
+      "expected_show_generation": 5,
+      "created_at": "2026-10-11T09:46:27Z"
+    },
+    "request_sha256": "0feec95b6a93f50ceb9b401bc44a30064cb901f5470404dc677f0d683527cd1a",
+    "snapshot_only": true,
+    "authorizes_operation": false,
+    "payloads_verified": false,
+    "eligible": true,
+    "admission_state": "open",
+    "show": {
+      "lifecycle": "active",
+      "generation": 5
+    },
+    "episode": null,
+    "blockers": []
+  }
+}

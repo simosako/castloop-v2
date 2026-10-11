@@ -1,0 +1,132 @@
+{
+  "family": "publication",
+  "operation_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+  "client_state": {
+    "schema_version": 1,
+    "identity": {
+      "service_id": "domtest-1011-r4",
+      "account_id": "[REDACTED_RESOURCE_ID]",
+      "worker_name": "castloop-domtest-1011-r4-48dcc965",
+      "public_base_url": "https://castloop-domtest-1011-r4-48dcc965.simosako.workers.dev"
+    },
+    "publication": {
+      "schema_version": 1,
+      "request": {
+        "schema_version": 1,
+        "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+        "show_id": "domain-a",
+        "kind": "episode",
+        "episode_id": "hidden",
+        "action": "publish",
+        "expected_show_generation": 7,
+        "expected_episode_generation": 0,
+        "created_at": "2026-10-11T09:31:43Z"
+      },
+      "commit": {
+        "schema_version": 1,
+        "kind": "episode",
+        "show_id": "domain-a",
+        "episode_id": "hidden",
+        "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+        "metadata_sha256": "1474333baef912982be5d1011519ca6e8cf42fe0bc69004a6649324fbcd16b3b",
+        "audio_sha256": "cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87",
+        "audio_length_bytes": 962185,
+        "duration_seconds": 30,
+        "committed_at": "2026-10-11T09:31:43Z"
+      },
+      "staged_uploads": [
+        "60d7bd98-ad26-46b9-a342-5e8f90d851a5",
+        "bbe3bd2e-5a59-42c5-9603-9a75d56b61c5"
+      ]
+    },
+    "manifest_sha256": "585aad675f7c122d7051e59b19c949a0a167372622a3ee10ad2c664f86c3c519",
+    "phase": "committed",
+    "claim_receipt": {
+      "show_id": "domain-a",
+      "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+      "show_generation": 8
+    },
+    "commit_receipt": {
+      "key": "staging/episodes/domain-a/hidden/6fd70bee-bf20-4a41-91cd-d7ebf2d74982/commit.json",
+      "created": true
+    }
+  },
+  "lock_present": false,
+  "remote_state_checked": true,
+  "authorizes_mutation": false,
+  "authorizes_recovery": false,
+  "server_status": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r4",
+    "result": "status",
+    "publication": {
+      "schema_version": 1,
+      "request": {
+        "schema_version": 1,
+        "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+        "show_id": "domain-a",
+        "kind": "episode",
+        "episode_id": "hidden",
+        "action": "publish",
+        "expected_show_generation": 7,
+        "expected_episode_generation": 0,
+        "created_at": "2026-10-11T09:31:43Z"
+      },
+      "commit": {
+        "schema_version": 1,
+        "kind": "episode",
+        "show_id": "domain-a",
+        "episode_id": "hidden",
+        "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+        "metadata_sha256": "1474333baef912982be5d1011519ca6e8cf42fe0bc69004a6649324fbcd16b3b",
+        "audio_sha256": "cd8e9f224d95080ecd50ea6a0deed49059561ab05ce9c81a83ea9df38afcce87",
+        "audio_length_bytes": 962185,
+        "duration_seconds": 30,
+        "committed_at": "2026-10-11T09:31:43Z"
+      },
+      "staged_uploads": [
+        "60d7bd98-ad26-46b9-a342-5e8f90d851a5",
+        "bbe3bd2e-5a59-42c5-9603-9a75d56b61c5"
+      ]
+    },
+    "operation": {
+      "show_id": "domain-a",
+      "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+      "show_generation": 8
+    },
+    "manifest_sha256": "585aad675f7c122d7051e59b19c949a0a167372622a3ee10ad2c664f86c3c519",
+    "request_sha256": "448347c3a60242c79349da5530cdf65510d4951b43c92f1d1072bcd809d18bae",
+    "status": {
+      "schema_version": 2,
+      "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+      "show_id": "domain-a",
+      "kind": "episode",
+      "episode_id": "hidden",
+      "action": "publish",
+      "show_generation": 8,
+      "request_sha256": "448347c3a60242c79349da5530cdf65510d4951b43c92f1d1072bcd809d18bae",
+      "state": "published",
+      "phase": "finished",
+      "result_lifecycle": "active"
+    },
+    "progress": {
+      "schema_version": 1,
+      "job_id": "6fd70bee-bf20-4a41-91cd-d7ebf2d74982",
+      "show_id": "domain-a",
+      "kind": "episode",
+      "episode_id": "hidden",
+      "action": "publish",
+      "show_generation": 8,
+      "request_sha256": "448347c3a60242c79349da5530cdf65510d4951b43c92f1d1072bcd809d18bae",
+      "phase": "finished",
+      "deleted_objects": 0,
+      "purge_confirmed": true,
+      "updated_at": "2026-10-11T09:32:42Z"
+    },
+    "ownership": "released",
+    "execution_active": false,
+    "marker_present": true,
+    "staging_verified": false,
+    "authorizes_recovery": false
+  }
+}

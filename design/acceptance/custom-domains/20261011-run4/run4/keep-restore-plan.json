@@ -1,0 +1,44 @@
+{
+  "request": {
+    "schema_version": 1,
+    "job_id": "5d948d8c-fc9c-4472-9e13-64142d176ed0",
+    "show_id": "domain-a",
+    "kind": "episode",
+    "episode_id": "keep",
+    "action": "restore",
+    "expected_show_generation": 17,
+    "expected_episode_generation": 2,
+    "created_at": "2026-10-11T09:45:30Z"
+  },
+  "preview": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r4",
+    "result": "preview",
+    "request": {
+      "schema_version": 1,
+      "job_id": "5d948d8c-fc9c-4472-9e13-64142d176ed0",
+      "show_id": "domain-a",
+      "kind": "episode",
+      "episode_id": "keep",
+      "action": "restore",
+      "expected_show_generation": 17,
+      "expected_episode_generation": 2,
+      "created_at": "2026-10-11T09:45:30Z"
+    },
+    "request_sha256": "c397731678713821ba867299b519b3bc52efa5493635a21fa8bb941719a91241",
+    "snapshot_only": true,
+    "authorizes_operation": false,
+    "payloads_verified": false,
+    "eligible": true,
+    "admission_state": "open",
+    "show": {
+      "lifecycle": "active",
+      "generation": 17
+    },
+    "episode": {
+      "lifecycle": "unpublished",
+      "generation": 2
+    },
+    "blockers": []
+  }
+}
