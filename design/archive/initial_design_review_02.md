@@ -1,7 +1,7 @@
 # `initial_design.md` レビュー（第2サイクル）
 
 - 作成日: 2026-09-23
-- 対象: [`initial_design.md`](./initial_design.md)、[`initial_design_review_01.md`](./initial_design_review_01.md)、[`show-template.toml`](./show-template.toml)、[`episode-template.toml`](./episode-template.toml)、[`AGENTS.md`](../AGENTS.md)
+- 対象: [`initial_design.md`](../initial_design.md)、[`initial_design_review_01.md`](./initial_design_review_01.md)、[`show-template.toml`](../show-template.toml)、[`episode-template.toml`](../episode-template.toml)、[`AGENTS.md`](../../AGENTS.md)
 - 目的: 第1サイクルで採用した構成を前提に、M0〜M2を実装するための残る判断と失敗時の振る舞いを明確にする
 - 状態: 一部確定、一部保留。以下の決定記録と各節の追記を優先して読む。初回の選択肢表は比較履歴として残す
 

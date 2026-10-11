@@ -1,6 +1,6 @@
 # M0実機プロトタイプ
 
-[`worker.ts`](./worker.ts)は公開受付・R2通知・Queue再試行・Workers Cachingの**検証専用**Worker。公開処理の実装ではない。試験結果と残件は[`../../design/m0_verification_log.md`](../../design/m0_verification_log.md)に記録する。
+[`worker.ts`](./worker.ts)は公開受付・R2通知・Queue再試行・Workers Cachingの**検証専用**Worker。公開処理の実装ではない。試験結果と残件は[`../../design/archive/m0_verification_log.md`](../../design/archive/m0_verification_log.md)に記録する。
 
 - [`wrangler.jsonc.example`](./wrangler.jsonc.example)をgit管理外のディレクトリへコピーし、専用のbucket/Queue/DLQ/Worker名に置換する。`main`と`$schema`はコピー先からの実パスに直す。専用bucketとQueueの作成、`staging/` prefix・`commit.json` suffixのR2通知rule作成は別途Wranglerで行う。既存のサービス用リソースを使わない。
 - 管理用のランダムなsecret `M0_SECRET`はローカルの保護されたJSONファイル（`{"M0_SECRET":"..."}`）に置く。リポジトリに入れない。`wrangler deploy --config <config> --secrets-file <secret-json>`で配備する。アクセス時は`X-M0-Key`ヘッダーを使い、値をログに残さない。

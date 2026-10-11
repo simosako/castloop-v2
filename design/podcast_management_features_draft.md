@@ -1,7 +1,9 @@
 # Podcast運営向け管理機能の追加案（draft）
 
 作成日: 2026-10-04
-対象: v0.2.0リリース後
+対象: v0.2.0リリース後の検討履歴と今後の候補
+
+現在の状態（2026-10-11）: A・Bの一覧はv0.2.1、独自ドメインはv0.3.0で提供済み。以下の「一覧が不足」「独自ドメインを後続へ」は検討当時の説明。未採用の機能候補は草案のままで、追加開発の承認ではない。
 状態: **A・Bと選択肢1を2026-10-04に承認。その他は草案・未承認。** A・Bの実装状況は末尾を参照。
 
 ## 1. 結論
@@ -153,4 +155,4 @@ D〜Fやその他の候補は、具体的な運営上の困りごとが出てか
 - [metadataと個別状態確認のschema](../packages/shared/src/index.ts)、[個別状態確認API](../src/target-inspection-admin.ts)
 - [制御記録と公開状態](../src/lifecycle-control.ts)、[ローカル下書き作成](../packages/cli/src/m6-local-drafts.ts)
 - [RSS生成](../src/feed.ts)
-- [独自ドメイン計画](./custom_domain_plan.md)、[基礎実装と残課題](./custom_domain_implementation_log.md)
+- [独自ドメイン計画](./custom_domain_plan.md)、[基礎実装と残課題](archive/custom_domain_implementation_log.md)

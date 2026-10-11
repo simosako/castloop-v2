@@ -4,7 +4,7 @@
 
 ## 範囲
 
-M6稼働済みサービスのWorkerだけを更新する内部経路を追加した。Show/Episodeのschema変換、音源・revision・公開snapshotのinventory、legacy bridgeは実行しない。新規初期化・通常更新・必要時の旧形式変換を独立した責務として扱う。
+M6稼働済みサービスのWorkerだけを更新する経路を、v0.2.0以降の正式`deploy`へ接続済み。Show/Episodeのschema変換、音源・revision・公開snapshotのinventory、legacy bridgeは実行しない。新規初期化・通常更新・必要時の旧形式変換を独立した責務として扱う。操作は[README](../README.md#compatible-worker-updates)を参照する。
 
 通常更新で使うコードはM6保存形式を維持する検証済みbuildに限定する。source hashから任意のコードの保存形式互換性を自動証明する仕組みではない。Custom Domain/route変更はこの経路へ含めず、旧版の汎用変換frameworkも作らない。
 
@@ -35,7 +35,9 @@ admissionの旧`readiness`（legacy移行監査）は変更せず、新version�
 
 service境界は、このprotocolを無視した第三者のCloudflare操作を禁止できない。メンテナンス中は別deploy/upload/version削除/secret変更を行わない運用を前提とし、REST snapshot・version履歴・upload ETagの不一致では閉じた状態を保持する。最新versionの前後照合はCloudflare上の原子的lockやUUID指定inheritの保証ではない。任意の将来の非互換コードや外部deployerを安全にrollbackする一般機構ではない。
 
-## 検証と残件
+## 検証履歴（2026-10-04）
+
+以下の未接続・残件は当時の進捗。正式`deploy`は配備・runtime検証後もpausedで完了し、v0.3.0では一致するCustom Domain接続を保持する。[独自ドメイン設計](custom_domain_plan.md)と[実機記録](archive/m6_standalone_acceptance.md)を参照する。unknown IOや残存lockの強制解放は提供しない。
 
 content/Show control/公開音源/revision/staging/job記録の非変更、live owner拒否、遅いconsumerとのCAS競合、別update競合、targetの固定、旧監査証拠保持、journal/要求喪失、RESTの入力凍結/secret inherit/ETag照合を自動テストした。共通runtime検証の異常系は既存初期化テストを利用し、同じ安全条件の重複テストを増やしていない。
 

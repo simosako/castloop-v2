@@ -2,15 +2,17 @@
 
 作成日: 2026-09-30
 
-状態: R2制御record方式を決定（2026-09-30）、基礎実装に着手。公開停止・削除・再開のCLIと配信ゲートの接続は未実装。
+現在の状態（2026-10-11）: 承認済みMVP範囲を実装・受け入れし、v0.2.0で公開済み。v0.3.0でもR2制御record・原子的受付・毎要求の配信状態検査・確認付き削除・必要記録保持を維持する。
 
-基準版: [v0.1.2](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2)。この版には公開停止・削除・再開のコマンドはない。
+現在の構成は[全体設計](initial_design.md)、実際のコマンドは[README](../README.md#unpublish-restore-or-delete)、完成範囲は[承認済み方針](m6_review_queue.md)を優先する。旧形式変換・万能なunknown IO復旧・無停止移行は公開条件ではない。独自ドメインはv0.3.0で提供済み。
+
+以下はv0.1.2を基準にした初期設計と開発経緯。状態・排他・削除・cacheの設計理由を参照するために保持する。未接続・検証待ちの記述は当時の進捗であり、現在の残タスクではない。初期CLI案や応答喪失時の再送案を現在の運用手順として実行しない。
 
 ### 決定事項と現在の実装範囲
 
 管理者のレビューにより、方式Bの**R2制御recordを公開状態の正とする方式**を決定し、実装開始の指示を受けた。入力Show/Episode TOMLへ公開・削除フラグは追加しない。方式Aとの比較は採否の記録として保持する。
 
-最初の実装ではstrictな状態/request schema、同じShow keyでのCAS受付、凍結request、processing開始時のowner照合、R2を毎回読む公開可否判定を追加した。2026-09-30に専用環境でcache/REST deploy・内部purge・generation key・GET/HEAD/Range構成を実証した。旧recordの移行や既存CLI/consumer/公開入口への接続はまだ行わず、破壊的操作を先行公開しない。Free制限・upload収束・削除/復旧等のゲートは引き続き未通過であり、構成実証をM6全体の合格と扱わない。具体的な進捗は[実装ログ](./m6_implementation_log.md)へ記録する。
+最初の実装ではstrictな状態/request schema、同じShow keyでのCAS受付、凍結request、processing開始時のowner照合、R2を毎回読む公開可否判定を追加した。2026-09-30に専用環境でcache/REST deploy・内部purge・generation key・GET/HEAD/Range構成を実証した。旧recordの移行や既存CLI/consumer/公開入口への接続はまだ行わず、破壊的操作を先行公開しない。Free制限・upload収束・削除/復旧等のゲートは引き続き未通過であり、構成実証をM6全体の合格と扱わない。具体的な進捗は[実装ログ](archive/m6_implementation_log.md)へ記録する。
 
 2026-10-01の管理者判断で、M6のuploadは**現行Cloudflare REST APIの単一PUTを維持**する。クライアント切断後にそのPUTが遅れてobjectを作成・更新することはないと仮定する。これは確認済みのCloudflare仕様ではなく、[未解決の懸念U1](./m6_upload_recovery_options.md)として保持する。U1の解消や分割uploadへの変更をM6公開条件にせず、通常のupload排他・照合・中断回復の実装は引き続き必要とする。
 
@@ -25,7 +27,7 @@
 - R2状態・ジョブ・進捗を正とし、CLIの終了や別端末への切替でも操作を再開できるようにする。
 - 公開停止と不可逆な削除を混同しない。公開停止だけでストレージ使用量が減るとは説明しない。
 
-## 2. 現状の制約
+## 2. 計画時点の制約
 
 - `src/publication.ts`の`publishedEpisodes`はcurrent metadataを列挙する。停止状態がなく、metadataを残すだけでは次のfeed再生成でEpisodeが復活する。
 - `src/index.ts`の`publicAsset`は許可されたpathにR2 objectがあれば配信する。feedからEpisodeを消すだけでは、既知のMP3 URLで再生できる。
@@ -63,9 +65,9 @@ Show停止は親の配信ゲートとして働き、子Episodeの状態を一括
 
 公開停止した保存済みsnapshotを明示的に再公開する。ローカルの未公開編集は取り込まない。GUID、元の`published_at`、音源path、revisionは変えず、現在の`public_base_url`でfeedを再生成する。削除中・削除済みは再開不可。
 
-## 4. CLI案
+## 4. 初期CLI案（不採用・履歴）
 
-以下は**将来のコマンド案**であり、v0.1.2では実行できない。
+以下は初期のコマンド案。現在はサービスrootの`preview-show-lifecycle`／`preview-episode-lifecycle`で要求を保存し、hashと明示確認を添えて`lifecycle-execute`を実行する。完了は`operation-status lifecycle JOB_UUID`の`completed`／`released`で確認する。以下の直接操作コマンドや`cleanup-job`は現在のCLIには提供しない。
 
 ```text
 # Showディレクトリから
@@ -406,5 +408,5 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 - [Cache purge](https://developers.cloudflare.com/workers/cache/purge/) — tag/path prefix、entrypoint scope、success確認とrate limits。
 - [R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/) — bindingのread/write/delete/listは強整合、cacheは別。
 - [Queue delivery guarantees](https://developers.cloudflare.com/queues/reference/delivery-guarantees/) — at-least-once配送。
-- [全体設計](./initial_design.md)、[独自ドメイン計画](./custom_domain_plan.md)、[M3実装ログ](./m3_implementation_log.md)、[M5実装ログ](./m5_implementation_log.md)。
-- [M6実装ログ](./m6_implementation_log.md) — 今後の判断・検証・進捗を記録する。
+- [全体設計](./initial_design.md)、[独自ドメイン計画](./custom_domain_plan.md)、[M3実装ログ](archive/m3_implementation_log.md)、[M5実装ログ](archive/m5_implementation_log.md)。
+- [M6実装ログ](archive/m6_implementation_log.md) — 今後の判断・検証・進捗を記録する。

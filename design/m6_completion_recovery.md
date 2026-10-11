@@ -14,13 +14,15 @@
 
 file保存とlockは既存共通storageへ置き、初期化/更新固有のphase遷移は各journalへ残す。全操作を扱う汎用回復状態機械は追加しない。
 
-## 試験専用binary
+## 正式CLI
 
-`init-reconcile OPERATION_UUID`と`update-service-reconcile OPERATION_UUID`を接続した。後者の`update-service-verify`（保存済みupload/deployment receiptから未実行の検証を続行）とは別責務である。通常公開CLI/entryのgateは開けない。
+`init-reconcile OPERATION_UUID`と`update-service-reconcile OPERATION_UUID`をv0.2.0以降の正式CLIで提供する。後者の`update-service-verify`（保存済みupload/deployment receiptから未実行の検証を続行）とは別責務である。
 
 現在のbinary/source bytesが元のbuildと異なっても、回復時に再uploadしないため、保存済み初期化journalをそのまま開く。config hashと既知targetは厳密に照合する。
 
-## 検証と残件
+## 検証履歴とサポート境界
+
+以下は2026-10-04の検証記録。対象operation/versionは[アーカイブの実機記録](archive/m6_standalone_acceptance.md)にある。新規初期化専用fault harnessや万能な外部復旧は[承認済みMVP範囲](m6_review_queue.md)の完成条件ではない。試験専用faultコマンドは正式CLIへ含めない。
 
 実HTTP handler/Queue/CASを使うlocal結合で、初期化・更新のcompletion応答喪失→永続証拠の非書込照合→local完了→paused維持を確認した。未完了、欠落/別request receipt、別pause、live token、途中generation変更を拒否し、remote writes/Queue送信が増えないことを回帰する。
 

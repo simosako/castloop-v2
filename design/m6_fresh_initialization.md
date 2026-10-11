@@ -6,7 +6,7 @@
 
 旧サービスのデータ変換を経ず、別名のWorker/private R2/Queue/DLQから開始する内部経路を実装した。既存資源を削除・採用する機能ではない。legacy移行用の`readiness`は互換性と監査のため保持し、新規起動には独立した`runtime_readiness`を用いる。架空のmigration ID・旧IO終了証拠・旧cache purge証拠は作らない。
 
-通常の`init`とM6公開コマンドはまだこの経路へ接続していない。専用の試験バイナリで実Cloudflare初期化・Show/Episode公開・基本配信を確認済みだが、M6全体の公開ゲートとは区別する。
+現在は通常の`init`と正式Workerへ接続し、v0.2.0以降で提供済み。操作方法は[README](../README.md#initialize-and-publish)。以下の責務と失敗時の非再送条件は維持する。
 
 ## 小さい責務
 
@@ -27,7 +27,7 @@ serverはservice TOMLとadmission以外のobjectがあるbucketを拒否する�
 
 ## 認証付きの起動時検査
 
-試験専用entry `src/m6-setup-worker.ts`にだけ初期化経路を接続する。通常candidate・既存binaryのready=falseと書込禁止は変えない。
+正式Worker入口は`src/worker.ts`。試験専用entryの接続履歴は後半へ区別し、正式入口の検証では試験用faultやcache nonce headerを使わない。
 
 1. CLIがCloudflare RESTからdeployment/version/settings/previewの前後snapshotを採取する。検査の実装はWorkerと共有し、account API tokenはCLIに留める。
    実RESTのsettingsはexportsを省略することがある。前後の100%配備照合とimmutable versionの明示export設定を必須とし、settingsにexportがある場合も照合する。省略をready申告や架空の設定で補完しない。到達待ちは認証付きhealthの有限回GETだけで、対象versionが確認できるまでprepareを送らない。
@@ -42,7 +42,9 @@ REST snapshotは認証済み管理者から受け取るCloudflare観測値であ
 
 Queue statusの有限回待機はCLIの観測終了だけである。時間だけでowner/consumerを失効させない。prepare/complete/Queue送信の応答喪失は自動再送せず、既存記録とrequested journalを保持する。Queue receiptが未着なら完了しない。runtime-check記録にはtargetと固定receiptのみを永久保持し、secret・metadata本文・任意の例外messageを保存しない。
 
-## 検証と残件
+## 検証履歴（2026-10-04）
+
+以下の未接続・残件・資源保持の説明は当時の状態。正式入口の受け入れ結果は[実機記録](archive/m6_standalone_acceptance.md)、現在のサポート境界は[承認済み方針](m6_review_queue.md)を参照する。
 
 初期化・CAS競合・誤証拠・設定変更・応答喪失・journal/lock・REST資源衝突を自動テストした。既存の一つのcontent-flow結合テストも、新規初期化からShow登録・公開・改訂・停止/再開/削除へ通す経路に置き換えた。別の巨大なE2Eテストは追加していない。
 

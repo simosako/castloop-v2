@@ -35,7 +35,7 @@ bun experiments/m6/verify-cache.ts
 
 ## 2026-09-30 実測
 
-最終実行は10項目すべて合格。Standard usage model、観測したHTTP応答50件のcoloはNRT。[`cache-results-20260930.json`](./cache-results-20260930.json)にsecretを含まない観測記録を保存し、判断と残件は[実装ログ](../../design/m6_implementation_log.md)へ記録した。作成したWorker/bucketは削除済み。
+最終実行は10項目すべて合格。Standard usage model、観測したHTTP応答50件のcoloはNRT。[`cache-results-20260930.json`](./cache-results-20260930.json)にsecretを含まない観測記録を保存し、判断と残件は[実装ログ](../../design/archive/m6_implementation_log.md)へ記録した。作成したWorker/bucketは削除済み。
 
 これはM6.0のcache/REST/Range構成実証であり、M6全体やFree対応、300MB音源、本番への移行、upload収束、削除consumerの合格ではない。複数colo・別hostname・負荷・実請求額の検証も含まない。
 
@@ -77,10 +77,10 @@ mutationの自動再送、未知lock/tokenの解放、Worker/bucket/Queueの削�
 
 各試験は成功時もserviceを明示pausedで残す。これらのscriptの実装・local型検査だけをCloudflare合格として扱わず、実行結果を設計logへ別途記録する。複数colo・独自domain・請求額・無停止移行・unknown live IOの解放・正式releaseは対象外。
 
-2026-10-04、六lifecycle・completion recovery・実cache HITは合格したが、300MB stagingのWorker検証はCPU制限で未完了となった。元serviceはpaused/未収束owner/token/payload保持。native digest直結でもexceededCpuを実機観測した。管理者がWorkers Paid利用不可を決定したため、Paidへの変更ではなくR2/CLIの検証能力へ責務を集約する。`usage_model=standard`をPaid証拠としない。具体的な証拠・残件は`design/m6_standalone_acceptance.md`。このharnessを既存failed workspaceで再実行してはいけない。
+2026-10-04、六lifecycle・completion recovery・実cache HITは合格したが、300MB stagingのWorker検証はCPU制限で未完了となった。元serviceはpaused/未収束owner/token/payload保持。native digest直結でもexceededCpuを実機観測した。管理者がWorkers Paid利用不可を決定したため、Paidへの変更ではなくR2/CLIの検証能力へ責務を集約する。`usage_model=standard`をPaid証拠としない。具体的な証拠・残件は`design/archive/m6_standalone_acceptance.md`。このharnessを既存failed workspaceで再実行してはいけない。
 
 ## R2 native checksumの調査（2026-10-04）
 
-[sanitized結果](./checksum-results-20261004.json)と[調査報告](../../design/m6_upload_integrity_review.md)を参照。管理REST PUTは誤ったchecksumヘッダーを拒否せず、binding PUTは誤ったSHA-256を拒否した。300MBのbinding stream保存/HEAD native SHA-256とCLI全量読み戻しが一致し、単独保存のCPUは2msだった。既存service/control/Queueは変更せず、今回作成したprobe payload七件だけをexact keyで削除した。旧token解放・M6全体の300MB受け入れ合格を許可する証拠ではない。private診断script/manifestを消してmutationを再送しない。
+[sanitized結果](./checksum-results-20261004.json)と[調査報告](../../design/archive/m6_upload_integrity_review.md)を参照。管理REST PUTは誤ったchecksumヘッダーを拒否せず、binding PUTは誤ったSHA-256を拒否した。300MBのbinding stream保存/HEAD native SHA-256とCLI全量読み戻しが一致し、単独保存のCPUは2msだった。既存service/control/Queueは変更せず、今回作成したprobe payload七件だけをexact keyで削除した。旧token解放・M6全体の300MB受け入れ合格を許可する証拠ではない。private診断script/manifestを消してmutationを再送しない。
 
-管理者承認の案Bを実装し、CLI全量SHA-256読戻しのETag/version証拠とWorker HEAD照合、公開時のR2 SHA-256検証/native checksum照合へ集約した。Workerの音源全量再hashは行わない。新規`castloop-m6-test-7c97f1a0`で初期化・小さい公開・300MB公開/全量配信・二種改訂・明示削除まで合格した。途中の試験CLI引数制約を修正し、正常metadata staging/publication未開始のcheckpointだけから続行した。最終pause/空registryを確認し、旧未知owner/tokenと資源は解放・削除しない。[sanitized結果](./large-media-results-20261004.json)と[受け入れ記録](../../design/m6_standalone_acceptance.md)参照。
+管理者承認の案Bを実装し、CLI全量SHA-256読戻しのETag/version証拠とWorker HEAD照合、公開時のR2 SHA-256検証/native checksum照合へ集約した。Workerの音源全量再hashは行わない。新規`castloop-m6-test-7c97f1a0`で初期化・小さい公開・300MB公開/全量配信・二種改訂・明示削除まで合格した。途中の試験CLI引数制約を修正し、正常metadata staging/publication未開始のcheckpointだけから続行した。最終pause/空registryを確認し、旧未知owner/tokenと資源は解放・削除しない。[sanitized結果](./large-media-results-20261004.json)と[受け入れ記録](../../design/archive/m6_standalone_acceptance.md)参照。

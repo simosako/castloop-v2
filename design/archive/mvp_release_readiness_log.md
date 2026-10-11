@@ -2,9 +2,9 @@
 
 ## 2026-09-30: MVP公開後の次マイルストーン
 
-v0.1.2を公開し、サブコマンドhelpと初回initのhealth待機を修正した（[修正記録](./cli_external_test_fixes.md)、[Release notes](../docs/release-v0.1.2.md)）。Episode/Showの公開停止・削除はこの版には含まれない。
+v0.1.2を公開し、サブコマンドhelpと初回initのhealth待機を修正した（[修正記録](./cli_external_test_fixes.md)、[Release notes](../../docs/release-v0.1.2.md)）。Episode/Showの公開停止・削除はこの版には含まれない。
 
-次の機能マイルストーンを[M6: 公開停止と削除](./m6_content_lifecycle_plan.md)とする。R2制御record方式を決定し、状態schemaと原子的受付・公開可否判定の基礎実装に着手したが、CLI/公開入口へは未接続で受け入れ済みではない。可逆な停止と不可逆な削除、atomic admission、warm cacheでの配信遮断、全revision/staging処理、部分失敗からの再開と既存v0.1.2サービスの移行を新しい公開ゲートに含める。M6の実測は[専用ログ](./m6_implementation_log.md)へ記録し、下記のMVP受け入れをM6の合格根拠として流用しない。
+次の機能マイルストーンを[M6: 公開停止と削除](../m6_content_lifecycle_plan.md)とする。R2制御record方式を決定し、状態schemaと原子的受付・公開可否判定の基礎実装に着手したが、CLI/公開入口へは未接続で受け入れ済みではない。可逆な停止と不可逆な削除、atomic admission、warm cacheでの配信遮断、全revision/staging処理、部分失敗からの再開と既存v0.1.2サービスの移行を新しい公開ゲートに含める。M6の実測は[専用ログ](./m6_implementation_log.md)へ記録し、下記のMVP受け入れをM6の合格根拠として流用しない。
 
 独自ドメイン対応は既存の承認・基礎実装を保持してM6の後続へ回す。過去MVPの検証結果・残件は以下の履歴として保持する。
 
@@ -45,7 +45,7 @@ M4.5の新規サービス作成ではWranglerのdeploy自体が成功した直�
 
 **判断:** ソースコードのない別マシンへのコピー・実行は、このMVPの公開ブロッカーにしない。対象は管理者が運用するLinux x86-64環境でのShow/Episode公開であり、任意のLinux環境や他OSで動くという配布保証は含めない。
 
-M4ではリポジトリ外にコピーした実行ファイルと別置きWranglerで公開を確認した。M4.5では`ffprobe`なしで新規workspaceから`init`・Show/Episode公開まで検証した。2026-09-25のsmoke testでも同一Linux環境で新規サービスを作り、Show/Episode jobの完了、feed・MP3・画像の一致を確認した（[`docs/linux_smoke_test.md`](../docs/linux_smoke_test.md)）。一方、異なるLinuxディストリビューション・システムライブラリ・Node/Wranglerの導入差を越えた動作は未確認。
+M4ではリポジトリ外にコピーした実行ファイルと別置きWranglerで公開を確認した。M4.5では`ffprobe`なしで新規workspaceから`init`・Show/Episode公開まで検証した。2026-09-25のsmoke testでも同一Linux環境で新規サービスを作り、Show/Episode jobの完了、feed・MP3・画像の一致を確認した（[`docs/linux_smoke_test.md`](../../docs/linux_smoke_test.md)）。一方、異なるLinuxディストリビューション・システムライブラリ・Node/Wranglerの導入差を越えた動作は未確認。
 
 別マシン試験は、CLI実行ファイルを不特定の利用者へ配布するとき、または対応するOS/環境を広げるときの配布検証として実施する。今回の初回`init`では一時的なHTTP 500の後、同じworkspaceでの再実行により完了した。500の原因は記録から断定しない。
 

@@ -563,7 +563,7 @@
 - `serveLifecyclePublicRequest`を追加し、許可pathについて毎要求のstate読取、検証済みgeneration props、停止404/削除410/障害503、HEAD bodyなし、内部TTLと外部再検証headerの分離を実装した。Range/条件付きheaderは公開可否の確認後だけ内部transportへ渡す。
 - warm cache相当のmock、別host/query、全revision、GET/HEAD/206/304、状態破損/R2障害/内部transport障害の自動テストを追加した。停止時はcached transportを呼ばず、障害時にもfallbackしない。内部HTTP/CDN cache用headerは外部応答から除去する。
 - gatewayはまだ本番default入口へ接続しておらず、deploy metadataによるcache無効化や内部entrypointの実装をこの関数だけで保証しない。専用実機の既存実証と今回のmock結果を区別する。
-- 確認が必要な監査記録policy/公開利用条件と、判断待ちではないupload統合・実行回復・配信/移行・restore/delete・CLI/実機の残件を[レビュー待ち一覧](./m6_review_queue.md)へまとめた。運用への配備、物理削除、サポート問い合わせ、Releaseは行っていない。
+- 確認が必要な監査記録policy/公開利用条件と、判断待ちではないupload統合・実行回復・配信/移行・restore/delete・CLI/実機の残件を[レビュー待ち一覧](../m6_review_queue.md)へまとめた。運用への配備、物理削除、サポート問い合わせ、Releaseは行っていない。
 - 最終回帰は`bun test`（128件、911 assertions）、`npm run check`、M6実証tsconfig、Linux x86-64 buildと既存`--version`/`--help`、文書リンク/コードフェンス/空白/英語AGENTS.md、`git diff --check`に合格。既存CLIはv0.1.2のままでlifecycleコマンドをまだ表示しない。今回の新moduleの検証はローカル自動テストであり、Cloudflare実機の新しい合格記録は追加していない。
 
 ## 2026-10-01: Show/Episode公開停止の状態機械を追加
@@ -604,11 +604,11 @@
 - 本番consumerは未接続。runtime強制終了時の安全なtoken回復は未実装であり、M6の残ゲートとして保持する。これはREST単一PUTの未解決懸念U1とは別の問題である。
 - 自動テストは91件・561 assertionsに合格。Cloudflareリソース・運用サービスは変更していない。
 
-**現在のupload方針（2026-10-01）**: 管理者判断により現行REST単一PUTを維持し、クライアント切断後に遅れてobjectが作成・更新されないと仮定する。確認済み仕様ではなく[未解決懸念U1](./m6_upload_recovery_options.md)として保持し、M6公開をブロックしない。以下の過去ログにある条件付きPUT/分割uploadの公開ゲート判断は、末尾の決定で更新された。既存実測はそのまま保持する。
+**現在のupload方針（2026-10-01）**: 管理者判断により現行REST単一PUTを維持し、クライアント切断後に遅れてobjectが作成・更新されないと仮定する。確認済み仕様ではなく[未解決懸念U1](../m6_upload_recovery_options.md)として保持し、M6公開をブロックしない。以下の過去ログにある条件付きPUT/分割uploadの公開ゲート判断は、末尾の決定で更新された。既存実測はそのまま保持する。
 
 ## 2026-09-30: 次マイルストーンの設定と設計案
 
-管理者の依頼により、Episode/Showの公開停止・削除を次のマイルストーンM6とした。[設計案](./m6_content_lifecycle_plan.md)を作成し、全体設計・README・Agent Guideと独自ドメイン計画に開発順を反映した。
+管理者の依頼により、Episode/Showの公開停止・削除を次のマイルストーンM6とした。[設計案](../m6_content_lifecycle_plan.md)を作成し、全体設計・README・Agent Guideと独自ドメイン計画に開発順を反映した。
 
 ### 設計案作成時の状態
 
@@ -668,10 +668,10 @@
 
 ### 専用実装と証拠
 
-- [`experiments/m6/cache-worker.ts`](../experiments/m6/cache-worker.ts): `readPublicVisibility`で実際のR2制御recordを確認し、`CachedMedia`をloopback fetchで呼ぶ試験Worker。gateway/inner別UUID、generation props、内側purge RPC、遅延response fixtureを持つ。入力metadataや公開consumerは試験対象にしていない。
-- [`experiments/m6/verify-cache.ts`](../experiments/m6/verify-cache.ts): 毎回新規resourceを作成し、試験・証拠保存・cleanupを実行。型は[専用tsconfig](../experiments/m6/tsconfig.json)で既存platform typesに対して確認する。
+- [`experiments/m6/cache-worker.ts`](../../experiments/m6/cache-worker.ts): `readPublicVisibility`で実際のR2制御recordを確認し、`CachedMedia`をloopback fetchで呼ぶ試験Worker。gateway/inner別UUID、generation props、内側purge RPC、遅延response fixtureを持つ。入力metadataや公開consumerは試験対象にしていない。
+- [`experiments/m6/verify-cache.ts`](../../experiments/m6/verify-cache.ts): 毎回新規resourceを作成し、試験・証拠保存・cleanupを実行。型は[専用tsconfig](../../experiments/m6/tsconfig.json)で既存platform typesに対して確認する。
 - 最終実行は`castloop-m6-cache-7b5a047d`、compatibility date `2026-09-30`、usage model `standard`、完了時刻 `2026-09-30T14:15:32.022Z`。10チェック合格。公開/隔離path等の50応答はNRTで観測した。
-- [保存したJSON結果](../experiments/m6/cache-results-20260930.json)にuploadのexports、settings、個々のHTTP status/bytes/ID/cache状態/colo/経過時間、cleanup結果を保持する。raw記録は`/tmp/opencode/castloop-m6-cache-7b5a047d/`。secret入りmanifestはGitに入れない。
+- [保存したJSON結果](../../experiments/m6/cache-results-20260930.json)にuploadのexports、settings、個々のHTTP status/bytes/ID/cache状態/colo/経過時間、cleanup結果を保持する。raw記録は`/tmp/opencode/castloop-m6-cache-7b5a047d/`。secret入りmanifestはGitに入れない。
 
 ### 実測結果
 
@@ -717,7 +717,7 @@
 
 ### 実機結果
 
-最終環境`castloop-m6-admission-89e9794f-07f`、Standard、完了`2026-09-30T14:43:23.015Z`。[専用runner](../experiments/m6/verify-admission.ts)の5チェック合格。[JSON証拠](../experiments/m6/admission-results-20260930.json)を保存する。
+最終環境`castloop-m6-admission-89e9794f-07f`、Standard、完了`2026-09-30T14:43:23.015Z`。[専用runner](../../experiments/m6/verify-admission.ts)の5チェック合格。[JSON証拠](../../experiments/m6/admission-results-20260930.json)を保存する。
 
 1. publish/stage/unpublish/deleteの16同時claimは1件だけ成功、15件拒否。
 2. 同一requestの6同時claimは冪等、generationは1だけ進む。processingはabandon不可。
@@ -759,7 +759,7 @@ CAS実証と限定abandonを`0523af1`でcommit/pushした後、upload protocol�
 - `src/public-assets.ts`: v0.1.2と同じ公開path/ID/UUID/媒体keyを解析するpure helperを追加。Show/Episode対象が一致するpublic snapshotだけからcache propsを作り、feed/cover tagを維持しつつshow/episode階層tagを追加。Episodeタグはslug結合が曖昧にならない区切りにする。
 - migration planのenclosure path検証も同じparserを使用。既存`src/index.ts`やconsumer/CLIへはまだ接続せず、v0.1.2の公開応答/headerは変更していない。cache実証fixtureや既存JSON証拠を新snapshotの本番回帰結果と扱わない。
 - 新たな8テストでread回数、snapshot世代/対象照合、非公開/不正generationのcache key拒否、private/encoded/不正ID path拒否、tag衝突防止を確認。`npm run check`、専用実証tsconfig、`bun test`（85件、532 assertions）に合格。
-- [upload方式の選択肢](./m6_upload_recovery_options.md)を追加。既存REST直PUTを条件付きwriteで取消できないことが現在の主要ゲート。同じWorkerを介する分割sessionを推奨候補として整理したが、方式変更は未承認・未実装。CLI/公開入口の接続とdelete公開は引き続き保留する。
+- [upload方式の選択肢](../m6_upload_recovery_options.md)を追加。既存REST直PUTを条件付きwriteで取消できないことが現在の主要ゲート。同じWorkerを介する分割sessionを推奨候補として整理したが、方式変更は未承認・未実装。CLI/公開入口の接続とdelete公開は引き続き保留する。
 - Linux x86-64 build、既存version/init help、文書リンク/コードフェンス/空白、英語AGENTS.md、`git diff --check`にも合格。今回のCAS試験で作成した4組のWorker/bucketすべてがREST GETで404であることを最終確認した。
 
 ## 2026-10-01: 単一PUTの維持と未解決懸念U1の扱いを決定
@@ -770,7 +770,7 @@ CAS実証と限定abandonを`0523af1`でcommit/pushした後、upload protocol�
 
 - **現行Cloudflare REST APIの単一object PUTを維持**する。Worker経由の分割upload sessionやS3 credentialsは導入しない。
 - **クライアント切断後にそのPUTが遅れてobjectを作成・更新することはない**と仮定する。これはCloudflareの確認済み仕様でも新たな実機合格でもない。
-- 仮定が誤っているなら削除完了後にstaging payloadが残る可能性があるという点を、[未解決懸念U1](./m6_upload_recovery_options.md)として記録する。この懸念の解消・困難なローカル再現・分割uploadへの変更をM6公開条件にはしない。反例や明確な公開仕様が得られた場合は再検討する。
+- 仮定が誤っているなら削除完了後にstaging payloadが残る可能性があるという点を、[未解決懸念U1](../m6_upload_recovery_options.md)として記録する。この懸念の解消・困難なローカル再現・分割uploadへの変更をM6公開条件にはしない。反例や明確な公開仕様が得られた場合は再検討する。
 - REST PUTが不一致`If-Match`でも上書きしたという既存実測は変更しない。条件付きREST PUT fenceは使わず、この試験を切断後の保存継続の証拠とも扱わない。
 - 同じShowの原子的受付、通常PUTの完了/size/内容照合、明示的publish、300,000,000 bytes上限、移行時の旧CLI停止は維持する。単なる経過時間やHEAD不在を理由に、まだ継続中のPUT/Worker/consumerを解放する方針ではない。切断後のowner/generationを照合した回復・解放は上記仮定の下で後続実装へ接続する。
 - 変更は設計・実装ログ・README・Agent Guide・試験の解釈に限定する。CLI/Worker/テストコード、保存済み実測JSON、Cloudflareリソース、Releaseは変更していない。M6全体の公開ゲートを通過したとは扱わない。

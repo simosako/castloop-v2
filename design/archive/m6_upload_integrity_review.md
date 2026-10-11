@@ -76,9 +76,9 @@ checksumは原本との同一性検査であり、原本自体のMP3破損・再
 
 ## 証拠と残る検証
 
-- [sanitized結果](../experiments/m6/checksum-results-20261004.json)。raw観測とprivate実行記録は`/tmp/opencode/castloop-m6-checksum-8057dd2f/`。secretを含む`binding-before.json`を外部報告へ添付しない。
+- [sanitized結果](../../experiments/m6/checksum-results-20261004.json)。raw観測とprivate実行記録は`/tmp/opencode/castloop-m6-checksum-8057dd2f/`。secretを含む`binding-before.json`を外部報告へ添付しない。
 - 新規診断Workerは`castloop-m6-test-checksum-913cb489`。既存service Worker/control/Queueには書き込まず、既知staging音源は読取だけ。今回作った成功済みprobe payload七件のみexact keyで削除し、GET 404を確認した。資源自体は削除していない。
-- 元serviceのpaused状態・未返却owner/token・回復可能な300MB staging payloadは維持する。この試験は旧IO収束/強制解放の証拠ではない。[U1](./m6_upload_recovery_options.md)の扱いも変更しない。
+- 元serviceのpaused状態・未返却owner/token・回復可能な300MB staging payloadは維持する。この試験は旧IO収束/強制解放の証拠ではない。[U1](../m6_upload_recovery_options.md)の扱いも変更しない。
 - Bの証拠伝達を実装し、receipt/GET/HEADのidentity一致・途中差替え・証拠欠落/不一致・manifest/owner/generation不一致を各責務の層で回帰した。音源stagingのbody GETと公開後のbody GETを行わないこと、native checksum欠落/不一致を拒否すること、live IO/token保持も検査する。native checksumの実動作は今回の実機証拠を使い、各層へ同じ大容量検証testを重複させない。
 - 新規`castloop-m6-test-7c97f1a0`で試験standaloneの初期化→明示再開→Show/20,850-byte Episode公開→GET/HEAD/Range→明示pauseまで合格した。REST PUT receipt→CLI journal/GET→管理settlement→Worker HEADのETag/version一致、公開native checksum検査を実経路で通した。証拠は`/tmp/opencode/castloop-m6-test-7c97f1a0/acceptance.json`。旧環境は採用・再配備・解放しない。
-- 同じ新規専用環境で300MBのM6 publication全体、二種改訂、全量配信/HEAD/Range/304、明示deleteが合格した。[sanitized結果](../experiments/m6/large-media-results-20261004.json)と[checkpoint/残件](./m6_standalone_acceptance.md)参照。旧IOの収束、全colo、聴取品質、通常release全体の合格とは区別する。
+- 同じ新規専用環境で300MBのM6 publication全体、二種改訂、全量配信/HEAD/Range/304、明示deleteが合格した。[sanitized結果](../../experiments/m6/large-media-results-20261004.json)と[checkpoint/残件](./m6_standalone_acceptance.md)参照。旧IOの収束、全colo、聴取品質、通常release全体の合格とは区別する。

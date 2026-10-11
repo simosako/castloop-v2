@@ -29,7 +29,7 @@ M4後、**MVP公開前の追加マイルストーンM4.5**として案Aを短期
 3. 拡張子だけ`.mp3`の別形式、0 byte、上限超過、不正ヘッダー・duration不明、ファイル変更後の公開を拒否することを確認。切断音源は基準の`ffprobe`を含む解析器がどこまで検知できるか確認し、保証範囲を明示する。`update-episode-audio`は検証に失敗した場合にuploadしない。前後でSHA-256・サイズの照合、凍結済みjobの復旧、metadata-only更新が変わらないことを確認する。
 4. 採用時はCLI、配布ビルド、READMEを更新し、M4時点の依存説明は履歴として残してM4.5の変更を別記する。新規workspaceで`init`→Show/Episode公開→feed/MP3検証を行う。macOS/WindowsのCLI利用は各OS向け実行ファイルのビルド・検証が別途必要。
 
-参照: [`music-metadata`のAPIと`duration`オプション](https://github.com/Borewit/music-metadata#ioptions-interface)、[`packages/cli/src/audio.ts`](../packages/cli/src/audio.ts)、[`m0_verification_log.md`](./m0_verification_log.md)。
+参照: [`music-metadata`のAPIと`duration`オプション](https://github.com/Borewit/music-metadata#ioptions-interface)、[`packages/cli/src/audio.ts`](../../packages/cli/src/audio.ts)、[`m0_verification_log.md`](./m0_verification_log.md)。
 
 ## M4.5 検証結果と採用判断（2026-09-24）
 

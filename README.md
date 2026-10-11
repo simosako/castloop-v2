@@ -2,13 +2,29 @@
 
 Serverless podcast hosting on Cloudflare: one private R2 bucket and one public Worker per service, multiple Shows, managed through a standalone CLI.
 
-**v0.3.0 adds custom domains to the Show/Episode listings and M6 lifecycle features.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md).
+**v0.3.0 supports Show/Episode publication, listings, unpublishing, restoration, deletion, and custom domains.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md). The [design overview](design/initial_design.md) describes the current architecture and development history.
 
 ## Build and install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.3.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.3.0). Run `sha256sum --check SHA256SUMS` in the download directory before installing the binary. `castloop --version` must report `0.3.0`.
+### Install the release binary
 
-The build machine needs Bun 1.4.2 and Node.js/npm:
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.3.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.3.0). In the download directory:
+
+```sh
+sha256sum --check SHA256SUMS
+mkdir -p "$HOME/.local/bin"
+install -m 0755 castloop-linux-x64 "$HOME/.local/bin/castloop"
+export PATH="$HOME/.local/bin:$PATH"
+castloop --version
+```
+
+The version must be `0.3.0`. Keep the two license files with the binary and add `$HOME/.local/bin` to your shell's PATH for future sessions.
+
+The target Linux x86-64 machine needs no Bun, Node.js, Wrangler, source tree, `ffprobe`, or R2 S3 credentials. Enable R2 and Queues and supply an account-scoped Cloudflare API token with Workers Scripts, Workers R2 Storage, and Queues read/write permissions. Never store it in TOML or Git. Experimental macOS/Windows cross-builds are not distributed or runtime-verified.
+
+### Build from source
+
+The build machine needs Bun 1.4.2 and Node.js 24/npm:
 
 ```sh
 npm ci
@@ -16,11 +32,9 @@ npm run check
 bun test
 npm run build:cli -- linux-x64
 sha256sum dist/castloop-linux-x64
-install -m 0755 dist/castloop-linux-x64 "$HOME/.local/bin/castloop"
-castloop --version
 ```
 
-The target Linux x86-64 machine needs no Bun, Node.js, Wrangler, source tree, `ffprobe`, or R2 S3 credentials. Enable R2 and Queues and supply an account-scoped Cloudflare API token with Workers Scripts, Workers R2 Storage, and Queues permissions. Never store it in TOML or Git. Experimental macOS/Windows cross-builds are not distributed or runtime-verified.
+The binary is written to `dist/castloop-linux-x64`; install it in place of the downloaded binary above. Wrangler is not part of this build path.
 
 ## Initialize and publish
 
@@ -39,6 +53,7 @@ castloop create-show my-show --site-url https://your-real-site.example/podcast
 castloop update-show my-show
 castloop publish-show my-show
 castloop job-status SHOW_JOB_UUID
+# Repeat job-status until published and ownership released before continuing.
 cd my-show
 castloop create-episode first
 # Edit episode-first.toml and provide an MP3.
@@ -49,9 +64,13 @@ cd ..
 castloop job-status EPISODE_JOB_UUID
 ```
 
-Use the `pause_id` from `service-status`, not a newly generated ID, to resume. Replace the example website with the administrator's real site URL. A publish receipt means submitted, not finished: wait for `server_status.status.state: "published"` and `server_status.ownership: "released"` before another operation on that Show. The feed is `<public_base_url>/podcasts/my-show/feed.xml`; settings are in `castloop.toml`.
+Use `admission.pause_id` from `service-status`, not a newly generated ID, to resume. Replace the example website with the administrator's real site URL. Use the `job_id` from each publish response for `job-status`. A publish receipt means submitted, not finished: wait for `server_status.status.state: "published"` and `server_status.ownership: "released"` before another operation on that Show. The feed is `<public_base_url>/podcasts/my-show/feed.xml`; settings are in `castloop.toml`.
+
+Show commands run from the service root; Episode create/update/publish commands run from the Show directory. `create-episode` creates only a local TOML, not a server reservation. Initialization adds `.castloop/` and `*.mp3` to `.gitignore`. Keep `.castloop/` private and back it up: it contains the administrator key and operation journals needed for status and recovery. A Git checkout of the TOML files alone is not a complete administration workspace.
 
 Updates stage inputs without publishing. For metadata-only Episode revisions, run `update-episode ID`, then `publish-episode ID` **without an MP3 argument**. For audio-only revisions, run `update-episode-audio ID file.mp3`, then `publish-episode ID file.mp3`. Whenever audio is staged, publication requires the unchanged original MP3. Keep GUID and `published_at` unchanged. Normal revisions retain immutable published media and history.
+
+Use JPEG or PNG cover art; a published Show's cover extension cannot be changed. Restore unpublished content before editing it. A future `published_at` does not schedule publication: only an explicit publish command starts it.
 
 MP3s are limited to 300,000,000 bytes. The CLI validates duration, uploads and reads back the complete object to verify its size/SHA-256 and identity. The Worker checks that evidence against R2 HEAD; R2 verifies SHA-256 when saving immutable published audio. Workers Paid is not required by this implementation. Staging audio has no automatic expiration or general cleanup command in this MVP.
 
@@ -89,22 +108,27 @@ Replace `unpublish` with `restore` or `delete`. For a whole Show, use `preview-s
 - Unpublish hides content with HTTP 404; restore preserves GUID, revisions and media.
 - Delete physically removes payloads and is irreversible. Deleted IDs cannot be reused. Necessary small reservations, tombstones, frozen requests, commit markers and status/progress records are retained indefinitely without copying content text or secrets.
 - Deleting/deleted content returns 410. Public responses require cache revalidation; `system/` and `staging/` are never public.
-- Operations do not interrupt unfinished uploads/publications. Check lifecycle status for completed/released ownership, not just a commit receipt.
+- Operations do not interrupt unfinished uploads/publications. Wait for `server_status.status.state: "completed"` and `server_status.ownership: "released"`, not just a commit receipt. Restoring a Show preserves each Episode's own state; separately unpublished Episodes stay unpublished.
 
 ## Compatible Worker updates
 
-Back up `castloop.toml` and the private `.castloop/` directory, replace the executable with the verified new build, then run from each **already initialized M6** workspace:
+Back up `castloop.toml` and the private `.castloop/` directory, replace the executable with the verified new build, then run from each **already initialized M6** workspace. If it is already paused, skip `service-pause` and use its existing `admission.pause_id` instead of a new UUID.
+
+Obtain all Show IDs with `list-shows --include-deleted`, following every `next_cursor`. For a v0.2.0 Worker without listing support, inspect the bucket's `system/show-publications/` prefix in Cloudflare instead. Do not treat an empty page or local directories as a complete inventory.
 
 ```sh
 castloop service-pause NEW_PAUSE_UUID
 castloop service-status
-# Wait for invocations to settle and unfinished Show owners to complete.
+# Repeat target-show for every Show ID, including deleted IDs.
+castloop target-show SHOW_ID
+# Continue only when admission.invocations is [] and every
+# target-show reports unfinished_show_operation: false.
 castloop deploy
 castloop service-status
 castloop service-resume NEW_PAUSE_UUID
 ```
 
-Pause temporarily stops delivery and new mutations. Paused does not necessarily mean drained. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update in this MVP.
+Pause blocks new mutations; v0.3.0 Workers also return HTTP 503 for paused public delivery. Paused does not necessarily mean drained, and an HTTP response alone is not proof that old operations ended. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update in this MVP. Installing a binary or publishing a release does not update Cloudflare Workers automatically.
 
 ## Custom domains
 
@@ -130,9 +154,11 @@ The single REST PUT recovery model retains [unverified assumption U1](design/m6_
 
 ## Development and release scope
 
+The [design document index](design/README.md) separates current references from archived development history.
+
 Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.
 
-[M6 acceptance](design/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.3.0 release notes](docs/release-v0.3.0.md), [v0.2.1 release notes](docs/release-v0.2.1.md), and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
+[M6 acceptance](design/archive/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.3.0 release notes](docs/release-v0.3.0.md), [v0.2.1 release notes](docs/release-v0.2.1.md), and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
 
 Existing M6 workspaces without `workers_dev_base_url` retain their original workers.dev URL and configuration hash until an owned domain change saves the field. [Live Cloudflare acceptance passed](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md), including removal and restored workers.dev delivery. Earlier interrupted trial operations remain retained; their unknown requests or tokens are not released by this version.
 

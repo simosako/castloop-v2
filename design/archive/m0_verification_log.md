@@ -22,7 +22,7 @@
 
 ## 2026-09-23: R2有効化後の実機検証（項目1・2・4の一部）
 
-R2 subscription有効化後、`wrangler r2 bucket list`が成功した。API tokenとWrangler 4.131.2で **検証専用bucket・Queue・DLQの作成、WorkerのdeployとR2 binding/Queue consumer設定、R2 object put、通知rule作成**に成功した。専用リソース名は`castloop-m0-e87da5b3ca`（bucket/Worker/Queue）、`castloop-m0-dlq-e87da5b3ca`（DLQ）。テスト用コードは[`../experiments/m0/worker.ts`](../experiments/m0/worker.ts)、アカウント固有のWrangler設定・Workerの管理用secretはgit管理外の`/tmp/opencode/castloop-m0/`に置いた。検証完了時はこれらの専用リソースと実験オブジェクトだけを片付ける。
+R2 subscription有効化後、`wrangler r2 bucket list`が成功した。API tokenとWrangler 4.131.2で **検証専用bucket・Queue・DLQの作成、WorkerのdeployとR2 binding/Queue consumer設定、R2 object put、通知rule作成**に成功した。専用リソース名は`castloop-m0-e87da5b3ca`（bucket/Worker/Queue）、`castloop-m0-dlq-e87da5b3ca`（DLQ）。テスト用コードは[`../../experiments/m0/worker.ts`](../../experiments/m0/worker.ts)、アカウント固有のWrangler設定・Workerの管理用secretはgit管理外の`/tmp/opencode/castloop-m0/`に置いた。検証完了時はこれらの専用リソースと実験オブジェクトだけを片付ける。
 
 | 検証 | 実測と判定 |
 | --- | --- |
@@ -70,7 +70,7 @@ purge失敗時の再試行も、**初回だけpurge結果を人工的に失敗�
 
 ## 2026-09-23: 簡素な停止・同job再試行方式の実機ミニ検証
 
-検証専用Workerに[`../experiments/m0/verify_recovery.py`](../experiments/m0/verify_recovery.py)の実行経路を追加し、既存の専用bucket・Queue・DLQで実施した。`staging/shows/m0-gate-.../<jobId>/commit.json`のR2通知から同じQueue consumerを起動し、`m0/gate/`内の**模擬公開キー**だけを書き換えた。本番のfeedやmetadataは操作していない。最終版Workerでは`processing → free`を管理用HTTP経路から実行できず、Queue consumer内でのみ完了する。確認済みの実行IDは`69766be1`。検証時のQueue設定は`max_batch_size: 1`、`max_concurrency: 1`、`max_retries: 2`。
+検証専用Workerに[`../../experiments/m0/verify_recovery.py`](../../experiments/m0/verify_recovery.py)の実行経路を追加し、既存の専用bucket・Queue・DLQで実施した。`staging/shows/m0-gate-.../<jobId>/commit.json`のR2通知から同じQueue consumerを起動し、`m0/gate/`内の**模擬公開キー**だけを書き換えた。本番のfeedやmetadataは操作していない。最終版Workerでは`processing → free`を管理用HTTP経路から実行できず、Queue consumer内でのみ完了する。確認済みの実行IDは`69766be1`。検証時のQueue設定は`max_batch_size: 1`、`max_concurrency: 1`、`max_retries: 2`。
 
 | ケース | 実測 |
 | --- | --- |
@@ -92,7 +92,7 @@ purge失敗時の再試行も、**初回だけpurge結果を人工的に失敗�
 
 ## 2026-09-23: Show/Episode共通受付から通知まで（項目2・4の接続）
 
-検証専用Worker・R2・同じQueueを使い、[`../experiments/m0/verify_admission_flow.py`](../experiments/m0/verify_admission_flow.py)で実施。最終実行IDは`cba4e2bf`。ShowとEpisodeの両要求は認証付きの同じShow単位のR2受付記録へ条件付きPUTを行い、勝者のみWranglerでTOMLをstagingし、最後に`commit.json`をアップロードした。検証用consumerはmarkerの種類・jobIdとstagingの存在を確認し、**模擬公開キー**へ反映して予約を解放する。Queue設定は1並列・1件batch。
+検証専用Worker・R2・同じQueueを使い、[`../../experiments/m0/verify_admission_flow.py`](../../experiments/m0/verify_admission_flow.py)で実施。最終実行IDは`cba4e2bf`。ShowとEpisodeの両要求は認証付きの同じShow単位のR2受付記録へ条件付きPUTを行い、勝者のみWranglerでTOMLをstagingし、最後に`commit.json`をアップロードした。検証用consumerはmarkerの種類・jobIdとstagingの存在を確認し、**模擬公開キー**へ反映して予約を解放する。Queue設定は1並列・1件batch。
 
 | 検証 | 実測 |
 | --- | --- |
@@ -104,7 +104,7 @@ purge失敗時の再試行も、**初回だけpurge結果を人工的に失敗�
 
 ## 2026-09-23: 実R2公開キーの途中失敗とcache purge（項目2）
 
-検証専用リソースで[`../experiments/m0/verify_release_purge.py`](../experiments/m0/verify_release_purge.py)を実行（ID `dc982242`）。専用Showの`m0/system/shows/<showId>/show.toml`、`m0/public/podcasts/<showId>/feed.xml`と固定キー`cover.jpg`、`m0/public/episodes/<showId>/<episodeId>/metadata.toml`を使った。JPEGは`ffmpeg`で生成し、feedは小さなRSS XMLをstaging。既存の共通Queue consumer（1並列・1件batch）でShowとEpisodeを順に更新した。メタデータは検証用の最小TOMLであり、本番schema/RSS生成の検証ではない。
+検証専用リソースで[`../../experiments/m0/verify_release_purge.py`](../../experiments/m0/verify_release_purge.py)を実行（ID `dc982242`）。専用Showの`m0/system/shows/<showId>/show.toml`、`m0/public/podcasts/<showId>/feed.xml`と固定キー`cover.jpg`、`m0/public/episodes/<showId>/<episodeId>/metadata.toml`を使った。JPEGは`ffmpeg`で生成し、feedは小さなRSS XMLをstaging。既存の共通Queue consumer（1並列・1件batch）でShowとEpisodeを順に更新した。メタデータは検証用の最小TOMLであり、本番schema/RSS生成の検証ではない。
 
 | ケース | 実測 |
 | --- | --- |
@@ -116,7 +116,7 @@ purge失敗時の再試行も、**初回だけpurge結果を人工的に失敗�
 
 ## 2026-09-23: job status・commit・受付・DLQの照合（項目3）
 
-検証専用bucketとQueueを使い[`../experiments/m0/verify_job_diagnostics.py`](../experiments/m0/verify_job_diagnostics.py)を実行（ID `c0369105`）。認証付き`/diagnose`から、Showの受付記録、`staging/shows/<showId>/<jobId>/commit.json`の有無、R2の`system/jobs/<jobId>/status.toml`、DLQ consumerの記録を読む。consumerは検証用の故障注入を行い、**DLQ配送だけでstatusを更新しない**。
+検証専用bucketとQueueを使い[`../../experiments/m0/verify_job_diagnostics.py`](../../experiments/m0/verify_job_diagnostics.py)を実行（ID `c0369105`）。認証付き`/diagnose`から、Showの受付記録、`staging/shows/<showId>/<jobId>/commit.json`の有無、R2の`system/jobs/<jobId>/status.toml`、DLQ consumerの記録を読む。consumerは検証用の故障注入を行い、**DLQ配送だけでstatusを更新しない**。
 
 | ケース | 実測 |
 | --- | --- |

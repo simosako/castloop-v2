@@ -2,7 +2,9 @@
 
 更新日: 2026-10-01
 
-状態: **現行のCloudflare REST単一PUTを維持する方針を決定（2026-10-01）。切断後の遅延書込は未解決の懸念として保持する。** [M6設計](./m6_content_lifecycle_plan.md)と[実測ログ](./m6_implementation_log.md)の補足。
+現在の状態（2026-10-11）: この方式はv0.2.0以降の正式CLI／Workerへ接続済み。U1は引き続き未検証の仮定であり、取得応答喪失・強制終了・残存lockの万能な復旧は提供しない。末尾の未公開・release gateの記述は2026-10-04までの開発経緯で、現在の完成条件ではない。
+
+状態: **現行のCloudflare REST単一PUTを維持する方針を決定（2026-10-01）。切断後の遅延書込は未解決の懸念として保持する。** [M6設計](./m6_content_lifecycle_plan.md)と[実測ログ](archive/m6_implementation_log.md)の補足。
 
 ## M6の決定事項
 
@@ -76,4 +78,4 @@
 
 `settleStageUpload`には`put_requests_settled=true`と`no_more_puts=true`の明示的な申告が必要である。単一PUTが継続している間や、旧clientが後でPUTを開始/再試行し得る間は申告してはならない。新client helperは自身の全PUTをawaitして以後PUTしない場合だけ送信し、beginの結果不明では自動送信しない。別端末からの回復も旧clientの終了確認が必要である。この申告は認証された管理者/準拠CLIの契約であって、R2/Workerが別経路のREST接続終了を直接証明するものではない。Cloudflare tokenによる手動REST書込や虚偽の終了申告を防ぐ保証はない。
 
-終了確認だけではownerを解放しない。`runStageVerification`はuploading ownerの専用verification tokenを取得し、size/CLIの全量checksum照合証拠/HEAD ETag・versionとmetadata/coverを検証する。2026-10-04に[案B](./m6_upload_integrity_review.md)を実装し、音源のWorker内全量hashを除いた。公開保存はR2のSHA-256検証とnative checksum照合を使う。検証成功/明示的取消のfinished progressとv2 statusを照合し、owner解放とupload receiptを同じCASで保存する。取消では既存staging payloadを消さず、次の編集で同じdraft jobを再利用できるようにする。検証失敗の通常終了ではverification tokenだけを返し、stage受付を保持する。時間/HEAD不在だけの解放は追加しない。試験用管理API/CLIは接続済みだが、取得応答喪失/強制終了のtoken回復と通常release gateは未完了である。
+終了確認だけではownerを解放しない。`runStageVerification`はuploading ownerの専用verification tokenを取得し、size/CLIの全量checksum照合証拠/HEAD ETag・versionとmetadata/coverを検証する。2026-10-04に[案B](archive/m6_upload_integrity_review.md)を実装し、音源のWorker内全量hashを除いた。公開保存はR2のSHA-256検証とnative checksum照合を使う。検証成功/明示的取消のfinished progressとv2 statusを照合し、owner解放とupload receiptを同じCASで保存する。取消では既存staging payloadを消さず、次の編集で同じdraft jobを再利用できるようにする。検証失敗の通常終了ではverification tokenだけを返し、stage受付を保持する。時間/HEAD不在だけの解放は追加しない。試験用管理API/CLIは接続済みだが、取得応答喪失/強制終了のtoken回復と通常release gateは未完了である。

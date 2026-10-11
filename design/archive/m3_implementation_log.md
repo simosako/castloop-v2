@@ -14,4 +14,4 @@
 
 公開feedをRSS Feed Validatorで確認したところ、有効なRSSと判定された。唯一の推奨事項は`atom:link rel="self"`であり、レンダラーへ追加してShowを再公開した。validatorのキャッシュを回避して再検証し、有効判定・該当推奨事項なしを確認した。Apple Podcastsの公開要件（GUID不変・重複なし、各item固有のenclosure、HEADとbyte-range対応、公開画像）のうち、RSS出力、GUID、音源・画像の配信を検証した。画像の`HEAD 200`、冷たいキャッシュへのbyte-range要求で画像・MP3ともに`206`を確認した。Apple Podcasts Connectに実際の番組を登録しての審査・アートワーク検証は行っていない。参照: [Apple RSS要件](https://podcasters.apple.com/support/823-podcast-requirements)、[RSS validator](https://validator.w3.org/feed/)。
 
-MVP公開前の残課題だった実公開jobのretry上限→DLQ→同job回復も専用Showで確認済み。手順と実測は`design/m2_implementation_log.md`の「MVP公開前の実公開job回復検証」を参照。
+MVP公開前の残課題だった実公開jobのretry上限→DLQ→同job回復も専用Showで確認済み。手順と実測は`design/archive/m2_implementation_log.md`の「MVP公開前の実公開job回復検証」を参照。

@@ -1,8 +1,10 @@
-# M6: 承認済み方針と残る技術ゲート
+# M6: 承認済み方針と開発範囲
 
 更新日: 2026-10-04
 
-管理者の指示に従い、判断待ちでも独立した開発は進める。確認待ちと明示的に承認されたpolicyを区別する。公開停止・再開・削除コマンドは未提供。現行REST単一PUTの維持と未解決懸念U1の非ブロッカー扱いは決定済みで、再承認を求めない。
+現在の状態（2026-10-11）: 承認済みMVP範囲は実装・検証済みで、M6をv0.2.0、一覧をv0.2.1、独自ドメインをv0.3.0で公開した。現行REST単一PUTの維持と未解決懸念U1の非ブロッカー扱い、必要記録の保持、unknown IO／残存lockを強制解放しない条件は現在も有効で、再承認を求めない。
+
+以下の承認事項は維持する。到達点・未接続・技術残件の記述は2026-10-04までの履歴であり、現在の残タスクとして再実装しない。現在の仕様は[全体設計](initial_design.md)、公開範囲は[v0.2.0](../docs/release-v0.2.0.md)と[v0.3.0](../docs/release-v0.3.0.md)のRelease notesを参照する。
 
 ## 承認済みの試験環境・移行・リリース方針（2026-10-02）
 
@@ -44,7 +46,7 @@
 
 これは仕様・構成の承認であり、測定済みの性能/料金値や実機受け入れ合格を意味しない。専用環境での機能・安全性の回帰は継続し、費用・停止時間の測定計画は2026-10-02の決定に従ってMVP構築後へ回す。運用記録保持policyの承認も、実削除の実機合格とは区別する。
 
-## 管理者の判断待ちではない技術残件
+## 完成範囲と開発経緯
 
 ### 承認済みのMVP完成範囲（2026-10-04）
 
@@ -56,15 +58,15 @@
 
 管理者がWorkers Paidの利用不可を明示した。Paidへの変更を再要求せず、無料枠を前提に検証処理の責務・実行場所を見直す。既存の300MB上限を勝手に下げず、全量contents照合・object identity/owner/generation照合を単純に省略しない。現行Worker内全量SHA-256のCPU超過は、この実装方式の問題であり、R2へ300MBを保存できないという実証ではない。
 
-R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理REST PUTは誤ったchecksumヘッダーでも保存する一方、binding PUTは誤ったSHA-256を拒否し、300MBの検証付きstream保存/HEAD native checksumがCPU 2msで成功することを確認した。管理者が案Bを承認し、既存CLIの全量SHA-256読み戻し結果をexact objectへ結び付け、公開保存時のSHA-256をR2へ任せる方式を実装した。Worker内の二箇所の全量再ハッシュを除き、owner/generation/IO終了確認とnative checksum照合は維持する。接続後の実機受け入れは別記し、旧IO収束の合格とは区別する。
+R2/CLIの[完全性検証調査](archive/m6_upload_integrity_review.md)で、管理REST PUTは誤ったchecksumヘッダーでも保存する一方、binding PUTは誤ったSHA-256を拒否し、300MBの検証付きstream保存/HEAD native checksumがCPU 2msで成功することを確認した。管理者が案Bを承認し、既存CLIの全量SHA-256読み戻し結果をexact objectへ結び付け、公開保存時のSHA-256をR2へ任せる方式を実装した。Worker内の二箇所の全量再ハッシュを除き、owner/generation/IO終了確認とnative checksum照合は維持する。接続後の実機受け入れは別記し、旧IO収束の合格とは区別する。
 
-### 現在の到達点（2026-10-04）
+### 当時の到達点（2026-10-04・以下は進捗履歴）
 
 下記の各module詳細には実装当時の未接続項目も残る。正式CLI/Worker entryを既存runnerへ切り替え、専用新規環境でLinuxバイナリの初期化→明示再開→Show/Episode公開→metadata-only改訂→通常更新→六lifecycle操作→paused終了が合格した。GET/HEAD/Range/304、停止404/削除410、既知payload物理不在、永久記録保持、空registryまで確認した。正式version/tag/GitHub Releaseは未作成である。
 
 通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。改修前の300MB Worker hashはCPU超過となり、元serviceはpaused/owner/token/payloadを保持する。管理者承認のCLI全量SHA-256証拠＋Worker HEAD照合＋R2公開時検証へ集約した後、新規`castloop-m6-test-7c97f1a0`で300MB公開・audio-only/metadata-only改訂・全量配信/HEAD/Range/304・明示削除まで合格した。試験CLIのmetadata-only引数制約は修正し、publication未開始の確認済みcheckpointだけを続行した。課金/CPU limitは変更しておらず、費用測定計画を通常開発のgateへ戻すものではない。
 
-承認済みMVP範囲の実装・検証・利用案内とRelease notes草案は完成した。残るのは正式version/tagと公開操作の確定・実施であり、万能なunknown IO復旧や追加fault matrixをgateへ戻さない。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](./m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+承認済みMVP範囲の実装・検証・利用案内とRelease notes草案は完成した。残るのは正式version/tagと公開操作の確定・実施であり、万能なunknown IO復旧や追加fault matrixをgateへ戻さない。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](archive/m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 
@@ -72,7 +74,7 @@ R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理RES
 
 保存形式を変えないM6更新を、試験専用の認証HTTP/standaloneへ接続した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通HTTP/Queue/cache runtime検証は初期化と共有する。実機で二つのupload APIがinheritのUUID指定を拒否したため、最新upload/連番/履歴とacknowledged versionを照合する配備経路へ修正し、中間receiptもdurable保存する。`castloop-m6-test-ff3bfd8c`で通常更新・10 object非変更・GUID/revision/URL保持・明示再開/再pauseが合格した。失敗した専用環境はrequested/updatingを保持し、再送/採用/自動再開しない。全lifecycle/cache/300MB/unknown IO復旧と公開CLI gateは残る。[通常更新](./m6_compatible_updates.md)参照。
 
-2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](./m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
+2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](archive/m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
 
 1. **upload/publication統合**: staging操作IDとdraft job IDの分離、単一PUT前の受付/一度限りの開始、明示的client終了確認、検証token、size/全量checksum/metadata/cover照合、完了/取消receiptとowner解放の基礎処理を追加した。凍結publication manifest・共通CAS受付・staging証拠/current ETag/base revision照合後のcommit準備も追加した。Show/Episode publication runner/実行token付きconsumer/内部purge effect、stream媒体保存と2種改訂の再開まで独立moduleで追加済み。管理API/既存CLIのREST PUTへの接続、状態喪失後の回復手順、本番publication routingを完成する。未知の検証tokenは時間で奪わない。
     staging/publication/lifecycleの3内部管理handlerを未公開の`fetchM6ManagementIntegration`へ接続した。認証/readiness/version照合後のrouteを結合testで検証し、通常candidateはmock readinessがあってもmanagement書込を拒否する。公開入口・CLI書込commandと実機受け入れは未完了である。`m6_management_api.md`参照。
@@ -102,8 +104,8 @@ R2/CLIの[完全性検証調査](./m6_upload_integrity_review.md)で、管理RES
     `operation-status FAMILY ID`もsource CLI/standalone buildへ接続した。凍結local要求のstatusだけを一回送り、local/remoteの非変更・requested非昇格を4familyとlocal HTTPS binaryで検証した。通常candidateのmanagement gateを開けず、保持record不足/未知応答/途中変更は拒否する。実Cloudflare受け入れではない。`m6_remote_operation_status.md`参照。
     四operation familyとtarget draft、三layoutの移行journalのlocal親path/lock返却も監査し、symlink/dangling lock/他所有lockの削除を拒否した。移行recordもbounded/no-follow readerへ統一した。snapshotの監査と公開CLI・復旧・実機受け入れは継続する。`m6_local_journal_paths.md`参照。
 
-## 今回実装済みだが本番未接続
+## 当時の未接続項目（履歴）
 
 strictな制御/request/status/progress/commitとallowlist診断、CAS job journal、Show CAS受付、reserved限定abandon、invocation token、完了解放receipt、移行inventory、削除対象ページ、owner-gated payload batch/verification pass、削除開始/最終purge/子tombstone/完了解放、lifecycle対応feed入力、Show/Episode停止・保存済みsnapshot再開状態機械、通常終了consumer/続行/requeue、公開gateway、内部cached entrypoint/transport/purge。既存本番DLQ handlerの固定診断化は接続済みだが、lifecycle操作はまだ本番へ接続しない。個々の自動テスト合格はM6全体の受け入れ合格ではない。
 
-詳細は[M6設計](./m6_content_lifecycle_plan.md)、[実装ログ](./m6_implementation_log.md)、[U1と単一PUT方針](./m6_upload_recovery_options.md)を参照。
+詳細は[M6設計](./m6_content_lifecycle_plan.md)、[実装ログ](archive/m6_implementation_log.md)、[U1と単一PUT方針](./m6_upload_recovery_options.md)を参照。
