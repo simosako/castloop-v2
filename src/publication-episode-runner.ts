@@ -1,6 +1,6 @@
 import { episodeDraftFromRevision, episodeRevisionSchema, lifecycleFailureForPhase, lifecycleJobStatusSchema, lifecycleProgressSchema,
   parseEpisodeDraft, parseEpisodeLifecycle, parseEpisodeRevision, parseServiceConfig, parseShowMetadata, stringifyLifecycleToml,
-  stringifyToml, validateId } from "../packages/shared/src/index";
+  sameEpisodeIdentity, stringifyToml, validateId } from "../packages/shared/src/index";
 import type { EpisodeCommit, EpisodeRevision, LifecycleProgress } from "../packages/shared/src/index";
 import { finishShowOperation, readShowControl, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
@@ -128,7 +128,7 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
         if (await publicationChecksum(bytes) !== commit.metadata_sha256) throw new Error("Episode metadata differs from its frozen commit");
         draft = parseEpisodeDraft(text(bytes));
       }
-      if (!draft || draft.episode_id !== commit.episode_id || base && (draft.guid !== base.guid || draft.published_at !== base.published_at)) {
+      if (!draft || draft.episode_id !== commit.episode_id || base && !sameEpisodeIdentity(draft, base)) {
         throw new Error("Episode identity and publication date must remain unchanged");
       }
       const show = parseShowMetadata(text(await readPublicationBytes(env, `system/shows/${execution.showId}/show.toml`, 1_000_000)));

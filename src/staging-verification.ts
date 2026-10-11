@@ -1,6 +1,6 @@
 import { lifecycleFailureForPhase, lifecycleJobStatusSchema, parseEpisodeDraft, parseEpisodeRevision, parseJobStatus,
   parseShowControl, parseShowMetadata, stageControlRequest, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema,
-  stringifyToml } from "../packages/shared/src/index";
+  sameEpisodeIdentity, stringifyToml } from "../packages/shared/src/index";
 import type { LifecycleJobStatus, StagePayload, StageUploadProgress } from "../packages/shared/src/index";
 import { controlRequestHash, readEpisodeLifecycle, readShowControl } from "./lifecycle-control";
 import type { LifecycleControlEnv } from "./lifecycle-control";
@@ -96,7 +96,7 @@ async function verifyPayload(env: LifecycleControlEnv, verification: StageVerifi
     if (published) {
       if (published.size > 1_000_000) throw new Error("Published Episode metadata is oversized");
       const previous = parseEpisodeRevision(await published.text());
-      if (previous.episode_id !== episode.episode_id || previous.guid !== episode.guid || previous.published_at !== episode.published_at) {
+      if (!sameEpisodeIdentity(previous, episode)) {
         throw new Error("Episode identity and published_at must remain unchanged");
       }
     }

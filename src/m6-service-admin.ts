@@ -25,7 +25,7 @@ export async function handleM6ServiceAdmin(request: Request, env: M6RuntimeEnv &
     const admission = await readServiceAdmission(env, input.service_id);
     if (!admission) throw new Error("Service has no retained admission");
     return reply(m6ServiceAdminResponseSchema.parse({ result: "service", request: input,
-      worker_version_id: env.CASTLOOP_VERSION_METADATA.id, admission: admission.value }));
+      worker_version_id: env.CASTLOOP_VERSION_METADATA.id, external_episode_guids: true, admission: admission.value }));
   } catch {
     console.error(JSON.stringify({ event: "m6_service_blocked", reason_code: "service_operation_blocked" }));
     return reply({ reason_code: "service_operation_blocked" }, 409);

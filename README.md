@@ -154,6 +154,8 @@ The single REST PUT recovery model retains [unverified assumption U1](design/m6_
 
 ## Development and release scope
 
+The M7 development branch adds one-time RSS migration into a new Show, with local download/review followed by explicit sequential publication. It is not part of the published v0.3.0 binary. See [M7 development usage](docs/rss_migration.md) and the [approved plan](design/m7_rss_import_plan.md).
+
 The [design document index](design/README.md) separates current references from archived development history.
 
 Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.

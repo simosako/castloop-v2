@@ -24,6 +24,24 @@ function effects(setup: Awaited<ReturnType<typeof episodePublicationFixture>>) {
 }
 
 describe("M6 owned Episode publication runner", () => {
+  test("imported opaque GUIDs survive staging, publication and immutable history", async () => {
+    const setup = await episodePublicationFixture(undefined, { guid: "old-host:episode:123", guid_is_permalink: true });
+    await consumeOwnedPublication(setup.env, setup.key, effects(setup).effects);
+    const revision = parseEpisodeRevision(setup.text(setup.metadataKey));
+    expect(revision.guid).toBe("old-host:episode:123");
+    expect(revision.guid_is_permalink).toBe(true);
+    expect(parseEpisodeRevision(setup.text(setup.historyKey))).toEqual(revision);
+    expect(setup.text(setup.feedKey)).toContain('<guid isPermaLink="true">old-host:episode:123</guid>');
+  });
+
+  test("publication rejects a permalink meaning changed from its immutable base", async () => {
+    const setup = await episodePublicationFixture("metadata");
+    await setup.bucket.put(`public/episodes/daily/${setup.episodeId}/revisions/${setup.base!.revision_id}.toml`,
+      stringifyToml({ ...setup.base!, guid_is_permalink: true }));
+    await expect(consumeOwnedPublication(setup.env, setup.key, effects(setup).effects)).rejects.toThrow("identity");
+    expect(setup.entries.has(setup.historyKey)).toBe(false);
+  });
+
   test("initial, metadata-only and audio-only publication preserve identity and immutable history", async () => {
     for (const update of [undefined, "metadata", "audio"] as const) {
       const setup = await episodePublicationFixture(update);

@@ -231,11 +231,12 @@ describe("M6 staging verification and admission completion", () => {
   });
 
   test("published Episode GUID and published_at remain immutable even for correctly hashed staging inputs", async () => {
-    for (const fault of ["guid", "published_at"] as const) {
+    for (const fault of ["guid", "published_at", "guid_is_permalink"] as const) {
       const setup = await fixture("episode_metadata");
       const bytes = setup.payloads.get(stagePayloadKey(setup.request, "episode_metadata"))!.bytes;
       const staged = parseEpisodeDraft(new TextDecoder().decode(bytes));
       const current = episodeRevisionSchema.parse({ ...staged, ...(fault === "guid" ? { guid: crypto.randomUUID() } :
+        fault === "guid_is_permalink" ? { guid_is_permalink: true } :
         { published_at: "2026-09-30T12:00:00Z" }), revision_id: crypto.randomUUID(),
         enclosure_url: `https://example.com/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`,
         content_type: "audio/mpeg", length_bytes: 1, duration_seconds: 1, sha256: "a".repeat(64), updated_at: "2026-10-01T12:00:00Z" });

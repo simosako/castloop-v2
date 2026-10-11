@@ -114,7 +114,21 @@ async function main(): Promise<unknown> {
   if (["version", "--version"].includes(command) && !rest.length) return CLI_VERSION;
   if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`Unknown command: ${command}`);
   const listing = command === "list-shows" || command === "list-episodes";
-  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : command === "migration-status" ? ["local"] : []);
+  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : command === "migration-status" ? ["local"] : command === "import-rss" ? ["dry-run"] : []);
+  if (command === "import-rss") {
+    allowedFlags(flags, ["dry-run", "output"]);
+    if (positional.length !== 2 || Boolean(flags["dry-run"]) === Boolean(flags.output)) throw new Error(commandHelp(command));
+    const { importRssLocally, inspectRssImport } = await import("./rss-import-local");
+    return flags["dry-run"] ? inspectRssImport(positional[0]!, positional[1]!) : importRssLocally(positional[0]!, positional[1]!, flags.output!);
+  }
+  if (command === "publish-rss-import") {
+    allowedFlags(flags, []);
+    if (positional.length !== 1) throw new Error(commandHelp(command));
+    const root = process.cwd();
+    const config = loadConfig(root);
+    const { createRssPublicationEffects, publishRssImport } = await import("./rss-import-publication");
+    return publishRssImport(root, config, positional[0]!, createRssPublicationEffects(root, config, workerSource));
+  }
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
     return init(positional[0] ?? ".", flags);

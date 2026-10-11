@@ -15,6 +15,7 @@
 | [承認済み方針](m6_review_queue.md) | 記録保持・安全条件・開発範囲 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |
+| [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針。実装中 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 

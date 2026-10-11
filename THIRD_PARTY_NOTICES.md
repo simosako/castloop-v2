@@ -1,6 +1,6 @@
 # Third-party notices
 
-The castloop executable includes code from the following packages. Versions are from `package-lock.json` for v0.1.0. Copyright notices and license conditions must accompany redistributed binaries.
+The castloop executable includes code from the following packages. Versions are from `package-lock.json`. Copyright notices and license conditions must accompany redistributed binaries.
 
 | Package | Version | License | Copyright holder(s) |
 | --- | --- | --- | --- |
@@ -20,6 +20,8 @@ The castloop executable includes code from the following packages. Versions are 
 | `ieee754` | 1.2.1 | BSD-3-Clause | Copyright 2008 Fair Oaks Labs, Inc. |
 | `win-guid` | 0.2.1 | MIT | Copyright © 2026 Borewit |
 | `zod` | 4.6.5 | MIT | Copyright (c) 2025 Colin McDonnell |
+| `saxes` | 6.0.0 | ISC | Copyright (c) Contributors; Copyright (c) Isaac Z. Schlueter and Contributors |
+| `xmlchars` | 2.2.0 | MIT | Copyright Louis-Dominique Dubeau and contributors to xmlchars |
 
 ## MIT License (packages marked MIT)
 
@@ -29,9 +31,13 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## ISC License (`@iarna/toml`)
+## ISC License (packages marked ISC)
 
 Copyright (c) 2016, Rebecca Turner <me@re-becca.org>
+
+Copyright (c) Contributors
+
+Copyright (c) Isaac Z. Schlueter and Contributors
 
 Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
 

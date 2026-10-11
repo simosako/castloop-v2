@@ -1,6 +1,25 @@
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
+  "publish-rss-import": {
+    usage: "publish-rss-import DIRECTORY",
+    description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
+      "Requires an open M7-compatible Worker, retained administrator key and Cloudflare upload credentials.\n" +
+      "Validates all TOML and assets before registration; publishes the Show then Episodes sequentially.\n" +
+      "Intermediate Episodes become public as jobs finish. The operation is not an atomic batch.\n" +
+      "Re-running inspects acknowledged pending jobs and continues recorded progress without republishing completed inputs.\n" +
+      "Unknown mutation outcomes remain blocked; preserve .castloop journals and inspect the existing jobs.\n" +
+      "Completion does not authorize removal of the old host or certify subscriber migration.",
+  },
+  "import-rss": {
+    usage: "import-rss SHOW_ID FEED_URL (--dry-run | --output DIRECTORY)",
+    description: "Import one RSS 2.0 podcast to local files without Cloudflare credentials or changes.\n" +
+      "--dry-run fetches only RSS and reports counts, missing fields and unsupported extensions.\n" +
+      "--output downloads the RSS snapshot, JPEG/PNG cover, MP3s and editable TOML into an empty directory.\n" +
+      "Repeat the same command to continue this snapshot without overwriting edited TOML.\n" +
+      "Preserve downloaded files and private .castloop records; review them before publication.\n" +
+      "Audio must be MP3 and at most 300,000,000 bytes. Local import does not migrate subscribers or remove the old host.",
+  },
   init: {
     usage: "init [dir] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
     description: "Create a service workspace and Cloudflare resources. Missing values are prompted on a terminal.\n" +

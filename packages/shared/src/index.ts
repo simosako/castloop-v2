@@ -133,10 +133,21 @@ export const showMetadataSchema = z.object({
   show_type: z.enum(["episodic", "serial"]).optional(),
 }).strict();
 
+export const episodeGuidSchema = z.string().min(1).max(4096).refine((value) => {
+  if (!value.trim() || new TextEncoder().encode(value).byteLength > 4096) return false;
+  return [...value].every((character) => {
+    const point = character.codePointAt(0)!;
+    return point === 9 || point === 10 || point === 13 ||
+      point >= 0x20 && point <= 0xd7ff || point >= 0xe000 && point <= 0xfffd ||
+      point >= 0x10000 && point <= 0x10ffff;
+  });
+}, "Expected a nonblank XML-compatible GUID of at most 4096 UTF-8 bytes");
+
 export const episodeDraftSchema = z.object({
   schema_version: z.literal(1),
   episode_id: ID(80),
-  guid: z.uuid(),
+  guid: episodeGuidSchema,
+  guid_is_permalink: z.boolean().optional(),
   title: z.string().trim().min(1),
   description: z.string().trim().min(1),
   published_at: publishedAt,
@@ -199,6 +210,12 @@ export type EpisodeDraft = z.infer<typeof episodeDraftSchema>;
 export type ShowCommit = z.infer<typeof showCommitSchema>;
 export type EpisodeCommit = z.infer<typeof episodeCommitSchema>;
 export type EpisodeRevision = z.infer<typeof episodeRevisionSchema>;
+
+export function sameEpisodeIdentity(left: EpisodeDraft, right: EpisodeDraft): boolean {
+  return left.episode_id === right.episode_id && left.guid === right.guid &&
+    left.published_at === right.published_at &&
+    (left.guid_is_permalink ?? false) === (right.guid_is_permalink ?? false);
+}
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 export type PublicationJobStatus = z.infer<typeof publicationJobStatusSchema>;
 

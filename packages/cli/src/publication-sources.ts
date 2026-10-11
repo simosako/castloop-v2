@@ -1,4 +1,4 @@
-import { episodeDraftFromRevision, episodeRevisionSchema, parseEpisodeDraft, parseShowMetadata } from "@castloop/shared";
+import { episodeDraftFromRevision, episodeRevisionSchema, parseEpisodeDraft, parseShowMetadata, sameEpisodeIdentity } from "@castloop/shared";
 import type { EpisodeRevision, ServiceConfig, StageAsset, StagePayload } from "@castloop/shared";
 import { createPublicationOperationEffects } from "./publication-operation";
 import type { PublicationOperationEffects } from "./publication-operation";
@@ -82,7 +82,7 @@ export function createLocalPublicationEffects(config: ServiceConfig, input: Publ
       await assertLocalStagingSource(coverPath!, checked.get(`cover_${commit.cover_extension}`)!);
     } else {
       const metadata = parseEpisodeDraft(text);
-      if (metadata.episode_id !== commit.episode_id || base && (metadata.guid !== base.guid || metadata.published_at !== base.published_at) ||
+      if (metadata.episode_id !== commit.episode_id || base && !sameEpisodeIdentity(metadata, base) ||
         !metadataAsset && (!base || JSON.stringify(metadata) !== JSON.stringify(episodeDraftFromRevision(base)))) {
         throw new Error("Local Episode metadata differs from its target, immutable identity or reused base; explicitly stage the edit");
       }
