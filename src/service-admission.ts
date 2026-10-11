@@ -32,7 +32,7 @@ async function requireService(env: LifecycleControlEnv, serviceId: string): Prom
 function verifiedM6Snapshot(snapshot: ServiceAdmissionSnapshot | null, workerVersionId: string | undefined):
   ServiceAdmissionSnapshot & { readiness: M6ServiceReadiness } {
   const readiness = snapshot?.value.runtime_readiness ?? snapshot?.value.readiness;
-  if (!snapshot || snapshot.value.mode !== "m6" || !["open", "paused"].includes(snapshot.value.state) || !readiness) {
+  if (!snapshot || snapshot.value.mode !== "m6" || !["open", "paused"].includes(snapshot.value.state) || snapshot.value.url_change || !readiness) {
     throw new Error("M6 requires completed service migration readiness or verified runtime readiness");
   }
   if (readiness.worker_version_id !== workerVersionId) throw new Error("Executing Worker version does not match verified M6 cutover");
@@ -51,6 +51,7 @@ async function write(env: LifecycleControlEnv, snapshot: ServiceAdmissionSnapsho
   if (new TextEncoder().encode(source).length > MAX_RECORD_BYTES) throw new Error("Service admission exceeds its record budget");
   return Boolean(await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, source, { onlyIf: { etagMatches: snapshot.etag } }));
 }
+export { write as compareAndSetServiceAdmission };
 
 export async function initializeServiceAdmission(env: LifecycleControlEnv, serviceId: string): Promise<void> {
   const existing = await readServiceAdmission(env, serviceId);
@@ -68,7 +69,7 @@ export async function acquireServiceInvocation(env: LifecycleControlEnv, service
   for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
     const snapshot = await requireService(env, serviceId);
     const mode = kind.startsWith("legacy_") ? "legacy" : "m6";
-    if (snapshot.value.mode !== mode || ["migrating", "initializing", "updating"].includes(snapshot.value.state) ||
+    if (snapshot.value.mode !== mode || snapshot.value.url_change || ["migrating", "initializing", "updating"].includes(snapshot.value.state) ||
       snapshot.value.state === "paused" && kind.endsWith("_admin")) throw new ServiceAdmissionBlocked();
     if (snapshot.value.invocations.length === 32) throw new Error("Service mutation registry is full; do not expire active invocations");
     if (await write(env, snapshot, { ...snapshot.value, invocations: [...snapshot.value.invocations, { token, kind }] })) {
@@ -125,6 +126,7 @@ export async function resumeServiceAdmission(env: LifecycleControlEnv, serviceId
     if (workerVersionId !== undefined) verifiedM6Snapshot(snapshot, workerVersionId);
     if (snapshot.value.state === "open" && snapshot.value.last_resumed_pause_id === pauseId) return;
     if (snapshot.value.state !== "paused" || snapshot.value.pause_id !== pauseId) throw new Error("Only the current pause owner can resume admission");
+    if (snapshot.value.url_change) throw new Error("Do not resume an unfinished URL change");
     if (workerVersionId !== undefined && snapshot.value.invocations.length) throw new Error("Do not resume while M6 service invocations remain");
     const { pause_id: _pause, ...withoutPause } = snapshot.value;
     if (await write(env, snapshot, { ...withoutPause, state: "open", last_resumed_pause_id: pauseId })) return;

@@ -6,6 +6,7 @@ import { version } from "../../../package.json";
 import { administratorKey } from "./administrator-key";
 import { CloudflareApi } from "./cloudflare-api";
 import { formatContentList } from "./content-list";
+import { runDomainCommand } from "./domain-operation";
 import { COMMAND_HELP, commandHelp } from "./help";
 import { readLocalOperationStatus } from "./local-operation-status";
 import { M6_COMMAND_ARGUMENTS, runM6Command } from "./m6-commands";
@@ -81,9 +82,10 @@ async function init(target: string, flags: Record<string, string>): Promise<unkn
     const subdomain = await ask(flags["workers-subdomain"], "workers-subdomain", "workers.dev subdomain");
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subdomain)) throw new Error("Invalid workers.dev subdomain");
     const workerName = `castloop-${serviceId}-${suffix}`;
+    const workersDevBaseUrl = `https://${workerName}.${subdomain}.workers.dev`;
     const config = serviceConfigSchema.parse({ schema_version: 1, service_id: serviceId, account_id: accountId,
       bucket_name: bucketName, worker_name: workerName, queue_name: workerName,
-      dlq_name: `castloop-${serviceId}-dlq-${suffix}`, public_base_url: `https://${workerName}.${subdomain}.workers.dev` });
+      dlq_name: `castloop-${serviceId}-dlq-${suffix}`, public_base_url: workersDevBaseUrl, workers_dev_base_url: workersDevBaseUrl });
     writeFileSync(file, stringifyToml(config), { flag: "wx" });
   } else if (Object.keys(flags).some((name) => name !== "operation-id")) {
     throw new Error("Workspace configuration already exists; do not change its initialization inputs");
@@ -116,6 +118,13 @@ async function main(): Promise<unknown> {
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
     return init(positional[0] ?? ".", flags);
+  }
+  if (command === "domain") {
+    allowedFlags(flags, ["operation-id"]);
+    const action = positional[0];
+    if (!["add", "list", "remove"].includes(action ?? "") || positional.length !== (action === "add" ? 2 : 1) ||
+      action === "list" && flags["operation-id"]) throw new Error(commandHelp(command));
+    return runDomainCommand(process.cwd(), loadConfig(process.cwd()), action as "add" | "list" | "remove", positional[1], flags["operation-id"]);
   }
   let root = process.cwd();
   if (command === "create-show") {

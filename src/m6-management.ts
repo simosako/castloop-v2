@@ -1,5 +1,5 @@
 import { cachedDeliveryRuntimeSchema, parseServiceConfig } from "../packages/shared/src/index";
-import type { ServiceAdmission, ServiceConfig } from "../packages/shared/src/index";
+import type { M6ServiceReadiness, ServiceAdmission, ServiceConfig } from "../packages/shared/src/index";
 import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
@@ -8,6 +8,16 @@ import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } 
 
 export class M6ManagementServiceMismatch extends Error {
   constructor() { super("Management input targets another service"); }
+}
+
+export async function requireM6ManagementRuntime(bindings: M6DeliveryGateBindings,
+  readiness: Pick<M6ServiceReadiness, "worker_version_id" | "cached_entrypoint">): Promise<void> {
+  if (bindings.gatewayProtocol !== "m6-uncached-gateway-v1") throw new Error("Management requires the uncached gateway protocol");
+  if (bindings.versionMetadata.id !== readiness.worker_version_id) throw new Error("Management has another executing Worker version");
+  const cached = cachedDeliveryRuntimeSchema.parse(await bindings.cachedAssets.describeRuntime());
+  if (cached.worker_version_id !== readiness.worker_version_id || cached.entrypoint !== readiness.cached_entrypoint) {
+    throw new Error("Management has another cache owner");
+  }
 }
 
 export async function withM6ManagementInvocation<T>(env: LifecycleControlEnv, serviceId: string, kind: "m6_admin" | "m6_recovery",
@@ -32,19 +42,11 @@ export async function withM6ManagementRead<T>(env: LifecycleReadEnv, serviceId: 
   if (!configObject || configObject.size < 1 || configObject.size > 16384) throw new Error("Invalid service configuration");
   const config = parseServiceConfig(await configObject.text());
   if (config.service_id !== serviceId) throw new M6ManagementServiceMismatch();
-  if (bindings.gatewayProtocol !== "m6-uncached-gateway-v1") throw new Error("Management preview requires the uncached gateway protocol");
   const snapshot = await requireM6ServiceRuntime(env, serviceId, bindings.versionMetadata.id);
   const readiness = snapshot.readiness;
-  const checkRuntime = async () => {
-    if (bindings.versionMetadata.id !== readiness.worker_version_id) throw new Error("Management preview has another executing Worker version");
-    const cached = cachedDeliveryRuntimeSchema.parse(await bindings.cachedAssets.describeRuntime());
-    if (cached.worker_version_id !== readiness.worker_version_id || cached.entrypoint !== readiness.cached_entrypoint) {
-      throw new Error("Management preview has another cache owner");
-    }
-  };
-  await checkRuntime();
+  await requireM6ManagementRuntime(bindings, readiness);
   const result = await callback(snapshot.value, config);
-  await checkRuntime();
+  await requireM6ManagementRuntime(bindings, readiness);
   const current = await readServiceAdmission(env, serviceId);
   const currentConfig = await env.CASTLOOP_BUCKET.head("system/service.toml");
   if (!current || current.etag !== snapshot.etag || JSON.stringify(current.value) !== JSON.stringify(snapshot.value) ||

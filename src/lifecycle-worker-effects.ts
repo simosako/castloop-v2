@@ -1,14 +1,13 @@
-import { episodeRevisionSchema, parseLifecycleCommitKey, parseServiceConfig, parseShowMetadata,
+import { episodeRevisionSchema, parseLifecycleCommitKey,
   serviceConfigSchema, showMetadataSchema } from "../packages/shared/src/index";
-import type { EpisodeRevision, ServiceConfig, ShowMetadata } from "../packages/shared/src/index";
-import { renderFeed } from "./feed";
+import type { EpisodeRevision } from "../packages/shared/src/index";
 import { readLifecycleCommit } from "./lifecycle-commit";
 import { readPublicVisibility, readShowControl, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import type { LifecycleConsumerEffects } from "./lifecycle-consumer";
 import type { LifecycleDeleteEnv } from "./lifecycle-delete-batch";
-import { readLifecycleFeedInputs } from "./lifecycle-feed";
+import { readLifecycleFeedInputs, readPublishedFeedSource, writePublishedFeed } from "./lifecycle-feed";
 import type { RestoreFeedSnapshot } from "./lifecycle-restore";
 import type { ShowPublicationEffects } from "./publication-show-runner";
 import type { PublicationEffects } from "./publication-inputs";
@@ -44,31 +43,6 @@ export async function createPublicationWorkerEffects(env: LifecycleDeleteEnv, ex
     await requireShowExecution(env, execution);
   } };
 }
-type PublishedFeedSource = {
-  show: ShowMetadata; service: ServiceConfig; coverExtension: "jpg" | "png";
-  objects: Array<{ key: string; etag: string; size: number }>;
-};
-
-async function publishedFeedSource(env: LifecycleDeleteEnv, execution: ShowExecution): Promise<PublishedFeedSource> {
-  await requireShowExecution(env, execution);
-  const showKey = `system/shows/${execution.showId}/show.toml`;
-  const serviceKey = "system/service.toml";
-  const showObject = await env.CASTLOOP_BUCKET.get(showKey);
-  const serviceObject = await env.CASTLOOP_BUCKET.get(serviceKey);
-  if (!showObject || showObject.size < 1 || showObject.size > 1_000_000 ||
-    !serviceObject || serviceObject.size < 1 || serviceObject.size > 16384) throw new Error("Published feed snapshots are missing or oversized");
-  const show = parseShowMetadata(await showObject.text());
-  const service = parseServiceConfig(await serviceObject.text());
-  if (show.show_id !== execution.showId) throw new Error("Published feed Show does not match its owner");
-  const coverExtension = show.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg";
-  const coverKey = `public/podcasts/${execution.showId}/cover.${coverExtension}`;
-  const cover = await env.CASTLOOP_BUCKET.head(coverKey);
-  if (!cover || !Number.isSafeInteger(cover.size) || cover.size < 1 || cover.size > 5_000_000) throw new Error("Published feed cover is missing or oversized");
-  await requireShowExecution(env, execution);
-  return { show, service, coverExtension, objects: [{ key: showKey, etag: showObject.etag, size: showObject.size },
-    { key: serviceKey, etag: serviceObject.etag, size: serviceObject.size }, { key: coverKey, etag: cover.etag, size: cover.size }] };
-}
-
 function sameEpisodes(left: EpisodeRevision[], right: EpisodeRevision[]): boolean {
   const ordered = (episodes: EpisodeRevision[]) => episodes.toSorted((a, b) => a.episode_id.localeCompare(b.episode_id));
   return JSON.stringify(ordered(left)) === JSON.stringify(ordered(right));
@@ -97,27 +71,12 @@ export async function createLifecycleWorkerEffects(env: LifecycleDeleteEnv, exec
     const episodes = input.map((episode) => episodeRevisionSchema.parse(episode));
     const eligible = await readLifecycleFeedInputs(env, execution);
     if (!eligible.writeFeed || !sameEpisodes(episodes, eligible.episodes)) throw new Error("Lifecycle feed input no longer matches saved snapshots");
-    const source = await publishedFeedSource(env, execution);
+    const source = await readPublishedFeedSource(env, execution.showId);
     if (restoring && (JSON.stringify(showMetadataSchema.parse(restoring.show)) !== JSON.stringify(source.show) ||
       JSON.stringify(serviceConfigSchema.parse(restoring.service)) !== JSON.stringify(source.service) || restoring.coverExtension !== source.coverExtension)) {
       throw new Error("Restore snapshots changed before feed writing");
     }
-    const sourceBytes = new TextEncoder().encode(JSON.stringify({ show: source.show, episodes, baseUrl: source.service.public_base_url })).byteLength;
-    if (sourceBytes * 6 + episodes.length * 1024 + 4096 > 32_000_000) throw new Error("Lifecycle feed exceeds its conservative rendering budget");
-    const feed = renderFeed(source.show, episodes, source.service.public_base_url, source.coverExtension);
-    const key = `public/podcasts/${execution.showId}/feed.xml`;
-    const previous = await env.CASTLOOP_BUCKET.head(key);
-    for (const object of source.objects) {
-      const latest = await env.CASTLOOP_BUCKET.head(object.key);
-      if (!latest || latest.etag !== object.etag || latest.size !== object.size) throw new Error("Published feed snapshots changed before writing");
-    }
-    await guard();
-    const written = await env.CASTLOOP_BUCKET.put(key, feed, {
-      onlyIf: previous ? { etagMatches: previous.etag } : new Headers({ "If-None-Match": "*" }),
-      httpMetadata: { contentType: "application/rss+xml; charset=utf-8" },
-    });
-    if (!written) throw new Error("Lifecycle feed changed before writing");
-    await requireShowExecution(env, execution);
+    await writePublishedFeed(env, source, episodes, guard);
   }
 
   async function purge(input: LifecyclePurgeTarget): Promise<void> {

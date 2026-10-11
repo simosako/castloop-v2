@@ -23,6 +23,9 @@ export type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from
 export { showRegistrationRequestSchema, showRegistrationResponseSchema, showReservationSchema } from "./show-registration";
 export type { ShowRegistrationRequest, ShowRegistrationResponse, ShowReservation } from "./show-registration";
 export { validateId } from "./ids";
+export { normalizeHostname } from "./hostname";
+export { domainAdminRequestSchema, domainAdminResponseSchema, domainOperationRequestSchema, domainRuntimeProbeSchema } from "./domain-admin";
+export type { DomainAdminRequest, DomainAdminResponse, DomainOperationRequest, DomainConnectionReceipt } from "./domain-admin";
 export { parsePublicAssetPath } from "./public-assets";
 export type { PublicAsset } from "./public-assets";
 export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, lifecycleStateSchema,
@@ -31,8 +34,10 @@ export { controlActionSchema, controlRequestSchema, episodeLifecycleSchema, life
 export type { ControlAction, ControlRequest, EpisodeLifecycle, LifecycleState, ShowControl } from "./lifecycle";
 export { CONTENT_LIST_PAGE_SIZE, contentListRequestSchema, contentListResponseSchema } from "./content-list";
 export type { ContentListRequest, ContentListResponse } from "./content-list";
-export { m6RuntimeTargetSchema, m6RuntimeReadinessSchema, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "./service-admission";
-export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, M6ServiceUpdateRequest, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "./service-admission";
+export { domainConnectionReceiptSchema, m6RuntimeTargetSchema, m6RuntimeReadinessSchema, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema,
+  serviceUrlChangeProgressSchema, serviceUrlChangeRequestSchema } from "./service-admission";
+export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, M6ServiceUpdateRequest, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest,
+  ServiceUrlChangeProgress, ServiceUrlChangeRequest } from "./service-admission";
 export { frozenMigrationPlanSchema, migrationApplyProgressSchema, migrationRuntimeProofSchema } from "./migration-plan";
 export type { FrozenMigrationPlan, MigrationApplyProgress, MigrationRuntimeProof } from "./migration-plan";
 export { serviceCapabilitiesSchema } from "./service-capabilities";
@@ -78,7 +83,18 @@ const webUrl = z.url().refine((value) => {
     !url.username && !url.password && !url.hash;
 }, "Expected an HTTP(S) URL without credentials or fragment");
 
-export const serviceConfigSchema = z.object({
+function workersDevOrigin(value: string, workerName: string): string {
+  const url = new URL(value);
+  const labels = url.hostname.split(".");
+  if (url.protocol !== "https:" || url.username || url.password || url.port || url.search || url.hash || url.pathname !== "/" ||
+    labels.length !== 4 || labels[0] !== workerName || labels[2] !== "workers" || labels[3] !== "dev" ||
+    !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(labels[1]!)) {
+    throw new Error("Management requires its matching workers.dev HTTPS origin without credentials, path, query or port");
+  }
+  return url.origin;
+}
+
+const serviceConfigBaseSchema = z.object({
   schema_version: z.literal(1),
   service_id: ID(20),
   account_id: z.string().regex(/^[a-f0-9]{32}$/i),
@@ -86,9 +102,19 @@ export const serviceConfigSchema = z.object({
   worker_name: z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/),
   queue_name: z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/),
   dlq_name: z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/),
-  public_base_url: webUrl.refine((value) => value.startsWith("https://"),
-    "The public Worker URL must use HTTPS"),
+  public_base_url: webUrl.refine((value) => {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.port && !url.search && url.pathname === "/";
+  }, "The public Worker URL must be an HTTPS origin without path, query or port"),
+  workers_dev_base_url: z.url().optional(),
 }).strict();
+export const serviceIdentitySchema = serviceConfigBaseSchema.pick({ service_id: true, account_id: true, worker_name: true, public_base_url: true });
+export const serviceConfigSchema = serviceConfigBaseSchema.superRefine((value, context) => {
+  if (value.workers_dev_base_url !== undefined) {
+    try { workersDevOrigin(value.workers_dev_base_url, value.worker_name); }
+    catch { context.addIssue({ code: "custom", path: ["workers_dev_base_url"], message: "Expected this Worker's workers.dev HTTPS origin" }); }
+  }
+});
 
 export const showMetadataSchema = z.object({
   schema_version: z.literal(1),
@@ -167,6 +193,7 @@ export const publicationJobStatusSchema = z.object({
 export const jobStatusSchema = z.discriminatedUnion("schema_version", [publicationJobStatusSchema, lifecycleJobStatusSchema]);
 
 export type ServiceConfig = z.infer<typeof serviceConfigSchema>;
+export type ServiceIdentity = z.infer<typeof serviceIdentitySchema>;
 export type ShowMetadata = z.infer<typeof showMetadataSchema>;
 export type EpisodeDraft = z.infer<typeof episodeDraftSchema>;
 export type ShowCommit = z.infer<typeof showCommitSchema>;
@@ -174,6 +201,15 @@ export type EpisodeCommit = z.infer<typeof episodeCommitSchema>;
 export type EpisodeRevision = z.infer<typeof episodeRevisionSchema>;
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 export type PublicationJobStatus = z.infer<typeof publicationJobStatusSchema>;
+
+export function serviceManagementBaseUrl(config: ServiceConfig): string {
+  return workersDevOrigin(config.workers_dev_base_url ?? config.public_base_url, config.worker_name);
+}
+
+export function serviceOperationIdentity(config: ServiceConfig): ServiceIdentity {
+  return serviceIdentitySchema.parse({ service_id: config.service_id, account_id: config.account_id,
+    worker_name: config.worker_name, public_base_url: serviceManagementBaseUrl(config) });
+}
 
 export function episodeDraftFromRevision(revision: EpisodeRevision): EpisodeDraft {
   return episodeDraftSchema.parse(Object.fromEntries(

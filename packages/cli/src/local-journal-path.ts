@@ -2,7 +2,7 @@ import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openS
 import { dirname, join } from "node:path";
 
 export type JournalFamily = "staging-uploads" | "publication-jobs" | "lifecycle-jobs" | "show-registrations" | "drafts" |
-  "bridge-deployments" | "migration-setups" | "migrations" | "service-initializations" | "service-updates";
+  "bridge-deployments" | "migration-setups" | "migrations" | "service-initializations" | "service-updates" | "domain-changes";
 
 export function localJournalEntryExists(path: string): boolean {
   try { lstatSync(path); return true; } catch (error) {
@@ -18,7 +18,7 @@ export function syncLocalJournalDirectory(path: string): void {
 
 export function ensureLocalJournalParents(root: string, family: JournalFamily, serviceId: string | undefined, create = false): void {
   const flat = ["bridge-deployments", "migration-setups", "migrations", "service-initializations"].includes(family);
-  if (!["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts", "bridge-deployments", "migration-setups", "migrations", "service-initializations", "service-updates"].includes(family) ||
+  if (!["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts", "bridge-deployments", "migration-setups", "migrations", "service-initializations", "service-updates", "domain-changes"].includes(family) ||
     flat !== (serviceId === undefined) || serviceId !== undefined &&
     (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(serviceId) || serviceId.length > 20)) throw new Error("Invalid local journal directory identity");
   const directories = [root, join(root, ".castloop"), join(root, ".castloop", family),

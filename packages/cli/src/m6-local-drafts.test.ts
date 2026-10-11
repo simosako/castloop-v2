@@ -110,7 +110,7 @@ describe("M6 local drafts from durable Show registration receipts", () => {
     const setup = await fixture();
     try {
       await setup.register();
-      await expect(createM6LocalShowDraft(setup.root, { ...setup.config, worker_name: "foreign-worker" }, setup.showId,
+      await expect(createM6LocalShowDraft(setup.root, { ...setup.config, worker_name: "foreign-worker", workers_dev_base_url: "https://foreign-worker.example.workers.dev" }, setup.showId,
         "https://site.example")).rejects.toThrow("another service");
       writeFileSync(`${setup.record}.lock`, "keep unknown lock");
       const before = readFileSync(setup.record);

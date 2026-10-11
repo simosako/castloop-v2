@@ -1,12 +1,14 @@
-import { m6RuntimeTargetSchema, serviceConfigSchema } from "@castloop/shared";
+import { m6RuntimeTargetSchema, serviceConfigSchema, serviceManagementBaseUrl } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 
 export type M6AdminTransport = (input: URL, init: RequestInit) => Promise<Response>;
 const RESPONSE_BUDGET = 65536;
 const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle: "Lifecycle", shows: "Show registration", target: "Target inspection", catalog: "Catalog listing", service: "Service administration",
-  "setup/prepare": "Setup preparation", "setup/status": "Setup status", "setup/complete": "Setup completion", "update/begin": "Compatible update admission" };
+  domain: "Domain administration", "setup/prepare": "Setup preparation", "setup/status": "Setup status", "setup/complete": "Setup completion", "update/begin": "Compatible update admission" };
 
-async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
+export class M6AdminOperationRejected extends Error {}
+
+export async function readM6JsonResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
   const length = response.headers.get("Content-Length");
   if (response.headers.get("Cache-Control") !== "no-store" ||
     !/^application\/json(?:\s*;|$)/i.test(response.headers.get("Content-Type") ?? "") ||
@@ -37,15 +39,13 @@ async function readResponse(response: Response, maximumBytes = RESPONSE_BUDGET):
 
 export class M6AdminJsonClient {
   readonly config: ServiceConfig;
+  readonly managementBaseUrl: string;
   private readonly adminKey: string;
   private readonly transport: M6AdminTransport;
 
   constructor(config: ServiceConfig, adminKey: string, transport: M6AdminTransport = fetch) {
     this.config = serviceConfigSchema.parse(config);
-    const origin = new URL(this.config.public_base_url);
-    if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
-      throw new Error("M6 administration requires an HTTPS service origin without credentials or path");
-    }
+    this.managementBaseUrl = serviceManagementBaseUrl(this.config);
     if (!adminKey || /[\u0000-\u001f\u007f]/.test(adminKey)) throw new Error("M6 administration requires a valid local administrator key");
     this.adminKey = adminKey;
     this.transport = transport;
@@ -56,18 +56,18 @@ export class M6AdminJsonClient {
     const label = ROUTE_LABELS[route];
     const body = JSON.stringify(input);
     if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
-    return this.send(new URL(`/admin/${route}`, this.config.public_base_url), label, body, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
+    return this.send(new URL(`/admin/${route}`, this.managementBaseUrl), label, body, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
   }
 
   async getSetupProbe(operationId: string): Promise<unknown> {
     m6RuntimeTargetSchema.shape.operation_id.parse(operationId);
-    const url = new URL("/admin/setup/probe", this.config.public_base_url);
+    const url = new URL("/admin/setup/probe", this.managementBaseUrl);
     url.searchParams.set("operation_id", operationId);
     return this.send(url, "Setup probe");
   }
 
   async getRuntimeHealth(): Promise<unknown> {
-    return this.send(new URL("/admin/health", this.config.public_base_url), "Runtime health");
+    return this.send(new URL("/admin/health", this.managementBaseUrl), "Runtime health");
   }
 
   private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
@@ -82,11 +82,18 @@ export class M6AdminJsonClient {
     }
     try {
       if (response.status !== 200) {
+        if (label === ROUTE_LABELS.domain && response.status === 409) {
+          const value = await readM6JsonResponse(response);
+          if (value && typeof value === "object" && "reason_code" in value && value.reason_code === "domain_operation_blocked") {
+            throw new M6AdminOperationRejected("Domain operation was rejected after its server invocation returned; inspect retained ownership before retrying");
+          }
+        }
         if (response.body) await response.body.cancel();
         throw new Error("Management operation was not confirmed");
       }
-      return await readResponse(response, maximumBytes);
-    } catch {
+      return await readM6JsonResponse(response, maximumBytes);
+    } catch (error) {
+      if (error instanceof M6AdminOperationRejected) throw error;
       throw new Error(`${label} response was not verified; inspect retained ownership/progress without automatic retry`);
     }
   }

@@ -125,6 +125,14 @@ test("foreign targets, origins, changed deployments and externally cached probes
       { maximumReads: 1, delay: async () => { await consumeM6SetupProbe(setup.batch(setup.sent[0]), setup.env); } })).rejects.toThrow();
     expect((await readServiceAdmission(setup.env, setup.config.service_id))?.value.state).toBe(failure === "target" ? undefined : failure === "receipt" ? "paused" : "initializing");
     if (failure === "target") expect(setup.sent).toHaveLength(0);
-    expect(() => new M6SetupClient({ ...setup.config, public_base_url: "https://another.example.workers.dev" }, "private-secret", { collectM6DeploymentSnapshot: async () => setup.snapshot })).toThrow("matching workers.dev");
+    expect(() => new M6SetupClient({ ...setup.config, workers_dev_base_url: "https://another.example.workers.dev" }, "private-secret", { collectM6DeploymentSnapshot: async () => setup.snapshot })).toThrow("workers.dev");
   }
+});
+
+test("fresh setup does not adopt a custom-domain configuration even with a valid management origin", async () => {
+  const setup = await m6SetupFixture({ publicBaseUrl: "https://podcasts.example.com" });
+  const client = new M6SetupClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => { throw new Error("No REST observation is allowed"); } },
+    async () => { throw new Error("No HTTP request is allowed"); });
+  await expect(client.initialize(setup.request.target)).rejects.toThrow("matching workers.dev");
+  expect(await readServiceAdmission(setup.env, setup.config.service_id)).toBeNull();
 });

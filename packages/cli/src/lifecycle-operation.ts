@@ -1,4 +1,4 @@
-import { lifecycleAdminResponseSchema, serviceConfigSchema } from "@castloop/shared";
+import { lifecycleAdminResponseSchema, serviceConfigSchema, serviceOperationIdentity } from "@castloop/shared";
 import type { LifecycleAdminResponse, ServiceConfig } from "@castloop/shared";
 import { LifecycleAdminClient } from "./lifecycle-client";
 import { expectedLifecycleOperation, validateLifecycleClientState } from "./lifecycle-journal";
@@ -83,8 +83,7 @@ export function createLifecycleOperationEffects(configInput: ServiceConfig, inpu
   adminKey: string, client?: Pick<LifecycleAdminClient, "claim" | "commit" | "retry" | "status">): LifecycleOperationEffects {
   const config = serviceConfigSchema.parse(configInput);
   const state = validateLifecycleClientState(input);
-  if (state.identity.service_id !== config.service_id || state.identity.account_id !== config.account_id ||
-    state.identity.worker_name !== config.worker_name || state.identity.public_base_url !== config.public_base_url) {
+  if (JSON.stringify(state.identity) !== JSON.stringify(serviceOperationIdentity(config))) {
     throw new Error("Lifecycle effects target another service/account/Worker/origin");
   }
   const api = client ?? new LifecycleAdminClient(config, adminKey);

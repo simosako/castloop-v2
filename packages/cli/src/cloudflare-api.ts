@@ -1,4 +1,4 @@
-import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, serviceConfigSchema, stringifyToml, workerDeploymentsSnapshotSchema,
+import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, normalizeHostname, serviceConfigSchema, serviceManagementBaseUrl, stringifyToml, workerDeploymentsSnapshotSchema,
   workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema,
   workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
@@ -28,22 +28,13 @@ type WorkerSettings = {
   tags?: string[];
   tail_consumers?: object[];
 };
-type WorkerDomain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
+export type WorkerDomain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
 type ZoneRecord = { id: string; name: string; status: string; type: string;
   account?: { id?: string }; paused?: boolean };
 type DnsRecord = { name: string; type: string };
 type PaginatedResult<T> = ApiResult<T[]> & { result_info?: { total_pages?: number } };
 
-export function normalizeHostname(value: string): string {
-  const hostname = value.toLowerCase();
-  const labels = hostname.split(".");
-  if (hostname.length > 253 || labels.length < 2 || labels.some((label) =>
-    label.length === 0 || label.length > 63 || !/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/.test(label)) ||
-    !/[a-z]/.test(labels.at(-1)!)) {
-    throw new Error("Expected a DNS hostname without a URL scheme, path, or port");
-  }
-  return hostname;
-}
+export { normalizeHostname } from "@castloop/shared";
 
 export class CloudflareApi {
   private readonly base: string;
@@ -86,9 +77,11 @@ export class CloudflareApi {
   private async json<T>(method: string, path: string, value?: object, global = false): Promise<T> {
     const response = await this.request(method, path,
       value ? JSON.stringify(value) : undefined, value ? "application/json" : undefined, 30000, global);
-    const data: ApiResult<T> = await response.json();
-    if (!data.success) throw new Error(`Cloudflare ${method} ${path} did not succeed`);
-    return data.result;
+    const data: unknown = await response.json();
+    if (data === null || typeof data !== "object" || !("success" in data) || data.success !== true) {
+      throw new Error(`Cloudflare ${method} ${path} did not succeed`);
+    }
+    return (data as ApiResult<T>).result;
   }
 
   async createBucket(name: string): Promise<void> {
@@ -147,15 +140,16 @@ export class CloudflareApi {
   async prepareCompatibleM6WorkerUpload(input: ServiceConfig, previousVersionId: string,
     expectedLatestVersionId = previousVersionId): Promise<M6WorkerUploadMetadata> {
     const config = serviceConfigSchema.parse(input);
-    const path = this.migrationWorkerPath(config);
+    const path = this.workerPath(config);
+    const domains = await this.compatibleDomainSnapshot(config);
     const previous = workerSettingsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/settings`));
     if (!previous.compatibility_date) throw new Error("Compatible update requires the existing runtime compatibility date");
     const evidence = await this.inspectM6WorkerDeployment(config, previousVersionId, previous.compatibility_date);
-    if ((await this.workerDomains("service", config.worker_name)).length) throw new Error("Compatible update with Custom Domains is not released");
     const metadata = buildM6WorkerUploadMetadata(config, previous, "", previous.compatibility_date);
     const current = buildM6WorkerUploadMetadata(config, await this.json<unknown>("GET", `${path}/settings`), "", previous.compatibility_date);
     const deployment = await this.singleMigrationDeployment(path, previousVersionId);
-    if (migrationPayloadHash(current) !== migrationPayloadHash(metadata) || deployment.id !== evidence.deployment_id) {
+    if (migrationPayloadHash(current) !== migrationPayloadHash(metadata) || deployment.id !== evidence.deployment_id ||
+      await this.compatibleDomainSnapshot(config) !== domains) {
       throw new Error("M6 settings or deployment changed during compatible upload preparation");
     }
     await this.latestM6Version(path, expectedLatestVersionId);
@@ -172,7 +166,7 @@ export class CloudflareApi {
       migrationPayloadHash(source) !== request.worker_source_sha256 || migrationPayloadHash(metadataSource) !== request.worker_metadata_sha256) {
       throw new Error("Compatible upload differs from its frozen service, source or metadata");
     }
-    const path = this.migrationWorkerPath(config);
+    const path = this.workerPath(config);
     const expected = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id);
     if (migrationPayloadHash(expected) !== request.worker_metadata_sha256) throw new Error("Compatible settings changed after metadata was frozen");
     const previousDeployment = await this.singleMigrationDeployment(path, request.previous_worker_version_id);
@@ -219,7 +213,7 @@ export class CloudflareApi {
     if (config.service_id !== request.service_id || await m6ServiceConfigHash(config) !== request.service_config_sha256 ||
       deployment.operation_id !== request.operation_id || deployment.service_config_sha256 !== request.service_config_sha256 ||
       deployment.worker_version_id !== uploaded.id || uploaded.id === request.previous_worker_version_id) throw new Error("Compatible verification has foreign receipts");
-    const path = this.migrationWorkerPath(config);
+    const path = this.workerPath(config);
     const versionId = uploaded.id;
     await this.requireUploadedM6Version(path, versionId, uploaded.resources.script);
     const versions = workerVersionsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/versions?page=1&per_page=2`)).items;
@@ -270,7 +264,7 @@ export class CloudflareApi {
     return data.result;
   }
 
-  async ensureWorkerDomain(hostname: string, service: string): Promise<WorkerDomain> {
+  async ensureWorkerDomain(hostname: string, service: string, beforeMutation?: () => Promise<void>): Promise<WorkerDomain> {
     hostname = normalizeHostname(hostname);
     const [existing, forService] = await Promise.all([
       this.workerDomains("hostname", hostname), this.workerDomains("service", service),
@@ -282,8 +276,13 @@ export class CloudflareApi {
     if (forService.some((domain) => domain.hostname !== hostname) || existing.some((domain) => domain.service !== service)) {
       throw new Error("The hostname or Worker already has a different Custom Domain");
     }
+    if (existing.length > 1 || forService.length !== existing.length || existing[0] &&
+      (existing[0].id !== forService[0]?.id || existing[0].zone_id !== forService[0]?.zone_id)) {
+      throw new Error("Custom Domain lookups are inconsistent or ambiguous; do not adopt or overwrite them");
+    }
     const zone = await this.zoneForHostname(hostname);
     if (existing.length) {
+      if (beforeMutation) throw new Error("Do not adopt an existing domain without this operation's acknowledged receipt");
       if (existing.length !== 1 || existing[0].zone_id !== zone.id) {
         throw new Error("The Custom Domain is attached to a different zone");
       }
@@ -295,19 +294,35 @@ export class CloudflareApi {
       record.name === hostname && ["A", "AAAA", "CNAME", "NS"].includes(record.type))) {
       throw new Error(`DNS records for ${hostname} conflict with a new Custom Domain`);
     }
+    if (beforeMutation) await beforeMutation();
     return this.json<WorkerDomain>("PUT", "/workers/domains", {
       hostname, service, zone_id: zone.id,
     });
   }
 
-  async removeWorkerDomain(hostname: string, service: string): Promise<void> {
+  async removeWorkerDomain(hostname: string, service: string, expectedId?: string): Promise<void> {
     hostname = normalizeHostname(hostname);
     const domains = await this.workerDomains("hostname", hostname);
-    if (!domains.length) return;
-    if (domains.length !== 1 || domains[0].hostname !== hostname || domains[0].service !== service) {
+    if (!domains.length && expectedId === undefined) return;
+    if (domains.length !== 1 || domains[0].hostname !== hostname || domains[0].service !== service ||
+      expectedId !== undefined && domains[0].id !== expectedId) {
       throw new Error(`Custom Domain ${hostname} is not owned by this Worker`);
     }
-    await this.json("DELETE", `/workers/domains/${encodeURIComponent(domains[0].id)}`);
+    const path = `/workers/domains/${encodeURIComponent(domains[0].id)}`;
+    const response = await this.request("DELETE", path);
+    const unconfirmed = `Cloudflare DELETE ${path} did not confirm deletion (HTTP ${response.status}); retain its connection token without replay`;
+    if (response.status === 204) return;
+    if (response.status !== 200) {
+      await response.body?.cancel();
+      throw new Error(unconfirmed);
+    }
+    let data: unknown;
+    try { data = await response.json(); }
+    catch { throw new Error(unconfirmed); }
+    if (data !== null && (typeof data !== "object" || !("success" in data) || data.success !== true ||
+      "errors" in data && (!Array.isArray(data.errors) || data.errors.length))) {
+      throw new Error(unconfirmed);
+    }
   }
 
   async queueId(name: string): Promise<string> {
@@ -387,14 +402,31 @@ export class CloudflareApi {
 
   private m6DeploymentReads(input: ServiceConfig): M6DeploymentReads {
     const config = serviceConfigSchema.parse(input);
-    if (config.account_id !== this.accountId) throw new Error("Worker inspection targets another Cloudflare account");
-    const path = `/workers/scripts/${encodeURIComponent(config.worker_name)}`;
+    const path = this.workerPath(config);
     return {
       deployments: () => this.json<unknown>("GET", `${path}/deployments`),
       settings: () => this.json<unknown>("GET", `${path}/settings`),
       version: (versionId) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(versionId)}`),
       subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
     };
+  }
+
+  private workerPath(input: ServiceConfig): string {
+    const config = serviceConfigSchema.parse(input);
+    if (config.account_id !== this.accountId) throw new Error("Worker targets another Cloudflare account; use this account's configured Worker");
+    return `/workers/scripts/${encodeURIComponent(config.worker_name)}`;
+  }
+
+  private async compatibleDomainSnapshot(config: ServiceConfig): Promise<string> {
+    const management = serviceManagementBaseUrl(config);
+    const primary = new URL(config.public_base_url);
+    const domains = await this.workerDomains("service", config.worker_name);
+    const expected = primary.origin === management ? 0 : 1;
+    if (domains.length !== expected || domains.some((domain) => domain.hostname !== primary.hostname || domain.service !== config.worker_name ||
+      !domain.id || !domain.zone_id)) {
+      throw new Error("Custom Domain connections differ from the configured primary Worker; no update is allowed");
+    }
+    return JSON.stringify(domains.map(({ id, hostname, service, zone_id }) => ({ id, hostname, service, zone_id })));
   }
 
   private migrationWorkerPath(input: ServiceConfig): string {
@@ -404,7 +436,7 @@ export class CloudflareApi {
       !url.hostname.startsWith(`${config.worker_name}.`) || !url.hostname.endsWith(".workers.dev")) {
       throw new Error("Migration REST deploy requires this account's existing workers.dev service; custom-domain/route migration is not released");
     }
-    return `/workers/scripts/${encodeURIComponent(config.worker_name)}`;
+    return this.workerPath(config);
   }
 
   private async singleMigrationDeployment(path: string, expectedVersionId: string) {

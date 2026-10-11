@@ -1,5 +1,5 @@
 import { inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE, m6ServiceConfigHash, m6SetupCompletedSchema,
-  m6SetupHealthSchema, m6SetupProbeSchema, m6SetupRequestSchema, m6SetupStatusSchema, m6SnapshotReads } from "@castloop/shared";
+  m6SetupHealthSchema, m6SetupProbeSchema, m6SetupRequestSchema, m6SetupStatusSchema, m6SnapshotReads, serviceManagementBaseUrl } from "@castloop/shared";
 import type { M6RuntimeReadiness, M6RuntimeTarget, M6ServiceUpdateRequest, M6SetupRequest, ServiceConfig } from "@castloop/shared";
 import type { CloudflareApi } from "./cloudflare-api";
 import { M6AdminJsonClient } from "./m6-admin-json";
@@ -26,13 +26,11 @@ export class M6SetupClient {
     transport: M6AdminTransport = fetch) {
     this.admin = new M6AdminJsonClient(config, adminKey, transport);
     this.service = new M6ServiceClient(config, adminKey, transport);
-    const url = new URL(this.admin.config.public_base_url);
-    if (url.port || url.hostname.split(".").length !== 4 || !url.hostname.startsWith(`${this.admin.config.worker_name}.`) || !url.hostname.endsWith(".workers.dev")) {
-      throw new Error("Fresh M6 setup requires its matching workers.dev origin; custom-domain setup is not released");
-    }
   }
 
   async initialize(input: M6RuntimeTarget, wait: M6SetupWait = DEFAULT_WAIT): Promise<M6RuntimeReadiness> {
+    const origin = serviceManagementBaseUrl({ ...this.admin.config, workers_dev_base_url: undefined });
+    if (origin !== this.admin.managementBaseUrl) throw new Error("Fresh M6 setup requires the same public and management workers.dev origin");
     return this.verify({ target: input }, wait);
   }
 

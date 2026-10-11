@@ -9,8 +9,8 @@ import { readServiceAdmission } from "../../../src/service-admission";
 import { m6SetupFixture } from "../../../src/test-support/m6-setup";
 import { mkdtempSync, rmSync } from "node:fs";
 
-async function fixture() {
-  const setup = await m6SetupFixture();
+async function fixture(customDomain = false) {
+  const setup = await m6SetupFixture(customDomain ? { publicBaseUrl: "https://podcasts.example.com" } : {});
   await setup.run(setup.post("prepare", setup.request));
   await consumeM6SetupProbe(setup.batch(setup.sent[0]), setup.env);
   expect((await setup.run(setup.post("complete", { ...setup.request, snapshots: [setup.snapshot, setup.snapshot] }))).status).toBe(200);
@@ -28,15 +28,18 @@ async function fixture() {
     item.deployments[0]!.versions[0]!.version_id = target.worker_version_id;
   }
   const paths: string[] = [];
-  const transport = (url: URL, init: RequestInit) => { paths.push(url.pathname); return setup.run(new Request(url, init)); };
+  const transport = (url: URL, init: RequestInit) => {
+    expect(url.origin).toBe(setup.config.workers_dev_base_url!);
+    paths.push(url.pathname); return setup.run(new Request(url, init));
+  };
   const client = new M6UpdateClient(setup.config, "private-secret", { collectM6DeploymentSnapshot: async () => snapshot }, transport);
   const deployed = () => { setup.env.CASTLOOP_VERSION_METADATA.id = target.worker_version_id; };
   const wait = { maximumReads: 1, delay: async () => { await consumeM6SetupProbe(setup.batch(setup.sent.at(-1)), setup.env); } };
   return { ...setup, source, metadata, update: request, target, updatedSnapshot: snapshot, client, paths, transport, deployed, wait };
 }
 
-test("compatible update journal reaches authenticated CAS admission and reuses actual setup HTTP/Queue checks without changing payloads", async () => {
-  const setup = await fixture();
+test.each([false, true])("compatible update reuses authenticated CAS/HTTP/Queue checks without changing payloads (custom domain: %s)", async (customDomain) => {
+  const setup = await fixture(customDomain);
   const root = mkdtempSync("/tmp/opencode/castloop-update-http-");
   try {
     await setup.bucket.put("public/unchanged.mp3", "immutable payload");

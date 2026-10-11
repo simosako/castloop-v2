@@ -1,4 +1,4 @@
-import { publicationAdminResponseSchema, publicationCommitKey, publicationRequestSchema, serviceConfigSchema } from "@castloop/shared";
+import { publicationAdminResponseSchema, publicationCommitKey, publicationRequestSchema, serviceConfigSchema, serviceOperationIdentity } from "@castloop/shared";
 import type { PublicationAdminResponse, PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { PublicationAdminClient, publicationClientOperation } from "./publication-client";
 import { validatePublicationClientState } from "./publication-journal";
@@ -91,8 +91,7 @@ export function createPublicationOperationEffects(configInput: ServiceConfig, in
   client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">): PublicationOperationEffects {
   const config = serviceConfigSchema.parse(configInput);
   const state = validatePublicationClientState(input);
-  if (state.identity.service_id !== config.service_id || state.identity.account_id !== config.account_id ||
-    state.identity.worker_name !== config.worker_name || state.identity.public_base_url !== config.public_base_url) {
+  if (JSON.stringify(state.identity) !== JSON.stringify(serviceOperationIdentity(config))) {
     throw new Error("Publication effects target another service/account/Worker/origin");
   }
   const api = client ?? new PublicationAdminClient(config, adminKey);

@@ -58,7 +58,7 @@ for (const kind of ["show", "episode"] as const) {
         .toBe(action === "unpublish" ? "not_found" : action === "restore" ? "public" : "gone");
     }
     for (const request of calls) {
-      expect(request.url).toBe(new URL("/admin/lifecycle", setup.config.public_base_url).href);
+      expect(request.url).toBe(new URL("/admin/lifecycle", setup.config.workers_dev_base_url!).href);
       expect(request.method).toBe("POST");
       expect(request.redirect).toBe("error");
       expect(request.headers.get("X-Castloop-Key")).toBe("private-secret");

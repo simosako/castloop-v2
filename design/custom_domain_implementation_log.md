@@ -1,5 +1,117 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-11: run4実機受け入れ完了・mainへの統合判断
+
+[Issue #6](https://github.com/simosako/castloop-v2/issues/6)・[Issue #7](https://github.com/simosako/castloop-v2/issues/7)の再検証コメントと、[run4の固定commit](https://github.com/simosako/castloop-v2/tree/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4)の結果・活動記録・選別証跡を確認した。試験対象は開発branchの最新コード `da6b6ea8309a87508dc7e7d0b4b70d84bba040d8`。manifestの全hashとJSON、公開HTTP結果、R2 metadata／revisionのsnapshot一致を確認した。
+
+- 追加、両hostのGET／HEAD／Range／ETag、非公開化／復元、独自ドメイン保持deployが合格。pause中は温めたcacheを含め503、明示resume後は正常配信となった。
+- removeは1回で正常完了。local/server receipt一致、journal完了、pending／lock／url_change不在を確認し、明示resume後のworkers.dev配信・RSS正規URL復帰・媒体／revision／GUID保持と最終pauseまで合格した。DELETE生応答は未採取のため、成功した応答形式は断定しない。
+- 試験process限定の1.1.1.1名前解決を使用し、TLS検証と通常の管理API経路を維持した。読み取り照会の一時失敗17件は記録後に照会のみ続行し、変更要求を再送せず明示完了を確認した。原因は未確定。
+- Issue #6・#7はclose済み。run3の旧操作の復旧は別であり、完了receiptのないtokenを解放しない。run1〜4の記録と保持環境、証跡branchは変更しない。
+
+承認済みの独自ドメイン対応は実装・受け入れ完了と判断し、mainへのPR統合対象とした。公開済みv0.2.1には含まれず、version変更・tag・バイナリリリースは今回行わない。
+
+統合前の再検証: `bun test` **937件成功 / 0失敗**（101 files、14,404 assertions）、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuild・domain helpが成功。更新文書の27 shell blockと22相対リンク、`git diff --check`も合格。コードは実機合格commitから変更していない。
+
+## 2026-10-11: Issue #7 — Custom Domain削除の完了応答を専用処理へ分離
+
+[Issue #7](https://github.com/simosako/castloop-v2/issues/7)と[run3証跡の固定commit](https://github.com/simosako/castloop-v2/tree/5658f60aece35822296d23451c3c1c96f4c7ffa2/design/acceptance/custom-domains/20261011-run3)を確認した。run3は第5〜7節が合格し、Issue #6の停止中503も実機で確認済み。第8節のDELETEは、共通JSON処理がtop-level nullの`success`へアクセスして失敗する経路と一致した。ただし生HTTP status／bodyは保存されておらず、実機の応答形式は断定しない。
+
+- `removeWorkerDomain`だけで、HTTP 204、またはHTTP 200で全文取得・解析したJSON null／`success === true`のJSON応答を完了として扱う。通常JSON APIへnull許可を広げず、共通helperはnullや文字列のsuccessを明示的に拒否する。
+- [公式API資料](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/delete/)の200成功応答はJSON envelopeであり、null応答の保証はない。200/nullは今回の解析経路に対応する限定的な互換処理、204は[HTTP DELETEの完了応答](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.3.5)として扱う。202、その他のstatus、不正・空・切断された200本文、失敗・不正なsuccess／errorsは拒否し、未知IOのtokenを返さない。
+- 成功receiptをlocalへ保存してからexact tokenをWorkerへ返す既存runnerを変更せず、実際のAPIクライアントとfake管理routeを接続して、200/nullで1回だけDELETEし、receipt保存・所有者解放・paused完了を確認した。旧テストのDELETE stubが`{ success: true, result: null }`を返していた箇所もtop-level nullへ変更した。
+- 既存の未知PUT／DELETE結果の再送拒否は維持する。run3の`pending.action = connection`は完了receiptがなく、修正版CLIや接続/DNS不在の観測だけでは安全に復旧できない。再実行・token強制解放・resumeは行わず、原本workspace／journalと停止状態を保持する判断を手順書へ記載した。
+
+検証: 修正前に同じnullアクセス例外を再現。修正後の`bun test` **937件成功 / 0失敗**（101 files）、最終の関連47テスト、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuild・domain help、文書のシェル構文・相対リンク確認が成功。全体結果は`/tmp/opencode/castloop-issue-7-tests.log`。
+
+Cloudflare/DNS、保持環境、証跡ブランチは変更していない。修正後のdomain remove実機受け入れとrun3の残留操作の復旧は未実施。
+
+## 2026-10-11: Issue #6 — 停止中の公開配信をキャッシュより先に拒否
+
+[Issue #6](https://github.com/simosako/castloop-v2/issues/6)と[証跡ブランチの固定commit](https://github.com/simosako/castloop-v2/tree/a584a3bd2ec02752cf6997c299695648b71eb928/design/acceptance/custom-domains/20261011)を確認した。管理操作にも使うruntime readinessが`paused`を許可すること自体は正しく、公開配信の入口に`open`の確認がなかった。
+
+- `src/m6-routes.ts`の公開配信gateで、稼働確認済みsnapshotのstateが`open`でなければキャッシュを呼ばず、既存のno-store 503を返す。管理API・consumerの停止中動作と、所有者を検証した旧形式変換の配信確認windowは変更しない。
+- feed／画像／音源、GET／HEAD／Range／条件付き要求、両host・両entrypointの遮断、停止中の管理照会、明示再開、既存consumerの停止後の完了を検証した。公開配信テストのfixtureは、移行完了後に明示再開してから配信を確認するよう修正した。
+- 証跡の`paused-public.ts`を修正済みコードで実行し、`actual_status = 503`、`cache_calls = 0`を確認した。Cloudflareアクセスなしのローカル再現であり、実機キャッシュの検証ではない。
+- 実機手順のEpisodeコマンドを、ShowディレクトリでShow IDを省略するCLI仕様へ修正した。試験中断とドメイン追加以降が未実施であることも記載した。
+
+検証: `bun test` **933件成功 / 0失敗**（101 files）、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuild、手順書のシェル構文・相対リンク確認が成功。全体テスト結果は`/tmp/opencode/castloop-issue-6-tests.log`。
+
+状態照会のsnapshot競合は別件で、実機失敗時の生応答がないため原因を断定しない。競合拒否・所有者・lock管理は緩めていない。Cloudflare/DNS・保持された試験環境・証跡ブランチは変更していない。修正版Workerの実機確認と受け入れ試験の続行は未実施。
+
+## 2026-10-04: domain CLI・ローカル同期と限定的な復旧の接続
+
+開発buildの`domain add HOSTNAME`・`domain list`・`domain remove`を正式CLI entrypointへ接続した。既存のservice-pause/resumeを使い、操作完了後もpausedのままにする。別のdomain deploy、consumer、Show lock、汎用状態機械は追加していない。
+
+- 1つのURL変更runnerから両方向のfeed/cache/R2同期を呼ぶ。addは接続と秘密を送らないHTTPS probeを先に確認し、removeはworkers.devへの収束後に一致するdomain IDだけを切断する。通常deployは接続を保持する既存経路のまま。
+- `createLocalJournalStorage`の保存・fsync・exclusive lockを再利用した。TOML同期も同じ同期書き込みhelperを使い、rename前後のsource/target hashとローカル編集を確認する。無関係な編集、違う固定要求、異なるreceipt、unknown lockは上書きしない。
+- 接続API成功のreceiptをlocalに保存してからremoteへ渡す。TLS待ちや確認済みのpurge失敗は同じコマンドで続行する。管理API応答喪失は、固定要求とsettledなremote receipt/progressで確認できる場合だけ続行し、RESTを繰り返さない。
+- connection claim後の応答生成失敗やreceipt-returnのCAS競合でも、claim/returnのpendingとexact tokenを失わない。確認済みreceiptと一致するtokenだけを返す明示続行を検証し、エラーを理由に未知のconnection/Worker IOを解放しない。
+- Cloudflare PUT/DELETEそのものが不明ならconnection tokenとpendingを保持する。読み取りで想定接続が見えてもtokenを返さない。これは万能な外部IO復旧を追加しないというMVP範囲を維持するもので、応答喪失の安全をCloudflare保証として扱わない。
+- listは接続の全件・正規/管理URL・設定不一致・admission・unfinishedなlocal操作/lockを読み取り専用で返す。想定外の接続を隠さず、add/removeは採用を拒否する。操作記録は必要な小さな固定要求/receiptだけを保持し、秘密やコンテンツ診断文を複製しない。
+- CLI/管理API間の変更箇所を既存M6 fixtureで検証した。両方向、秘密の送信先、読み取り不変、TLS待ち、purge失敗、管理receipt喪失、実行中/未知REST、設定片側更新、lockと不一致を確認した。formal CLIの引数/helpとlistのREST GET接続も検証した。既存lifecycle/300 MB試験を別の大規模試験群へ複製していない。
+
+検証: **`bun test` 932件成功 / 0失敗**（101 files、14,065 assertions）、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuildと資格情報なしのdomain help/不正引数拒否が成功。全体試験で共通保存helperの変更による失敗時temp保持の差分を検出し、従来の保存契約を維持するよう修正した。試験結果は`/tmp/opencode/castloop-domain-cli-final-tests.log`。
+
+[`docs/custom_domains.md`](../docs/custom_domains.md)に未リリースbuildの利用・復旧制限を記載した。ローカル実装・自動検証は完了し、残るのは承認された専用hostname/M6サービスでのDNS/TLS・両host配信・lifecycle・通常deploy・removeの実機受け入れ。今回はユーザー指定に従い**Cloudflare/DNS設定を一切変更していない**。未リリースであり、v0.2.1バイナリに提供済みとは扱わない。
+
+## 2026-10-04: 共通coreへの管理API接続と秘密を送らないTLS確認
+
+認証・request上限・no-store・固定要求照合を既存管理経路で共有し、`/admin/domain`からURL切替coreを呼べるようにした。読み取り専用statusはURL ownerや未知のtokenが残っていても照会できる。CLIからのCloudflare接続/切断中にも同じservice admission上のtokenを保持し、Worker側のstep/completeと並行しないようにした。接続receiptは固定要求と一致するものだけを保持し、別token・別action・receiptの書き換えを拒否する。
+
+`/.well-known/castloop/runtime`はnonce・service/Worker/versionだけを返すno-storeの読み取り専用probeとした。独自hostのHTTPS到達確認に管理鍵・API tokenを送らず、管理APIは常にworkers.devを使う。probeは公開feed/媒体の停止gateを迂回せず、system/stagingを公開しない。
+
+変更箇所のテストで認証・strict/上限・candidate経路の拒否、connection排他とreceipt、停止中probe/private領域を確認し、既存URL切替の7テストも成功。`npm run check`が成功。domain CLIとlocal journalへの接続は続けて実装する。Cloudflare/DNSの変更はしていない。
+
+## 2026-10-04: 共通の停止中URL切替core
+
+`src/service-url-change.ts`に、add/removeが同じ処理を使うserver coreを実装した。まだ公開管理APIやdomain CLIには接続していない。
+
+- 既存service admissionのpaused recordに小さな`url_change` ownerを追加し、同じCASで実行tokenを管理する。状態enum・別のShow lock・consumer・deployは追加しない。処理中は通常mutation/consumer/recovery/resume/deployを共通層で拒否する。
+- Show所有者の終了確認を通常更新と共有した。最大100 controlを確認し、unfinished/deleting/登録不完全なら拒否する。invocationがないだけで変更を始めない。
+- feed選別・immutable音源HEAD検証・公開済みShow/coverの読み出し・bounded RSS生成・条件付きfeed保存を既存lifecycle処理と共有した。1 stepにつき1 Showを進め、activeなShow/Episodeだけを新URLへ再生成してpurgeする。非公開/削除/draftの不復活と、媒体・revision/current metadata・GUID・公開日時・`site_url`の不変を維持する。
+- 全feed/purgeの成功後にR2設定を同期する。進捗は`feeds`→`configured`→`complete`の小さなrecordに固定要求とShow cursorだけを保存し、コンテンツやsecretを複製しない。設定PUTの応答喪失後はtarget hashから確認し、同じPUTを繰り返さず収束できる。
+- `configured`でもownerを解放しない。domain接続/TLS、remove時のDetach、ローカル設定同期を将来のCLIで確認してから完了関数を呼ぶ。完了時は同じWorker/version/deploymentのまま設定hashだけを合わせ、pausedでownerを解放する。サービス再開は既存resumeだけを使う。
+- purge失敗は進捗を進めず明示再試行できる。稼働中/未知の実行tokenはstatus・同じ要求の再実行でも解放・失効させない。receiptの`complete`表示だけでなくowner解放も確認する管理APIへ接続する予定。
+
+変更箇所の7テストで両方向、複数Show、既存の新項目なし設定・Show 0件、purge失敗、設定応答喪失、live/residual token、早すぎるresume/deployと公開GET停止を確認した。`bun test`全919件、`npm run check`、試験用TypeScript検証とLinuxバイナリbuildが成功。既存M6の安全条件・300 MB受け入れを別の大規模試験群へ複製していない。
+
+残りはCloudflareの接続照会とTLS確認をこのcoreへ接続し、共有local journal保存によるCLI・設定同期・復旧を完成すること。その後に承認された専用hostnameで実機検証する。Cloudflareリソース/DNSの変更はしていない。
+
+## 2026-10-04: 公開URLから操作記録のidentityを分離
+
+Show登録・local draft・staging・publication・lifecycleのidentity生成を共通の`serviceOperationIdentity`へ統一した。照合するのはservice/account/Workerと固定のworkers.dev管理originであり、変更可能なPodcast正規URLではない。既存journalのwire形式を変えず、identity内の従来の`public_base_url`欄には固定originを入れる。独自ドメイン未提供だった既存M6のworkers.dev identityはそのまま一致し、過去のrecordやfrozen要求を書き換えない。
+
+公開URL変更後にも全4操作familyを読み取り専用で照会でき、未知のphaseやlockを修復・昇格しないことを既存fixtureで検証した。異なるaccount/Worker/管理originの拒否は維持する。`bun test` 912件と`npm run check`が成功。
+
+## 2026-10-04: 管理URL分離と通常更新の接続保持
+
+開発順①を実装した。管理操作は同じWorkerの`workers.dev`へ固定し、`public_base_url`はRSS/公開URLとして維持する。
+
+- optionalな`workers_dev_base_url`をstrict service schemaへ追加。対象Worker名とHTTPS originを検証し、新規initで保存する。未設定の既存M6設定では元のworkers.dev URLを使い、設定値や稼働証跡のhashを自動変更しない。
+- 共通管理クライアントと旧形式の調査用クライアントで管理URLを解決する。独自ドメインへのfallback、redirect追跡、失敗時の自動再送はしない。
+- 通常deployのREST対象をaccount/Worker identityで決める。設定どおりの0/1件の接続を事前・更新中・検証時に照会し、別hostname/別Worker/複数接続/接続消失なら拒否する。DomainのPUT/DELETEは通常更新では行わない。
+- 既存の停止・所有者・version receipt・HTTP/Queue/runtime検証をそのまま使い、独自ドメイン付き更新も完了後はpausedを維持する。新規initと旧形式変換のworkers.dev限定条件は維持する。
+- journal identity schemaは同じwire形式のまま共有定義へまとめた。操作固有の状態遷移・receipt検証は変更していない。
+
+検証: `bun test` 911件成功、`npm run check`、試験用TypeScript検証、Linux単一バイナリのbuildと資格情報なしのhelpが成功。追加テストは管理先の固定、既存hash互換、接続保持/不一致拒否と独自ドメイン付き既存更新フローに絞った。既存テストのHTTP期待値を管理先へ合わせ、安全条件のテストを重複追加していない。
+
+`domain add/list/remove`はまだ公開していない。次は共通admissionでの正規URL切替、active feed再生成・purgeと設定同期を接続する。実サービス・DNS・Cloudflareリソースは変更していない。
+
+## 2026-10-04: v0.2.1に合わせた計画の縮小・更新
+
+[`custom_domain_plan.md`](./custom_domain_plan.md)をM6完成後の共通処理へ合わせて改訂した。今回は文書のみを変更し、以下は実装済み機能と追加予定の区別である。以下の2026-09-30以前の記述は履歴として保持する。
+
+- `ensureWorkerDomain`は既存の別hostname/別Workerを拒否し、1サービス1ドメインをすでに制限している。domain listはこの0/1件の状態確認であり、複数ドメイン実装は不要。
+- 通常の配信・公開・削除・restoreはドメインに依存させない。別の停止・CAS・lock・cache・consumerを作るのではなく、M6の共通層を利用する。
+- 独自処理はCloudflareの接続/切断とDNS/TLS確認だけに絞る。正規URLの切替・逆方向の復帰は同じ処理にし、既存feed生成・lifecycle選別・journal保存を再利用する。
+- 通常deployのCustom Domain拒否は解除予定。ただし`migrationWorkerPath`のworkers.dev限定条件と、管理APIが`public_base_url`へ接続する前提も修正が必要。旧形式変換・新規initの安全条件まで緩めない。
+- 改訂計画では既存service-pause/resumeを使い、一時停止下で切替を完了する。stagingを並行継続する機構、無停止移行、旧形式変換、一般的な操作状態機械は追加しない。
+- URL変更はWorker再配備・音源コピー・revision変更ではない。現行のcompatible updateは新Worker version前提なので偽装転用せず、必要なURL変更所有者を共通service admissionへ最小限追加する計画とした。
+- 接続/TLS、feed・cache・R2/ローカル設定の収束を確認し、未完了の変更中は通常resume/deployを拒否する。操作完了後もpausedを保持し、明示再開後に公開配信を確認する。
+
+直前のコード調査では関連テスト61件と`npm run check`が成功。今回、実サービス・DNS・Cloudflareリソースの変更や新CLI公開は行っていない。
+
 ## 2026-09-30: M6を先行する開発順へ変更
 
 公開済みv0.1.2の次マイルストーンを[Episode・Showの公開停止と削除（M6）](./m6_content_lifecycle_plan.md)とした。独自ドメインの承認済み方針とD0/D1基礎コードは維持し、完成・CLI公開・実機受け入れはM6の後続へ回す。domainコマンドは引き続き未公開。

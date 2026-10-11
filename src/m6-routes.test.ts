@@ -4,9 +4,9 @@ import { commitOwnedLifecycleOperation } from "./lifecycle-commit";
 import { claimShowOperation, readShowControl } from "./lifecycle-control";
 import { describeCachedDeliveryRuntime } from "./lifecycle-delivery-gate";
 import { runLifecycleMigrationStep } from "./lifecycle-migration-apply";
-import { fetchM6Candidate, queueM6Candidate } from "./m6-routes";
+import { fetchM6Candidate, fetchM6ManagementIntegration, queueM6Candidate } from "./m6-routes";
 import type { M6CachedLoopback, M6CandidateEnv } from "./m6-routes";
-import { readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
+import { pauseServiceAdmission, readServiceAdmission, resumeServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import { migrationFixture } from "./test-support/migration";
 import { publicationFixture } from "./test-support/publication";
 import { episodePublicationFixture } from "./test-support/episode-publication";
@@ -19,6 +19,7 @@ const batch = (key: string, queue = "test-queue") => ({ queue, messages: [{ id: 
 async function fixture() {
   const setup = await migrationFixture();
   for (let index = 0; index < 3; index += 1) await runLifecycleMigrationStep(setup.env, "service", setup.migrationId, setup.effects);
+  await resumeServiceAdmission(setup.env, "service", setup.pauseId, setup.runtime.worker_version_id);
   const events: Array<{ method: string; props?: object; request?: Request }> = [];
   let status = 200;
   const loopback = Object.assign(({ props }: { props: object }) => ({ async fetch(input: Request) {
@@ -73,6 +74,52 @@ describe("M6 candidate state-first gateway", () => {
     await setup.bucket.put("system/show-publications/daily.json", "{}");
     expect((await fetchM6Candidate(request(), setup.env, setup.loopback)).status).toBe(503);
     expect(setup.events.length).toBe(calls);
+  });
+
+  test("service pause blocks warmed public assets on both hosts before cache access; management and resume remain available", async () => {
+    for (const fetchRoute of [fetchM6Candidate, fetchM6ManagementIntegration]) {
+      const setup = await fixture();
+      const audioKey = [...setup.entries.keys()].find((key) => key.endsWith(".mp3"))!;
+      const managementOrigin = "https://test-worker.example.workers.dev";
+      const urls = [managementOrigin, "https://podcasts.example.com"]
+        .flatMap((origin) => [feedPath, "/podcasts/daily/cover.jpg", audioKey.slice("public".length)].map((path) => `${origin}${path}`));
+      for (const url of urls) expect((await fetchRoute(new Request(url), setup.env, setup.loopback)).status).toBe(200);
+      const pauseId = crypto.randomUUID();
+      const service = (action: "pause" | "status" | "resume") => fetchM6ManagementIntegration(new Request(`${managementOrigin}/admin/service`, {
+        method: "POST", headers: { "X-Castloop-Key": "private-secret" },
+        body: JSON.stringify({ action, service_id: "service", ...(action === "status" ? {} : { pause_id: pauseId }) }),
+      }), setup.env, setup.loopback);
+      expect((await service("pause")).status).toBe(200);
+      const before = new Map(setup.entries);
+      const cacheCalls = setup.events.length;
+      setup.setStatus(304);
+      const variants: Array<{ method: string; headers?: HeadersInit }> = [
+        { method: "GET" }, { method: "HEAD" }, { method: "GET", headers: { Range: "bytes=0-1" } },
+        { method: "GET", headers: { "If-None-Match": '"test"' } },
+        { method: "HEAD", headers: { "If-Modified-Since": "Thu, 01 Oct 2026 12:00:00 GMT" } },
+      ];
+      for (const url of urls) for (const variant of variants) {
+        const response = await fetchRoute(new Request(`${url}?tracking=ignored`, variant), setup.env, setup.loopback);
+        expect(response.status).toBe(503);
+        expect(response.headers.get("Cache-Control")).toBe("no-store");
+        expect(response.headers.get("ETag")).toBeNull();
+        expect(await response.text()).toBe(variant.method === "HEAD" ? "" : JSON.stringify({ error: "temporarily unavailable" }));
+      }
+      expect(setup.events.length).toBe(cacheCalls);
+      expect(setup.entries).toEqual(before);
+      const status = await service("status");
+      expect(status.status).toBe(200);
+      expect(await status.json()).toMatchObject({ admission: { state: "paused", pause_id: pauseId, invocations: [] } });
+      const target = await fetchM6ManagementIntegration(new Request(`${managementOrigin}/admin/target`, {
+        method: "POST", headers: { "X-Castloop-Key": "private-secret" },
+        body: JSON.stringify({ schema_version: 1, service_id: "service", kind: "show", show_id: "daily" }),
+      }), setup.env, setup.loopback);
+      expect(target.status).toBe(200);
+      expect(setup.entries).toEqual(before);
+      expect((await service("resume")).status).toBe(200);
+      setup.setStatus(200);
+      for (const url of urls) expect((await fetchRoute(new Request(url), setup.env, setup.loopback)).status).toBe(200);
+    }
   });
 
   test("missing/legacy migration readiness and foreign Worker versions never use legacy public delivery", async () => {
@@ -164,11 +211,16 @@ describe("M6 candidate Queue routing and common service fence", () => {
     const loopback = Object.assign(setup.loopback, { invalidate: async () => { started.resolve(); await ended.promise; } });
     const outcome = queueM6Candidate(batch(marker.key), setup.env, loopback);
     await started.promise;
+    const pauseId = crypto.randomUUID();
+    await pauseServiceAdmission(setup.env, "service", pauseId, setup.runtime.worker_version_id);
+    expect((await fetchM6Candidate(request(), setup.env, loopback)).status).toBe(503);
+    expect(setup.events.some((event) => event.method === "fetch")).toBe(false);
     expect((await readServiceAdmission(setup.env, "service"))?.value.invocations).toHaveLength(1);
     expect((await readShowControl(setup.env, "daily"))?.value.owner?.execution_id).toBeDefined();
     ended.resolve();
     await outcome;
     expect((await readServiceAdmission(setup.env, "service"))?.value.invocations).toEqual([]);
+    expect((await readServiceAdmission(setup.env, "service"))?.value.state).toBe("paused");
     expect((await readShowControl(setup.env, "daily"))?.value.owner).toBeUndefined();
   });
 

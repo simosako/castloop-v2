@@ -157,7 +157,7 @@ describe("durable pause/claim/quiescence setup without automatic retry", () => {
       await expect(runMigrationSetupQuiescence(setup.journal, setup.effects, wrong)).rejects.toThrow("frozen migration");
       expect(migrationQuiescenceSchema.safeParse({ ...confirmation(setup), old_rest_puts_settled: false }).success).toBe(false);
       expect(setup.calls).toHaveLength(before);
-      expect(() => createMigrationSetupEffects({ ...setup.config, worker_name: "foreign-worker" }, setup.request, "private-key")).toThrow("another service");
+      expect(() => createMigrationSetupEffects({ ...setup.config, worker_name: "foreign-worker", workers_dev_base_url: "https://foreign-worker.example.workers.dev" }, setup.request, "private-key")).toThrow("another service");
     } finally { setup.dispose(); }
   });
 
