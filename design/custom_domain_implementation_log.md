@@ -1,5 +1,18 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-11: Issue #7 — Custom Domain削除の完了応答を専用処理へ分離
+
+[Issue #7](https://github.com/simosako/castloop-v2/issues/7)と[run3証跡の固定commit](https://github.com/simosako/castloop-v2/tree/5658f60aece35822296d23451c3c1c96f4c7ffa2/design/acceptance/custom-domains/20261011-run3)を確認した。run3は第5〜7節が合格し、Issue #6の停止中503も実機で確認済み。第8節のDELETEは、共通JSON処理がtop-level nullの`success`へアクセスして失敗する経路と一致した。ただし生HTTP status／bodyは保存されておらず、実機の応答形式は断定しない。
+
+- `removeWorkerDomain`だけで、HTTP 204、またはHTTP 200で全文取得・解析したJSON null／`success === true`のJSON応答を完了として扱う。通常JSON APIへnull許可を広げず、共通helperはnullや文字列のsuccessを明示的に拒否する。
+- [公式API資料](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/delete/)の200成功応答はJSON envelopeであり、null応答の保証はない。200/nullは今回の解析経路に対応する限定的な互換処理、204は[HTTP DELETEの完了応答](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.3.5)として扱う。202、その他のstatus、不正・空・切断された200本文、失敗・不正なsuccess／errorsは拒否し、未知IOのtokenを返さない。
+- 成功receiptをlocalへ保存してからexact tokenをWorkerへ返す既存runnerを変更せず、実際のAPIクライアントとfake管理routeを接続して、200/nullで1回だけDELETEし、receipt保存・所有者解放・paused完了を確認した。旧テストのDELETE stubが`{ success: true, result: null }`を返していた箇所もtop-level nullへ変更した。
+- 既存の未知PUT／DELETE結果の再送拒否は維持する。run3の`pending.action = connection`は完了receiptがなく、修正版CLIや接続/DNS不在の観測だけでは安全に復旧できない。再実行・token強制解放・resumeは行わず、原本workspace／journalと停止状態を保持する判断を手順書へ記載した。
+
+検証: 修正前に同じnullアクセス例外を再現。修正後の`bun test` **937件成功 / 0失敗**（101 files）、最終の関連47テスト、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuild・domain help、文書のシェル構文・相対リンク確認が成功。全体結果は`/tmp/opencode/castloop-issue-7-tests.log`。
+
+Cloudflare/DNS、保持環境、証跡ブランチは変更していない。修正後のdomain remove実機受け入れとrun3の残留操作の復旧は未実施。
+
 ## 2026-10-11: Issue #6 — 停止中の公開配信をキャッシュより先に拒否
 
 [Issue #6](https://github.com/simosako/castloop-v2/issues/6)と[証跡ブランチの固定commit](https://github.com/simosako/castloop-v2/tree/a584a3bd2ec02752cf6997c299695648b71eb928/design/acceptance/custom-domains/20261011)を確認した。管理操作にも使うruntime readinessが`paused`を許可すること自体は正しく、公開配信の入口に`open`の確認がなかった。

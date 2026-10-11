@@ -1,10 +1,20 @@
 import { expect, test } from "bun:test";
-import { m6ServiceConfigHash, m6ServiceUpdateRequestSchema, serviceAdmissionSchema, serviceConfigSchema, workerSettingsSnapshotSchema } from "@castloop/shared";
+import { m6ServiceConfigHash, m6ServiceUpdateRequestSchema, parseServiceConfig, serviceAdmissionSchema, serviceConfigSchema,
+  stringifyToml, workerSettingsSnapshotSchema } from "@castloop/shared";
+import { fetchM6ManagementIntegration } from "../../../src/m6-routes";
+import { readServiceAdmission } from "../../../src/service-admission";
+import { domainAdminFixture } from "../../../src/test-support/domain-admin";
 import { CloudflareApi, normalizeHostname } from "./cloudflare-api";
+import { DomainClient } from "./domain-client";
+import { readLocalDomainChanges } from "./domain-journal";
+import { runDomainCommand } from "./domain-operation";
+import type { DomainEffects } from "./domain-operation";
 import { buildM6WorkerUploadMetadata, M6_FRESH_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
 import { createFreshM6RestEffects } from "./m6-initialization-rest";
 import { createM6UpdateRestEffects } from "./m6-update-rest";
 import { migrationPayloadHash } from "./migration-deployment";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const accountId = "a".repeat(32);
 const worker = "castloop-example";
@@ -16,16 +26,16 @@ const zone = { id: "z".repeat(32), name: "example.com", type: "full", status: "a
 type Domain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
 
 async function withCloudflare(handler: (request: Request) => Response | Promise<Response>,
-  run: (api: CloudflareApi) => Promise<void>): Promise<void> {
+  run: (api: CloudflareApi) => Promise<void>, service = config): Promise<void> {
   const originalFetch = globalThis.fetch;
   const originalAccount = process.env.CLOUDFLARE_ACCOUNT_ID;
   const originalToken = process.env.CLOUDFLARE_API_TOKEN;
-  process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
+  process.env.CLOUDFLARE_ACCOUNT_ID = service.account_id;
   process.env.CLOUDFLARE_API_TOKEN = "test-token";
   globalThis.fetch = Object.assign(async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
     handler(new Request(input, init)), { preconnect: originalFetch.preconnect });
   try {
-    await run(new CloudflareApi(config));
+    await run(new CloudflareApi(service));
   } finally {
     globalThis.fetch = originalFetch;
     if (originalAccount === undefined) delete process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -71,7 +81,7 @@ test("attaches only after zone and DNS preflight, then reconciles and detaches i
     }
     if (request.method === "DELETE" && url.pathname.endsWith("/workers/domains/domain-id")) {
       existing = null;
-      return reply(null);
+      return Response.json(null);
     }
     throw new Error(`Unexpected request ${request.method} ${url}`);
   }, async (api) => {
@@ -80,10 +90,110 @@ test("attaches only after zone and DNS preflight, then reconciles and detaches i
     await expect(api.ensureWorkerDomain("podcasts.example.com", worker, async () => { throw new Error("Never claim an unowned existing domain"); })).rejects.toThrow("Do not adopt");
     await expect(api.removeWorkerDomain("podcasts.example.com", worker, "foreign-id")).rejects.toThrow("not owned");
     await api.removeWorkerDomain("podcasts.example.com", worker, "domain-id");
+    await expect(api.removeWorkerDomain("podcasts.example.com", worker, "domain-id")).rejects.toThrow("not owned");
     await api.removeWorkerDomain("podcasts.example.com", worker);
   });
   expect(methods.filter((method) => method.startsWith("PUT"))).toHaveLength(1);
   expect(methods.filter((method) => method.startsWith("DELETE"))).toHaveLength(1);
+});
+
+test("domain deletion accepts only completed no-content or successful JSON acknowledgements", async () => {
+  const domain: Domain = { id: "domain-id", hostname: "podcasts.example.com", service: worker,
+    zone_id: zone.id, zone_name: zone.name };
+  for (const response of [new Response(null, { status: 204 }), Response.json({ success: true, errors: [], messages: [] }), reply(null)]) {
+    const methods: string[] = [];
+    await withCloudflare((request) => {
+      methods.push(request.method);
+      if (request.method === "GET") return reply([domain]);
+      expect(new URL(request.url).pathname.endsWith("/workers/domains/domain-id")).toBe(true);
+      return response;
+    }, async (api) => { await api.removeWorkerDomain(domain.hostname, worker, domain.id); });
+    expect(methods).toEqual(["GET", "DELETE"]);
+  }
+});
+
+test("domain deletion rejects unfinished, malformed, failed and interrupted responses without replay", async () => {
+  const domain: Domain = { id: "domain-id", hostname: "podcasts.example.com", service: worker,
+    zone_id: zone.id, zone_name: zone.name };
+  const interrupted = new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode("nu"));
+    controller.error(new Error("response interrupted"));
+  } }));
+  for (const response of [Response.json(null, { status: 202 }), Response.json({ success: true }, { status: 202 }), Response.json(null, { status: 201 }),
+    new Response(""), new Response("nu"), Response.json({}), Response.json([]), Response.json("null"),
+    Response.json({ success: "true" }), Response.json({ success: false }),
+    Response.json({ success: true, errors: [{ code: 1000, message: "failed" }] }),
+    Response.json({ success: true, errors: "invalid" }), Response.json(null, { status: 403 }), interrupted]) {
+    const methods: string[] = [];
+    await withCloudflare((request) => {
+      methods.push(request.method);
+      if (request.method === "GET") return reply([domain]);
+      return response;
+    }, async (api) => { await expect(api.removeWorkerDomain(domain.hostname, worker, domain.id)).rejects.toThrow("Cloudflare DELETE"); });
+    expect(methods).toEqual(["GET", "DELETE"]);
+  }
+});
+
+test("ordinary JSON operations reject null or non-boolean success instead of treating them as acknowledgements", async () => {
+  for (const data of [null, {}, [], { success: "true" }]) {
+    let calls = 0;
+    await withCloudflare(() => { calls++; return Response.json(data); }, async (api) => {
+      await expect(api.createBucket("unused-bucket")).rejects.toThrow("Cloudflare POST /r2/buckets did not succeed");
+    });
+    expect(calls).toBe(1);
+  }
+});
+
+test("a completed null deletion response is journaled before returning the exact connection token and finishing paused", async () => {
+  const setup = await domainAdminFixture();
+  const root = mkdtempSync("/tmp/opencode/castloop-domain-delete-");
+  writeFileSync(join(root, "castloop.toml"), stringifyToml(setup.config));
+  const localConfig = () => parseServiceConfig(readFileSync(join(root, "castloop.toml"), "utf8"));
+  const client = new DomainClient(setup.config, "private-secret", async (url, init) =>
+    fetchM6ManagementIntegration(new Request(url, init), setup.env, setup.cachedAssets));
+  const connected: Domain[] = [];
+  let deletes = 0;
+  await withCloudflare((request) => {
+    const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname.endsWith("/workers/domains")) return reply(connected);
+    expect(request.method).toBe("DELETE");
+    expect(url.pathname).toBe(`/client/v4/accounts/${setup.config.account_id}/workers/domains/domain-id`);
+    deletes++;
+    connected.splice(0);
+    return Response.json(null);
+  }, async (api) => {
+    const effects: DomainEffects = { admin: async (input) => {
+      if (input.action === "return-connection" && input.receipt.action === "remove") {
+        const retained = readLocalDomainChanges(root, localConfig()).find((entry) => !entry.state.completed)!.state;
+        expect(retained.connection_receipt).toEqual(input.receipt);
+        expect((await readServiceAdmission(setup.env, "service"))!.value.url_change).toMatchObject({
+          execution_id: input.receipt.execution_id, execution_kind: "connection",
+        });
+      }
+      return client.call(input);
+    }, domains: (name) => api.workerDomains("service", name),
+      attach: async (hostname, service, claim) => {
+        await claim();
+        const domain = { id: "domain-id", hostname, service, zone_id: zone.id, zone_name: zone.name };
+        connected.push(domain);
+        return domain;
+      }, detach: (hostname, service, id) => api.removeWorkerDomain(hostname, service, id),
+      verifyOrigin: (origin, version) => client.verifyOrigin(origin, version) };
+    await runDomainCommand(root, localConfig(), "add", "podcasts.example.com", undefined, effects);
+    const operationId = crypto.randomUUID();
+    await expect(runDomainCommand(root, localConfig(), "remove", undefined, operationId, effects)).resolves.toMatchObject({
+      result: "domain-changed-paused", operation_id: operationId,
+    });
+    const state = readLocalDomainChanges(root, localConfig()).find((entry) => entry.state.request.operation_id === operationId)!.state;
+    expect(state).toMatchObject({ completed: true, progress: { phase: "complete" },
+      connection_receipt: { action: "remove", domain_id: "domain-id" } });
+    expect(state.pending).toBeUndefined();
+    expect((await readServiceAdmission(setup.env, "service"))!.value).toMatchObject({ state: "paused", invocations: [] });
+    expect((await readServiceAdmission(setup.env, "service"))!.value.url_change).toBeUndefined();
+    expect(localConfig().public_base_url).toBe(setup.management);
+    expect(connected).toEqual([]);
+    expect(deletes).toBe(1);
+  }, setup.config);
 });
 
 test("refuses partial zones, occupied DNS names, and a domain owned by another Worker", async () => {

@@ -2,7 +2,7 @@
 
 更新日: 2026-10-11。対象は`feature/custom-domains`でビルドしたCLI／Worker。
 
-2026-10-11の実機試験は、第5節の停止中feedが200を返す不具合（[Issue #6](https://github.com/simosako/castloop-v2/issues/6)）で中断しました。修正版の実機確認とドメイン追加以降の試験は未実施です。
+2026-10-11のrun3は、第5〜7節が合格し、停止中配信の[Issue #6](https://github.com/simosako/castloop-v2/issues/6)も解消を確認しました。第8節は削除応答の処理エラー（[Issue #7](https://github.com/simosako/castloop-v2/issues/7)）で中断しました。削除応答の修正版は実機未検証です。
 
 新しい試験サービスと未使用のhostnameで、**ドメイン追加 → 配信・公開・非公開化・復元 → Worker更新 → ドメイン削除**を確認します。
 
@@ -335,6 +335,8 @@ curl --disable --silent --show-error --connect-timeout 10 --max-time 60 \
 
 応答喪失・設定同期の復旧条件は[利用・復旧手順の「エラー時」](custom_domains.md#エラー時)を参照してください。
 
+Issue #7のrun3は、削除時の生HTTP status／bodyと完了receiptが残っていません。修正版CLIで再実行せず、pausedとpending／実行tokenを保持してください。Custom Domain／DNSが不在でも、削除要求の完了確認にはなりません。
+
 ## 10. 結果を記録する
 
 `$EVIDENCE/result.md`に以下を記録します。
@@ -342,6 +344,6 @@ curl --disable --silent --show-error --connect-timeout 10 --max-time 60 \
 - 実施日、account／Zone／hostname／Worker／bucket、commit ID／バイナリSHA-256。
 - init・add・deploy・removeの操作ID、pause ID、Worker version。
 - 第5〜8節の各確認項目の合格／不合格／未実施と、対応する保存ファイル名。
-- 最後の停止状態、保持したリソース、未解決事項。エラーは`reason_code`を記録し、秘密やmetadata本文を報告へ転載しないこと。
+- 最後の停止状態、保持したリソース、未解決事項。エラーのstderrと、JSONに`reason_code`があればその値を保存し、秘密やmetadata本文を報告へ転載しないこと。
 
 参照: [利用・復旧手順](custom_domains.md)、[実装計画](../design/custom_domain_plan.md)。

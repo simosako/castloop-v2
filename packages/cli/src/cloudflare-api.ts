@@ -77,9 +77,11 @@ export class CloudflareApi {
   private async json<T>(method: string, path: string, value?: object, global = false): Promise<T> {
     const response = await this.request(method, path,
       value ? JSON.stringify(value) : undefined, value ? "application/json" : undefined, 30000, global);
-    const data: ApiResult<T> = await response.json();
-    if (!data.success) throw new Error(`Cloudflare ${method} ${path} did not succeed`);
-    return data.result;
+    const data: unknown = await response.json();
+    if (data === null || typeof data !== "object" || !("success" in data) || data.success !== true) {
+      throw new Error(`Cloudflare ${method} ${path} did not succeed`);
+    }
+    return (data as ApiResult<T>).result;
   }
 
   async createBucket(name: string): Promise<void> {
@@ -306,7 +308,21 @@ export class CloudflareApi {
       expectedId !== undefined && domains[0].id !== expectedId) {
       throw new Error(`Custom Domain ${hostname} is not owned by this Worker`);
     }
-    await this.json("DELETE", `/workers/domains/${encodeURIComponent(domains[0].id)}`);
+    const path = `/workers/domains/${encodeURIComponent(domains[0].id)}`;
+    const response = await this.request("DELETE", path);
+    const unconfirmed = `Cloudflare DELETE ${path} did not confirm deletion (HTTP ${response.status}); retain its connection token without replay`;
+    if (response.status === 204) return;
+    if (response.status !== 200) {
+      await response.body?.cancel();
+      throw new Error(unconfirmed);
+    }
+    let data: unknown;
+    try { data = await response.json(); }
+    catch { throw new Error(unconfirmed); }
+    if (data !== null && (typeof data !== "object" || !("success" in data) || data.success !== true ||
+      "errors" in data && (!Array.isArray(data.errors) || data.errors.length))) {
+      throw new Error(unconfirmed);
+    }
   }
 
   async queueId(name: string): Promise<string> {

@@ -1,6 +1,6 @@
 # 独自ドメイン（開発ブランチ・未リリース）
 
-この機能は`feature/custom-domains`のCLIと同じbuildのWorkerが必要です。公開済みv0.2.1バイナリにはありません。ローカル実装・自動テストは完了していますが、Cloudflare上のDNS/TLS・配信受け入れは未実施です。
+この機能は`feature/custom-domains`のCLIと同じbuildのWorkerが必要です。公開済みv0.2.1バイナリにはありません。実機受け入れはドメイン追加・配信・通常deployまで合格し、削除で[Issue #7](https://github.com/simosako/castloop-v2/issues/7)が発生しました。削除応答の修正版は実機未検証です。
 
 実機検証は[専用hostnameでの受け入れ手順](custom_domain_live_acceptance.md)を参照してください。
 
@@ -51,7 +51,7 @@ workspace、`castloop.toml`、`.castloop/`を保持してください。操作�
 - **TLS準備待ち / 確認済みのpurge失敗:** 原因を解消後、同じadd/removeを再実行してください。unfinishedな固定要求を再利用し、成功済みの接続を繰り返しません。必要なら`--operation-id OPERATION_UUID`を付けます。
 - **管理APIの応答喪失:** 同じ要求のreceiptと進捗が確認でき、対応tokenがsettledの場合だけ続行します。完了markerだけでownerを解放済みとは扱いません。
 - **ローカル設定の未同期:** remoteが同じ固定要求のtarget hashへ到達している場合だけ同期します。無関係なローカル編集は上書きせずエラーにします。元/目標以外の設定へ手動変更して操作をやり直さないでください。
-- **Cloudflare接続/切断要求そのものの結果が不明:** listで照会はできますが、想定結果が見えることだけでIO終了とは判定しません。pending記録・connection tokenを保ち、再送や強制解放は行いません。
+- **Cloudflare接続/切断要求そのものの結果が不明:** listで照会はできますが、想定結果が見えることだけでIO終了とは判定しません。pending記録・connection tokenを保ち、再送や強制解放は行いません。修正版CLIへの交換だけでは既存のpendingは解消しません。
 - **残存lock / Worker execution token:** 古い実行が生存不明ならblockedのままです。時間経過、HEAD不在、接続照会だけで削除・解放しないでください。
 
 通常の公開feed/画像/音源はpaused中に503です。TLS確認用の公開probeはnonceとservice/Worker/versionだけを返し、秘密やコンテンツを公開しません。自動再開・自動rollback・未知IOからの万能な復旧はこのMVPには含めません。
