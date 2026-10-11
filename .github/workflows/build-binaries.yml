@@ -70,13 +70,17 @@ jobs:
           chmod +x castloop-linux-x64
           test "$(./castloop-linux-x64 --version)" = "$expected_version"
           ./castloop-linux-x64 --help | grep -F 'Usage: castloop'
-          for command in init create-show create-episode list-shows list-episodes; do
+          for command in init create-show create-episode list-shows list-episodes domain; do
             ./castloop-linux-x64 "$command" --help | grep -F "Usage: castloop $command"
           done
           if ./castloop-linux-x64 list-episodes > list-episodes-error.txt 2>&1; then
             exit 1
           fi
           grep -F 'Usage: castloop list-episodes SHOW_ID' list-episodes-error.txt
+          if ./castloop-linux-x64 domain add > domain-error.txt 2>&1; then
+            exit 1
+          fi
+          grep -F 'Usage: castloop domain add HOSTNAME' domain-error.txt
 
   release:
     if: github.event_name == 'push' && github.ref_type == 'tag'
