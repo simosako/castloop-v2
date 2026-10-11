@@ -61,7 +61,8 @@ async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Pr
   if (current?.value.state === "migrating") {
     return readBootstrapDeliveryWindow(env, current.value, env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_VERSION_METADATA?.tag);
   }
-  await requireCandidateReadiness(env, config);
+  const ready = await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
+  if (ready.value.state !== "open") throw new Error("Public delivery requires open service admission");
   return undefined;
 }
 

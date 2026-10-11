@@ -1,5 +1,18 @@
 # 独自ドメイン対応 実装ログ
 
+## 2026-10-11: Issue #6 — 停止中の公開配信をキャッシュより先に拒否
+
+[Issue #6](https://github.com/simosako/castloop-v2/issues/6)と[証跡ブランチの固定commit](https://github.com/simosako/castloop-v2/tree/a584a3bd2ec02752cf6997c299695648b71eb928/design/acceptance/custom-domains/20261011)を確認した。管理操作にも使うruntime readinessが`paused`を許可すること自体は正しく、公開配信の入口に`open`の確認がなかった。
+
+- `src/m6-routes.ts`の公開配信gateで、稼働確認済みsnapshotのstateが`open`でなければキャッシュを呼ばず、既存のno-store 503を返す。管理API・consumerの停止中動作と、所有者を検証した旧形式変換の配信確認windowは変更しない。
+- feed／画像／音源、GET／HEAD／Range／条件付き要求、両host・両entrypointの遮断、停止中の管理照会、明示再開、既存consumerの停止後の完了を検証した。公開配信テストのfixtureは、移行完了後に明示再開してから配信を確認するよう修正した。
+- 証跡の`paused-public.ts`を修正済みコードで実行し、`actual_status = 503`、`cache_calls = 0`を確認した。Cloudflareアクセスなしのローカル再現であり、実機キャッシュの検証ではない。
+- 実機手順のEpisodeコマンドを、ShowディレクトリでShow IDを省略するCLI仕様へ修正した。試験中断とドメイン追加以降が未実施であることも記載した。
+
+検証: `bun test` **933件成功 / 0失敗**（101 files）、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuild、手順書のシェル構文・相対リンク確認が成功。全体テスト結果は`/tmp/opencode/castloop-issue-6-tests.log`。
+
+状態照会のsnapshot競合は別件で、実機失敗時の生応答がないため原因を断定しない。競合拒否・所有者・lock管理は緩めていない。Cloudflare/DNS・保持された試験環境・証跡ブランチは変更していない。修正版Workerの実機確認と受け入れ試験の続行は未実施。
+
 ## 2026-10-04: domain CLI・ローカル同期と限定的な復旧の接続
 
 開発buildの`domain add HOSTNAME`・`domain list`・`domain remove`を正式CLI entrypointへ接続した。既存のservice-pause/resumeを使い、操作完了後もpausedのままにする。別のdomain deploy、consumer、Show lock、汎用状態機械は追加していない。

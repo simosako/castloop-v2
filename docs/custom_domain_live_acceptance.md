@@ -1,6 +1,8 @@
 # 独自ドメインの実機検証手順（専用hostname）
 
-更新日: 2026-10-09。対象は`feature/custom-domains`でビルドしたCLI／Worker。実機検証は未実施。
+更新日: 2026-10-11。対象は`feature/custom-domains`でビルドしたCLI／Worker。
+
+2026-10-11の実機試験は、第5節の停止中feedが200を返す不具合（[Issue #6](https://github.com/simosako/castloop-v2/issues/6)）で中断しました。修正版の実機確認とドメイン追加以降の試験は未実施です。
 
 新しい試験サービスと未使用のhostnameで、**ドメイン追加 → 配信・公開・非公開化・復元 → Worker更新 → ドメイン削除**を確認します。
 
@@ -97,7 +99,7 @@ CLIの管理操作は常に`WORKERS_BASE`へ接続します。この値は以後
 | `domain-b` | `keep` | 公開中 |
 | `domain-idle` | なし | create-showのみ。未公開 |
 
-`domain-a/keep`の作成例です。Showの`image_path`は`cover.jpg`にします。
+`domain-a/keep`の作成例です。Showの`image_path`は`cover.jpg`にします。Episodeの作成・更新・公開コマンドはShowディレクトリで実行し、Show IDを引数に付けません。状態照会はサービスのルートで実行します。
 
 ```sh
 "$CASTLOOP" create-show domain-a --site-url "$SITE_URL"
@@ -107,11 +109,13 @@ cp "$COVER_FILE" domain-a/cover.jpg
 "$CASTLOOP" publish-show domain-a
 "$CASTLOOP" job-status SHOW_JOB_UUID
 
-"$CASTLOOP" create-episode domain-a keep
-# Edit domain-a/episode-keep.toml before staging.
-"$CASTLOOP" update-episode domain-a keep
-"$CASTLOOP" update-episode-audio domain-a keep "$MP3_FILE"
-"$CASTLOOP" publish-episode domain-a keep "$MP3_FILE"
+cd domain-a
+"$CASTLOOP" create-episode keep
+# Edit episode-keep.toml before staging.
+"$CASTLOOP" update-episode keep
+"$CASTLOOP" update-episode-audio keep "$MP3_FILE"
+"$CASTLOOP" publish-episode keep "$MP3_FILE"
+cd "$WORKSPACE"
 "$CASTLOOP" job-status EPISODE_JOB_UUID
 ```
 
