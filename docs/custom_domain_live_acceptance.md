@@ -36,7 +36,7 @@ sha256sum dist/castloop-linux-x64
 
 Linux x86-64の試験先へバイナリを配置し、SHA-256がビルド元と一致することを確認します。試験先にはBash、curl、jq、uuidgen、sha256sum、cmpを用意してください。
 
-公開済みv0.2.1にはdomainコマンドがありません。開発版もversion表示は`0.2.1`なので、commit IDとSHA-256で識別します。
+domainコマンドはv0.3.0以降が対象です。run4で使用したリリース前buildのversion表示は`0.2.1`だったため、試験記録はcommit IDとSHA-256で識別しています。
 
 以下のplaceholderを実際の値に置き換え、同じBashセッションで実行します。
 

@@ -2,11 +2,11 @@
 
 Serverless podcast hosting on Cloudflare: one private R2 bucket and one public Worker per service, multiple Shows, managed through a standalone CLI.
 
-**v0.2.1 adds Show and Episode listings to the M6 lifecycle features released in v0.2.0.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md).
+**v0.3.0 adds custom domains to the Show/Episode listings and M6 lifecycle features.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md).
 
 ## Build and install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.2.1 release](https://github.com/simosako/castloop-v2/releases/tag/v0.2.1). Run `sha256sum --check SHA256SUMS` in the download directory before installing the binary. `castloop --version` must report `0.2.1`.
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.3.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.3.0). Run `sha256sum --check SHA256SUMS` in the download directory before installing the binary. `castloop --version` must report `0.3.0`.
 
 The build machine needs Bun 1.4.2 and Node.js/npm:
 
@@ -57,7 +57,7 @@ MP3s are limited to 300,000,000 bytes. The CLI validates duration, uploads and r
 
 ## List Shows and Episodes
 
-These commands require **both the v0.2.1 CLI and a Worker deployed from that build**; updating only the CLI is insufficient. For an existing v0.2.0 M6 service, use the compatible-update procedure below. No Cloudflare resources are updated merely by listing or installing the executable.
+These commands require **both a CLI and a Worker with listing support (v0.2.1 or later)**; updating only the CLI is insufficient. For an existing v0.2.0 M6 service, use the compatible-update procedure below. No Cloudflare resources are updated merely by listing or installing the executable.
 
 Run from the service workspace with its retained administrator key. Listing does not require `CLOUDFLARE_API_TOKEN`:
 
@@ -106,6 +106,14 @@ castloop service-resume NEW_PAUSE_UUID
 
 Pause temporarily stops delivery and new mutations. Paused does not necessarily mean drained. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update in this MVP.
 
+## Custom domains
+
+v0.3.0 provides `domain add HOSTNAME`, `domain list`, and `domain remove`, with one hostname per service. Use an active/full Cloudflare Zone in the same account; check Workers Scripts Write, Zone Read, and DNS Read permissions. Upgrade an existing M6 Worker with the compatible-update procedure above before using these commands.
+
+Domain operations require explicit pause/drain and finish paused; resume explicitly after checking completion. `public_base_url` is the canonical Podcast URL, while `workers_dev_base_url` remains the same Worker's HTTPS workers.dev origin for CLI administration. Both hosts serve the same public content without redirects. DNS/TLS probes send no secrets. Removal restores workers.dev URLs without deleting media, revisions or GUIDs; normal deployment preserves a matching Custom Domain connection.
+
+See [custom-domain usage and recovery](docs/custom_domains.md) for commands and recovery limits. Do not manually change these settings on a running service. Podcast directory URL changes are the administrator's responsibility; subscription migration and redirects are not provided.
+
 ## Errors and recovery limits
 
 Preserve the workspace, journals, locks and remote owners after any error. Do not rerun unknown requests, delete locks, replace administrator secrets or release tokens because time elapsed or HEAD found no object. An unknown/forcibly interrupted invocation can remain blocked; universal recovery is outside this MVP.
@@ -124,8 +132,8 @@ The single REST PUT recovery model retains [unverified assumption U1](design/m6_
 
 Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.
 
-[M6 acceptance](design/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.2.1 release notes](docs/release-v0.2.1.md) and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
+[M6 acceptance](design/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.3.0 release notes](docs/release-v0.3.0.md), [v0.2.1 release notes](docs/release-v0.2.1.md), and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
 
-Unreleased source builds provide `domain add HOSTNAME`, `domain list`, and `domain remove`, with one hostname per service. They separate `workers_dev_base_url` (CLI administration, always the same Worker's HTTPS workers.dev origin) from `public_base_url` (canonical Podcast URLs). Existing M6 workspaces without the new field retain their original workers.dev URL and configuration hash. Compatible updates preserve a matching Custom Domain connection. Domain operations require the matching Worker build, explicit pause/drain, and explicit resume. DNS/TLS probes send no secrets. [Live Cloudflare acceptance passed](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md), including removal and restored workers.dev delivery; these commands are **not in the published v0.2.1 executable**. See [custom-domain usage and recovery](docs/custom_domains.md). Do not manually change these settings on a running service.
+Existing M6 workspaces without `workers_dev_base_url` retain their original workers.dev URL and configuration hash until an owned domain change saves the field. [Live Cloudflare acceptance passed](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md), including removal and restored workers.dev delivery. Earlier interrupted trial operations remain retained; their unknown requests or tokens are not released by this version.
 
 The [release workflow](.github/workflows/build-binaries.yml) builds/checks Linux x86-64 artifacts and publishes on a matching `v*` tag. Include [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with redistributed binaries. castloop uses the MIT License.

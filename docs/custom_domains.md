@@ -1,6 +1,6 @@
-# 独自ドメイン（未リリース）
+# 独自ドメイン（v0.3.0）
 
-この機能は独自ドメイン対応を含むCLIと同じbuildのWorkerが必要です。公開済みv0.2.1バイナリにはありません。[run4の実機受け入れ](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)で、追加・配信・非公開化／復元・通常deploy・削除・workers.devへの復帰・最終停止まで合格しました。[Issue #6](https://github.com/simosako/castloop-v2/issues/6)・[Issue #7](https://github.com/simosako/castloop-v2/issues/7)の修正も確認済みです。
+この機能はv0.3.0のCLIと、そのバイナリで配備したWorkerの両方が必要です。v0.2.1以前のバイナリにはありません。[run4の実機受け入れ](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)で、追加・配信・非公開化／復元・通常deploy・削除・workers.devへの復帰・最終停止まで合格しました。[Issue #6](https://github.com/simosako/castloop-v2/issues/6)・[Issue #7](https://github.com/simosako/castloop-v2/issues/7)の修正も確認済みです。
 
 実機検証は[専用hostnameでの受け入れ手順](custom_domain_live_acceptance.md)を参照してください。
 
@@ -14,7 +14,7 @@
 
 ## 追加
 
-最初に対応buildで既存の通常deployを行ってください。domain操作自体はWorkerを再配備しません。その後、service workspaceで実行します。
+既存M6サービスでは最初に[通常更新手順](../README.md#compatible-worker-updates)に従い、v0.3.0でdeployしてください。domain操作自体はWorkerを再配備しません。その後、service workspaceで実行します。
 
 ```sh
 castloop service-pause NEW_PAUSE_UUID
