@@ -1,0 +1,27 @@
+{
+  "result": "service",
+  "request": {
+    "service_id": "domtest-1011-r3",
+    "action": "status"
+  },
+  "worker_version_id": "cab7bbf2-2637-4f42-b8d8-47ac4bc409d8",
+  "admission": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r3",
+    "generation": 217,
+    "mode": "m6",
+    "state": "open",
+    "invocations": [],
+    "last_resumed_pause_id": "fe5b60f3-f21b-472a-a7a0-69445f251280",
+    "runtime_readiness": {
+      "operation_id": "f2498204-dd97-46e8-aa04-074b83c89a9b",
+      "deployment_id": "679e0378-fa51-4f41-aa54-cab7e266f55d",
+      "worker_version_id": "cab7bbf2-2637-4f42-b8d8-47ac4bc409d8",
+      "service_config_sha256": "64a5f3cf6bb010cf93a5c0e0839f2f062bd46812a2e57cf8ee512ab5d69cc576",
+      "default_cache_disabled": true,
+      "cached_entrypoint": "CachedPublicAssets",
+      "cutover_verified": true,
+      "publication_routes_verified": true
+    }
+  }
+}

@@ -1,0 +1,9 @@
+HTTP/1.1 200 Connection Established
+HTTP/2 304
+date: Sun, 11 Oct 2026 08:22:34 GMT
+cf-cache-status: HIT
+age: 8
+cache-control: public, max-age=0, must-revalidate
+etag: "763fb1bc50a09f3f09c76a3bf44daf6a"
+last-modified: Sun, 11 Oct 2026 07:45:23 GMT
+x-castloop-worker-version: cab7bbf2-2637-4f42-b8d8-47ac4bc409d8

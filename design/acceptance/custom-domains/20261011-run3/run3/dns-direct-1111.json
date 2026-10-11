@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-10-11T08:16:05.389747+00:00",
+  "hostname": "castloop-test.otftalk.com",
+  "dns_server": "1.1.1.1",
+  "queries": [
+    {
+      "transport": "UDP",
+      "type": "A",
+      "rcode": 0,
+      "truncated": false,
+      "answer_count": 2,
+      "addresses": [
+        {
+          "type": "A",
+          "address": "104.21.19.82",
+          "ttl": 300
+        },
+        {
+          "type": "A",
+          "address": "172.67.185.171",
+          "ttl": 300
+        }
+      ]
+    },
+    {
+      "transport": "UDP",
+      "type": "AAAA",
+      "rcode": 0,
+      "truncated": false,
+      "answer_count": 2,
+      "addresses": [
+        {
+          "type": "AAAA",
+          "address": "2606:4700:3033::ac43:b9ab",
+          "ttl": 300
+        },
+        {
+          "type": "AAAA",
+          "address": "2606:4700:3035::6815:1352",
+          "ttl": 300
+        }
+      ]
+    },
+    {
+      "transport": "TCP",
+      "type": "A",
+      "rcode": 0,
+      "truncated": false,
+      "answer_count": 2,
+      "addresses": [
+        {
+          "type": "A",
+          "address": "172.67.185.171",
+          "ttl": 300
+        },
+        {
+          "type": "A",
+          "address": "104.21.19.82",
+          "ttl": 300
+        }
+      ]
+    },
+    {
+      "transport": "TCP",
+      "type": "AAAA",
+      "rcode": 0,
+      "truncated": false,
+      "answer_count": 2,
+      "addresses": [
+        {
+          "type": "AAAA",
+          "address": "2606:4700:3035::6815:1352",
+          "ttl": 300
+        },
+        {
+          "type": "AAAA",
+          "address": "2606:4700:3033::ac43:b9ab",
+          "ttl": 300
+        }
+      ]
+    }
+  ]
+}

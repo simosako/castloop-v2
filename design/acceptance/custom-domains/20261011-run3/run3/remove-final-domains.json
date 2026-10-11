@@ -1,0 +1,49 @@
+{
+  "result": "domains",
+  "public_base_url": "https://castloop-domtest-1011-r3-67afcecc.simosako.workers.dev",
+  "workers_dev_base_url": "https://castloop-domtest-1011-r3-67afcecc.simosako.workers.dev",
+  "configuration_matches": true,
+  "connections_match": true,
+  "domains": [],
+  "admission": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r3",
+    "generation": 233,
+    "mode": "m6",
+    "state": "paused",
+    "invocations": [],
+    "pause_id": "e69d8d23-baa2-49bf-9521-cb0d5cfcc829",
+    "last_resumed_pause_id": "d736a92e-64ad-4db9-96d1-352bf137f51a",
+    "url_change": {
+      "operation_id": "9dd5b0ac-ab4d-41ad-ad15-dfe785e4b21f",
+      "request_sha256": "1859162db87e0f5bc9f275df87e10eb2b7500486d0650073e1ccbad36b31fe5e",
+      "execution_id": "[REDACTED]",
+      "execution_kind": "connection"
+    },
+    "runtime_readiness": {
+      "operation_id": "652997c0-de6a-45be-9b5f-63f14058916f",
+      "deployment_id": "2c85ea78-0b82-419b-9d16-fab4b664f4d1",
+      "worker_version_id": "64017114-44a5-46aa-893d-bc0d7bb3f684",
+      "service_config_sha256": "64a5f3cf6bb010cf93a5c0e0839f2f062bd46812a2e57cf8ee512ab5d69cc576",
+      "default_cache_disabled": true,
+      "cached_entrypoint": "CachedPublicAssets",
+      "cutover_verified": true,
+      "publication_routes_verified": true
+    }
+  },
+  "local_operations": [
+    {
+      "operation_id": "9dd5b0ac-ab4d-41ad-ad15-dfe785e4b21f",
+      "domain_change": {
+        "action": "remove",
+        "hostname": "castloop-test.otftalk.com"
+      },
+      "pending": {
+        "action": "connection",
+        "execution_id": "[REDACTED]"
+      },
+      "phase": "configured",
+      "lock_present": false
+    }
+  ]
+}

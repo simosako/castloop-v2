@@ -1,0 +1,92 @@
+{
+  "family": "lifecycle",
+  "operation_id": "b7947bdb-3552-4c04-a4a1-60450978e0ec",
+  "client_state": {
+    "schema_version": 1,
+    "identity": {
+      "service_id": "domtest-1011-r3",
+      "account_id": "[REDACTED_RESOURCE_ID]",
+      "worker_name": "castloop-domtest-1011-r3-67afcecc",
+      "public_base_url": "https://castloop-domtest-1011-r3-67afcecc.simosako.workers.dev"
+    },
+    "claim": {
+      "schema_version": 1,
+      "service_id": "domtest-1011-r3",
+      "action": "claim",
+      "request": {
+        "schema_version": 1,
+        "job_id": "b7947bdb-3552-4c04-a4a1-60450978e0ec",
+        "show_id": "domain-b",
+        "kind": "show",
+        "action": "unpublish",
+        "expected_show_generation": 5,
+        "created_at": "2026-10-11T08:31:18Z"
+      },
+      "confirmation": {
+        "operator_confirmed": true,
+        "request_sha256": "fe5da400e2394b6f7111dd733c6fb58a3109c75f084b2c0632591a7930f3b9a8"
+      }
+    },
+    "phase": "committed",
+    "claim_receipt": {
+      "schema_version": 1,
+      "kind": "show",
+      "show_id": "domain-b",
+      "job_id": "b7947bdb-3552-4c04-a4a1-60450978e0ec",
+      "action": "unpublish",
+      "show_generation": 6,
+      "request_sha256": "fe5da400e2394b6f7111dd733c6fb58a3109c75f084b2c0632591a7930f3b9a8"
+    },
+    "commit_receipt": {
+      "key": "staging/lifecycle/shows/domain-b/b7947bdb-3552-4c04-a4a1-60450978e0ec/commit.json",
+      "created": true
+    }
+  },
+  "lock_present": false,
+  "remote_state_checked": true,
+  "authorizes_mutation": false,
+  "authorizes_recovery": false,
+  "server_status": {
+    "schema_version": 1,
+    "service_id": "domtest-1011-r3",
+    "result": "status",
+    "operation": {
+      "schema_version": 1,
+      "kind": "show",
+      "show_id": "domain-b",
+      "job_id": "b7947bdb-3552-4c04-a4a1-60450978e0ec",
+      "action": "unpublish",
+      "show_generation": 6,
+      "request_sha256": "fe5da400e2394b6f7111dd733c6fb58a3109c75f084b2c0632591a7930f3b9a8"
+    },
+    "status": {
+      "schema_version": 2,
+      "job_id": "b7947bdb-3552-4c04-a4a1-60450978e0ec",
+      "show_id": "domain-b",
+      "kind": "show",
+      "action": "unpublish",
+      "show_generation": 6,
+      "request_sha256": "fe5da400e2394b6f7111dd733c6fb58a3109c75f084b2c0632591a7930f3b9a8",
+      "state": "completed",
+      "phase": "finished",
+      "result_lifecycle": "unpublished"
+    },
+    "progress": {
+      "schema_version": 1,
+      "job_id": "b7947bdb-3552-4c04-a4a1-60450978e0ec",
+      "show_id": "domain-b",
+      "kind": "show",
+      "action": "unpublish",
+      "show_generation": 6,
+      "request_sha256": "fe5da400e2394b6f7111dd733c6fb58a3109c75f084b2c0632591a7930f3b9a8",
+      "phase": "finished",
+      "deleted_objects": 0,
+      "purge_confirmed": true,
+      "updated_at": "2026-10-11T08:31:58Z"
+    },
+    "ownership": "released",
+    "execution_active": false,
+    "marker_present": true,
+    "authorizes_retry": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "result": "initialized-paused",
+  "operation_id": "f2498204-dd97-46e8-aa04-074b83c89a9b",
+  "runtime_readiness": {
+    "operation_id": "f2498204-dd97-46e8-aa04-074b83c89a9b",
+    "deployment_id": "679e0378-fa51-4f41-aa54-cab7e266f55d",
+    "worker_version_id": "cab7bbf2-2637-4f42-b8d8-47ac4bc409d8",
+    "service_config_sha256": "bcbfb4272ec256fc4e5f75014c13157019208e6630ac59ddefd0fdfe15da6ed7",
+    "default_cache_disabled": true,
+    "cached_entrypoint": "CachedPublicAssets",
+    "cutover_verified": true,
+    "publication_routes_verified": true
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "Status": 0,
+  "TC": false,
+  "RD": true,
+  "RA": true,
+  "AD": false,
+  "CD": false,
+  "Question": [
+    {
+      "name": "castloop-test.otftalk.com",
+      "type": 1
+    }
+  ],
+  "Answer": [
+    {
+      "name": "castloop-test.otftalk.com",
+      "type": 1,
+      "TTL": 300,
+      "data": "104.21.19.82"
+    },
+    {
+      "name": "castloop-test.otftalk.com",
+      "type": 1,
+      "TTL": 300,
+      "data": "172.67.185.171"
+    }
+  ]
+}

@@ -1,0 +1,620 @@
+[
+  {
+    "published_path": "logs/test-20261011.log",
+    "local_source": "test-20261011.log",
+    "treatment": "sanitized cumulative activity log",
+    "published_sha256": "175dfeed0eec14a08afdc356317e9d5a39e29428640d5cdf190ca68175e44eb8"
+  },
+  {
+    "published_path": "run3/add-doh-cloudflare.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-doh-cloudflare.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "22c919ef029b452f4ba21175b0dcec084b859d4d6cd8ec7cac37ae025e2b1f65"
+  },
+  {
+    "published_path": "run3/add-explicit-dns-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-explicit-dns-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8a0c0f50774c03e74ec9e0583092269731ec597210b50224f007449dcda8f1ac"
+  },
+  {
+    "published_path": "run3/add-explicit-dns-runtime.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-explicit-dns-runtime.body",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3db4a2c96998420f22016ce44b175b7e7fc172e7446932efdd770431c9bd83d0"
+  },
+  {
+    "published_path": "run3/add-local-dns-no-cache.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-local-dns-no-cache.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7c65a615030fadbad135b57c2151e88a7fefe1ab487c6f8b146ff1d627ee9969"
+  },
+  {
+    "published_path": "run3/added-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b9ce7dfe46029a8f42d11fcfdedc8a2508fa256695f078f93b3ed074115cf8ec"
+  },
+  {
+    "published_path": "run3/added-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3eb21d8b112a0b6a75c067301a8abc78a29774250e15733b22da2d6a807e4afe"
+  },
+  {
+    "published_path": "run3/added-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c5a10560e791c1fbf62e84483e524307512dc44ba83a6ae7f3e41c3966b92134"
+  },
+  {
+    "published_path": "run3/after-publish-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/after-publish-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "c814d68473d01138078395a2ccc598573542aac3251a926eb464e20e376ddbb6"
+  },
+  {
+    "published_path": "run3/before-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/before-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e21ad934ccc38be836dd3e14688e94b182a53b9f010e2403a33e750e23c9b78e"
+  },
+  {
+    "published_path": "run3/before-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/before-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4e4c91d5e38daa6d5c943bae6b0680614fc9812776d04b64776f8ce13077f59a"
+  },
+  {
+    "published_path": "run3/before-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/before-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9906c24ad0ebda5d87f0d1fa81bc6f3572c1a8474cef9ed1f68d1025e7eef06e"
+  },
+  {
+    "published_path": "run3/binary.sha256",
+    "local_source": "evidence/domain-acceptance-20261011-run3/binary.sha256",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9888cdcd4f82335dab6ef1656aa93e0f045c4f238a1d0df71778653f88f16e5c"
+  },
+  {
+    "published_path": "run3/deploy-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/deploy-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "96b8531fa60b580b90a6805a8c3db7c361d3722866c24cb2ab01102b7b5ac6cb"
+  },
+  {
+    "published_path": "run3/deployed-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/deployed-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3fbfc3ba608ac21bd7a241acdbe5cd626736855a5cd2e6ff1e06e011bd1ef71"
+  },
+  {
+    "published_path": "run3/deployed-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/deployed-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9503f5a98954c2f2cd10118ed8feaf3242d3feaf16e796668bb1288529d8c0c0"
+  },
+  {
+    "published_path": "run3/deployed-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/deployed-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "6105cf344def4becd6c6fbf4f4d671cdfa6e0358ecea17687c710eba388db0a8"
+  },
+  {
+    "published_path": "run3/dns-direct-1111.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/dns-direct-1111.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "892d5ff4319af6d656e4079860d6e15d1fb75b92ff0aba06f8b04bbcfe46d4be"
+  },
+  {
+    "published_path": "run3/dns-local-recheck.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run3/dns-local-recheck.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7c65a615030fadbad135b57c2151e88a7fefe1ab487c6f8b146ff1d627ee9969"
+  },
+  {
+    "published_path": "run3/dns-proxy-stop.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/dns-proxy-stop.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "70d063c0d82140a845e11f016df471e50e963177751261f09b62ea7dacda1a07"
+  },
+  {
+    "published_path": "run3/gone-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/gone-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "de49f36f7b463b41804bba7ba088b9acd06ed1dc170349957671979dd6758453"
+  },
+  {
+    "published_path": "run3/hidden-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/hidden-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "94d3734082a4de98a4225ef6967a1049c210811ec22a5cc7e93ae2241d56dc19"
+  },
+  {
+    "published_path": "run3/init-result.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/init-result.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a097cfce9ad53c1cd8794f07541148d39ffa6b54ffb526669036bf46ee65792e"
+  },
+  {
+    "published_path": "run3/initialized-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/initialized-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "71c89dd350f953e738f1370b6f1f702957416fac373c0cce4021c9af41b3a38a"
+  },
+  {
+    "published_path": "run3/initialized-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/initialized-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d5b6231c79ba342d366d7bba4210a663a0c3e2f809f5fec4228a13f391a93e20"
+  },
+  {
+    "published_path": "run3/issue-domain-remove.md",
+    "local_source": "evidence/domain-acceptance-20261011-run3/issue-domain-remove.md",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "581ad51784d32537f30cacf940cfd08e62de3734699d355fa00b59e6747b4441"
+  },
+  {
+    "published_path": "run3/keep-restore-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/keep-restore-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b95d6ccbf4710b61414ac9221fba54c728e11fc03586ea620fc66ceb7d9fc539"
+  },
+  {
+    "published_path": "run3/keep-restored-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/keep-restored-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ceb734f66a60149b88025ec4b3a1baba8f9ad320f2db52329174ff545eb2170e"
+  },
+  {
+    "published_path": "run3/keep-unpublish-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/keep-unpublish-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "91245d1769c37c9331bf444f03d610444f546cdb522d768ae2d6cc3643c56453"
+  },
+  {
+    "published_path": "run3/pre-deploy-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/pre-deploy-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "13a3e91cdf324217185f191e27fde2d29e6510cefdb5391a5a153f7c4b9f211e"
+  },
+  {
+    "published_path": "run3/pre-deploy-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/pre-deploy-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "09efee1a5609e73881beabb78b65284bd168a407651d86482baadc28a24f6928"
+  },
+  {
+    "published_path": "run3/pre-remove-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/pre-remove-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3dc2e01d0ee9a6982bfb28266ffdf210c28d9cdd70b0ce41838fd4c3fe640819"
+  },
+  {
+    "published_path": "run3/publish-domain-a-after-domain-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/publish-domain-a-after-domain-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3433fdfe32b5531fa4f4428818c5a99e22a9d3ee6350ce443db20f3f6d49725c"
+  },
+  {
+    "published_path": "run3/publish-domain-a-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/publish-domain-a-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "3e444f98c19f7080fb70599f291cea617802c84d093dbc80450198770747fc0e"
+  },
+  {
+    "published_path": "run3/publish-domain-a-gone-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/publish-domain-a-gone-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "a201dc25435487af95fc41f68a0554e3d25833ddad8166c29e45c0eaca8f97ae"
+  },
+  {
+    "published_path": "run3/publish-domain-a-hidden-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/publish-domain-a-hidden-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "58ef4732596e59cada8fee15c69fdc29f11aac07cfc42f5877d5f55311750dc5"
+  },
+  {
+    "published_path": "run3/publish-domain-a-keep-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/publish-domain-a-keep-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0725b80e3b04244a98d0d39380d09e33ce5e440381b49477a0b0ada10de19a2c"
+  },
+  {
+    "published_path": "run3/publish-domain-b-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/publish-domain-b-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "20f8b95195bb80dbc73df76c1758bda091c59d72d6d573e10eef927fed79c2d4"
+  },
+  {
+    "published_path": "run3/publish-domain-b-keep-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/publish-domain-b-keep-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "65729122b9fae5244f76c2fe1f795258b13ded8650e7f4326b7d3c26c48014a2"
+  },
+  {
+    "published_path": "run3/r2-added/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-added/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e1b79c2d37cc13dba3f77744d5eb3875759002f6c72286a1f30b171215856e5d"
+  },
+  {
+    "published_path": "run3/r2-added/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-added/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run3/r2-before/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-before/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e1b79c2d37cc13dba3f77744d5eb3875759002f6c72286a1f30b171215856e5d"
+  },
+  {
+    "published_path": "run3/r2-before/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-before/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run3/r2-deployed/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-deployed/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e1b79c2d37cc13dba3f77744d5eb3875759002f6c72286a1f30b171215856e5d"
+  },
+  {
+    "published_path": "run3/r2-deployed/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-deployed/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run3/r2-post-lifecycle/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-post-lifecycle/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e1b79c2d37cc13dba3f77744d5eb3875759002f6c72286a1f30b171215856e5d"
+  },
+  {
+    "published_path": "run3/r2-post-lifecycle/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-post-lifecycle/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run3/r2-remove-failure/keys.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-remove-failure/keys.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e1b79c2d37cc13dba3f77744d5eb3875759002f6c72286a1f30b171215856e5d"
+  },
+  {
+    "published_path": "run3/r2-remove-failure/unpublished-check.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/r2-remove-failure/unpublished-check.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f3af78872d8dec4e4d149912f7d28b990cfa88af8f63b984074da45e735a081a"
+  },
+  {
+    "published_path": "run3/remove-final-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-final-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "7376fe7f9b51b0983139905e86060d718b588cb2685446ae9035b79a17e1d11a"
+  },
+  {
+    "published_path": "run3/remove-final-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-final-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ab24e3a5573c8b567e9b60c53b8c6105a03c9fd44844f86ea93101fa15aa4897"
+  },
+  {
+    "published_path": "run3/remove-observed-custom-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-observed-custom-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b3e19a091cb8118f69c53d3e67350a053e3b33e0f5d536ec4e619046ee8efc34"
+  },
+  {
+    "published_path": "run3/remove-observed-dns-records.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-observed-dns-records.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "5f325c997147877af4caaf461189ce2827ede701a7aa5ccf785978dbe7483dfd"
+  },
+  {
+    "published_path": "run3/remove-paused-domain-a.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-paused-domain-a.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "8571a99793b876cdc6efaa7ed3e498960a5f60ab4bab61801cfda4a07d9a30a7"
+  },
+  {
+    "published_path": "run3/remove-paused-domain-b.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-paused-domain-b.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e373dc2617b1e5b8fec5d336d3fcf9bf0f4037be0d3986440a9557cfb13e8854"
+  },
+  {
+    "published_path": "run3/remove-paused-domain-idle.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-paused-domain-idle.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "d458aab3a0f181893799087e27892fc79557a25fff6590cf6b12900c58df6744"
+  },
+  {
+    "published_path": "run3/remove-paused-domains.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-paused-domains.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "9c9d7f550326243dfbffa037bd38927eec66d340413919b7fa895b3dc26fc7d7"
+  },
+  {
+    "published_path": "run3/remove-paused-service.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-paused-service.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "4649a6b2c1df28da1d6af0a9740fcab3ac6d081d35d134834300a0c85c2f2c79"
+  },
+  {
+    "published_path": "run3/remove.stderr",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove.stderr",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "f7e11913b8725e99d903dc8cf0aa5b8f11a6f974ee1e3d8214be2721bd60c8ec"
+  },
+  {
+    "published_path": "run3/result.md",
+    "local_source": "evidence/domain-acceptance-20261011-run3/result.md",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "285cae1093e0c7a76314ddfd3f6dfe52b3f60d51fef9cc1a27634a766179d4a1"
+  },
+  {
+    "published_path": "run3/run-state-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/run-state-summary.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "fd694cfdedf63a025b2744bc08831dda16dd726c583d5f04c186b3eba31a790e"
+  },
+  {
+    "published_path": "run3/show-b-restore-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/show-b-restore-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "b8c255bfd58b5e4adf9fc70e87e21d68b12252a85e7ba643e0b3fa30aef68596"
+  },
+  {
+    "published_path": "run3/show-b-restored-public-checks.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/show-b-restored-public-checks.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "cfc56b6f890a32a068b1af4c4e9283bd2f11e1d14395ca480495af8ee45a38da"
+  },
+  {
+    "published_path": "run3/show-b-unpublish-completed.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/show-b-unpublish-completed.json",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "e4cff38669604115adf6c61d40f8ff6cdbdcca2dff56b7d60f668d68b717ef30"
+  },
+  {
+    "published_path": "run3/source-commit.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run3/source-commit.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "0fc85b67fd0b9ec030ab0cfdb12931864107b1de81cd4a1a89aff7f6742e5866"
+  },
+  {
+    "published_path": "run3/source-status.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run3/source-status.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive",
+    "published_sha256": "ba051334ebc33f3162a4fd5be48615e03c8dac8ec7977e7c2752dbc1cf981841"
+  },
+  {
+    "published_path": "run3/typecheck.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run3/typecheck.txt",
+    "treatment": "selected sanitized evidence; not a complete raw archive; trailing blank line normalized",
+    "published_sha256": "5a960c70b41464f7cb9f08caed1ce12d4c3be356526f3f5d60329ec979322635"
+  },
+  {
+    "published_path": "run3/http/add-paused-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-paused-domain-a-feed.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "33e25f04e229bd8c1cd39f3595610baab3b974ce52d7183f69c3ec90270cf574"
+  },
+  {
+    "published_path": "run3/http/add-paused-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-paused-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run3/http/add-paused-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-paused-domain-a-feed.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "b2bc01b951bc71bb715c1ae50f48b4df98d6b6e38e0c0f5ad0345f8235232e21"
+  },
+  {
+    "published_path": "run3/http/add-paused-domain-b-audio-range.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-paused-domain-b-audio-range.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "3d1365e45b625406de73a264f9a38faf55f0d2eef68d76a7afc1185aeb09a470"
+  },
+  {
+    "published_path": "run3/http/add-paused-domain-b-audio-range.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-paused-domain-b-audio-range.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run3/http/add-paused-domain-b-audio-range.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/add-paused-domain-b-audio-range.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "b2bc01b951bc71bb715c1ae50f48b4df98d6b6e38e0c0f5ad0345f8235232e21"
+  },
+  {
+    "published_path": "run3/http/added-paused-domain-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-paused-domain-domain-a-feed.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "6113b944f5b211c857d467785f6960d93cf716d8ede023e3b7d1239f1505b1e2"
+  },
+  {
+    "published_path": "run3/http/added-paused-domain-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-paused-domain-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run3/http/added-paused-domain-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-paused-domain-domain-a-feed.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "b2bc01b951bc71bb715c1ae50f48b4df98d6b6e38e0c0f5ad0345f8235232e21"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-feed.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "eb98f776ce880eb671c5807f007b4908be696de78cf16409a457d94e83f18f2b"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-feed.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "ad642d6bbde92e894a7a864dce0a309a691b9b7d7ceea91b61ef54abbfa9d64f"
+  },
+  {
+    "published_path": "run3/http/added-worker-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-worker-domain-a-feed.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "16e576ef4e49148c3abcadebfd07d26a465fc9cfda60877eaf3666abd824d26a"
+  },
+  {
+    "published_path": "run3/http/added-worker-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-worker-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run3/http/added-worker-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-worker-domain-a-feed.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "ad642d6bbde92e894a7a864dce0a309a691b9b7d7ceea91b61ef54abbfa9d64f"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-audio-range.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-audio-range.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "f43664a88c96612160365ac28ddcf9f1714c99b371c7a38ec1b0b803e7da6f4b"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-audio-range.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-audio-range.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "5d5a4c108c8c7450f948d9e81796228b5d72d5e1d24389465c170ae0ea8608f1"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-audio-range.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-audio-range.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "856baea1a846b729f1adb3d4e60155a0e64ee6c69be4196ce735177b5a69745c"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-audio-304.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-audio-304.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "2682a7b4a11da4aa79cbfa6e3e26c678df66e3f089dd19802f7efe4ff94895da"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-audio-304.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-audio-304.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c81a329be1379ebdd494f4341ba5bb2bc61e61b8a3bdf4983e54197701cb3aa7"
+  },
+  {
+    "published_path": "run3/http/added-domain-domain-a-audio-304.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/added-domain-domain-a-audio-304.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "f982a58c990691bba128bd3f7c7470f25360b7733ed3769dc23850afad3cea1b"
+  },
+  {
+    "published_path": "run3/http/keep-unpublished-domain.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/keep-unpublished-domain.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "0eb4ad2ee41c46be087d062e4a07788d272456f67f5fde7fa202e854de07547f"
+  },
+  {
+    "published_path": "run3/http/keep-unpublished-domain.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/keep-unpublished-domain.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "f8bf41177a5f5e808a7ccb648b51080b031f15ca8018d91a576263d6cc626eb6"
+  },
+  {
+    "published_path": "run3/http/keep-unpublished-domain.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/keep-unpublished-domain.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "89f5d85b072c3bc07cc6c2850602d32b64ae1dd212bdbd82eee98c6906243d40"
+  },
+  {
+    "published_path": "run3/http/show-b-unpublished-domain-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/show-b-unpublished-domain-feed.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "9b27465960daa7347f0a1381efb1c406ec7e6c4319d468842cf7e33011d27bda"
+  },
+  {
+    "published_path": "run3/http/show-b-unpublished-domain-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/show-b-unpublished-domain-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "f8bf41177a5f5e808a7ccb648b51080b031f15ca8018d91a576263d6cc626eb6"
+  },
+  {
+    "published_path": "run3/http/show-b-unpublished-domain-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/show-b-unpublished-domain-feed.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "89f5d85b072c3bc07cc6c2850602d32b64ae1dd212bdbd82eee98c6906243d40"
+  },
+  {
+    "published_path": "run3/http/deployed-domain-domain-a-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/deployed-domain-domain-a-feed.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "a1da717c0a9c3f4b2a02021ab16e98258623920d689ba940351991cc799ad24f"
+  },
+  {
+    "published_path": "run3/http/deployed-domain-domain-a-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/deployed-domain-domain-a-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f"
+  },
+  {
+    "published_path": "run3/http/deployed-domain-domain-a-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/deployed-domain-domain-a-feed.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "b5be40cbbd0568982e643f10912eaa2712aa8ec9ba853900e0271cd81e6fadb9"
+  },
+  {
+    "published_path": "run3/http/remove-failed-paused-feed.headers",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-failed-paused-feed.headers",
+    "treatment": "allowlisted headers; reporting IDs omitted; whitespace normalized",
+    "published_sha256": "7d0b62bee8e5573a692b381eb5329d26b5b0a2f05fe77a6fc32e110bd98d2ac3"
+  },
+  {
+    "published_path": "run3/http/remove-failed-paused-feed.status",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-failed-paused-feed.status",
+    "treatment": "HTTP status only",
+    "published_sha256": "8c4bc799953a87a2fa8386f58264974bdcaf4677d5ec91fd202cc1f9ed0f38bd"
+  },
+  {
+    "published_path": "run3/http/remove-failed-paused-feed.body-summary.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/remove-failed-paused-feed.body",
+    "treatment": "body hash/length only; no metadata/media",
+    "published_sha256": "b2bc01b951bc71bb715c1ae50f48b4df98d6b6e38e0c0f5ad0345f8235232e21"
+  },
+  {
+    "published_path": "repro/paused-public.ts",
+    "local_source": "diagnostics/paused-public.ts",
+    "treatment": "imports adjusted for this repository",
+    "published_sha256": "ec5096aa3543b60f20f33f6b2f1c2afd29659f3470ce791029962cde5642c389"
+  },
+  {
+    "published_path": "run3/unit-tests-summary.txt",
+    "local_source": "evidence/domain-acceptance-20261011-run3/unit-tests.txt",
+    "treatment": "aggregate test counts only; original verbose output retained locally",
+    "published_sha256": "e94d7f0330ca7b443085002a11760ca4c0d3c219228f38bdb7498424e2f60529"
+  },
+  {
+    "published_path": "run3/paused-public-fixed-repro.json",
+    "local_source": "evidence/domain-acceptance-20261011-run3/paused-public-fixed-repro.json",
+    "treatment": "fake-only regression executed from published repository layout",
+    "published_sha256": "f2927d851d9d6b67977c8d506576d0d68a9905c28ad0cc464620822482c43788"
+  }
+]

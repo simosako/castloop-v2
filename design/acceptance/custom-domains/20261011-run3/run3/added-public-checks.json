@@ -1,0 +1,276 @@
+{
+  "result": "passed",
+  "canonical_base": "https://castloop-test.otftalk.com",
+  "requests": [
+    {
+      "request": "added-worker-domain-a-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-a-feed-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-a-feed-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-worker-domain-a-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-a-cover-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-a-cover-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-worker-domain-a-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-a-audio-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-a-audio-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-worker-domain-a-audio-range",
+      "expected_http": 206,
+      "actual_http": 206
+    },
+    {
+      "request": "added-worker-hidden-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-worker-gone-denied",
+      "expected_http": 410,
+      "actual_http": 410
+    },
+    {
+      "request": "added-domain-domain-a-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-a-feed-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-a-feed-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-domain-domain-a-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-a-cover-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-a-cover-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-domain-domain-a-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-a-audio-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-a-audio-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-domain-domain-a-audio-range",
+      "expected_http": 206,
+      "actual_http": 206
+    },
+    {
+      "request": "added-domain-hidden-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-domain-gone-denied",
+      "expected_http": 410,
+      "actual_http": 410
+    },
+    {
+      "request": "added-worker-domain-a-old-feed-etag",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-b-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-b-feed-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-b-feed-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-worker-domain-b-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-b-cover-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-b-cover-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-worker-domain-b-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-b-audio-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-domain-b-audio-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-worker-domain-b-audio-range",
+      "expected_http": 206,
+      "actual_http": 206
+    },
+    {
+      "request": "added-domain-domain-b-feed",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-b-feed-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-b-feed-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-domain-domain-b-cover",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-b-cover-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-b-cover-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-domain-domain-b-audio",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-b-audio-head",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-domain-domain-b-audio-304",
+      "expected_http": 304,
+      "actual_http": 304
+    },
+    {
+      "request": "added-domain-domain-b-audio-range",
+      "expected_http": 206,
+      "actual_http": 206
+    },
+    {
+      "request": "added-worker-domain-b-old-feed-etag",
+      "expected_http": 200,
+      "actual_http": 200
+    },
+    {
+      "request": "added-worker-idle-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-worker-system-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-worker-staging-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-worker-admin-no-key",
+      "expected_http": 401,
+      "actual_http": 401
+    },
+    {
+      "request": "added-domain-idle-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-domain-system-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-domain-staging-denied",
+      "expected_http": 404,
+      "actual_http": 404
+    },
+    {
+      "request": "added-domain-admin-no-key",
+      "expected_http": 401,
+      "actual_http": 401
+    }
+  ]
+}

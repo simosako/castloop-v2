@@ -1,0 +1,12 @@
+HTTP/1.1 200 Connection Established
+HTTP/2 200
+date: Sun, 11 Oct 2026 08:35:10 GMT
+content-type: application/rss+xml; charset=utf-8
+content-length: 2127
+cf-cache-status: HIT
+accept-ranges: bytes
+age: 4
+cache-control: public, max-age=0, must-revalidate
+etag: "326ab61225a43b7682852e97cdbb56ab"
+last-modified: Sun, 11 Oct 2026 08:30:13 GMT
+x-castloop-worker-version: 64017114-44a5-46aa-893d-bc0d7bb3f684

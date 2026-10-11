@@ -1,0 +1,366 @@
+独自ドメイン実機受け入れ試験：再開
+run3 DNS経路の結論（公開記録用追記）:
+  今回は通常PC resolverの反映待ち/キャッシュ等による名前解決差を、対象hostnameを
+  1.1.1.1で明示解決する試験プロセス限定CONNECT tunnelで回避できた。
+  Cloudflare公開DNSで既に解決でき、TLSも準備済みだったことを先に確認してから使用。
+  これによりOS/ルーターのDNS設定を変えず、最新CLIのdomain addを続行し第5〜7節を完了。
+  これは今回の観測結果であり、権威DNS反映やTLS準備の待機を常に省略できる保証ではない。
+  最終の未完了範囲はdomain removeの完了確認、resume後のworkers.dev復帰配信と最終停止。
+run3明示DNS経路での続行結果（最新）:
+  1.1.1.1で解決するlocal CONNECT tunnelでruntime probe nonce/service一致を確認。
+  同add operation IDの続行が成功（add-explicit-dns-result.json）。重複接続なし。
+  第5節: 共通確認、指定hostname/Worker/Zoneの1接続、canonical domain/管理workers URL、
+  初期Worker version不変、両host両Showのfeed/cover/audio503を確認しresume。
+  第6節: 両hostでfeed/cover/audio GET/HEAD200、Range206・先頭1024bytes一致、
+  Content-Length/Type一致、ETag304（feed/cover/audio）、旧feed ETagに対して200。
+  RSSは初回workers→domainのURL置換だけ、両host本文一致、GUID/pubDate/site_url維持。
+  hidden404/gone410、idle404、draft非露出、system/staging404、管理鍵なしadmin401。
+  current_revision/R2 keys+TOML一致。after-domain公開後のRSS canonical URLも確認。
+  keep unpublish/restore: 両host404→200、同GUID/revision/media維持。
+  domain-b Show unpublish/restore: feed/cover/audio両host404→200。
+  各変更後hidden/gone/draft不変を確認。全lifecycle完了条件確認。
+  第7節: domain保持deploy成功。
+    deploy operation ID=652997c0-de6a-45be-9b5f-63f14058916f。
+    deploy pause ID=d736a92e-64ad-4db9-96d1-352bf137f51a。
+    Worker version cab7bbf2-2637-4f42-b8d8-47ac4bc409d8
+      →64017114-44a5-46aa-893d-bc0d7bb3f684、runtime_readiness一致。
+    domains id/hostname/service/zone_idと両URL維持、共通確認後resume。
+    両host配信200、RSS canonical domain、media/revisions/R2一致を確認。
+  第8節: 共通確認後domain remove実行で新たなエラー。
+    remove operation ID=9dd5b0ac-ab4d-41ad-ad15-dfe785e4b21f。
+    remove pause ID=e69d8d23-baa2-49bf-9521-cb0d5cfcc829。
+    stderr: null is not an object (evaluating 'data.success')。
+    再送/強制解放/resumeはしない。状態照会ではconnection execution token/pending残存。
+    読み取りAPIではCustom Domain接続0、DNS record0。ただし不在だけでIO終了/CLI完了とは判定しない。
+    canonical workers.dev、設定/接続一致、local操作phase=configured、lockなし、url_change token保持。
+    serviceはpaused、invocations=[]、Worker versionはdeploy後と同じ。
+    停止中workers feed503、R2 metadata/revisionsはbefore一致（r2-remove-failure）。
+    workers.devへの再開後配信、最終新pause ID完了確認は未実施。
+  新エラーのsource: packages/cli/src/cloudflare-api.ts:77-82のjson()がresponse.json()の
+  dataをnull検査せずdata.successへアクセス、removeWorkerDomain(:301-309)がこれを使用。
+  実機DELETEの生応答/statusは未保存。null解析経路は示唆されるがAPI応答仕様の断定はしない。
+  全remoteリソース/3workspace/操作記録を保持。Custom Domain/DNS不在はAPI読み取りで観測済み。
+  ローカルproxyは自分で起動したPIDを確認してSIGTERM終了。active markerをdisabledへ移動。
+  OS/router/DNS設定は変更なし。接続header/body/TLSは復号/記録なし。
+  最新証跡: run-state-summary.json / remove.stderr / remove-final-{service,domains}.json /
+            remove-observed-{custom-domains,dns-records}.json / r2-remove-failure/。
+DNS経路の読み替え承認:
+  管理者より通常DNS経路の調査/対応を終了し、1.1.1.1を明示する試験続行を指示。
+  local CONNECT tunnelを127.0.0.1限定で起動し、対象hostnameだけを1.1.1.1:53で解決。
+  HTTPS_PROXYは試験shellプロセス限定。Cloudflare API/Workers管理hostはNO_PROXYで通常経路。
+  tunnelはTLSを終端せずバイト転送。CLI/curlのhostname検証・証明書検査を維持。
+  DNS/system/router設定、CLI source/binaryは変更しない。
+  通常resolverではなく明示1.1.1.1を使う環境での試験であることを結果に記録する。
+  実行補助: diagnostics/dns-tunnel.py。接続証跡: dns-proxy-connections.jsonl（header/bodyは記録しない）。
+DNS 1.1.1.1直接照会（2026-10-11 17:16 JST）:
+  管理者が別VPSで名前解決成功を確認し、同PCから1.1.1.1の比較照会を依頼。
+  diagnostics/dns-direct.pyで1.1.1.1:53へUDP/TCPのA/AAAAを直接照会。
+  全4照会がrcode=0、TTL=300、IPv4 104.21.19.82/172.67.185.171、
+  IPv6 2606:4700:3033::ac43:b9ab/2606:4700:3035::6815:1352を取得。
+  同時の通常resolvectl queryは依然Name not found。
+  CF公開DNSでの反映は確認済み。PC通常DNS経路のresolver/cache等の差が疑われる。
+  propagationタイミング/negative cacheの可能性はあるが、まだ原因は断定しない。
+  システムDNS設定/サービス状態の変更、domain add再試行は実行していない。
+  証跡: run3/dns-direct-1111.json / dns-local-recheck.txt。
+run3最新結果:
+  commit=20a92f49ec283f5edc3ec5af3e8d27725928bfe0。未コミットsource変更なし。
+  npm ci / npm run check / bun test / Linux binary build成功。933 pass / 0 fail。
+  バイナリSHA-256=c381f8adf09b7348ddd1e178e01b6d9967168b0e32f767c2d758d6b2af25fa5b。
+  bin/castloop-linux-x64-20a92f4に別名配置しビルド元とcmp一致。旧バイナリ保持。
+  Worker/Queue=castloop-domtest-1011-r3-67afcecc、DLQ=castloop-domtest-1011-r3-dlq-67afcecc。
+  bucket=castloop-domain-20261011-run3。
+  init operation/pause ID=f2498204-dd97-46e8-aa04-074b83c89a9b。
+  Worker version=cab7bbf2-2637-4f42-b8d8-47ac4bc409d8。
+  第1〜4節完了（Dashboardの目視/downloadはAPI GET代替と明記）。
+  全fixture公開/lifecycle完了条件、before音源hash/length、R2 snapshotを確認。
+  第5節add前pause ID=fe5b60f3-f21b-472a-a7a0-69445f251280。
+  共通確認成功。温めたキャッシュの両Show feed/cover/audio GETが503。
+  両Show音源HEAD/Rangeも503。Issue #6の修正版実機再確認はこの範囲で合格。
+  domain add operation ID=4f20fdfe-4cf6-4345-a051-f1dfe23a565b。
+  接続作成後、CLIがDomain DNS/TLS is not verifiedと拒否（paused維持）。
+  domain listに指定hostname/Worker/Zoneの1接続あり、local phase=feeds、lock_present=false。
+  通常curlの公開probeは名前解決エラー。15秒間隔20回の読み取りでも同じ。
+  CF API GETでproxied AAAA record作成済み、Cloudflare DoHでAレコード解決成功。
+  resolvectl queryおよび--cache=no queryはName not found（local DNS経路の問題が疑われる）。
+  curl --doh-url https://cloudflare-dns.com/dns-query の公開runtime probeはTLS検査有効のまま200。
+  nonce/service_id一致を確認（認証なし、-k/-Lなし）。これは通常DNS経路の合格扱いにしない。
+  DNS/TLS準備の証拠取得後、手順の待機例外に従い同operation IDで1回のみ続行を試みたが
+  CLIは同じDNS/TLS未検証で拒否。これ以上の自動再実行/強制解放/resumeを行わず停止。
+  最終状態paused、invocations=[]、url_change保持、接続1件、local操作phase=feeds、lockなし。
+  domain add成功扱いにはしない。第5節追加後比較、第6〜8節は未実施。
+  旧2環境は未変更。現在のCustom Domain/DNSは追加途中の復旧情報として保持。
+  課題はlocal DNS経路の名前解決。DNS/TLSエラーのreason_codeフィールドはCLI stderrにない。
+  全証跡: evidence/domain-acceptance-20261011-run3/。result.mdに項目別結果。
+修正版run3開始:
+  管理者よりIssue修正後の最新手順・最新バイナリでの再試験を指示。
+  Issue修正コメント: https://github.com/simosako/castloop-v2/issues/6#issuecomment-6106724656
+  feature/custom-domains最新commit: 20a92f49ec283f5edc3ec5af3e8d27725928bfe0。
+  手順更新日2026-10-11。Episode例がShow cwd形式へ修正済み。
+  build/castloop-v2-run3にdetached worktreeを作り、過去のsource/binary/workspaceを保持。
+  service=domtest-1011-r3、bucket=castloop-domain-20261011-run3。
+  workspace=workspaces/domain-20261011-run3、evidence=evidence/domain-acceptance-20261011-run3。
+  状態照会の読み取り継続許可を維持。変更要求の再送/未知IO強制解放は禁止。
+  Dashboard目視の代替は前回同様API GETで行い、報告に明記。
+公開保存完了:
+  管理者指示で証跡専用branchを作り、46ファイルの匿名化/選別コピーをcommit/push。
+  branch: test-evidence/custom-domains-20261011
+  commit: a584a3bd2ec02752cf6997c299695648b71eb928
+  repo内: design/acceptance/custom-domains/20261011/
+  README/logs/選別JSON/許可header/本文hash/repro/manifestを保存。
+  workspace/.castloop/素材/バイナリ/認証情報/metadata本文は保存しない。
+  account/Zone ID、email、ローカル絶対path、操作token等を公開コピーだけで除去。
+  環境tokenとローカル管理鍵の完全一致検査、credential pattern、email/path、JSON、hash検査合格。
+  新配置のrepro 2本の実行結果が既存証跡と一致。git diff --check合格。
+  Issue #6へ固定commitリンクのコメント追加:
+    https://github.com/simosako/castloop-v2/issues/6#issuecomment-6106626963
+  PRは作成しない。元build cloneは元branchのまま、公開作業はpublish/castloop-v2 worktreeで実施。
+  既存remoteサービス/試験workspace/原本は変更なし。
+  この公開完了記録はcommit後のローカル追記であり、公開ログsnapshotには含まれない。
+課題登録:
+  管理者依頼によりgh issue createで停止中公開配信の不具合を新Issueとして登録。
+  https://github.com/simosako/castloop-v2/issues/6
+  タイトル: [bug] service-pause後も公開feedが200を返す（公開gatewayがpausedを拒否しない）
+  commit/SHA、再現手順、期待/実測、原因箇所、ローカル再現、修正後確認案を記載。
+  実機確認範囲はfeed GETと明記。秘密情報/metadata本文は掲載しない。
+  Issue本文控え: evidence/domain-acceptance-20261011-run2/issue-paused-delivery.md。
+最新の続行結果: 第5節の停止中配信で不合格、domain add前に停止。
+  管理者承認に従い状態照会の失敗を保存し、読み取りだけ継続する方針で再開。
+  第3節完了: hidden公開→unpublish、gone公開→delete、domain-b/keep公開。
+  各publishはpublished/released、各lifecycleはcompleted/finished/released/execution_active=false/
+  purge_confirmed=trueを確認。draftはcreateのみ、domain-idleはcreate-showのみ。
+  第4節完了: before-service/target JSON、両ShowのRSS/cover/audioを取得。
+  音源hash/lengthはcurrent_revisionに一致。R2 metadata/revisions全TOMLとキー一覧をAPI GETで保存。
+  R2 Dashboard目視/手動downloadではなくAPIで取得したことを明記。未公開R2キーなしも確認。
+  第5節: pause ID=75c97a30-a20d-4fb1-9208-fde02a144b4dで停止。
+  共通確認（paused/今回ID/invocations=[]、3 Show unfinished=false、設定/接続一致、
+  local_operations=[]、url_changeなし）成功。
+  ところが add-paused-feed は期待503に対し200、cf-cache-status=HIT、age=73秒。
+  読み取り再照会でも200/HIT、nonce付URLも200/HIT。no-cache要求は未実行。
+  状態照会失敗の許容承認は公開HTTP不一致には適用しないため、第9節に従い停止。
+  domain addは未実行。add-operation-id.txtは生成しただけで未使用。
+  ローカル再現diagnostics/paused-public.tsでもpaused/invocations=[]のgatewayが200、cache呼出1。
+  原因箇所: m6-routes.ts:59-65のdeliveryMigrationはrequireCandidateReadinessを使い、
+  service-admission.ts:32-39のverifiedM6Snapshotはopen/pausedの両方を許可。
+  lifecycle-gateway/controlはShow/Episode visibilityを確認するがservice pausedを拒否しない。
+  このためcached responseをpaused中にも返す経路がある。キャッシュ待ちで解消する問題とは判断しない。
+  最新状態: paused、invocations=[]、domains=[]、設定/接続一致。旧環境は未変更。
+  証跡: add-paused-*.json / add-paused-feed.{status,headers,body} /
+        pause-recheck-feed.* / pause-nonce-feed.* / paused-public-local-repro.json /
+        paused-delivery-final-service.json / paused-delivery-final-domains.json。
+  全リソース/workspace/.castloopを保持。第5節残り、第6〜8節未実施。修正/deploy未実行。
+判断記録（管理者承認）:
+  状態照会の失敗を保存して読み取りを継続する扱いを許可。
+  原因を一律にsnapshot競合と断定せず、照会stderr/応答を保存。
+  公開/lifecycle要求の再送・lock削除・強制所有権解放は引き続き禁止。
+  成功応答が明示的な完了条件を満たした場合のみ次の変更へ進む。
+  failedや回数上限時は止める。上限は処理終了の証拠とみなさない。
+  状態照会は最大120回、3秒間隔。実行ツールtimeout=0。
+状態照会失敗の調査結果:
+  source調査とローカル再現のみ実施。remote変更、resume、公開要求再送なし。
+  src/publication-inspection.ts:16-39はShow controlとjob記録を読み、再読/HEADでetag/sizeを比較。
+  読み取り中に更新があれば Publication records changed during their read-only inspection で拒否。
+  src/publication-admin.ts:53-56がHTTP409/reason_code=publication_operation_blockedへ変換。
+  cli m6-admin-json.tsとremote-operation-status.tsが詳細を包括catchし、一般的な応答検証エラーにする。
+  diagnostics/status-read-race.tsで、ローカルfake R2の読み取り中更新を決定的に再現。
+  安定前後はstatus成功、競合時はHTTP409→今回と完全に同じCLIメッセージを再現。
+  Cloudflareへのリクエスト0、既存ソース変更0。対象既存テストも1 pass / 0 fail。
+  実機失敗直前はprocessing/validating、後続はprocessing/purgeまたはpublishedであり競合仮説と整合。
+  ただし実機失敗時の生HTTP応答を保存していないため、実機原因の確定ではなく最有力仮説。
+  同じ包括エラーは通信/認証/別の検証失敗でも起こり得る。そこまでを除外したとは主張しない。
+  証跡: diagnosis-status-read-race.json / diagnosis-status-read-race.stderr /
+        diagnosis-concurrent-status-test.txt / diagnostics/status-read-race.ts。
+  今後の案: 変更要求の再送は禁止のまま、読み取り失敗は保存後に照会を継続し、
+  published+released等の完了条件が取れた場合だけ次へ進む。実機で再発する場合はHTTP statusと
+  allowlist reason_codeのみを診断経路で保存（token/header/metadataを報告に含めない）。
+  第9節の厳格停止ルールの読み替えになるため、試験続行は管理者判断待ち。
+run2結果（最新）:
+  旧環境は変更せず保持。新環境initは成功、第2節paused/empty invocations/version一致を確認後resume。
+  Worker/Queue: castloop-domtest-1011-r2-a42a0a3e
+  DLQ: castloop-domtest-1011-r2-dlq-a42a0a3e
+  bucket: castloop-domain-20261011-run2
+  init operation/pause ID: c57962d8-70b4-4495-87c1-5cf503f2d1b8
+  Worker version: 29af13fd-8487-48da-abb0-15ec7c280745
+  domain-a Show公開要求は成功したがjob-statusで応答検証エラーが2回発生。
+  公開要求は再送せず、診断用照会でpublished/released/finished/purge_confirmedを確認。
+  続いてdomain-aのkeep/hidden/gone/draftをローカル作成、domain-b/domain-idleをShow作成。
+  domain-a/keep metadata/audio staging、publishは成功。
+  job-status待ちで同じ Operation status could not be verified エラーが再発。
+  実行ツールtimeout=0（無制限）であり、前回の300秒中断とは別問題。
+  CLIは原因を包括catchして一般メッセージへ変換するため、HTTP status/reason_codeは不明。
+  一部照会ではprocessing/purge/ownership held/execution_active=trueを確認。
+  第9節に従い停止。後続の公開/非公開化/独自ドメイン操作は実行しない。
+  pause ID=124b4afd-f16a-4ad2-a681-21fb138024f0 で停止。
+  最終読み取りでkeep published/released/finished/purge_confirmed=true、lock_present=false。
+  serviceはpaused、invocations=[]。consumerのtokenは自然に解放、強制解放は未実行。
+  hidden/gone/draftはローカル作成のみ、domain-b/domain-idleはShow作成のみ。
+  第3節未完了、第4〜8節未実施。Custom Domain/DNS変更なし。
+  全証跡: evidence/domain-acceptance-20261011-run2/。result.mdへ項目別記録。
+  状態照会の一時失敗を許容して続行してよいか、またはCLIの原因診断が必要か要判断。
+新規環境run2の実施承認:
+  既存workspace/domain-20261010-685cd81cとremoteリソース/所有権は変更せず保持。
+  run2: service=domtest-1011-r2、bucket=castloop-domain-20261011-run2。
+  workspace=workspaces/domain-20261011-run2、evidence=evidence/domain-acceptance-20261011-run2。
+  同じcommit/バイナリ/承認素材/専用hostnameを使用。各変更操作は別呼び出しで結果保存。
+  時間制限なしで実行し、中断後は状態照会から判断。未知要求の再送なし。
+読み取り専用の復旧可否確認（2026-10-11 10:50 JST）:
+  管理者指示「まず1」に従いservice-status/domain list/job-status/target-show/target-episodeのみ実行。
+  gone job e4d22094-70ab-45fa-a19c-b58b4b183549 は前回から変化なし。
+  client phase=commit_requested、lock_present=true、ownership=held。
+  status/progress=null、execution_active=false、marker_present=false、authorizes_recovery=false。
+  ローカルlockファイルも存在（空ファイル、プロセスID情報なし）。
+  execution_active=falseは未知の管理IOの終了を証明しないため、強制unlock/retryしない。
+  Show unfinished_show_operation=true。既存サービスでの継続を安全と判断できない。
+  serviceはpaused、invocations=[]、pause ID=f9d098ff-70a6-44b0-aa03-7a36c178ed60。
+  domains=[]、configuration/connections一致。既存の停止状態・所有権・記録を維持。
+  証跡prefix: evidence/domain-acceptance-20261011-685cd81c/recovery-readonly-20261011T105049
+    -service.json / -domains.json / -gone-job.json / -show.json / -episode.json。
+  新規サービス作成、resume、要求再送、lock削除、remote変更は実行していない。
+最新の続行結果（過去の停止状態を更新）:
+  管理者承認に従いCLI実仕様のEpisodeコマンドで続行。
+  保存済みpause IDでresume後、domain-a/keepとhiddenの作成・staging・公開完了を確認。
+  domain-a/draftはcreate-episodeのみ。domain-b/domain-idleはcreate-showのみ。
+  hidden公開済みtargetをfixture-hidden-published.jsonへ保存（まだunpublishしていない）。
+  goneのmetadata/audio stagingは成功したが、公開コマンド実行中に実行ツールの
+  300秒制限（複数操作をまとめたshell全体の制限）で中断。これは実行側の時間設定ミス。
+  publish-domain-a-gone.jsonは空。要求の再送は行っていない。
+  gone job ID: e4d22094-70ab-45fa-a19c-b58b4b183549。
+  読み取り状態: client phase=commit_requested、lock_present=true、ownership=held、
+  marker_present=false、status/progress=null、authorizes_recovery=false。
+  Showのunfinished_show_operation=true。時間経過やmarker不在を終了根拠にしない。
+  第9節に従って停止。未知のIO/残留lockの自動retry・強制解放は未実施。
+  新規pause ID f9d098ff-70a6-44b0-aa03-7a36c178ed60 で公開配信/変更受付を停止。
+  最終service状態はpaused、invocations=[]。公開処理の所有権とworkspaceを保持。
+  証跡: timeout-final-service.json / timeout-final-domains.json /
+        timeout-final-gone-job-status.json / timeout-domain-a.json / timeout-pause-result.json。
+  第3節のfixture作成は未完了。第4〜8節未実施、Custom Domain/DNS変更なし。
+  復旧は別途、残留lockと未知IOの扱いを確認してから判断する。
+管理者承認: 手順書のEpisodeコマンド形式のミスを記録したうえで、CLI実仕様に合わせて続行する。
+Episode作成/更新/公開はShowディレクトリ内からShow IDを省略して実行する。他の確認条件は維持。
+管理者がAPI tokenへ権限を追加したため、読み取り専用の事前確認から再開。
+対象commit、バイナリ、素材、hostname、service/bucket名は前回と同じ。
+前回の /tmp/opencode 証跡は現時点で存在しない。前回結果はtest-20261010.logを参照。
+今回の証跡は evidence/domain-acceptance-20261011-685cd81c に保存する。
+Dashboard目視の代わりに読み取りAPIで確認することを明記する。
+認証情報は表示・保存しない。失敗時は手順第9節に従って停止する。
+
+再確認結果:
+  otftalk.comのZone取得は成功。同account、active/full、paused=falseを確認。
+  DNS records照会は再び HTTP 403 / Cloudflare error code 10000。
+  現在この実行環境のCLOUDFLARE_API_TOKENではDNS読み取り不可。
+  使用中tokenと変更したtokenが同一か、Zone DNS Readと対象Zone指定を要確認。
+  tokenを新規発行した場合は実行環境へ新しい値の反映が必要。
+  第1節で停止。init/domain add/deploy/removeは未実行、remote変更なし。
+  hostname空きおよび後続API権限は未確認。WORKSPACEは未作成。
+  証跡: preflight-zone.json / preflight-failure.json / preflight-output.txt / result.md。
+
+API token更新後の再確認:
+  preflight.pyの全読み取り検査が成功。
+  Zone取得、DNS records、Custom Domains、Worker Routes、workers.dev subdomain、
+  R2 buckets、Worker scripts、Queuesの一覧取得がすべて成功。
+  otftalk.comは同accountのactive/full Zone。hostnameは競合なし。
+  workers.dev subdomain=simosako、予定service/bucket名は未使用。
+  書き込み権限は読み取り成功のみでは証明できないため、管理操作時に検証する。
+  今回の依頼は権限確認のため、init等の変更操作は実行していない。
+  証跡: preflight.json / preflight-after-token-update-output.txt。
+
+この試験のためのAPI token権限設定変更（管理者がDashboardで実施）:
+  種別: Account API Token。既存のcastloop-v2-devを編集（token値は記録しない）。
+  独自ドメイン有無でtokenを分けず、同じtokenへ必要なZone権限を追加。
+  最終的に保存成功した構成（管理者提示の画面と更新完了報告に基づく）:
+    ポリシー1:
+      対象: 「すべてのドメイン」から「アカウント全体」へ変更。
+      権限: Workers Admin / Workers R2 Storage Write / Account Settings Read。
+    ポリシー2:
+      対象: 指定ドメイン otftalk.com。
+      権限: DNS Read / Zone Read / Workers Routes Write。
+      DNS Read / Zone Readを追加し、既存Workers Routes Writeをこちらへ移動。
+  経緯:
+    DNS Read / Zone Readを追加しても、ポリシー1が「すべてのドメイン」の間は
+    Failed common permission check against resources. (Permission group: "Workers Admin")
+    が出て更新できなかった。
+    ポリシー1を「アカウント全体」に変更するとエラーなく更新できた。
+    管理者はSuper Administrator。Account token編集不可が原因ではなかった。
+  注意:
+    「アカウント全体」は選択した権限の対象範囲であり、未選択の全権限を付与する指定ではない。
+    更新後、DNSを含む全事前読み取り検査が成功。書き込み権限の実機検証は未実施。
+    API token値、Global API Key、その他の秘密情報は記録していない。
+
+実機試験再開:
+  init初回はInvalid service IDでローカル入力検証時に拒否。
+  domtest-1010-685cd81cは21文字。前回の19文字という記録は誤り。
+  index.tsのinitでvalidateIdがremote操作/設定書き込み前に実行されることを確認。
+  workspaceは空ディレクトリのみ作成。remote IOは発生していない。
+  service IDをdomtest-685cd81c（15文字）へ修正し、未使用確認後に実行する。
+  初回証跡: init-result.json / init-stderr.txt。unknown IOの再実行ではない。
+
+第2節: 合格。
+  修正後service ID: domtest-685cd81c。
+  Worker: castloop-domtest-685cd81c-7ce82b9c。
+  bucket: castloop-domain-20261010-685cd81c。
+  workers.dev: https://castloop-domtest-685cd81c-7ce82b9c.simosako.workers.dev
+  init operation/pause ID: fac53423-624e-449b-b0d3-dd727b6dadde。
+  Worker version: 3655e932-7198-495c-84cc-9a33eb807d0e。
+  paused/invocations=[]/runtime_readinessとversionの一致を確認し、同pause IDでresume。
+  証跡: init-corrected-result.json / initialized-service.json / initialized-domains.json / init-resume.json。
+
+第3節: Show domain-a公開完了後、手順とCLIの引数不一致で停止。
+  domain-a/show.tomlを試験用title/description/author/ownerへ編集、承認JPEGを配置。
+  update-show / publish-show成功。
+  Show publication job: 10b6aa3c-f18f-4f8f-b50e-a929a327a5dc。
+  サーバー再起動により状態照会中に中断。公開要求を再送せず、同jobの照会で再開。
+  server_status.status.state=published、ownership=releasedを確認。
+  証跡: publish-domain-a-after-restart-completed.json。
+  手順の create-episode domain-a keep は Invalid command arguments; use --help で拒否。
+  CLI helpとindex.ts 144-152行では、Showディレクトリ内からcreate-episode keepが正しい。
+  この引数エラーはrunM6Command前に発生。Episodeは未作成、domain addも未実施。
+  第9節に従い停止。手順書の訂正なしに残りの操作へ進めていない。
+
+停止状態の保存:
+  unfinished_show_operation=false、invocations=[]を確認してservice-pause実施。
+  停止pause ID: 930d4f47-04e6-45fa-bcea-8b01d5ab4cb5。
+  証跡: failure-pause-result.json / failure-service.json / failure-domains.json。
+  停止済みサービスへ別pause IDで追加のservice-pauseを誤って実行し、
+  Service administration response was not verified; inspect retained ownership/progress without automatic retry
+  で拒否された。自動再試行・強制解放・resumeは行っていない。
+  その後GETのみで最終状態を再確認:
+    paused、invocations=[]、domain-aのunfinished_show_operation=false。
+    domains=[]、configuration_matches=connections_match=true、local_operations=[]、url_changeなし。
+  最終証跡: final-observed-service.json / final-observed-domains.json / final-observed-domain-a.json。
+  Worker/bucket/Queue/DLQ、workspace/.castloop、全操作記録を保持。
+  第4〜8節は未実施。Custom Domain/DNSの登録・削除は未実行。
+
+第2節: 合格。
+  修正後service IDで未使用確認をやり直し、init成功。
+  service ID: domtest-685cd81c
+  Worker/Queue: castloop-domtest-685cd81c-7ce82b9c
+  bucket: castloop-domain-20261010-685cd81c
+  workers.dev: https://castloop-domtest-685cd81c-7ce82b9c.simosako.workers.dev
+  init operation/pause ID: fac53423-624e-449b-b0d3-dd727b6dadde
+  Worker version: 3655e932-7198-495c-84cc-9a33eb807d0e
+  paused、invocations=[]、runtime_readiness/version一致を確認してservice-resume。
+  証跡: init-corrected-result.json / initialized-service.json / initialized-domains.json / init-resume.json。
+
+第3節: 手順とCLIの不一致で停止。
+  domain-a Show作成、承認済みcover.jpg配置、show.tomlの試験用表題/説明/著者を編集。
+  update-show / publish-showが成功。job ID: 10b6aa3c-f18f-4f8f-b50e-a929a327a5dc。
+  状態照会中にOpenCodeサーバー再起動。要求は再送せず、既存job IDを照会して継続。
+  server_status.status.state=published、ownership=released、purge_confirmed=trueを確認。
+  手順の create-episode domain-a keep をworkspace rootで実行すると
+  Invalid command arguments; use --help で拒否された（ローカル引数検査）。
+  実際のhelpは create-episode ID をShowディレクトリで実行する仕様。
+  index.ts:144-152はcwdのShow IDを引数に追加するため、手順の指定では引数が1つ過剰。
+  Episode作成は未実行。第4〜8節も未実施、Custom Domain/DNS変更なし。
+  他のEpisodeコマンドの例にも同じcwd/引数形式の不一致が見込まれる。
+  第9節に従い停止。invocations=[]、domain-a未完了操作なしを確認して新規pause IDで停止。
+  最終pause ID: 930d4f47-04e6-45fa-bcea-8b01d5ab4cb5
+  最終状態: paused、invocations=[]、domains=[]。workspace/.castloopとremoteリソースを保持。
+  証跡: publish-domain-a-after-restart-completed.json / create-episode-help.txt /
+        failure-service.json / failure-domains.json / failure-domain-a.json / failure-pause-result.json。
+  create-domain-a-keep.jsonは引数拒否のため空。stderr内容は本ログに記録。
+  停止済みサービスに別pause IDの追加停止要求を出したところ
+  Service administration response was not verified; inspect retained ownership/progress without automatic retry
+  と拒否。自動再試行・強制解放・resumeはせず、読み取りで最終状態を再確認。
+  追加要求IDはdocumentation-blocker-pause-id.txt、結果ファイルは空。
+  最終照会でpaused、invocations=[]、configuration/connections一致、local_operations=[]、
+  url_changeなし、domains=[]、未完了Show操作なしを確認。
+  証跡: final-observed-service.json / final-observed-domains.json / final-observed-domain-a.json。
