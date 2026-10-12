@@ -7,6 +7,7 @@ import type { LifecycleControlEnv } from "./lifecycle-control";
 import { M6ManagementServiceMismatch, withM6ManagementInvocation, withM6ManagementRead } from "./m6-management";
 import { claimPublicationOperation, commitOwnedPublication, requireOwnedPublication } from "./publication-admission";
 import { inspectPublication } from "./publication-inspection";
+import { ManagementReadConflict } from "./management-read-conflict";
 import { requeuePublicationOperation } from "./publication-consumer";
 
 export type PublicationAdminEnv = LifecycleControlEnv & { CASTLOOP_ADMIN_KEY: string;
@@ -51,6 +52,10 @@ export async function handleM6PublicationAdmin(request: Request, env: Publicatio
       });
     return reply(result);
   } catch (error) {
+    if (input.action === "status" && error instanceof ManagementReadConflict) {
+      return reply({ error: "Publication status changed during inspection", reason_code: "publication_status_changed",
+        service_id: input.service_id }, 409);
+    }
     if (error instanceof M6ManagementServiceMismatch) return reply({ error: "Service ID mismatch", reason_code: "publication_input_invalid" }, 400);
     console.error(JSON.stringify({ event: "publication_operation_blocked", reason_code: "publication_operation_blocked" }));
     return reply({ error: "Publication operation blocked; inspect retained ownership and progress", reason_code: "publication_operation_blocked" }, 409);

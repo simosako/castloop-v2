@@ -17,7 +17,7 @@
 castloop import-rss my-show https://old-host.example/feed.xml --dry-run
 ```
 
-空のディレクトリへ素材とTOMLを保存する。Cloudflare認証やサービスworkspaceは不要。
+空のディレクトリへ素材とTOMLを保存する。親ディレクトリは事前に作成しておく。Cloudflare認証やサービスworkspaceは不要。
 
 ```sh
 castloop import-rss my-show https://old-host.example/feed.xml --output /path/to/import
@@ -61,7 +61,9 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 
 ### 停止した場合
 
+- 読み取り中に公開記録やサービス状態が変わった場合（`publication_status_changed`）だけ、既知jobの状態を再照会する。最大120回、待機開始から2分経過後は照会を追加しない。`published`／`released`の検証までは次の公開へ進まない。この識別には修正済みCLIとWorkerの両方が必要。
 - 公開receiptを保存済みのjobで状態照会に失敗した、または公開待機が終わらない場合は、同じコマンドでそのjobの確認から続けられる。完了済みの公開を再送しない。
+- 照会エラーの`reason_code`は、通信失敗（`management_transport_failed`）、HTTP拒否（`management_http_rejected`）、応答形式不正（`management_response_invalid`）、公開schema／identity不一致（`management_identity_invalid`）、ローカル記録変化（`local_record_changed`）等を区別する。これらは自動再照会せず停止する。調査にはコードを保存し、秘密を含む原本や応答を公開しない。
 - 変更コマンドの応答が不明な場合は再送を拒否する。サービスの`.castloop/`にある登録・staging・publicationの既存journalを保持し、`local-operation-status`／`operation-status`で調べる。lockやownerを削除しない。
 - 公開進捗は`.castloop/rss-imports/<serviceId>/<importId>.json`に保存する。開始後に取り込み入力や公開URL・サービスを変更したら続行しない。
 - `.castloop/`の記録削除、新しいjobによる置換、`init`の再実行は復旧方法ではない。未知の変更要求からの万能な自動復旧は提供しない。

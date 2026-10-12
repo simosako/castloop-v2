@@ -194,3 +194,18 @@ M7開発ブランチ`feat/m7-rss-import`で以下を接続した。公開済みv
 - `npm run check`、`npm run build:cli -- linux-x64`: 成功。
 - 単一バイナリで両コマンドのhelpと非HTTP URL拒否を確認。
 - Cloudflare資源・設定・配信内容の変更は行っていない。残る受け入れは、利用対象を確認した試験サービスと公開元RSSを使う単一バイナリでの実機移行。GUID・日時・説明・MP3 hash・新RSS URLを照合する。
+
+### Issue #10: 公開中の状態照会による停止
+
+[Issue #10](https://github.com/simosako/castloop-v2/issues/10)と証跡ブランチ`test-evidence/rss-import-20261012-run1`（固定commit `308090e4c4b48ceed2de0687114fea8bfe77ef41`）を確認した。36件のローカル取得は成功したが、Show公開後と最初のEpisode公開後に一般的な状態検証エラーで停止した。失敗時のHTTP応答は残っておらず、実機での原因は断定できない。
+
+コードでは、publication記録またはservice snapshotの読み取り前後の変化を、他の検証失敗と同じエラーへ変換し、逐次公開を即停止していた。この経路を自動テストで再現し、次のように修正した。
+
+- Workerは読み取り中の変化だけをHTTP 409／`publication_status_changed`として返す。schema・manifest・所有者不一致や変更操作の失敗はこのコードにしない。
+- CLIはstatus要求・応答形式・service IDを確認し、ローカルjournal／lockが変わっていない場合だけこの区別を保持する。
+- 一括公開はその場合だけ同じjobを再照会する。最大120回、待機開始から2分経過後は新たな照会を始めないという既存上限を保ち、検証済み`published`／`released`まで進まない。上限後もwaiting cursorを保持する。
+- その他の失敗は秘密を含まないallowlistの診断コードで停止する。変更要求の再送、jobの再投入、owner／token／lockの解放は追加しない。
+
+既存試験workspaceを新規initし直す必要はない。修正済みCLIをビルドし、通常のpause／drain／deploy／検証／resumeでWorkerも更新する。その後、元の取り込み先と保持したwaiting cursorで`publish-rss-import`を続行する。処理中・不明なownerが残る場合はdeployせず、既存の状態照会で確認する。実機の全36件完了は引き続き未検証。
+
+修正後の検証: `bun test`は962 pass／0 fail、`npm run check`とLinux単一バイナリbuildは成功。Show／Episodeの読み取り競合からの続行、継続的競合の上限停止、通信・応答・identity異常の診断、ローカルlock変化での停止、変更要求への競合コード誤適用拒否を確認した。Cloudflare環境への変更は行っていない。

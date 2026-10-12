@@ -4,6 +4,7 @@ import { runM6Command } from "./m6-commands";
 import { readLocalLifecycleJob } from "./lifecycle-journal";
 import type { M6LifecyclePlan } from "./m6-local-lifecycle";
 import { readLocalPublicationJob } from "./publication-journal";
+import { RemoteOperationStatusError } from "./remote-operation-status";
 import { importRssLocally } from "./rss-import-local";
 import { publishRssImport } from "./rss-import-publication";
 import type { RssPublicationEffects } from "./rss-import-publication";
@@ -51,10 +52,29 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
   }, { preconnect: globalThis.fetch.preconnect }));
   const commands: string[] = [];
   let loseStatus = true;
+  let continuousConflict = false;
+  const conflictedJobs = new Set<string>();
+  let waits = 0;
+  const originalHead = setup.bucket.head.bind(setup.bucket);
+  let changedKey: string | undefined;
+  setup.bucket.head = (async (key: string) => {
+    if (key === changedKey) {
+      changedKey = undefined;
+      await setup.bucket.put(key, setup.text(key));
+    }
+    return originalHead(key);
+  }) as typeof setup.bucket.head;
   const effects: RssPublicationEffects = {
     async command(command, args) {
       commands.push(command);
       if (command === "operation-status" && loseStatus) { loseStatus = false; throw new Error("Read-only status unavailable"); }
+      if (command === "operation-status") {
+        if (continuousConflict) throw new RemoteOperationStatusError("publication_status_changed");
+        if (!conflictedJobs.has(args[1]!)) {
+          conflictedJobs.add(args[1]!);
+          changedKey = `system/jobs/${args[1]}/status.toml`;
+        }
+      }
       const result = await runM6Command(root, setup.config, command, args, { workerSource: async () => "unused" });
       if (command.startsWith("publish-")) {
         const job = readLocalPublicationJob(root, setup.config, (result as { job_id: string }).job_id).client_state!;
@@ -63,7 +83,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
           env as never, cachedAssets);
       }
       return result;
-    }, async readFeed() { return setup.text("public/podcasts/imported/feed.xml"); }, async wait() {}, report() {},
+    }, async readFeed() { return setup.text("public/podcasts/imported/feed.xml"); }, async wait() { waits++; }, report() {},
   };
   try {
     await expect(publishRssImport(root, setup.config, output, { ...effects, async command(command, args) {
@@ -76,11 +96,19 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
     await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("status unavailable");
     expect(commands.filter((command) => command === "create-show")).toHaveLength(1);
     expect(commands.filter((command) => command === "create-episode")).toHaveLength(0);
+    continuousConflict = true;
+    await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("still pending");
+    expect(waits).toBe(120);
+    expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
+    expect(commands.filter((command) => command === "create-episode")).toHaveLength(0);
+    continuousConflict = false;
     const completed = await publishRssImport(root, setup.config, output, effects);
     expect(completed).toMatchObject({ result: "rss-import-published", episode_count: 2, subscriber_migration_completed: false });
     expect(commands.filter((command) => command === "create-show")).toHaveLength(1);
     expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
     expect(commands.filter((command) => command === "publish-episode")).toHaveLength(2);
+    expect(conflictedJobs.size).toBe(3);
+    expect(waits).toBe(123);
     const report = JSON.parse(readFileSync(join(output, "import.json"), "utf8"));
     for (const episode of report.episodes) {
       const revision = parseEpisodeRevision(setup.text(`public/episodes/imported/${episode.metadata.episode_id}/metadata.toml`));

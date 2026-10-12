@@ -441,7 +441,7 @@ test("status rejects foreign/secret/oversized or concurrently changed operationa
     if (name === key) await setup.bucket.put(key, original);
     return head(name);
   };
-  await expect(setup.client.status(setup.frozen)).rejects.toThrow("response was not verified");
+  await expect(setup.client.status(setup.frozen)).rejects.toThrow("reason_code=publication_status_changed");
 });
 
 test("shared status rejects a published record without durable purge completion or false authorization", async () => {

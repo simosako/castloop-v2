@@ -3,6 +3,7 @@ import { episodeCommitSchema, parseControlRequest, parseJobStatus, parseLifecycl
 import type { PublicationAdminResponse, PublicationRequest } from "../packages/shared/src/index";
 import { controlRequestHash, readShowControl } from "./lifecycle-control";
 import type { LifecycleReadEnv } from "./lifecycle-control";
+import { ManagementReadConflict } from "./management-read-conflict";
 
 export async function inspectPublication(env: LifecycleReadEnv, serviceId: string, input: PublicationRequest):
   Promise<Extract<PublicationAdminResponse, { result: "status" }>> {
@@ -36,7 +37,7 @@ export async function inspectPublication(env: LifecycleReadEnv, serviceId: strin
   const current = await Promise.all(keys.map((key) => env.CASTLOOP_BUCKET.head(key)));
   if (!after || before.etag !== after.etag || JSON.stringify(before.value) !== JSON.stringify(after.value) ||
     records.some((object, index) => object?.etag !== current[index]?.etag || object?.size !== current[index]?.size)) {
-    throw new Error("Publication records changed during their read-only inspection");
+    throw new ManagementReadConflict();
   }
   const control = after.value;
   const held = control.generation === generation && control.owner?.job_id === request.job_id;

@@ -1,7 +1,7 @@
 import { publicationAdminRequestSchema, publicationAdminResponseSchema, publicationCommitKey, publicationManifestHash,
   publicationOperationSchema, publicationRequestSchema } from "@castloop/shared";
 import type { PublicationAdminResponse, PublicationOperationIdentity, PublicationRequest, ServiceConfig } from "@castloop/shared";
-import { M6AdminJsonClient } from "./m6-admin-json";
+import { M6AdminJsonClient, M6AdminVerificationError } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
 import { createHash } from "node:crypto";
 
@@ -38,7 +38,8 @@ export class PublicationAdminClient {
       }
       return value;
     } catch {
-      throw new Error("Publication response was not verified; inspect retained ownership/progress without automatic retry");
+      throw new M6AdminVerificationError("Publication response was not verified; inspect retained ownership/progress without automatic retry",
+        "management_identity_invalid");
     }
   }
 

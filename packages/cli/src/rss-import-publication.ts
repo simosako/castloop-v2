@@ -6,6 +6,7 @@ import { localJournalEntryExists as present, syncLocalJournalDirectory } from ".
 import { createLocalJournalStorage, writeSyncedLocalFile } from "./local-journal-storage";
 import { readLocalMetadata } from "./local-metadata-read";
 import { M6_COMMAND_ARGUMENTS, runM6Command } from "./m6-commands";
+import { RemoteOperationStatusError } from "./remote-operation-status";
 import { receiveRssAsset } from "./rss-import-download";
 import { parseRssImportFeed } from "./rss-import-feed";
 import { hashRssImportFile } from "./rss-import-local";
@@ -121,7 +122,14 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
     const waitForJob = async () => {
       const deadline = Date.now() + 120000;
       for (let attempt = 0; attempt < 120 && Date.now() < deadline; attempt++) {
-        const result = await effects.command("operation-status", ["publication", state.waiting_job_id!]) as { server_status?: unknown };
+        let result: { server_status?: unknown };
+        try {
+          result = await effects.command("operation-status", ["publication", state.waiting_job_id!]) as { server_status?: unknown };
+        } catch (error) {
+          if (!(error instanceof RemoteOperationStatusError) || error.reasonCode !== "publication_status_changed") throw error;
+          await effects.wait();
+          continue;
+        }
         const server = publicationAdminResponseSchema.parse(result.server_status);
         if (server.result !== "status") throw new Error("Publication returned an unexpected status receipt");
         if (server.status?.state === "published" && server.ownership === "released") {

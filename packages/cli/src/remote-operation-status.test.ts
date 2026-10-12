@@ -3,7 +3,8 @@ import { lifecycleAdminRequestSchema, stringifyToml } from "@castloop/shared";
 import { createLifecycleJournal } from "./lifecycle-journal";
 import type { M6AdminTransport } from "./m6-admin-json";
 import { createPublicationJournal } from "./publication-journal";
-import { readRemoteOperationStatus } from "./remote-operation-status";
+import { PublicationAdminClient } from "./publication-client";
+import { readRemoteOperationStatus, RemoteOperationStatusError } from "./remote-operation-status";
 import { createShowRegistrationJournal } from "./show-registration-journal";
 import { createStagingJournal } from "./staging-journal";
 import { fetchM6Candidate, fetchM6ManagementIntegration } from "../../../src/m6-routes";
@@ -54,6 +55,47 @@ function snapshot(root: string): Array<{ path: string; bytes: Buffer; mtime: num
 }
 
 describe("read-only M6 operation-status", () => {
+  test("status conflicts and failures have allowlisted diagnostics without retries, secret errors or local changes", async () => {
+    const setup = await fixture();
+    try {
+      const before = snapshot(setup.root);
+      const conflict = { error: "Publication status changed during inspection", reason_code: "publication_status_changed",
+        service_id: setup.config.service_id };
+      const cases = [
+        { code: "publication_status_changed", response: () => Response.json(conflict, { status: 409, headers: { "Cache-Control": "no-store" } }) },
+        { code: "management_http_rejected", response: () => Response.json({ ...conflict, service_id: "foreign" }, { status: 409, headers: { "Cache-Control": "no-store" } }) },
+        { code: "management_http_rejected", response: () => Response.json({ ...conflict, secret: "private-secret" }, { status: 409, headers: { "Cache-Control": "no-store" } }) },
+        { code: "management_response_invalid", response: () => Response.json(conflict, { status: 409 }) },
+        { code: "management_response_invalid", response: () => new Response("private malformed body", { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }) },
+        { code: "management_transport_failed", response: (): Response => { throw new Error("private transport exception"); } },
+        { code: "management_identity_invalid", response: () => Response.json({ secret: "private-secret" }, { headers: { "Cache-Control": "no-store" } }) },
+      ] as const;
+      for (const { code, response } of cases) {
+        let calls = 0;
+        try {
+          await setup.inspect(1, async () => { calls++; return response(); });
+          throw new Error("Expected inspection failure");
+        } catch (error) {
+          expect(error).toBeInstanceOf(RemoteOperationStatusError);
+          expect((error as RemoteOperationStatusError).reasonCode).toBe(code);
+          expect((error as Error).message).toContain(`reason_code=${code}`);
+          expect((error as Error).message).not.toContain("private");
+        }
+        expect(calls).toBe(1);
+        expect(snapshot(setup.root)).toEqual(before);
+      }
+      const operation = setup.operations[1]!;
+      await expect(new PublicationAdminClient(setup.config, "private-secret", async () =>
+        Response.json(conflict, { status: 409, headers: { "Cache-Control": "no-store" } }))
+        .commit(setup.frozen)).rejects.toThrow("reason_code=management_http_rejected");
+      await expect(setup.inspect(1, async () => {
+        writeFileSync(`${operation.file}.lock`, "keep unknown lock");
+        return Response.json(conflict, { status: 409, headers: { "Cache-Control": "no-store" } });
+      })).rejects.toThrow("reason_code=local_record_changed");
+      expect(readFileSync(`${operation.file}.lock`, "utf8")).toBe("keep unknown lock");
+    } finally { setup.dispose(); }
+  });
+
   test("all four families use frozen status requests and preserve local files, locks and remote records", async () => {
     const setup = await fixture();
     try {

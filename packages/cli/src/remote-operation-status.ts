@@ -4,6 +4,7 @@ import { validateLifecycleClientState } from "./lifecycle-journal";
 import { readLocalOperationStatus } from "./local-operation-status";
 import type { LocalOperationStatus } from "./local-operation-status";
 import type { M6AdminTransport } from "./m6-admin-json";
+import { M6AdminVerificationError } from "./m6-admin-json";
 import { PublicationAdminClient } from "./publication-client";
 import { validatePublicationClientState } from "./publication-journal";
 import { ShowRegistrationClient } from "./show-registration-client";
@@ -17,13 +18,24 @@ export type RemoteOperationStatus = Omit<LocalOperationStatus, "remote_state_che
     Awaited<ReturnType<LifecycleAdminClient["status"]>> | Awaited<ReturnType<ShowRegistrationClient["status"]>>;
 };
 
+export class RemoteOperationStatusError extends Error {
+  constructor(readonly reasonCode: M6AdminVerificationError["reasonCode"] | "local_record_invalid" | "administrator_key_invalid" |
+    "server_status_unverified" | "local_record_changed") {
+    super(`Operation status could not be verified; preserve records, locks and ownership without automatic retry or recovery [reason_code=${reasonCode}]`);
+  }
+}
+
 export async function readRemoteOperationStatus(root: string, config: ServiceConfig, family: string, operationId: string,
   readAdminKey: () => string, transport: M6AdminTransport = fetch): Promise<RemoteOperationStatus> {
+  let reason: ConstructorParameters<typeof RemoteOperationStatusError>[0] = "local_record_invalid";
+  let before: string | undefined;
   try {
     const local = readLocalOperationStatus(root, config, family, operationId);
     if (!local.client_state) throw new Error("A frozen local operation record is required for remote inspection");
-    const before = JSON.stringify(local);
+    before = JSON.stringify(local);
+    reason = "administrator_key_invalid";
     const key = readAdminKey();
+    reason = "server_status_unverified";
     let server: RemoteOperationStatus["server_status"];
     if (local.family === "staging") {
       const state = validateStagingClientState(local.client_state);
@@ -39,11 +51,19 @@ export async function readRemoteOperationStatus(root: string, config: ServiceCon
       const state = validateShowRegistrationState(local.client_state);
       server = await new ShowRegistrationClient(config, key, transport).status({ ...state.reserve, action: "status" });
     }
+    reason = "local_record_changed";
     if (JSON.stringify(readLocalOperationStatus(root, config, family, operationId)) !== before) {
       throw new Error("Local operation record or lock changed during remote inspection");
     }
     return { ...local, remote_state_checked: true, server_status: server };
-  } catch {
-    throw new Error("Operation status could not be verified; preserve records, locks and ownership without automatic retry or recovery");
+  } catch (error) {
+    if (error instanceof M6AdminVerificationError && error.reasonCode === "publication_status_changed") {
+      try {
+        if (before !== JSON.stringify(readLocalOperationStatus(root, config, family, operationId))) {
+          throw new Error("Local operation changed");
+        }
+      } catch { throw new RemoteOperationStatusError("local_record_changed"); }
+    }
+    throw new RemoteOperationStatusError(error instanceof M6AdminVerificationError ? error.reasonCode : reason);
   }
 }

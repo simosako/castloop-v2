@@ -8,6 +8,32 @@ import { pauseServiceAdmission, readServiceAdmission, SERVICE_ADMISSION_KEY } fr
 import { publicationAdminFixture } from "./test-support/publication-admin";
 
 describe("unreleased M6 publication admission and commit boundary", () => {
+  test("only a changing read-only snapshot reports a repeatable publication status conflict", async () => {
+    const setup = await publicationAdminFixture();
+    await setup.publicationSuccess(setup.body("claim"));
+    const input = { schema_version: 1, service_id: "service", action: "status", publication: setup.frozen };
+    const original = setup.bucket.head.bind(setup.bucket);
+    setup.bucket.head = (async (key: string) => {
+      const object = await original(key);
+      return key === "system/service.toml" && object ? { ...object, etag: "concurrent-service-change" } : object;
+    }) as typeof setup.bucket.head;
+    const writes = setup.writes.length;
+    const conflict = await setup.call(input);
+    expect(conflict.status).toBe(409);
+    expect(conflict.headers.get("Cache-Control")).toBe("no-store");
+    expect(await conflict.json<Record<string, unknown>>()).toEqual({ error: "Publication status changed during inspection",
+      reason_code: "publication_status_changed", service_id: "service" });
+    expect(setup.writes).toHaveLength(writes);
+    expect((await readShowControl(setup.env, "daily"))?.value.owner?.state).toBe("reserved");
+    setup.bucket.head = original;
+    expect((await setup.call(input)).status).toBe(200);
+    await setup.bucket.put(`system/jobs/${setup.frozen.request.job_id}/publication.json`, "private malformed manifest");
+    const invalid = await setup.call(input);
+    expect(invalid.status).toBe(409);
+    expect(await invalid.json<Record<string, unknown>>()).toEqual({ error: "Publication operation blocked; inspect retained ownership and progress",
+      reason_code: "publication_operation_blocked" });
+  });
+
   test("API claims and commits Show/Episode and both revision types before the same registered Queue consumer publishes", async () => {
     for (const mode of ["show", "episode", "metadata", "audio"] as const) {
       const setup = await publicationAdminFixture(mode);
