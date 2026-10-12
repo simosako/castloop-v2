@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "result": "catalog",
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "admission_state": "open",
+  "next_cursor": null,
+  "request": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "include_deleted": false,
+    "kind": "episode",
+    "show_id": "otftalk-rss"
+  },
+  "show": {
+    "show_id": "otftalk-rss",
+    "lifecycle": "active",
+    "unfinished_operation": false
+  },
+  "episodes": [
+    {
+      "episode_id": "ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-27T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-64741a4d4d2e921348f50fc08871a33d9183f9c045cd81c4e6d8c3a27ca0c072",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-13T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-956114dcde97d3e33d54b8cc767435638c3cf4fbf219fe7f551f23b943cde484",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-07-30T02:51:50Z"
+    },
+    {
+      "episode_id": "ep-a22f5c232f5699ec42579cda2b2ac842f741dd930ad485f20e2a0053d6e42bdd",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-06T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-d6113b57d9102da91b66c05747175755eb3f00f3b27a7f81f15d7bfe73b28eb2",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-20T22:00:00Z"
+    }
+  ]
+}

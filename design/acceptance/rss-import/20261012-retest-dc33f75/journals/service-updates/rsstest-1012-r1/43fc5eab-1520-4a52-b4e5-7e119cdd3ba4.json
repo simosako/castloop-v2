@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "config": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "account_id": "[REDACTED_RESOURCE_ID]",
+    "bucket_name": "castloop-rss-20261012-run1",
+    "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+    "queue_name": "castloop-rsstest-1012-r1-acb1fbca",
+    "dlq_name": "castloop-rsstest-1012-r1-dlq-acb1fbca",
+    "public_base_url": "https://castloop-rss-r1.otftalk.com",
+    "workers_dev_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev"
+  },
+  "request": {
+    "operation_id": "43fc5eab-1520-4a52-b4e5-7e119cdd3ba4",
+    "service_id": "rsstest-1012-r1",
+    "expected_service_generation": 48,
+    "pause_id": "18140bab-d7b0-4ab3-b6e2-bcbcc38a10c1",
+    "previous_worker_version_id": "edfd6cba-b5c0-42d6-a747-14443ff0992e",
+    "service_config_sha256": "bd02fd6ce45769262e323f62b608f73a69663093c909c165b82fe04794a2b405",
+    "worker_source_sha256": "3c13f8361cdcf548884363b582927d3f44eee9d8979766ef3deaa01030240d98",
+    "worker_metadata_sha256": "c819e6d7b0f7fdf3b35e0ad03eb040473633e65def7b1dbf9a3bf58da728b864"
+  },
+  "phase": "completed",
+  "upload_receipt": {
+    "id": "[REDACTED_RESOURCE_ID]",
+    "number": 2,
+    "resources": {
+      "script": {
+        "etag": "e9add617f72bd9e114d51806aa81139bb0ab1279048e62032fc34b1e26eef93f"
+      }
+    }
+  },
+  "deployment_receipt": {
+    "operation_id": "43fc5eab-1520-4a52-b4e5-7e119cdd3ba4",
+    "deployment_id": "b90426a2-e2c6-4cc3-8bb2-6a1e595ea5ee",
+    "worker_version_id": "4d87255c-0d41-43b1-89ce-50c1eb14fb11",
+    "service_config_sha256": "bd02fd6ce45769262e323f62b608f73a69663093c909c165b82fe04794a2b405"
+  },
+  "target": {
+    "operation_id": "43fc5eab-1520-4a52-b4e5-7e119cdd3ba4",
+    "deployment_id": "b90426a2-e2c6-4cc3-8bb2-6a1e595ea5ee",
+    "worker_version_id": "4d87255c-0d41-43b1-89ce-50c1eb14fb11",
+    "service_config_sha256": "bd02fd6ce45769262e323f62b608f73a69663093c909c165b82fe04794a2b405"
+  },
+  "runtime_readiness": {
+    "operation_id": "43fc5eab-1520-4a52-b4e5-7e119cdd3ba4",
+    "deployment_id": "b90426a2-e2c6-4cc3-8bb2-6a1e595ea5ee",
+    "worker_version_id": "4d87255c-0d41-43b1-89ce-50c1eb14fb11",
+    "service_config_sha256": "bd02fd6ce45769262e323f62b608f73a69663093c909c165b82fe04794a2b405",
+    "default_cache_disabled": true,
+    "cached_entrypoint": "CachedPublicAssets",
+    "cutover_verified": true,
+    "publication_routes_verified": true
+  }
+}

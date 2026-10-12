@@ -1,0 +1,5 @@
+
+> castloop-v2@0.3.0 build:cli
+> bun scripts/build-cli.ts linux-x64
+
+Built [LOCAL_TEST_ROOT]/build/castloop-v2-rss-dc33f75/dist/castloop-linux-x64
