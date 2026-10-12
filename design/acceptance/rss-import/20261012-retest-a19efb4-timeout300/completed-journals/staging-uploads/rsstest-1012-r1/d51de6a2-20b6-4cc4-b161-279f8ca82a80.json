@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "service_id": "rsstest-1012-r1",
+    "account_id": "[REDACTED_RESOURCE_OR_CURSOR]",
+    "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+    "public_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev"
+  },
+  "upload": {
+    "schema_version": 1,
+    "operation_id": "d51de6a2-20b6-4cc4-b161-279f8ca82a80",
+    "draft_job_id": "09dbc9b0-a81b-4e46-91d2-b335ef88a40e",
+    "show_id": "otftalk-rss",
+    "kind": "episode",
+    "episode_id": "ep-722c9146e9a0df10d1b1b9badb248ee013c71917452425b7df2530c6ad8d3531",
+    "expected_show_generation": 32,
+    "expected_episode_generation": 0,
+    "created_at": "2026-10-12T02:18:35Z",
+    "payloads": [
+      {
+        "asset": "episode_metadata",
+        "length_bytes": 2292,
+        "sha256": "73ba280f608ab1d8dee1a4a18589ea87ae45adf82edab2c603f7271babe0d7a8"
+      }
+    ]
+  },
+  "phase": "finished",
+  "claim_receipt": {
+    "show_id": "otftalk-rss",
+    "operation_id": "d51de6a2-20b6-4cc4-b161-279f8ca82a80",
+    "show_generation": 33
+  },
+  "begin_receipt": [
+    {
+      "key": "staging/episodes/otftalk-rss/ep-722c9146e9a0df10d1b1b9badb248ee013c71917452425b7df2530c6ad8d3531/09dbc9b0-a81b-4e46-91d2-b335ef88a40e/episode.toml",
+      "length": 2292,
+      "sha256": "73ba280f608ab1d8dee1a4a18589ea87ae45adf82edab2c603f7271babe0d7a8"
+    }
+  ],
+  "put_outcome": "staged",
+  "acknowledged_puts": 1,
+  "readback_receipts": [
+    {
+      "asset": "episode_metadata",
+      "length_bytes": 2292,
+      "sha256": "73ba280f608ab1d8dee1a4a18589ea87ae45adf82edab2c603f7271babe0d7a8",
+      "etag": "4d0e0ba28b5871b589d84ac41ac326fe",
+      "version": "7e5ed2183eeec99390284ab624f2627d"
+    }
+  ],
+  "finish_receipt": "staged"
+}

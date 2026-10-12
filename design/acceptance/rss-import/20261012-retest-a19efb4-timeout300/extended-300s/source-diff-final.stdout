@@ -1,0 +1,37 @@
+diff --git i/packages/cli/src/rss-import-publication.test.ts w/packages/cli/src/rss-import-publication.test.ts
+index e7f4f51..234b992 100644
+--- i/packages/cli/src/rss-import-publication.test.ts
++++ w/packages/cli/src/rss-import-publication.test.ts
+@@ -104,7 +104,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
+     expect(commands.filter((command) => command === "create-episode")).toHaveLength(0);
+     continuousConflict = true;
+     await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("still pending");
+-    expect(waits).toBe(120);
++    expect(waits).toBe(300);
+     expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
+     expect(commands.filter((command) => command === "create-episode")).toHaveLength(0);
+     continuousConflict = false;
+@@ -130,7 +130,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
+     expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
+     expect(commands.filter((command) => command === "publish-episode")).toHaveLength(2);
+     expect(conflictedJobs.size).toBe(3);
+-    expect(waits).toBe(123);
++    expect(waits).toBe(303);
+     const report = JSON.parse(readFileSync(join(output, "import.json"), "utf8"));
+     for (const episode of report.episodes) {
+       const revision = parseEpisodeRevision(setup.text(`public/episodes/imported/${episode.metadata.episode_id}/metadata.toml`));
+diff --git i/packages/cli/src/rss-import-publication.ts w/packages/cli/src/rss-import-publication.ts
+index 090c4c0..fcb4550 100644
+--- i/packages/cli/src/rss-import-publication.ts
++++ w/packages/cli/src/rss-import-publication.ts
+@@ -142,8 +142,8 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
+       (state.phase === "waiting") !== (state.waiting_job_id !== undefined)) throw new Error("RSS publication progress is inconsistent");
+     const save = () => storage.replace(stateSchema.parse(state));
+     const waitForJob = async () => {
+-      const deadline = Date.now() + 120000;
+-      for (let attempt = 0; attempt < 120 && Date.now() < deadline; attempt++) {
++      const deadline = Date.now() + 300000;
++      for (let attempt = 0; attempt < 300 && Date.now() < deadline; attempt++) {
+         let result: { server_status?: unknown };
+         try {
+           result = await effects.command("operation-status", ["publication", state.waiting_job_id!]) as { server_status?: unknown };

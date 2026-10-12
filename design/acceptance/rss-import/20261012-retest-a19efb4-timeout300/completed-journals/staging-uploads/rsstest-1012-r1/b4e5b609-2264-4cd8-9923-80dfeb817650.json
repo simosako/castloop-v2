@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "service_id": "rsstest-1012-r1",
+    "account_id": "[REDACTED_RESOURCE_OR_CURSOR]",
+    "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+    "public_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev"
+  },
+  "upload": {
+    "schema_version": 1,
+    "operation_id": "b4e5b609-2264-4cd8-9923-80dfeb817650",
+    "draft_job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+    "show_id": "otftalk-rss",
+    "kind": "show",
+    "expected_show_generation": 0,
+    "created_at": "2026-10-12T00:55:36Z",
+    "payloads": [
+      {
+        "asset": "show_metadata",
+        "length_bytes": 553,
+        "sha256": "ae4e472e573d9c52ad04d99a23cf3d25aba5e56a6eebb34ac935f70a4b9ef7ba"
+      },
+      {
+        "asset": "cover_jpg",
+        "length_bytes": 2173207,
+        "sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35"
+      }
+    ]
+  },
+  "phase": "finished",
+  "claim_receipt": {
+    "show_id": "otftalk-rss",
+    "operation_id": "b4e5b609-2264-4cd8-9923-80dfeb817650",
+    "show_generation": 1
+  },
+  "begin_receipt": [
+    {
+      "key": "staging/shows/otftalk-rss/7d484a96-f681-41ad-b91d-c877fb858b7e/show.toml",
+      "length": 553,
+      "sha256": "ae4e472e573d9c52ad04d99a23cf3d25aba5e56a6eebb34ac935f70a4b9ef7ba"
+    },
+    {
+      "key": "staging/shows/otftalk-rss/7d484a96-f681-41ad-b91d-c877fb858b7e/cover.jpg",
+      "length": 2173207,
+      "sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35"
+    }
+  ],
+  "put_outcome": "staged",
+  "acknowledged_puts": 2,
+  "readback_receipts": [
+    {
+      "asset": "show_metadata",
+      "length_bytes": 553,
+      "sha256": "ae4e472e573d9c52ad04d99a23cf3d25aba5e56a6eebb34ac935f70a4b9ef7ba",
+      "etag": "31340d6e83095bd3a39bac0003904971",
+      "version": "7e5ed264416ba1c6ae8d7d9f047db770"
+    },
+    {
+      "asset": "cover_jpg",
+      "length_bytes": 2173207,
+      "sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35",
+      "etag": "52d74b275b660091656ed45882d00680",
+      "version": "7e5ed2643b0efbe3e395d54fd81d2708"
+    }
+  ],
+  "finish_receipt": "staged"
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "result": "target",
+  "request": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "kind": "episode",
+    "show_id": "otftalk-rss",
+    "episode_id": "ep-3b2c6d1cdea50d1a3c6d4d9fbaaf8ea9507ada9ef5796891d8b717bf5635cdc0"
+  },
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "payloads_verified": false,
+  "admission_state": "open",
+  "show": {
+    "lifecycle": "active",
+    "generation": 17
+  },
+  "episode": null,
+  "unfinished_show_operation": false,
+  "current_revision": null
+}

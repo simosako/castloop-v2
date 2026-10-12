@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "result": "catalog",
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "admission_state": "open",
+  "next_cursor": null,
+  "request": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "include_deleted": false,
+    "cursor": "1-JTdCJTIydiUyMiUzQTElMkMlMjJzdGFydEFmdGVyJTIyJTNBJTIyc3lzdGVtJTJGZXBpc29kZS1saWZlY3ljbGUlMkZvdGZ0YWxrLXJzcyUyRmVwLWQ2MTEzYjU3ZDkxMDJkYTkxYjY2YzA1NzQ3MTc1NzU1ZWIzZjAwZjNiMjdhN2Y4MWYxNWQ3YmZlNzNiMjhlYjIudG9tbCUyMiUyQyUyMnV1aWQlMjIlM0ElMjI3ZTVlZDIzYjk0YzhhYTA0ZWFhZmRhZDc0NTdmZmUxZSUyMiU3RA==",
+    "kind": "episode",
+    "show_id": "otftalk-rss"
+  },
+  "show": {
+    "show_id": "otftalk-rss",
+    "lifecycle": "active",
+    "unfinished_operation": false
+  },
+  "episodes": [
+    {
+      "episode_id": "ep-f01704e024cf73b79fb8fbcc4c4575f3d899d324d6d710b4d6b04ee200393141",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-09-24T22:00:00Z"
+    }
+  ]
+}

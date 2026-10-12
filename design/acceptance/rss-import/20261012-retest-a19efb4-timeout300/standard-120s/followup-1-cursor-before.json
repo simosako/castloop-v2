@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "import_id": "908efe60-3585-4a6a-af01-f1c5d8afb206",
+  "identity": {
+    "service_id": "rsstest-1012-r1",
+    "account_id": "[REDACTED_RESOURCE_OR_CURSOR]",
+    "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+    "public_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev"
+  },
+  "public_base_url": "https://castloop-rss-r1.otftalk.com",
+  "source_directory": "[LOCAL_TEST_ROOT]/imports/rss-20261012-run1",
+  "input_sha256": "956244da8f6807c264678b0f5622a7b1784c1bf61b045d5ecdebf26f99adb79b",
+  "step": 76,
+  "phase": "waiting",
+  "waiting_job_id": "9c26524d-d0d1-4d2d-85eb-024f2a5ccf01",
+  "created_show_sha256": "e26e6d746ad8b7bcbfa0964981b9358f39f148df3d2ae3606ef5ab67a4dd985d",
+  "reconciled_unstarted_update_step": 25
+}

@@ -1,0 +1,418 @@
+[
+  {
+    "job_id": "3e296db1-8056-4859-91cf-788b3d679685",
+    "publication_created_at": "2026-10-12T02:05:46Z",
+    "commit_ack_local_mtime": "2026-10-12T02:05:55.584602+00:00",
+    "progress_updated_at": "2026-10-12T02:07:11Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:04:41Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2610,
+        "journal_finished_at": "2026-10-12T02:05:10.991045+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:05:11Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 49357635,
+        "journal_finished_at": "2026-10-12T02:05:45.277704+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.619,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:07:13 GMT",
+      "CF-Ray": "a492c3568b48d760-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:30 GMT"
+    }
+  },
+  {
+    "job_id": "1bca5ba8-91d9-431a-b0a5-7b0439aa4482",
+    "publication_created_at": "2026-10-12T02:08:23Z",
+    "commit_ack_local_mtime": "2026-10-12T02:08:32.141051+00:00",
+    "progress_updated_at": "2026-10-12T02:09:46Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:07:20Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2640,
+        "journal_finished_at": "2026-10-12T02:07:49.739471+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:07:50Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 32642611,
+        "journal_finished_at": "2026-10-12T02:08:22.791143+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.494,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:09:47 GMT",
+      "CF-Ray": "a492c35a6823d760-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:30 GMT"
+    }
+  },
+  {
+    "job_id": "7bb959b1-8156-4765-828e-138a10ebcec6",
+    "publication_created_at": "2026-10-12T02:11:00Z",
+    "commit_ack_local_mtime": "2026-10-12T02:11:09.366309+00:00",
+    "progress_updated_at": "2026-10-12T02:12:22Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:09:55Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 3125,
+        "journal_finished_at": "2026-10-12T02:10:24.549925+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:10:25Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 32382640,
+        "journal_finished_at": "2026-10-12T02:10:59.693441+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.522,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:12:24 GMT",
+      "CF-Ray": "a492c35d6f1de364-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:31 GMT"
+    }
+  },
+  {
+    "job_id": "ae1173cc-96b0-4cb0-90b8-cb1977fca2e3",
+    "publication_created_at": "2026-10-12T02:13:36Z",
+    "commit_ack_local_mtime": "2026-10-12T02:13:45.221264+00:00",
+    "progress_updated_at": "2026-10-12T02:15:18Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:12:32Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 3084,
+        "journal_finished_at": "2026-10-12T02:13:01.441825+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:13:02Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 34455718,
+        "journal_finished_at": "2026-10-12T02:13:35.155392+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.596,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:15:20 GMT",
+      "CF-Ray": "a492c360b86e317f-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:32 GMT"
+    }
+  },
+  {
+    "job_id": "867c8309-f52e-4bbc-a57d-b80305e0e106",
+    "publication_created_at": "2026-10-12T02:16:31Z",
+    "commit_ack_local_mtime": "2026-10-12T02:16:40.457101+00:00",
+    "progress_updated_at": "2026-10-12T02:18:24Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:15:30Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 3223,
+        "journal_finished_at": "2026-10-12T02:15:58.760604+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:15:59Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 32094248,
+        "journal_finished_at": "2026-10-12T02:16:30.622219+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.474,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:18:26 GMT",
+      "CF-Ray": "a492c3647dd4af46-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:32 GMT"
+    }
+  },
+  {
+    "job_id": "09dbc9b0-a81b-4e46-91d2-b335ef88a40e",
+    "publication_created_at": "2026-10-12T02:19:39Z",
+    "commit_ack_local_mtime": "2026-10-12T02:19:47.338908+00:00",
+    "progress_updated_at": "2026-10-12T02:21:22Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:18:35Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2292,
+        "journal_finished_at": "2026-10-12T02:19:04.151406+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:19:05Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 41971460,
+        "journal_finished_at": "2026-10-12T02:19:38.055015+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.589,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:21:24 GMT",
+      "CF-Ray": "a492c3676f73ae95-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:33 GMT"
+    }
+  },
+  {
+    "job_id": "7a99d514-72d2-4597-b944-0854ee7ffeb5",
+    "publication_created_at": "2026-10-12T02:22:35Z",
+    "commit_ack_local_mtime": "2026-10-12T02:22:43.869913+00:00",
+    "progress_updated_at": "2026-10-12T02:24:05Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:21:33Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2336,
+        "journal_finished_at": "2026-10-12T02:22:01.781383+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:22:02Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 47161677,
+        "journal_finished_at": "2026-10-12T02:22:34.551017+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.466,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:24:06 GMT",
+      "CF-Ray": "a492c36b1ab121b5-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:33 GMT"
+    }
+  },
+  {
+    "job_id": "644af68a-7c17-48f8-a9c1-98f5a4662b3b",
+    "publication_created_at": "2026-10-12T02:25:17Z",
+    "commit_ack_local_mtime": "2026-10-12T02:25:26.092126+00:00",
+    "progress_updated_at": "2026-10-12T02:26:44Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:24:13Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2324,
+        "journal_finished_at": "2026-10-12T02:24:41.762611+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:24:42Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 36690964,
+        "journal_finished_at": "2026-10-12T02:25:16.800227+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.564,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:26:46 GMT",
+      "CF-Ray": "a492c36dfc0b4e13-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:34 GMT"
+    }
+  },
+  {
+    "job_id": "6d1c83b0-494c-4860-a66f-d81dba5779d1",
+    "publication_created_at": "2026-10-12T02:27:57Z",
+    "commit_ack_local_mtime": "2026-10-12T02:28:06.154394+00:00",
+    "progress_updated_at": "2026-10-12T02:29:27Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:26:53Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2488,
+        "journal_finished_at": "2026-10-12T02:27:21.996869+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:27:22Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 44296149,
+        "journal_finished_at": "2026-10-12T02:27:56.372499+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.412,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:29:29 GMT",
+      "CF-Ray": "a492c3718cfcaff4-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:34 GMT"
+    }
+  },
+  {
+    "job_id": "98de25e2-ec09-4048-a6e1-3dd2425947a5",
+    "publication_created_at": "2026-10-12T02:30:41Z",
+    "commit_ack_local_mtime": "2026-10-12T02:30:50.212643+00:00",
+    "progress_updated_at": "2026-10-12T02:32:13Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:29:37Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2032,
+        "journal_finished_at": "2026-10-12T02:30:06.681106+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:30:07Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 38199796,
+        "journal_finished_at": "2026-10-12T02:30:40.601745+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.425,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:32:15 GMT",
+      "CF-Ray": "a492c3741a04e1a3-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:34 GMT"
+    }
+  },
+  {
+    "job_id": "3dec757d-f6d6-443e-8c3b-d83e4c0ec416",
+    "publication_created_at": "2026-10-12T02:33:26Z",
+    "commit_ack_local_mtime": "2026-10-12T02:33:34.919902+00:00",
+    "progress_updated_at": "2026-10-12T02:34:53Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:32:22Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 1797,
+        "journal_finished_at": "2026-10-12T02:32:51.815356+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:32:52Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 38855156,
+        "journal_finished_at": "2026-10-12T02:33:25.568000+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.54,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:34:55 GMT",
+      "CF-Ray": "a492c376be4bd756-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:35 GMT"
+    }
+  },
+  {
+    "job_id": "aee3b9c4-5eda-48e8-8903-a8363e3bd6d7",
+    "publication_created_at": "2026-10-12T02:36:08Z",
+    "commit_ack_local_mtime": "2026-10-12T02:36:17.614195+00:00",
+    "progress_updated_at": "2026-10-12T02:37:41Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:35:03Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 1864,
+        "journal_finished_at": "2026-10-12T02:35:33.103661+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:35:34Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 40777768,
+        "journal_finished_at": "2026-10-12T02:36:07.798297+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.518,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:37:43 GMT",
+      "CF-Ray": "a492c37a1d30fd47-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:36 GMT"
+    }
+  },
+  {
+    "job_id": "9c26524d-d0d1-4d2d-85eb-024f2a5ccf01",
+    "publication_created_at": "2026-10-12T02:38:55Z",
+    "commit_ack_local_mtime": "2026-10-12T02:39:03.393464+00:00",
+    "progress_updated_at": "2026-10-12T02:40:56Z",
+    "phase": "finished",
+    "purge_confirmed": true,
+    "uploads": [
+      {
+        "created_at": "2026-10-12T02:37:52Z",
+        "assets": [
+          "episode_metadata"
+        ],
+        "bytes": 2001,
+        "journal_finished_at": "2026-10-12T02:38:20.193914+00:00"
+      },
+      {
+        "created_at": "2026-10-12T02:38:21Z",
+        "assets": [
+          "audio"
+        ],
+        "bytes": 47730937,
+        "journal_finished_at": "2026-10-12T02:38:54.321559+00:00"
+      }
+    ],
+    "rest_read_seconds": 0.529,
+    "response_headers": {
+      "Last-Modified": "Mon, 12 Oct 2026 02:40:59 GMT",
+      "CF-Ray": "a492c37d6d4faf87-NRT",
+      "Date": "Mon, 12 Oct 2026 02:44:36 GMT"
+    }
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "service_id": "rsstest-1012-r1",
+    "account_id": "[REDACTED_RESOURCE_OR_CURSOR]",
+    "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+    "public_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev"
+  },
+  "target": {
+    "kind": "episode",
+    "show_id": "otftalk-rss",
+    "episode_id": "ep-140875ef1574780cbef958d264a5e709e2045ae97a1d97bea075622e2b5e45a8"
+  },
+  "draft_job_id": "644af68a-7c17-48f8-a9c1-98f5a4662b3b",
+  "phase": "frozen",
+  "uploads": [
+    {
+      "slot": "audio",
+      "operation_id": "91ce502b-2c35-47ea-8aa4-0825d81ccb1b"
+    },
+    {
+      "slot": "episode_metadata",
+      "operation_id": "4a27ad26-7fb1-49a7-af31-48064742ce3b"
+    }
+  ],
+  "publication_sha256": "c1a2931c76d94f5c2460b0c56315bc091eeb0a9f56d7b9cd61b3f4076726bcb1"
+}

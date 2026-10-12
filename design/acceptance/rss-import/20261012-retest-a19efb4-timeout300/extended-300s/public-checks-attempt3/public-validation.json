@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "dns_server": "1.1.1.1",
+  "tls_verified": true,
+  "episode_count": 36,
+  "all_audio_get_hash_size_head_range": false,
+  "checked_audio_count": 2,
+  "selected_audio_indices": [
+    0,
+    35
+  ],
+  "selected_audio_get_hash_size_head_range": true,
+  "source_audio_bytes": 1496055589,
+  "checked_audio_bytes": 85381535,
+  "cover_hash_size": true,
+  "same_feed_on_workers_dev": true,
+  "feed_conditional_304": true,
+  "private_paths_denied": true,
+  "requests": 12
+}

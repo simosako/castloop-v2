@@ -1,0 +1,53 @@
+{
+  "metadata_staging_seconds": {
+    "min": 28.194,
+    "max": 30.104,
+    "mean": 29.305,
+    "sum": 380.969
+  },
+  "audio_staging_seconds": {
+    "min": 31.622,
+    "max": 34.8,
+    "mean": 33.508,
+    "sum": 435.608
+  },
+  "publication_request_to_finished_progress_seconds": {
+    "min": 82.0,
+    "max": 121.0,
+    "mean": 94.462,
+    "sum": 1228.0
+  },
+  "commit_ack_to_finished_progress_seconds": {
+    "min": 72.634,
+    "max": 112.607,
+    "mean": 85.356,
+    "sum": 1109.634
+  },
+  "metadata_bytes": {
+    "min": 1797,
+    "max": 3223,
+    "mean": 2447.385,
+    "sum": 31816
+  },
+  "audio_bytes": {
+    "min": 32094248,
+    "max": 49357635,
+    "mean": 39739750.692,
+    "sum": 516616759
+  },
+  "sample_count": 13,
+  "commit_intervals_seconds": [
+    157.0,
+    157.0,
+    156.0,
+    175.0,
+    188.0,
+    176.0,
+    162.0,
+    160.0,
+    164.0,
+    165.0,
+    162.0,
+    167.0
+  ]
+}

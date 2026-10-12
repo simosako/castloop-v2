@@ -1,0 +1,8 @@
+{
+  "base_commit": "a19efb4cfc95507787fa54c335c67b5722de414b",
+  "test_only_patch": true,
+  "publication_wait_seconds": 300,
+  "publication_max_inspections": 300,
+  "sha256": "4c1388be1a91d5ce4343a78aec359edf36d29c3a4358a27fa8e14a57965a7c20",
+  "worker_redeployment": false
+}

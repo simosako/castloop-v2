@@ -1,0 +1,10 @@
+[
+  {
+    "label": "feed",
+    "http": 200,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/feed.xml",
+    "bytes": 118850,
+    "sha256": "9be4dc70dd136342bfaeac95daaf26533997607c43da873829a01637a64380e3"
+  }
+]

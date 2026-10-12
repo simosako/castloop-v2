@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "result": "catalog",
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "admission_state": "open",
+  "next_cursor": null,
+  "request": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "include_deleted": false,
+    "kind": "episode",
+    "show_id": "otftalk-rss"
+  },
+  "show": {
+    "show_id": "otftalk-rss",
+    "lifecycle": "active",
+    "unfinished_operation": false
+  },
+  "episodes": [
+    {
+      "episode_id": "ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-27T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-0479444008811d309ff6ef545f96a05cb1cb8a69fe40bd130293b7f028d91247",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-11-19T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-140875ef1574780cbef958d264a5e709e2045ae97a1d97bea075622e2b5e45a8",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-10-22T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-14edf28a4cf58e322cec638e8b72ec39cfffa8dc2512f273b688854298462325",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-09-10T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-243aa5363b35def893e3ed81070c7400469b6f163b906d5b3433182209efc14b",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-10-01T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-3b2c6d1cdea50d1a3c6d4d9fbaaf8ea9507ada9ef5796891d8b717bf5635cdc0",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-09-03T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-4a9ab370370a1393c271a8b1fdbc2ce5cd5005d167cd6fa6e7ca7839e37a7d3d",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-10-29T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-64741a4d4d2e921348f50fc08871a33d9183f9c045cd81c4e6d8c3a27ca0c072",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-13T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-722c9146e9a0df10d1b1b9badb248ee013c71917452425b7df2530c6ad8d3531",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-10-08T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-7e01c9db99471a390f5c3296c3a08ba2178588d32523dbacfbf3754fb2fe1c5f",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-11-12T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-82b4abe86eae343738f00d359f00cfe8272ac12a67ee991e9d1fcf3dcc04ca79",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-10-15T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-83f6ca32e62ad6ed16f87a27c058c5a238782a3b4711f99c948a64be9cad939f",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-09-17T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-8ae83fa91926cd69ccebef1477ec8c82824247c73e85ff26dd2634bc25a3b076",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-11-05T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-956114dcde97d3e33d54b8cc767435638c3cf4fbf219fe7f551f23b943cde484",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-07-30T02:51:50Z"
+    },
+    {
+      "episode_id": "ep-a22f5c232f5699ec42579cda2b2ac842f741dd930ad485f20e2a0053d6e42bdd",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-06T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-d00390b71b18d845c12351c13753ca9a2e668748eed603fffe1c417e91eb80e2",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-11-26T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-d6113b57d9102da91b66c05747175755eb3f00f3b27a7f81f15d7bfe73b28eb2",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-08-20T22:00:00Z"
+    },
+    {
+      "episode_id": "ep-f01704e024cf73b79fb8fbcc4c4575f3d899d324d6d710b4d6b04ee200393141",
+      "lifecycle": "active",
+      "title": "[OMITTED_METADATA]",
+      "published_at": "2024-09-24T22:00:00Z"
+    }
+  ]
+}

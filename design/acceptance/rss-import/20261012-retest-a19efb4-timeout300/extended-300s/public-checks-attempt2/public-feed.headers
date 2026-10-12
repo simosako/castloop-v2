@@ -1,0 +1,16 @@
+HTTP/2 200
+date: Mon, 12 Oct 2026 04:42:04 GMT
+content-type: application/rss+xml; charset=utf-8
+content-length: 118850
+cf-cache-status: HIT
+accept-ranges: bytes
+age: 84
+cache-control: public, max-age=0, must-revalidate
+etag: "0d024275384162cd2b82e6acfee3155f"
+last-modified: Mon, 12 Oct 2026 04:40:02 GMT
+x-castloop-worker-version: 012b8cc5-a185-41c7-bbff-5cbb5bfc5dda
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?[REDACTED_QUERY]"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a4936f8dba2cd79c-NRT
+alt-svc: h3=":443"; ma=86400

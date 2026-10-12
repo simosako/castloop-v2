@@ -1,0 +1,17 @@
+{
+  "rcode": 0,
+  "truncated": false,
+  "answer_count": 2,
+  "addresses": [
+    {
+      "type": "A",
+      "address": "172.67.185.171",
+      "ttl": 300
+    },
+    {
+      "type": "A",
+      "address": "104.21.19.82",
+      "ttl": 300
+    }
+  ]
+}

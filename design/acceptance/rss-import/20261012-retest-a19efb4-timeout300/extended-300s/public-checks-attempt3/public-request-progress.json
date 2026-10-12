@@ -1,0 +1,98 @@
+[
+  {
+    "label": "feed",
+    "http": 200,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/feed.xml",
+    "bytes": 118850,
+    "sha256": "9be4dc70dd136342bfaeac95daaf26533997607c43da873829a01637a64380e3"
+  },
+  {
+    "label": "cover",
+    "http": 200,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/cover.jpg",
+    "bytes": 2173207,
+    "sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35"
+  },
+  {
+    "label": "audio-00-head",
+    "http": 200,
+    "method": "HEAD",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/episodes/ep-3552791a372112dac1e4c152461567b7c0964d4e9f32e869dea973e81172341c/0d059ee5-9d6d-4298-91a4-7fc1580b53c6.mp3",
+    "bytes": 776,
+    "sha256": null
+  },
+  {
+    "label": "audio-00-get",
+    "http": 200,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/episodes/ep-3552791a372112dac1e4c152461567b7c0964d4e9f32e869dea973e81172341c/0d059ee5-9d6d-4298-91a4-7fc1580b53c6.mp3",
+    "bytes": 46472044,
+    "sha256": "c8fa9b632bc25582f6ab222216a20bd970b55c93559b55c2ab59c627c05041cf"
+  },
+  {
+    "label": "audio-00-range",
+    "http": 206,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/episodes/ep-3552791a372112dac1e4c152461567b7c0964d4e9f32e869dea973e81172341c/0d059ee5-9d6d-4298-91a4-7fc1580b53c6.mp3",
+    "bytes": 1024,
+    "sha256": "bfe4812235455c3012771e8f790e8d2c255f39698537bb10d5f1f46da585147a"
+  },
+  {
+    "label": "audio-35-head",
+    "http": 200,
+    "method": "HEAD",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/episodes/ep-956114dcde97d3e33d54b8cc767435638c3cf4fbf219fe7f551f23b943cde484/a497abe0-450b-407b-96bb-c52d7782547c.mp3",
+    "bytes": 776,
+    "sha256": null
+  },
+  {
+    "label": "audio-35-get",
+    "http": 200,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/episodes/ep-956114dcde97d3e33d54b8cc767435638c3cf4fbf219fe7f551f23b943cde484/a497abe0-450b-407b-96bb-c52d7782547c.mp3",
+    "bytes": 38909491,
+    "sha256": "f70e3dd418ec63393b56c90ea50db495ee9270806ed1db58a6a2104111e94e59"
+  },
+  {
+    "label": "audio-35-range",
+    "http": 206,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/episodes/ep-956114dcde97d3e33d54b8cc767435638c3cf4fbf219fe7f551f23b943cde484/a497abe0-450b-407b-96bb-c52d7782547c.mp3",
+    "bytes": 1024,
+    "sha256": "243f7d93821aa7ef0ed7d8c420427ed9fa9c33b3ca35dde8c855879b2a19ccd0"
+  },
+  {
+    "label": "workers-feed",
+    "http": 200,
+    "method": "GET",
+    "url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev/podcasts/otftalk-rss/feed.xml",
+    "bytes": 118850,
+    "sha256": "9be4dc70dd136342bfaeac95daaf26533997607c43da873829a01637a64380e3"
+  },
+  {
+    "label": "feed-304",
+    "http": 304,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/feed.xml",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "system-denied",
+    "http": 404,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/system/service.toml",
+    "bytes": 21,
+    "sha256": "51d0a9e3bd9ffc25483790aaffe7a3597e642edd040dddb16aafc324e6e922ed"
+  },
+  {
+    "label": "staging-denied",
+    "http": 404,
+    "method": "GET",
+    "url": "https://castloop-rss-r1.otftalk.com/staging/shows/otftalk-rss/7d484a96-f681-41ad-b91d-c877fb858b7e/show.toml",
+    "bytes": 21,
+    "sha256": "51d0a9e3bd9ffc25483790aaffe7a3597e642edd040dddb16aafc324e6e922ed"
+  }
+]

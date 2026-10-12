@@ -1,0 +1,17 @@
+[
+  {
+    "command": "service",
+    "elapsed_seconds": 0.28,
+    "exit_code": 0
+  },
+  {
+    "command": "target",
+    "elapsed_seconds": 0.75,
+    "exit_code": 0
+  },
+  {
+    "command": "publication",
+    "elapsed_seconds": 0.781,
+    "exit_code": 0
+  }
+]
