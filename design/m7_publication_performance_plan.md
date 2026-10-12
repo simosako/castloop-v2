@@ -301,3 +301,54 @@ CLI・Workerとも無改変の`4781fad`。同じ36件Show、同じEpisodeの同�
 再測定手順は[`docs/rss_migration.md`](../docs/rss_migration.md#workerの時間ログと性能比較)。既存Showは最初のjobで初回構築し、次のjobを通常更新として比較する。カタログサイズ・RSS生成量はO(N)のままであり、Workers Freeでの実測と正式待機上限の判断は残る。
 
 実装時の検証: `bun test`は977 pass / 0 fail（111 files）、`npm run check`とLinux単一CLI buildは成功。Cloudflareでの所要時間は未測定。
+
+## 最初のEpisodeが300秒待機する事象の並行調査（2026-10-12）
+
+### 確認範囲と結論
+
+管理者から、別環境の性能試験で最初のEpisodeが300秒以内に公開完了にならないと報告された。調査対象は`056f6a6`（`a8c7e54`とIssue #11修正`5954e44`を含む）。この事象のjob ID・停止時status・Worker Logs・固定証跡は、調査時点のIssue #10/#11にはまだ掲載されていない。以下はソースとローカルmockの結果であり、実機の原因確定ではない。
+
+- Issue #11修正はCLIの互換Worker更新とjournalに限定される。`src/`の公開consumer、音源保存、カタログ処理は`a8c7e54`から無変更。更新が正常完了したかは別途、試験対象CLI/Workerのcommit・versionとserviceの稼働状態で確認する。
+- CLIの300秒は、公開受付receiptを保存した後の`waitForJob`の待機予算。ローカルdownload、staging、音源upload/readback、公開受付の時間は含まない。各管理HTTP要求の120秒とも別で、実行中の照会を300秒のdeadlineで中断する実装ではない。
+- これまでの73.978秒という実測は、36件Showのmetadata-only更新。初回音源コピーを測っていないため、今回の音源付き公開と直接比較できない。
+- **pendingというCLIメッセージだけでは、長時間のconsumer実行と、失敗・再試行後の停止を区別できない。** 原因が不明なままtimeout延長やowner解放を行わない。
+
+### ソースとmockで確認した経路
+
+初回音源は`persistAudio`でstagingからimmutable公開キーへストリームコピーする。Worker内の全量buffer化・アプリ側SHA-256計算はなく、R2 PUTへchecksumを渡す。この区間のGET/PUT完了待ちには独自の時間上限を設けていない。
+
+カタログは新規Show公開時の`advanceLifecycleFeedGeneration`で初期化する。正常な新規Showなら、最初のEpisodeで既存36件を読み直す処理はない。旧Showの未構築カタログを最初に作る場合は全件読取があるが、初回構築と通常公開を分けて測る。
+
+既存fixtureと正式consumer/effectsにR2操作カウンターを挟んだローカル診断を実施した。gateのruntime RPC/R2、service invocationの取得・解放、CLI照会はmock集計に含まない。音源は6 bytesのfixtureで、実ファイルの転送性能は測っていない。
+
+| 新しいEpisodeの公開条件 | GET | HEAD | PUT | LIST | 結果 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| カタログ構築済み、既存Episodeなし | 144 | 12 | 17 | 0 | published/released |
+| カタログ構築済み、既存36件 | 144 | 12 | 17 | 0 | published/released |
+| カタログ構築済み、既存200件 | 144 | 12 | 17 | 0 | published/released |
+| カタログ未構築、既存36件 | 219 | 48 | 19 | 2 | published/released |
+
+構築済みの場合でもShow control GETは80回、publication manifest GETは13回残る。ただしこの回数は実機300秒の説明ではなく、追加最適化は今回の停止箇所を特定してから判断する。正常なfixtureでは無限再試行・カタログ全件読取の反復は再現しなかった。
+
+音源PUTのPromiseだけを保留したmockでは、読み取り照会は`processing / phase=feed / held / execution_active=true`となり、PUTを完了させた同じconsumerはpublished/releasedに到達した。一方、構築済みカタログの欠落、音源PUT例外をそれぞれ3回のconsumer呼出で再現すると、以下の状態が残った。
+
+| 模擬故障 | status | progress.phase | ownership | execution_active |
+| --- | --- | --- | --- | --- |
+| 構築済みカタログの欠落 | retrying | validating | held | false |
+| 音源PUT例外 | retrying | feed | held | false |
+
+runnerの例外処理はretryingを保存し、呼出がsettleした後にexecution tokenを返す。Queueの再試行が尽きても、DLQ処理は`dlq.json`を保存するだけでstatusをfailedへ変えない。CLIはpublished/released、failed、superseded以外では待機を続ける。このため、処理が実行され続けていなくても300秒のpending停止になり得る。模擬故障が実機で起きたと断定するものではない。
+
+### 別環境の証跡で照合する順序
+
+1. **対象を固定する。** CLI/Workerのcommit・Worker version、service/Show/Episode/job ID、公開受付完了・CLI停止の時刻、stderr全文を記録する。「最初」が新規Showの最初のEpisodeか、既存Showの改修後最初のjobかも区別する。
+2. **同じjobを読み取り照会する。** `castloop operation-status publication JOB_UUID`と`castloop service-status`でstatus.state/phase、progress.phase、ownership、execution_active、service invocationの有無を確認する。`execution_active`とinvocationの残存は記録上の所有権であり、実際にconsumerが生きている証明ではない。照会競合はそのまま記録し、秘密鍵・tokenは共有しない。
+3. **そのjobのQueue invocationを照合する。** attempts、platform outcome、exceptions、CPU/wall time、`publication_delivery`、`worker_timing`の各phaseを取得する。CPU/memory制限等の強制終了では、catch/finallyやtoken解放が完了しない可能性がある。
+4. **phaseを見て調査先を絞る。** validatingならstaging証跡・GUID/カタログ、feedなら音源コピー→feed入力→history/current/feed保存→カタログ/世代保存、purgeならcache purge、finishedならterminal statusとowner解放を確認する。`progress.phase=feed`だけで音源コピー停止とは断定しない。
+5. **再試行停止と照会遅延を区別する。** retryingでattemptsが増えた場合は同じ失敗phaseとDLQ markerの有無を確認する。サーバー側published/releasedがCLI停止より前なら、consumerではなく照会応答・競合回数・照会時間を調べる。service invocation解放は別に確認する。
+
+現行`measureWorkerPhase`は終了時にログを出すため、未完了のphaseの開始ログはない。またカタログ/世代保存には独立した時間ログがない。この2点は観測の不足であり、既存ログで区間を絞れなければ、固定phaseの開始checkpointとカタログ/世代保存の計測だけを追加する。ログがないことだけで処理未開始とは判断しない。
+
+[Queuesのwall time上限](https://developers.cloudflare.com/queues/platform/limits/#wall-time-limits-by-invocation-type)は15分であり、CLIの300秒と同じではない。CPU時間とI/O待機も区別する。接続上限は応答header待ち最大6件であり、staging音源の本文streamを保持しただけで接続枠が詰まると断定できない。
+
+調査時の既存関連テストは21 pass / 0 fail（4 files）。診断helper/結果は`/tmp/opencode/m7-first-publication-diagnostic.ts`と`/tmp/opencode/m7-first-publication-diagnostic.json`に保存した。製品source、Cloudflare設定・配備、timeout、記録・ownerには変更を加えていない。修正対象は実機証跡との照合後に決める。
