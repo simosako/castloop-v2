@@ -70,6 +70,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Run from the service workspace. Explicitly retry the same acknowledged publication commit.\n" +
       "Requires its retained journal and settled execution; active or unknown owners/locks are not released.",
   },
+  "release-job": {
+    usage: "release-job JOB",
+    description: "Run from the service workspace. Free a publication frozen by a canceled consumer invocation.\n" +
+      "Requires its retained journal, a retained execution token and matching dead-letter evidence\n" +
+      "(every delivery attempt ended); then requeues the same commit. Elapsed time alone never releases.",
+  },
   deploy: {
     usage: "deploy [--operation-id UUID]",
     description: "Run from the service workspace. Update an already initialized M6 service without converting data.\n" +

@@ -160,6 +160,10 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
           state = { ...state, phase: "ready", waiting_job_id: undefined }; save(); return;
         }
         if (server.status?.state === "failed" || server.ownership === "superseded") throw new Error("RSS publication failed or was superseded; inspect the retained job");
+        if (server.execution_active && server.dead_letter_present) {
+          throw new Error("Publication job is frozen with its retained execution token after dead-lettering; " +
+            "inspect the retained job and run publication-release before resuming this import");
+        }
         await effects.wait();
       }
       throw new Error("RSS publication is still pending; rerun this import only to inspect its acknowledged job");

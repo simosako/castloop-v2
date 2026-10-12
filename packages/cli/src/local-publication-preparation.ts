@@ -23,7 +23,7 @@ export type PreparedLocalPublication = { journal: PublicationJournal; effects: P
 
 export async function prepareLocalPublication(root: string, configInput: ServiceConfig, requestInput: PublicationRequest["request"],
   input: LocalPublicationPreparation, adminKey: string,
-  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">): Promise<PreparedLocalPublication> {
+  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "release" | "status">): Promise<PreparedLocalPublication> {
   const config = serviceConfigSchema.parse(configInput);
   const request = publicationRequestSchema.shape.request.parse(requestInput);
   if (request.action !== "publish") throw new Error("Local publication preparation requires a publish request");

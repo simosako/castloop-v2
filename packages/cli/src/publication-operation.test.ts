@@ -5,12 +5,12 @@ import { readShowControl } from "../../../src/lifecycle-control";
 import { handleM6PublicationAdmin } from "../../../src/publication-admin";
 import { queueM6Candidate } from "../../../src/m6-routes";
 import { acquireShowExecution } from "../../../src/lifecycle-control";
-import { SERVICE_ADMISSION_KEY } from "../../../src/service-admission";
+import { SERVICE_ADMISSION_KEY, acquireServiceInvocation } from "../../../src/service-admission";
 import { publicationAdminFixture } from "../../../src/test-support/publication-admin";
 import { PublicationAdminClient } from "./publication-client";
 import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
 import type { PublicationJournal } from "./publication-journal";
-import { createPublicationOperationEffects, inspectPublicationOperation, runPublicationClaim, runPublicationCommit, runPublicationRetry } from "./publication-operation";
+import { createPublicationOperationEffects, inspectPublicationOperation, runPublicationClaim, runPublicationCommit, runPublicationRelease, runPublicationRetry } from "./publication-operation";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -468,4 +468,41 @@ test("commit preflight does not adopt another marker or infer an unknown consume
   await expect(runPublicationCommit(setup.journal, setup.effects)).rejects.toThrow("unstarted held owner");
   expect(setup.journal.load().phase).toBe("claimed");
   expect(setup.calls.filter((call) => call === "commit")).toHaveLength(1);
+});
+
+test("release requires its retained execution token and dead-letter evidence before freeing a frozen job", async () => {
+  const setup = await fixture();
+  await runPublicationClaim(setup.journal, setup.effects);
+  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("never replay");
+  await runPublicationCommit(setup.journal, setup.effects);
+  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("retained execution token");
+  expect(setup.journal.load().release).toBeUndefined();
+  await acquireShowExecution(setup.env, "daily", setup.frozen.request.job_id, setup.publicationOperation.show_generation);
+  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("dead-letter evidence");
+  expect(setup.journal.load().release).toBeUndefined();
+  expect(setup.sent).toEqual([]);
+});
+
+test("release frees a frozen dead-lettered publication and the requeued job completes", async () => {
+  const setup = await fixture();
+  await runPublicationClaim(setup.journal, setup.effects);
+  await runPublicationCommit(setup.journal, setup.effects);
+  await acquireShowExecution(setup.env, "daily", setup.frozen.request.job_id, setup.publicationOperation.show_generation);
+  await acquireServiceInvocation(setup.env, "service", "m6_consumer");
+  await setup.bucket.put(`system/jobs/${setup.frozen.request.job_id}/dlq.json`, JSON.stringify({ key: setup.markerKey }));
+  const before = await setup.client.status(setup.frozen);
+  expect(before.execution_active).toBe(true);
+  expect(before.dead_letter_present).toBe(true);
+  await runPublicationRelease(setup.journal, setup.effects);
+  expect(setup.journal.load().release).toEqual({ attempt: 1, state: "released", key: setup.markerKey });
+  expect(setup.calls).toEqual(["claim", "status", "commit", "status", "status", "release"]);
+  expect(setup.sent).toEqual([setup.markerKey]);
+  const owner = (await readShowControl(setup.env, "daily"))!.value.owner!;
+  expect(owner.state).toBe("processing");
+  expect(owner.execution_id).toBeUndefined();
+  await setup.consume(setup.markerKey);
+  const observed = await inspectPublicationOperation(setup.journal, setup.effects);
+  expect(observed.server_status.status?.state).toBe("published");
+  expect(observed.server_status.ownership).toBe("released");
+  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("unfinished held owner");
 });

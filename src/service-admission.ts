@@ -98,6 +98,18 @@ export async function releaseServiceInvocation(env: LifecycleControlEnv, invocat
   throw new Error("Service mutation token return conflicted; admission remains held");
 }
 
+export async function releaseRetainedConsumerInvocation(env: LifecycleControlEnv, serviceId: string): Promise<boolean> {
+  for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
+    const snapshot = await requireService(env, serviceId);
+    const retained = snapshot.value.invocations.filter((item) => item.kind === "m6_consumer");
+    if (retained.length === 0) return false;
+    if (retained.length > 1) return false;
+    if (await write(env, snapshot, { ...snapshot.value,
+      invocations: snapshot.value.invocations.filter((item) => item.kind !== "m6_consumer") })) return true;
+  }
+  throw new Error("Retained consumer invocation return conflicted; admission remains held");
+}
+
 export async function withServiceInvocation<T>(env: LifecycleControlEnv, serviceId: string,
   kind: ServiceInvocationKind, callback: (invocation: ServiceInvocation) => Promise<T>, timingJobId?: string): Promise<T> {
   const invocation = await acquireServiceInvocation(env, serviceId, kind);

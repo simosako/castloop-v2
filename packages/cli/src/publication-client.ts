@@ -19,19 +19,20 @@ export class PublicationAdminClient {
     this.http = new M6AdminJsonClient(config, adminKey, transport);
   }
 
-  private async call(input: PublicationRequest, action: "claim" | "commit" | "retry" | "status"): Promise<PublicationAdminResponse> {
+  private async call(input: PublicationRequest, action: "claim" | "commit" | "retry" | "release" | "status"): Promise<PublicationAdminResponse> {
     const publication = publicationRequestSchema.parse(input);
     const operation = publicationClientOperation(publication);
     const hash = await publicationManifestHash(publication);
     const identity = { schema_version: 1, service_id: this.http.config.service_id, action };
-    const request = publicationAdminRequestSchema.parse(action === "commit" || action === "retry" ? { ...identity, operation, manifest_sha256: hash } :
-      { ...identity, publication });
+    const request = publicationAdminRequestSchema.parse(action === "commit" || action === "retry" || action === "release" ?
+      { ...identity, operation, manifest_sha256: hash } : { ...identity, publication });
     const payload = await this.http.post("publication", request);
     try {
       const value = publicationAdminResponseSchema.parse(payload);
-      const expected = { claim: "claimed", commit: "committed", retry: "requeued", status: "status" }[action];
+      const expected = { claim: "claimed", commit: "committed", retry: "requeued", release: "released", status: "status" }[action];
       if (value.service_id !== this.http.config.service_id || value.result !== expected || value.manifest_sha256 !== hash ||
-        JSON.stringify(value.operation) !== JSON.stringify(operation) || (value.result === "committed" || value.result === "requeued") && value.key !== publicationCommitKey(publication.commit) ||
+        JSON.stringify(value.operation) !== JSON.stringify(operation) ||
+        (value.result === "committed" || value.result === "requeued" || value.result === "released") && value.key !== publicationCommitKey(publication.commit) ||
         value.result === "status" && (JSON.stringify(value.publication) !== JSON.stringify(publication) ||
           value.request_sha256 !== createHash("sha256").update(JSON.stringify(publication.request)).digest("hex"))) {
         throw new Error("Publication response differs from its frozen manifest/control request");
@@ -64,6 +65,12 @@ export class PublicationAdminClient {
   async retry(publication: PublicationRequest): Promise<Result<"requeued">> {
     const value = await this.call(publication, "retry");
     if (value.result !== "requeued") throw new Error("Invalid publication retry result");
+    return value;
+  }
+
+  async release(publication: PublicationRequest): Promise<Result<"released">> {
+    const value = await this.call(publication, "release");
+    if (value.result !== "released") throw new Error("Invalid publication release result");
     return value;
   }
 }

@@ -21,7 +21,7 @@ import { M6SetupClient } from "./m6-setup-client";
 import { M6UpdateClient } from "./m6-update-client";
 import { createM6UpdateRestEffects } from "./m6-update-rest";
 import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
-import { createPublicationOperationEffects, runPublicationRetry } from "./publication-operation";
+import { createPublicationOperationEffects, runPublicationRelease, runPublicationRetry } from "./publication-operation";
 import { readRemoteOperationStatus } from "./remote-operation-status";
 import { createShowRegistrationJournal } from "./show-registration-journal";
 import { createShowRegistrationEffects, runShowRegistration } from "./show-registration-operation";
@@ -36,7 +36,7 @@ export const M6_COMMAND_ARGUMENTS: Record<string, number> = {
   "service-status": 0, "service-pause": 1, "service-resume": 1, "target-show": 1, "target-episode": 2,
   "list-shows": 0, "list-episodes": 1,
   "preview-show-lifecycle": 2, "preview-episode-lifecycle": 3, "lifecycle-execute": 3, "lifecycle-retry": 3,
-  "publication-retry": 1, "operation-status": 2, "create-show": 2, "create-episode": 2,
+  "publication-retry": 1, "publication-release": 1, "operation-status": 2, "create-show": 2, "create-episode": 2,
   "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3,
 };
 
@@ -63,6 +63,13 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
     const journal = createPublicationJournal(root, config, retained.client_state.publication);
     await runPublicationRetry(journal, createPublicationOperationEffects(config, journal.load(), key));
     return { result: "publication-requeued", job_id: args[0] };
+  }
+  if (command === "publication-release") {
+    const retained = readLocalPublicationJob(root, config, args[0]!);
+    if (!retained.client_state || retained.lock_present) throw new Error("Release requires its retained publication journal without an unknown lock");
+    const journal = createPublicationJournal(root, config, retained.client_state.publication);
+    await runPublicationRelease(journal, createPublicationOperationEffects(config, journal.load(), key));
+    return { result: "publication-released", job_id: args[0] };
   }
   if (command === "operation-status") return readRemoteOperationStatus(root, config, args[0]!, args[1]!, () => key);
   if (command === "lifecycle-execute") {

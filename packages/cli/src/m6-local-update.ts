@@ -20,7 +20,7 @@ export class LocalUpdateInspectionError extends Error {
 }
 export type M6LocalUpdateOptions = LocalDraftStagingOptions & { inspector?: Inspection; now?: () => Date };
 export type M6LocalPublishOptions = { audioPath?: string; inspector?: Inspection; now?: () => Date;
-  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status"> };
+  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "release" | "status"> };
 
 function timestamp(now?: () => Date): string {
   return (now?.() ?? new Date()).toISOString().replace(/\.\d{3}Z$/, "Z");

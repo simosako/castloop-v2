@@ -161,6 +161,7 @@ async function main(): Promise<unknown> {
   }
   if (command === "job-status") { command = "operation-status"; positional.unshift("publication"); }
   if (command === "retry-job") command = "publication-retry";
+  if (command === "release-job") command = "publication-release";
   if (Object.hasOwn(M6_COMMAND_ARGUMENTS, command)) {
     const count = command === "publish-episode" && positional.length === 2 ? 2 : M6_COMMAND_ARGUMENTS[command];
     if (positional.length !== count) throw new Error(listing ? commandHelp(command) : "Invalid command arguments; use --help");

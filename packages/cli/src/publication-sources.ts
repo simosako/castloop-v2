@@ -21,7 +21,7 @@ export type LocalPublicationInputs = {
 };
 
 export function createLocalPublicationEffects(config: ServiceConfig, input: PublicationClientState, adminKey: string,
-  local: LocalPublicationInputs, client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">): PublicationOperationEffects {
+  local: LocalPublicationInputs, client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "release" | "status">): PublicationOperationEffects {
   const state = validatePublicationClientState(input);
   const effects = createPublicationOperationEffects(config, state, adminKey, client);
   const frozen = state.publication;

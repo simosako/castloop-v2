@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 type Receipt<Result extends PublicationAdminResponse["result"]> = Extract<PublicationAdminResponse, { result: Result }>;
 export type PublicationOperationEffects = { publication: PublicationRequest; claim: () => Promise<Receipt<"claimed">>;
   commit: () => Promise<Receipt<"committed">>; status: () => Promise<Receipt<"status">>; retry: () => Promise<Receipt<"requeued">>;
-  checkLocalInputs?: () => Promise<void> };
+  release: () => Promise<Receipt<"released">>; checkLocalInputs?: () => Promise<void> };
 
 function load(journal: PublicationJournal, effects: PublicationOperationEffects): PublicationClientState {
   const state = validatePublicationClientState(journal.load());
@@ -87,8 +87,29 @@ export async function runPublicationRetry(journal: PublicationJournal, effects: 
   });
 }
 
+export async function runPublicationRelease(journal: PublicationJournal, effects: PublicationOperationEffects): Promise<void> {
+  await journal.exclusively(async () => {
+    const state = load(journal, effects);
+    if (state.phase !== "committed" || state.release?.state === "requested") {
+      throw new Error("Publication release outcome is unknown or its commit was not acknowledged; never replay its POST");
+    }
+    const status = receipt(state, await effects.status(), "status");
+    if (status.result !== "status" || status.ownership !== "held" || !status.marker_present ||
+      status.status?.state === "published" || status.status?.state === "abandoned") {
+      throw new Error("Publication release requires its unfinished held owner");
+    }
+    if (!status.execution_active) throw new Error("Publication release requires its retained execution token; use publication-retry without one");
+    if (!status.dead_letter_present) throw new Error("Publication release requires its dead-letter evidence of ended delivery attempts");
+    const started = validatePublicationClientState({ ...state, release: { attempt: (state.release?.attempt ?? 0) + 1, state: "requested" } });
+    journal.save(started);
+    const value = receipt(started, await effects.release(), "released");
+    if (value.result !== "released") throw new Error("Invalid publication release receipt");
+    journal.save({ ...started, release: { ...started.release!, state: "released", key: value.key } });
+  });
+}
+
 export function createPublicationOperationEffects(configInput: ServiceConfig, input: PublicationClientState, adminKey: string,
-  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">): PublicationOperationEffects {
+  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "release" | "status">): PublicationOperationEffects {
   const config = serviceConfigSchema.parse(configInput);
   const state = validatePublicationClientState(input);
   if (JSON.stringify(state.identity) !== JSON.stringify(serviceOperationIdentity(config))) {
@@ -96,5 +117,6 @@ export function createPublicationOperationEffects(configInput: ServiceConfig, in
   }
   const api = client ?? new PublicationAdminClient(config, adminKey);
   const publication = state.publication;
-  return { publication, claim: () => api.claim(publication), commit: () => api.commit(publication), retry: () => api.retry(publication), status: () => api.status(publication) };
+  return { publication, claim: () => api.claim(publication), commit: () => api.commit(publication), retry: () => api.retry(publication),
+    release: () => api.release(publication), status: () => api.status(publication) };
 }

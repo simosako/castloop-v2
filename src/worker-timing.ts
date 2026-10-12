@@ -4,7 +4,7 @@ type WorkerTimingPhase = "publication.consumer" | "publication.guard" | "publica
   "publication.unique_guid" | "publication.audio" | "publication.feed_inputs" | "publication.purge" |
   `publication.progress.${LifecycleProgress["phase"]}` | `publication.status_write.${"processing" | "retrying" | "published"}` |
   "publication.history_write" | "publication.metadata_write" | "publication.feed_write" | "publication.owner_release" | "publication.invocation_release" |
-  "publication.claim" | "publication.commit" | "publication.retry" | "publication.status" |
+  "publication.claim" | "publication.commit" | "publication.retry" | "publication.release" | "publication.status" |
   "staging.claim" | "staging.begin" | "staging.settle" | "staging.finish" | "staging.status";
 
 function emit(record: object): void {
