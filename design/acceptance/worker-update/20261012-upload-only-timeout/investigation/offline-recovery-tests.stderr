@@ -1,0 +1,32 @@
+
+diagnostics/rss-a8c7e54-update-recovery.test.ts:
+ZodError: [
+  {
+    "code": "custom",
+    "message": "M6 mode requires durable runtime readiness evidence",
+    "path": []
+  },
+  {
+    "code": "custom",
+    "message": "Compatible M6 updates require their paused owner, previous readiness and exact new target without live invocations",
+    "path": []
+  }
+]
+(fail) offline: post-upload-settings-get leaves upload-only journal and refuses automatic replay [6.12ms]
+ZodError: [
+  {
+    "code": "custom",
+    "message": "M6 mode requires durable runtime readiness evidence",
+    "path": []
+  },
+  {
+    "code": "custom",
+    "message": "Compatible M6 updates require their paused owner, previous readiness and exact new target without live invocations",
+    "path": []
+  }
+]
+(fail) offline: activation-post-response-unknown leaves upload-only journal and refuses automatic replay [0.59ms]
+
+ 0 pass
+ 2 fail
+Ran 2 tests across 1 file. [54.00ms]

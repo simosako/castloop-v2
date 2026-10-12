@@ -1,0 +1,7 @@
+commit a8c7e54e8c326ef238a2fcd9d672a27b002bec66
+Author:     Akira Shimosako <[REDACTED_EMAIL]>
+AuthorDate: Mon Oct 12 18:59:14 2026 +0900
+Commit:     Akira Shimosako <[REDACTED_EMAIL]>
+CommitDate: Mon Oct 12 18:59:14 2026 +0900
+
+    perf: use episode catalogs and reuse staging verification records

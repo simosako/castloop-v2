@@ -1,0 +1,10 @@
+{
+  "unmodified_product_source": true,
+  "workspace_update_journal_bytes_unchanged": true,
+  "source_inputs_completed_cursor_config_local_toml_hashes_unchanged": true,
+  "product_update_tests_passed": 3,
+  "offline_simulation_tests_passed": 2,
+  "live_mutations_performed": false,
+  "performance_jobs_performed": 0,
+  "github_shared": false
+}

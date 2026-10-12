@@ -1,0 +1,31 @@
+{
+  "performance_measurement_started": false,
+  "cli_build_success": true,
+  "unit_tests_passed": 977,
+  "deploy_exit_code": 1,
+  "failed_read": "Cloudflare GET Worker settings: operation timed out",
+  "service_state": "updating",
+  "service_invocation_count": 0,
+  "invocation_kinds": [],
+  "worker_version_id": "6d3d011d-e720-42b6-80b0-41f2830128ff",
+  "worker_version_unchanged": true,
+  "post_stop_target_show_verified": false,
+  "post_stop_target_error": "Target inspection response was not verified [http_status=409] [reason_code=management_http_rejected]",
+  "source_input_cursor_toml_hashes_unchanged": true,
+  "changed_update_journals": [
+    {
+      "filename": "3ad4f8af-7552-40a2-9525-8bf434a6146e.json",
+      "phase": "deploy_requested",
+      "upload_receipt_present": true,
+      "deployment_receipt_present": false,
+      "target_present": false
+    }
+  ],
+  "deploy_replayed": false,
+  "resume_performed": false,
+  "operation_id": "3ad4f8af-7552-40a2-9525-8bf434a6146e",
+  "acknowledged_uploaded_version_id": "846ac0df-94dc-4c26-af27-7d189c7f159b",
+  "standard_update_verify_requires_both_receipts": true,
+  "standard_update_verify_preconditions_satisfied": false,
+  "deploy_command_elapsed_ms": 81348.109500992
+}

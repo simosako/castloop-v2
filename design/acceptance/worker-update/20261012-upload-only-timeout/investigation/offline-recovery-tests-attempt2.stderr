@@ -1,0 +1,35 @@
+
+diagnostics/rss-a8c7e54-update-recovery.test.ts:
+81 |     try {
+82 |       const api = new CloudflareApi(config);
+83 |       const effects = createM6UpdateRestEffects(api, { begin: async () => {}, admission: async () => admission,
+84 |         complete: async () => { throw new Error("Completion must never be reached"); } });
+85 |       const journal = await createM6UpdateJournal(root, config, request);
+86 |       await expect(runM6Update(journal, effects, source, metadata)).rejects.toThrow("The operation timed out.");
+                                                                                 ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "The operation timed out."
+Received message: "Management requires its matching workers.dev HTTPS origin without credentials, path, query or port"
+
+      at <anonymous> ([LOCAL_TEST_ROOT]/diagnostics/rss-a8c7e54-update-recovery.test.ts:86:77)
+(fail) offline: post-upload-settings-get leaves upload-only journal and refuses automatic replay [10.94ms]
+81 |     try {
+82 |       const api = new CloudflareApi(config);
+83 |       const effects = createM6UpdateRestEffects(api, { begin: async () => {}, admission: async () => admission,
+84 |         complete: async () => { throw new Error("Completion must never be reached"); } });
+85 |       const journal = await createM6UpdateJournal(root, config, request);
+86 |       await expect(runM6Update(journal, effects, source, metadata)).rejects.toThrow("The operation timed out.");
+                                                                                 ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "The operation timed out."
+Received message: "Management requires its matching workers.dev HTTPS origin without credentials, path, query or port"
+
+      at <anonymous> ([LOCAL_TEST_ROOT]/diagnostics/rss-a8c7e54-update-recovery.test.ts:86:77)
+(fail) offline: activation-post-response-unknown leaves upload-only journal and refuses automatic replay [1.44ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [71.00ms]

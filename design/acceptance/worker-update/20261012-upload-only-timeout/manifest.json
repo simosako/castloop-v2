@@ -1,0 +1,626 @@
+[
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/baseline-hashes.json",
+    "local_source": "evidence/rss-performance-a8c7e54/baseline-hashes.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "08cc7152dd397a3450ab7a1922578ec09e4620eb72ed86304d9efa1ba7b2390d"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-service.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/before-service.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "bbd541da348b2b8b1ed7b42b62009223b14373bb0cc9268b4afba8ae7b37cca0"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-service.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/before-service.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-service.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/before-service.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-service.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/before-service.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "b2ca1cc1eb88b40388603f9b2a10d544c2e2c656eade9b82c92ccc938fdb1f9a"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-show-0.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/before-show-0.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "a2d5ec8ea566db9515029b17cbd2466827d99cf1263972813b5a560ba52b4aa9"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-show-0.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/before-show-0.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-show-0.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/before-show-0.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-show-0.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/before-show-0.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9fa6bf5de72f72b58247f9713216ac054338e507c4341de165da2facc74d9685"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-shows.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/before-shows.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "4f2f7a5db0bfb6e5edfb0dd91f0bd52e7d3bfbcab0b76859d940b2d90a5f4701"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-shows.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/before-shows.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-shows.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/before-shows.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/before-shows.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/before-shows.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "2024e74204b5e038acac6e7635c5a5d79ad76e2144073f5af34363145fd564b2"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/build-identity.json",
+    "local_source": "evidence/rss-performance-a8c7e54/build-identity.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "2fbc4687cd45c33e1e1cb2ec2b67a7953e1c485fb1fd64394f8b128008c6e155"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/build.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/build.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "802f4224aa12884c69a79a8e0320b23a78048594d3f4ed4fa257cdad21912eb5"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/build.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/build.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/build.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/build.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/build.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/build.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "83b0eeedc1e3c9fdf94bef2a11667409dfe90cba369f0e445813769e78a899cc"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/bun-test.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/bun-test.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "95d1a215fbf94851f94c0002b498224996762836382597eaf7a5041f27033207"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/bun-test.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/bun-test.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/bun-test.stderr-summary.txt",
+    "local_source": "evidence/rss-performance-a8c7e54/bun-test.stderr",
+    "treatment": "aggregate product test counts only",
+    "published_sha256": "2ec7e1d9fb4e0743ce7b528412227bdf9f4ae855038cd6c0e09445e1d000e969"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/check.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/check.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "d29dff486711311ba4f34ec91ca60fbddd5f43821d461209add76197b2247c8c"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/check.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/check.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/check.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/check.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/check.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/check.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "6bae55e7f5f01e2eb012dbc23c0617357d9f67893bd1bd821f38744917d42c33"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-tests.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-tests.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "7ba8cac4008f05e51e29fe9237b88e5bd6a8bacb99f4603a5940a85efd8a4f25"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-tests.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-tests.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-tests.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-tests.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "34f56f19c742db45d14f27dd59ca204be898363fbdc61ae09c5c5cbaf0994731"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-tests.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-tests.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-deploy.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/install-deploy.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "cccabf77b6eb9adf3e2b61fa2379dd44289b2d2209d12aec556c732b3b83e14b"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-deploy.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/install-deploy.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-deploy.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/install-deploy.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "0509d47910324fcc8a09caa8ab5ee54e56cb3b1ea0c8a698517c5b045b370953"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-deploy.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/install-deploy.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-pause-id.json",
+    "local_source": "evidence/rss-performance-a8c7e54/install-pause-id.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "23925ee674e941470b1e82f9272cfc10c9ccf85b1bf4d414c2255a3013632277"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-pause.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/install-pause.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "2c431399829a4ec025eaac1ee9ec4168d89753ac682f179fededaf22998522cb"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-pause.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/install-pause.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-pause.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/install-pause.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-pause.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/install-pause.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "008c3482181142960db137000763b0e238174fb19b5ce61ac922ea1ee0e49a0e"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-paused.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/install-paused.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "90f50aa2098ef48a7533a4c9f61ad822fb0ee7cd4c2dc5369c41d700bf978678"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-paused.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/install-paused.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-paused.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/install-paused.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/install-paused.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/install-paused.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "06b038808bd82b6384a7a4f77a1d4944aadbc611db6c0abc7dc2d4459b337aa3"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/npm-ci.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/npm-ci.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "4309a19279f861b76c2e510db57a59cc368deffe585f1522855d284fcf65093b"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/npm-ci.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/npm-ci.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/npm-ci.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/npm-ci.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/npm-ci.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/npm-ci.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "fca60e1b6cc6761a96b650353d10239f7d43f499ef92af8062638d8c397f2f01"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/result.md",
+    "local_source": "evidence/rss-performance-a8c7e54/result.md",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "13c9846fd7979c4d9ea42ab8ad10acc5df1b13f08b7586134eb61a988eb58d2e"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-change-summary.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/source-change-summary.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "8c51013bd711be0ddb0c2a0056657de8a73685084981884cb6726dcd07b436bd"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-commit.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/source-commit.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "ea36f9c696ae18208f090b609a4dd442d4dbcd3089dca83d89ab1f60cda9bd73"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-head.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/source-head.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e39ab3ae3f9fe6c027a221f52459fc5e56c78b9af8bb9c4948457f84d8615bcd"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-head.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/source-head.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-head.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/source-head.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-head.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/source-head.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "0676eff0e9e389bbe0e1b3e030b1a536a346066d30163cd4e73a75bd0a5491db"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-status.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/source-status.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "3230cca4b58f2163e0ee1537f776620819ca3565bfb36d75ce6a083f63444b58"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-status.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/source-status.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-status.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/source-status.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/source-status.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/source-status.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-service-status.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-service-status.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "7dcc4562a3c07a69cfcc7436bea4ac62a734ed2ff377f90d6dc872facf43f0f4"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-service-status.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-service-status.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-service-status.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-service-status.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-service-status.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-service-status.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "6733dc93df5b562077e45ee477a039521859c3bd43df4505377f1313e111dbd9"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-summary.json",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-summary.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "243339151f4acf6542f9b2b90f801782cf436ebce40919de528516708428ea45"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-target-show.elapsed.json",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-target-show.elapsed.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "65b5365d77c2adb85c8320088c40d3b8c98ab669043fab13147f39e7e2875d91"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-target-show.exit-code",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-target-show.exit-code",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-target-show.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-target-show.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e4345990423e9aa525098d7be00b51c7e29b7afe43bad28e5f51f49ac33f9a01"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/stopped-target-show.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-target-show.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/update-investigation.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "0855cde43e2a6452cf8b58e31f40327ff9ecdfce6a3e7a761db21640f88510e7"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/update-investigation.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/update-recovery-unit-tests.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/update-recovery-unit-tests.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "5dd52eea5daab1c85da2f5541fd03dcc5c25bd65f98a07acfa036f50138cc8f0"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/update-recovery-unit-tests.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/update-recovery-unit-tests.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "93e17c6d85569f385aa7b45405c874ee0eea42e855761a831066dd5dcffcdf89"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/failure.json",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/failure.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "089425b4ae5d6f2cd67929e5c92f85b2217244912d5546d11d2193b5a80225d1"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/findings.md",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/findings.md",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "c2f954662e960176ef137db58c01171848f5d5dcf7b754861d1ae786853bb0c8"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/investigation-validation.json",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/investigation-validation.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "ff59c5bb909f0c1dbca2fa3384a9dee2c42fb8430df2982c6b2484648778d750"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-activation-post-response-unknown.json",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-activation-post-response-unknown.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "8fbe96e6682a4f6793edc9c54b9d0f2c450c38f851c9c932ac8bfff29a8bb078"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-post-upload-settings-get.json",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-post-upload-settings-get.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "6d4ac0d4ed9cf6d5cffdc36534e55793ab1c2346ee4edf0c8f2642a77d91bc76"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-recovery-tests-attempt2.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-recovery-tests-attempt2.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "b4c022c2e232502e97f86e738ee9141b996fbceb8b155a41aa893f1e3f73f4a5"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-recovery-tests-attempt2.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-recovery-tests-attempt2.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "93e17c6d85569f385aa7b45405c874ee0eea42e855761a831066dd5dcffcdf89"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-recovery-tests-attempt3.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-recovery-tests-attempt3.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "8711a238d404a8832a853c5738c5ca991d913709deaa4033503749102e3c289e"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-recovery-tests-attempt3.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-recovery-tests-attempt3.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "93e17c6d85569f385aa7b45405c874ee0eea42e855761a831066dd5dcffcdf89"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-recovery-tests.stderr",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-recovery-tests.stderr",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "52a9b2bd4621eeb05a71bcc6e61424a1e36d789c34806b7d492f2fe62bee8987"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/offline-recovery-tests.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/offline-recovery-tests.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "93e17c6d85569f385aa7b45405c874ee0eea42e855761a831066dd5dcffcdf89"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/partial-findings.json",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/partial-findings.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "56725af87e4d7f22b5c56b207688d228d421d717aec70ca07eb41ce8ca525d49"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/read-timings.json",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/read-timings.json",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "0b7de14395149d3a30cbfc1775166ab7a9888d15da9799fbd3d3dbfee8928c46"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/source-status.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/source-status.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/update-engine-source-diff.stdout",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/update-engine-source-diff.stdout",
+    "treatment": "sanitized diagnostic evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/journals/3ad4f8af-7552-40a2-9525-8bf434a6146e.json",
+    "local_source": "evidence/rss-performance-a8c7e54/stopped-private-update-journals/3ad4f8af-7552-40a2-9525-8bf434a6146e.json",
+    "treatment": "redacted upload-only journal for analysis; NOT usable for restoration or recovery",
+    "published_sha256": "d516e836d06de27ef334102426bb3972107169c0bdbf367ad0a493c248cf78fb"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-source/rss-performance-a8c7e54.py",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-source/rss-performance-a8c7e54.py",
+    "treatment": "historical diagnostic helper snapshot with local path placeholders",
+    "published_sha256": "42d65c31d44360cfa1e20c251a85eee9021cdbe1efc53ecf296c0a1b064c8b8f"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-source/rss-performance-tail.ts",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-source/rss-performance-tail.ts",
+    "treatment": "historical diagnostic helper snapshot with local path placeholders",
+    "published_sha256": "2701615c797ddb60ec5b366956d84929ffbc477bd4c23b3fb3aa5c1fa2f4891e"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-source/rss_performance_wait.py",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-source/rss_performance_wait.py",
+    "treatment": "historical diagnostic helper snapshot with local path placeholders",
+    "published_sha256": "5a4756f5aa030fa5ccd7d92a2a0e4cc8f819b459623779f5f9d2aa9a5abb77a4"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-source/test-plan-rss-performance-a8c7e54.md",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-source/test-plan-rss-performance-a8c7e54.md",
+    "treatment": "historical diagnostic helper snapshot with local path placeholders",
+    "published_sha256": "a248e9fab0b5685b574e37227c7e3b1fa5b7ada82f2dbdfb58bc745c06cfcb06"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/evidence/harness-source/test_rss_performance_wait.py",
+    "local_source": "evidence/rss-performance-a8c7e54/harness-source/test_rss_performance_wait.py",
+    "treatment": "historical diagnostic helper snapshot with local path placeholders",
+    "published_sha256": "43cccff228fa4be3e1a41da7ee93ce5813bc49dcd3102b3b63293fb780ec4505"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/harness-source/rss-a8c7e54-update-investigate.ts",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/harness-source/rss-a8c7e54-update-investigate.ts",
+    "treatment": "historical diagnostic helper snapshot with local path placeholders",
+    "published_sha256": "955cd13385888650eea04e8797700a089298bda5ee488bd83f852f9801f51c50"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/investigation/harness-source/rss-a8c7e54-update-recovery.test.ts",
+    "local_source": "evidence/rss-performance-a8c7e54/update-investigation/harness-source/rss-a8c7e54-update-recovery.test.ts",
+    "treatment": "historical diagnostic helper snapshot with local path placeholders",
+    "published_sha256": "73f29183d753dd6c9d80aaa1e4f4c85d5eba91c9f42125e33563bce6d4c99830"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/logs/test-20261012.log",
+    "local_source": "test-20261012.log",
+    "treatment": "sanitized activity/plan snapshot",
+    "published_sha256": "bc58d3edea48634934458805694c208bacd868bb4f3bd4989e7d19b5a4f501b1"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/logs/test-plan-rss-performance-a8c7e54.md",
+    "local_source": "test-plan-rss-performance-a8c7e54.md",
+    "treatment": "sanitized activity/plan snapshot",
+    "published_sha256": "a248e9fab0b5685b574e37227c7e3b1fa5b7ada82f2dbdfb58bc745c06cfcb06"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/rss-performance-a8c7e54.py",
+    "local_source": "diagnostics/rss-performance-a8c7e54.py",
+    "treatment": "local diagnostic/helper source only; adapt placeholders/import locations before use",
+    "published_sha256": "42d65c31d44360cfa1e20c251a85eee9021cdbe1efc53ecf296c0a1b064c8b8f"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/rss-performance-tail.ts",
+    "local_source": "diagnostics/rss-performance-tail.ts",
+    "treatment": "local diagnostic/helper source only; adapt placeholders/import locations before use",
+    "published_sha256": "2701615c797ddb60ec5b366956d84929ffbc477bd4c23b3fb3aa5c1fa2f4891e"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/rss_performance_wait.py",
+    "local_source": "diagnostics/rss_performance_wait.py",
+    "treatment": "local diagnostic/helper source only; adapt placeholders/import locations before use",
+    "published_sha256": "5a4756f5aa030fa5ccd7d92a2a0e4cc8f819b459623779f5f9d2aa9a5abb77a4"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/test_rss_performance_wait.py",
+    "local_source": "diagnostics/test_rss_performance_wait.py",
+    "treatment": "local diagnostic/helper source only; adapt placeholders/import locations before use",
+    "published_sha256": "43cccff228fa4be3e1a41da7ee93ce5813bc49dcd3102b3b63293fb780ec4505"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/dns-direct.py",
+    "local_source": "diagnostics/dns-direct.py",
+    "treatment": "local diagnostic/helper source only; adapt placeholders/import locations before use",
+    "published_sha256": "e2701aa632bbfe1edcf2a88264f4f12c18abb2ad0cb3c131aed093b1a18a8090"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/rss-a8c7e54-update-investigate.ts",
+    "local_source": "diagnostics/rss-a8c7e54-update-investigate.ts",
+    "treatment": "local diagnostic/helper source only; adapt placeholders/import locations before use",
+    "published_sha256": "955cd13385888650eea04e8797700a089298bda5ee488bd83f852f9801f51c50"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/rss-a8c7e54-update-recovery.test.ts",
+    "local_source": "diagnostics/rss-a8c7e54-update-recovery.test.ts",
+    "treatment": "local diagnostic/helper source only; adapt placeholders/import locations before use",
+    "published_sha256": "73f29183d753dd6c9d80aaa1e4f4c85d5eba91c9f42125e33563bce6d4c99830"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/diagnostics/publication-sanitizer.py",
+    "local_source": "prepare-public-evidence-worker-update-upload-only.py",
+    "treatment": "sanitization/export source, not product code; uses local path placeholders",
+    "published_sha256": "011b1571769b0c4da5d18724947e70221411800278519edea2c1c633eb47d791"
+  },
+  {
+    "repository_path": "design/acceptance/worker-update/20261012-upload-only-timeout/README.md",
+    "local_source": "prepare-public-evidence-worker-update-upload-only.py",
+    "treatment": "publication index with safety/snapshot qualifications",
+    "published_sha256": "505a278761a8181a799fa46c7edfd30f3eb02456cbb3b5ecffe627f1bcb8c72e"
+  }
+]

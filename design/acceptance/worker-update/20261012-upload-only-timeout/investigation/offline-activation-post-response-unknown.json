@@ -1,0 +1,151 @@
+{
+  "failure": "activation-post-response-unknown",
+  "simulated_only": true,
+  "real_cloudflare_requests": 0,
+  "fixture_directory": "[REDACTED_FIXTURE_PATH]",
+  "mocked_writes": [
+    "versions",
+    "deployments"
+  ],
+  "retained_phase": "deploy_requested",
+  "upload_receipt_present": true,
+  "deployment_receipt_present": false,
+  "target_present": false,
+  "normal_replay_rejected_before_any_new_requests": true,
+  "verification_rejected_without_both_receipts": true,
+  "real_workspace_journal_bytes_unchanged": true,
+  "mock_calls": [
+    {
+      "method": "GET",
+      "endpoint": "domains"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "e5cdcdb8-55b8-492d-9a4c-0e4eacc2a848"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "subdomain"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "subdomain"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "domains"
+    },
+    {
+      "method": "GET",
+      "endpoint": "versions"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "versions"
+    },
+    {
+      "method": "POST",
+      "endpoint": "versions"
+    },
+    {
+      "method": "GET",
+      "endpoint": "582d5ee3-1057-4e81-8329-981ba156b78f"
+    },
+    {
+      "method": "GET",
+      "endpoint": "domains"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "e5cdcdb8-55b8-492d-9a4c-0e4eacc2a848"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "subdomain"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "subdomain"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "domains"
+    },
+    {
+      "method": "GET",
+      "endpoint": "versions"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "versions"
+    },
+    {
+      "method": "POST",
+      "endpoint": "deployments"
+    }
+  ]
+}

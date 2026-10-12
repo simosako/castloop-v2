@@ -1,0 +1,19 @@
+{
+  "read_only": true,
+  "partial_investigation": true,
+  "settings_read_ms": 419.57624899999996,
+  "settings_match_frozen_intent": true,
+  "active_deployment_id": "d3526d87-c1d1-41fd-8efa-5419810fe5bb",
+  "active_worker_versions": [
+    {
+      "version_id": "6d3d011d-e720-42b6-80b0-41f2830128ff",
+      "percentage": 100
+    }
+  ],
+  "active_deployment_matches_pre_update": true,
+  "new_version_currently_active": false,
+  "versions_list_read_timed_out": true,
+  "latest_two_versions_and_uploaded_etag_not_live_verified": true,
+  "update_engine_unchanged_from_4781fad": true,
+  "mutations_sent": false
+}

@@ -1,0 +1,20 @@
+ design/m7_publication_performance_plan.md | 121 ++++++++++++++++---
+ docs/rss_migration.md                     |  11 +-
+ packages/shared/src/lifecycle.ts          |   1 +
+ src/episode-catalog.test.ts               | 106 +++++++++++++++++
+ src/episode-catalog.ts                    | 186 ++++++++++++++++++++++++++++++
+ src/lifecycle-control.ts                  |  27 ++++-
+ src/lifecycle-delete.test.ts              |   2 +-
+ src/lifecycle-delete.ts                   |   2 +
+ src/lifecycle-deletion.ts                 |   2 +-
+ src/lifecycle-feed.ts                     |  44 ++++++-
+ src/lifecycle-mutations.ts                |   5 +-
+ src/lifecycle-unpublish.test.ts           |   2 +-
+ src/lifecycle-unpublish.ts                |   2 +
+ src/publication-episode-runner.test.ts    |   4 +
+ src/publication-episode-runner.ts         |  48 +++-----
+ src/staging-upload.ts                     |  24 +++-
+ src/staging-verification.test.ts          |  43 ++++++-
+ src/staging-verification.ts               |  21 ++--
+ src/test-support/publication.ts           |  10 ++
+ 19 files changed, 586 insertions(+), 75 deletions(-)

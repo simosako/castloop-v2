@@ -1,0 +1,94 @@
+{
+  "failure": "post-upload-settings-get",
+  "simulated_only": true,
+  "real_cloudflare_requests": 0,
+  "fixture_directory": "[REDACTED_FIXTURE_PATH]",
+  "mocked_writes": [
+    "versions"
+  ],
+  "retained_phase": "deploy_requested",
+  "upload_receipt_present": true,
+  "deployment_receipt_present": false,
+  "target_present": false,
+  "normal_replay_rejected_before_any_new_requests": true,
+  "verification_rejected_without_both_receipts": true,
+  "real_workspace_journal_bytes_unchanged": true,
+  "mock_calls": [
+    {
+      "method": "GET",
+      "endpoint": "domains"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "400b3d9e-3381-4769-b1e9-c6c1f4f812fe"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "subdomain"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "subdomain"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "domains"
+    },
+    {
+      "method": "GET",
+      "endpoint": "versions"
+    },
+    {
+      "method": "GET",
+      "endpoint": "deployments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "versions"
+    },
+    {
+      "method": "POST",
+      "endpoint": "versions"
+    },
+    {
+      "method": "GET",
+      "endpoint": "0209f259-da68-4ee8-820f-880b56ec9ae1"
+    },
+    {
+      "method": "GET",
+      "endpoint": "domains"
+    },
+    {
+      "method": "GET",
+      "endpoint": "settings"
+    }
+  ]
+}

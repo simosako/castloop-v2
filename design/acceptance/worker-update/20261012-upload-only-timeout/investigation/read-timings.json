@@ -1,0 +1,22 @@
+[
+  {
+    "name": "settings-before",
+    "method": "GET",
+    "elapsed_ms": 419.57624899999996,
+    "success": true,
+    "status": 200
+  },
+  {
+    "name": "deployments-before",
+    "method": "GET",
+    "elapsed_ms": 1093.2504210000002,
+    "success": true,
+    "status": 200
+  },
+  {
+    "name": "versions-before",
+    "method": "GET",
+    "elapsed_ms": 30001.971744,
+    "success": false
+  }
+]
