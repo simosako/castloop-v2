@@ -5,14 +5,17 @@ import { createLocalJournalStorage } from "./local-journal-storage";
 import { ensureLocalJournalParents, localJournalEntryExists } from "./local-journal-path";
 import { workerPayloadHash } from "./worker-upload-hash";
 
-const stateSchema = z.object({ schema_version: z.literal(1), config: serviceConfigSchema, request: m6ServiceUpdateRequestSchema,
+const stateSchema = z.object({ schema_version: z.union([z.literal(1), z.literal(2)]), config: serviceConfigSchema, request: m6ServiceUpdateRequestSchema,
   phase: z.enum(["prepared", "begin_requested", "admitted", "deploy_requested", "deployed", "completion_requested", "completed"]),
   upload_receipt: workerVersionUploadReceiptSchema.optional(), deployment_receipt: m6RuntimeTargetSchema.optional(),
+  activation_checkpoint: z.object({ previous_deployment_id: m6RuntimeTargetSchema.shape.deployment_id,
+    state: z.enum(["not_started", "requested"]) }).strict().optional(),
   target: m6RuntimeTargetSchema.optional(), runtime_readiness: m6RuntimeReadinessSchema.optional() }).strict();
 export type M6UpdateClientState = z.infer<typeof stateSchema>;
 export type M6UpdateJournal = { load: () => M6UpdateClientState; save: (state: M6UpdateClientState) => void;
   exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
-export type M6UpdateDeployReceipts = { uploaded: (receipt: WorkerVersionUploadReceipt) => void;
+export type M6UpdateDeployReceipts = { uploaded: (receipt: WorkerVersionUploadReceipt, previousDeploymentId: string) => void;
+  activating: () => void;
   deployed: (receipt: { deployment_id: string; worker_version_id: string }) => void };
 export type M6UpdateEffects = {
   begin: (request: M6ServiceUpdateRequest) => Promise<void>;
@@ -20,12 +23,20 @@ export type M6UpdateEffects = {
     receipts?: M6UpdateDeployReceipts) => Promise<{ deployment_id: string; worker_version_id: string }>;
   verifyDeployment?: (config: ServiceConfig, request: M6ServiceUpdateRequest, upload: WorkerVersionUploadReceipt,
     deployment: M6RuntimeTarget) => Promise<{ deployment_id: string; worker_version_id: string }>;
+  activate?: (config: ServiceConfig, request: M6ServiceUpdateRequest, upload: WorkerVersionUploadReceipt,
+    previousDeploymentId: string, receipts: M6UpdateDeployReceipts) => Promise<{ deployment_id: string; worker_version_id: string }>;
   complete: (request: M6ServiceUpdateRequest, target: M6RuntimeTarget) => Promise<M6RuntimeReadiness>;
 };
 
 function validate(input: unknown): M6UpdateClientState {
   const state = stateSchema.parse(input);
   const phase = stateSchema.shape.phase.options.indexOf(state.phase);
+  if (state.schema_version === 1 && state.activation_checkpoint ||
+    state.schema_version === 2 && !!state.upload_receipt !== !!state.activation_checkpoint ||
+    state.activation_checkpoint && (phase < 3 || !state.upload_receipt ||
+      state.activation_checkpoint.state === "not_started" && (phase !== 3 || !!state.deployment_receipt))) {
+    throw new Error("Compatible update journal has inconsistent activation checkpoint");
+  }
   if (state.config.service_id !== state.request.service_id || (phase >= 4) !== (state.target !== undefined) ||
     (phase === 6) !== (state.runtime_readiness !== undefined) || state.target &&
     (state.target.operation_id !== state.request.operation_id || state.target.service_config_sha256 !== state.request.service_config_sha256 ||
@@ -65,7 +76,7 @@ export async function createM6UpdateJournal(root: string, configInput: ServiceCo
     }
     return state;
   };
-  storage.initialize({ schema_version: 1, config, request, phase: "prepared" });
+  storage.initialize({ schema_version: 2, config, request, phase: "prepared" });
   load();
   return { load, exclusively: storage.exclusively, save: (input) => {
     storage.requireLock();
@@ -73,9 +84,16 @@ export async function createM6UpdateJournal(root: string, configInput: ServiceCo
     const previous = load();
     const phases = stateSchema.shape.phase.options;
     const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
-    const { upload_receipt: _previousUpload, deployment_receipt: _previousDeployment, ...previousState } = previous;
-    const { upload_receipt: _nextUpload, deployment_receipt: _nextDeployment, ...nextState } = next;
-    if (JSON.stringify(next.config) !== JSON.stringify(config) || JSON.stringify(next.request) !== JSON.stringify(request) ||
+    const { upload_receipt: _previousUpload, deployment_receipt: _previousDeployment, activation_checkpoint: previousCheckpoint, ...previousState } = previous;
+    const { upload_receipt: _nextUpload, deployment_receipt: _nextDeployment, activation_checkpoint: nextCheckpoint, ...nextState } = next;
+    const checkpointChanged = JSON.stringify(previousCheckpoint) !== JSON.stringify(nextCheckpoint);
+    if (checkpointChanged && !(previous.schema_version === 2 && previous.phase === "deploy_requested" && next.phase === "deploy_requested" &&
+      (!previousCheckpoint && !previous.upload_receipt && next.upload_receipt && nextCheckpoint?.state === "not_started" ||
+        previousCheckpoint?.state === "not_started" && nextCheckpoint?.state === "requested" &&
+        previousCheckpoint.previous_deployment_id === nextCheckpoint.previous_deployment_id))) {
+      throw new Error("Compatible update cannot infer or rewrite its activation checkpoint");
+    }
+    if (next.schema_version !== previous.schema_version || JSON.stringify(next.config) !== JSON.stringify(config) || JSON.stringify(next.request) !== JSON.stringify(request) ||
       distance < 0 || distance > 1 || distance === 0 && JSON.stringify(nextState) !== JSON.stringify(previousState) ||
       previous.upload_receipt && JSON.stringify(previous.upload_receipt) !== JSON.stringify(next.upload_receipt) ||
       previous.deployment_receipt && JSON.stringify(previous.deployment_receipt) !== JSON.stringify(next.deployment_receipt) ||
@@ -84,6 +102,25 @@ export async function createM6UpdateJournal(root: string, configInput: ServiceCo
       previous.target && JSON.stringify(previous.target) !== JSON.stringify(next.target)) throw new Error("Compatible update cannot rewrite receipts or skip phases");
     storage.replace(next);
   } };
+}
+
+function deployReceipts(journal: M6UpdateJournal): M6UpdateDeployReceipts {
+  return {
+    uploaded: (receipt, previousDeploymentId) => journal.save({ ...journal.load(), upload_receipt: receipt,
+      activation_checkpoint: { previous_deployment_id: previousDeploymentId, state: "not_started" } }),
+    activating: () => {
+      const state = journal.load();
+      if (state.phase !== "deploy_requested" || state.activation_checkpoint?.state !== "not_started") {
+        throw new Error("Activation requires its durable not-started checkpoint; preserve unknown requests without replay");
+      }
+      journal.save({ ...state, activation_checkpoint: { ...state.activation_checkpoint, state: "requested" } });
+    },
+    deployed: (receipt) => {
+      const state = journal.load();
+      journal.save({ ...state, deployment_receipt: m6RuntimeTargetSchema.parse({ ...receipt,
+        operation_id: state.request.operation_id, service_config_sha256: state.request.service_config_sha256 }) });
+    },
+  };
 }
 
 async function complete(journal: M6UpdateJournal, effects: M6UpdateEffects): Promise<void> {
@@ -100,6 +137,7 @@ export async function runM6Update(journal: M6UpdateJournal, effects: M6UpdateEff
   await journal.exclusively(async () => {
     let state = journal.load();
     if (state.phase !== "prepared") throw new Error("Compatible update may already have started; preserve unknown requests without replay");
+    if (state.schema_version !== 2) throw new Error("Legacy compatible update journals cannot start the activation-checkpoint protocol");
     if (workerPayloadHash(source) !== state.request.worker_source_sha256 || workerPayloadHash(frozenMetadata) !== state.request.worker_metadata_sha256) {
       throw new Error("Compatible update source or metadata differs from its frozen request");
     }
@@ -107,14 +145,25 @@ export async function runM6Update(journal: M6UpdateJournal, effects: M6UpdateEff
     await effects.begin(state.request);
     journal.save({ ...state, phase: "admitted" });
     journal.save({ ...state, phase: "deploy_requested" });
-    const deployment = await effects.deploy(state.config, state.request, source, frozenMetadata, {
-      uploaded: (receipt) => journal.save({ ...journal.load(), upload_receipt: receipt }),
-      deployed: (receipt) => journal.save({ ...journal.load(), deployment_receipt: m6RuntimeTargetSchema.parse({ ...receipt,
-        operation_id: state.request.operation_id, service_config_sha256: state.request.service_config_sha256 }) }),
-    });
+    const deployment = await effects.deploy(state.config, state.request, source, frozenMetadata, deployReceipts(journal));
     state = { ...journal.load(), phase: "deployed", target: m6RuntimeTargetSchema.parse({ ...deployment,
       operation_id: state.request.operation_id, service_config_sha256: state.request.service_config_sha256 }) };
     journal.save(state);
+    await complete(journal, effects);
+  });
+}
+
+export async function resumeM6UpdateActivation(journal: M6UpdateJournal, effects: M6UpdateEffects): Promise<void> {
+  await journal.exclusively(async () => {
+    const state = journal.load();
+    if (state.schema_version !== 2 || state.phase !== "deploy_requested" || !state.upload_receipt || state.deployment_receipt ||
+      state.activation_checkpoint?.state !== "not_started" || !effects.activate) {
+      throw new Error("Activation continuation requires a durable not-started checkpoint; legacy or unknown activation requests cannot be replayed");
+    }
+    const deployment = await effects.activate(state.config, state.request, state.upload_receipt,
+      state.activation_checkpoint.previous_deployment_id, deployReceipts(journal));
+    journal.save({ ...journal.load(), phase: "deployed", target: m6RuntimeTargetSchema.parse({ ...deployment,
+      operation_id: state.request.operation_id, service_config_sha256: state.request.service_config_sha256 }) });
     await complete(journal, effects);
   });
 }

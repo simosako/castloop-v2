@@ -158,7 +158,7 @@ export class CloudflareApi {
   }
 
   async uploadCompatibleM6Worker(configInput: ServiceConfig, input: M6ServiceUpdateRequest, source: string,
-    metadata: object, receipts?: M6UpdateDeployReceipts): Promise<M6WorkerDeploymentEvidence> {
+    metadata: object, receipts?: M6UpdateDeployReceipts, beforeActivation?: () => Promise<void>): Promise<M6WorkerDeploymentEvidence> {
     const config = serviceConfigSchema.parse(configInput);
     const request = m6ServiceUpdateRequestSchema.parse(input);
     const metadataSource = JSON.stringify(metadata);
@@ -181,18 +181,35 @@ export class CloudflareApi {
     if (versionId === request.previous_worker_version_id || uploaded.number !== previousVersion.number + 1) {
       throw new Error("Compatible upload did not acknowledge the next version after its exact inheritance source");
     }
-    receipts?.uploaded(uploaded);
-    await this.requireUploadedM6Version(path, versionId, uploaded.resources.script);
-    const current = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id, versionId);
-    if (migrationPayloadHash(current) !== request.worker_metadata_sha256 ||
-      (await this.singleMigrationDeployment(path, request.previous_worker_version_id)).id !== previousDeployment.id) {
-      throw new Error("Compatible settings or deployment changed before activation; preserve the acknowledged version");
+    receipts?.uploaded(uploaded, previousDeployment.id);
+    return this.activateCompatibleM6Worker(config, request, uploaded, previousDeployment.id, receipts, beforeActivation);
+  }
+
+  async activateCompatibleM6Worker(configInput: ServiceConfig, input: M6ServiceUpdateRequest, upload: WorkerVersionUploadReceipt,
+    previousDeploymentId: string, receipts?: M6UpdateDeployReceipts, beforeActivation?: () => Promise<void>): Promise<M6WorkerDeploymentEvidence> {
+    const config = serviceConfigSchema.parse(configInput);
+    const request = m6ServiceUpdateRequestSchema.parse(input);
+    const uploaded = workerVersionUploadReceiptSchema.parse(upload);
+    m6RuntimeTargetSchema.shape.deployment_id.parse(previousDeploymentId);
+    if (config.service_id !== request.service_id || await m6ServiceConfigHash(config) !== request.service_config_sha256 ||
+      uploaded.id === request.previous_worker_version_id) throw new Error("Compatible activation has foreign configuration or upload receipt");
+    const path = this.workerPath(config);
+    const versionId = uploaded.id;
+    for (let snapshot = 0; snapshot < 2; snapshot += 1) {
+      await this.requireUploadedM6Version(path, versionId, uploaded.resources.script);
+      const current = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id, versionId);
+      if (migrationPayloadHash(current) !== request.worker_metadata_sha256 ||
+        (await this.singleMigrationDeployment(path, request.previous_worker_version_id)).id !== previousDeploymentId) {
+        throw new Error("Compatible settings or deployment changed before activation; preserve the acknowledged version");
+      }
+      const versions = workerVersionsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/versions?page=1&per_page=2`)).items;
+      if (versions[0]!.id !== versionId || versions[0]!.number !== uploaded.number ||
+        versions[1]?.id !== request.previous_worker_version_id || versions[1].number !== uploaded.number - 1) {
+        throw new Error("Compatible inheritance history changed; preserve the acknowledged version without deployment");
+      }
     }
-    const versions = workerVersionsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/versions?page=1&per_page=2`)).items;
-    if (versions[0]!.id !== versionId || versions[0]!.number !== uploaded.number ||
-      versions[1]?.id !== previousVersion.id || versions[1].number !== previousVersion.number) {
-      throw new Error("Compatible inheritance history changed; preserve the acknowledged version without deployment");
-    }
+    await beforeActivation?.();
+    receipts?.activating();
     const deployment = workerDeploymentsSnapshotSchema.shape.deployments.element.partial({ strategy: true, versions: true }).parse(await this.json<unknown>("POST", `${path}/deployments`, {
       strategy: "percentage", versions: [{ version_id: versionId, percentage: 100 }],
     }));
