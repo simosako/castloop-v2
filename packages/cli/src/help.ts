@@ -88,6 +88,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "init-reconcile OPERATION_UUID",
     description: "Reconcile a retained initialization only when the server already completed it paused. Does not redeploy or replay initialization.",
   },
+  "update-service-continue": {
+    usage: "update-service-continue OPERATION_UUID",
+    description: "Explicitly activate an acknowledged upload only with a durable not-started activation checkpoint.\n" +
+      "Rechecks the retained owner, settings, version history and script ETag; never uploads again. Completes paused.\n" +
+      "Legacy upload-only journals, unknown activation requests and residual locks remain blocked.",
+  },
   "update-service-verify": {
     usage: "update-service-verify OPERATION_UUID",
     description: "Continue verification of an acknowledged deployment using its retained journal. Never re-upload an unknown deployment.",
