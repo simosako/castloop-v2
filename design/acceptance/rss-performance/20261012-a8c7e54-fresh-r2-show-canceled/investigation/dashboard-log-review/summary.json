@@ -1,0 +1,60 @@
+{
+  "reviewed_at": "2026-10-12T12:11:19.171454+00:00",
+  "source_file": "logs-2026-10-12T12_06_15.809Z.json",
+  "source_bytes": 4890461,
+  "source_sha256": "c0eba5ea1b3144d2ba59c55ad44edf518f5836e607ee54679966fdc3b6952a44",
+  "row_count": 2000,
+  "worker": "castloop-rssperf-1012-r2-0f9dbe46",
+  "job_id": "69a619df-9115-42e8-87db-e98947635863",
+  "time_range_utc": {
+    "from": "2026-10-12T11:37:12.785000+00:00",
+    "to": "2026-10-12T12:05:25.480000+00:00"
+  },
+  "time_range_jst": {
+    "from": "2026-10-12T20:37:12.785000+09:00",
+    "to": "2026-10-12T21:05:25.480000+09:00"
+  },
+  "required_time_range_utc": {
+    "from": "2026-10-12T11:34:00+00:00",
+    "to": "2026-10-12T11:36:00+00:00"
+  },
+  "required_window_rows": 0,
+  "queue_event_rows": 0,
+  "error_level_or_abnormal_invocation_rows": 0,
+  "counts": {
+    "worker": {
+      "castloop-rssperf-1012-r2-0f9dbe46": 2000
+    },
+    "event_type": {
+      "fetch": 162,
+      "missing": 1702,
+      "jsrpc": 136
+    },
+    "invocation_outcome": {
+      "ok": 228,
+      "missing": 1772
+    },
+    "log_type": {
+      "cf-worker-event": 228,
+      "span": 1702,
+      "cf-worker": 70
+    },
+    "level": {
+      "info": 1930,
+      "missing": 70
+    }
+  },
+  "target_job_structured_rows": 70,
+  "target_job_phases": {
+    "publication.status": 70
+  },
+  "target_job_publication_consumer_rows": 0,
+  "target_job_publication_delivery_rows": 0,
+  "target_job_status_query_success_rows": 70,
+  "source_unchanged": true,
+  "network_requests": 0,
+  "live_mutations": 0,
+  "initial_failure_root_cause_confirmed": false,
+  "conclusion": "Export excludes the required failure window. Successful publication.status rows confirm status-query execution, not successful publication.",
+  "possible_export_limit": "Exactly 2000 rows and earliest timestamp after the failure suggest a latest-results export limit; not established from this file alone."
+}

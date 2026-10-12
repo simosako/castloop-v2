@@ -1,0 +1,591 @@
+[
+  {
+    "method": "get",
+    "key": "system/service.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/lifecycle-service.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/lifecycle-service.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "put",
+    "key": "system/lifecycle-service.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/commit.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/publication.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "put",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/lifecycle-service.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/lifecycle-service.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/publication.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/commit.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/publication.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/status.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/progress.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/publication.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/lifecycle-service.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/lifecycle-service.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/progress.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "put",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/progress.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/status.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "put",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/status.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/publication.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/c4b0e1c8-bb03-44c8-bf55-08996ca73049/upload.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/c4b0e1c8-bb03-44c8-bf55-08996ca73049/upload-progress.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/c4b0e1c8-bb03-44c8-bf55-08996ca73049/status.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "head",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/show.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "head",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/cover.jpg",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/publication.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "head",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/show.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/show.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "head",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/cover.jpg",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "staging/shows/daily/02098e40-e1f1-4cac-8677-3489ac5bc74d/cover.jpg",
+    "phase": "before-feed"
+  },
+  {
+    "method": "head",
+    "key": "system/shows/daily/show.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "head",
+    "key": "system/service.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/service.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "public/podcasts/daily/episode-catalog.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "list",
+    "key": "public/episodes/daily/",
+    "phase": "before-feed"
+  },
+  {
+    "method": "list",
+    "key": "system/episode-lifecycle/daily/",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/progress.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-reservations/daily.json",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/request.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "put",
+    "key": "system/jobs/02098e40-e1f1-4cac-8677-3489ac5bc74d/progress.toml",
+    "phase": "before-feed"
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "after-feed",
+    "injected_failure": true
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "after-feed",
+    "injected_failure": true
+  },
+  {
+    "method": "get",
+    "key": "system/show-publications/daily.json",
+    "phase": "after-feed",
+    "injected_failure": true
+  },
+  {
+    "method": "get",
+    "key": "system/lifecycle-service.json",
+    "phase": "after-feed",
+    "injected_failure": true
+  }
+]

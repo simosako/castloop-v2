@@ -1,0 +1,12 @@
+{
+  "http_status": 403,
+  "success": false,
+  "dry": true,
+  "worker": "castloop-rssperf-1012-r2-0f9dbe46",
+  "settings_changed": false,
+  "retries": 0,
+  "error_codes": [
+    10000
+  ],
+  "result_keys": []
+}

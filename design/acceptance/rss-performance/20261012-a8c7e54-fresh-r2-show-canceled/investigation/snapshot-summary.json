@@ -1,0 +1,58 @@
+{
+  "observed_at": "2026-10-12T11:43:14.204874+00:00",
+  "job_id": "69a619df-9115-42e8-87db-e98947635863",
+  "job_status": "processing",
+  "job_phase": "validating",
+  "ownership": "held",
+  "service_state": "open",
+  "invocation_count": 1,
+  "unfinished_show_operation": true,
+  "worker_version_id": "0f833389-f021-435c-bdf0-59205115e759",
+  "status-private.toml": {
+    "bytes": 270,
+    "etag": "W/\"311dfd47576afe2cec09f13c923e929f-gzip\""
+  },
+  "progress-private.toml": {
+    "bytes": 323,
+    "etag": "W/\"ac9c27c6b09612ae5effd1a8966edc22-gzip\""
+  },
+  "show-control-private.json": {
+    "bytes": 744,
+    "etag": "W/\"634246dfeaa8054ada90b24bdba29da3-gzip\""
+  },
+  "service-admission-private.json": {
+    "bytes": 654,
+    "etag": "W/\"081c90402eed915f2f4d1bd71e7dbf00-gzip\""
+  },
+  "catalog-private.json": {
+    "missing": true
+  },
+  "feed-private.xml": {
+    "missing": true
+  },
+  "show-metadata-private.toml": {
+    "missing": true
+  },
+  "cover-private.jpg": {
+    "missing": true
+  },
+  "stored_status_phase": "validating",
+  "stored_status_state": "processing",
+  "progress": {
+    "phase": "feed",
+    "updated_at": "2026-10-12T11:34:57Z",
+    "purge_confirmed": false,
+    "deleted_objects": 0
+  },
+  "show_lifecycle": "draft",
+  "feed_generation": 0,
+  "catalog_initialized": false,
+  "owner": {
+    "job_id": "69a619df-9115-42e8-87db-e98947635863",
+    "kind": "show",
+    "action": "publish",
+    "state": "processing"
+  },
+  "execution_id_present": true,
+  "verification_id_present": false
+}

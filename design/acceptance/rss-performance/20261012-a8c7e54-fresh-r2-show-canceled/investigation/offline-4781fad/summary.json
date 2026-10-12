@@ -1,0 +1,128 @@
+{
+  "source_commit": "4781fad",
+  "cases": [
+    {
+      "fault": "none",
+      "passed": true,
+      "primary": {
+        "status": "published",
+        "status_phase": "finished",
+        "progress_phase": "finished",
+        "lifecycle": "active",
+        "owner_present": false,
+        "execution_present": false,
+        "service_invocations": 0,
+        "published_metadata_present": true,
+        "feed_present": true
+      },
+      "after_retry": {
+        "status": "published",
+        "status_phase": "finished",
+        "progress_phase": "finished",
+        "lifecycle": "active",
+        "owner_present": false,
+        "execution_present": false,
+        "service_invocations": 0,
+        "published_metadata_present": true,
+        "feed_present": true
+      },
+      "error_class": null,
+      "retry_error_class": null,
+      "primary_r2_calls": 316,
+      "primary_r2_by_method": {
+        "get": 288,
+        "head": 9,
+        "put": 17,
+        "list": 2,
+        "delete": 0
+      },
+      "calls_through_feed_progress": 112,
+      "runtime_calls": 9,
+      "purge_calls": 1,
+      "dlq_marker_present": false
+    },
+    {
+      "fault": "one-read-failure",
+      "passed": true,
+      "primary": {
+        "status": "retrying",
+        "status_phase": "feed",
+        "progress_phase": "feed",
+        "lifecycle": "draft",
+        "owner_present": true,
+        "execution_present": false,
+        "service_invocations": 0,
+        "published_metadata_present": false,
+        "feed_present": false
+      },
+      "after_retry": {
+        "status": "published",
+        "status_phase": "finished",
+        "progress_phase": "finished",
+        "lifecycle": "active",
+        "owner_present": false,
+        "execution_present": false,
+        "service_invocations": 0,
+        "published_metadata_present": true,
+        "feed_present": true
+      },
+      "error_class": "Error",
+      "retry_error_class": null,
+      "primary_r2_calls": 137,
+      "primary_r2_by_method": {
+        "get": 121,
+        "head": 6,
+        "put": 8,
+        "list": 2,
+        "delete": 0
+      },
+      "calls_through_feed_progress": 112,
+      "runtime_calls": 2,
+      "purge_calls": 0,
+      "dlq_marker_present": false
+    },
+    {
+      "fault": "persistent-io-failure",
+      "passed": true,
+      "primary": {
+        "status": "processing",
+        "status_phase": "validating",
+        "progress_phase": "feed",
+        "lifecycle": "draft",
+        "owner_present": true,
+        "execution_present": true,
+        "service_invocations": 1,
+        "published_metadata_present": false,
+        "feed_present": false
+      },
+      "after_retry": {
+        "status": "processing",
+        "status_phase": "validating",
+        "progress_phase": "feed",
+        "lifecycle": "draft",
+        "owner_present": true,
+        "execution_present": true,
+        "service_invocations": 1,
+        "published_metadata_present": false,
+        "feed_present": false
+      },
+      "error_class": "Error",
+      "retry_error_class": "Error",
+      "primary_r2_calls": 116,
+      "primary_r2_by_method": {
+        "get": 103,
+        "head": 6,
+        "put": 5,
+        "list": 2,
+        "delete": 0
+      },
+      "calls_through_feed_progress": 112,
+      "runtime_calls": 2,
+      "purge_calls": 0,
+      "dlq_marker_present": true
+    }
+  ],
+  "network_calls": 0,
+  "mock_only": true,
+  "limitation": "Injected persistent IO failures demonstrate token-retention mechanics, not the original live invocation failure cause. Mock counts are not production performance timings."
+}

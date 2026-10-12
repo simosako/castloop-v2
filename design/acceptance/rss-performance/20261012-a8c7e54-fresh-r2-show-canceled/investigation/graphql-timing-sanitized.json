@@ -1,0 +1,1084 @@
+{
+  "data": {
+    "viewer": {
+      "accounts": [
+        {
+          "workersInvocationsAdaptive": [
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:56Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12756,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1048729
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:29Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9070,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 894930
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "AMS",
+                "datetime": "2026-10-12T11:35:41Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 3812,
+                "errors": 0,
+                "requests": 5,
+                "subrequests": 0,
+                "wallTime": 6472
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:54Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10572,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 965267
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:20Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11631,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 994447
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:16Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10773,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 932915
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:34Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10890,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 945613
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:28Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10351,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 885076
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:58Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10142,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 996346
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:30Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11690,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 910972
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:08Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 15968,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 969474
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:36Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10209,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 901184
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:00Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11035,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1211710
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:48Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11144,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1021696
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:21Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 36008,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 5623894
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "SEA",
+                "datetime": "2026-10-12T11:34:29Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "clientDisconnected",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 1,
+                "cpuTimeUs": 146160,
+                "errors": 0,
+                "requests": 1,
+                "subrequests": 0,
+                "wallTime": 34982800
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:24Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11816,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1019719
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:54Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12917,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1005271
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:22Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11504,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1094513
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:48Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10533,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 872849
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:46Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 8140,
+                "errors": 0,
+                "requests": 2,
+                "subrequests": 0,
+                "wallTime": 735647
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:32Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10833,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 963990
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:02Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 80362,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 12831626
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:12Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12373,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 983575
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:27Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9833,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1037821
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:36:00Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 16355,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 963033
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:50Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12178,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 924900
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:10Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11675,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 962294
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "SEA",
+                "datetime": "2026-10-12T11:35:20Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "scriptThrewException",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9693,
+                "errors": 1,
+                "requests": 1,
+                "subrequests": 0,
+                "wallTime": 3781318
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:30Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10272,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 939321
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:02Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12767,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 940828
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "SEA",
+                "datetime": "2026-10-12T11:35:30Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 8164,
+                "errors": 0,
+                "requests": 2,
+                "subrequests": 0,
+                "wallTime": 4059838
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:42Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10197,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 908752
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:40Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11741,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1008577
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:01Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 13288,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1082738
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:36Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10829,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 992371
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:34Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9397,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1014316
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "BOS",
+                "datetime": "2026-10-12T11:35:50Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 1260,
+                "errors": 0,
+                "requests": 1,
+                "subrequests": 0,
+                "wallTime": 1844
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:26Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9873,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 962405
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:44Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12315,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 928038
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "AMS",
+                "datetime": "2026-10-12T11:35:40Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 2613,
+                "errors": 0,
+                "requests": 2,
+                "subrequests": 0,
+                "wallTime": 6305
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "SEA",
+                "datetime": "2026-10-12T11:34:29Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 1076,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 3318
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:58Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11048,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1038121
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:15Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 6908,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 959953
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:14Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12187,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1309429
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:04Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 12137,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 949812
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:20Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9570,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 962986
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:50Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10469,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 895606
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:52Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11577,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 936908
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:56Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11998,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 980182
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:32Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10715,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 860919
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:46Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10722,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 884178
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:38Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9905,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 931396
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "SEA",
+                "datetime": "2026-10-12T11:35:24Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "scriptThrewException",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9550,
+                "errors": 1,
+                "requests": 1,
+                "subrequests": 0,
+                "wallTime": 4026572
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "CDG",
+                "datetime": "2026-10-12T11:35:42Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 1371,
+                "errors": 0,
+                "requests": 1,
+                "subrequests": 0,
+                "wallTime": 2584
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:16Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 20309,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 3298691
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:52Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9395,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 888228
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:40Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10547,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 981135
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:42Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10180,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 996813
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:06Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11456,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 959496
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:35:18Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 10703,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1052915
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:38Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 11045,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 1018593
+              }
+            },
+            {
+              "dimensions": {
+                "coloCode": "NRT",
+                "datetime": "2026-10-12T11:34:44Z",
+                "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+                "status": "success",
+                "usageModel": "standard"
+              },
+              "sum": {
+                "clientDisconnects": 0,
+                "cpuTimeUs": 9623,
+                "errors": 0,
+                "requests": 3,
+                "subrequests": 0,
+                "wallTime": 933493
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

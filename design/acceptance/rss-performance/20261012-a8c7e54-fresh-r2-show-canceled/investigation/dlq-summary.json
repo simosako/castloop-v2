@@ -1,0 +1,6 @@
+{
+  "read_only": true,
+  "marker_present": true,
+  "matches_commit_key": true,
+  "queue_pull_or_acknowledgement_performed": false
+}

@@ -1,0 +1,118 @@
+{
+  "reviewed_at": "2026-10-12T12:18:55.748921+00:00",
+  "source_file": "logs-2026-10-12T12_14_27.128Z.json",
+  "source_bytes": 4249830,
+  "source_sha256": "d7a389696fe139a5e62b5d72f1320cb0dcc101ec3fefa19459f3a9cf3470cc23",
+  "record_count": 1757,
+  "worker": "castloop-rssperf-1012-r2-0f9dbe46",
+  "job_id": "69a619df-9115-42e8-87db-e98947635863",
+  "timestamp_min_utc": "2026-10-12T11:34:00.095Z",
+  "timestamp_max_utc": "2026-10-12T11:35:59.181Z",
+  "required_failure_window_present": true,
+  "all_three_target_job_attempts_correlated": true,
+  "attempts": [
+    {
+      "attempts": 1,
+      "delivery_row_index_zero_based": 1425,
+      "delivered_at": "2026-10-12T11:34:29.732Z",
+      "message_timestamp": "2026-10-12T11:34:26.199Z",
+      "invocation_row_index_zero_based": 800,
+      "finished_at": "2026-10-12T11:35:03.794Z",
+      "outcome": "canceled",
+      "wall_time_ms": 34982,
+      "cpu_time_ms": 146,
+      "correlation": "Same requestId as the target job publication_delivery",
+      "exception_record_count": 0,
+      "execution_busy_confirmed": false,
+      "consumer_timing": [],
+      "invocation_release_timing": []
+    },
+    {
+      "attempts": 2,
+      "delivery_row_index_zero_based": 563,
+      "delivered_at": "2026-10-12T11:35:20.503Z",
+      "message_timestamp": "2026-10-12T11:34:26.199Z",
+      "invocation_row_index_zero_based": 496,
+      "finished_at": "2026-10-12T11:35:23.845Z",
+      "outcome": "exception",
+      "wall_time_ms": 3781,
+      "cpu_time_ms": 9,
+      "correlation": "Same requestId as the target job publication_delivery",
+      "exception_record_count": 1,
+      "execution_busy_confirmed": true,
+      "consumer_timing": [
+        {
+          "event": "worker_timing",
+          "job_id": "69a619df-9115-42e8-87db-e98947635863",
+          "phase": "publication.consumer",
+          "outcome": "error",
+          "started_at": "2026-10-12T11:35:20.503Z",
+          "finished_at": "2026-10-12T11:35:23.845Z",
+          "duration_ms": 3342
+        }
+      ],
+      "invocation_release_timing": [
+        {
+          "event": "worker_timing",
+          "job_id": "69a619df-9115-42e8-87db-e98947635863",
+          "phase": "publication.invocation_release",
+          "outcome": "success",
+          "started_at": "2026-10-12T11:35:22.852Z",
+          "finished_at": "2026-10-12T11:35:23.845Z",
+          "duration_ms": 993
+        }
+      ]
+    },
+    {
+      "attempts": 3,
+      "delivery_row_index_zero_based": 488,
+      "delivered_at": "2026-10-12T11:35:24.984Z",
+      "message_timestamp": "2026-10-12T11:34:26.199Z",
+      "invocation_row_index_zero_based": 419,
+      "finished_at": "2026-10-12T11:35:28.342Z",
+      "outcome": "exception",
+      "wall_time_ms": 4026,
+      "cpu_time_ms": 9,
+      "correlation": "Same requestId as the target job publication_delivery",
+      "exception_record_count": 1,
+      "execution_busy_confirmed": true,
+      "consumer_timing": [
+        {
+          "event": "worker_timing",
+          "job_id": "69a619df-9115-42e8-87db-e98947635863",
+          "phase": "publication.consumer",
+          "outcome": "error",
+          "started_at": "2026-10-12T11:35:24.984Z",
+          "finished_at": "2026-10-12T11:35:28.342Z",
+          "duration_ms": 3358
+        }
+      ],
+      "invocation_release_timing": [
+        {
+          "event": "worker_timing",
+          "job_id": "69a619df-9115-42e8-87db-e98947635863",
+          "phase": "publication.invocation_release",
+          "outcome": "success",
+          "started_at": "2026-10-12T11:35:27.129Z",
+          "finished_at": "2026-10-12T11:35:28.342Z",
+          "duration_ms": 1213
+        }
+      ]
+    }
+  ],
+  "dlq_invocation": [
+    {
+      "row_index_zero_based": 326,
+      "timestamp": "2026-10-12T11:35:34.769Z",
+      "outcome": "ok",
+      "queue": "castloop-rssperf-1012-r2-dlq-0f9dbe46",
+      "wall_time_ms": 4058,
+      "cpu_time_ms": 7
+    }
+  ],
+  "initial_cancellation_reason_confirmed": false,
+  "remaining_analysis": "Initial Queue invocation outcome is canceled; this check does not establish why it was canceled. Span analysis remains possible within this export.",
+  "source_unchanged": true,
+  "network_requests": 0,
+  "live_mutations": 0
+}

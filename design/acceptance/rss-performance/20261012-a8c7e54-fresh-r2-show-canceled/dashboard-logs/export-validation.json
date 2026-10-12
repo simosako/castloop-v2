@@ -1,0 +1,20 @@
+[
+  {
+    "source_file": "logs-2026-10-12T12_06_15.809Z.json",
+    "source_sha256": "c0eba5ea1b3144d2ba59c55ad44edf518f5836e607ee54679966fdc3b6952a44",
+    "record_count": 2000,
+    "timestamp_min": "2026-10-12T11:37:12.785Z",
+    "timestamp_max": "2026-10-12T12:05:25.480Z",
+    "published_path": "design/acceptance/rss-performance/20261012-a8c7e54-fresh-r2-show-canceled/dashboard-logs/logs-2026-10-12T12_06_15.809Z-sanitized.json",
+    "record_order_and_trace_identity_preserved": true
+  },
+  {
+    "source_file": "logs-2026-10-12T12_14_27.128Z.json",
+    "source_sha256": "d7a389696fe139a5e62b5d72f1320cb0dcc101ec3fefa19459f3a9cf3470cc23",
+    "record_count": 1757,
+    "timestamp_min": "2026-10-12T11:34:00.095Z",
+    "timestamp_max": "2026-10-12T11:35:59.181Z",
+    "published_path": "design/acceptance/rss-performance/20261012-a8c7e54-fresh-r2-show-canceled/dashboard-logs/logs-2026-10-12T12_14_27.128Z-sanitized.json",
+    "record_order_and_trace_identity_preserved": true
+  }
+]

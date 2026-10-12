@@ -1,0 +1,11 @@
+schema_version = 1
+job_id = "69a619df-9115-42e8-87db-e98947635863"
+show_id = "otftalk-rss"
+kind = "show"
+action = "publish"
+show_generation = 2
+request_sha256 = "780a394ce4783da6a473eb68d40b8ddcbefb1f646f1bc07a8be316b57ff555c9"
+phase = "feed"
+deleted_objects = 0
+purge_confirmed = false
+updated_at = "2026-10-12T11:34:57Z"

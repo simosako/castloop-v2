@@ -1,0 +1,64 @@
+{
+  "http_status": 200,
+  "error_count": 0,
+  "read_only": true,
+  "units": {
+    "cpuTimeUs": "microseconds",
+    "wallTime": "milliseconds"
+  },
+  "limitations": "Invocation kind and job ID unavailable. Row metrics are aggregated; dates are request timestamps, not exception occurrence timestamps.",
+  "row_count": 63,
+  "non_success_rows": [
+    {
+      "dimensions": {
+        "coloCode": "SEA",
+        "datetime": "2026-10-12T11:34:29Z",
+        "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+        "status": "clientDisconnected",
+        "usageModel": "standard"
+      },
+      "sum": {
+        "clientDisconnects": 1,
+        "cpuTimeUs": 146160,
+        "errors": 0,
+        "requests": 1,
+        "subrequests": 0,
+        "wallTime": 34982800
+      }
+    },
+    {
+      "dimensions": {
+        "coloCode": "SEA",
+        "datetime": "2026-10-12T11:35:20Z",
+        "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+        "status": "scriptThrewException",
+        "usageModel": "standard"
+      },
+      "sum": {
+        "clientDisconnects": 0,
+        "cpuTimeUs": 9693,
+        "errors": 1,
+        "requests": 1,
+        "subrequests": 0,
+        "wallTime": 3781318
+      }
+    },
+    {
+      "dimensions": {
+        "coloCode": "SEA",
+        "datetime": "2026-10-12T11:35:24Z",
+        "scriptVersion": "0f833389-f021-435c-bdf0-59205115e759",
+        "status": "scriptThrewException",
+        "usageModel": "standard"
+      },
+      "sum": {
+        "clientDisconnects": 0,
+        "cpuTimeUs": 9550,
+        "errors": 1,
+        "requests": 1,
+        "subrequests": 0,
+        "wallTime": 4026572
+      }
+    }
+  ]
+}

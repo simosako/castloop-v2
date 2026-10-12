@@ -1,0 +1,59 @@
+{
+  "source": "graphql-response-private.json",
+  "correction": "Cloudflare reports success, not ok. Original query summary retained unchanged.",
+  "network_queries_in_this_review": 0,
+  "row_count": 188,
+  "by_status": {
+    "success": {
+      "requests": 644,
+      "errors": 0,
+      "rows": 185
+    },
+    "scriptThrewException": {
+      "requests": 2,
+      "errors": 2,
+      "rows": 2
+    },
+    "clientDisconnected": {
+      "requests": 1,
+      "errors": 0,
+      "rows": 1
+    }
+  },
+  "non_success_rows": [
+    {
+      "dimensions": {
+        "datetime": "2026-10-12T11:34:29Z",
+        "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+        "status": "clientDisconnected"
+      },
+      "sum": {
+        "errors": 0,
+        "requests": 1
+      }
+    },
+    {
+      "dimensions": {
+        "datetime": "2026-10-12T11:35:20Z",
+        "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+        "status": "scriptThrewException"
+      },
+      "sum": {
+        "errors": 1,
+        "requests": 1
+      }
+    },
+    {
+      "dimensions": {
+        "datetime": "2026-10-12T11:35:24Z",
+        "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+        "status": "scriptThrewException"
+      },
+      "sum": {
+        "errors": 1,
+        "requests": 1
+      }
+    }
+  ],
+  "limitation": "No job ID or invocation kind in these dimensions. Errors are not conclusively attributed to this job."
+}

@@ -1,0 +1,127 @@
+[
+  {
+    "event": "publication_delivery",
+    "job_id": "fdef0018-8b41-4921-8dd8-c048514d594d",
+    "delivered_at": "2026-10-12T11:54:48.300Z",
+    "message_timestamp": "2026-10-12T11:54:48.300Z",
+    "attempts": 1
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "fdef0018-8b41-4921-8dd8-c048514d594d",
+    "phase": "publication.invocation_release",
+    "outcome": "success",
+    "started_at": "2026-10-12T11:54:48.327Z",
+    "finished_at": "2026-10-12T11:54:48.327Z",
+    "duration_ms": 0.22840600000000677
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "fdef0018-8b41-4921-8dd8-c048514d594d",
+    "phase": "publication.consumer",
+    "outcome": "success",
+    "started_at": "2026-10-12T11:54:48.301Z",
+    "finished_at": "2026-10-12T11:54:48.327Z",
+    "duration_ms": 26.463870999999983
+  },
+  {
+    "event": "publication_delivery",
+    "job_id": "d240df62-bc63-4e9a-b4e8-80b72efc7d80",
+    "delivered_at": "2026-10-12T11:54:48.338Z",
+    "message_timestamp": "2026-10-12T11:54:48.338Z",
+    "attempts": 1
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d240df62-bc63-4e9a-b4e8-80b72efc7d80",
+    "phase": "publication.invocation_release",
+    "outcome": "success",
+    "started_at": "2026-10-12T11:54:48.343Z",
+    "finished_at": "2026-10-12T11:54:48.343Z",
+    "duration_ms": 0.12050300000001357
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d240df62-bc63-4e9a-b4e8-80b72efc7d80",
+    "phase": "publication.consumer",
+    "outcome": "error",
+    "started_at": "2026-10-12T11:54:48.338Z",
+    "finished_at": "2026-10-12T11:54:48.343Z",
+    "duration_ms": 4.747046999999981
+  },
+  {
+    "event": "publication_delivery",
+    "job_id": "d240df62-bc63-4e9a-b4e8-80b72efc7d80",
+    "delivered_at": "2026-10-12T11:54:48.343Z",
+    "message_timestamp": "2026-10-12T11:54:48.343Z",
+    "attempts": 1
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d240df62-bc63-4e9a-b4e8-80b72efc7d80",
+    "phase": "publication.invocation_release",
+    "outcome": "success",
+    "started_at": "2026-10-12T11:54:48.351Z",
+    "finished_at": "2026-10-12T11:54:48.351Z",
+    "duration_ms": 0.0686979999999835
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d240df62-bc63-4e9a-b4e8-80b72efc7d80",
+    "phase": "publication.consumer",
+    "outcome": "success",
+    "started_at": "2026-10-12T11:54:48.343Z",
+    "finished_at": "2026-10-12T11:54:48.351Z",
+    "duration_ms": 8.08036100000001
+  },
+  {
+    "event": "publication_delivery",
+    "job_id": "d1a4ab03-7296-4765-a807-da42bc3c9949",
+    "delivered_at": "2026-10-12T11:54:48.369Z",
+    "message_timestamp": "2026-10-12T11:54:48.368Z",
+    "attempts": 1
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d1a4ab03-7296-4765-a807-da42bc3c9949",
+    "phase": "publication.invocation_release",
+    "outcome": "error",
+    "started_at": "2026-10-12T11:54:48.376Z",
+    "finished_at": "2026-10-12T11:54:48.376Z",
+    "duration_ms": 0.03668599999997468
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d1a4ab03-7296-4765-a807-da42bc3c9949",
+    "phase": "publication.consumer",
+    "outcome": "error",
+    "started_at": "2026-10-12T11:54:48.369Z",
+    "finished_at": "2026-10-12T11:54:48.376Z",
+    "duration_ms": 7.660948999999988
+  },
+  {
+    "event": "publication_delivery",
+    "job_id": "d1a4ab03-7296-4765-a807-da42bc3c9949",
+    "delivered_at": "2026-10-12T11:54:48.377Z",
+    "message_timestamp": "2026-10-12T11:54:48.377Z",
+    "attempts": 1
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d1a4ab03-7296-4765-a807-da42bc3c9949",
+    "phase": "publication.invocation_release",
+    "outcome": "success",
+    "started_at": "2026-10-12T11:54:48.378Z",
+    "finished_at": "2026-10-12T11:54:48.378Z",
+    "duration_ms": 0.17284900000001358
+  },
+  {
+    "event": "worker_timing",
+    "job_id": "d1a4ab03-7296-4765-a807-da42bc3c9949",
+    "phase": "publication.consumer",
+    "outcome": "error",
+    "started_at": "2026-10-12T11:54:48.377Z",
+    "finished_at": "2026-10-12T11:54:48.378Z",
+    "duration_ms": 0.749494999999996
+  }
+]

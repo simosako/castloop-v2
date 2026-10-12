@@ -1,0 +1,21 @@
+{
+  "queryId": "b1bd7bde-d4d4-48b6-9a5d-183293771c1d",
+  "dry": true,
+  "view": "invocations",
+  "limit": 100,
+  "timeframe": {
+    "from": 1791804840000,
+    "to": 1791804960000
+  },
+  "parameters": {
+    "filters": [
+      {
+        "key": "$metadata.service",
+        "operation": "eq",
+        "type": "string",
+        "value": "castloop-rssperf-1012-r2-0f9dbe46"
+      }
+    ],
+    "filterCombination": "and"
+  }
+}

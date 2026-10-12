@@ -1,0 +1,12 @@
+{
+  "observed_at": "2026-10-12T11:59:01.993134+00:00",
+  "status_state": "processing",
+  "status_phase": "validating",
+  "progress_phase": "feed",
+  "progress_updated_at": "2026-10-12T11:34:57Z",
+  "show_lifecycle": "draft",
+  "execution_present": true,
+  "service_state": "open",
+  "service_invocations": 1,
+  "durable_objects_unchanged_from_first_snapshot": true
+}

@@ -1,0 +1,7 @@
+{
+  "python_syntax_valid": true,
+  "measurement_worker_explicit_from_new_service_config": true,
+  "comparison_baseline": "4781fad metadata-only 36 Episodes",
+  "fresh_import_setup_not_counted_as_metadata_update_performance": true,
+  "old_workspace_never_used_as_command_cwd": true
+}

@@ -1,0 +1,363 @@
+{
+  "type_names": [
+    "AccountWorkersInvocationsAdaptive",
+    "AccountWorkersInvocationsAdaptiveAvg",
+    "AccountWorkersInvocationsAdaptiveConfidence",
+    "AccountWorkersInvocationsAdaptiveDimensions",
+    "AccountWorkersInvocationsAdaptiveFilter_InputObject",
+    "AccountWorkersInvocationsAdaptiveMax",
+    "AccountWorkersInvocationsAdaptiveMin",
+    "AccountWorkersInvocationsAdaptiveOrderBy",
+    "AccountWorkersInvocationsAdaptiveQuantiles",
+    "AccountWorkersInvocationsAdaptiveSum",
+    "AccountWorkersInvocationsAdaptiveSumConfidence"
+  ],
+  "field_details": {
+    "AccountWorkersInvocationsAdaptiveDimensions": {
+      "fields": [
+        {
+          "description": "Cache status for cache-enabled Worker invocation, if applicable",
+          "name": "cacheStatus",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "IATA airport code for the Cloudflare datacenter where the script ran.",
+          "name": "coloCode",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "Request datetime, truncated to start of a day",
+          "name": "date",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Date"
+            }
+          }
+        },
+        {
+          "description": "Request datetime",
+          "name": "datetime",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Time"
+            }
+          }
+        },
+        {
+          "description": "The date and time of the event truncated to fifteen minutes",
+          "name": "datetimeFifteenMinutes",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Time"
+            }
+          }
+        },
+        {
+          "description": "The date and time of the event truncated to five minutes",
+          "name": "datetimeFiveMinutes",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Time"
+            }
+          }
+        },
+        {
+          "description": "Request datetime, truncated to start of an hour",
+          "name": "datetimeHour",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Time"
+            }
+          }
+        },
+        {
+          "description": "Request datetime, truncated to start of an minute",
+          "name": "datetimeMinute",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Time"
+            }
+          }
+        },
+        {
+          "description": "Request datetime, truncated to start of six hour window",
+          "name": "datetimeSixHours",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Time"
+            }
+          }
+        },
+        {
+          "description": "The name of the script's dispatch namespace",
+          "name": "dispatchNamespaceName",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "The name of the script environment",
+          "name": "environmentName",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "Whether the request is from a Dispatch Worker. Non-zero if true",
+          "name": "isDispatcher",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint8"
+            }
+          }
+        },
+        {
+          "description": "Whether this invocation is for a preview. 1 if preview, 0 if not.",
+          "name": "isPreview",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint8"
+            }
+          }
+        },
+        {
+          "description": "The name (slug) of the preview script. Requires an exact scriptName filter.",
+          "name": "previewSlug",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "The name of the script",
+          "name": "scriptName",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "The unique tag of the script",
+          "name": "scriptTag",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "The version of the Worker",
+          "name": "scriptVersion",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "Status of the worker invocation",
+          "name": "status",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "description": "Usage model of the worker invocation",
+          "name": "usageModel",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "string"
+            }
+          }
+        }
+      ]
+    },
+    "AccountWorkersInvocationsAdaptiveSum": {
+      "fields": [
+        {
+          "description": "Sum of client disconnects",
+          "name": "clientDisconnects",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint64"
+            }
+          }
+        },
+        {
+          "description": "Sum of cpu time in us",
+          "name": "cpuTimeUs",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint64"
+            }
+          }
+        },
+        {
+          "description": "Sum of Duration - GB*s",
+          "name": "duration",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "float64"
+            }
+          }
+        },
+        {
+          "description": "Sum of Errors",
+          "name": "errors",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint64"
+            }
+          }
+        },
+        {
+          "description": "Sum of Request Duration in microseconds",
+          "name": "requestDuration",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "float64"
+            }
+          }
+        },
+        {
+          "description": "Sum of Requests",
+          "name": "requests",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint64"
+            }
+          }
+        },
+        {
+          "description": "Sum of Response Body Sizes",
+          "name": "responseBodySize",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint64"
+            }
+          }
+        },
+        {
+          "description": "Sum of Subrequests",
+          "name": "subrequests",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint64"
+            }
+          }
+        },
+        {
+          "description": "Sum of Wall Time",
+          "name": "wallTime",
+          "type": {
+            "kind": "NON_NULL",
+            "name": "",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "uint64"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "read_only": true,
+  "settings_changed": false
+}

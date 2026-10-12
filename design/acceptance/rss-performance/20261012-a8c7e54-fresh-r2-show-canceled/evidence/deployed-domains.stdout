@@ -1,0 +1,40 @@
+{
+  "result": "domains",
+  "public_base_url": "https://castloop-rss-perf-r2.otftalk.com",
+  "workers_dev_base_url": "https://castloop-rssperf-1012-r2-0f9dbe46.simosako.workers.dev",
+  "configuration_matches": true,
+  "connections_match": true,
+  "domains": [
+    {
+      "id": "[REDACTED_RESOURCE_ID]",
+      "zone_id": "[REDACTED_RESOURCE_ID]",
+      "zone_name": "otftalk.com",
+      "hostname": "castloop-rss-perf-r2.otftalk.com",
+      "service": "castloop-rssperf-1012-r2-0f9dbe46",
+      "environment": "production",
+      "cert_id": "[REDACTED_RESOURCE_ID]",
+      "previews_enabled": false,
+      "enabled": true
+    }
+  ],
+  "admission": {
+    "schema_version": 1,
+    "service_id": "rssperf-1012-r2",
+    "generation": 8,
+    "mode": "m6",
+    "state": "paused",
+    "invocations": [],
+    "pause_id": "756fed9a-2a81-4b98-b520-668cbb281628",
+    "runtime_readiness": {
+      "operation_id": "756fed9a-2a81-4b98-b520-668cbb281628",
+      "deployment_id": "e59210c0-d482-4b4e-80d6-3344da0c67c9",
+      "worker_version_id": "0f833389-f021-435c-bdf0-59205115e759",
+      "service_config_sha256": "5e54776bb0a038d7fe53a0eccc66bd3d56d399e35033d034ff16cbdd9098412a",
+      "default_cache_disabled": true,
+      "cached_entrypoint": "CachedPublicAssets",
+      "cutover_verified": true,
+      "publication_routes_verified": true
+    }
+  },
+  "local_operations": []
+}

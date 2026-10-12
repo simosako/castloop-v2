@@ -1,0 +1,28 @@
+{
+  "phase": "waiting",
+  "step": 4,
+  "job_id": "69a619df-9115-42e8-87db-e98947635863",
+  "publication_kind": "show",
+  "episode_publication_not_started": true,
+  "cli_wait_timeout_seconds": 300,
+  "input_116_files_unchanged": true,
+  "mutation_replayed": false,
+  "performance_measurement_started": false,
+  "job_status": "processing",
+  "ownership": "held",
+  "diagnostic_code": null,
+  "status_keys": [
+    "schema_version",
+    "job_id",
+    "show_id",
+    "kind",
+    "action",
+    "show_generation",
+    "request_sha256",
+    "state",
+    "phase"
+  ],
+  "service_state": "open",
+  "invocation_count": 1,
+  "unfinished_show_operation": true
+}

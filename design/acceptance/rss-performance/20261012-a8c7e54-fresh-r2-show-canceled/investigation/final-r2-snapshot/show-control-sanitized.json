@@ -1,0 +1,24 @@
+{
+  "schema_version": 2,
+  "show_id": "otftalk-rss",
+  "reservation_id": "ae03ffac-29aa-4601-a719-44bda4d5f422",
+  "lifecycle": "draft",
+  "generation": 2,
+  "feed_generation": 0,
+  "owner": {
+    "job_id": "69a619df-9115-42e8-87db-e98947635863",
+    "kind": "show",
+    "action": "publish",
+    "state": "processing",
+    "request_sha256": "780a394ce4783da6a473eb68d40b8ddcbefb1f646f1bc07a8be316b57ff555c9",
+    "execution_id": "[REDACTED_SECRET_OR_EXECUTION_TOKEN]"
+  },
+  "last_finished_upload": {
+    "operation_id": "9fffa289-86df-4a44-9f8f-7d6113a6d7ad",
+    "generation": 1,
+    "verification_id": "[REDACTED_SECRET_OR_EXECUTION_TOKEN]",
+    "request_sha256": "25b37d271d48aeb9e3b9d5ebd23e6d7bc8be4fea1e41937d01893195b6661a70",
+    "manifest_sha256": "50bb193d54d78d40dfd9811bfafda4c6cb5616974159cc06f3212fe45be0825e",
+    "outcome": "staged"
+  }
+}

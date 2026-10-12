@@ -1,0 +1,25 @@
+{
+  "completed_at": "2026-10-12T11:59:02.882286+00:00",
+  "server": "[OMITTED_PRIVATE_CONTEXT]",
+  "input_116_files_unchanged": true,
+  "local_journals_unchanged": true,
+  "local_journal_file_count": 8,
+  "source_clean": true,
+  "source_commit": "a8c7e54e8c326ef238a2fcd9d672a27b002bec66",
+  "core_show_and_cleanup_files_unchanged_since_4781fad": [
+    "src/publication-show-runner.ts",
+    "src/publication-consumer.ts",
+    "src/lifecycle-consumer.ts",
+    "src/service-admission.ts",
+    "src/m6-routes.ts",
+    "src/lifecycle-worker-effects.ts"
+  ],
+  "offline_passed_cases": 6,
+  "offline_network_calls": 0,
+  "wallTime_unit_correction": "Initial timing summary milliseconds annotation is withdrawn. Schema does not establish its unit; raw values retained, no performance conversion used.",
+  "initial_failure_root_cause_confirmed": false,
+  "dlq_marker_matches_show_commit": true,
+  "live_mutation_replayed": false,
+  "owner_force_released": false,
+  "github_published": false
+}

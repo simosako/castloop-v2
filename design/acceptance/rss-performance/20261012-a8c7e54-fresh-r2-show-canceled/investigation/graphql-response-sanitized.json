@@ -1,0 +1,2081 @@
+{
+  "data": {
+    "viewer": {
+      "accounts": [
+        {
+          "workersInvocationsAdaptive": [
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:05Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 4
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:50Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:26Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:27Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:51Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:19Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:36Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:44Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:24Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:06Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:43Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:34Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:32:40Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:38Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:54Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:55Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:38Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:46Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 2
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:34Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:42Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:36Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 4
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:34Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:38Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:56Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:50Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 4
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:11Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 5
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:57Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:00Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:36Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:00Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:26Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:40Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:09Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 26
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:41Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 5
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:10Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:43Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:06Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:52Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:34Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:43:11Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:04Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:18Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:15Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:43:13Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:24Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:24Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:23Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:27Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:02Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:14Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:14Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:32Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:58Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:40Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:46Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:40:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 4
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:30Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:02Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:22Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:32Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:53Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:14Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:43:12Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:40:15Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 4
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:12Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:44Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:50Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:24Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "scriptThrewException"
+              },
+              "sum": {
+                "errors": 1,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:16Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 5
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:28Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:10Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:36Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:38Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:32Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:40Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:29Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:08Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:04Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:34Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:56Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:24Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:25Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:29Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "clientDisconnected"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:54Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:15Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:42Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 4
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:40Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:21Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:47Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:55Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:51Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:12Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:29Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:08Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:52Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:22Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:21Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:48Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:22Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:18Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:26Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:26Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:10Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:36Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:26Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:27Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:00Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:06Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:40:17Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 4
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:32Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:08Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:46Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:49Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:15Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:28Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:41Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:17Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:58Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:30Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:04Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:00Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "scriptThrewException"
+              },
+              "sum": {
+                "errors": 1,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:52Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:12Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:36Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:38Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:16Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:56Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:07Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:24Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:02Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:42Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:01Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:59Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:08Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:45Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:18Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:14Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:49Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:44Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:54Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:57Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:30Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:44Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:58Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:48Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:12Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:30Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 5
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:02Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:18Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:28Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:13Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:20Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 2
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:52Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:40:18Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:02Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:48Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:21Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 6
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:48Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:37Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:42Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:46Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:49Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:04Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:06Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:16Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:40Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 5
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:02Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:04Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:57Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:42:50Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 1
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:00Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:33:16Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 8
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:30Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:34:32Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:22Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:35:16Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:58Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:39:16Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:37:15Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 2
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:10Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 50
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:36:42Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 12
+              }
+            },
+            {
+              "dimensions": {
+                "datetime": "2026-10-12T11:38:10Z",
+                "scriptName": "castloop-rssperf-1012-r2-0f9dbe46",
+                "status": "success"
+              },
+              "sum": {
+                "errors": 0,
+                "requests": 3
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

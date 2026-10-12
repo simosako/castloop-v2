@@ -1,0 +1,9 @@
+{
+  "service_id": "rssperf-1012-r2",
+  "bucket_name": "castloop-rss-perf-20261012-r2",
+  "hostname": "castloop-rss-perf-r2.otftalk.com",
+  "episode_count": 36,
+  "audio_bytes": 1496055589,
+  "input_reused": true,
+  "old_environment_mutations": false
+}
