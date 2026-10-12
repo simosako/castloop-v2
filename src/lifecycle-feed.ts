@@ -6,6 +6,8 @@ import type { LifecycleControlEnv, ShowExecution } from "./lifecycle-control";
 import { canonicalEnclosureUrl } from "./media-url";
 import { parsePublicAssetPath } from "./public-assets";
 import { requireShowReservationReady } from "./show-reservation-record";
+import { readEpisodeCatalog, verifyCatalogAudio } from "./episode-catalog";
+import type { EpisodeCatalog } from "./episode-catalog";
 
 export type LifecycleFeedEnv = LifecycleControlEnv & { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head" | "list"> };
 export type LifecycleFeedInputs = { writeFeed: boolean; episodes: EpisodeRevision[] };
@@ -68,9 +70,12 @@ export async function readLifecycleFeedInputs(env: LifecycleFeedEnv, execution: 
     !(snapshot.value.lifecycle === "active" || restoringShow || publishingShow)) {
     return { writeFeed: false, episodes: [] };
   }
-  const episodes = await readFeedEpisodes(env, execution.showId, limits, owner.kind === "episode" ? {
+  const target = owner.kind === "episode" ? {
     episodeId: owner.episode_id!, action: owner.action, jobId: execution.jobId, candidate,
-  } : undefined);
+  } : undefined;
+  const catalog = await readEpisodeCatalog(env, snapshot.value, execution);
+  const episodes = catalog ? await catalogFeedEpisodes(env, execution.showId, catalog.value, limits, target) :
+    await readFeedEpisodes(env, execution.showId, limits, target);
   const current = await requireShowExecution(env, execution);
   if (current.etag !== snapshot.etag) throw new Error("Show control changed during feed preparation");
   return { writeFeed: true, episodes };
@@ -85,9 +90,42 @@ export async function readActiveShowFeedInputs(env: LifecycleFeedEnv, showId: st
   }
   await requireShowReservationReady(env, snapshot.value);
   if (snapshot.value.lifecycle !== "active") return { writeFeed: false, episodes: [] };
-  const episodes = await readFeedEpisodes(env, showId, limits);
+  const catalog = await readEpisodeCatalog(env, snapshot.value);
+  const episodes = catalog ? await catalogFeedEpisodes(env, showId, catalog.value, limits) : await readFeedEpisodes(env, showId, limits);
   if ((await readShowControl(env, showId))?.etag !== snapshot.etag) throw new Error("Show control changed during feed preparation");
   return { writeFeed: true, episodes };
+}
+
+async function catalogFeedEpisodes(env: LifecycleFeedEnv, showId: string, catalog: EpisodeCatalog,
+  limits: ReturnType<typeof feedLimits>, target?: FeedTarget): Promise<EpisodeRevision[]> {
+  if (catalog.entries.length > limits.maximumObjects) throw new Error("Lifecycle feed exceeds the Episode limit");
+  let episodes = catalog.entries.filter((entry) => entry.active).map((entry) => entry.revision);
+  if (target) {
+    const lifecycle = await readEpisodeLifecycle(env, showId, target.episodeId);
+    if (!lifecycle) throw new Error("Known Episode has no lifecycle record");
+    episodes = episodes.filter((revision) => revision.episode_id !== target.episodeId);
+    if (target.action === "publish" || target.action === "restore") {
+      if (target.action === "publish" ? !["draft", "active"].includes(lifecycle.lifecycle) :
+        lifecycle.lifecycle !== "unpublished" && !(lifecycle.lifecycle === "active" && lifecycle.last_job_id === target.jobId)) {
+        throw new Error("Feed target lifecycle no longer permits publication or restore");
+      }
+      const revision = target.candidate ?? catalog.entries.find((entry) => entry.revision.episode_id === target.episodeId)?.revision;
+      if (!revision) throw new Error("Active or restoring Episode has no current metadata");
+      if (target.action === "restore") {
+        const object = await env.CASTLOOP_BUCKET.get(`public/episodes/${showId}/${target.episodeId}/metadata.toml`);
+        if (!object || object.size < 1 || object.size > 1_000_000 ||
+          JSON.stringify(parseEpisodeRevision(await object.text())) !== JSON.stringify(revision)) {
+          throw new Error("Restore target no longer matches its catalog snapshot");
+        }
+      }
+      await verifyCatalogAudio(env, showId, revision);
+      episodes.push(revision);
+    }
+  }
+  if (new TextEncoder().encode(JSON.stringify(episodes)).length > limits.maximumMetadataBytes) {
+    throw new Error("Lifecycle feed exceeds the metadata budget");
+  }
+  return episodes;
 }
 
 async function readFeedEpisodes(env: LifecycleFeedEnv, showId: string, limits: ReturnType<typeof feedLimits>,

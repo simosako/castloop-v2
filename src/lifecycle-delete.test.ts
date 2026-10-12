@@ -154,7 +154,7 @@ describe("M6 complete deletion state machine", () => {
     const stopped = await fixture({ parent: "unpublished" });
     await complete(stopped);
     expect(stopped.entries.get("public/podcasts/daily/feed.xml")?.data).toBe("original feed");
-    expect((await readShowControl(stopped.env, "daily"))?.value.feed_generation).toBe(0);
+    expect((await readShowControl(stopped.env, "daily"))?.value.feed_generation).toBe(1);
   });
 
   test("unpublished and draft targets can be deleted without implicitly publishing them", async () => {

@@ -6,7 +6,7 @@ import { requireShowReservationReady } from "./show-reservation-record";
 
 const VERIFIED_OPERATION = Symbol("verifiedShowOperation");
 type VerifiedOperation = Readonly<{ bucket: LifecycleControlEnv["CASTLOOP_BUCKET"]; request: Readonly<ControlRequest>;
-  hash: string; reservationId: string | undefined; executionId: string }>;
+  hash: string; reservationId: string | undefined; executionId?: string; verificationId?: string }>;
 export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head">;
   [VERIFIED_OPERATION]?: VerifiedOperation };
 export type LifecycleReadEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head"> };
@@ -159,7 +159,9 @@ async function requireOwnedOperation(env: LifecycleControlEnv, showId: string,
   if (verified) {
     if (verified.bucket !== env.CASTLOOP_BUCKET || verified.request.show_id !== showId || verified.request.job_id !== jobId ||
       verified.request.expected_show_generation + 1 !== expectedGeneration || current.value.reservation_id !== verified.reservationId ||
-      current.value.owner.execution_id !== verified.executionId || !ownsRequest(current.value, verified.request, verified.hash)) {
+      (verified.executionId !== undefined ? current.value.owner.execution_id !== verified.executionId :
+        current.value.owner.state !== "uploading" || current.value.owner.verification_id !== verified.verificationId) ||
+      !ownsRequest(current.value, verified.request, verified.hash)) {
       throw new Error("Verified request no longer matches its current Show execution");
     }
     return { ...current, value: { ...current.value, owner: current.value.owner } };
@@ -178,16 +180,31 @@ async function requireOwnedOperation(env: LifecycleControlEnv, showId: string,
 export async function createShowExecutionEnv<T extends LifecycleControlEnv>(env: T, execution: ShowExecution): Promise<T> {
   if (env[VERIFIED_OPERATION]) throw new Error("A verified execution environment cannot be reused for another invocation");
   const current = await requireShowExecution(env, execution);
-  const frozen = await env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/request.toml`);
+  return verifiedOperationEnv(env, current, { executionId: execution.executionId });
+}
+
+export async function createStageVerificationControlEnv<T extends LifecycleControlEnv>(env: T,
+  verification: { showId: string; operationId: string; generation: number; verificationId: string }): Promise<T> {
+  if (!verification.verificationId) throw new Error("Staging verification requires an acquired token");
+  if (env[VERIFIED_OPERATION]) throw new Error("A verified environment cannot be reused for another invocation");
+  const current = await requireOwnedOperation(env, verification.showId, verification.operationId, verification.generation);
+  if (current.value.owner.action !== "stage" || current.value.owner.state !== "uploading" ||
+    current.value.owner.verification_id !== verification.verificationId) throw new Error("Staging verification token does not match its owner");
+  return verifiedOperationEnv(env, current, { verificationId: verification.verificationId });
+}
+
+async function verifiedOperationEnv<T extends LifecycleControlEnv>(env: T, current: ShowControlSnapshot,
+  token: { executionId: string } | { verificationId: string }): Promise<T> {
+  const frozen = await env.CASTLOOP_BUCKET.get(`system/jobs/${current.value.owner!.job_id}/request.toml`);
   if (!frozen) throw new Error("Frozen control request is missing");
   checkRecordSize(frozen);
   const request = parseControlRequest(await frozen.text());
   const hash = await requestHash(request);
-  if (request.show_id !== execution.showId || !ownsRequest(current.value, request, hash)) {
+  if (request.show_id !== current.value.show_id || !ownsRequest(current.value, request, hash)) {
     throw new Error("Frozen control request changed during execution verification");
   }
   return { ...env, [VERIFIED_OPERATION]: Object.freeze({ bucket: env.CASTLOOP_BUCKET, request: Object.freeze(request), hash,
-    reservationId: current.value.reservation_id, executionId: execution.executionId }) };
+    reservationId: current.value.reservation_id, ...token }) };
 }
 
 export async function beginShowOperation(env: LifecycleControlEnv, showId: string,

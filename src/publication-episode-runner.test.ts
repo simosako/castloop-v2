@@ -178,6 +178,10 @@ describe("M6 owned Episode publication runner", () => {
     const stoppedKey = "public/episodes/daily/stopped/metadata.toml";
     const stopped = parseEpisodeRevision(setup.text(stoppedKey));
     await setup.bucket.put(stoppedKey, stringifyToml({ ...stopped, guid: setup.draft.guid }));
+    const catalogKey = "public/podcasts/daily/episode-catalog.json";
+    const catalog = JSON.parse(setup.text(catalogKey));
+    catalog.entries.find((entry: { revision: { episode_id: string } }) => entry.revision.episode_id === "stopped").revision.guid = setup.draft.guid;
+    await setup.bucket.put(catalogKey, JSON.stringify(catalog));
     await expect(consumeOwnedPublication(setup.env, setup.key, effects(setup).effects)).rejects.toThrow("GUID is already used");
     expect(setup.entries.has(setup.mediaKey)).toBe(false);
     expect(setup.entries.has(setup.historyKey)).toBe(false);

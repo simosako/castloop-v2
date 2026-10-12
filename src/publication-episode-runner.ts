@@ -1,6 +1,6 @@
 import { episodeDraftFromRevision, episodeRevisionSchema, lifecycleFailureForPhase, lifecycleJobStatusSchema, lifecycleProgressSchema,
   parseEpisodeDraft, parseEpisodeLifecycle, parseEpisodeRevision, parseServiceConfig, parseShowMetadata, stringifyLifecycleToml,
-  sameEpisodeIdentity, stringifyToml, validateId } from "../packages/shared/src/index";
+  sameEpisodeIdentity, stringifyToml } from "../packages/shared/src/index";
 import type { EpisodeCommit, EpisodeRevision, LifecycleProgress } from "../packages/shared/src/index";
 import { finishShowOperation, readShowControl, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
@@ -13,42 +13,24 @@ import { publicationCommitKey, readFrozenPublicationCommit, requireOwnedPublicat
 import { matchesPublishedAudio, publicationChecksum, readPublicationBytes, renderPublicationFeed } from "./publication-inputs";
 import type { PublicationEffects } from "./publication-inputs";
 import { measureWorkerPhase } from "./worker-timing";
+import { ensureEpisodeCatalog } from "./episode-catalog";
 
 function text(bytes: Uint8Array): string {
   return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
 }
 
-async function uniqueGuid(env: LifecycleFeedEnv, execution: ShowExecution, revision: EpisodeRevision): Promise<void> {
-  const prefix = `public/episodes/${execution.showId}/`;
-  const cursors = new Set<string>();
-  const keys = new Set<string>();
-  let cursor: string | undefined;
-  let bytes = 0;
-  do {
-    const page = await env.CASTLOOP_BUCKET.list({ prefix, cursor, limit: 1000 });
-    for (const object of page.objects) {
-      if (!object.key.startsWith(prefix) || keys.has(object.key) || keys.size >= 10000) throw new Error("Episode GUID inventory is inconsistent or oversized");
-      keys.add(object.key);
-      const parts = object.key.slice(prefix.length).split("/");
-      if (parts.at(-1) !== "metadata.toml") continue;
-      if (parts.length !== 2) throw new Error("Invalid current Episode metadata key");
-      const episodeId = validateId(parts[0], "episode");
-      bytes += object.size;
-      if (object.size < 1 || object.size > 1_000_000 || bytes > 8_000_000) throw new Error("Episode GUID inventory exceeds its metadata budget");
-      const metadata = await env.CASTLOOP_BUCKET.get(object.key, { onlyIf: { etagMatches: object.etag } });
-      if (!metadata || !("body" in metadata) || !metadata.body || metadata.etag !== object.etag || metadata.size !== object.size) {
-        throw new Error("Episode GUID inventory changed during validation");
-      }
-      const current = parseEpisodeRevision(await metadata.text());
-      if (current.episode_id !== episodeId) throw new Error("Episode GUID inventory targets another Episode");
-      if (episodeId !== revision.episode_id && current.guid === revision.guid) throw new Error("Episode GUID is already used by another Episode");
-    }
-    await requireShowExecution(env, execution);
-    if (!page.truncated) break;
-    if (!page.cursor || cursors.has(page.cursor)) throw new Error("Episode GUID inventory cursor did not advance");
-    cursors.add(page.cursor);
-    cursor = page.cursor;
-  } while (true);
+async function uniqueGuid(env: LifecycleFeedEnv, execution: ShowExecution, revision: EpisodeRevision,
+  base: EpisodeRevision | null): Promise<void> {
+  const catalog = await ensureEpisodeCatalog(env, execution);
+  const previous = catalog.value.entries.find((entry) => entry.revision.episode_id === revision.episode_id)?.revision;
+  if (base && JSON.stringify(previous) !== JSON.stringify(base) &&
+    !(catalog.value.applied_job_id === execution.jobId && JSON.stringify(previous) === JSON.stringify(revision))) {
+    throw new Error("Episode catalog no longer matches its immutable base revision");
+  }
+  if (catalog.value.entries.some((entry) => entry.revision.episode_id !== revision.episode_id && entry.revision.guid === revision.guid)) {
+    throw new Error("Episode GUID is already used by another Episode");
+  }
+  await requireShowExecution(env, execution);
 }
 
 async function persistAudio(env: LifecycleFeedEnv, execution: ShowExecution, commit: EpisodeCommit): Promise<void> {
@@ -148,7 +130,7 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
         length_bytes: commit.audio_length_bytes ?? base!.length_bytes, duration_seconds: commit.duration_seconds ?? base!.duration_seconds,
         sha256: commit.audio_sha256 ?? base!.sha256, updated_at: commit.committed_at });
       await measureWorkerPhase(execution.jobId, "publication.verify_staging", () => verifyPublicationStaging(env, execution, { publishedCandidate: revision }));
-      await measureWorkerPhase(execution.jobId, "publication.unique_guid", () => uniqueGuid(env, execution, revision));
+      await measureWorkerPhase(execution.jobId, "publication.unique_guid", () => uniqueGuid(env, execution, revision, base));
       failurePhase = "feed";
       await recordProgress("feed");
       await guard();

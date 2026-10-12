@@ -82,7 +82,16 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 
 ログには素材・本文・秘密・execution tokenを含めない。詳細traceをR2に保存せず、診断用headerも返さない。Workerの時計はI/Oで進むため、`duration_ms`はI/O区間の比較用でCPU profileではない。consumer全体とその内部phaseは重なるので加算しない。ログのsampling・保持期間により、全記録を後から取得できるとは限らない。
 
-最初の性能比較は、公開済み36件Showのmetadata-only 1件更新を同じ条件で測る。完成済みimportの再実行では公開処理を測れない。CLI/Workerのcommitとjob IDを記録し、`publication.consumer`、`publication.guard`、`publication.feed_inputs`、`publication.unique_guid`、terminal status/owner解放と、CLIが`published / released`を確認するまでを比較する。実機更新は承認された試験環境で行う。
+性能比較は、公開済み36件Showのmetadata-only 1件更新を同じ条件で測る。完成済みimportの再実行では公開処理を測れない。CLI/Workerのcommitとjob IDを記録し、`publication.consumer`、`publication.guard`、`publication.feed_inputs`、`publication.unique_guid`、`staging.finish`と、CLIが`published / released`を確認するまでを比較する。実機更新は承認された試験環境で行う。
+
+この改修版は、検証済みEpisode情報をShow単位のカタログに保存する。CLIを更新し、通常更新手順でWorkerもdeploy・検証・明示resumeする。古いWorkerへのdowngradeは行わない。
+
+- 既存Showの最初の公開更新ではカタログ構築のため全件を読む。このjobの時間は「初回構築」として別に記録し、published/releasedとservice invocation解放を確認する。
+- 次の同一metadata-only更新1jobを通常更新として測る。GUID/feed入力の時間とstaging finishを4781fadの測定と比較し、前後のfeed byte一致、GUID・音源参照不変、所有権解放を確認する。
+- カタログはprivate R2の`public/podcasts/<showId>/episode-catalog.json`。`public/`というkeyでも公開Workerはこのpathを配信しない。確認時はそのURLが404になることも調べる。手動編集・削除はしない。
+- Episode公開停止ではカタログ内に元情報を保持し、復元で再掲載する。Episode削除では対象情報を除き、Show削除ではカタログ自体をpayloadとして削除する。Show停止中の子操作もカタログ更新世代を進めるが、停止中のfeedは書き換えない。
+
+通常更新では未変更Episodeの個別GET/HEADを行わない。転送するカタログと生成するRSSの量は件数に比例するため、全体の所要時間が件数に全く依存しなくなるという意味ではない。構築済みカタログの欠落・破損・世代不一致は自動再構築せず停止する。
 
 ## 3. 購読先を切り替える
 

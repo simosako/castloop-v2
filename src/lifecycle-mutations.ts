@@ -3,6 +3,8 @@ import { parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsCo
 import type { EpisodeLifecycle } from "../packages/shared/src/index";
 import { requireShowExecution } from "./lifecycle-control";
 import type { LifecycleControlEnv, ShowExecution } from "./lifecycle-control";
+import { advanceEpisodeCatalog } from "./episode-catalog";
+import type { LifecycleFeedEnv } from "./lifecycle-feed";
 
 export async function closeOwnedLifecycleTarget(env: LifecycleControlEnv, execution: ShowExecution): Promise<void> {
   const current = await requireShowExecution(env, execution);
@@ -36,7 +38,8 @@ export async function closeOwnedLifecycleTarget(env: LifecycleControlEnv, execut
   if (!written) throw new Error("Episode lifecycle changed before closing delivery");
 }
 
-export async function advanceLifecycleFeedGeneration(env: LifecycleControlEnv, execution: ShowExecution): Promise<void> {
+export async function advanceLifecycleFeedGeneration(env: LifecycleFeedEnv, execution: ShowExecution): Promise<void> {
+  await advanceEpisodeCatalog(env, execution);
   const current = await requireShowExecution(env, execution);
   if (current.value.last_feed_job_id === execution.jobId) return;
   if (current.value.feed_generation === Number.MAX_SAFE_INTEGER) throw new Error("Feed generation is exhausted");
