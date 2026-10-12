@@ -347,8 +347,20 @@ runnerの例外処理はretryingを保存し、呼出がsettleした後にexecut
 4. **phaseを見て調査先を絞る。** validatingならstaging証跡・GUID/カタログ、feedなら音源コピー→feed入力→history/current/feed保存→カタログ/世代保存、purgeならcache purge、finishedならterminal statusとowner解放を確認する。`progress.phase=feed`だけで音源コピー停止とは断定しない。
 5. **再試行停止と照会遅延を区別する。** retryingでattemptsが増えた場合は同じ失敗phaseとDLQ markerの有無を確認する。サーバー側published/releasedがCLI停止より前なら、consumerではなく照会応答・競合回数・照会時間を調べる。service invocation解放は別に確認する。
 
-現行`measureWorkerPhase`は終了時にログを出すため、未完了のphaseの開始ログはない。またカタログ/世代保存には独立した時間ログがない。この2点は観測の不足であり、既存ログで区間を絞れなければ、固定phaseの開始checkpointとカタログ/世代保存の計測だけを追加する。ログがないことだけで処理未開始とは判断しない。
+この調査時点の`measureWorkerPhase`は終了時にログを出すため、未完了のphaseの開始ログはなく、カタログ/世代保存にも独立した時間ログがなかった。2026-10-13のIssue #13再調査で、固定phase開始checkpointとカタログ/世代保存・後処理の計測を追加した。ログがないことだけで処理未開始とは判断しない。
 
 [Queuesのwall time上限](https://developers.cloudflare.com/queues/platform/limits/#wall-time-limits-by-invocation-type)は15分であり、CLIの300秒と同じではない。CPU時間とI/O待機も区別する。接続上限は応答header待ち最大6件であり、staging音源の本文streamを保持しただけで接続枠が詰まると断定できない。
 
 調査時の既存関連テストは21 pass / 0 fail（4 files）。診断helper/結果は`/tmp/opencode/m7-first-publication-diagnostic.ts`と`/tmp/opencode/m7-first-publication-diagnostic.json`に保存した。製品source、Cloudflare設定・配備、timeout、記録・ownerには変更を加えていない。修正対象は実機証跡との照合後に決める。
+
+### Issue #13・断続的なEpisode停止の再調査（2026-10-13）
+
+音源stream取得後の検証/owner照合/本文未消費PUT例外で未読本文を閉じない経路を修正した。
+PUTがsettleした後、未lockの元bodyをcancelしてawaitする。並列status/progress読取も、片方の例外で
+もう片方の開始済みGET/本文を残さないよう全settlementを待つ。音源を全量buffer化しない。
+通常の音源コピー・catalog/世代保存・published記録・owner/service解放をそれぞれ保留するmockで、
+開始だけのphase、所有権の維持、完了後の解放を確認した。R2継続失敗で後処理にも失敗すればtokenが残る。
+
+前回のDLQ一致を終了証明とする明示解放は安全条件を満たさないため撤回した。古い失敗履歴と現在の
+実行/IOを区別し、未知tokenを保持する。実機Episodeの取消原因は未確定で、待機延長/制限変更・
+Cloudflare操作はしていない。停止経路と証跡採取は[publication診断](./publication_execution_recovery.md)参照。

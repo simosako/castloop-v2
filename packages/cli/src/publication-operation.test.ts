@@ -470,7 +470,7 @@ test("commit preflight does not adopt another marker or infer an unknown consume
   expect(setup.calls.filter((call) => call === "commit")).toHaveLength(1);
 });
 
-test("release requires its retained execution token and dead-letter evidence before freeing a frozen job", async () => {
+test("release refuses an unknown execution without recording or sending a mutation", async () => {
   const setup = await fixture();
   await runPublicationClaim(setup.journal, setup.effects);
   await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("never replay");
@@ -478,12 +478,12 @@ test("release requires its retained execution token and dead-letter evidence bef
   await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("retained execution token");
   expect(setup.journal.load().release).toBeUndefined();
   await acquireShowExecution(setup.env, "daily", setup.frozen.request.job_id, setup.publicationOperation.show_generation);
-  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("dead-letter evidence");
+  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("not proven settled");
   expect(setup.journal.load().release).toBeUndefined();
   expect(setup.sent).toEqual([]);
 });
 
-test("release frees a frozen dead-lettered publication and the requeued job completes", async () => {
+test("matching dead-letter history cannot authorize a CLI release or retry of a retained execution", async () => {
   const setup = await fixture();
   await runPublicationClaim(setup.journal, setup.effects);
   await runPublicationCommit(setup.journal, setup.effects);
@@ -493,16 +493,15 @@ test("release frees a frozen dead-lettered publication and the requeued job comp
   const before = await setup.client.status(setup.frozen);
   expect(before.execution_active).toBe(true);
   expect(before.dead_letter_present).toBe(true);
-  await runPublicationRelease(setup.journal, setup.effects);
-  expect(setup.journal.load().release).toEqual({ attempt: 1, state: "released", key: setup.markerKey });
-  expect(setup.calls).toEqual(["claim", "status", "commit", "status", "status", "release"]);
-  expect(setup.sent).toEqual([setup.markerKey]);
+  const journalBeforeRelease = readFileSync(setup.file, "utf8");
+  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("does not authorize release");
+  expect(setup.journal.load().release).toBeUndefined();
+  expect(readFileSync(setup.file, "utf8")).toBe(journalBeforeRelease);
+  expect(setup.calls).toEqual(["claim", "status", "commit", "status", "status"]);
+  expect(setup.sent).toEqual([]);
   const owner = (await readShowControl(setup.env, "daily"))!.value.owner!;
   expect(owner.state).toBe("processing");
-  expect(owner.execution_id).toBeUndefined();
-  await setup.consume(setup.markerKey);
-  const observed = await inspectPublicationOperation(setup.journal, setup.effects);
-  expect(observed.server_status.status?.state).toBe("published");
-  expect(observed.server_status.ownership).toBe("released");
-  await expect(runPublicationRelease(setup.journal, setup.effects)).rejects.toThrow("unfinished held owner");
+  expect(owner.execution_id).toBeString();
+  await expect(runPublicationRetry(setup.journal, setup.effects)).rejects.toThrow("unfinished held owner");
+  expect(setup.sent).toEqual([]);
 });

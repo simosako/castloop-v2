@@ -99,12 +99,7 @@ export async function runPublicationRelease(journal: PublicationJournal, effects
       throw new Error("Publication release requires its unfinished held owner");
     }
     if (!status.execution_active) throw new Error("Publication release requires its retained execution token; use publication-retry without one");
-    if (!status.dead_letter_present) throw new Error("Publication release requires its dead-letter evidence of ended delivery attempts");
-    const started = validatePublicationClientState({ ...state, release: { attempt: (state.release?.attempt ?? 0) + 1, state: "requested" } });
-    journal.save(started);
-    const value = receipt(started, await effects.release(), "released");
-    if (value.result !== "released") throw new Error("Invalid publication release receipt");
-    journal.save({ ...started, release: { ...started.release!, state: "released", key: value.key } });
+    throw new Error("Publication execution and outstanding IO are not proven settled; a dead-letter marker does not authorize release. Preserve tokens and inspect logs");
   });
 }
 

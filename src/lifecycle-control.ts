@@ -269,15 +269,21 @@ export async function finishShowOperation(env: LifecycleControlEnv,
     receipt.execution_id === execution.executionId) return snapshot!;
   const current = await requireShowExecution(env, execution);
   const owner = current.value.owner!;
-  const [statusObject, progressObject] = await Promise.all([
-    env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/status.toml`),
-    env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/progress.toml`),
-  ]);
-  if (!statusObject || !progressObject) throw new Error("Operation has no durable terminal status and progress");
-  checkRecordSize(statusObject);
-  checkRecordSize(progressObject);
-  const status = parseJobStatus(await statusObject.text());
-  const progress = parseLifecycleProgress(await progressObject.text());
+  const records = await Promise.allSettled((["status", "progress"] as const).map(async (name) => {
+    const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/${name}.toml`);
+    if (!object) return null;
+    if (object.size > MAX_CONTROL_BYTES) {
+      await object.body?.cancel();
+      throw new Error("Lifecycle control record exceeds the size limit");
+    }
+    return await object.text();
+  }));
+  const [statusRecord, progressRecord] = records;
+  if (statusRecord.status === "rejected") throw statusRecord.reason;
+  if (progressRecord.status === "rejected") throw progressRecord.reason;
+  if (statusRecord.value === null || progressRecord.value === null) throw new Error("Operation has no durable terminal status and progress");
+  const status = parseJobStatus(statusRecord.value);
+  const progress = parseLifecycleProgress(progressRecord.value);
   for (const record of [status, progress]) {
     if (!("request_sha256" in record) || record.job_id !== execution.jobId ||
       record.show_id !== execution.showId || record.show_generation !== execution.generation ||

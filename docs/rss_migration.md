@@ -63,6 +63,7 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 
 - 読み取り中に公開記録やサービス状態が変わった場合（`publication_status_changed`）だけ、既知jobの状態を再照会する。この計測用開発版は最大300回、待機開始から5分経過後は照会を追加しない。進行中のHTTP照会には別の要求timeoutがある。正式版の既定待機上限は性能改善後の実測で決定する。`published`／`released`の検証までは次の公開へ進まない。この識別には修正済みCLIとWorkerの両方が必要。
 - 公開receiptを保存済みのjobで状態照会に失敗した、または公開待機が終わらない場合は、同じコマンドでそのjobの確認から続けられる。完了済みの公開を再送しない。
+- heldなjobにDLQ履歴がある場合は早期停止し、token残留か、実行tokenを返却済みの失敗履歴かを表示する。DLQ markerは現在の実行・I/Oの終了証明ではない。前回追加した`release-job`／`publication-release`は安全条件を満たさず無効化したため使用しない。lock/owner/registryを保持し、[停止の診断手順](../design/publication_execution_recovery.md)で調べる。
 - 更新前の対象照会では、確認できた記録変化（`target_status_changed`）だけ最大3回照会する。その他のエラーは停止し、変更処理を始めていなければ進捗を`ready`に戻す。同じ取り込みコマンドで続行できる。HTTP拒否には`http_status`を表示する。
 - 修正前の`command_requested`記録も、Episode作成直後の最初の`update-episode`に限り続行できる。保持したworkspaceで下書きjournal／lockが未作成、ローカルTOMLが取り込み内容と一致、サーバーのEpisodeが未登録、Showがactive／openで所有者なし、照会前後のローカル記録が不変であることを確認する。確認できなければ停止する。通常更新は下書きjournalを保存してから変更要求を送るため、既存journalがあればこの復旧は適用しない。
 - 照会エラーの`reason_code`は、通信失敗（`management_transport_failed`）、HTTP拒否（`management_http_rejected`）、応答形式不正（`management_response_invalid`）、公開schema／identity不一致（`management_identity_invalid`）、ローカル記録変化（`local_record_changed`）等を区別する。これらは自動再照会せず停止する。調査にはコードを保存し、秘密を含む原本や応答を公開しない。
@@ -76,11 +77,18 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 
 この開発版Workerは、Cloudflare Workers LogsへJSONログを出力する。Dashboardの対象WorkerのObservabilityでjob IDを検索する。
 
-- `event: "worker_timing"`: `job_id`、`phase`、`outcome`、`started_at`、`finished_at`、`duration_ms`。
+- `event: "worker_phase_started"`: `job_id`、固定`phase`、`timing_id`、`started_at`。処理のawait前に出す。
+- `event: "worker_timing"`: 同じ`timing_id`と`job_id`／`phase`、`outcome`、`started_at`、`finished_at`、`duration_ms`。
 - `event: "publication_delivery"`: Queue messageの時刻、consumer登録前の時刻、配送試行回数。時計が異なるため、時刻差は近似値として扱う。
-- 公開受付、consumer全体、service invocation解放を記録する。Episode公開はさらにguard、staging証跡、GUID検証、音源保存、feed入力、history/current/feed書き込み、progress/status保存、purge、Show owner解放を区別する。staging管理APIもactionごとに記録する。
+- `event: "publication_execution_blocked"`: 残留execution tokenでconsumerを拒否したこと。`authorizes_recovery: false`であり、生存・終了証明ではない。
+- 公開受付、consumer全体、実行取得、service invocation解放を記録する。Episode公開はさらにguard内部、staging証跡、snapshot、GUID検証、音源HEAD/GET/PUT/検証/cancel、feed入力、history/current/feed書き込み、catalog/世代保存、progress/status保存、purge、Show owner解放、例外後処理を区別する。staging管理APIもactionごとに記録する。
 
 ログには素材・本文・秘密・execution tokenを含めない。詳細traceをR2に保存せず、診断用headerも返さない。Workerの時計はI/Oで進むため、`duration_ms`はI/O区間の比較用でCPU profileではない。consumer全体とその内部phaseは重なるので加算しない。ログのsampling・保持期間により、全記録を後から取得できるとは限らない。
+
+停止調査ではjob IDに加え同じattemptのrequestId/traceIdで絞り、`timing_id`で開始と終了を対応付ける。
+最も内側の開始だけのphaseをplatform outcome/例外・CPU/wallと照合する。`progress.phase=feed`は
+音源保存だけでなくcatalog/世代保存まで含み、開始ログのみでも取消理由や解放の安全性を確定できない。
+このログには対応Workerが必要だが、残留tokenを通常更新のpause/drain条件から除外して配備しない。
 
 性能比較は、公開済み36件Showのmetadata-only 1件更新を同じ条件で測る。完成済みimportの再実行では公開処理を測れない。CLI/Workerのcommitとjob IDを記録し、`publication.consumer`、`publication.guard`、`publication.feed_inputs`、`publication.unique_guid`、`staging.finish`と、CLIが`published / released`を確認するまでを比較する。実機更新は承認された試験環境で行う。
 

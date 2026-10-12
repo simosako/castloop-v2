@@ -72,9 +72,8 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "release-job": {
     usage: "release-job JOB",
-    description: "Run from the service workspace. Free a publication frozen by a canceled consumer invocation.\n" +
-      "Requires its retained journal, a retained execution token and matching dead-letter evidence\n" +
-      "(every delivery attempt ended); then requeues the same commit. Elapsed time alone never releases.",
+    description: "Disabled: dead-letter history does not prove that the current execution or IO ended.\n" +
+      "Preserve journals and tokens and inspect Worker logs. No token is released or commit requeued.",
   },
   deploy: {
     usage: "deploy [--operation-id UUID]",

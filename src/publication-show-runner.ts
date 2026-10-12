@@ -10,27 +10,29 @@ import { advanceLifecycleFeedGeneration } from "./lifecycle-mutations";
 import { publicationCommitKey, readFrozenPublicationCommit, requireOwnedPublication, verifyPublicationStaging } from "./publication-admission";
 import { publicationChecksum, readPublicationBytes, renderPublicationFeed } from "./publication-inputs";
 import type { PublicationEffects } from "./publication-inputs";
+import { measureWorkerPhase } from "./worker-timing";
 
 export type ShowPublicationEffects = PublicationEffects;
 
 export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: ShowExecution,
   effects: ShowPublicationEffects): Promise<void> {
-  const existing = await readShowControl(env, execution.showId);
+  const existing = await measureWorkerPhase(execution.jobId, "publication.runner_control", () => readShowControl(env, execution.showId));
   const receipt = existing?.value.last_finished_operation;
   if (receipt?.job_id === execution.jobId && receipt.generation === execution.generation && receipt.execution_id === execution.executionId) {
-    await finishShowOperation(env, execution);
+    await measureWorkerPhase(execution.jobId, "publication.owner_release", () => finishShowOperation(env, execution));
     return;
   }
-  const owned = await requireOwnedPublication(env, execution);
+  const owned = await measureWorkerPhase(execution.jobId, "publication.runner_manifest", () => requireOwnedPublication(env, execution));
   if (owned.frozen.commit.kind !== "show") throw new Error("Show publication requires a Show commit");
-  const marker = await readFrozenPublicationCommit(env, publicationCommitKey(owned.frozen.commit));
+  const marker = await measureWorkerPhase(execution.jobId, "publication.frozen_commit", () =>
+    readFrozenPublicationCommit(env, publicationCommitKey(owned.frozen.commit)));
   if (!marker || JSON.stringify(marker) !== JSON.stringify(owned.frozen)) throw new Error("Show publication has no matching frozen commit");
   const commit = owned.frozen.commit;
-  const journal = await readLifecycleJobJournal(env, execution);
+  const journal = await measureWorkerPhase(execution.jobId, "publication.journal_read", () => readLifecycleJobJournal(env, execution));
   let progress = journal.progress ?? lifecycleProgressSchema.parse({ schema_version: 1, ...journal.identity, phase: "admitted",
     deleted_objects: 0, purge_confirmed: false, updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") });
   if (journal.status?.state === "published") {
-    await finishShowOperation(env, execution);
+    await measureWorkerPhase(execution.jobId, "publication.owner_release", () => finishShowOperation(env, execution));
     return;
   }
   if (journal.status?.state === "completed" || journal.status?.state === "abandoned") throw new Error("Show publication status is incompatible");
@@ -39,21 +41,25 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
   const target = { showId: execution.showId };
   let failurePhase = progress.phase;
   async function guard(): Promise<void> {
-    await requireShowExecution(env, execution);
-    await requireOwnedPublication(env, execution);
-    await effects.checkDeliveryGate(target);
-    await requireShowExecution(env, execution);
+    await measureWorkerPhase(execution.jobId, "publication.guard", async () => {
+      await measureWorkerPhase(execution.jobId, "publication.guard_owner", async () => {
+        await requireShowExecution(env, execution);
+        await requireOwnedPublication(env, execution);
+      });
+      await measureWorkerPhase(execution.jobId, "publication.guard_delivery", () => effects.checkDeliveryGate(target));
+      await measureWorkerPhase(execution.jobId, "publication.guard_recheck", () => requireShowExecution(env, execution));
+    });
   }
   async function recordProgress(phase: LifecycleProgress["phase"], purged = false): Promise<void> {
     const next = lifecycleProgressSchema.parse({ ...progress, phase, purge_confirmed: purged,
       updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") });
-    await writeLifecycleProgress(env, execution, next);
+    await measureWorkerPhase(execution.jobId, `publication.progress.${phase}`, () => writeLifecycleProgress(env, execution, next));
     progress = next;
   }
   async function recordStatus(state: "processing" | "retrying" | "published"): Promise<void> {
-    await writeLifecycleJobStatus(env, execution, lifecycleJobStatusSchema.parse({ schema_version: 2, ...journal.identity,
+    await measureWorkerPhase(execution.jobId, `publication.status_write.${state}`, () => writeLifecycleJobStatus(env, execution, lifecycleJobStatusSchema.parse({ schema_version: 2, ...journal.identity,
       state, phase: progress.phase, ...(state === "published" ? { result_lifecycle: "active" } : {}),
-      ...(state === "retrying" ? lifecycleFailureForPhase(failurePhase) : {}) }));
+      ...(state === "retrying" ? lifecycleFailureForPhase(failurePhase) : {}) })));
   }
   async function overwrite(key: string, value: string | Uint8Array, contentType?: string): Promise<void> {
     await guard();
@@ -72,7 +78,7 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
       failurePhase = "validating";
       if (progress.phase !== "feed") await recordProgress("validating");
       await recordStatus("processing");
-      await verifyPublicationStaging(env, execution);
+      await measureWorkerPhase(execution.jobId, "publication.verify_staging", () => verifyPublicationStaging(env, execution));
       const prefix = `staging/shows/${execution.showId}/${execution.jobId}`;
       const metadata = await readPublicationBytes(env, `${prefix}/show.toml`, 1_000_000);
       const cover = await readPublicationBytes(env, `${prefix}/cover.${commit.cover_extension}`, 5_000_000);
@@ -97,51 +103,57 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
         }
       }
       const service = parseServiceConfig(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(await readPublicationBytes(env, "system/service.toml", 16384)));
-      const inputs = await readLifecycleFeedInputs(env, execution);
+      const inputs = await measureWorkerPhase(execution.jobId, "publication.feed_inputs", () => readLifecycleFeedInputs(env, execution));
       if (!inputs.writeFeed) throw new Error("Show lifecycle does not permit publication feed writing");
       const feed = renderPublicationFeed(show, inputs.episodes, service.public_base_url, extension);
       failurePhase = "feed";
       await recordProgress("feed");
-      await overwrite(showKey, source);
-      await overwrite(`public/podcasts/${execution.showId}/cover.${extension}`, cover, extension === "jpg" ? "image/jpeg" : "image/png");
-      await overwrite(`public/podcasts/${execution.showId}/feed.xml`, feed, "application/rss+xml; charset=utf-8");
-      await advanceLifecycleFeedGeneration(env, execution);
+      await measureWorkerPhase(execution.jobId, "publication.metadata_write", () => overwrite(showKey, source));
+      await measureWorkerPhase(execution.jobId, "publication.cover_write", () =>
+        overwrite(`public/podcasts/${execution.showId}/cover.${extension}`, cover, extension === "jpg" ? "image/jpeg" : "image/png"));
+      await measureWorkerPhase(execution.jobId, "publication.feed_write", () =>
+        overwrite(`public/podcasts/${execution.showId}/feed.xml`, feed, "application/rss+xml; charset=utf-8"));
+      await measureWorkerPhase(execution.jobId, "publication.feed_generation", () => advanceLifecycleFeedGeneration(env, execution));
       await recordProgress("purge");
     }
     if (progress.phase === "purge") {
       failurePhase = "purge";
       await recordStatus("processing");
       await guard();
-      await effects.purge(target);
+      await measureWorkerPhase(execution.jobId, "publication.purge", () => effects.purge(target));
       await guard();
       await recordProgress("visibility", true);
     }
     if (progress.phase === "visibility") {
       failurePhase = "visibility";
       await guard();
-      const current = await requireShowExecution(env, execution);
-      if (current.value.lifecycle === "draft") {
-        const value = parseShowControl({ ...current.value, lifecycle: "active" });
-        const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
-          onlyIf: { etagMatches: current.etag },
-        });
-        if (!written) throw new Error("Show lifecycle changed before opening publication");
-      } else if (current.value.lifecycle !== "active") throw new Error("Show publication cannot restore stopped delivery");
+      await measureWorkerPhase(execution.jobId, "publication.visibility", async () => {
+        const current = await requireShowExecution(env, execution);
+        if (current.value.lifecycle === "draft") {
+          const value = parseShowControl({ ...current.value, lifecycle: "active" });
+          const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
+            onlyIf: { etagMatches: current.etag },
+          });
+          if (!written) throw new Error("Show lifecycle changed before opening publication");
+        } else if (current.value.lifecycle !== "active") throw new Error("Show publication cannot restore stopped delivery");
+      });
       await recordProgress("finished", true);
     }
     if (progress.phase !== "finished") throw new Error("Show publication cannot finish from its current phase");
     failurePhase = "finished";
     await recordStatus("published");
-    await finishShowOperation(env, execution);
+    await measureWorkerPhase(execution.jobId, "publication.owner_release", () => finishShowOperation(env, execution));
   } catch (error) {
-    const current = await readShowControl(env, execution.showId);
-    if (current?.value.last_finished_operation?.job_id === execution.jobId && current.value.last_finished_operation.generation === execution.generation &&
-      current.value.last_finished_operation.execution_id === execution.executionId) throw error;
-    const saved = await readLifecycleJobJournal(env, execution);
-    if (saved.status?.state !== "published" && saved.progress?.phase !== "finished") {
-      progress = saved.progress ?? progress;
-      await recordStatus("retrying");
-    }
+    await measureWorkerPhase(execution.jobId, "publication.failure_record", async () => {
+      const current = await readShowControl(env, execution.showId);
+      if (current?.value.last_finished_operation?.job_id === execution.jobId && current.value.last_finished_operation.generation === execution.generation &&
+        current.value.last_finished_operation.execution_id === execution.executionId) return;
+      const saved = await readLifecycleJobJournal(env, execution);
+      if (saved.status?.state !== "published" && saved.progress?.phase !== "finished") {
+        progress = saved.progress ?? progress;
+        await recordStatus("retrying");
+      }
+    });
     throw error;
   }
 }

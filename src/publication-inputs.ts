@@ -12,6 +12,7 @@ export async function readPublicationBytes(env: LifecycleFeedEnv, key: string, m
   if (!head || head.size < 1 || head.size > maximum) throw new Error("Publication snapshot is missing or oversized");
   const object = await env.CASTLOOP_BUCKET.get(key, { onlyIf: { etagMatches: head.etag } });
   if (!object || !("body" in object) || !object.body || object.etag !== head.etag || object.size !== head.size) {
+    if (object && "body" in object && object.body) await object.body.cancel();
     throw new Error("Publication snapshot changed before reading");
   }
   const bytes = new Uint8Array(await object.arrayBuffer());

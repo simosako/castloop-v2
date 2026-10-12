@@ -24,7 +24,10 @@ async function requireIdentity(env: LifecycleControlEnv, execution: ShowExecutio
 
 async function jobObject(env: LifecycleControlEnv, execution: ShowExecution, name: "status" | "progress"): Promise<R2ObjectBody | null> {
   const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/${name}.toml`);
-  if (object && object.size > 16384) throw new Error("Lifecycle job record exceeds the size limit");
+  if (object && object.size > 16384) {
+    await object.body?.cancel();
+    throw new Error("Lifecycle job record exceeds the size limit");
+  }
   return object;
 }
 
@@ -42,9 +45,15 @@ function checkedProgress(source: string, identity: LifecycleJobIdentity): Lifecy
 
 export async function readLifecycleJobJournal(env: LifecycleControlEnv, execution: ShowExecution): Promise<LifecycleJobJournal> {
   const identity = await requireIdentity(env, execution);
-  const [status, progress] = await Promise.all([jobObject(env, execution, "status"), jobObject(env, execution, "progress")]);
-  const result = { identity, status: status ? checkedStatus(await status.text(), identity) : null,
-    progress: progress ? checkedProgress(await progress.text(), identity) : null };
+  const records = await Promise.allSettled((["status", "progress"] as const).map(async (name) => {
+    const object = await jobObject(env, execution, name);
+    return object ? await object.text() : null;
+  }));
+  const [status, progress] = records;
+  if (status.status === "rejected") throw status.reason;
+  if (progress.status === "rejected") throw progress.reason;
+  const result = { identity, status: status.value !== null ? checkedStatus(status.value, identity) : null,
+    progress: progress.value !== null ? checkedProgress(progress.value, identity) : null };
   await requireIdentity(env, execution);
   return result;
 }

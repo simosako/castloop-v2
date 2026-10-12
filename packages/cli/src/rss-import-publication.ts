@@ -161,8 +161,12 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
         }
         if (server.status?.state === "failed" || server.ownership === "superseded") throw new Error("RSS publication failed or was superseded; inspect the retained job");
         if (server.execution_active && server.dead_letter_present) {
-          throw new Error("Publication job is frozen with its retained execution token after dead-lettering; " +
-            "inspect the retained job and run publication-release before resuming this import");
+          throw new Error(`Publication ${state.waiting_job_id} has dead-letter history and a retained execution token; ` +
+            "execution may be active or interrupted. Preserve journals and tokens and inspect Worker logs; " +
+            "a dead-letter marker does not authorize release");
+        }
+        if (server.dead_letter_present && server.ownership === "held") {
+          throw new Error(`Publication ${state.waiting_job_id} has dead-letter history; inspect the retained job before an explicit same-job retry`);
         }
         await effects.wait();
       }

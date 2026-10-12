@@ -185,7 +185,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
   }
 });
 
-test("RSS import stops waiting on a frozen dead-lettered publication and resumes after publication-release", async () => {
+test("RSS import reports retained execution with DLQ history without authorizing release or replay", async () => {
   const setup = await m6InitializationFixture();
   await prepareM6ServiceInitialization(setup.env, setup.target);
   await completeM6ServiceInitialization(setup.env, setup.target, setup.checks);
@@ -221,45 +221,38 @@ test("RSS import stops waiting on a frozen dead-lettered publication and resumes
     }
     return fetchM6ManagementIntegration(new Request(input, init) as never, env as never, cachedAssets);
   }, { preconnect: globalThis.fetch.preconnect }));
-  let frozen = true;
   let waits = 0;
   const effects: RssPublicationEffects = {
     async command(command, args) {
+      if (command === "publish-episode") throw new Error("Import must not publish an Episode while the Show execution is retained");
       const result = await runM6Command(root, setup.config, command, args, { workerSource: async () => "unused" });
       if (command === "publish-show") {
         const jobId = z.object({ result: z.literal("publication-committed"), job_id: z.uuid() }).strict().parse(result).job_id;
         const job = readLocalPublicationJob(root, setup.config, jobId).client_state!;
-        if (frozen) {
-          await acquireShowExecution(setup.env, "imported", jobId, job.publication.request.expected_show_generation + 1);
-          await acquireServiceInvocation(setup.env, setup.config.service_id, "m6_consumer");
-          await setup.bucket.put(`system/jobs/${jobId}/dlq.json`, JSON.stringify({ key: publicationCommitKey(job.publication.commit) }));
-          return result;
-        }
-      }
-      if (command.startsWith("publish-")) {
-        const job = readLocalPublicationJob(root, setup.config, (result as { job_id: string }).job_id).client_state!;
-        await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: crypto.randomUUID(),
-          body: { object: { key: publicationCommitKey(job.publication.commit) } } }] } as never,
-          env as never, cachedAssets);
+        await acquireShowExecution(setup.env, "imported", jobId, job.publication.request.expected_show_generation + 1);
+        await acquireServiceInvocation(setup.env, setup.config.service_id, "m6_consumer");
+        await setup.bucket.put(`system/jobs/${jobId}/dlq.json`, JSON.stringify({ key: publicationCommitKey(job.publication.commit) }));
       }
       return result;
     }, async readFeed() { return setup.text("public/podcasts/imported/feed.xml"); }, async wait() { waits++; }, report() {},
   };
   try {
-    await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("frozen with its retained execution token");
+    await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("dead-letter history and a retained execution token");
     expect(waits).toBe(0);
     const importId = JSON.parse(readFileSync(join(output, "import.json"), "utf8")).import_id;
     const cursorFile = join(root, ".castloop", "rss-imports", setup.config.service_id, `${importId}.json`);
     const jobId = JSON.parse(readFileSync(cursorFile, "utf8")).waiting_job_id;
     expect(jobId).toBeTruthy();
-    frozen = false;
-    await runM6Command(root, setup.config, "publication-release", [jobId], { workerSource: async () => "unused" });
-    const released = readLocalPublicationJob(root, setup.config, jobId).client_state!;
-    expect(sent).toEqual([publicationCommitKey(released.publication.commit)]);
-    await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: crypto.randomUUID(),
-      body: { object: { key: sent[0]! } } }] } as never, env as never, cachedAssets);
-    const completed = await publishRssImport(root, setup.config, output, effects);
-    expect(completed).toMatchObject({ result: "rss-import-published", episode_count: 2, subscriber_migration_completed: false });
+    const cursor = readFileSync(cursorFile, "utf8");
+    const control = setup.text("system/show-publications/imported.json");
+    const admission = setup.text("system/lifecycle-service.json");
+    await expect(runM6Command(root, setup.config, "publication-release", [jobId], { workerSource: async () => "unused" }))
+      .rejects.toThrow("not proven settled");
+    expect(sent).toEqual([]);
+    expect(setup.text("system/show-publications/imported.json")).toBe(control);
+    expect(setup.text("system/lifecycle-service.json")).toBe(admission);
+    await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("does not authorize release");
+    expect(readFileSync(cursorFile, "utf8")).toBe(cursor);
   } finally {
     fetchSpy.mockRestore();
     if (originalAccount === undefined) delete process.env.CLOUDFLARE_ACCOUNT_ID; else process.env.CLOUDFLARE_ACCOUNT_ID = originalAccount;

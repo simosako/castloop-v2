@@ -305,6 +305,32 @@ describe("M6 durable operation completion", () => {
     return { ...result, input, execution, status, progress };
   }
 
+  for (const pending of ["get", "body"] as const) {
+    test(`terminal status read failure awaits the companion progress ${pending} before returning`, async () => {
+      const { env, bucket, input, execution } = await completing();
+      const get = bucket.get.bind(bucket);
+      const started = Promise.withResolvers<void>();
+      const finish = Promise.withResolvers<void>();
+      bucket.get = async (key: string) => {
+        if (key === `system/jobs/${input.job_id}/status.toml`) throw new Error("Terminal status read failed");
+        const object = await get(key);
+        if (key !== `system/jobs/${input.job_id}/progress.toml` || !object) return object;
+        if (pending === "get") { started.resolve(); await finish.promise; return object; }
+        return { ...object, async text() { started.resolve(); await finish.promise; return object.text(); } };
+      };
+      let settled = false;
+      const outcome = finishShowOperation(env, execution).then(() => null, (error: unknown) => error)
+        .finally(() => { settled = true; });
+      try {
+        await started.promise;
+        expect((await readShowControl(env, "daily"))!.value.owner?.execution_id).toBe(execution.executionId);
+        expect(settled).toBe(false);
+      } finally { finish.resolve(); }
+      expect(await outcome).toBeInstanceOf(Error);
+      expect((await readShowControl(env, "daily"))!.value.owner?.execution_id).toBe(execution.executionId);
+    });
+  }
+
   test("terminal status, matching result and purge permit atomic owner release", async () => {
     const { env, execution } = await completing();
     const result = await finishShowOperation(env, execution);

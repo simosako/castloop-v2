@@ -13,7 +13,7 @@
 | [完了応答喪失の照合](m6_completion_recovery.md) | 確認済み完了の復旧条件と限界 |
 | [単一PUT・U1](m6_upload_recovery_options.md) | 採用方式と未検証の仮定 |
 | [承認済み方針](m6_review_queue.md) | 記録保持・安全条件・開発範囲 |
-| [凍結publication実行の診断と明示解放](publication_execution_recovery.md) | canceled consumer後の実行token残留の診断・DLQ証拠付き明示解放・運用手順 |
+| [publication停止の診断とtoken保全](publication_execution_recovery.md) | Show/Episodeの停止経路・開始/終了ログ・DLQ根拠の解放の撤回・読み取り調査 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針。実装中 |
