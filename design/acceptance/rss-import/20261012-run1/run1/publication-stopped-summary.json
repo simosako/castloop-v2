@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-10-12T00:57:23.667191+00:00",
+  "state": "stopped_on_non_dns_error",
+  "stage": "5: publish-rss-import",
+  "error": "Operation status could not be verified; preserve records, locks and ownership without automatic retry or recovery",
+  "phase": "waiting",
+  "step": 4,
+  "waiting_job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+  "import_id": "908efe60-3585-4a6a-af01-f1c5d8afb206",
+  "import_cursor_lock_present": false,
+  "inspections": [
+    {
+      "label": "publication-stopped-service",
+      "exit_code": 0
+    },
+    {
+      "label": "publication-stopped-target",
+      "exit_code": 0
+    },
+    {
+      "label": "publication-stopped-domains",
+      "exit_code": 0
+    },
+    {
+      "label": "publication-stopped-job",
+      "exit_code": 0
+    }
+  ],
+  "publication_retry_performed": false,
+  "pause_or_resume_after_error": false,
+  "old_environment_changed": false
+}

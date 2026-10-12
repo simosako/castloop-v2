@@ -1,0 +1,8 @@
+Usage: castloop init [dir] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]
+
+Create a service workspace and Cloudflare resources. Missing values are prompted on a terminal.
+Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Creates only new resources and completes paused.
+Use service-status, then service-resume with its pause ID. Never rerun an initialization with an unknown outcome.
+
+Options:
+  --help, -h  Show this help

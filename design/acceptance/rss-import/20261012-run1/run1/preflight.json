@@ -1,0 +1,17 @@
+{
+  "account_id": "[REDACTED_RESOURCE_ID]",
+  "zone_id": "[REDACTED_RESOURCE_ID]",
+  "zone_name": "otftalk.com",
+  "zone_status": "active",
+  "zone_type": "full",
+  "name_servers": "[OMITTED_METADATA_OR_UNRELATED_CONFIGURATION]",
+  "hostname": "castloop-rss-r1.otftalk.com",
+  "workers_subdomain": "simosako",
+  "dns_records": [],
+  "custom_domains": [],
+  "conflicting_routes": [],
+  "worker_routes": "[OMITTED_METADATA_OR_UNRELATED_CONFIGURATION]",
+  "bucket_name_available": true,
+  "service_prefix_available": true,
+  "verification_method": "read-only Cloudflare API; Dashboard visual check not performed"
+}

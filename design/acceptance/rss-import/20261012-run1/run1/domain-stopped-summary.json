@@ -1,0 +1,41 @@
+{
+  "recorded_at": "2026-10-12T00:49:59.436917+00:00",
+  "state": "stopped_on_error",
+  "stage": "4: domain add",
+  "error": "Domain operation e1a5c445-31d6-4b6d-963a-bf90dbc3765f: Domain DNS/TLS is not verified; keep the service paused and retry the same operation after it is ready",
+  "domain_add_exit_code": 1,
+  "read_only_inspections": [
+    {
+      "inspection": "stopped-service",
+      "exit_code": 0
+    },
+    {
+      "inspection": "stopped-domains",
+      "exit_code": 0
+    }
+  ],
+  "domain_journals": [
+    {
+      "operation_id": "e1a5c445-31d6-4b6d-963a-bf90dbc3765f",
+      "completed": false,
+      "progress_phase": "feeds",
+      "pending_present": false,
+      "pending_phase": null,
+      "lock_present": false,
+      "journal_keys": [
+        "schema_version",
+        "config",
+        "request",
+        "progress",
+        "connection_receipt",
+        "completed"
+      ]
+    }
+  ],
+  "retry_performed": false,
+  "resume_performed": false,
+  "rss_publication_started": false,
+  "old_environment_changed": false,
+  "new_resources_retained": true,
+  "hostname": "castloop-rss-r1.otftalk.com"
+}

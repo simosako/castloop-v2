@@ -1,0 +1,25 @@
+{
+  "service_state": "open",
+  "invocations_count": 1,
+  "url_change_present": false,
+  "unfinished_show_operation": true,
+  "show_state": null,
+  "publication_status": "published",
+  "publication_ownership": "held",
+  "publication_progress": {
+    "schema_version": 1,
+    "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+    "show_id": "otftalk-rss",
+    "kind": "show",
+    "action": "publish",
+    "show_generation": 2,
+    "request_sha256": "9c6a1ed12b6383e9aa0742018063015649c3373073db0981a7691455f1b24d7c",
+    "phase": "finished",
+    "deleted_objects": 0,
+    "purge_confirmed": true,
+    "updated_at": "2026-10-12T00:57:16Z"
+  },
+  "domain_configuration_matches": true,
+  "domain_connections_match": true,
+  "domain_local_operations": []
+}

@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "import_id_preserved": true,
+  "all_file_hashes_sizes_mtimes_preserved": true,
+  "files_checked": 116,
+  "residual_locks": false,
+  "note": "No TOML edits were needed; preservation of administrator-edited TOML is covered by automated tests, not demonstrated by this repeat."
+}

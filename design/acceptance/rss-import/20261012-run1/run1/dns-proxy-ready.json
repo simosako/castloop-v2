@@ -1,0 +1,7 @@
+{
+  "proxy_url": "http://127.0.0.1:48265",
+  "pid": 745,
+  "hostname": "castloop-rss-r1.otftalk.com",
+  "dns_server": "1.1.1.1",
+  "tls_terminated": false
+}

@@ -1,0 +1,33 @@
+{
+  "recorded_at": "2026-10-12T01:04:27.652076+00:00",
+  "state": "stopped_on_recurrent_status_error",
+  "import_id": "908efe60-3585-4a6a-af01-f1c5d8afb206",
+  "phase": "waiting",
+  "step": 8,
+  "waiting_job_id": "a497abe0-450b-407b-96bb-c52d7782547c",
+  "cursor_lock_present": false,
+  "inspections": [
+    {
+      "label": "service",
+      "exit_code": 0
+    },
+    {
+      "label": "target",
+      "exit_code": 0
+    },
+    {
+      "label": "job",
+      "exit_code": 0
+    }
+  ],
+  "previous_show_job_before_continue": "published/released",
+  "old_environment_changed": false,
+  "forced_recovery_performed": false,
+  "publish_continuations_after_this_error": 0,
+  "service_state": "open",
+  "invocations_count": 1,
+  "unfinished_show_operation": true,
+  "job_state": "processing",
+  "job_ownership": "held",
+  "oldest_episode_id": "ep-956114dcde97d3e33d54b8cc767435638c3cf4fbf219fe7f551f23b943cde484"
+}

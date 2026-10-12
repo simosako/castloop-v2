@@ -1,0 +1,11 @@
+Usage: castloop import-rss SHOW_ID FEED_URL (--dry-run | --output DIRECTORY)
+
+Import one RSS 2.0 podcast to local files without Cloudflare credentials or changes.
+--dry-run fetches only RSS and reports counts, missing fields and unsupported extensions.
+--output downloads the RSS snapshot, JPEG/PNG cover, MP3s and editable TOML into an empty directory.
+Repeat the same command to continue this snapshot without overwriting edited TOML.
+Preserve downloaded files and private .castloop records; review them before publication.
+Audio must be MP3 and at most 300,000,000 bytes. Local import does not migrate subscribers or remove the old host.
+
+Options:
+  --help, -h  Show this help

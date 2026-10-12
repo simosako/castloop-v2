@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "service_id": "rsstest-1012-r1",
+  "bucket_name": "castloop-rss-20261012-run1",
+  "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+  "queue_name": "castloop-rsstest-1012-r1-acb1fbca",
+  "public_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev",
+  "pause_id": "fa44efef-405b-4d4d-8b9a-01030f7e18a5",
+  "external_episode_guids": true,
+  "admission_state": "paused",
+  "init_journal_keys": [
+    "schema_version",
+    "request",
+    "phase",
+    "target",
+    "runtime_readiness"
+  ],
+  "init_progress": null,
+  "init_phase": "initialized"
+}

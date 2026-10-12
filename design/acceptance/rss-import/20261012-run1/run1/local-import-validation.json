@@ -1,0 +1,386 @@
+{
+  "passed": true,
+  "episode_count": 36,
+  "audio_bytes": 1496055589,
+  "largest_audio_bytes": 62853537,
+  "feed_sha256": "b13db8318268cf8f503ddbb5e13c43434576ce96f3cadbdc7680632a673bc4cf",
+  "cover_sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35",
+  "cover_bytes": 2173207,
+  "guid_types": {
+    "uuid_shaped": 36
+  },
+  "old_host_dependency_hosts_in_descriptions": [],
+  "warnings": [
+    "Not imported: {http://purl.org/dc/elements/1.1/}creator",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}duration",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}image",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}summary",
+    "Not imported: {http://www.w3.org/2005/Atom}link",
+    "Not imported: {}author",
+    "Not imported: {}generator",
+    "Not imported: {}lastBuildDate",
+    "Not imported: {}link"
+  ],
+  "episodes": [
+    {
+      "episode_id": "ep-3552791a372112dac1e4c152461567b7c0964d4e9f32e869dea973e81172341c",
+      "guid": "8c6907d9-cf01-4c3c-b312-a9698151a0f2",
+      "guid_is_permalink": false,
+      "published_at": "2026-03-24T22:00:00Z",
+      "title_sha256": "bbc39163107896887a65a24947603fcb56ded4e8cf6e278a9b7725db0e08e33f",
+      "description_sha256": "30f67cd89c0a9a78f6cef04baad29572344ff3e6e337b902d95d684f31f285f9",
+      "bytes": 46472044,
+      "sha256": "c8fa9b632bc25582f6ab222216a20bd970b55c93559b55c2ab59c627c05041cf"
+    },
+    {
+      "episode_id": "ep-8cc15ae4c2a0628ca3db2113afd7315c79299e865e8108b68d57042d726cd652",
+      "guid": "cc42f11f-41a6-4a48-bc41-ef634f74d265",
+      "guid_is_permalink": false,
+      "published_at": "2025-12-16T22:00:00Z",
+      "title_sha256": "7490b114744a69c20908e441a1ff449d642c025b7a6edc55b855d6e0148d1b4d",
+      "description_sha256": "980ec9051ade643492f425322c9429bec8388b359a59c65c6e9e5fa3da8b1c46",
+      "bytes": 62853537,
+      "sha256": "dcd3cf32fb45e5574fcb6bf3cabb2e52907b9bfd1d407b234491995b8e555819"
+    },
+    {
+      "episode_id": "ep-24e365ac3c55764e10644273d4f2327ed6590cef50e5797f320d4770eee3cced",
+      "guid": "0ece556f-4be9-4ba7-a0be-c81db9f3a023",
+      "guid_is_permalink": false,
+      "published_at": "2025-10-28T22:00:00Z",
+      "title_sha256": "832603497192e7403f6b0697ce03daf374c5933b657e30d53fc968358404af45",
+      "description_sha256": "07e59275d455a4d806210393517a2c26e5d6ad8162ae4bc33395bac5f737c5a5",
+      "bytes": 52998059,
+      "sha256": "efdd07fdd02a06a03bfb0cd45c6173e93e9244d152cb03f11f78bdafd8d95852"
+    },
+    {
+      "episode_id": "ep-55eb429f7ca591d9dbb8bbd0dd19d917965e9e171bce241012684c0663660fd1",
+      "guid": "cd96bc8c-be37-4063-9ffe-430068d5ffcf",
+      "guid_is_permalink": false,
+      "published_at": "2025-10-21T22:00:00Z",
+      "title_sha256": "311442108c99a480ff3e2c38a502dac837a79ef444711044294007783c27495f",
+      "description_sha256": "623c6585f3898669e1d6f48ab5520ad9201e54355f25432cd018ee8a39eead67",
+      "bytes": 40859688,
+      "sha256": "a6f01051b469136a1730e41ae29058d151cd29afc8f1018e08ab4ff942d5d39d"
+    },
+    {
+      "episode_id": "ep-0f9e935e1aaf0e45d80ec602c6f83d2b35a941e871cff4ce8f3e6cb0c13b5338",
+      "guid": "2ecd0d5d-278d-49c8-9eb2-81a31687e58b",
+      "guid_is_permalink": false,
+      "published_at": "2025-10-14T22:00:00Z",
+      "title_sha256": "e90d6ae0c1d9c12c28ff5c4874e77c8182e59f067f286e0aac2913380d1a26eb",
+      "description_sha256": "f7f86ce229fd599b34d72fa005ab4dd39999998a5ca97c3bd929a634070ece45",
+      "bytes": 45522441,
+      "sha256": "90be5459f3f9caff30428db7f4d3f7adb15d104dd1f47fcf50941cad613e7e83"
+    },
+    {
+      "episode_id": "ep-14453d7c60d0a81acf50405b5136954e009e984d86e910ad7397192cd8d4d3ad",
+      "guid": "d0df83f2-ec6c-4402-b22f-3f60f3c52d27",
+      "guid_is_permalink": false,
+      "published_at": "2025-10-07T22:00:00Z",
+      "title_sha256": "d09178cfb5636e08279e3557a378881502f0aaf8c48e301a4824a99e776e6da6",
+      "description_sha256": "8f4f485db440d01a68a9ce63f6e4d7be2b9818ce05c485e3d3c103a56f447f6b",
+      "bytes": 45239065,
+      "sha256": "91894b2f37b445197a018f7e81b61bfd41d8514cfc77f305ddb41331e1f8f88d"
+    },
+    {
+      "episode_id": "ep-7adad36d1b1dfff806fa2ba4823f821b8341924bac8b1e474e6f33968e1e0152",
+      "guid": "9de31071-cc01-47b9-9a1e-bbb40ce58f26",
+      "guid_is_permalink": false,
+      "published_at": "2025-09-30T22:00:00Z",
+      "title_sha256": "99b5751c6a358cca226d92925d432b730fd912a03f7337bd11b3662ebfe6c0c6",
+      "description_sha256": "fc0b1228875c87b185fa3a7c1c848eb67370499ae7d6bbfb08af671ec215235b",
+      "bytes": 45737272,
+      "sha256": "ee48c734bf2144a552bbe1915e389cb3008d814ccebd9dd09c09f5eb3d37f4f0"
+    },
+    {
+      "episode_id": "ep-4b9e284e92d09c924c0f3bb753a51e43c487cbf7cb71d499e0400609475323a8",
+      "guid": "5d767311-7bb5-4638-be2a-c07828872615",
+      "guid_is_permalink": false,
+      "published_at": "2025-09-23T22:00:00Z",
+      "title_sha256": "21c0e89a04317114744ba1504e05504196efb76c57809d53ad9c1a03a269c3da",
+      "description_sha256": "69ca4a17eb29db9e3c8e70021d92e2c057ec50a6a6e24a389dcb1135f8a46613",
+      "bytes": 37748400,
+      "sha256": "197409a05019644bad1be90df6a58d457ec07d4d3876f0e065f3b6ae15a1cef2"
+    },
+    {
+      "episode_id": "ep-1170829104385c387225e0ba6c3a9c632b8d273e3e629856866ce00670fc88c6",
+      "guid": "761d7bbb-e8e6-46d7-ac41-5d8b88680586",
+      "guid_is_permalink": false,
+      "published_at": "2025-09-16T22:00:00Z",
+      "title_sha256": "3086871be863f094615b3aec8e6b6ed0e8f606841011be2caf33ef7f635bbb57",
+      "description_sha256": "b4b88cb5ba7eb995446d551bb59bc739049983a7d64eca27821fa2521a276641",
+      "bytes": 59560018,
+      "sha256": "3df235af147bcaa54f61e5b37c05e9ef4c26d15636ff5cbd70cb5c4a9052b0ab"
+    },
+    {
+      "episode_id": "ep-a9251daaf012ca62fd99e8f116a755bd7d7eae72c7b12d1ca29e0fd4d25849c4",
+      "guid": "7f5f8402-5432-487a-9f41-83431807c5d9",
+      "guid_is_permalink": false,
+      "published_at": "2025-09-09T22:00:00Z",
+      "title_sha256": "983044fa2b345c8ff30618e6777cf5ff6fa8625a66567ba06cbafdaf385ae5a0",
+      "description_sha256": "5d67558497219dcfdf10f04923ac25fa780f3b3f7a0046cfa17c8aa787ab53e3",
+      "bytes": 44147355,
+      "sha256": "8c79287a6a44e054f614b66b84618dfebd8e3138f344eff6b4407e1252c6a413"
+    },
+    {
+      "episode_id": "ep-a73c551528a7f95c56aafb859cce86062301e44ce842b21b2ffcb94a1adab7e0",
+      "guid": "76369a2d-2b09-4c0f-8437-28f5ed53ec2f",
+      "guid_is_permalink": false,
+      "published_at": "2025-09-02T22:00:00Z",
+      "title_sha256": "645810e191b703ba47f30b69503606e6191ea9bc6ee2aad45053f1ad821d15df",
+      "description_sha256": "3d7bd390c07d28304cb5b0f772e3cc86a60b21c7e2fd8f02f5b32212ce063962",
+      "bytes": 35770617,
+      "sha256": "89ecd68c87aa8230bd1e2a03c202e3728167af33f25b6ffb0be119432d03c33d"
+    },
+    {
+      "episode_id": "ep-363997422e0603127e479fd8c6c85363af39ab55d02e1c214e463bd185ed7b44",
+      "guid": "32ac05ee-d94c-43e6-8ca5-959f18ec888d",
+      "guid_is_permalink": false,
+      "published_at": "2025-08-26T22:00:00Z",
+      "title_sha256": "aae5d7fdb001da94f31fabf770f6a22f9a2c59400366ae810e1ebd640d48bac2",
+      "description_sha256": "a3ed61f01c73823ffe721bbe865cd99c3f124a046cd8aa41aabe6fd6bc164273",
+      "bytes": 31687992,
+      "sha256": "0cd41be8d662d80786763538095093f528e77ee9ff48af973347eefb0d84a212"
+    },
+    {
+      "episode_id": "ep-eb3eb75782a74efa88be8614197e8d20d26e4619f1913fd47ca9689e8b3c61e6",
+      "guid": "129c69ab-957a-4ea8-8e2b-d4332f12b6bd",
+      "guid_is_permalink": false,
+      "published_at": "2025-08-19T22:00:00Z",
+      "title_sha256": "b4a459d87ba3ccd2bd75ce5b00f6a79da0c34d203b86de14d6ddc2e18b372c64",
+      "description_sha256": "f0d328da8ec3eb41af107e248adf2eddb69d7749ce256bede43cc21aa60b4d05",
+      "bytes": 37633044,
+      "sha256": "66bed65f72b1bb3104d982b0f51191b3db3ec16a3562a7556363a4c30eacf603"
+    },
+    {
+      "episode_id": "ep-4c9d3ac4864218f7fd8320b752a88c19963acda4ba151fb8620b62bae5eb06ba",
+      "guid": "e11e8b10-7181-4a88-918b-28b6bff2042c",
+      "guid_is_permalink": false,
+      "published_at": "2024-12-30T22:00:00Z",
+      "title_sha256": "5e7449d8c8532a40fbee543c56fe57178d9dfad6ebaaad02bfa72914f39ff942",
+      "description_sha256": "b25a0b01390e9126668cde4be673e504faca3983c4f32c64e096feb69901a84f",
+      "bytes": 40389902,
+      "sha256": "216fb6db51479a6b1b90b55e3a3c7154fce67a24e0e1043898d1f24e96e6fa11"
+    },
+    {
+      "episode_id": "ep-35ccb6a963f84f65fdf9153591ab4092778b45fc59fffdb3105e82720aa76476",
+      "guid": "b9b9a23c-b83c-42b6-b045-cb009f9fd808",
+      "guid_is_permalink": false,
+      "published_at": "2024-12-24T22:00:00Z",
+      "title_sha256": "2c8cf00e89d610a48c04421f85627b8efb7f733e9fee05ba6a9b4240b3163924",
+      "description_sha256": "c1a74a46435c62aeee5f41ee97261143869f94ae72a4754767897831e238a90f",
+      "bytes": 37000253,
+      "sha256": "96a3831993b00e4b48a1e19dec588fbbc02d3190b573e921fbb4088fed5fa9fd"
+    },
+    {
+      "episode_id": "ep-4e80dc772ef9166f2008d45d1d6c554adfffae1130d3e83467d7e8dbc9d3240c",
+      "guid": "0ef0fa0e-0657-4150-8584-4dbf6d20119a",
+      "guid_is_permalink": false,
+      "published_at": "2024-12-17T22:00:00Z",
+      "title_sha256": "b379819b23a8c15ed24ce4f0417210bcf69e936793b24533723c018f238305d3",
+      "description_sha256": "7c3dde705dd97d7c24c7cc735c2319a8582c99ee83c1d74d0198832fac79f5c2",
+      "bytes": 40021262,
+      "sha256": "91a5821ff76ea01319375d7cde56b4756eeec7b6c1b909ced4a24e0f727f0cc1"
+    },
+    {
+      "episode_id": "ep-54c5c496106de25bf95dba63f1704481342b2680762c097579188749b276e3ba",
+      "guid": "bf59eb5d-a6e7-41b6-86bb-7f5431290fdd",
+      "guid_is_permalink": false,
+      "published_at": "2024-12-10T22:00:00Z",
+      "title_sha256": "68add12b874d6401c89ddba77b11b7062895681f9cc0281bbec6b069a8470389",
+      "description_sha256": "fe1199b3fca0331776d7e5751039bdddd2858392f181d4f3d926e8a907dc99ad",
+      "bytes": 53727816,
+      "sha256": "88217914db05c4430c0d564a96ceadff04aecefd74619a4303dbe3d4344cd1ce"
+    },
+    {
+      "episode_id": "ep-44d7dd4ac63765dd5760397a60d1aab7a5ea0538878dbccc1b0da2502fe1f968",
+      "guid": "a6d56f33-618a-4eb5-8da3-260fce424310",
+      "guid_is_permalink": false,
+      "published_at": "2024-12-03T22:00:00Z",
+      "title_sha256": "5bc202fbcbb439c87f43c09bbca0383622a30c610c61d07f2ee6dc6c2f3cf5ee",
+      "description_sha256": "1c40a91d70f2a0fa9b4f3754894a1e5b33f24c0b5da96b2cd95b68dc6e01959a",
+      "bytes": 38704691,
+      "sha256": "5deeba051b8a6ca249fb2e0dcde606bc6fb769a1affad10e6cf9e4f028d686ae"
+    },
+    {
+      "episode_id": "ep-d00390b71b18d845c12351c13753ca9a2e668748eed603fffe1c417e91eb80e2",
+      "guid": "3699dd5b-b411-43d4-aa6f-78bb4cde4985",
+      "guid_is_permalink": false,
+      "published_at": "2024-11-26T22:00:00Z",
+      "title_sha256": "90a41c14221173def00d7d6f679c7f9f253480bd5f55d33b185ecc200fa5d8ea",
+      "description_sha256": "5aa9a19d7317dec4ccdf5efc36e600f238238db258c0d7a7f42671e75cf42e6a",
+      "bytes": 47730937,
+      "sha256": "f0dd5b4e11042c05232867032339775b7e99ff31017ea0b4fe07ecfa7ebb5501"
+    },
+    {
+      "episode_id": "ep-0479444008811d309ff6ef545f96a05cb1cb8a69fe40bd130293b7f028d91247",
+      "guid": "0450d7ab-33e1-4888-b03b-0c103bfdc722",
+      "guid_is_permalink": false,
+      "published_at": "2024-11-19T22:00:00Z",
+      "title_sha256": "545a2bc05973888e6c0688b91444b20f86c653d37220083d9593673ca2de9044",
+      "description_sha256": "fb362fbfb19b93130b164a4467a134fe23b76a31a690932766fdfc4fcd546553",
+      "bytes": 40777768,
+      "sha256": "41f145c5213d1238f4cca50d928054c3791a6c58a74565ef52d5f006d0d30114"
+    },
+    {
+      "episode_id": "ep-7e01c9db99471a390f5c3296c3a08ba2178588d32523dbacfbf3754fb2fe1c5f",
+      "guid": "a831603c-5251-4469-9b8c-bed5f435c787",
+      "guid_is_permalink": false,
+      "published_at": "2024-11-12T22:00:00Z",
+      "title_sha256": "46e1e2509062c272ffed59572dd2528689c3a821365a6f321f050a647b2d8cdc",
+      "description_sha256": "04c57758f7f6226079c5e40cafbf94ceb1c2b5945492c70f5a29591bde044964",
+      "bytes": 38855156,
+      "sha256": "52ce252f2703be78fdbc9a9cfabf4ea0141fe2afe53a5d420ffc40bc9df27db9"
+    },
+    {
+      "episode_id": "ep-8ae83fa91926cd69ccebef1477ec8c82824247c73e85ff26dd2634bc25a3b076",
+      "guid": "450a22bb-ed25-4d22-8e96-e1a5016b7cb1",
+      "guid_is_permalink": false,
+      "published_at": "2024-11-05T22:00:00Z",
+      "title_sha256": "92df2838e6e45264fffbc93eb88c01423a3366a647443af4e0631e0d6950acca",
+      "description_sha256": "3379f632b6e61dc98a3648d10284140e20482916e62d4277228bc8f285ab86cd",
+      "bytes": 38199796,
+      "sha256": "8ec38e5837f5a9632d494959e42dde9dca4954541b6d47cbd0202a66ce2c06b5"
+    },
+    {
+      "episode_id": "ep-4a9ab370370a1393c271a8b1fdbc2ce5cd5005d167cd6fa6e7ca7839e37a7d3d",
+      "guid": "6a709d4b-d9d6-4e28-8558-5264dfc47495",
+      "guid_is_permalink": false,
+      "published_at": "2024-10-29T22:00:00Z",
+      "title_sha256": "8f7374b20029f69804b0e5a4460c0e7f54287d0a745eac1438a8acf443b360f3",
+      "description_sha256": "e415c889948262c73307b492924739fd20d275c0ed6838fa6195ffb4e57d207e",
+      "bytes": 44296149,
+      "sha256": "1feb461edad8fbb1d3c46659975941fe452e8fbf6ee93e7b26a3a9407641aa36"
+    },
+    {
+      "episode_id": "ep-140875ef1574780cbef958d264a5e709e2045ae97a1d97bea075622e2b5e45a8",
+      "guid": "0417b5f3-555f-48e9-abf2-3bfb74f27969",
+      "guid_is_permalink": false,
+      "published_at": "2024-10-22T22:00:00Z",
+      "title_sha256": "29bf39e3d0581c8aeef0e6aa6385c5ed8c2aeb06b5db74f61ef1b8239f948318",
+      "description_sha256": "ca7286f3a3df7081f208819671f58763d2f5d4046f004b05ff3676972d12563b",
+      "bytes": 36690964,
+      "sha256": "20f126d96bb555c7bfff25010005cbaab7a31e6f09f914b6235576eba4b0340a"
+    },
+    {
+      "episode_id": "ep-82b4abe86eae343738f00d359f00cfe8272ac12a67ee991e9d1fcf3dcc04ca79",
+      "guid": "cbe08a63-dbbf-4c31-8808-ccc369da1247",
+      "guid_is_permalink": false,
+      "published_at": "2024-10-15T22:00:00Z",
+      "title_sha256": "fc2d8498e1e9e58e30281e657bccc6bd24c11c780fb7181ea3bb0e913b3dcdd8",
+      "description_sha256": "e7ecded97800853cd4a92dc337721d14610fd303d08d6743c3789be5916f6655",
+      "bytes": 47161677,
+      "sha256": "39f2ece7bf60fce205de52f8ede4a45d058f1cb2310d6bba79866dfc78674a96"
+    },
+    {
+      "episode_id": "ep-722c9146e9a0df10d1b1b9badb248ee013c71917452425b7df2530c6ad8d3531",
+      "guid": "81143c92-8668-40dc-8c27-4aaced89e2a6",
+      "guid_is_permalink": false,
+      "published_at": "2024-10-08T22:00:00Z",
+      "title_sha256": "ef8611154750fba08a9c2663178feb9c03573aac8cb9a4c145a743b863d4d7fb",
+      "description_sha256": "c84e38116dbe4991d5882c279f08ad7c41a08d9931cc1327574dd9eba5960e87",
+      "bytes": 41971460,
+      "sha256": "acdbd3d82c524904c32a880d2b7bc6d98955b2283ca77e2d7e3758fce847370e"
+    },
+    {
+      "episode_id": "ep-243aa5363b35def893e3ed81070c7400469b6f163b906d5b3433182209efc14b",
+      "guid": "ffa985bb-16f8-4ceb-9f5d-c9cc4d09cbeb",
+      "guid_is_permalink": false,
+      "published_at": "2024-10-01T22:00:00Z",
+      "title_sha256": "5592040ced43a03a0fb9844386fad325081a5d346d5950c2b0d861bd207ab505",
+      "description_sha256": "b8c1b5956476c3ec450165dbd082d9496f2fc637d7afcbb3bbda5580378c94bd",
+      "bytes": 32094248,
+      "sha256": "273f8acee960146414cf89821ab5d9d8341421123fead3b2a2ada9a8c1aa8223"
+    },
+    {
+      "episode_id": "ep-f01704e024cf73b79fb8fbcc4c4575f3d899d324d6d710b4d6b04ee200393141",
+      "guid": "b0c92106-f4b6-4e5e-b876-8dafeb8fc8fa",
+      "guid_is_permalink": false,
+      "published_at": "2024-09-24T22:00:00Z",
+      "title_sha256": "5920f64e902b40398b873e02466406f15fb96da4cca55393c0f0ad1a5d2cecc5",
+      "description_sha256": "31e5d548048812c42a5074514d500f5d60c2d2872b7e1d055786c5661b16de70",
+      "bytes": 34455718,
+      "sha256": "b1691dc3ad1168d9bb89f3cc56ff933e6389127a7ca84fa01921c12d3cbd99c5"
+    },
+    {
+      "episode_id": "ep-83f6ca32e62ad6ed16f87a27c058c5a238782a3b4711f99c948a64be9cad939f",
+      "guid": "d710d4a4-1555-444f-bcf3-7c3a4e4222d2",
+      "guid_is_permalink": false,
+      "published_at": "2024-09-17T22:00:00Z",
+      "title_sha256": "1abbc9ac008ec22a6324cb47650d86288c32b46ce73697ae862c4c07e1836ed3",
+      "description_sha256": "3bc277c0d4f309220ff901bf200898f242abd6a1457bf904e856731bacb23782",
+      "bytes": 32382640,
+      "sha256": "cb29b9e8a549a9d7210cf7231caa6ac89070205677ba498b4ef5a2d6761b7cd3"
+    },
+    {
+      "episode_id": "ep-14edf28a4cf58e322cec638e8b72ec39cfffa8dc2512f273b688854298462325",
+      "guid": "35ec9064-d2a1-4387-85f3-2fc42c195703",
+      "guid_is_permalink": false,
+      "published_at": "2024-09-10T22:00:00Z",
+      "title_sha256": "0ab6a6dd86a43d8e07e0b483456cb3e8f97a2c07e244b93d6c43a19605c0fee7",
+      "description_sha256": "cb5c9cff70ed6cb7d7e5940e9462e04d284421bf9d942994f5b5b1f57871b27f",
+      "bytes": 32642611,
+      "sha256": "2af0699e742bd5e199d694450d27222c1d96fa7d647f7d1fa5062070f7c6a0cc"
+    },
+    {
+      "episode_id": "ep-3b2c6d1cdea50d1a3c6d4d9fbaaf8ea9507ada9ef5796891d8b717bf5635cdc0",
+      "guid": "649e7fd1-7c5e-459f-97c0-cbe8f5fb6109",
+      "guid_is_permalink": false,
+      "published_at": "2024-09-03T22:00:00Z",
+      "title_sha256": "254097905548522f65da6324bdc68e4d76b10092fc12deee42b68aa5aeba97a9",
+      "description_sha256": "7ed6e56f47c7d70df13b375240b10ef2249579c8afe4341c4af3d31a86e7ae86",
+      "bytes": 49357635,
+      "sha256": "7a376729098619d72135605a2124d2e112129e6a432f478f3cb31e1225e2bcbc"
+    },
+    {
+      "episode_id": "ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915",
+      "guid": "4d837add-8084-4b93-b621-0022e3fe64a8",
+      "guid_is_permalink": false,
+      "published_at": "2024-08-27T22:00:00Z",
+      "title_sha256": "7130867a0d3882327335c44b10629b5654bf47bb95e2cf3bf709f72aa0337b68",
+      "description_sha256": "201b953f56c5f75bd527e3004e70f73a0bad5bc0b48528b390d170eb61568dae",
+      "bytes": 42010748,
+      "sha256": "b5b19d8512bc4e2a0c6aadb64d062eebfe6bc9ca5f3c1eb3bdd8b48c222e5836"
+    },
+    {
+      "episode_id": "ep-d6113b57d9102da91b66c05747175755eb3f00f3b27a7f81f15d7bfe73b28eb2",
+      "guid": "c5575f56-f9fd-4620-a736-562bd0bf0254",
+      "guid_is_permalink": false,
+      "published_at": "2024-08-20T22:00:00Z",
+      "title_sha256": "7827fe7014789a0fa61d8795a00323874f0133211c0fe58645043bf11ac10b3b",
+      "description_sha256": "95953997c3d1abd436e9f804eb044dc944a25beee10c04e98ea74d5277ba5124",
+      "bytes": 38945435,
+      "sha256": "794e342ea6b305d3de76556aaab602c9e5d6a507d2ff66b4c7d5b0a97db981f9"
+    },
+    {
+      "episode_id": "ep-64741a4d4d2e921348f50fc08871a33d9183f9c045cd81c4e6d8c3a27ca0c072",
+      "guid": "8701fcf1-d188-4ca6-bbf7-462d26c6eb8f",
+      "guid_is_permalink": false,
+      "published_at": "2024-08-13T22:00:00Z",
+      "title_sha256": "bea846aefc6ac168499dd6bc59720492f6508ad4e93b8cfdd9c95fc922882117",
+      "description_sha256": "8950bf3f113fe85dd9e686c9e20fda6bd49ca552a3a9860ec06cb9efb1d1bf2c",
+      "bytes": 33961690,
+      "sha256": "8e1df006baf7e9949eef0e8e3345e8c8f09ebf345402a08c97a607946b444a19"
+    },
+    {
+      "episode_id": "ep-a22f5c232f5699ec42579cda2b2ac842f741dd930ad485f20e2a0053d6e42bdd",
+      "guid": "64727102-bed8-4046-903e-fc882d790206",
+      "guid_is_permalink": false,
+      "published_at": "2024-08-06T22:00:00Z",
+      "title_sha256": "7ca9d891695da0301020e339098fde192d208561f3a8a6f80ce8e5a2057579f2",
+      "description_sha256": "4126078e8e4fee7f0f90844ebdbb098787554748b32070e649a89744761cde16",
+      "bytes": 29538010,
+      "sha256": "901835547d8e617ce59838cd8573d808f6577f725b1830b978aac5719a8db4c1"
+    },
+    {
+      "episode_id": "ep-956114dcde97d3e33d54b8cc767435638c3cf4fbf219fe7f551f23b943cde484",
+      "guid": "3996ab78-2f9a-4601-8d4f-f757fafad342",
+      "guid_is_permalink": false,
+      "published_at": "2024-07-30T02:51:50Z",
+      "title_sha256": "1aaa1a9e58e9b432921654040b8d38a1c534f5dc5bb7288482cb1b0f61408e00",
+      "description_sha256": "d676d99dc9f5070bafe0090a8a122fba7d59d5dec084edbfbdf42f1312a216be",
+      "bytes": 38909491,
+      "sha256": "f70e3dd418ec63393b56c90ea50db495ee9270806ed1db58a6a2104111e94e59"
+    }
+  ]
+}

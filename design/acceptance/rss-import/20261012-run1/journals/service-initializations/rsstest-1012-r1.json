@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "request": {
+    "config": {
+      "schema_version": 1,
+      "service_id": "rsstest-1012-r1",
+      "account_id": "[REDACTED_RESOURCE_ID]",
+      "bucket_name": "castloop-rss-20261012-run1",
+      "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+      "queue_name": "castloop-rsstest-1012-r1-acb1fbca",
+      "dlq_name": "castloop-rsstest-1012-r1-dlq-acb1fbca",
+      "public_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev",
+      "workers_dev_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev"
+    },
+    "operation_id": "fa44efef-405b-4d4d-8b9a-01030f7e18a5",
+    "service_config_sha256": "eb4acb4ee29ce4217ee0f5ddcd88a03a897fba3174d19a12a1b8ab8b558ded97",
+    "worker_source_sha256": "aaa4759dd9498d88f57cb27fc44e8f5a4fecba5551908dfa87249666b945a34e",
+    "worker_metadata_sha256": "c4aed2eeb6e31c4acbbeae6338e6776b226b220aaf7a1e01ace042b0b266850a"
+  },
+  "phase": "initialized",
+  "target": {
+    "operation_id": "fa44efef-405b-4d4d-8b9a-01030f7e18a5",
+    "deployment_id": "1cae53b7-a79f-4bf2-a4c3-258f329b1573",
+    "worker_version_id": "edfd6cba-b5c0-42d6-a747-14443ff0992e",
+    "service_config_sha256": "eb4acb4ee29ce4217ee0f5ddcd88a03a897fba3174d19a12a1b8ab8b558ded97"
+  },
+  "runtime_readiness": {
+    "operation_id": "fa44efef-405b-4d4d-8b9a-01030f7e18a5",
+    "deployment_id": "1cae53b7-a79f-4bf2-a4c3-258f329b1573",
+    "worker_version_id": "edfd6cba-b5c0-42d6-a747-14443ff0992e",
+    "service_config_sha256": "eb4acb4ee29ce4217ee0f5ddcd88a03a897fba3174d19a12a1b8ab8b558ded97",
+    "default_cache_disabled": true,
+    "cached_entrypoint": "CachedPublicAssets",
+    "cutover_verified": true,
+    "publication_routes_verified": true
+  }
+}

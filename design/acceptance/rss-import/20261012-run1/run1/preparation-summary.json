@@ -1,0 +1,60 @@
+{
+  "recorded_at": "2026-10-11T23:33:57.097801+00:00",
+  "branch": "feat/m7-rss-import",
+  "commit": "5413fba350f3ae340c94d63030eb37e41b5ca116",
+  "source_status": "",
+  "binary": "bin/castloop-linux-x64-5413fba",
+  "binary_sha256": "098565a1c5f0003920042d8b75bb642b3a80fa1bb725a9d0b01cdd8db912b073",
+  "versions": {
+    "bun": "1.4.3",
+    "node": "v26.7.0",
+    "npm": "11.19.0"
+  },
+  "automated_tests": {
+    "pass": 960,
+    "fail": 0,
+    "files": 108
+  },
+  "npm_ci": "success; 0 vulnerabilities",
+  "typecheck": "success",
+  "build": "success",
+  "saved_source_feed": {
+    "episode_count": 36,
+    "declared_audio_bytes": 1496055589,
+    "largest_declared_audio_bytes": 62853537
+  },
+  "materials": [
+    {
+      "file": "materials/otftalk/SHA256SUMS",
+      "bytes": 238,
+      "sha256": "3d211f86099a1ac6ebe9b3793348f2bc56c0a61b724a67acfb00f54594177553"
+    },
+    {
+      "file": "materials/otftalk/cover.jpg",
+      "bytes": 2173207,
+      "sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35"
+    },
+    {
+      "file": "materials/otftalk/episode-35.mp3",
+      "bytes": 62853537,
+      "sha256": "dcd3cf32fb45e5574fcb6bf3cabb2e52907b9bfd1d407b234491995b8e555819"
+    },
+    {
+      "file": "materials/otftalk/episode-36.mp3",
+      "bytes": 46472044,
+      "sha256": "c8fa9b632bc25582f6ab222216a20bd970b55c93559b55c2ab59c627c05041cf"
+    },
+    {
+      "file": "materials/otftalk/metadata.json",
+      "bytes": 7412,
+      "sha256": "3788646a9598876c8e6a92857c30f1c11031cf86cce7a9c4ea91a785ffaf65fd"
+    },
+    {
+      "file": "materials/otftalk/source-feed.xml",
+      "bytes": 204273,
+      "sha256": "f9f56711e61c32fda093db2f3ccb880576c31646b822602d0697b6420a90dc30"
+    }
+  ],
+  "cloudflare_mutations": false,
+  "old_host_changes": false
+}

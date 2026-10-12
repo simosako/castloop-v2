@@ -1,0 +1,10 @@
+{
+  "account_id": "[REDACTED_RESOURCE_ID]",
+  "zone_id": "[REDACTED_RESOURCE_ID]",
+  "zone_name": "otftalk.com",
+  "status": "active",
+  "type": "full",
+  "paused": false,
+  "name_servers": "[OMITTED_METADATA_OR_UNRELATED_CONFIGURATION]",
+  "verification_method": "read-only Cloudflare API"
+}

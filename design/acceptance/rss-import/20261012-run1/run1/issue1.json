@@ -1,0 +1,7 @@
+{
+  "body": "It's very helpfulf if castloop supports podcast hosting migration via RSS.\n\nsteps:\n- user put their podcast's feed url to castloop\n- castloop reads it and copy all podcast episodes (audio) and descriptions to R2 \n- castloop generate new RSS feed\n- user can use the new RSS feed and delete old podcast hosting",
+  "comments": [],
+  "state": "OPEN",
+  "title": "[OMITTED_METADATA_OR_UNRELATED_CONFIGURATION]",
+  "url": "https://github.com/simosako/castloop-v2/issues/1"
+}

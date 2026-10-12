@@ -1,0 +1,12 @@
+Usage: castloop publish-rss-import DIRECTORY
+
+Publish a reviewed local RSS import as a new Show from the service workspace.
+Requires an open M7-compatible Worker, retained administrator key and Cloudflare upload credentials.
+Validates all TOML and assets before registration; publishes the Show then Episodes sequentially.
+Intermediate Episodes become public as jobs finish. The operation is not an atomic batch.
+Re-running inspects acknowledged pending jobs and continues recorded progress without republishing completed inputs.
+Unknown mutation outcomes remain blocked; preserve .castloop journals and inspect the existing jobs.
+Completion does not authorize removal of the old host or certify subscriber migration.
+
+Options:
+  --help, -h  Show this help

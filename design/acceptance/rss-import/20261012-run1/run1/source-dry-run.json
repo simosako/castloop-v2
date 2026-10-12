@@ -1,0 +1,20 @@
+{
+  "result": "rss-import-preview",
+  "show_id": "otftalk-rss",
+  "episode_count": 36,
+  "declared_audio_bytes": 1496055589,
+  "audio_sizes_complete": true,
+  "missing_fields": [],
+  "warnings": [
+    "Not imported: {http://purl.org/dc/elements/1.1/}creator",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}duration",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}image",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}summary",
+    "Not imported: {http://www.w3.org/2005/Atom}link",
+    "Not imported: {}author",
+    "Not imported: {}generator",
+    "Not imported: {}lastBuildDate",
+    "Not imported: {}link"
+  ],
+  "cloudflare_changed": false
+}

@@ -1,0 +1,19 @@
+{
+  "result": "rss-import-downloaded",
+  "import_id": "908efe60-3585-4a6a-af01-f1c5d8afb206",
+  "directory": "[LOCAL_TEST_ROOT]/imports/rss-20261012-run1",
+  "episode_count": 36,
+  "missing_fields": [],
+  "warnings": [
+    "Not imported: {http://purl.org/dc/elements/1.1/}creator",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}duration",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}image",
+    "Not imported: {http://www.itunes.com/dtds/podcast-1.0.dtd}summary",
+    "Not imported: {http://www.w3.org/2005/Atom}link",
+    "Not imported: {}author",
+    "Not imported: {}generator",
+    "Not imported: {}lastBuildDate",
+    "Not imported: {}link"
+  ],
+  "cloudflare_changed": false
+}

@@ -1,0 +1,118 @@
+{
+  "family": "publication",
+  "operation_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+  "client_state": {
+    "schema_version": 1,
+    "identity": {
+      "service_id": "rsstest-1012-r1",
+      "account_id": "[REDACTED_RESOURCE_ID]",
+      "worker_name": "castloop-rsstest-1012-r1-acb1fbca",
+      "public_base_url": "https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev"
+    },
+    "publication": {
+      "schema_version": 1,
+      "request": {
+        "schema_version": 1,
+        "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+        "show_id": "otftalk-rss",
+        "kind": "show",
+        "action": "publish",
+        "expected_show_generation": 1,
+        "created_at": "2026-10-12T00:56:05Z"
+      },
+      "commit": {
+        "schema_version": 1,
+        "kind": "show",
+        "show_id": "otftalk-rss",
+        "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+        "metadata_sha256": "ae4e472e573d9c52ad04d99a23cf3d25aba5e56a6eebb34ac935f70a4b9ef7ba",
+        "cover_sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35",
+        "cover_extension": "jpg"
+      },
+      "staged_uploads": [
+        "b4e5b609-2264-4cd8-9923-80dfeb817650"
+      ]
+    },
+    "manifest_sha256": "1926dc729484b5677bde361b532b19a8f8107ba71a58806da6f45342fe13bb95",
+    "phase": "committed",
+    "claim_receipt": {
+      "show_id": "otftalk-rss",
+      "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+      "show_generation": 2
+    },
+    "commit_receipt": {
+      "key": "staging/shows/otftalk-rss/7d484a96-f681-41ad-b91d-c877fb858b7e/commit.json",
+      "created": true
+    }
+  },
+  "lock_present": false,
+  "remote_state_checked": true,
+  "authorizes_mutation": false,
+  "authorizes_recovery": false,
+  "server_status": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "result": "status",
+    "publication": {
+      "schema_version": 1,
+      "request": {
+        "schema_version": 1,
+        "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+        "show_id": "otftalk-rss",
+        "kind": "show",
+        "action": "publish",
+        "expected_show_generation": 1,
+        "created_at": "2026-10-12T00:56:05Z"
+      },
+      "commit": {
+        "schema_version": 1,
+        "kind": "show",
+        "show_id": "otftalk-rss",
+        "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+        "metadata_sha256": "ae4e472e573d9c52ad04d99a23cf3d25aba5e56a6eebb34ac935f70a4b9ef7ba",
+        "cover_sha256": "7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35",
+        "cover_extension": "jpg"
+      },
+      "staged_uploads": [
+        "b4e5b609-2264-4cd8-9923-80dfeb817650"
+      ]
+    },
+    "operation": {
+      "show_id": "otftalk-rss",
+      "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+      "show_generation": 2
+    },
+    "manifest_sha256": "1926dc729484b5677bde361b532b19a8f8107ba71a58806da6f45342fe13bb95",
+    "request_sha256": "9c6a1ed12b6383e9aa0742018063015649c3373073db0981a7691455f1b24d7c",
+    "status": {
+      "schema_version": 2,
+      "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+      "show_id": "otftalk-rss",
+      "kind": "show",
+      "action": "publish",
+      "show_generation": 2,
+      "request_sha256": "9c6a1ed12b6383e9aa0742018063015649c3373073db0981a7691455f1b24d7c",
+      "state": "published",
+      "phase": "finished",
+      "result_lifecycle": "active"
+    },
+    "progress": {
+      "schema_version": 1,
+      "job_id": "7d484a96-f681-41ad-b91d-c877fb858b7e",
+      "show_id": "otftalk-rss",
+      "kind": "show",
+      "action": "publish",
+      "show_generation": 2,
+      "request_sha256": "9c6a1ed12b6383e9aa0742018063015649c3373073db0981a7691455f1b24d7c",
+      "phase": "finished",
+      "deleted_objects": 0,
+      "purge_confirmed": true,
+      "updated_at": "2026-10-12T00:57:16Z"
+    },
+    "ownership": "held",
+    "execution_active": true,
+    "marker_present": true,
+    "staging_verified": false,
+    "authorizes_recovery": false
+  }
+}
