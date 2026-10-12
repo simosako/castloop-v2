@@ -4,6 +4,7 @@ import { stagingClientTargets } from "./staging-client";
 import type { StagePutTarget } from "./staging-client";
 import type { FrozenStagingSources } from "./staging-sources";
 import { createHash } from "node:crypto";
+import { localCliTimingSpan } from "./local-timing";
 
 export type StagingRestTransport = (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => Promise<Response>;
 export type StagingRestOptions = {
@@ -89,11 +90,11 @@ export function createStagingRestPut(configInput: ServiceConfig, sources: Frozen
         response = await transport(url, { method: "PUT", body, redirect: "error", signal: controller.signal,
           headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": types[upload.payloads[index]!.asset], "Content-Length": String(target.length) } });
         if (response.status !== 200) throw new Error("Staging REST PUT failed or has an unknown outcome");
-        const receipt = await readReceipt(response, target);
+        const receipt = await localCliTimingSpan("staging.put.receipt", () => readReceipt(response!, target));
         requireConsumed();
         response = await transport(url, { method: "GET", redirect: "error", cache: "no-store", signal: controller.signal,
           headers: { Authorization: `Bearer ${apiToken}`, "Accept-Encoding": "identity" } });
-        const sha256 = await verifyResponse(response, target, receipt.etag);
+        const sha256 = await localCliTimingSpan("staging.readback.body_hash", () => verifyResponse(response!, target, receipt.etag));
         readback = stageReadbackReceiptSchema.parse({ ...upload.payloads[index], sha256, ...receipt });
       } catch {
         throw new Error("Staging REST PUT/verification failed; no automatic retry or remote termination proof");

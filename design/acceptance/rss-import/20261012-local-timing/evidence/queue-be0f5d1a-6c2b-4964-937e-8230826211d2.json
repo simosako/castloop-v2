@@ -1,0 +1,103 @@
+{
+  "run": "20261012-one-job",
+  "id": "be0f5d1a-6c2b-4964-937e-8230826211d2",
+  "kind": "queue",
+  "started_at_ms": 1791786082269,
+  "events": [
+    {
+      "label": "queue.setup_probe",
+      "start_ms": 1791786082269,
+      "end_ms": 1791786084117,
+      "ok": true
+    },
+    {
+      "label": "r2.get:system/service.toml",
+      "start_ms": 1791786082269,
+      "end_ms": 1791786082453,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.body.text:system/service.toml",
+      "start_ms": 1791786082453,
+      "end_ms": 1791786082454,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.get:system/runtime-checks/8e7d50ac-2c52-4916-92ad-72343cd04cd3.json",
+      "start_ms": 1791786082454,
+      "end_ms": 1791786082773,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.body.json:system/runtime-checks/8e7d50ac-2c52-4916-92ad-72343cd04cd3.json",
+      "start_ms": 1791786082773,
+      "end_ms": 1791786082773,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.get:system/service.toml",
+      "start_ms": 1791786082773,
+      "end_ms": 1791786082946,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.body.text:system/service.toml",
+      "start_ms": 1791786082946,
+      "end_ms": 1791786082946,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.get:system/service-updates/8e7d50ac-2c52-4916-92ad-72343cd04cd3/request.json",
+      "start_ms": 1791786082946,
+      "end_ms": 1791786083256,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.body.json:system/service-updates/8e7d50ac-2c52-4916-92ad-72343cd04cd3/request.json",
+      "start_ms": 1791786083256,
+      "end_ms": 1791786083256,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.get:system/lifecycle-service.json",
+      "start_ms": 1791786083256,
+      "end_ms": 1791786083568,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.body.json:system/lifecycle-service.json",
+      "start_ms": 1791786083568,
+      "end_ms": 1791786083568,
+      "parent": 0,
+      "ok": true
+    },
+    {
+      "label": "r2.put:system/runtime-checks/8e7d50ac-2c52-4916-92ad-72343cd04cd3.json",
+      "start_ms": 1791786083568,
+      "end_ms": 1791786084117,
+      "parent": 0,
+      "ok": true
+    }
+  ],
+  "context": {
+    "queue": "castloop-rsstest-1012-r1-acb1fbca",
+    "messages": [
+      {
+        "id": "944107c74359ccf3cf4c7404ed176ee7",
+        "timestamp_ms": 1791786081216,
+        "attempts": 1
+      }
+    ],
+    "ok": true
+  },
+  "ended_at_ms": 1791786084117
+}

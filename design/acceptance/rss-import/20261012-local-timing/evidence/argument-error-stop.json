@@ -1,0 +1,11 @@
+{
+  "cause": "harness used internal arguments rather than public CLI Show-directory convention",
+  "failed_command_elapsed_ms": 54.22552100208122,
+  "failed_command_no_http_trace": true,
+  "publication_not_started": true,
+  "original_inputs_cursor_toml_unchanged": true,
+  "service_open_drained": true,
+  "unfinished_show_operation": false,
+  "instrumented_worker_remains_installed": true,
+  "corrected_harness_not_executed": true
+}

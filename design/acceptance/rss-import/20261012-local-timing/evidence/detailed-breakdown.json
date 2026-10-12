@@ -1,0 +1,152 @@
+{
+  "repeated_get_same_records": [
+    {
+      "record": "show_control",
+      "count": 80,
+      "total_ms": 14500,
+      "mean_ms": 181.25
+    },
+    {
+      "record": "job_request.toml",
+      "count": 79,
+      "total_ms": 14095,
+      "mean_ms": 178.418
+    },
+    {
+      "record": "show_reservation",
+      "count": 77,
+      "total_ms": 13563,
+      "mean_ms": 176.143
+    },
+    {
+      "record": "service_admission",
+      "count": 23,
+      "total_ms": 4492,
+      "mean_ms": 195.304
+    },
+    {
+      "record": "target_episode_lifecycle",
+      "count": 16,
+      "total_ms": 3004,
+      "mean_ms": 187.75
+    },
+    {
+      "record": "job_publication.json",
+      "count": 13,
+      "total_ms": 2607,
+      "mean_ms": 200.538
+    },
+    {
+      "record": "job_progress.toml",
+      "count": 8,
+      "total_ms": 2308,
+      "mean_ms": 288.5
+    },
+    {
+      "record": "job_status.toml",
+      "count": 5,
+      "total_ms": 1472,
+      "mean_ms": 294.4
+    },
+    {
+      "record": "other",
+      "count": 2,
+      "total_ms": 352,
+      "mean_ms": 176
+    },
+    {
+      "record": "other",
+      "count": 2,
+      "total_ms": 465,
+      "mean_ms": 232.5
+    }
+  ],
+  "runner_guards": {
+    "count": 8,
+    "r2_binding_operations": 152,
+    "wall_ms": 26949
+  },
+  "queue_exclusive_phase_wall_ms": {
+    "publication.guard": 26949,
+    "progress_status_writes_with_checks": 16831,
+    "publication.verify_staging": 3911,
+    "publication.unique_guid": 7566,
+    "publication.persist_audio": 0,
+    "publication.feed_inputs": 20616,
+    "publication.purge_with_guards": 2070,
+    "publication.finish_show_operation": 1910,
+    "other_validation_and_output_writes": 9904,
+    "queue_preparation_and_consumer_wrapper": 6970
+  },
+  "stage_components": [
+    {
+      "component": "target",
+      "client_ms": 1487.172,
+      "worker_ms": 1292,
+      "r2_binding_operations": 14
+    },
+    {
+      "component": "claim",
+      "client_ms": 4771.532,
+      "worker_ms": 4734,
+      "r2_binding_operations": 41
+    },
+    {
+      "component": "status",
+      "client_ms": 907.202,
+      "worker_ms": 880,
+      "r2_binding_operations": 16
+    },
+    {
+      "component": "begin",
+      "client_ms": 2682.033,
+      "worker_ms": 2656,
+      "r2_binding_operations": 24
+    },
+    {
+      "component": "R2 REST PUT",
+      "client_ms": 1014.999,
+      "worker_ms": null,
+      "r2_binding_operations": null
+    },
+    {
+      "component": "R2 REST GET",
+      "client_ms": 805.173,
+      "worker_ms": null,
+      "r2_binding_operations": null
+    },
+    {
+      "component": "status",
+      "client_ms": 874.884,
+      "worker_ms": 842,
+      "r2_binding_operations": 16
+    },
+    {
+      "component": "settle",
+      "client_ms": 3422.251,
+      "worker_ms": 3396,
+      "r2_binding_operations": 31
+    },
+    {
+      "component": "status",
+      "client_ms": 929.924,
+      "worker_ms": 902,
+      "r2_binding_operations": 16
+    },
+    {
+      "component": "finish",
+      "client_ms": 14302.03,
+      "worker_ms": 14270,
+      "r2_binding_operations": 139
+    }
+  ],
+  "stage_worker_r2_binding_operations": 297,
+  "stage_worker_wall_ms_sum": 28972,
+  "stage_http_ms_sum": 31197.2,
+  "stage_outside_http_ms": 451.338,
+  "worker_get_average_ms_comparison": {
+    "management_during_stage": 89.768,
+    "queue_consumer": 187.272,
+    "note": "Different invocations/execution paths; no location or storage-region cause confirmed"
+  }
+}

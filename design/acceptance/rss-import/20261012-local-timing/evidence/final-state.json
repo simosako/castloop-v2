@@ -1,0 +1,10 @@
+{
+  "worker_restored_to_standard_a19efb4": true,
+  "worker_version_id": "2bc0b330-2efe-43eb-94ed-0cb7856ae428",
+  "service_open_drained": true,
+  "unfinished_show_operation": false,
+  "domains_match": true,
+  "original_inputs_cursor_toml_unchanged": true,
+  "local_source_and_binary_not_committed_or_pushed": true,
+  "private_R2_diagnostic_records_retained": true
+}

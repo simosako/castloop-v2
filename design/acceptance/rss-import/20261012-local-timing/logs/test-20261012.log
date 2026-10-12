@@ -1,0 +1,312 @@
+2026-10-12T06:42:17.612908+00:00 RSS単一job計測のGitHub共有準備
+ユーザーが計測コード/証跡のcommit & pushを明示承認。以前のlocal-only条件を今回共有について変更。別証跡branch test-evidence/rss-local-timing-20261012 に計測source変更を保存し、本番向け修正とは区別。秘密/素材/backupを除外、Issue #10へ計測値/限界/commit番号を追記する。live環境の追加操作なし。
+
+2026-10-12T06:33:29.550359+00:00 RSS単一jobローカル計測
+単一metadata-only job精密計測完了。Queue message→consumer 940ms、Worker96727ms、R2 binding484回（GET419/HEAD45/list3/PUT17）。guard8回26949ms、GUID7566ms、RSS全件入力20616ms、cache invalidate RPC173ms。標準a19efb4 Workerへ正式pause/deploy/resumeで復帰済み、最終service open/drained・Show未完了なし・domain整合・元入力/cursor/TOML不変。公開feed byte同一。計測source/binaryはlocal-only、commit/pushなし。詳細 timing-analysis.json/detailed-breakdown.json/result.md。
+
+2026-10-12T06:31:03.851291+00:00 RSS単一jobローカル計測
+restore: 正式pause/drain→deploy/verified→resume完了。設定/旧環境変更なし。
+
+2026-10-12T06:28:21.366168+00:00 RSS単一jobローカル計測
+計測1job published/released。metadataはrevision_id/updated_at以外同一、feed byte同一、全入力/cursor/ローカルTOML同一、service open/drained。計測trace取得・無計測Workerへの正式更新待ち。
+
+2026-10-12T06:25:57.908468+00:00 RSS単一jobローカル計測
+ユーザーが引数修正後の計測続行を承認。Show directoryでupdate-episode/publish-episodeへEpisode IDのみ渡す。前回54msの引数拒否記録は保持し、同一metadata-only1jobを新規に計測する。
+
+2026-10-12T06:24:36.544937+00:00 RSS単一jobローカル計測
+計測commandの引数誤りで54ms/exit1、HTTP計測出力なし、ステージング/公開開始前に停止。実仕様はShow directoryでEpisode IDのみ。helperの引数のみ修正したが未再実行。読み取り確認でservice open/drained、Show未完了なし、元入力/cursor/TOML不変。計測Workerはinstalled、無計測Workerへまだ戻していない。ユーザー確認待ち。
+
+2026-10-12T06:22:03.669079+00:00 RSS単一jobローカル計測
+measured-metadata-stage failed; stop, preserve evidence and owners.
+
+2026-10-12T06:21:34.319524+00:00 RSS単一jobローカル計測
+install: 正式pause/drain→deploy/verified→resume完了。設定/旧環境変更なし。
+
+2026-10-12T06:19:50.205976+00:00 RSS単一jobローカル計測
+completed cursor/全入力/全ローカルTOMLのhash保存、workspaceコピーbackupのみ。全Show idle/service open/drained、変更前feed/current metadata取得。
+
+2026-10-12T06:19:00.986284+00:00 RSS単一jobローカル計測
+ユーザーが1job精密計測とlocal-only debug追加を承認。別detached worktreeにCLI/Worker計測、元36件Showの同一metadata-only再公開1jobを計測。正式pause/deploy/resume後に実施し、idle確認後無計測Workerへ戻す。source/binaryをcommit/pushしない。
+
+2026-10-12T06:07:05Z 性能調査再開の依頼を受け、既存13job計測とa19efb4 waitForJob実装を再確認。120秒はRSS移行全体ではなく各公開jobのpublishedかつreleased待機上限であり、metadata/audio stagingの約63秒はこの予算外。直接の停止原因の調査対象はcommit後のQueue待ち/Worker公開/所有権解放/CLI観測。最大の測定区間は公開要求→finished平均94.5秒（82〜121秒）、commit応答→finished85.4秒。約2.4KB metadataでもstaging29.3秒なので音源容量だけでは説明不能。安全確認の直列I/O・GUID/feed全件走査は候補、Queue/R2/cache/release内訳は未確定。今回は既存記録の再分析のみ、公開再実行/remote照会/権限変更なし。この追記は未push。
+
+2026-10-12T05:56:47.259721+00:00 a19efb4/300秒試験build追試証跡をGitHub公開。branch test-evidence/rss-import-retest-a19efb4-timeout300 commit 44566bd8f3bdb52398d6ca84b9978a2842642f97 秘密除去356ファイル、manifest/remote一致/clean確認。Issue #10追記 https://github.com/simosako/castloop-v2/issues/10#issuecomment-6118624570 内容照合済み、state=OPEN。標準120秒停止と延長build成功、全36RSS/代表2音源確認、未実施項目を区別。PR/closeなし、試験環境追加操作なし。公開snapshot後のこの記録とcomment応答はローカルのみ。
+
+2026-10-12T04:43:45.171763+00:00 300秒試験CLIで元RSS import全36件公開exit0、completed/step148、入力hash不変。完了後service open/drained、Show未完了なし、domain整合。独立照合はschema trim仕様に合わせShow/Episode比較側補正（attempt1/2失敗証跡保持）、attempt3成功: 全36件RSS情報/GUID/日時等一致、カバーGET/hash、代表2音源HEAD/GET/hash/Range、workers.dev同feed/304/system staging404。1.1.1.1/TLS有効。全36音源独立GET/追加回帰/最終pauseなし、新環境open保持、旧環境変更なし。標準120秒CLI合格とは区別、試験用延長buildで成功。詳細 evidence/rss-import-retest-a19efb4-timeout300/result.md。GitHub未push/Issue未追記。
+
+2026-10-12T04:42:03.720339+00:00 全36件publish exit0、cursor completed/step148、service open/invocations空、unfinished Show false、domain整合。独立Show description比較は末尾改行1文字のため初回assert失敗。shared schema description.trim仕様を確認し、試験比較側のみ修正、失敗証跡保持、public-checks-attempt2で再実行。
+
+2026-10-12T04:40:40.126685+00:00 Issue #10 a19efb4 再試験
+300秒試験buildで全36件publish-rss-import exit0。標準120秒buildの合格と混同せず記録。独立RSS/代表配信確認待ち。
+
+2026-10-12T03:54:01.954973+00:00 Issue #10 a19efb4 再試験
+延長試験buildのcheck/全自動試験/build成功。私有backup作成のみ、入力hash不変、既知21件目published/released、service open/drainedを確認。同じpublish-rss-importを一度続行。外側時間制限なし。
+
+2026-10-12T03:53:29.436488+00:00 Issue #10 a19efb4 再試験
+延長build初回自動試験964 pass/1 fail: 合計waits期待値123が残り実際303。上限延長の期待値漏れのみでlive未操作。期待値303へ修正し別証跡名でcheck/全試験/build再実行する。
+
+2026-10-12T03:52:55.725637+00:00 Issue #10 a19efb4 再試験
+bun-test: exit=1。エラー時停止、記録保持。
+
+2026-10-12T03:52:35.022898+00:00 Issue #10 a19efb4 再試験
+管理者が試験専用CLIで待機時間延長を承認。別worktree a19efb4で公開待機のみ120秒/120回→300秒/300回、対応テスト期待値のみ変更。Worker/安全確認/再送拒否/記録は変更しない。製品無改変commitそのものではない試験buildとして区別する。
+
+2026-10-12T03:03:58.739840+00:00 a19efb4 followup-1: step88/21件目waitingで公開待機上限、exit1。保存cursor/journal/input hash不変を確認。既知job/service/一覧を読み取り保存。再実行/タイムアウト変更なし、停止報告。
+
+2026-10-12T03:03:29.499151+00:00 Issue #10 a19efb4 再試験
+publish-followup-1: exit=1。エラー時停止、記録保持。
+
+2026-10-12T02:54:07.006114+00:00 Issue #10 a19efb4 再試験
+管理者が速度調査より動作検証の継続を優先。追加調査/回帰を止め、全36件公開完了を先に確認する。CLI内120秒上限は変更せず、既知waiting jobから同じコマンドを一度続行。外側の実行時間制限なし。再エラーなら停止。
+
+2026-10-12T02:52:05.455963+00:00 Workers権限案内訂正: 最新Workers rolesガイド（2026-09-15更新）でObservability Edit/Telemetry EditはWorkers product scope Editorへ置換、AdminはFull manage。API個別参照のlegacy Write記載のみを根拠に追加必須とした前回答は不適切。対象account/Workersを含むtoken Adminがあれば通常追加不要。403原因は未確定、token一致/scope/API新role・account-token対応を切り分ける。findings.md訂正、remote再試行や権限変更なし。
+
+2026-10-12T02:47:36.481019+00:00 RSS所要時間調査: 6〜18件目13jobのlocal journal/R2 finished progressを読み取り照合。metadata staging平均29.3秒（約2.4KB）、audio33.5秒（約39.7MB）、commit応答→finished85.4秒、公開要求間隔156〜188秒。逐次処理/複数staging往復/全量GET検証/多数owner/runtimeチェック/既存Episode逐次走査を確認。Queue滞留とWorker内部時間の分離は未確定。履歴telemetry dry照会HTTP403 code10000、公式必要権限Workers Observability Write。拒否後追加remote操作停止、権限/環境変更なし、publish再開なし。詳細 evidence/rss-import-retest-a19efb4/timing-investigation/findings.md。
+
+2026-10-12T02:42:09.121937+00:00 Issue #10 a19efb4再試験: 965 pass/0 fail。CLI/Worker更新、既存step25未開始をCLIが確認し復旧。step76/18件目job待機上限でexit1。停止後読み取りで既知job 9c26524d-d0d1-4d2d-85eb-024f2a5ccf01 published/finished/released、一覧18件、service open/invocations空。入力全hash不変。エラー時停止指示に従い再実行なし、管理者判断待ち。詳細 evidence/rss-import-retest-a19efb4/result.md。全36件照合未実施、旧環境変更なし。
+
+2026-10-12T02:41:04.957128+00:00 Issue #10 a19efb4 再試験
+publish-continued: exit=1。エラー時停止、記録保持。
+
+2026-10-12T02:04:32.987056+00:00 Issue #10 a19efb4 再試験
+CLI/Worker更新後明示resume成功。既存記録を保持した元publish-rss-importを一度続行する。
+
+2026-10-12T02:04:23.987451+00:00 Issue #10 a19efb4 再試験
+全Show unfinished=false、pause/drain後deploy成功。新Worker runtime verified、paused、設定byte不変/domain整合。明示resume待ち。
+
+2026-10-12T02:03:28.693491+00:00 Issue #10 a19efb4 再試験
+私有workspace backup作成のみ（復元なし）。全116入力hash/size前回一致。cursor/service/全Show/停止Episode照会を保存。
+
+2026-10-12T02:02:58.995167+00:00 Issue #10 a19efb4 再試験
+ユーザーが修正commit a19efb4のCLI/Worker両方更新と既存import続行を指示。修正差分/最新手順確認。未開始更新のみCLIが厳密確認し旧command_requestedを復旧、未知変更再送拒否は維持。計画保存。
+
+2026-10-12T01:48:54.638548+00:00 Issue #10 追試結果のGitHub公開完了
+branch=test-evidence/rss-import-retest-dc33f75、commit=275151233aa77d25e7764cef4f51c71851d4308c。
+秘密除去済み98ファイルをdesign/acceptance/rss-import/20261012-retest-dc33f75へ保存。manifest/hash/JSON/秘密値・email・ローカルpath scan、git diff --check合格。音源/画像/source RSS/TOML/秘密backupは除外。
+push成功、remote SHA一致、worktree clean、git tree 98件とmanifest一致。
+Issue #10へ追試中の別target inspectionエラー、command_requested/step25、5件active/全36件未完了、安全な続行調査依頼とbranch/固定commit証跡linksを追記。
+comment=https://github.com/simosako/castloop-v2/issues/10#issuecomment-6116309892。gh再取得で本文一致を確認。Issue state=OPEN、close/PRはしていない。
+公開作業中はCloudflareや試験/旧環境の追加操作・live再照会なし。この公開完了記録とcomment作成証跡は公開snapshot後の私有記録。
+
+2026-10-12T01:43:38.102023+00:00 Issue #10 再試験が別のtarget inspectionエラーで停止
+publish-continued exit1: Target inspection response was not verified; management operation was not confirmed [reason_code=management_http_rejected]。
+進捗phase=command_requested/step25（6件目のupdate-episode action）。再送拒否phaseなのでコマンド再実行、cursor改変、owner/lock解除を行わず停止。
+停止後はservice/target-show/list-episodes/domain listを読み取り保存、秘密journalを私有copyへ保持。取り込み入力全hashを照合。
+公開全36件完了・最終配信照合・回帰・終了pauseは未実施。旧環境変更なし。新たなエラーの根本原因は未確定。
+
+2026-10-12T01:42:53.653269+00:00 Issue #10 再試験
+publish-continued: exit=1。エラー時停止方針に従い停止、証跡を保持。
+
+2026-10-12T01:32:18.232556+00:00 Issue #10 再試験
+Worker更新後domain整合/未完了操作なしを確認。保存したpause IDで明示resume、open/invocations空/M7 capability true。元importからの続行準備完了。
+
+2026-10-12T01:32:11.499927+00:00 Issue #10 再試験
+962 tests pass/0 fail、型check/build成功。既知Episode job published/released。全Show inventory=1件、末尾cursorなし。pause後invocations空・unfinished=falseを確認しdeploy成功、新runtime verified/paused、設定byte不変。resume前domain確認待ち。
+
+2026-10-12T01:30:41.079540+00:00 Issue #10 再試験
+新build npm ci/check/bun test/build完了。workspace設定と秘密journalを私有backupへ保存。入力全hash/cursor/service/Show一覧を読み取り保存。
+
+2026-10-12T01:29:31.850752+00:00 Issue #10 修正再試験開始
+管理者がdc33f75のCLIとWorkerの更新、元取り込み記録からの継続を承認。
+修正・docs/rss_migration.md・README更新手順を確認。plan=test-plan-rss-retest-dc33f75.md。
+既定git fetchは削除済みfeature/custom-domains refで失敗したため、feat/m7-rss-importを明示fetch。別detached worktree build/castloop-v2-rss-dc33f75を作成。環境/入力はまだ変更していない。
+
+2026-10-12 M7 RSS移行試験 run1: 新Issue #10と証跡ブランチ公開完了
+
+- 新Issue: https://github.com/simosako/castloop-v2/issues/10 （OPEN）
+- title: [bug] M7 RSS逐次公開がジョブ状態検証エラーで繰り返し停止する
+- branch: test-evidence/rss-import-20261012-run1
+- commit: 308090e4c4b48ceed2de0687114fea8bfe77ef41
+- 証跡: https://github.com/simosako/castloop-v2/tree/308090e4c4b48ceed2de0687114fea8bfe77ef41/design/acceptance/rss-import/20261012-run1
+- 秘密除去済み144ファイル（README/manifest/活動log/計画/主要証跡/redacted journal）。raw素材、source RSS、metadata TOML、管理鍵/API token等は除外。
+- manifestと実際のgit treeが完全一致、全SHA-256、JSON構文、secret/email/path除去scanに合格。ignore対象の活動.logはこの1ファイルを明示的force-add。
+- git diff --checkで公開copyの末尾空白/余分な空行を検出し、copy2ファイルだけ正規化してmanifest hash/treatment更新後、再検証に合格。試験原本は変更していない。
+- git push成功、ls-remoteで同じSHA、publication worktree cleanを確認。
+- gh issue create成功。Issue本文にブランチと固定commitのREADME/result/log/plan/error/cursor/job状態リンクを追加。gh issue viewでOPEN/リンク存在を確認。Issue #1へRelated参照。
+- PRは作成していない。今回の公開作業ではCloudflare/旧環境/試験環境の変更もlive状態再照会も行っていない。
+- ローカル保存: issue-status-error-body.md、issue-create.stdout/stderr/exit-code、issue10-published.json、publication-completed.json。
+- この公開完了entryとIssue作成記録は公開snapshotより後に生成したため、上記commitには含めていない。READMEにもsnapshot時点を明記。
+
+2026-10-12 M7 RSS移行試験 run1: Issue報告・証跡ブランチ公開準備
+
+管理者が新Issue報告と必要証跡のbranch/push、Issueからリンクを依頼。
+- 既存Issue一覧で同じ課題のIssueがないことを確認（#1は機能要望、#6/#7はCLOSED）。
+- 試験環境・旧環境への変更や新たな状態照会/復旧は行わない。公開する状態は各保存時点のsnapshotであり、現在のlive状態を推定しない。
+- source worktreeがcleanであることを確認。対象commit 5413fbaから別worktree publish/castloop-v2-rss-run1にbranch test-evidence/rss-import-20261012-run1を作成。
+- 証跡はdesign/acceptance/rss-import/20261012-run1に活動log、計画、build/help/dry-run、内容hash検証、domain経過、公開失敗/既知job継続/再発、redacted journalをまとめる。
+- API token/管理鍵/account・Zone・domain・execution識別子、email、ローカル絶対パス、URL query、番組title/description等を除去。音源/画像/source RSS/TOML/秘密原本は公開しない。
+- raw bun testは集計のみ、HTTP headerはallowlistのみを公開。公開manifestにSHA-256を保存し、秘密値との一致scanで検証する。
+- IssueではShowとEpisodeの異なるjobで再発した事実、waiting cursorに既知jobが保存されること、後のShow job照会でpublished/releasedを確認できたこと、エラー内部原因は未確定であることを分けて報告する。
+- readRemoteOperationStatusのcatchが内部例外を一般エラーへ置換するため、取得/API/schema/local snapshot不一致等の区別が今回stderrだけでは不可能。snapshot競合等は調査候補にとどめ、確定原因や強制解除の根拠にしない。
+
+2026-10-12 M7 RSS移行試験 run1: 承認後に同一import継続、最初のEpisodeで状態検証エラー再発
+
+管理者が継続を承認。既知Show公開job 7d484a96-f681-41ad-b91d-c877fb858b7eを読み取りで再照会:
+- status=published、ownership=released、target-show unfinished_show_operation=false、service open/invocations0件を確認。
+- 完了/解放を確認したので、同じimport ID/入力/公開URLでpublish-rss-importを1回継続。Showを新jobとして再公開していない。
+- publish-import-continued.exit-code=1。前回と同じ Operation status could not be verified; preserve records, locks and ownership without automatic retry or recovery が再発。
+- 許可された既知Show jobからの継続は実施したが、再発後は「エラー時に中止」という既存指示に従って停止。許可なくエラー耐性ループ/任意の自動再試行へ拡大しない。
+
+停止後の読み取り保存:
+- 同じcursorのphase=waiting、step=8、waiting_job_id=a497abe0-450b-407b-96bb-c52d7782547c、cursor lockなし。
+- step=8は最初のEpisodeのcreate/update/audio upload/publish receipt後。残り35件へは進んでいない。
+- 停止時の1回のjob照会はprocessing/ownership held。service open/invocations1件、target-show unfinished_show_operation=true。
+- 処理中のconsumerを強制終了/owner解放せず保持。公開完了と解放を推測で判定しない。
+- エラー内部原因は未確定。DNSと確認されたエラーではない。Showと最初のEpisodeという異なる公開jobで再発しており、状態照会検証と処理中snapshotの整合性を調査候補とする（原因確定ではない）。
+- DNS tunnelは前回停止済みで、今回は新たに起動していない。サービスをpause/resumeしたりdomainを変更していない。旧ホスト/旧環境も変更なし。
+
+証跡: publication-before-continue-job/target/service.json、publication-before-continue-validation.json、publish-import-continued.stdout/stderr/exit-code、publication-stop2-cursor/service/target/job.json、publication-stop2-summary.json。
+新サービスはopenのまま保持。次は再発する状態照会エラーの原因調査、またはこのエラーに限定した既知waiting job完了解放確認後の継続方針を管理者と決める。
+
+2026-10-12 M7 RSS移行試験 run1: Show公開の状態検証エラーで停止
+
+第5段階publish-rss-importを新workspaceから1回実行、exit1:
+- stderrの事前報告は36件/音源1,496,055,589 bytes/正規URL=https://castloop-rss-r1.otftalk.com。
+- エラー: Operation status could not be verified; preserve records, locks and ownership without automatic retry or recovery
+- domain DNS/TLS未検証とは異なる状態照会エラー。DNS起因と確認できたわけではないため、DNSエラー継続の承認で自動再試行しない。
+- 最新指示に従いここで停止。元import入力や既存操作要求の変更・再送なし。
+
+停止後の読み取り照会（各exit0）とlocal cursorを保存:
+- cursor import ID=908efe60-3585-4a6a-af01-f1c5d8afb206、phase=waiting、step=4、waiting_job_id=7d484a96-f681-41ad-b91d-c877fb858b7e、cursor lockなし。
+- 実装のstep=4はShow登録/素材配置/Show update/Show publishの4 action後。Episode actionはまだ開始していない。
+- 保存した1回のpublication job照会はstatus.state=published、ownership=held。publishedだけで解放/完了とは判定しない。
+- serviceはopen、invocations1件、url_changeなし。target-showはunfinished_show_operation=true。
+- domainはconfiguration_matches=true、connections_match=true、local_operations=[]で切替完了を維持。
+- まだ公開処理が進行中の可能性がある。状態検証失敗の内部原因は未確定（過去に類似の一時的照会不一致はあったが、今回の原因証明ではない）。
+- 再照会のループ、publish再実行、pause/resume、retry-job、lock/owner/tokenの削除は未実施。Show公開の完了を確認せずEpisodeへ進めない。
+- 新サービスはopenのまま保持。旧ホスト/旧環境は変更なし。新domain削除も行っていない。
+- 試験限定DNS tunnelはcmdlineを照合してSIGTERMで終了、active markerをdisabledへ変更。background終了通知を受領。OS DNS変更なし。
+
+証跡: publish-import.stdout/stderr/exit-code、publication-stopped-cursor.json、publication-stopped-summary.json、publication-stopped-service/target/domains/job.json、publication-stopped-current-state.json、dns-proxy-stop.json。
+
+再開案（管理者判断待ち）: この既知waiting jobの読み取り状態を確認し、publishedかつreleased、必要なpurge/owner解放が確認できたら、同じimport・同じ入力・同じ公開URLでpublish-rss-importを継続する。新jobで置換せず、command_requested/未知変更応答が判明した場合は継続しない。
+
+2026-10-12 M7 RSS移行試験 run1: 1.1.1.1経路でdomain継続成功・公開へ
+
+管理者がDNS起因エラーでは今後確認なしに1.1.1.1指定で実施することを承認。
+- 診断scriptの対象HOSTをこの実行だけcastloop-rss-r1.otftalk.comへ指定し、1.1.1.1へUDP A/AAAA問い合わせ。正の応答を保存。
+- curl --resolveで1.1.1.1から得たIPへ接続。元hostname/SNI/通常証明書検証を維持し、HTTP200のnonce runtime probeが新service/Workerと一致。
+- 対象hostname:443だけ許すプロセス限定CONNECT tunnelを開始。TLS復号なし、OS/ルーターDNS設定変更なし。Cloudflare API/管理workers.devは通常経路。
+- test-env-rss-run1.shは旧envをsourceせず新試験のみを指定。新試験のactive markerがある場合だけHTTPS_PROXY設定。
+- 固定domain operation e1a5c445-31d6-4b6d-963a-bf90dbc3765fを--operation-id付きで継続、exit0。新接続の別要求として作り直していない。
+- domain journal completed=true/progress.phase=complete、pending/lockなし、local_operations=[]、url_change解消、config/connections一致。
+- public_base_url=https://castloop-rss-r1.otftalk.com、管理URLは元workers.devを維持。paused/空invocations/M7 capabilityを確認後、初期pause IDでservice-resume、exit0。
+- 再照会でopen/external_episode_guids=true/空invocations/url_changeなし。これからpublish-rss-importを1回実行する。
+- 前回のDNS/TLSエラーは1.1.1.1経路で解消できた。ただし当時のDNSキャッシュと証明書準備のどちらが原因かを断定しない。node:http/httpsによる最終feed取得はこのBun fetch用proxyと別の経路である。
+証跡: dns-1111.json、dns-1111-probe.*、dns-proxy-ready/connections、domain-add-continued.*、added-service/domains.json、domain-added-validation.json、resume.*、open-service.json。
+
+2026-10-12 M7 RSS移行試験 run1: 新M7環境初期化成功、domain DNS/TLS待ちで停止
+
+第4段階:
+- 新workspace workspaces/rss-20261012-run1のみで固定CLI initを1回実行、exit0。
+- service: rsstest-1012-r1、bucket: castloop-rss-20261012-run1。
+- Worker/main Queue: castloop-rsstest-1012-r1-acb1fbca。
+- 管理workers.dev URL: https://castloop-rsstest-1012-r1-acb1fbca.simosako.workers.dev。
+- service-status/domain listの照会exit0。external_episode_guids=true、paused、invocations=[]、domainなし、configuration/connections一致、local_operations=[]、init journal lockなしを確認。
+- 初期pause ID fa44efef-405b-4d4d-8b9a-01030f7e18a5。
+- domain add castloop-rss-r1.otftalk.comを1回実行、exit1。
+- stderr: Domain operation e1a5c445-31d6-4b6d-963a-bf90dbc3765f: Domain DNS/TLS is not verified; keep the service paused and retry the same operation after it is ready
+
+最新指示に従いエラー時点で停止。TLS準備待ちとして続行可能なエラーであっても、無断でretry/別operation/remove/resume/publishは実行しない。
+
+停止後は読み取りだけでservice-status/domain listとローカルjournalを保存:
+- 新hostnameのCloudflare Custom Domain接続は対象Workerへenabled=trueで存在し、connection_receiptあり。
+- domain operation completed=false、progress.phase=feeds、pendingなし、ローカルlockなし。
+- serviceは初期pause IDを維持したpaused、invocations=[]、url_changeあり。操作は未完了で、強制解除しない。
+- 公開正規URLはまだworkers.dev、configuration_matches=true、connections_match=false。接続作成済み・正規URL変更前の途中状態であり完了扱いしない。
+- DNS/TLS未検証の原因がDNS反映か証明書準備か本機解決かは未確定。新たなDNS調査やOS設定変更は実施していない。
+- 36件のローカル素材と全journal、新Cloudflare資源/domainを保持。Show登録/RSS公開は未着手。旧環境変更なし。
+
+証跡: init.stdout/stderr/exit-code、initialized-service/domains.json、initialized-validation.json、domain-add.stdout/stderr/exit-code、stopped-service/domains.json、domain-stopped-summary.json、domain-stopped-state-allowlist.json、result.md。
+
+次の提案: 管理者が承認したら1.1.1.1を明示したDNS/TLS到達確認を行い、準備完了後に固定operation e1a5c445-31d6-4b6d-963a-bf90dbc3765fだけを継続する。初期化の再実行、既存接続の再作成、token手動削除はしない。CLI内部の最終RSS取得が本機DNSを使用する制約も残るため、独立配信確認だけで全CLI検証成功とはしない。
+
+2026-10-12 M7 RSS移行試験 run1: 承認された再開、ローカル取り込み成功
+
+管理者がimports作成と再開を承認。ローカルimports親だけ作成し、同じCLI/出力先で初回取り込みを再実行した。
+- import-download-resumed: exit0、rss-import-downloaded、36件、missing_fields=[]、Cloudflare変更なし。
+- import ID: 908efe60-3585-4a6a-af01-f1c5d8afb206。
+- source.xml SHA-256: b13db8318268cf8f503ddbb5e13c43434576ce96f3cadbdc7680632a673bc4cf。
+- 全36 MP3の実合計1,496,055,589 bytes、最大62,853,537 bytes。各素材hash/sizeは私有download receiptと一致し、CLIで全MP3解析成功。
+- Python XML/tomllibによる独立照合でGUID、ep-SHA256 ID、permalink属性、公開日時、title/description/対応任意項目がsourceと一致。Show項目とsite_url=https://www.otftalk.com/を確認。
+- 元GUIDは36件ともUUID形状。非UUID外部GUIDは自動テストで検証済みであり、今回の実番組素材による実機証明ではない。
+- カバー表示確認成功、size2,173,207 bytes/hash 7f981948e456c7c9849192d59005551254237bbf20f7644fdf15695bda208b35。
+- description内URLを抽出しanchor.fm/spotify.com/cloudfront.netの旧ホスト依存なし。全外部リンクの生存確認や全未知hostの判定を行ったわけではない。
+- 代表2音源の先頭30秒をffmpegでdecode-to-null成功。人の聴取試験ではない。
+- 同じimportコマンドを正常完了後に1回実行、exit0。116ファイルのhash/size/mtimeとimport IDが不変、残留lockなし。TOML編集は不要だったため編集済みTOML保持は自動テストの証拠を利用。
+- 警告は計画時と同じ非対応項目。全XML完全複製とは扱わない。
+証跡: local-import-validation.json、local-import-before-repeat.json、local-import-repeat-validation.json、decode-validation.json、import-download-resumed/repeat stdout/stderr/exit-code。
+次は新規M7サービスのinitと新domain設定。旧環境の変更は行っていない。
+
+2026-10-12 M7 RSS移行試験 run1: 実行開始・エラーで停止
+
+実行許可: 計画に従いできるだけ最後まで実施。ただし管理者判断が必要な場合、またはエラー発生時は中止して報告する、という最新指示を優先。エラー後の自動再試行はしない。
+
+第1段階（事前確認）成功:
+- 本機の空き容量は約420GBで、予定の約1.50GB素材と比較証跡を保存可能。
+- 認証環境変数が存在することを値を出さずに確認。配置binary hashは計画と一致。
+- 予定imports/rss-20261012-run1とworkspaces/rss-20261012-run1は未作成。
+- 新試験のEVIDENCE/DOMAIN_HOST/SERVICE_ID/BUCKET_NAMEを明示してpreflight.pyを実行、exit0。
+- 認証付きAPI GETに成功。active/full otftalk.com、hostnameにDNS/Custom Domain/Worker Routeの競合なし、simosako.workers.dev、新bucket/service Worker/Queue prefix未使用を確認。
+- preflight.stdout/stderr/exit-code、preflight.json、preflight-zone.jsonを保存。Dashboard目視ではなくAPI確認。
+
+第2段階（ローカル取り込み）失敗、ここで中止:
+- 認証環境変数をこの実行プロセスだけ外し、固定binaryのimport-rss --output [LOCAL_TEST_ROOT]/imports/rss-20261012-run1を1回実行。
+- exit1。stderr: ENOENT: no such file or directory, lstat '[LOCAL_TEST_ROOT]/imports'
+- importsという親ディレクトリの準備漏れ。rss-import-local.tsはrealpathSync(dirname(root))で親を確認した後、出力先rootだけmkdirする実装。
+- RSS download/解析そのものの不具合を示す結果ではない。import先、source.xml、import.json、journalは未作成で、全音源の取得は開始していない。
+- 失敗後に出力先をReadした2照会もFile not found。続くPath.existsの読み取りでparent/import/workspace不在を確認。
+- 最新指示に従い、親ディレクトリ作成やコマンド再試行もまだ行っていない。
+- Cloudflareの変更0、新service/Worker/bucket/Queue/domain作成なし。旧ホスト/旧環境の変更0。
+
+証跡: evidence/rss-import-20261012-run1/import-download.stdout、import-download.stderr、import-download.exit-code、stopped-summary.json。準備時のbuild/test証跡も保持。
+提案する再開: 管理者の承認後、ローカルimports親ディレクトリだけ作成し、第2段階の初回取り込みを再実行。その後は同じ固定commit/計画で進める。
+
+2026-10-12 M7 RSS移行試験 run1: 準備と計画
+
+依頼: feat/m7-rss-import（Issue #1実装）を確認・取得し、新サブドメインへ旧環境と同じ内容を移せるか試験する準備。旧環境の廃止は行わない。
+
+判断・安全境界:
+- 旧ホスト削除、redirect、directory切替、購読者切替、既存試験環境の更新/復旧/削除は対象外。
+- 新規service/bucket/hostnameのみを予定し、今回はローカル準備まで。Cloudflareの変更は0。
+- 開発ブランチのcleanup記録ではrun2/run4等は既に削除済み。以前の活動記録を根拠に稼働中と仮定しない。run1/run3の未完了記録も触らない。
+- 本機DNSは変更・追加調査しない。M7のnode:http/https直接取得は前回HTTPS_PROXYを使えると仮定しない。1.1.1.1の独立配信検証とCLI内部照合を分離する。
+
+取得/確認:
+- gh issue view 1で目的を確認。OPEN、公開RSSから説明/全音源を複製して新RSSを作る機能。
+- build/castloop-v2で既存checkoutがcleanであることを確認し、git fetch origin feat/m7-rss-import。
+- commit 5413fba350f3ae340c94d63030eb37e41b5ca116をbuild/castloop-v2-rss-run1へdetached worktreeとして取得。既存branchやworkspaceは上書きしない。
+- AGENTS.md、design/README.md、docs/rss_migration.md、design/m7_rss_import_plan.md、cleanup記録、主要download/preflight/publication実装を確認。
+- Codegraphは実indexなしとの応答。index作成せずRead/Grepで確認。
+- 新規Show限定、local import→レビュー→逐次publish、CLI/Worker双方M7必須、external_episode_guids capability確認、GUID/日時/permalink維持、旧ホスト変更なし。
+- 公開jobのCLI内部待機は120秒。command_requestedは未知結果として止め、既知waiting jobの状態照会だけを続行可能とする。
+
+ビルド/試験（Cloudflare認証環境変数を外して実行）:
+- npm ci 成功、26 packages追加、監査29 packages、脆弱性0。
+- npm run check 成功。
+- bun test: 960 pass / 0 fail、108 files、14,623 expect、49.64秒。
+- npm run build:cli -- linux-x64 成功。正式Workerを埋め込む単一CLI。
+- bin/castloop-linux-x64-5413fbaへ新規配置。build元とSHA-256一致:
+  098565a1c5f0003920042d8b75bb642b3a80fa1bb725a9d0b01cdd8db912b073
+- version表示だけではM7を識別できない（package version=0.3.0）。commit/binary hashで固定する。
+- Bun1.4.3、Nodev26.7.0、npm11.19.0。
+- import-rss / publish-rss-import help保存。
+- バイナリでfile URL / loopback / custom portの拒否を確認（各exit1）。
+- build worktreeのgit status --porcelainは空。
+
+素材/公開元:
+- materials/otftalkにsource-feed.xml、metadata.json、cover.jpg、episode-35.mp3、episode-36.mp3、SHA256SUMS。
+- sha256sum -c成功（カバーと2音源）。原本に変更なし。
+- 保存済みRSS36件、最大宣言音源62,853,537 bytes。手元の全話音源はそろっていない。
+- metadata記載元URL https://anchor.fm/s/f95e6290/podcast/rss をCloudflare認証なしでCLI dry-run。
+- result=rss-import-preview、36件、音源宣言合計1,496,055,589 bytes、sizes complete、missing_fields=[]、cloudflare_changed=false。
+- 未取り込み警告: dc:creator、itunes:duration/image/summary、Atom link、author/generator/lastBuildDate/link。durationは実MP3解析、Episode画像等は非対象。全XML完全複製とは扱わない。
+- 全件同一内容を検証する主試験でprepared/short.mp3は使用しない。36件の全素材取得とupload/readback/公開GETで数GB規模の通信を想定する。
+- dry-runと後続downloadは別取得。主比較基準は取り込み時source.xmlとhashにする。
+
+作成物:
+- test-plan-rss-run1.md: 全件移行・独自ドメイン・独立全件照合・既知job続行・通常UUID/lifecycle回帰・安全終了の計画。
+- evidence/rss-import-20261012-run1/: npm-ci/check/bun-test/buildのstdout/stderr、help、source-dry-run.json/stderr、issue1.json、preparation-summary.json、local-negative-checks.jsonとstderr、source-docs/。
+- 証跡表示のshellを誤ったworkdirから実行し、相対パス読み取りでnot foundが2回発生。絶対/正しいrootで確認し直した。ビルドや試験の失敗ではなく、元の証跡ファイルは正常に保存されている。
+
+次の段階は計画に沿う事前競合/容量確認、全素材のローカル取り込み・内容レビュー。その後、新規M7 serviceとcastloop-rss-r1.otftalk.com（予定）を作成して明示公開。全素材download/Cloudflare作成/公開はまだ実行していない。

@@ -11,6 +11,7 @@ import { readLifecycleFeedInputs, readPublishedFeedSource, writePublishedFeed } 
 import type { RestoreFeedSnapshot } from "./lifecycle-restore";
 import type { ShowPublicationEffects } from "./publication-show-runner";
 import type { PublicationEffects } from "./publication-inputs";
+import { localTimingSpan } from "./local-timing";
 
 export type LifecycleWorkerBindings = {
   cachedAssets: { invalidate: (target: LifecyclePurgeTarget) => Promise<void> };
@@ -39,7 +40,7 @@ export async function createPublicationWorkerEffects(env: LifecycleDeleteEnv, ex
   await guard(target);
   return { checkDeliveryGate: guard, async purge(input) {
     await guard(input);
-    await bindings.cachedAssets.invalidate(target);
+    await localTimingSpan(env, "cache.invalidate_rpc", () => bindings.cachedAssets.invalidate(target));
     await requireShowExecution(env, execution);
   } };
 }

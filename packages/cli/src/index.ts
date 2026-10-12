@@ -4,6 +4,7 @@ import { contentListResponseSchema, parseServiceConfig, serviceConfigSchema, str
 import type { ServiceConfig } from "@castloop/shared";
 import { version } from "../../../package.json";
 import { administratorKey } from "./administrator-key";
+import { installLocalCliTiming } from "./local-timing";
 import { CloudflareApi } from "./cloudflare-api";
 import { formatContentList } from "./content-list";
 import { runDomainCommand } from "./domain-operation";
@@ -21,6 +22,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 const SOURCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+installLocalCliTiming();
 const CLI_VERSION = version;
 const USAGE = `Usage: castloop COMMAND [arguments]\n\nCommands:\n  ${Object.keys(COMMAND_HELP).join("\n  ")}\n\nUse castloop help COMMAND for details.`;
 

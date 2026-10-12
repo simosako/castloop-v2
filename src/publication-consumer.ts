@@ -8,6 +8,7 @@ import type { LifecycleControlEnv } from "./lifecycle-control";
 import { runOwnedShowPublication } from "./publication-show-runner";
 import { runOwnedEpisodePublication } from "./publication-episode-runner";
 import type { PublicationEffects } from "./publication-inputs";
+import { localTimingSpan } from "./local-timing";
 
 export type PublicationConsumerResult = { state: "completed" } |
   { state: "ignored"; reason: "unmatched_path" | "missing_marker" | "stale_operation" } |
@@ -46,11 +47,11 @@ export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string
     owner.action !== "publish" || owner.kind !== request.kind || owner.episode_id !== request.episode_id ||
     owner.request_sha256 !== await controlRequestHash(request)) return { state: "ignored", reason: "stale_operation" };
   if (owner.execution_id) throw new LifecycleExecutionBusy();
-  const execution = await acquireShowExecution(env, request.show_id, request.job_id, current.value.generation);
+  const execution = await localTimingSpan(env, "consumer.acquire_execution", () => acquireShowExecution(env, request.show_id, request.job_id, current.value.generation));
   try {
-    const effects = typeof source === "function" ? await source(execution) : source;
+    const effects = typeof source === "function" ? await localTimingSpan(env, "consumer.create_effects", async () => source(execution)) : source;
     if (request.kind === "show") await runOwnedShowPublication(env, execution, effects);
-    else await runOwnedEpisodePublication(env, execution, effects);
+    else await localTimingSpan(env, "consumer.episode_runner", () => runOwnedEpisodePublication(env, execution, effects));
   } catch (error) {
     if (await releaseSettledExecution(env, execution) === "completed") return { state: "completed" };
     throw error;

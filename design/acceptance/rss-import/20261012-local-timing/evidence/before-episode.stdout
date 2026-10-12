@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "result": "target",
+  "request": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "kind": "episode",
+    "show_id": "otftalk-rss",
+    "episode_id": "ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915"
+  },
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "payloads_verified": false,
+  "admission_state": "open",
+  "show": {
+    "lifecycle": "active",
+    "generation": 110
+  },
+  "episode": {
+    "lifecycle": "active",
+    "generation": 1
+  },
+  "unfinished_show_operation": false,
+  "current_revision": {
+    "schema_version": 1,
+    "episode_id": "ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915",
+    "guid": "4d837add-8084-4b93-b621-0022e3fe64a8",
+    "guid_is_permalink": false,
+    "title": "[OMITTED_METADATA]",
+    "description": "[OMITTED_METADATA]",
+    "published_at": "2024-08-27T22:00:00Z",
+    "explicit": false,
+    "episode_type": "full",
+    "season_number": 1,
+    "episode_number": 5,
+    "revision_id": "7f3c84ee-cd25-4259-aa27-daf719c57341",
+    "enclosure_url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/episodes/ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915/7f3c84ee-cd25-4259-aa27-daf719c57341.mp3",
+    "content_type": "audio/mpeg",
+    "length_bytes": 42010748,
+    "duration_seconds": 1313,
+    "sha256": "b5b19d8512bc4e2a0c6aadb64d062eebfe6bc9ca5f3c1eb3bdd8b48c222e5836",
+    "updated_at": "2026-10-12T01:41:24Z"
+  }
+}

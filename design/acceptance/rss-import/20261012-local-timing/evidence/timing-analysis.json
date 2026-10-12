@@ -1,0 +1,1628 @@
+{
+  "measurement": "one unchanged metadata-only publication with 36 existing Episodes",
+  "job_id": "5798a64d-7e25-420e-907d-411d931cdee6",
+  "queue_delivery_count": 1,
+  "queue_attempts": 1,
+  "stage": {
+    "elapsed": {
+      "started_at_ms": 1791786357908,
+      "elapsed_ms": 31648.53751099872,
+      "exit_code": 0
+    },
+    "http": [
+      {
+        "path": "/admin/target",
+        "method": "POST",
+        "action": null,
+        "duration_ms": 1487.171902,
+        "status": 200,
+        "worker": {
+          "wall_ms": 1292,
+          "event_count": 25,
+          "r2_binding_operation_count": 14,
+          "r2_including_body_union_ms": 1292,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 6,
+              "total_ms": 1,
+              "mean_ms": 0.167,
+              "min_ms": 0,
+              "max_ms": 1
+            },
+            "r2.body.text": {
+              "count": 5,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 11,
+              "total_ms": 1110,
+              "mean_ms": 100.909,
+              "min_ms": 78,
+              "max_ms": 161
+            },
+            "r2.head": {
+              "count": 3,
+              "total_ms": 255,
+              "mean_ms": 85,
+              "min_ms": 74,
+              "max_ms": 91
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 4,
+              "total_ms": 169,
+              "mean_ms": 42.25,
+              "min_ms": 0,
+              "max_ms": 91
+            },
+            "episode_metadata_history": {
+              "count": 6,
+              "total_ms": 406,
+              "mean_ms": 67.667,
+              "min_ms": 0,
+              "max_ms": 152
+            },
+            "other": {
+              "count": 3,
+              "total_ms": 181,
+              "mean_ms": 60.333,
+              "min_ms": 0,
+              "max_ms": 91
+            },
+            "service_admission": {
+              "count": 4,
+              "total_ms": 171,
+              "mean_ms": 42.75,
+              "min_ms": 0,
+              "max_ms": 87
+            },
+            "show_control": {
+              "count": 4,
+              "total_ms": 188,
+              "mean_ms": 47,
+              "min_ms": 0,
+              "max_ms": 101
+            },
+            "show_reservation": {
+              "count": 4,
+              "total_ms": 251,
+              "mean_ms": 62.75,
+              "min_ms": 0,
+              "max_ms": 161
+            }
+          },
+          "scopes_inclusive": {}
+        },
+        "outside_worker_wall_ms": 195.172
+      },
+      {
+        "path": "/admin/staging",
+        "method": "POST",
+        "action": "claim",
+        "duration_ms": 4771.532123,
+        "status": 200,
+        "worker": {
+          "wall_ms": 4734,
+          "event_count": 71,
+          "r2_binding_operation_count": 41,
+          "r2_including_body_union_ms": 4734,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 19,
+              "total_ms": 8,
+              "mean_ms": 0.421,
+              "min_ms": 0,
+              "max_ms": 5
+            },
+            "r2.body.text": {
+              "count": 9,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 30,
+              "total_ms": 2572,
+              "mean_ms": 85.733,
+              "min_ms": 73,
+              "max_ms": 119
+            },
+            "r2.head": {
+              "count": 5,
+              "total_ms": 431,
+              "mean_ms": 86.2,
+              "min_ms": 74,
+              "max_ms": 97
+            },
+            "r2.put": {
+              "count": 6,
+              "total_ms": 1723,
+              "mean_ms": 287.167,
+              "min_ms": 235,
+              "max_ms": 338
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 10,
+              "total_ms": 420,
+              "mean_ms": 42,
+              "min_ms": 0,
+              "max_ms": 87
+            },
+            "job_records": {
+              "count": 18,
+              "total_ms": 1713,
+              "mean_ms": 95.167,
+              "min_ms": 0,
+              "max_ms": 338
+            },
+            "other": {
+              "count": 2,
+              "total_ms": 88,
+              "mean_ms": 44,
+              "min_ms": 0,
+              "max_ms": 88
+            },
+            "service_admission": {
+              "count": 16,
+              "total_ms": 1128,
+              "mean_ms": 70.5,
+              "min_ms": 0,
+              "max_ms": 298
+            },
+            "show_control": {
+              "count": 9,
+              "total_ms": 630,
+              "mean_ms": 70,
+              "min_ms": 0,
+              "max_ms": 270
+            },
+            "show_reservation": {
+              "count": 10,
+              "total_ms": 407,
+              "mean_ms": 40.7,
+              "min_ms": 0,
+              "max_ms": 87
+            },
+            "staging": {
+              "count": 4,
+              "total_ms": 348,
+              "mean_ms": 87,
+              "min_ms": 74,
+              "max_ms": 97
+            }
+          },
+          "scopes_inclusive": {
+            "service.acquire_invocation:m6_admin": {
+              "count": 1,
+              "total_ms": 375,
+              "mean_ms": 375,
+              "min_ms": 375,
+              "max_ms": 375
+            },
+            "service.release_invocation:m6_admin": {
+              "count": 1,
+              "total_ms": 329,
+              "mean_ms": 329,
+              "min_ms": 329,
+              "max_ms": 329
+            }
+          }
+        },
+        "outside_worker_wall_ms": 37.532
+      },
+      {
+        "path": "/admin/staging",
+        "method": "POST",
+        "action": "status",
+        "duration_ms": 907.2015929999998,
+        "status": 200,
+        "worker": {
+          "wall_ms": 880,
+          "event_count": 24,
+          "r2_binding_operation_count": 16,
+          "r2_including_body_union_ms": 880,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 6,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.body.text": {
+              "count": 2,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 9,
+              "total_ms": 851,
+              "mean_ms": 94.556,
+              "min_ms": 77,
+              "max_ms": 143
+            },
+            "r2.head": {
+              "count": 7,
+              "total_ms": 628,
+              "mean_ms": 89.714,
+              "min_ms": 74,
+              "max_ms": 121
+            }
+          },
+          "r2_by_record_category": {
+            "job_records": {
+              "count": 11,
+              "total_ms": 708,
+              "mean_ms": 64.364,
+              "min_ms": 0,
+              "max_ms": 95
+            },
+            "other": {
+              "count": 3,
+              "total_ms": 160,
+              "mean_ms": 53.333,
+              "min_ms": 0,
+              "max_ms": 86
+            },
+            "service_admission": {
+              "count": 4,
+              "total_ms": 244,
+              "mean_ms": 61,
+              "min_ms": 0,
+              "max_ms": 143
+            },
+            "show_control": {
+              "count": 4,
+              "total_ms": 168,
+              "mean_ms": 42,
+              "min_ms": 0,
+              "max_ms": 91
+            },
+            "staging": {
+              "count": 2,
+              "total_ms": 199,
+              "mean_ms": 99.5,
+              "min_ms": 78,
+              "max_ms": 121
+            }
+          },
+          "scopes_inclusive": {}
+        },
+        "outside_worker_wall_ms": 27.202
+      },
+      {
+        "path": "/admin/staging",
+        "method": "POST",
+        "action": "begin",
+        "duration_ms": 2682.0330860000004,
+        "status": 200,
+        "worker": {
+          "wall_ms": 2656,
+          "event_count": 45,
+          "r2_binding_operation_count": 24,
+          "r2_including_body_union_ms": 2656,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 14,
+              "total_ms": 1,
+              "mean_ms": 0.071,
+              "min_ms": 0,
+              "max_ms": 1
+            },
+            "r2.body.text": {
+              "count": 5,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 19,
+              "total_ms": 1592,
+              "mean_ms": 83.789,
+              "min_ms": 75,
+              "max_ms": 110
+            },
+            "r2.head": {
+              "count": 2,
+              "total_ms": 161,
+              "mean_ms": 80.5,
+              "min_ms": 80,
+              "max_ms": 81
+            },
+            "r2.put": {
+              "count": 3,
+              "total_ms": 902,
+              "mean_ms": 300.667,
+              "min_ms": 263,
+              "max_ms": 374
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 4,
+              "total_ms": 163,
+              "mean_ms": 40.75,
+              "min_ms": 0,
+              "max_ms": 83
+            },
+            "job_records": {
+              "count": 11,
+              "total_ms": 662,
+              "mean_ms": 60.182,
+              "min_ms": 0,
+              "max_ms": 265
+            },
+            "other": {
+              "count": 2,
+              "total_ms": 79,
+              "mean_ms": 39.5,
+              "min_ms": 0,
+              "max_ms": 79
+            },
+            "service_admission": {
+              "count": 16,
+              "total_ms": 1279,
+              "mean_ms": 79.938,
+              "min_ms": 0,
+              "max_ms": 374
+            },
+            "show_control": {
+              "count": 4,
+              "total_ms": 158,
+              "mean_ms": 39.5,
+              "min_ms": 0,
+              "max_ms": 81
+            },
+            "show_reservation": {
+              "count": 4,
+              "total_ms": 154,
+              "mean_ms": 38.5,
+              "min_ms": 0,
+              "max_ms": 79
+            },
+            "staging": {
+              "count": 2,
+              "total_ms": 161,
+              "mean_ms": 80.5,
+              "min_ms": 80,
+              "max_ms": 81
+            }
+          },
+          "scopes_inclusive": {
+            "service.acquire_invocation:m6_admin": {
+              "count": 1,
+              "total_ms": 464,
+              "mean_ms": 464,
+              "min_ms": 464,
+              "max_ms": 464
+            },
+            "service.release_invocation:m6_admin": {
+              "count": 1,
+              "total_ms": 338,
+              "mean_ms": 338,
+              "min_ms": 338,
+              "max_ms": 338
+            }
+          }
+        },
+        "outside_worker_wall_ms": 26.033
+      },
+      {
+        "path": "/client/v4/accounts/[account]/r2/buckets/castloop-rss-20261012-run1/objects/staging/episodes/otftalk-rss/ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915/5798a64d-7e25-420e-907d-411d931cdee6/episode.toml",
+        "method": "PUT",
+        "action": null,
+        "duration_ms": 1014.9994079999997,
+        "status": 200
+      },
+      {
+        "path": "/client/v4/accounts/[account]/r2/buckets/castloop-rss-20261012-run1/objects/staging/episodes/otftalk-rss/ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915/5798a64d-7e25-420e-907d-411d931cdee6/episode.toml",
+        "method": "GET",
+        "action": null,
+        "duration_ms": 805.1728220000005,
+        "status": 200
+      },
+      {
+        "path": "/admin/staging",
+        "method": "POST",
+        "action": "status",
+        "duration_ms": 874.8838160000014,
+        "status": 200,
+        "worker": {
+          "wall_ms": 842,
+          "event_count": 24,
+          "r2_binding_operation_count": 16,
+          "r2_including_body_union_ms": 842,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 6,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.body.text": {
+              "count": 2,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 9,
+              "total_ms": 869,
+              "mean_ms": 96.556,
+              "min_ms": 79,
+              "max_ms": 116
+            },
+            "r2.head": {
+              "count": 7,
+              "total_ms": 625,
+              "mean_ms": 89.286,
+              "min_ms": 75,
+              "max_ms": 101
+            }
+          },
+          "r2_by_record_category": {
+            "job_records": {
+              "count": 11,
+              "total_ms": 780,
+              "mean_ms": 70.909,
+              "min_ms": 0,
+              "max_ms": 116
+            },
+            "other": {
+              "count": 3,
+              "total_ms": 194,
+              "mean_ms": 64.667,
+              "min_ms": 0,
+              "max_ms": 108
+            },
+            "service_admission": {
+              "count": 4,
+              "total_ms": 189,
+              "mean_ms": 47.25,
+              "min_ms": 0,
+              "max_ms": 102
+            },
+            "show_control": {
+              "count": 4,
+              "total_ms": 159,
+              "mean_ms": 39.75,
+              "min_ms": 0,
+              "max_ms": 80
+            },
+            "staging": {
+              "count": 2,
+              "total_ms": 172,
+              "mean_ms": 86,
+              "min_ms": 83,
+              "max_ms": 89
+            }
+          },
+          "scopes_inclusive": {}
+        },
+        "outside_worker_wall_ms": 32.884
+      },
+      {
+        "path": "/admin/staging",
+        "method": "POST",
+        "action": "settle",
+        "duration_ms": 3422.2508070000003,
+        "status": 200,
+        "worker": {
+          "wall_ms": 3396,
+          "event_count": 58,
+          "r2_binding_operation_count": 31,
+          "r2_including_body_union_ms": 3396,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 18,
+              "total_ms": 8,
+              "mean_ms": 0.444,
+              "min_ms": 0,
+              "max_ms": 7
+            },
+            "r2.body.text": {
+              "count": 7,
+              "total_ms": 2,
+              "mean_ms": 0.286,
+              "min_ms": 0,
+              "max_ms": 1
+            },
+            "r2.get": {
+              "count": 25,
+              "total_ms": 2186,
+              "mean_ms": 87.44,
+              "min_ms": 75,
+              "max_ms": 143
+            },
+            "r2.head": {
+              "count": 3,
+              "total_ms": 237,
+              "mean_ms": 79,
+              "min_ms": 76,
+              "max_ms": 81
+            },
+            "r2.put": {
+              "count": 3,
+              "total_ms": 963,
+              "mean_ms": 321,
+              "min_ms": 254,
+              "max_ms": 414
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 6,
+              "total_ms": 312,
+              "mean_ms": 52,
+              "min_ms": 0,
+              "max_ms": 143
+            },
+            "job_records": {
+              "count": 17,
+              "total_ms": 1081,
+              "mean_ms": 63.588,
+              "min_ms": 0,
+              "max_ms": 414
+            },
+            "other": {
+              "count": 2,
+              "total_ms": 91,
+              "mean_ms": 45.5,
+              "min_ms": 1,
+              "max_ms": 90
+            },
+            "service_admission": {
+              "count": 16,
+              "total_ms": 1159,
+              "mean_ms": 72.438,
+              "min_ms": 0,
+              "max_ms": 295
+            },
+            "show_control": {
+              "count": 6,
+              "total_ms": 249,
+              "mean_ms": 41.5,
+              "min_ms": 0,
+              "max_ms": 85
+            },
+            "show_reservation": {
+              "count": 6,
+              "total_ms": 267,
+              "mean_ms": 44.5,
+              "min_ms": 0,
+              "max_ms": 93
+            },
+            "staging": {
+              "count": 3,
+              "total_ms": 237,
+              "mean_ms": 79,
+              "min_ms": 76,
+              "max_ms": 81
+            }
+          },
+          "scopes_inclusive": {
+            "service.acquire_invocation:m6_recovery": {
+              "count": 1,
+              "total_ms": 338,
+              "mean_ms": 338,
+              "min_ms": 338,
+              "max_ms": 338
+            },
+            "service.release_invocation:m6_recovery": {
+              "count": 1,
+              "total_ms": 378,
+              "mean_ms": 378,
+              "min_ms": 378,
+              "max_ms": 378
+            }
+          }
+        },
+        "outside_worker_wall_ms": 26.251
+      },
+      {
+        "path": "/admin/staging",
+        "method": "POST",
+        "action": "status",
+        "duration_ms": 929.9241550000006,
+        "status": 200,
+        "worker": {
+          "wall_ms": 902,
+          "event_count": 24,
+          "r2_binding_operation_count": 16,
+          "r2_including_body_union_ms": 902,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 6,
+              "total_ms": 1,
+              "mean_ms": 0.167,
+              "min_ms": 0,
+              "max_ms": 1
+            },
+            "r2.body.text": {
+              "count": 2,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 9,
+              "total_ms": 942,
+              "mean_ms": 104.667,
+              "min_ms": 76,
+              "max_ms": 162
+            },
+            "r2.head": {
+              "count": 7,
+              "total_ms": 551,
+              "mean_ms": 78.714,
+              "min_ms": 72,
+              "max_ms": 85
+            }
+          },
+          "r2_by_record_category": {
+            "job_records": {
+              "count": 11,
+              "total_ms": 754,
+              "mean_ms": 68.545,
+              "min_ms": 0,
+              "max_ms": 162
+            },
+            "other": {
+              "count": 3,
+              "total_ms": 160,
+              "mean_ms": 53.333,
+              "min_ms": 0,
+              "max_ms": 80
+            },
+            "service_admission": {
+              "count": 4,
+              "total_ms": 256,
+              "mean_ms": 64,
+              "min_ms": 0,
+              "max_ms": 160
+            },
+            "show_control": {
+              "count": 4,
+              "total_ms": 167,
+              "mean_ms": 41.75,
+              "min_ms": 0,
+              "max_ms": 90
+            },
+            "staging": {
+              "count": 2,
+              "total_ms": 157,
+              "mean_ms": 78.5,
+              "min_ms": 72,
+              "max_ms": 85
+            }
+          },
+          "scopes_inclusive": {}
+        },
+        "outside_worker_wall_ms": 27.924
+      },
+      {
+        "path": "/admin/staging",
+        "method": "POST",
+        "action": "finish",
+        "duration_ms": 14302.030146000001,
+        "status": 200,
+        "worker": {
+          "wall_ms": 14270,
+          "event_count": 252,
+          "r2_binding_operation_count": 139,
+          "r2_including_body_union_ms": 14270,
+          "r2_by_method": {
+            "r2.body.arrayBuffer": {
+              "count": 1,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.body.json": {
+              "count": 73,
+              "total_ms": 20,
+              "mean_ms": 0.274,
+              "min_ms": 0,
+              "max_ms": 13
+            },
+            "r2.body.text": {
+              "count": 37,
+              "total_ms": 17,
+              "mean_ms": 0.459,
+              "min_ms": 0,
+              "max_ms": 6
+            },
+            "r2.get": {
+              "count": 112,
+              "total_ms": 9986,
+              "mean_ms": 89.161,
+              "min_ms": 71,
+              "max_ms": 245
+            },
+            "r2.head": {
+              "count": 18,
+              "total_ms": 1471,
+              "mean_ms": 81.722,
+              "min_ms": 72,
+              "max_ms": 95
+            },
+            "r2.put": {
+              "count": 9,
+              "total_ms": 2776,
+              "mean_ms": 308.444,
+              "min_ms": 239,
+              "max_ms": 363
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 34,
+              "total_ms": 1551,
+              "mean_ms": 45.618,
+              "min_ms": 0,
+              "max_ms": 130
+            },
+            "episode_metadata_history": {
+              "count": 2,
+              "total_ms": 92,
+              "mean_ms": 46,
+              "min_ms": 0,
+              "max_ms": 92
+            },
+            "job_records": {
+              "count": 108,
+              "total_ms": 6229,
+              "mean_ms": 57.676,
+              "min_ms": 0,
+              "max_ms": 363
+            },
+            "other": {
+              "count": 2,
+              "total_ms": 96,
+              "mean_ms": 48,
+              "min_ms": 0,
+              "max_ms": 96
+            },
+            "service_admission": {
+              "count": 16,
+              "total_ms": 1251,
+              "mean_ms": 78.188,
+              "min_ms": 0,
+              "max_ms": 312
+            },
+            "show_control": {
+              "count": 36,
+              "total_ms": 2088,
+              "mean_ms": 58,
+              "min_ms": 0,
+              "max_ms": 330
+            },
+            "show_reservation": {
+              "count": 32,
+              "total_ms": 1405,
+              "mean_ms": 43.906,
+              "min_ms": 0,
+              "max_ms": 144
+            },
+            "staging": {
+              "count": 20,
+              "total_ms": 1558,
+              "mean_ms": 77.9,
+              "min_ms": 0,
+              "max_ms": 95
+            }
+          },
+          "scopes_inclusive": {
+            "service.acquire_invocation:m6_recovery": {
+              "count": 1,
+              "total_ms": 383,
+              "mean_ms": 383,
+              "min_ms": 383,
+              "max_ms": 383
+            },
+            "service.release_invocation:m6_recovery": {
+              "count": 1,
+              "total_ms": 379,
+              "mean_ms": 379,
+              "min_ms": 379,
+              "max_ms": 379
+            }
+          }
+        },
+        "outside_worker_wall_ms": 32.03
+      }
+    ],
+    "cli_spans": [
+      {
+        "kind": "cli_span",
+        "label": "staging.put.receipt",
+        "started_at_ms": 1791786369063,
+        "duration_ms": 0.5258979999998701,
+        "ok": true
+      },
+      {
+        "kind": "cli_span",
+        "label": "staging.readback.body_hash",
+        "started_at_ms": 1791786369869,
+        "duration_ms": 0.31335499999840977,
+        "ok": true
+      }
+    ]
+  },
+  "commit": {
+    "elapsed": {
+      "started_at_ms": 1791786389557,
+      "elapsed_ms": 10805.428394000046,
+      "exit_code": 0
+    },
+    "http": [
+      {
+        "path": "/admin/target",
+        "method": "POST",
+        "action": null,
+        "duration_ms": 1515.183611,
+        "status": 200,
+        "worker": {
+          "wall_ms": 1338,
+          "event_count": 25,
+          "r2_binding_operation_count": 14,
+          "r2_including_body_union_ms": 1338,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 6,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.body.text": {
+              "count": 5,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 11,
+              "total_ms": 1165,
+              "mean_ms": 105.909,
+              "min_ms": 80,
+              "max_ms": 215
+            },
+            "r2.head": {
+              "count": 3,
+              "total_ms": 258,
+              "mean_ms": 86,
+              "min_ms": 85,
+              "max_ms": 87
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 4,
+              "total_ms": 178,
+              "mean_ms": 44.5,
+              "min_ms": 0,
+              "max_ms": 90
+            },
+            "episode_metadata_history": {
+              "count": 6,
+              "total_ms": 344,
+              "mean_ms": 57.333,
+              "min_ms": 0,
+              "max_ms": 87
+            },
+            "other": {
+              "count": 3,
+              "total_ms": 181,
+              "mean_ms": 60.333,
+              "min_ms": 0,
+              "max_ms": 94
+            },
+            "service_admission": {
+              "count": 4,
+              "total_ms": 312,
+              "mean_ms": 78,
+              "min_ms": 0,
+              "max_ms": 215
+            },
+            "show_control": {
+              "count": 4,
+              "total_ms": 234,
+              "mean_ms": 58.5,
+              "min_ms": 0,
+              "max_ms": 124
+            },
+            "show_reservation": {
+              "count": 4,
+              "total_ms": 174,
+              "mean_ms": 43.5,
+              "min_ms": 0,
+              "max_ms": 94
+            }
+          },
+          "scopes_inclusive": {}
+        },
+        "outside_worker_wall_ms": 177.184
+      },
+      {
+        "path": "/admin/publication",
+        "method": "POST",
+        "action": "claim",
+        "duration_ms": 3333.5125529999996,
+        "status": 200,
+        "worker": {
+          "wall_ms": 3299,
+          "event_count": 43,
+          "r2_binding_operation_count": 24,
+          "r2_including_body_union_ms": 3299,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 12,
+              "total_ms": 1,
+              "mean_ms": 0.083,
+              "min_ms": 0,
+              "max_ms": 1
+            },
+            "r2.body.text": {
+              "count": 5,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 17,
+              "total_ms": 1599,
+              "mean_ms": 94.059,
+              "min_ms": 77,
+              "max_ms": 126
+            },
+            "r2.head": {
+              "count": 2,
+              "total_ms": 154,
+              "mean_ms": 77,
+              "min_ms": 75,
+              "max_ms": 79
+            },
+            "r2.put": {
+              "count": 5,
+              "total_ms": 1545,
+              "mean_ms": 309,
+              "min_ms": 245,
+              "max_ms": 396
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 4,
+              "total_ms": 200,
+              "mean_ms": 50,
+              "min_ms": 0,
+              "max_ms": 123
+            },
+            "job_records": {
+              "count": 7,
+              "total_ms": 1029,
+              "mean_ms": 147,
+              "min_ms": 0,
+              "max_ms": 396
+            },
+            "other": {
+              "count": 2,
+              "total_ms": 126,
+              "mean_ms": 63,
+              "min_ms": 0,
+              "max_ms": 126
+            },
+            "service_admission": {
+              "count": 16,
+              "total_ms": 1134,
+              "mean_ms": 70.875,
+              "min_ms": 0,
+              "max_ms": 272
+            },
+            "show_control": {
+              "count": 5,
+              "total_ms": 464,
+              "mean_ms": 92.8,
+              "min_ms": 0,
+              "max_ms": 283
+            },
+            "show_reservation": {
+              "count": 6,
+              "total_ms": 267,
+              "mean_ms": 44.5,
+              "min_ms": 0,
+              "max_ms": 95
+            },
+            "staging": {
+              "count": 1,
+              "total_ms": 79,
+              "mean_ms": 79,
+              "min_ms": 79,
+              "max_ms": 79
+            }
+          },
+          "scopes_inclusive": {
+            "service.acquire_invocation:m6_admin": {
+              "count": 1,
+              "total_ms": 370,
+              "mean_ms": 370,
+              "min_ms": 370,
+              "max_ms": 370
+            },
+            "service.release_invocation:m6_admin": {
+              "count": 1,
+              "total_ms": 324,
+              "mean_ms": 324,
+              "min_ms": 324,
+              "max_ms": 324
+            }
+          }
+        },
+        "outside_worker_wall_ms": 34.513
+      },
+      {
+        "path": "/admin/publication",
+        "method": "POST",
+        "action": "status",
+        "duration_ms": 747.2557529999995,
+        "status": 200,
+        "worker": {
+          "wall_ms": 720,
+          "event_count": 23,
+          "r2_binding_operation_count": 16,
+          "r2_including_body_union_ms": 720,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 5,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.body.text": {
+              "count": 2,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 10,
+              "total_ms": 877,
+              "mean_ms": 87.7,
+              "min_ms": 78,
+              "max_ms": 112
+            },
+            "r2.head": {
+              "count": 6,
+              "total_ms": 485,
+              "mean_ms": 80.833,
+              "min_ms": 76,
+              "max_ms": 91
+            }
+          },
+          "r2_by_record_category": {
+            "job_records": {
+              "count": 10,
+              "total_ms": 657,
+              "mean_ms": 65.7,
+              "min_ms": 0,
+              "max_ms": 91
+            },
+            "other": {
+              "count": 3,
+              "total_ms": 169,
+              "mean_ms": 56.333,
+              "min_ms": 0,
+              "max_ms": 93
+            },
+            "service_admission": {
+              "count": 4,
+              "total_ms": 194,
+              "mean_ms": 48.5,
+              "min_ms": 0,
+              "max_ms": 112
+            },
+            "show_control": {
+              "count": 4,
+              "total_ms": 178,
+              "mean_ms": 44.5,
+              "min_ms": 0,
+              "max_ms": 92
+            },
+            "staging": {
+              "count": 2,
+              "total_ms": 164,
+              "mean_ms": 82,
+              "min_ms": 78,
+              "max_ms": 86
+            }
+          },
+          "scopes_inclusive": {}
+        },
+        "outside_worker_wall_ms": 27.256
+      },
+      {
+        "path": "/admin/publication",
+        "method": "POST",
+        "action": "commit",
+        "duration_ms": 4949.347676,
+        "status": 200,
+        "worker": {
+          "wall_ms": 4926,
+          "event_count": 86,
+          "r2_binding_operation_count": 45,
+          "r2_including_body_union_ms": 4926,
+          "r2_by_method": {
+            "r2.body.json": {
+              "count": 19,
+              "total_ms": 1,
+              "mean_ms": 0.053,
+              "min_ms": 0,
+              "max_ms": 1
+            },
+            "r2.body.text": {
+              "count": 20,
+              "total_ms": 0,
+              "mean_ms": 0,
+              "min_ms": 0,
+              "max_ms": 0
+            },
+            "r2.get": {
+              "count": 40,
+              "total_ms": 3528,
+              "mean_ms": 88.2,
+              "min_ms": 75,
+              "max_ms": 235
+            },
+            "r2.head": {
+              "count": 2,
+              "total_ms": 154,
+              "mean_ms": 77,
+              "min_ms": 73,
+              "max_ms": 81
+            },
+            "r2.put": {
+              "count": 3,
+              "total_ms": 1243,
+              "mean_ms": 414.333,
+              "min_ms": 256,
+              "max_ms": 709
+            }
+          },
+          "r2_by_record_category": {
+            "episode_lifecycle": {
+              "count": 12,
+              "total_ms": 514,
+              "mean_ms": 42.833,
+              "min_ms": 0,
+              "max_ms": 115
+            },
+            "episode_metadata_history": {
+              "count": 4,
+              "total_ms": 169,
+              "mean_ms": 42.25,
+              "min_ms": 0,
+              "max_ms": 86
+            },
+            "job_records": {
+              "count": 26,
+              "total_ms": 1061,
+              "mean_ms": 40.808,
+              "min_ms": 0,
+              "max_ms": 90
+            },
+            "other": {
+              "count": 2,
+              "total_ms": 83,
+              "mean_ms": 41.5,
+              "min_ms": 0,
+              "max_ms": 83
+            },
+            "public_feed_cover_audio": {
+              "count": 1,
+              "total_ms": 81,
+              "mean_ms": 81,
+              "min_ms": 81,
+              "max_ms": 81
+            },
+            "service_admission": {
+              "count": 16,
+              "total_ms": 1301,
+              "mean_ms": 81.312,
+              "min_ms": 0,
+              "max_ms": 278
+            },
+            "show_control": {
+              "count": 10,
+              "total_ms": 453,
+              "mean_ms": 45.3,
+              "min_ms": 0,
+              "max_ms": 131
+            },
+            "show_reservation": {
+              "count": 10,
+              "total_ms": 401,
+              "mean_ms": 40.1,
+              "min_ms": 0,
+              "max_ms": 86
+            },
+            "staging": {
+              "count": 3,
+              "total_ms": 863,
+              "mean_ms": 287.667,
+              "min_ms": 73,
+              "max_ms": 709
+            }
+          },
+          "scopes_inclusive": {
+            "service.acquire_invocation:m6_recovery": {
+              "count": 1,
+              "total_ms": 354,
+              "mean_ms": 354,
+              "min_ms": 354,
+              "max_ms": 354
+            },
+            "service.release_invocation:m6_recovery": {
+              "count": 1,
+              "total_ms": 334,
+              "mean_ms": 334,
+              "min_ms": 334,
+              "max_ms": 334
+            }
+          }
+        },
+        "outside_worker_wall_ms": 23.348
+      }
+    ],
+    "cli_spans": []
+  },
+  "queue": {
+    "wall_ms": 96727,
+    "event_count": 929,
+    "r2_binding_operation_count": 484,
+    "r2_including_body_union_ms": 96554,
+    "r2_by_method": {
+      "r2.body.arrayBuffer": {
+        "count": 4,
+        "total_ms": 0,
+        "mean_ms": 0,
+        "min_ms": 0,
+        "max_ms": 0
+      },
+      "r2.body.json": {
+        "count": 182,
+        "total_ms": 46,
+        "mean_ms": 0.253,
+        "min_ms": 0,
+        "max_ms": 4
+      },
+      "r2.body.text": {
+        "count": 229,
+        "total_ms": 151,
+        "mean_ms": 0.659,
+        "min_ms": 0,
+        "max_ms": 54
+      },
+      "r2.get": {
+        "count": 419,
+        "total_ms": 78467,
+        "mean_ms": 187.272,
+        "min_ms": 162,
+        "max_ms": 530
+      },
+      "r2.head": {
+        "count": 45,
+        "total_ms": 7652,
+        "mean_ms": 170.044,
+        "min_ms": 160,
+        "max_ms": 208
+      },
+      "r2.list": {
+        "count": 3,
+        "total_ms": 692,
+        "mean_ms": 230.667,
+        "min_ms": 209,
+        "max_ms": 249
+      },
+      "r2.put": {
+        "count": 17,
+        "total_ms": 9913,
+        "mean_ms": 583.118,
+        "min_ms": 523,
+        "max_ms": 703
+      }
+    },
+    "r2_by_record_category": {
+      "episode_lifecycle": {
+        "count": 104,
+        "total_ms": 10256,
+        "mean_ms": 98.615,
+        "min_ms": 0,
+        "max_ms": 550
+      },
+      "episode_metadata_history": {
+        "count": 154,
+        "total_ms": 15722,
+        "mean_ms": 102.091,
+        "min_ms": 0,
+        "max_ms": 574
+      },
+      "job_records": {
+        "count": 220,
+        "total_ms": 26171,
+        "mean_ms": 118.959,
+        "min_ms": 0,
+        "max_ms": 635
+      },
+      "other": {
+        "count": 5,
+        "total_ms": 522,
+        "mean_ms": 104.4,
+        "min_ms": 0,
+        "max_ms": 182
+      },
+      "public_feed_cover_audio": {
+        "count": 40,
+        "total_ms": 7211,
+        "mean_ms": 180.275,
+        "min_ms": 160,
+        "max_ms": 552
+      },
+      "service_admission": {
+        "count": 48,
+        "total_ms": 5750,
+        "mean_ms": 119.792,
+        "min_ms": 0,
+        "max_ms": 703
+      },
+      "show_control": {
+        "count": 163,
+        "total_ms": 16346,
+        "mean_ms": 100.282,
+        "min_ms": 0,
+        "max_ms": 673
+      },
+      "show_metadata": {
+        "count": 3,
+        "total_ms": 340,
+        "mean_ms": 113.333,
+        "min_ms": 0,
+        "max_ms": 170
+      },
+      "show_reservation": {
+        "count": 154,
+        "total_ms": 13578,
+        "mean_ms": 88.169,
+        "min_ms": 0,
+        "max_ms": 309
+      },
+      "staging": {
+        "count": 8,
+        "total_ms": 1025,
+        "mean_ms": 128.125,
+        "min_ms": 0,
+        "max_ms": 284
+      }
+    },
+    "scopes_inclusive": {
+      "cache.invalidate_rpc": {
+        "count": 1,
+        "total_ms": 173,
+        "mean_ms": 173,
+        "min_ms": 173,
+        "max_ms": 173
+      },
+      "consumer.acquire_execution": {
+        "count": 1,
+        "total_ms": 1260,
+        "mean_ms": 1260,
+        "min_ms": 1260,
+        "max_ms": 1260
+      },
+      "consumer.create_effects": {
+        "count": 1,
+        "total_ms": 2295,
+        "mean_ms": 2295,
+        "min_ms": 2295,
+        "max_ms": 2295
+      },
+      "consumer.episode_runner": {
+        "count": 1,
+        "total_ms": 89757,
+        "mean_ms": 89757,
+        "min_ms": 89757,
+        "max_ms": 89757
+      },
+      "publication.feed_inputs": {
+        "count": 1,
+        "total_ms": 20616,
+        "mean_ms": 20616,
+        "min_ms": 20616,
+        "max_ms": 20616
+      },
+      "publication.finish_show_operation": {
+        "count": 1,
+        "total_ms": 1910,
+        "mean_ms": 1910,
+        "min_ms": 1910,
+        "max_ms": 1910
+      },
+      "publication.guard": {
+        "count": 8,
+        "total_ms": 26949,
+        "mean_ms": 3368.625,
+        "min_ms": 3227,
+        "max_ms": 3647
+      },
+      "publication.persist_audio": {
+        "count": 1,
+        "total_ms": 0,
+        "mean_ms": 0,
+        "min_ms": 0,
+        "max_ms": 0
+      },
+      "publication.progress:feed": {
+        "count": 1,
+        "total_ms": 1964,
+        "mean_ms": 1964,
+        "min_ms": 1964,
+        "max_ms": 1964
+      },
+      "publication.progress:finished": {
+        "count": 1,
+        "total_ms": 1887,
+        "mean_ms": 1887,
+        "min_ms": 1887,
+        "max_ms": 1887
+      },
+      "publication.progress:purge": {
+        "count": 1,
+        "total_ms": 2281,
+        "mean_ms": 2281,
+        "min_ms": 2281,
+        "max_ms": 2281
+      },
+      "publication.progress:validating": {
+        "count": 1,
+        "total_ms": 1765,
+        "mean_ms": 1765,
+        "min_ms": 1765,
+        "max_ms": 1765
+      },
+      "publication.progress:visibility": {
+        "count": 1,
+        "total_ms": 1906,
+        "mean_ms": 1906,
+        "min_ms": 1906,
+        "max_ms": 1906
+      },
+      "publication.purge_with_guards": {
+        "count": 1,
+        "total_ms": 2070,
+        "mean_ms": 2070,
+        "min_ms": 2070,
+        "max_ms": 2070
+      },
+      "publication.status:processing": {
+        "count": 2,
+        "total_ms": 3803,
+        "mean_ms": 1901.5,
+        "min_ms": 1778,
+        "max_ms": 2025
+      },
+      "publication.status:published": {
+        "count": 1,
+        "total_ms": 3225,
+        "mean_ms": 3225,
+        "min_ms": 3225,
+        "max_ms": 3225
+      },
+      "publication.unique_guid": {
+        "count": 1,
+        "total_ms": 7566,
+        "mean_ms": 7566,
+        "min_ms": 7566,
+        "max_ms": 7566
+      },
+      "publication.verify_staging": {
+        "count": 1,
+        "total_ms": 3911,
+        "mean_ms": 3911,
+        "min_ms": 3911,
+        "max_ms": 3911
+      },
+      "queue.candidate": {
+        "count": 1,
+        "total_ms": 96727,
+        "mean_ms": 96727,
+        "min_ms": 96727,
+        "max_ms": 96727
+      },
+      "queue.setup_probe": {
+        "count": 1,
+        "total_ms": 0,
+        "mean_ms": 0,
+        "min_ms": 0,
+        "max_ms": 0
+      },
+      "service.acquire_invocation:m6_consumer": {
+        "count": 1,
+        "total_ms": 770,
+        "mean_ms": 770,
+        "min_ms": 770,
+        "max_ms": 770
+      },
+      "service.release_invocation:m6_consumer": {
+        "count": 1,
+        "total_ms": 870,
+        "mean_ms": 870,
+        "min_ms": 870,
+        "max_ms": 870
+      }
+    }
+  },
+  "timeline": {
+    "marker_put_started_at_ms": 1791786399047,
+    "marker_put_ack_at_ms": 1791786399756,
+    "queue_message_timestamp_ms": 1791786399586,
+    "consumer_started_at_ms": 1791786400526,
+    "finished_progress_ack_at_ms": 1791786491248,
+    "published_status_ack_at_ms": 1791786494473,
+    "show_release_ack_at_ms": 1791786496383,
+    "service_release_ack_at_ms": 1791786497253,
+    "consumer_ended_at_ms": 1791786497253,
+    "cli_observed_at_ms": 1791786497147,
+    "queue_message_to_consumer_ms": 940,
+    "marker_ack_to_consumer_ms_approx": 770,
+    "marker_ack_to_finished_progress_ms_approx": 91492,
+    "finished_progress_to_service_release_ms": 6005,
+    "commit_command_end_to_cli_observed_ms": 96784.57153320312
+  },
+  "poll_http_ms": {
+    "count": 48,
+    "total_ms": 46327.895,
+    "mean_ms": 965.164,
+    "min_ms": 717.524,
+    "max_ms": 1371.88
+  },
+  "poll_worker_wall_ms": {
+    "count": 48,
+    "total_ms": 41872,
+    "mean_ms": 872.333,
+    "min_ms": 655,
+    "max_ms": 1212
+  },
+  "preservation": {
+    "feed_byte_unchanged": true,
+    "metadata_except_revision_updated_at_unchanged": true,
+    "inputs_cursor_local_toml_unchanged": true,
+    "service_open_drained": true,
+    "unfinished_show_operation": false
+  },
+  "limits": [
+    "Worker clocks advance on IO; wall/IO measurement, not CPU profiling",
+    "Cross-invocation absolute-time deltas include possible clock skew; queue message timestamp meaning and actual R2 event enqueue boundary are not identical",
+    "Named scopes include nested IO; do not add inclusive scope totals to R2 totals",
+    "R2 operation durations may overlap (Promise.all); union time is used for wall share",
+    "Metadata-only: no MP3 upload/readback or immutable audio copy measured",
+    "Instrumented single sample; no causal performance improvement experiment"
+  ]
+}
