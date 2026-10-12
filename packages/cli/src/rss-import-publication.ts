@@ -6,6 +6,8 @@ import { localJournalEntryExists as present, syncLocalJournalDirectory } from ".
 import { createLocalJournalStorage, writeSyncedLocalFile } from "./local-journal-storage";
 import { readLocalMetadata } from "./local-metadata-read";
 import { M6_COMMAND_ARGUMENTS, runM6Command } from "./m6-commands";
+import { LocalUpdateInspectionError } from "./m6-local-update";
+import { readLocalDraft } from "./local-draft-journal";
 import { RemoteOperationStatusError } from "./remote-operation-status";
 import { receiveRssAsset } from "./rss-import-download";
 import { parseRssImportFeed } from "./rss-import-feed";
@@ -21,7 +23,7 @@ const stateSchema = z.object({ schema_version: z.literal(1), import_id: z.uuid()
   account_id: z.string(), worker_name: z.string(), public_base_url: z.string() }).strict(), public_base_url: z.string(),
   source_directory: z.string(), input_sha256: z.string(), step: z.number().int().nonnegative(),
   phase: z.enum(["ready", "command_requested", "waiting", "completed"]), waiting_job_id: z.uuid().optional(),
-  created_show_sha256: z.string().optional() }).strict();
+  created_show_sha256: z.string().optional(), reconciled_unstarted_update_step: z.number().int().nonnegative().optional() }).strict();
 export type RssPublicationEffects = { command: (command: string, args: string[]) => Promise<unknown>;
   readFeed: (url: string) => Promise<string>; wait: () => Promise<void>;
   report: (summary: { show_id: string; episode_count: number; audio_bytes: number; public_base_url: string }) => void };
@@ -78,7 +80,27 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
       if (JSON.stringify(state[field]) !== JSON.stringify(initial[field])) throw new Error("RSS publication inputs or service changed; preserve the retained operation");
     }
     if (state.phase === "command_requested") {
-      throw new Error("RSS publication command outcome is unknown; inspect the existing operation journals without replaying mutations");
+      const index = (state.step - 5) / 4;
+      const episode = Number.isInteger(index) && index >= 0 ? prepared.episodes[index] : undefined;
+      if (!episode || state.waiting_job_id) {
+        throw new Error("RSS publication command outcome is unknown; inspect the existing operation journals without replaying mutations");
+      }
+      const target = { kind: "episode" as const, show_id: showId, episode_id: episode.metadata.episode_id };
+      const before = readLocalDraft(root, config, target);
+      if (before.client_state || before.lock_present) {
+        throw new Error("RSS publication command outcome is unknown; preserve the existing draft and operation journals without replaying mutations");
+      }
+      const local = parseEpisodeDraft(metadataText(await readLocalMetadata(join(directory, `episode-${target.episode_id}.toml`))));
+      if (JSON.stringify(local) !== JSON.stringify(episode.metadata)) throw new Error("Imported Episode draft changed; unstarted update cannot be reconciled");
+      const snapshot = targetInspectionResponseSchema.parse(await effects.command("target-episode", [showId, target.episode_id]));
+      if (snapshot.request.service_id !== config.service_id || snapshot.request.kind !== "episode" ||
+        snapshot.request.show_id !== showId || snapshot.request.episode_id !== target.episode_id ||
+        snapshot.admission_state !== "open" || snapshot.show?.lifecycle !== "active" || snapshot.unfinished_show_operation ||
+        snapshot.episode || snapshot.current_revision || JSON.stringify(readLocalDraft(root, config, target)) !== JSON.stringify(before)) {
+        throw new Error("Unstarted update cannot be verified; preserve the retained command and ownership");
+      }
+      state = { ...state, phase: "ready", reconciled_unstarted_update_step: state.step };
+      storage.replace(stateSchema.parse(state));
     }
     effects.report({ show_id: showId, episode_count: prepared.episodes.length, audio_bytes: prepared.audioBytes, public_base_url: config.public_base_url });
     const actions: Array<() => Promise<{ jobId?: string; createdShowHash?: string }>> = [];
@@ -143,7 +165,12 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
     if (state.phase === "waiting") await waitForJob();
     while (state.step < actions.length) {
       state = { ...state, phase: "command_requested" }; save();
-      const result = await actions[state.step]!();
+      let result: { jobId?: string; createdShowHash?: string };
+      try { result = await actions[state.step]!(); }
+      catch (error) {
+        if (error instanceof LocalUpdateInspectionError) { state = { ...state, phase: "ready" }; save(); }
+        throw error;
+      }
       state = { ...state, step: state.step + 1, phase: result.jobId ? "waiting" : "ready",
         ...(result.createdShowHash ? { created_show_sha256: result.createdShowHash } : {}),
         ...(result.jobId ? { waiting_job_id: result.jobId } : {}) };

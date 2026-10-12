@@ -29,6 +29,60 @@ async function fixture() {
 }
 
 describe("read-only M6 target generation and base revision inspection", () => {
+  test("verified target snapshot conflicts are bounded read-only retries; other rejections stop", async () => {
+    const setup = await fixture();
+    const writes = [...setup.writes];
+    let calls = 0;
+    let conflicts = 2;
+    let blocked = false;
+    const client = new TargetInspectionClient(setup.config, "private-secret", async () => {
+      calls++;
+      if (blocked) return Response.json({ error: "Target inspection could not verify a consistent snapshot", reason_code: "target_inspection_blocked" },
+        { status: 409, headers: { "Cache-Control": "no-store" } });
+      if (conflicts-- > 0) return Response.json({ error: "Target status changed during inspection", reason_code: "target_status_changed",
+        service_id: setup.config.service_id }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      return setup.call(setup.input());
+    });
+    expect((await client.inspect(setup.input())).show?.lifecycle).toBe("active");
+    expect(calls).toBe(3);
+    conflicts = 10;
+    await expect(client.inspect(setup.input())).rejects.toThrow("target_status_changed");
+    expect(calls).toBe(6);
+    blocked = true;
+    await expect(client.inspect(setup.input())).rejects.toThrow("http_status=409");
+    expect(calls).toBe(7);
+    expect(setup.writes).toEqual(writes);
+  });
+
+  test("changed Show controls report a read conflict rather than an invalid snapshot", async () => {
+    const setup = await fixture();
+    const get = setup.bucket.get.bind(setup.bucket);
+    let reads = 0;
+    setup.bucket.get = (async (...args: Parameters<typeof setup.bucket.get>) => {
+      if (args[0] === "system/show-publications/daily.json" && ++reads === 2) {
+        await setup.bucket.put(args[0], setup.text(args[0]));
+      }
+      return get(...args);
+    }) as typeof setup.bucket.get;
+    const response = await setup.call(setup.input());
+    expect(response.status).toBe(409);
+    expect(await response.json<Record<string, unknown>>()).toEqual({ error: "Target status changed during inspection", reason_code: "target_status_changed",
+      service_id: setup.config.service_id });
+  });
+  test("foreign or malformed target conflict responses are not retried", async () => {
+    const setup = await fixture();
+    for (const invalid of ["service", "extra", "headers"] as const) {
+      let calls = 0;
+      const client = new TargetInspectionClient(setup.config, "private-secret", async () => {
+        calls++;
+        return Response.json({ error: "Target status changed during inspection", reason_code: "target_status_changed",
+          service_id: invalid === "service" ? "foreign" : setup.config.service_id, ...(invalid === "extra" ? { extra: true } : {}) },
+          { status: 409, headers: { "Cache-Control": invalid === "headers" ? "public" : "no-store" } });
+      });
+      await expect(client.inspect(setup.input())).rejects.toThrow(invalid === "headers" ? "management_response_invalid" : "management_http_rejected");
+      expect(calls).toBe(1);
+    }
+  });
   test("Show and missing target inspections do not write, reserve, initialize or authorize operations", async () => {
     const setup = await fixture();
     const before = [...setup.entries];

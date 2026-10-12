@@ -7,6 +7,7 @@ import type { LifecycleReadEnv } from "./lifecycle-control";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import { M6ManagementServiceMismatch, withM6ManagementRead } from "./m6-management";
 import { requireShowReservationReady } from "./show-reservation-record";
+import { ManagementReadConflict } from "./management-read-conflict";
 
 type Env = LifecycleReadEnv & { CASTLOOP_ADMIN_KEY: string };
 
@@ -41,12 +42,12 @@ async function inspectTarget(env: Env, bindings: M6DeliveryGateBindings, input: 
     const afterShow = await readShowControl(env, input.show_id);
     const afterEpisode = input.kind === "episode" ? await readEpisodeLifecycle(env, input.show_id, input.episode_id!) : null;
     if (show?.etag !== afterShow?.etag || JSON.stringify(show?.value) !== JSON.stringify(afterShow?.value) ||
-      JSON.stringify(episode) !== JSON.stringify(afterEpisode)) throw new Error("Target controls changed during inspection");
+      JSON.stringify(episode) !== JSON.stringify(afterEpisode)) throw new ManagementReadConflict();
     if (afterShow) await requireShowReservationReady(env, afterShow.value);
     if (key && historyKey) {
       const [afterMetadata, afterHistory] = await Promise.all([env.CASTLOOP_BUCKET.head(key), env.CASTLOOP_BUCKET.head(historyKey)]);
       if (metadata?.etag !== afterMetadata?.etag || metadata?.size !== afterMetadata?.size ||
-        history?.etag !== afterHistory?.etag || history?.size !== afterHistory?.size) throw new Error("Current Episode revision changed during inspection");
+        history?.etag !== afterHistory?.etag || history?.size !== afterHistory?.size) throw new ManagementReadConflict();
     }
     return targetInspectionResponseSchema.parse({ schema_version: 1, result: "target", request: input,
       snapshot_only: true, authorizes_operation: false, payloads_verified: false, admission_state: admission.state,
@@ -70,6 +71,8 @@ export async function handleM6TargetInspection(request: Request, env: Env, bindi
     return reply(result);
   }
   catch (error) {
+    if (error instanceof ManagementReadConflict) return reply({ error: "Target status changed during inspection",
+      reason_code: "target_status_changed", service_id: input.service_id }, 409);
     if (error instanceof M6ManagementServiceMismatch) return reply({ error: "Service ID mismatch", reason_code: "target_input_invalid" }, 400);
     console.error(JSON.stringify({ event: "target_inspection_blocked", reason_code: "target_inspection_blocked" }));
     return reply({ error: "Target inspection could not verify a consistent snapshot", reason_code: "target_inspection_blocked" }, 409);

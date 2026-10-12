@@ -63,8 +63,10 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 
 - 読み取り中に公開記録やサービス状態が変わった場合（`publication_status_changed`）だけ、既知jobの状態を再照会する。最大120回、待機開始から2分経過後は照会を追加しない。`published`／`released`の検証までは次の公開へ進まない。この識別には修正済みCLIとWorkerの両方が必要。
 - 公開receiptを保存済みのjobで状態照会に失敗した、または公開待機が終わらない場合は、同じコマンドでそのjobの確認から続けられる。完了済みの公開を再送しない。
+- 更新前の対象照会では、確認できた記録変化（`target_status_changed`）だけ最大3回照会する。その他のエラーは停止し、変更処理を始めていなければ進捗を`ready`に戻す。同じ取り込みコマンドで続行できる。HTTP拒否には`http_status`を表示する。
+- 修正前の`command_requested`記録も、Episode作成直後の最初の`update-episode`に限り続行できる。保持したworkspaceで下書きjournal／lockが未作成、ローカルTOMLが取り込み内容と一致、サーバーのEpisodeが未登録、Showがactive／openで所有者なし、照会前後のローカル記録が不変であることを確認する。確認できなければ停止する。通常更新は下書きjournalを保存してから変更要求を送るため、既存journalがあればこの復旧は適用しない。
 - 照会エラーの`reason_code`は、通信失敗（`management_transport_failed`）、HTTP拒否（`management_http_rejected`）、応答形式不正（`management_response_invalid`）、公開schema／identity不一致（`management_identity_invalid`）、ローカル記録変化（`local_record_changed`）等を区別する。これらは自動再照会せず停止する。調査にはコードを保存し、秘密を含む原本や応答を公開しない。
-- 変更コマンドの応答が不明な場合は再送を拒否する。サービスの`.castloop/`にある登録・staging・publicationの既存journalを保持し、`local-operation-status`／`operation-status`で調べる。lockやownerを削除しない。
+- 変更コマンドの応答が不明な場合は再送を拒否する。サービスの`.castloop/`にある登録・staging・publicationの既存journalを保持し、`local-operation-status`／`operation-status`で調べる。lockやownerを削除しない。上記の未開始確認は、記録を削除・復元したworkspaceには適用しない。
 - 公開進捗は`.castloop/rss-imports/<serviceId>/<importId>.json`に保存する。開始後に取り込み入力や公開URL・サービスを変更したら続行しない。
 - `.castloop/`の記録削除、新しいjobによる置換、`init`の再実行は復旧方法ではない。未知の変更要求からの万能な自動復旧は提供しない。
 

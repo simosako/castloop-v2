@@ -37,8 +37,14 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
   const cachedAssets: M6CachedLoopback = Object.assign(() => ({ fetch: async () => new Response("asset") }),
     { ...setup.bindings.cachedAssets, invalidate: async () => {} });
   const env = { ...setup.env, CASTLOOP_DLQ_NAME: setup.config.dlq_name, CASTLOOP_QUEUE: { send: async () => { throw new Error("Unexpected continuation"); } } };
+  let rejectTargetRead = false;
   const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(Object.assign(async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const url = new URL(String(input));
+    if (url.pathname === "/admin/target" && rejectTargetRead) {
+      rejectTargetRead = false;
+      return Response.json({ error: "Target inspection could not verify a consistent snapshot", reason_code: "target_inspection_blocked" },
+        { status: 409, headers: { "Cache-Control": "no-store" } });
+    }
     if (url.hostname === "api.cloudflare.com") {
       const key = url.pathname.slice(url.pathname.indexOf("/objects/") + 9);
       if (init?.method === "PUT") {
@@ -102,7 +108,23 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
     expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
     expect(commands.filter((command) => command === "create-episode")).toHaveLength(0);
     continuousConflict = false;
+    await expect(publishRssImport(root, setup.config, output, { ...effects, async command(command, args) {
+      if (command === "update-episode") rejectTargetRead = true;
+      return effects.command(command, args);
+    } })).rejects.toThrow("management_http_rejected");
+    const cursorFile = join(root, ".castloop", "rss-imports", setup.config.service_id,
+      `${JSON.parse(readFileSync(join(output, "import.json"), "utf8")).import_id}.json`);
+    expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toMatchObject({ phase: "ready", step: 5 });
+    expect(commands.filter((command) => command === "publish-episode")).toHaveLength(0);
+    const stopped = { ...JSON.parse(readFileSync(cursorFile, "utf8")), phase: "command_requested" };
+    writeFileSync(cursorFile, JSON.stringify(stopped));
+    await expect(publishRssImport(root, setup.config, output, { ...effects, async command(command, args) {
+      const result = await effects.command(command, args);
+      return command === "target-episode" ? { ...(result as object), unfinished_show_operation: true } : result;
+    } })).rejects.toThrow("Unstarted update cannot be verified");
+    expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toEqual(stopped);
     const completed = await publishRssImport(root, setup.config, output, effects);
+    expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toMatchObject({ reconciled_unstarted_update_step: 5 });
     expect(completed).toMatchObject({ result: "rss-import-published", episode_count: 2, subscriber_migration_completed: false });
     expect(commands.filter((command) => command === "create-show")).toHaveLength(1);
     expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
@@ -121,6 +143,12 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
     const count = commands.length;
     await publishRssImport(root, setup.config, output, effects);
     expect(commands.slice(count)).toEqual(["service-status"]);
+    const completedCursor = readFileSync(cursorFile, "utf8");
+    writeFileSync(cursorFile, JSON.stringify({ ...JSON.parse(completedCursor), phase: "command_requested", step: 5 }));
+    const beforeUnknown = commands.length;
+    await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("preserve the existing draft");
+    expect(commands.slice(beforeUnknown)).toEqual(["service-status"]);
+    writeFileSync(cursorFile, completedCursor);
     const restoredEpisode = report.episodes.find((episode: { metadata: { guid_is_permalink: boolean } }) => episode.metadata.guid_is_permalink);
     const metadataKey = `public/episodes/imported/${restoredEpisode.metadata.episode_id}/metadata.toml`;
     const beforeLifecycle = setup.text(metadataKey);

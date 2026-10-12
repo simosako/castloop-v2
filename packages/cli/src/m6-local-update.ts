@@ -13,6 +13,11 @@ import type { StagingClientState } from "./staging-journal";
 import { TargetInspectionClient } from "./target-inspection-client";
 
 type Inspection = Pick<TargetInspectionClient, "inspect">;
+export class LocalUpdateInspectionError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : "Target inspection failed before starting an update", { cause });
+  }
+}
 export type M6LocalUpdateOptions = LocalDraftStagingOptions & { inspector?: Inspection; now?: () => Date };
 export type M6LocalPublishOptions = { audioPath?: string; inspector?: Inspection; now?: () => Date;
   client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status"> };
@@ -57,7 +62,9 @@ export async function updateLocalM6Draft(root: string, configInput: ServiceConfi
   const before = readLocalDraft(root, config, target);
   if (before.lock_present || before.client_state?.phase === "publication_prepared") throw new Error("Preserve the frozen or locked publication draft");
   if (before.client_state) requireSettledUploads(root, config, before.client_state);
-  const snapshot = await inspect(root, config, target, adminKey, options.inspector);
+  let snapshot: TargetInspectionResponse;
+  try { snapshot = await inspect(root, config, target, adminKey, options.inspector); }
+  catch (error) { throw new LocalUpdateInspectionError(error); }
   const current = readLocalDraft(root, config, target).client_state;
   const baseId = snapshot.current_revision?.revision_id;
   const journal = !current ? createLocalDraftJournal(root, config, target, crypto.randomUUID(), baseId) : current.phase === "frozen" ?

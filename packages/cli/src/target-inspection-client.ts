@@ -1,6 +1,6 @@
 import { targetInspectionRequestSchema, targetInspectionResponseSchema } from "@castloop/shared";
 import type { ServiceConfig, TargetInspectionRequest, TargetInspectionResponse } from "@castloop/shared";
-import { M6AdminJsonClient } from "./m6-admin-json";
+import { M6AdminJsonClient, M6AdminVerificationError } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
 
 export class TargetInspectionClient {
@@ -13,7 +13,14 @@ export class TargetInspectionClient {
   async inspect(input: TargetInspectionRequest): Promise<TargetInspectionResponse> {
     const request = targetInspectionRequestSchema.parse(input);
     if (request.service_id !== this.http.config.service_id) throw new Error("Target inspection belongs to another service");
-    const payload = await this.http.post("target", request);
+    let payload: unknown;
+    for (let attempt = 0; ; attempt++) {
+      try { payload = await this.http.post("target", request); break; }
+      catch (error) {
+        if (!(error instanceof M6AdminVerificationError) || error.reasonCode !== "target_status_changed" || attempt >= 2) throw error;
+        await Bun.sleep(100);
+      }
+    }
     const response = targetInspectionResponseSchema.parse(payload);
     if (JSON.stringify(response.request) !== JSON.stringify(request)) throw new Error("Target inspection response belongs to another exact target");
     return response;

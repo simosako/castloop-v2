@@ -209,3 +209,18 @@ M7開発ブランチ`feat/m7-rss-import`で以下を接続した。公開済みv
 既存試験workspaceを新規initし直す必要はない。修正済みCLIをビルドし、通常のpause／drain／deploy／検証／resumeでWorkerも更新する。その後、元の取り込み先と保持したwaiting cursorで`publish-rss-import`を続行する。処理中・不明なownerが残る場合はdeployせず、既存の状態照会で確認する。実機の全36件完了は引き続き未検証。
 
 修正後の検証: `bun test`は962 pass／0 fail、`npm run check`とLinux単一バイナリbuildは成功。Show／Episodeの読み取り競合からの続行、継続的競合の上限停止、通信・応答・identity異常の診断、ローカルlock変化での停止、変更要求への競合コード誤適用拒否を確認した。Cloudflare環境への変更は行っていない。
+
+### Issue #10追試: 更新前の対象照会と未開始cursor
+
+追試コメントと`test-evidence/rss-import-retest-dc33f75`（固定commit `275151233aa77d25e7764cef4f51c71851d4308c`）を確認した。CLI／Workerを更新後、5件まで公開できたが、6件目の最初の`update-episode`で対象照会がHTTP拒否となり、step 25／`command_requested`に停止した。具体的なHTTP応答は保存されていないため、追試時の拒否原因も未確定。
+
+対象照会はservice・Show・Episode・revisionのsnapshot変化をすべて一般拒否にしていた。またRSS cursorは更新runnerを呼ぶ前に`command_requested`を保存するため、読み取りだけの失敗も未知mutation扱いとなっていた。修正範囲は次の通り。
+
+- Workerの確認済みsnapshot変化だけを`target_status_changed`として区別する。CLIはservice ID・応答形式を照合し、読み取りだけ最大3回実行する。不整合や一般HTTP拒否は再照会しない。HTTP拒否の診断には数値のstatusを含める。
+- 更新runnerの対象照会は下書きjournal作成・staging開始より前に実行される。その部分の例外だけを型で区別し、RSS cursorを`ready`に戻して停止する。変更処理開始後の例外は引き続き`command_requested`を保持する。
+- 既存cursorも、Episode作成後の最初のメタデータ更新段階に限り未開始確認を行う。下書きjournal／lockが存在せず、保持したローカルTOMLが取り込み内容と一致し、認証付き対象照会でEpisode未登録・Show active／open・所有者なしを確認し、ローカル記録が照会前後で変わっていない場合だけ`ready`へ戻す。確認したstepをcursorへ保存する。
+- この未開始判定は、更新が必ず下書きjournalを永続化してから変更要求を送る既存runnerの順序に依存する。journal／lockを削除・古いbackupへ復元したworkspaceは対象外。既存下書きがあれば、サーバーに所有者が見えなくても再送しない。登録・音源更新・公開の結果不明記録にも適用しない。
+
+追試workspaceでは、記録・入力・URLを保持したままCLIとWorkerを更新し、同じ`publish-rss-import`でこの確認を実行できる。確認失敗時には停止した記録を保持する。Cloudflare設定の変更・実機再試験は本修正では行わず、全36件の完了確認は試験側で実施する。
+
+修正後の検証: `bun test`は965 pass／0 fail（108 files）、`npm run check`とLinux単一バイナリbuildは成功。対象照会の競合限定再試行と上限、別service／不正応答の即時停止、更新前のHTTP拒否後の`ready`保持、旧cursorの未開始確認と続行、所有者あり／既存下書きでの再送拒否を確認した。
