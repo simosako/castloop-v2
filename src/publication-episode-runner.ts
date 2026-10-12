@@ -12,6 +12,7 @@ import { canonicalEnclosureUrl } from "./media-url";
 import { publicationCommitKey, readFrozenPublicationCommit, requireOwnedPublication, verifyPublicationStaging } from "./publication-admission";
 import { matchesPublishedAudio, publicationChecksum, readPublicationBytes, renderPublicationFeed } from "./publication-inputs";
 import type { PublicationEffects } from "./publication-inputs";
+import { measureWorkerPhase } from "./worker-timing";
 
 function text(bytes: Uint8Array): string {
   return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
@@ -96,21 +97,25 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
   const target = { showId: execution.showId, episodeId: commit.episode_id };
   let failurePhase = progress.phase;
   async function guard(): Promise<void> {
-    await requireShowExecution(env, execution);
-    await requireOwnedPublication(env, execution, { allowPublishedResult: true });
-    await effects.checkDeliveryGate(target);
-    await requireShowExecution(env, execution);
+    await measureWorkerPhase(execution.jobId, "publication.guard", async () => {
+      const current = await requireOwnedPublication(env, execution, { allowPublishedResult: true });
+      if (current.control.value.owner.state !== "processing" || current.control.value.owner.execution_id !== execution.executionId) {
+        throw new Error("Invocation no longer owns the execution token");
+      }
+      await effects.checkDeliveryGate(target);
+      await requireShowExecution(env, execution);
+    });
   }
   async function recordProgress(phase: LifecycleProgress["phase"], purged = false): Promise<void> {
     const next = lifecycleProgressSchema.parse({ ...progress, phase, purge_confirmed: purged,
       updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") });
-    await writeLifecycleProgress(env, execution, next);
+    await measureWorkerPhase(execution.jobId, `publication.progress.${phase}`, () => writeLifecycleProgress(env, execution, next));
     progress = next;
   }
   async function recordStatus(state: "processing" | "retrying" | "published"): Promise<void> {
-    await writeLifecycleJobStatus(env, execution, lifecycleJobStatusSchema.parse({ schema_version: 2, ...journal.identity,
+    await measureWorkerPhase(execution.jobId, `publication.status_write.${state}`, () => writeLifecycleJobStatus(env, execution, lifecycleJobStatusSchema.parse({ schema_version: 2, ...journal.identity,
       state, phase: progress.phase, ...(state === "published" ? { result_lifecycle: "active" } : {}),
-      ...(state === "retrying" ? lifecycleFailureForPhase(failurePhase) : {}) }));
+      ...(state === "retrying" ? lifecycleFailureForPhase(failurePhase) : {}) })));
   }
   try {
     await guard();
@@ -142,18 +147,19 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
           canonicalEnclosureUrl(base!, execution.showId, service.public_base_url), content_type: "audio/mpeg",
         length_bytes: commit.audio_length_bytes ?? base!.length_bytes, duration_seconds: commit.duration_seconds ?? base!.duration_seconds,
         sha256: commit.audio_sha256 ?? base!.sha256, updated_at: commit.committed_at });
-      await verifyPublicationStaging(env, execution, { publishedCandidate: revision });
-      await uniqueGuid(env, execution, revision);
+      await measureWorkerPhase(execution.jobId, "publication.verify_staging", () => verifyPublicationStaging(env, execution, { publishedCandidate: revision }));
+      await measureWorkerPhase(execution.jobId, "publication.unique_guid", () => uniqueGuid(env, execution, revision));
       failurePhase = "feed";
       await recordProgress("feed");
       await guard();
-      await persistAudio(env, execution, commit);
-      const inputs = await readLifecycleFeedInputs(env, execution, { candidate: revision });
+      await measureWorkerPhase(execution.jobId, "publication.audio", () => persistAudio(env, execution, commit));
+      const inputs = await measureWorkerPhase(execution.jobId, "publication.feed_inputs", () => readLifecycleFeedInputs(env, execution, { candidate: revision }));
       if (!inputs.writeFeed) throw new Error("Episode lifecycle does not permit publication feed writing");
       const feed = renderPublicationFeed(show, inputs.episodes, service.public_base_url, extension);
       const historyKey = `${prefix}/revisions/${execution.jobId}.toml`;
       await guard();
-      const history = await env.CASTLOOP_BUCKET.put(historyKey, stringifyToml(revision), { onlyIf: new Headers({ "If-None-Match": "*" }) });
+      const history = await measureWorkerPhase(execution.jobId, "publication.history_write", () =>
+        env.CASTLOOP_BUCKET.put(historyKey, stringifyToml(revision), { onlyIf: new Headers({ "If-None-Match": "*" }) }));
       if (!history && JSON.stringify(parseEpisodeRevision(text(await readPublicationBytes(env, historyKey, 1_000_000)))) !== JSON.stringify(revision)) {
         throw new Error("Immutable Episode revision already contains different metadata");
       }
@@ -162,10 +168,10 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
         await guard();
         const previous = await env.CASTLOOP_BUCKET.head(key);
         await requireShowExecution(env, execution);
-        const written = await env.CASTLOOP_BUCKET.put(key, data, {
+        const written = await measureWorkerPhase(execution.jobId, contentType ? "publication.feed_write" : "publication.metadata_write", () => env.CASTLOOP_BUCKET.put(key, data, {
           onlyIf: previous ? { etagMatches: previous.etag } : new Headers({ "If-None-Match": "*" }),
           ...(contentType ? { httpMetadata: { contentType } } : {}),
-        });
+        }));
         if (!written) throw new Error("Episode publication output changed before writing");
       }
       await advanceLifecycleFeedGeneration(env, execution);
@@ -175,7 +181,7 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
       failurePhase = "purge";
       await recordStatus("processing");
       await guard();
-      await effects.purge(target);
+      await measureWorkerPhase(execution.jobId, "publication.purge", () => effects.purge(target));
       await guard();
       await recordProgress("visibility", true);
     }
@@ -200,7 +206,7 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
     if (progress.phase !== "finished") throw new Error("Episode publication cannot finish from its current phase");
     failurePhase = "finished";
     await recordStatus("published");
-    await finishShowOperation(env, execution);
+    await measureWorkerPhase(execution.jobId, "publication.owner_release", () => finishShowOperation(env, execution));
   } catch (error) {
     const current = await readShowControl(env, execution.showId);
     if (current?.value.last_finished_operation?.job_id === execution.jobId && current.value.last_finished_operation.generation === execution.generation &&

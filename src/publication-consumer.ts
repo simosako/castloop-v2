@@ -1,4 +1,4 @@
-import { acquireShowExecution, controlRequestHash, readShowControl } from "./lifecycle-control";
+import { acquireShowExecution, controlRequestHash, createShowExecutionEnv, readShowControl } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import { LifecycleExecutionBusy, releaseSettledExecution } from "./lifecycle-consumer";
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
@@ -12,7 +12,7 @@ import type { PublicationEffects } from "./publication-inputs";
 export type PublicationConsumerResult = { state: "completed" } |
   { state: "ignored"; reason: "unmatched_path" | "missing_marker" | "stale_operation" } |
   { state: "invalid"; reason: "invalid_frozen_publication" };
-export type PublicationEffectFactory = (execution: ShowExecution) => PublicationEffects | Promise<PublicationEffects>;
+export type PublicationEffectFactory = (execution: ShowExecution, env: LifecycleFeedEnv) => PublicationEffects | Promise<PublicationEffects>;
 
 export async function requeuePublicationOperation(env: LifecycleControlEnv, operation: PublicationOperation,
   send: (key: string) => Promise<void>): Promise<string> {
@@ -48,9 +48,10 @@ export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string
   if (owner.execution_id) throw new LifecycleExecutionBusy();
   const execution = await acquireShowExecution(env, request.show_id, request.job_id, current.value.generation);
   try {
-    const effects = typeof source === "function" ? await source(execution) : source;
+    const executionEnv = request.kind === "episode" ? await createShowExecutionEnv(env, execution) : env;
+    const effects = typeof source === "function" ? await source(execution, executionEnv) : source;
     if (request.kind === "show") await runOwnedShowPublication(env, execution, effects);
-    else await runOwnedEpisodePublication(env, execution, effects);
+    else await runOwnedEpisodePublication(executionEnv, execution, effects);
   } catch (error) {
     if (await releaseSettledExecution(env, execution) === "completed") return { state: "completed" };
     throw error;

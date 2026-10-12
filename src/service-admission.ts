@@ -1,6 +1,7 @@
 import { migrationApplyProgressSchema, serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "../packages/shared/src/index";
 import type { M6ServiceReadiness, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
+import { measureWorkerPhase } from "./worker-timing";
 
 export const SERVICE_ADMISSION_KEY = "system/lifecycle-service.json";
 const MAX_RECORD_BYTES = 16384;
@@ -98,10 +99,13 @@ export async function releaseServiceInvocation(env: LifecycleControlEnv, invocat
 }
 
 export async function withServiceInvocation<T>(env: LifecycleControlEnv, serviceId: string,
-  kind: ServiceInvocationKind, callback: (invocation: ServiceInvocation) => Promise<T>): Promise<T> {
+  kind: ServiceInvocationKind, callback: (invocation: ServiceInvocation) => Promise<T>, timingJobId?: string): Promise<T> {
   const invocation = await acquireServiceInvocation(env, serviceId, kind);
   try { return await callback(invocation); }
-  finally { await releaseServiceInvocation(env, invocation); }
+  finally {
+    if (timingJobId) await measureWorkerPhase(timingJobId, "publication.invocation_release", () => releaseServiceInvocation(env, invocation));
+    else await releaseServiceInvocation(env, invocation);
+  }
 }
 
 export async function pauseServiceAdmission(env: LifecycleControlEnv, serviceId: string, pauseId: string, workerVersionId?: string): Promise<void> {

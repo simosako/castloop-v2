@@ -9,6 +9,7 @@ import { beginStageUpload, claimStageUpload, settleStageUpload } from "./staging
 import type { StageOperation } from "./staging-upload";
 import type { StageEpisodeDraftEnv } from "./staging-episode-draft";
 import { runStageVerification } from "./staging-verification";
+import { measureWorkerPhase } from "./worker-timing";
 
 export type StagingAdminEnv = StageEpisodeDraftEnv & { CASTLOOP_ADMIN_KEY: string };
 
@@ -29,11 +30,13 @@ export async function handleM6StagingAdmin(request: Request, env: StagingAdminEn
   catch { return reply({ error: "Invalid staging input", reason_code: "staging_input_invalid" }, 400); }
   try {
     if (input.action === "status") {
-      return reply(await withM6ManagementRead(env, input.service_id, bindings, () => inspectStageUpload(env, input.service_id, input.upload)));
+      return reply(await measureWorkerPhase(input.upload.operation_id, "staging.status", () =>
+        withM6ManagementRead(env, input.service_id, bindings, () => inspectStageUpload(env, input.service_id, input.upload))));
     }
     const kind = input.action === "claim" || input.action === "begin" ? "m6_admin" : "m6_recovery";
     const showId = input.action === "claim" ? input.upload.show_id : input.operation.show_id;
-    const result = await withM6ManagementInvocation(env, input.service_id, kind, { showId }, bindings, async (): Promise<StagingAdminResponse> => {
+    const jobId = input.action === "claim" ? input.upload.operation_id : input.operation.operation_id;
+    const result = await measureWorkerPhase(jobId, `staging.${input.action}`, () => withM6ManagementInvocation(env, input.service_id, kind, { showId }, bindings, async (): Promise<StagingAdminResponse> => {
       const identity = { schema_version: 1 as const, service_id: input.service_id };
       let response: StagingAdminResponse;
       if (input.action === "claim") {
@@ -51,7 +54,7 @@ export async function handleM6StagingAdmin(request: Request, env: StagingAdminEn
         }
       }
       return stagingAdminResponseSchema.parse(response);
-    });
+    }));
     return reply(result);
   } catch (error) {
     if (error instanceof M6ManagementServiceMismatch) return reply({ error: "Service ID mismatch", reason_code: "staging_input_invalid" }, 400);

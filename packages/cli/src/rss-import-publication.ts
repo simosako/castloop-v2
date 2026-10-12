@@ -19,6 +19,8 @@ import { constants, renameSync } from "node:fs";
 import { copyFile, open } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
+const MEASUREMENT_WAIT_MS = 300_000;
+
 const stateSchema = z.object({ schema_version: z.literal(1), import_id: z.uuid(), identity: z.object({ service_id: z.string(),
   account_id: z.string(), worker_name: z.string(), public_base_url: z.string() }).strict(), public_base_url: z.string(),
   source_directory: z.string(), input_sha256: z.string(), step: z.number().int().nonnegative(),
@@ -142,8 +144,8 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
       (state.phase === "waiting") !== (state.waiting_job_id !== undefined)) throw new Error("RSS publication progress is inconsistent");
     const save = () => storage.replace(stateSchema.parse(state));
     const waitForJob = async () => {
-      const deadline = Date.now() + 120000;
-      for (let attempt = 0; attempt < 120 && Date.now() < deadline; attempt++) {
+      const deadline = performance.now() + MEASUREMENT_WAIT_MS;
+      for (let attempt = 0; attempt < 300 && performance.now() < deadline; attempt++) {
         let result: { server_status?: unknown };
         try {
           result = await effects.command("operation-status", ["publication", state.waiting_job_id!]) as { server_status?: unknown };

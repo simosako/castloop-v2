@@ -143,7 +143,10 @@ test("formal domain list uses workers.dev administration and Cloudflare GET with
   writeFileSync(preload, `import assert from "node:assert/strict";
 import { domainAdminFixture } from ${JSON.stringify(fixture)};
 import { fetchM6ManagementIntegration } from ${JSON.stringify(routes)};
+const output = console.log;
+console.log = () => {};
 const setup = await domainAdminFixture();
+console.log = output;
 globalThis.fetch = async (input, init) => {
   const request = new Request(input, init);
   const url = new URL(request.url);

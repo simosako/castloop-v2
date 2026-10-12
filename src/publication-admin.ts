@@ -9,6 +9,7 @@ import { claimPublicationOperation, commitOwnedPublication, requireOwnedPublicat
 import { inspectPublication } from "./publication-inspection";
 import { ManagementReadConflict } from "./management-read-conflict";
 import { requeuePublicationOperation } from "./publication-consumer";
+import { measureWorkerPhase } from "./worker-timing";
 
 export type PublicationAdminEnv = LifecycleControlEnv & { CASTLOOP_ADMIN_KEY: string;
   CASTLOOP_QUEUE: { send: (body: { object: { key: string } }) => Promise<unknown> } };
@@ -26,10 +27,12 @@ export async function handleM6PublicationAdmin(request: Request, env: Publicatio
   catch { return reply({ error: "Invalid publication input", reason_code: "publication_input_invalid" }, 400); }
   try {
     if (input.action === "status") {
-      return reply(await withM6ManagementRead(env, input.service_id, bindings, () => inspectPublication(env, input.service_id, input.publication)));
+      return reply(await measureWorkerPhase(input.publication.request.job_id, "publication.status", () =>
+        withM6ManagementRead(env, input.service_id, bindings, () => inspectPublication(env, input.service_id, input.publication))));
     }
     const showId = input.action === "claim" ? input.publication.request.show_id : input.operation.show_id;
-    const result = await withM6ManagementInvocation(env, input.service_id, input.action === "claim" ? "m6_admin" : "m6_recovery",
+    const jobId = input.action === "claim" ? input.publication.request.job_id : input.operation.job_id;
+    const result = await measureWorkerPhase(jobId, `publication.${input.action}`, () => withM6ManagementInvocation(env, input.service_id, input.action === "claim" ? "m6_admin" : "m6_recovery",
       { showId }, bindings, async (): Promise<PublicationAdminResponse> => {
         const identity = { schema_version: 1 as const, service_id: input.service_id };
         if (input.action === "claim") {
@@ -49,7 +52,7 @@ export async function handleM6PublicationAdmin(request: Request, env: Publicatio
         const committed = await commitOwnedPublication(env, operation);
         return publicationAdminResponseSchema.parse({ ...identity, result: "committed", operation: input.operation,
           manifest_sha256: input.manifest_sha256, ...committed });
-      });
+      }));
     return reply(result);
   } catch (error) {
     if (input.action === "status" && error instanceof ManagementReadConflict) {

@@ -16,6 +16,7 @@
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針。実装中 |
+| [M7: 公開所要時間の改善案](m7_publication_performance_plan.md) | Issue #10の120秒待機上限と重複I/Oの分析・レビュー用計画 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 

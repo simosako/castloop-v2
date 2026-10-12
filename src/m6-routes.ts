@@ -26,6 +26,7 @@ import { handleM6SetupAdmin } from "./m6-setup-admin";
 import type { M6SetupRuntime } from "./m6-setup-runtime";
 import { handleM6ServiceAdmin } from "./m6-service-admin";
 import { readM6ServiceConfiguration } from "./m6-runtime-readiness";
+import { logPublicationDelivery, measureWorkerPhase } from "./worker-timing";
 import { handleM6UpdateAdmin } from "./m6-update-admin";
 
 export type M6CandidateEnv = {
@@ -158,19 +159,23 @@ export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6Cand
   for (const message of batch.messages) {
     const delivery = parseQueueDelivery(message.body);
     if (batch.queue !== config.dlq_name && !delivery) continue;
-    await withServiceInvocation(env, config.service_id, "m6_consumer", async (invocation) => {
+    const consume = async () => withServiceInvocation(env, config.service_id, "m6_consumer", async (invocation) => {
       const gate = createM6DeliveryGate(env, invocation, { versionMetadata: env.CASTLOOP_VERSION_METADATA,
         gatewayProtocol: "m6-uncached-gateway-v1", cachedAssets });
       if (batch.queue === config.dlq_name) {
         await gate({ showId: delivery?.target.show_id ?? "dlq-boundary", ...(delivery?.target.episode_id ? { episodeId: delivery.target.episode_id } : {}) });
         await recordDeadLetterDelivery(env, message);
       } else if (delivery?.family === "publication") {
-        await consumeOwnedPublication(env, delivery.key, (execution) => createPublicationWorkerEffects(env, execution,
+        await consumeOwnedPublication(env, delivery.key, (execution, executionEnv) => createPublicationWorkerEffects(executionEnv, execution,
           { cachedAssets, checkDeliveryGate: gate }));
       } else if (delivery) {
         await consumeLifecycleCommit(env, delivery.key, (execution) => createLifecycleWorkerEffects(env, execution,
           { cachedAssets, checkDeliveryGate: gate, queue: env.CASTLOOP_QUEUE }), options);
       }
-    });
+    }, batch.queue !== config.dlq_name && delivery?.family === "publication" ? delivery.target.job_id : undefined);
+    if (batch.queue !== config.dlq_name && delivery?.family === "publication") {
+      logPublicationDelivery(delivery.target.job_id, message.timestamp, message.attempts);
+      await measureWorkerPhase(delivery.target.job_id, "publication.consumer", consume);
+    } else await consume();
   }
 }

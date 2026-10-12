@@ -104,7 +104,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
     expect(commands.filter((command) => command === "create-episode")).toHaveLength(0);
     continuousConflict = true;
     await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("still pending");
-    expect(waits).toBe(120);
+    expect(waits).toBe(300);
     expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
     expect(commands.filter((command) => command === "create-episode")).toHaveLength(0);
     continuousConflict = false;
@@ -130,7 +130,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
     expect(commands.filter((command) => command === "publish-show")).toHaveLength(1);
     expect(commands.filter((command) => command === "publish-episode")).toHaveLength(2);
     expect(conflictedJobs.size).toBe(3);
-    expect(waits).toBe(123);
+    expect(waits).toBe(303);
     const report = JSON.parse(readFileSync(join(output, "import.json"), "utf8"));
     for (const episode of report.episodes) {
       const revision = parseEpisodeRevision(setup.text(`public/episodes/imported/${episode.metadata.episode_id}/metadata.toml`));
