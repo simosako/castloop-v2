@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "job_id": "ad3884c2-8aac-4486-b7d1-eaeb32212cd2",
+  "show_id": "otftalk-rss",
+  "kind": "episode",
+  "episode_id": "ep-004c1392e01cd19ddc26e5c90cfb53446b4cecacda00c1cb03d82371b87ae915",
+  "action": "publish",
+  "show_generation": 114,
+  "request_sha256": "2c9bb2c1ebb02f1c449933c108bcf2cd5680464acede15435ac997689d15894f",
+  "phase": "finished",
+  "deleted_objects": 0,
+  "purge_confirmed": true,
+  "updated_at": "2026-10-12T07:37:23Z"
+}

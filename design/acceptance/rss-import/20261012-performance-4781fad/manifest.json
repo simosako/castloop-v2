@@ -1,0 +1,2408 @@
+[
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/README.md",
+    "local_source": "evidence/rss-performance-4781fad/README.md",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "0e7b53d94de33b5d70552f232c3e6930360872f009a49b9825747de17b77858a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/baseline-hashes.json",
+    "local_source": "evidence/rss-performance-4781fad/baseline-hashes.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "08cc7152dd397a3450ab7a1922578ec09e4620eb72ed86304d9efa1ba7b2390d"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-episode.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/before-episode.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a67cf80d74fc13e7750a50033a6067014f8187783e6d97a1324c01a0a1f0bba6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-episode.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/before-episode.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-episode.stderr",
+    "local_source": "evidence/rss-performance-4781fad/before-episode.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-episode.stdout",
+    "local_source": "evidence/rss-performance-4781fad/before-episode.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "835e2e92a838b92ad8b0df9940a5ea6be9ccc463dc0b5a779e4afd2698e77fd0"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-service.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/before-service.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "5bcfd4ac11088e075f35336dd9b8372718e9c7237098d4a4fb58623c72f3cbb9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-service.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/before-service.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-service.stderr",
+    "local_source": "evidence/rss-performance-4781fad/before-service.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-service.stdout",
+    "local_source": "evidence/rss-performance-4781fad/before-service.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "cb05bb716ec39bfc816aafa2de7f4c3bad14cf69519a98113b119d810291469c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-show-0.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/before-show-0.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "25aa9597f55d6e28cd7bb1cc289a27af0fa01c79b8508f86f32cdb32b6db76dd"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-show-0.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/before-show-0.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-show-0.stderr",
+    "local_source": "evidence/rss-performance-4781fad/before-show-0.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-show-0.stdout",
+    "local_source": "evidence/rss-performance-4781fad/before-show-0.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "6cb6d595f8205715a0c359e96a34704467528987110693177884108dc8dc0a93"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-shows.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/before-shows.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2093acc46a2342dcaf3069792dc25d926182eb62976cefd080a7718c00c5e90b"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-shows.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/before-shows.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-shows.stderr",
+    "local_source": "evidence/rss-performance-4781fad/before-shows.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/before-shows.stdout",
+    "local_source": "evidence/rss-performance-4781fad/before-shows.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2024e74204b5e038acac6e7635c5a5d79ad76e2144073f5af34363145fd564b2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/build-identity.json",
+    "local_source": "evidence/rss-performance-4781fad/build-identity.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "40c171ee49d7fd80b5cfee842e408fbe12e1ff952537d6aee05a908d03cdd3c9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/build.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/build.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "478788ee2da17f71512ae29d5a7d4eb39b44aaf930decb5eb84760e4f3116c43"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/build.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/build.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/build.stderr",
+    "local_source": "evidence/rss-performance-4781fad/build.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/build.stdout",
+    "local_source": "evidence/rss-performance-4781fad/build.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "02f5e10826882947b3610edc4e8f24e3ebdd35de5f09ac5bc61ca3973c3efe87"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/bun-test.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/bun-test.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "b43655f23874a3988dd47d7947c022bf7b14fccc725f3685994288b51a8f8099"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/bun-test.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/bun-test.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/bun-test.stderr-summary.txt",
+    "local_source": "evidence/rss-performance-4781fad/bun-test.stderr",
+    "treatment": "aggregate unit-test counts only",
+    "published_sha256": "a0adaa16ca1fda9d4295a404e189b3586d86061dd57b48d0b75bfc63d537b97a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/check.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/check.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "aa715a15f1847dfccd8ca07c490b621596e6f2e0b7650e10460cf180dc674cb7"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/check.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/check.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/check.stderr",
+    "local_source": "evidence/rss-performance-4781fad/check.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/check.stdout",
+    "local_source": "evidence/rss-performance-4781fad/check.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "6bae55e7f5f01e2eb012dbc23c0617357d9f67893bd1bd821f38744917d42c33"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-deploy.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/install-deploy.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "d494ad57ea125fee96b5e245ff4d3ba699e9ce7e8b7ce818fae52b6bcf902fa9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-deploy.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/install-deploy.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-deploy.stderr",
+    "local_source": "evidence/rss-performance-4781fad/install-deploy.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-deploy.stdout",
+    "local_source": "evidence/rss-performance-4781fad/install-deploy.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "0ca5adca7c5881f43c3e99a653f06098427ea2bc155669b2015a2e9a60bde115"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-pause-id.json",
+    "local_source": "evidence/rss-performance-4781fad/install-pause-id.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "b14f13ba78c5a5746765314ed84d89dcc1f97d6ac4d7110fcb9d9e3efc1c0cc3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-pause.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/install-pause.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4e7bfdbfcd5e72a88628cf63ea62aedc968546ccdd9d7c068a38759087db1098"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-pause.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/install-pause.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-pause.stderr",
+    "local_source": "evidence/rss-performance-4781fad/install-pause.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-pause.stdout",
+    "local_source": "evidence/rss-performance-4781fad/install-pause.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e953e12c25d9e1962be9b6129e4cb946bf7195c266d6de06a566bad7606275d5"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-paused.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/install-paused.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "0f5b64b28111f0ed8fe44e21448c60c1b592826b7a4c3c26b0efbd0c3cd2d682"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-paused.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/install-paused.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-paused.stderr",
+    "local_source": "evidence/rss-performance-4781fad/install-paused.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-paused.stdout",
+    "local_source": "evidence/rss-performance-4781fad/install-paused.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "af983a1caeec09ca69a9be594bd1c97e0ed944cc335e604de36912d3ad852bb6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-resume.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/install-resume.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "8fe713ade3652674b23a6f41def0e5ca965422e11ce391a915fa332b27122395"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-resume.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/install-resume.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-resume.stderr",
+    "local_source": "evidence/rss-performance-4781fad/install-resume.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-resume.stdout",
+    "local_source": "evidence/rss-performance-4781fad/install-resume.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "58cda0393fe5c43f804f2c42b995c29ddc4fbf85b9a64b860e2369906524bdea"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-updated.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/install-updated.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "35ee784a70f194bf53678a2da19a0c63045e5ce9f6d2dc5ccbb9fee73a597115"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-updated.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/install-updated.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-updated.stderr",
+    "local_source": "evidence/rss-performance-4781fad/install-updated.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/install-updated.stdout",
+    "local_source": "evidence/rss-performance-4781fad/install-updated.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "d847098cce85829467d44d05bbeb031878bd9157472a064965121831129e8775"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-service.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/installed-service.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c82a38524dfddb0958de75a2f1225e56645ce6a1b3bf47886c601f02442ccef3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-service.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/installed-service.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-service.stderr",
+    "local_source": "evidence/rss-performance-4781fad/installed-service.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-service.stdout",
+    "local_source": "evidence/rss-performance-4781fad/installed-service.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "7e8aa0c444c0d99408c6dc4fa09761938838883d1d68fed2534bb967948ff38c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-show-0.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/installed-show-0.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "cb4973b5ed78c736261f643fa68e868d02488d714af2ed51e7e0311311cff746"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-show-0.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/installed-show-0.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-show-0.stderr",
+    "local_source": "evidence/rss-performance-4781fad/installed-show-0.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-show-0.stdout",
+    "local_source": "evidence/rss-performance-4781fad/installed-show-0.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "6cb6d595f8205715a0c359e96a34704467528987110693177884108dc8dc0a93"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-shows.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/installed-shows.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "43aeb5df595b5c53a75cf7f42457ded5080ea10abf9d4549d95cc727136b9d0a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-shows.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/installed-shows.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-shows.stderr",
+    "local_source": "evidence/rss-performance-4781fad/installed-shows.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-shows.stdout",
+    "local_source": "evidence/rss-performance-4781fad/installed-shows.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2024e74204b5e038acac6e7635c5a5d79ad76e2144073f5af34363145fd564b2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/installed-worker.json",
+    "local_source": "evidence/rss-performance-4781fad/installed-worker.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f93d9cccba7f730df6ca198dd340af8569b308b14a802cc13ebcf1d34da63458"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-job.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-job.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a63c89703502547d2be301f22eccc27dbe249a96f4f8959fe435ee892d42edc2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-metadata-stage.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-metadata-stage.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "98acd28d45d8b915796c2b2d9de48b6ce524d45918a1103ab56b5b6620b237af"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-metadata-stage.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-metadata-stage.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-metadata-stage.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-metadata-stage.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-metadata-stage.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-metadata-stage.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9ecb786a2afde2d37ff1e951eda3fa7dadb4bbd6b25738702ef00dadf573da26"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-000.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-000.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "5cd4530cfa4185a945cced64bf0acc0220eb4ff351787cf826f706f5d60a19d2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-000.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-000.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-000.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-000.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-000.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-000.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "35432da63c62ef7baea3aff5f0a2eeefbf7a3f8fe7bd98698bb3760b9baf08a6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-001.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-001.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "7e8291b50a67662ea0447abb90a30f4a481dc86590e0acf4ad873c5ea828f1a0"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-001.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-001.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-001.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-001.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-001.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-001.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "35432da63c62ef7baea3aff5f0a2eeefbf7a3f8fe7bd98698bb3760b9baf08a6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-002.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-002.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a6746730b9aeacabbb0fe8d4e6c0090c19329dc386fa6cf84b7212a2d0e048af"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-002.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-002.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-002.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-002.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-002.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-002.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "35432da63c62ef7baea3aff5f0a2eeefbf7a3f8fe7bd98698bb3760b9baf08a6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-003.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-003.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c1728ea8259fa6343601d6f300413814fd249b4e2b3b1cc93ba569ba04beb2e2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-003.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-003.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-003.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-003.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-003.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-003.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "3831e0f3295eb85a05e80163f65daea24c604039a2554973f1e16ea9fc712457"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-004.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-004.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "57c07e479778b03e060de935b41ef0b7c870ae634d17b6869ab50e8ebe15b25b"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-004.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-004.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-004.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-004.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-004.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-004.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "3831e0f3295eb85a05e80163f65daea24c604039a2554973f1e16ea9fc712457"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-005.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-005.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "00626ec9793f879d30fe4ac3c60b1b106dac380bd8f05d96b755ac5e81aea146"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-005.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-005.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-005.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-005.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-005.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-005.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "3831e0f3295eb85a05e80163f65daea24c604039a2554973f1e16ea9fc712457"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-006.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-006.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "6f5f26bbf906ffe3eadf4d370ee9dd6a5f6d9715b8372fc8ff63e91eaa041270"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-006.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-006.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-006.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-006.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "53ee6bae54a3777c92f3a8fe22fd3f0ae38aaeb344333cd230ec220a339aa5af"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-poll-006.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-poll-006.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-publication-commit.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/measured-publication-commit.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "fae42df194b718fd2d27d885e4fa08c52bbe090e38d2ad49eb34bffc230b5cd3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-publication-commit.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/measured-publication-commit.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-publication-commit.stderr",
+    "local_source": "evidence/rss-performance-4781fad/measured-publication-commit.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/measured-publication-commit.stdout",
+    "local_source": "evidence/rss-performance-4781fad/measured-publication-commit.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a63c89703502547d2be301f22eccc27dbe249a96f4f8959fe435ee892d42edc2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/npm-ci.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/npm-ci.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "8d88f6e40576c8043552bca1da9ce7f8d623db3141eff34abdaac863ee0a5e8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/npm-ci.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/npm-ci.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/npm-ci.stderr",
+    "local_source": "evidence/rss-performance-4781fad/npm-ci.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/npm-ci.stdout",
+    "local_source": "evidence/rss-performance-4781fad/npm-ci.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "735c9298838c7330b90f71fc203374a7d34634e7b41e22fbbb01e3cb3da32e7a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/partial-comparison.json",
+    "local_source": "evidence/rss-performance-4781fad/partial-comparison.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c21827949e25976208df15fbfda8e0b3d64ab39dac6264b79b1d389027bc02d5"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/result.md",
+    "local_source": "evidence/rss-performance-4781fad/result.md",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "95ba928c6f66de0217c592550777ad8e204cf0c7f57766dc671fe1c60809e31c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/selection.json",
+    "local_source": "evidence/rss-performance-4781fad/selection.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "bcefd922fab3bd97bd8c695618975a906d78bd1b4867cd016261b92a15a8ef03"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-head.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/source-head.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4386e1e8140da1e7e20118dacc5ec2f7d3b770050a0fdcb2d93fef53441bbcf4"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-head.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/source-head.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-head.stderr",
+    "local_source": "evidence/rss-performance-4781fad/source-head.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-head.stdout",
+    "local_source": "evidence/rss-performance-4781fad/source-head.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "81848794349655b52913f640bcc3c38c57b6d971c892f3f1c9243e874a9e24de"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-status.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/source-status.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "75935dc7b86546e302fc19ea44eb56bd0dd5936c269fbf9d9e8c7745efd32d34"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-status.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/source-status.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-status.stderr",
+    "local_source": "evidence/rss-performance-4781fad/source-status.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/source-status.stdout",
+    "local_source": "evidence/rss-performance-4781fad/source-status.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-job-inspection.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/stopped-job-inspection.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "26ebf75ab176b9ac8159c9eef4fcd81e28102805b10a27744c2fe3d0166fa29e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-job-inspection.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/stopped-job-inspection.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-job-inspection.stderr",
+    "local_source": "evidence/rss-performance-4781fad/stopped-job-inspection.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "53ee6bae54a3777c92f3a8fe22fd3f0ae38aaeb344333cd230ec220a339aa5af"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-job-inspection.stdout",
+    "local_source": "evidence/rss-performance-4781fad/stopped-job-inspection.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-readonly-summary.json",
+    "local_source": "evidence/rss-performance-4781fad/stopped-readonly-summary.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "50c42c6a00a3cc7d744717d4a1fccd0f6e60440ee55b65ac9473b3180c4e67a3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-server-progress.toml.json",
+    "local_source": "evidence/rss-performance-4781fad/stopped-server-progress.toml",
+    "treatment": "sanitized parsed terminal status/progress; original TOML excluded",
+    "published_sha256": "1a51f9094bd04271f09cc9dac107a3aca5d07e015edd21e6dc068e4ee71d33bb"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-server-status.toml.json",
+    "local_source": "evidence/rss-performance-4781fad/stopped-server-status.toml",
+    "treatment": "sanitized parsed terminal status/progress; original TOML excluded",
+    "published_sha256": "b3a42e518fa1416fa52c8f2a95f3916566363dd482429aa74c5fabf01ed721af"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-service-inspection.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/stopped-service-inspection.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c8dae6aab15f51b2eee9a92aaa713cb937b1e1cfb988e3b6b12948f889184131"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-service-inspection.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/stopped-service-inspection.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-service-inspection.stderr",
+    "local_source": "evidence/rss-performance-4781fad/stopped-service-inspection.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-service-inspection.stdout",
+    "local_source": "evidence/rss-performance-4781fad/stopped-service-inspection.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "efed4cfe2c735f52f1c44b4691b65da81792a18aef335f138df9d4eaefd211c6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-show-inspection.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/stopped-show-inspection.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "0e3694408f8b92c7b1d49f8183655969b6a3c2cabfb9f781e397561d063ecd2c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-show-inspection.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/stopped-show-inspection.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-show-inspection.stderr",
+    "local_source": "evidence/rss-performance-4781fad/stopped-show-inspection.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/stopped-show-inspection.stdout",
+    "local_source": "evidence/rss-performance-4781fad/stopped-show-inspection.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4d609edbf0dd6dea0f0d7e9c83682738d974fab70518f6ff9a4ad9093fd6c91a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/tail-closed.json",
+    "local_source": "evidence/rss-performance-4781fad/tail-closed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2b33b156de342cca724b9a96696352406fec9ba6df12126e92876fa95ea8b2ca"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/tail-create-status.json",
+    "local_source": "evidence/rss-performance-4781fad/tail-create-status.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "1fbb2ae9c72e074a9caa5665f59f91b0c42b01e53899fd245716d58e483cd8c7"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/tail-ready.json",
+    "local_source": "evidence/rss-performance-4781fad/tail-ready.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "233d6cbc296f3d95866747c3a0c1c53ac3cb0d7a2a2e17b7174c6b83b5122062"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/tail-stop",
+    "local_source": "evidence/rss-performance-4781fad/tail-stop",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "1bca78555cf05d16ff14b528ef651759cc6525113418f6581b25c0b78d9cfc1e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/tail.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/tail.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/tail.stderr",
+    "local_source": "evidence/rss-performance-4781fad/tail.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/tail.stdout",
+    "local_source": "evidence/rss-performance-4781fad/tail.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/verify-input.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad/verify-input.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "13963618f225dace164200048c6e796afcd687c1895f7cf85547c7fce12711b2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/verify-input.exit-code",
+    "local_source": "evidence/rss-performance-4781fad/verify-input.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/verify-input.stderr",
+    "local_source": "evidence/rss-performance-4781fad/verify-input.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/verify-input.stdout",
+    "local_source": "evidence/rss-performance-4781fad/verify-input.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "3a5c702c59840c2cfe52939153f437b70c6a2f5d9b3bd2e92a9eb0a094dd7905"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/worker-logs.jsonl",
+    "local_source": "evidence/rss-performance-4781fad/worker-logs.jsonl",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a3d7dc5458ee536c26972178e4cb6fb455d185444dfbc11f83e26d9b65d0cec1"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/pre-remeasure-harness/rss-performance-4781fad-analyze.py",
+    "local_source": "evidence/rss-performance-4781fad/pre-remeasure-harness/rss-performance-4781fad-analyze.py",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "7ed316db5dec8ea50a08df2694dbe2bd256a896ba8f1f5abc22fac192ceb4456"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/pre-remeasure-harness/rss-performance-4781fad.py",
+    "local_source": "evidence/rss-performance-4781fad/pre-remeasure-harness/rss-performance-4781fad.py",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "444fad7319cae56ed09aa360454a55092cdce3b9ed20f5fd0f14af32c217564e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/pre-remeasure-harness/rss-performance-tail.ts",
+    "local_source": "evidence/rss-performance-4781fad/pre-remeasure-harness/rss-performance-tail.ts",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "2701615c797ddb60ec5b366956d84929ffbc477bd4c23b3fb3aa5c1fa2f4891e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad/pre-remeasure-harness/test-plan-rss-performance-4781fad.md",
+    "local_source": "evidence/rss-performance-4781fad/pre-remeasure-harness/test-plan-rss-performance-4781fad.md",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "7b3c3b66585a2e65e841b2456c49e20dca789771bcea32db0c97fc721dc26267"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/README.md",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/README.md",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "d6bf7283ae0afa5787ba6e11006817702a146e4738dfb823c574c8799ddb251d"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-drain-00.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-drain-00.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "52fda41fc30a50a013e69c8d29efe915211794c5d4fb56424d53250cda7c4fc1"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-drain-00.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-drain-00.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-drain-00.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-drain-00.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-drain-00.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-drain-00.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "b2ca1cc1eb88b40388603f9b2a10d544c2e2c656eade9b82c92ccc938fdb1f9a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-service.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-service.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "5e74f736eebcfdb0081540683280adb74a1c86d95b2308d9c1642f6e8863b352"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-service.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-service.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-service.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-service.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-service.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-service.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "b2ca1cc1eb88b40388603f9b2a10d544c2e2c656eade9b82c92ccc938fdb1f9a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-show-0.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-show-0.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f1017a9241222f0e7eddbd2d70ef1169692bfe2c426f1bc9bfff9ed611d43dcb"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-show-0.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-show-0.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-show-0.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-show-0.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-show-0.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-show-0.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9fa6bf5de72f72b58247f9713216ac054338e507c4341de165da2facc74d9685"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-shows.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-shows.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c5c334348d2226416887329de4ece272ce68b678a6fb67ae29cef1d72a71a97e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-shows.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-shows.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-shows.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-shows.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/after-shows.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/after-shows.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2024e74204b5e038acac6e7635c5a5d79ad76e2144073f5af34363145fd564b2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/baseline-hashes.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/baseline-hashes.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "08cc7152dd397a3450ab7a1922578ec09e4620eb72ed86304d9efa1ba7b2390d"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-episode.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-episode.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "fdbc66a4c993c8ccf05f78025891dafb2ef4793d698277a41b30c0e408f9e0b9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-episode.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-episode.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-episode.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-episode.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-episode.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-episode.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "361aef2f113648cb58529348a1709fec9d5948aa571d26399497cf4cc0e8a795"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-service.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-service.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "8be9cd8b18d4ceeef4fd6be454b827e16d62e30445f8dbf0d00e7b5f6aadc282"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-service.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-service.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-service.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-service.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-service.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-service.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "efed4cfe2c735f52f1c44b4691b65da81792a18aef335f138df9d4eaefd211c6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-show-0.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-show-0.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "6feb10f1fbfa955e0a385d94fc71fa68bafcc9a86a88ce2af63a7818b8d011c3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-show-0.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-show-0.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-show-0.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-show-0.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-show-0.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-show-0.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4d609edbf0dd6dea0f0d7e9c83682738d974fab70518f6ff9a4ad9093fd6c91a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-shows.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-shows.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a8f570e1a2a657a28a4fd0dc90cf8fc94b6e0854c2d0eede583d171a88cf46ba"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-shows.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-shows.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-shows.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-shows.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/before-shows.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/before-shows.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2024e74204b5e038acac6e7635c5a5d79ad76e2144073f5af34363145fd564b2"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/build-identity.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/build-identity.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "40c171ee49d7fd80b5cfee842e408fbe12e1ff952537d6aee05a908d03cdd3c9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/completion.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/completion.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2db9c0569e392ee4b31698a512999e5561195cfa314b77fa56ec51da98fc4729"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/final-domains.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/final-domains.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "83b58c501bfa6caeab795fed6e7923e446c21bc3fe7dcdfe5edb0a5701c4d711"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/final-domains.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/final-domains.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/final-domains.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/final-domains.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/final-domains.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/final-domains.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "18c4fe9e187b9f908d0ce03e369e3ad81c6298bf1222ed1af06de3e681de7f7e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/final-validation.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/final-validation.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "85974a50252f43c8ecdcadca27fc5eb3c0935db6ed05006eb4a2f57a1f62eacb"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-tests.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-tests.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "671fc0a92b96ca2120d4b77dc5f3741c329752c87ac55f61b1090e50243f0abe"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-tests.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-tests.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-tests.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-tests.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "34f56f19c742db45d14f27dd59ca204be898363fbdc61ae09c5c5cbaf0994731"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-tests.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-tests.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/installed-worker.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/installed-worker.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f93d9cccba7f730df6ca198dd340af8569b308b14a802cc13ebcf1d34da63458"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-job.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-job.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c71e08889989f76a67b9027886f70ae619cb9c05c52e7e5ce654c98db8e0f327"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "ca879e0e7176edba76da4b66042ba36f762918d5f606617b8cda7ec69d3ab9a9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-metadata-stage.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "5bd4804dc2c7c22781027ac9f132b90a4e02c016516e77092fb2e0dc7fe2eb34"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-000.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-000.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "1ad975e783c8a5b2035365829834b1fcfe6049978982b3272bd00416d977d3c5"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-000.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-000.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-000.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-000.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-000.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-000.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "60557d0846074d434bc019fdbe2965027539ce872325138f7e64b3ec9a9b51a8"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-001.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-001.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "6708c5b780c6295a411736caeda557832a674e57794eb5a4f7845ad87f4c9c49"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-001.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-001.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-001.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-001.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-001.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-001.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "60557d0846074d434bc019fdbe2965027539ce872325138f7e64b3ec9a9b51a8"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-002.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-002.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "d6f4ccd3fd5e11e053516418ca8d97a21dddb40173897600db6575564ec935d4"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-002.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-002.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-002.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-002.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-002.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-002.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f0394e6490b5744af6988144a13b96f017bb8d9cdb595b5d87c5554c7790b149"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-003.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-003.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "44960affd415e1a87606c890a17fd8004bb417814d6655608ee3cf8fe679797c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-003.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-003.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-003.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-003.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-003.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-003.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f0394e6490b5744af6988144a13b96f017bb8d9cdb595b5d87c5554c7790b149"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-004.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-004.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "7ed068081b6d5039c9937ce3c39baa7a7d26812bc9d893ada25fe2e75d807a8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-004.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-004.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-004.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-004.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-004.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-004.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f0394e6490b5744af6988144a13b96f017bb8d9cdb595b5d87c5554c7790b149"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-005.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-005.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "90efa8cf78d89a22ad89d3aee6b1ecd88992f2b07cc24bc3c4610521acee8cd3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-005.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-005.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-005.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-005.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-005.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-005.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f2fff471479f364c6d2ddd2bf446b79bc342bc9c3fa74b060983573f56480e6c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-006.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-006.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "dc98363dbab1ef520c11111403485a31d3a396f77deb84b6c7a1c7c812e0902d"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-006.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-006.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-006.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-006.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-006.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-006.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f4626ba0b1405817cb115300912a23029c50f48456310656125c7a0d038c7de9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-007.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-007.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "cf6b99fd12207364f0dcadfe48bc44b068ba50d64fa72c344921b74823bfba8a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-007.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-007.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-007.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-007.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-007.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-007.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f4626ba0b1405817cb115300912a23029c50f48456310656125c7a0d038c7de9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-008.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-008.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "739922d9d342b1bdf6bbe1befb91dccd7cb33ffcbc8429a38cc8c00e32d62aae"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-008.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-008.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-008.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-008.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-008.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-008.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f4626ba0b1405817cb115300912a23029c50f48456310656125c7a0d038c7de9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-009.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-009.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "bde36143bda94595dd8c28a53efc9d8697c95782a3ceaf746034351f0916469e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-009.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-009.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-009.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-009.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-009.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-009.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f4626ba0b1405817cb115300912a23029c50f48456310656125c7a0d038c7de9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-010.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-010.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a3497bf07c72db0d3b7d62a7d4f2fd539f364ffae05315ea16a5bc9f855038fb"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-010.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-010.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-010.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-010.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-010.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-010.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f4626ba0b1405817cb115300912a23029c50f48456310656125c7a0d038c7de9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-011.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-011.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "db72e8967676aad2e9c35e70016cfe074487954054a70208245bc74eb8a31b2e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-011.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-011.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-011.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-011.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-011.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-011.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f4626ba0b1405817cb115300912a23029c50f48456310656125c7a0d038c7de9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-012.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-012.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f1eb5b06ae2c5985eb39fb84d7f7aedd2e8d15c7f8d8b0cbe46742a46f55e718"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-012.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-012.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-012.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-012.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-012.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-012.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f4626ba0b1405817cb115300912a23029c50f48456310656125c7a0d038c7de9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-013.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-013.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "0c6221d12bb13fceaaf4b36e8c669d5a88f008a2fab264a406f7d7ced45f11d4"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-013.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-013.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-013.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-013.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-013.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-013.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-014.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-014.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "09c460fdb63fd215755e4fbdf4274f676572dda70a175a63b03532cb992d8f47"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-014.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-014.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-014.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-014.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-014.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-014.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-015.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-015.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "16d719a082a02f2071a5cfc6eeeeddccb5f0793f0bb0effb0f3ae1108f3d061e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-015.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-015.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-015.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-015.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-015.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-015.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-016.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-016.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "cae78dded6213f2fd1648e64978e6f62047b262b27ff0c62bd2c6c0e30a96c93"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-016.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-016.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-016.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-016.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-016.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-016.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-017.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-017.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "877d5407c1b416c901eeb251c1c4bdf99a43997d74c8e61a3300bae9da3cb54a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-017.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-017.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-017.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-017.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-017.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-017.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-018.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-018.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "d579d854d4cf38c3974054be6712ebd03cc5e9a944177c1c81a7d2c4e78c3329"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-018.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-018.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-018.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-018.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-018.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-018.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-019.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-019.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "b98974439ecc984041613b81033b8d618ab9f1abfe973eb30dedffaf5386f8d8"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-019.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-019.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-019.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-019.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-019.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-019.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-020.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-020.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e84c64b18cfd5dc14f291b0b0ae3118920929a9b45c480a905fb7a39de0b6a3b"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-020.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-020.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-020.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-020.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-020.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-020.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-021.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-021.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "33918e60632bc1b4cf5f8eb5f7c1339408f126b9785b2b3ca58967ceadd0ae87"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-021.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-021.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-021.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-021.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-021.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-021.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-022.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-022.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "3e4a56ff6f3365a01a98662aeff0bfd3841ac6918d2bab3bc92b7fa5af9b24af"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-022.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-022.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-022.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-022.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-022.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-022.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-023.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-023.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "86e23eede88526654b6adf4b656642f705e5efee1e8bf817be15a9ec63c2b302"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-023.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-023.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-023.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-023.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-023.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-023.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-024.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-024.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "ffc4810c3b6635fce5a0b99a1f11d6f514606044c99b5ec2d13d73a8ec5a861d"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-024.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-024.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-024.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-024.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-024.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-024.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-025.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-025.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "b2cf4fb441db18d2a4fb72a369c717e4b67560bce5aef495f474f66e3a69f8a8"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-025.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-025.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-025.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-025.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-025.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-025.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-026.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-026.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "92abffa9b720aa8e9fa92a9df1bc13a9fe60ee4b0ca703c5d236e10ddb98b8ed"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-026.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-026.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-026.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-026.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-026.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-026.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-027.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-027.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "3e4e20862de20876275db3dc81481a9a5ad8ec0e64640c1abafc9dddbd660831"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-027.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-027.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-027.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-027.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-027.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-027.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-028.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-028.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "aeac8d8efc74a6cdde3d79e9886a40c48b187a042c59f2230ba300219de4d552"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-028.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-028.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-028.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-028.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-028.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-028.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-029.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-029.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "663465f0f3f613276392feeae1997b78f15822af3110e5f6788ba40253b7aeb6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-029.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-029.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-029.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-029.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-029.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-029.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "62ae7dcaeec6d0c38babfeec806aec028202132f4cf46dd107dcf11a15340d8e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-030.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-030.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "bb3be5e193ec10fc9afe59f42a2fa5240517c5a91f1d291dd25b3999345605f7"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-030.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-030.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-030.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-030.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-030.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-030.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "5f57d2ac726d7d9f884667f88af8f5152c24c272f0bcadacf622f470003d1236"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-031.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-031.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2459ce50bcea692bbcee4d4a4155732cdbc5204770a0443d47ea91aab5fc1a24"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-031.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-031.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-031.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-031.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-031.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-031.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "38f2f9b8fea4b5fa5e98a4db4c7a543ae9ddeb484bf6b2f26a7546fb2ced26d3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-032.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-032.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c7476328eedd87eb2308ae7e25aa8c51d3fb008bd684b69946d89dfc46fab356"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-032.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-032.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-032.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-032.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-032.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-032.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "38f2f9b8fea4b5fa5e98a4db4c7a543ae9ddeb484bf6b2f26a7546fb2ced26d3"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-033.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-033.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c2d61bb8c2dedf0548f81341108a27c3f910ed21e1eabc37ae0ebcab076f852e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-033.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-033.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-033.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-033.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-033.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-033.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "271a7fa6f8121440cc708f5fef2a48ca3f92cf2b498eb086c65708b8535d11cd"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-034.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-034.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "423607616f2566d5288ff6f4c48e5cd002190e2a12ded838d747553f59229195"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-034.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-034.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-034.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-034.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-034.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-034.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "271a7fa6f8121440cc708f5fef2a48ca3f92cf2b498eb086c65708b8535d11cd"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-035.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-035.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "5694b63bc4a54563dfb4e192b26131a40167a8a0f4dce357fa46379d649a92da"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-035.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-035.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-035.retry.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-035.retry.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e54a6b69fd4cca53574ee556d03605629e14998c4a7d3f2506ead014c69f170c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-035.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-035.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "53ee6bae54a3777c92f3a8fe22fd3f0ae38aaeb344333cd230ec220a339aa5af"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-035.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-035.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-036.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-036.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "8f64615bab9a5b39429f6603ce3e4aa81fe76e0512f4d52ec9fdb7f3194e7681"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-036.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-036.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-036.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-036.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-036.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-036.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "19259bffcc7892eb45d8d84520e09e0109af4fb628f4c4badc180fb2a1877846"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-037.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-037.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "ac05e4da6b49b850d19867a0ef98663e8abbf3a09472a40638642346963482bb"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-037.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-037.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-037.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-037.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-037.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-037.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "f5ff1c0723d21bdc1a3d9731b6247ad71fdb59960a54777dc07049b58a5ba4ab"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-038.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-038.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "030d4c9d72f5a9bbe3b0bc980ade38a015150f4bc6db2fee7cf08bb38c55c491"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-038.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-038.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-038.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-038.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-poll-038.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-poll-038.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "d11587d1922a8828d44d21adc42f24f5f5925463d6e2d48f409f2ddabf6e7829"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "29ba2cb0a48c81092cfc2acd30b031c4b1a463989ee84b99e8b220cf983a6b0c"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measured-publication-commit.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "c71e08889989f76a67b9027886f70ae619cb9c05c52e7e5ce654c98db8e0f327"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/measurement-validation.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/measurement-validation.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a69f42d7da9a9d8d20f3febfb411b93c3d896f8b1211f6e5ea81fb797eef29ed"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/performance-comparison.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/performance-comparison.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "94ee015f36212f12735729646cefec2052e2b9c8796b2b82269421747f5317ae"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/preservation.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/preservation.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "42024b36213b05aa9c5a153985ffd66b7179cfc718af53e0f2fdcebd1e928feb"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/previous-job-confirmed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/previous-job-confirmed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9300c968d6bc5741a9e6dee6fcd216b6438166df13e0e80d7e9c431aee4fe22e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "ea98bb90360fe13096ae5000f36acd5f0f80c64f35319232d34994861e9b6699"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/previous-job-poll-000.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "bd94b0a50082d820ff4c75d85c4c3cb7b8c87f045d24832e1c8764bb381f3174"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/remeasure-ready.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/remeasure-ready.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "d8764d91b9b255625026530c91ca07e6c4035092d9516a08074bc94ce6d4c59a"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/result.md",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/result.md",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "6955d299dd0777d0da824da083325b1927c772785cbc46b36285186b025b9980"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/selection.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/selection.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "bcefd922fab3bd97bd8c695618975a906d78bd1b4867cd016261b92a15a8ef03"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/source-status.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/source-status.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "576d1bdd7239fbc8a12bafd168fa473aba8b8921aeab6f6e2135f9b7f46d25d6"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/source-status.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/source-status.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/source-status.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/source-status.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/source-status.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/source-status.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/tail-closed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/tail-closed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "a2d29210dd823b06eebff4f652d465576710d9a5ab15e677a11fada02d339360"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/tail-create-status.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/tail-create-status.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "1fbb2ae9c72e074a9caa5665f59f91b0c42b01e53899fd245716d58e483cd8c7"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/tail-ready.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/tail-ready.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "2dddab028c433a3fb2be28203bdfbc98046c82e6ba2f0451da26e310752b9dd0"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/tail-stop",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/tail-stop",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "1bca78555cf05d16ff14b528ef651759cc6525113418f6581b25c0b78d9cfc1e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/tail.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/tail.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/tail.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/tail.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/tail.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/tail.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/verify-input.elapsed.json",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/verify-input.elapsed.json",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "11884e9433bdd3cd0eb20134e8bff50162dc2238dae2cdc4866ca4c912dd5a66"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/verify-input.exit-code",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/verify-input.exit-code",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/verify-input.stderr",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/verify-input.stderr",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/verify-input.stdout",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/verify-input.stdout",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "3a5c702c59840c2cfe52939153f437b70c6a2f5d9b3bd2e92a9eb0a094dd7905"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/worker-logs.jsonl",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/worker-logs.jsonl",
+    "treatment": "sanitized timing/execution evidence; private originals retained",
+    "published_sha256": "4130631d5e0df6a6ab5eafa93ea9f4ef369025ed376060185401e130cd1f49b9"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-source/rss-performance-4781fad-analyze.py",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-source/rss-performance-4781fad-analyze.py",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "e9bb21b6e9b87908f3e10528db5ef557d4d9032f0d66cfda130d1da1a027dc1e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-source/rss-performance-4781fad.py",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-source/rss-performance-4781fad.py",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "1237d24abaa24b0baab355785c47df45f1e0e9a0c829429f3fb97689d12c2b81"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-source/rss-performance-tail.ts",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-source/rss-performance-tail.ts",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "2701615c797ddb60ec5b366956d84929ffbc477bd4c23b3fb3aa5c1fa2f4891e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-source/rss_performance_wait.py",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-source/rss_performance_wait.py",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "5a4756f5aa030fa5ccd7d92a2a0e4cc8f819b459623779f5f9d2aa9a5abb77a4"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-source/test-plan-rss-performance-4781fad.md",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-source/test-plan-rss-performance-4781fad.md",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "ddcaf1eb83a90de92e8532edfcd8f7a02943a7ca9bed6c3e2d951c862ae0a449"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/evidence/rss-performance-4781fad-remeasure1/harness-source/test_rss_performance_wait.py",
+    "local_source": "evidence/rss-performance-4781fad-remeasure1/harness-source/test_rss_performance_wait.py",
+    "treatment": "historical measured helper snapshot; adapt local path placeholders before execution",
+    "published_sha256": "43cccff228fa4be3e1a41da7ee93ce5813bc49dcd3102b3b63293fb780ec4505"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/logs/test-20261012.log",
+    "local_source": "test-20261012.log",
+    "treatment": "sanitized activity/plan snapshot",
+    "published_sha256": "63bf019cd144daa62743b005d39a0c1f6d0293d495085becaf2d9ae879941f03"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/logs/test-plan-rss-performance-4781fad.md",
+    "local_source": "test-plan-rss-performance-4781fad.md",
+    "treatment": "sanitized activity/plan snapshot",
+    "published_sha256": "ddcaf1eb83a90de92e8532edfcd8f7a02943a7ca9bed6c3e2d951c862ae0a449"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/diagnostics/rss-performance-4781fad.py",
+    "local_source": "diagnostics/rss-performance-4781fad.py",
+    "treatment": "diagnostic helper; product source unchanged; adapt local paths",
+    "published_sha256": "1237d24abaa24b0baab355785c47df45f1e0e9a0c829429f3fb97689d12c2b81"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/diagnostics/rss-performance-4781fad-analyze.py",
+    "local_source": "diagnostics/rss-performance-4781fad-analyze.py",
+    "treatment": "diagnostic helper; product source unchanged; adapt local paths",
+    "published_sha256": "e9bb21b6e9b87908f3e10528db5ef557d4d9032f0d66cfda130d1da1a027dc1e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/diagnostics/rss-performance-tail.ts",
+    "local_source": "diagnostics/rss-performance-tail.ts",
+    "treatment": "diagnostic helper; product source unchanged; adapt local paths",
+    "published_sha256": "2701615c797ddb60ec5b366956d84929ffbc477bd4c23b3fb3aa5c1fa2f4891e"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/diagnostics/rss_performance_wait.py",
+    "local_source": "diagnostics/rss_performance_wait.py",
+    "treatment": "diagnostic helper; product source unchanged; adapt local paths",
+    "published_sha256": "5a4756f5aa030fa5ccd7d92a2a0e4cc8f819b459623779f5f9d2aa9a5abb77a4"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/diagnostics/test_rss_performance_wait.py",
+    "local_source": "diagnostics/test_rss_performance_wait.py",
+    "treatment": "diagnostic helper; product source unchanged; adapt local paths",
+    "published_sha256": "43cccff228fa4be3e1a41da7ee93ce5813bc49dcd3102b3b63293fb780ec4505"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/diagnostics/dns-direct.py",
+    "local_source": "diagnostics/dns-direct.py",
+    "treatment": "diagnostic helper; product source unchanged; adapt local paths",
+    "published_sha256": "e2701aa632bbfe1edcf2a88264f4f12c18abb2ad0cb3c131aed093b1a18a8090"
+  },
+  {
+    "repository_path": "design/acceptance/rss-import/20261012-performance-4781fad/README.md",
+    "local_source": "prepare-public-evidence-rss-performance-4781fad.py",
+    "treatment": "publication index and historical-state qualification",
+    "published_sha256": "a1fe8e7c0f3aa37e2622594e991b20a50cbf540675e1b125bf412be1264acfb9"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "end_to_end_boundary": "metadata staging command start to CLI published/released observation; includes metadata staging, publication acceptance, Queue/consumer, read polling",
+  "before_ms": 139239,
+  "after_ms": 119520,
+  "reduction_percent": 14.161980479607006,
+  "final_worker_version_id": "6d3d011d-e720-42b6-80b0-41f2830128ff",
+  "worker_version_unchanged": true
+}

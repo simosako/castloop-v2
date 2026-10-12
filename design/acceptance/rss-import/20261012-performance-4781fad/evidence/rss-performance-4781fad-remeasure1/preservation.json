@@ -1,0 +1,8 @@
+{
+  "feed_byte_unchanged": true,
+  "metadata_except_revision_updated_at_unchanged": true,
+  "inputs_cursor_local_toml_unchanged": true,
+  "service_open_drained": true,
+  "all_shows_idle": true,
+  "domains_match": true
+}

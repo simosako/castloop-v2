@@ -1,0 +1,9 @@
+{
+  "cli_stage_before_ms": 31648.53751099872,
+  "cli_stage_after_ms": 33455.37088799756,
+  "cli_commit_before_ms": 10805.428394000046,
+  "cli_commit_after_ms": 13452.347132988507,
+  "approx_commit_return_to_finished_progress_before_ms": 90885.57153320312,
+  "approx_commit_return_to_finished_progress_after_ms": 68214.65283203125,
+  "note": "new finished_at is second-resolution progress timestamp before write acknowledgment; cross-clock approximate; NOT consumer total or published/released CLI observation"
+}

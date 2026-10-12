@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "result": "target",
+  "request": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "kind": "show",
+    "show_id": "otftalk-rss"
+  },
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "payloads_verified": false,
+  "admission_state": "open",
+  "show": {
+    "lifecycle": "active",
+    "generation": 112
+  },
+  "episode": null,
+  "unfinished_show_operation": false,
+  "current_revision": null
+}

@@ -1,0 +1,9 @@
+{
+  "server_status": "published",
+  "server_progress_phase": "finished",
+  "finished_at": "2026-10-12T07:37:23Z",
+  "purge_confirmed": true,
+  "metadata_except_revision_updated_at_unchanged": true,
+  "feed_byte_unchanged": true,
+  "inputs_cursor_local_toml_unchanged": true
+}

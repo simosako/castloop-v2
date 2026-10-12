@@ -1,0 +1,10 @@
+{
+  "validated_at": "2026-10-12T07:50:03.948203+00:00",
+  "cli_hash_unchanged": true,
+  "product_source_clean": true,
+  "all_preservation_checks_pass": true,
+  "consumer_log_captured": true,
+  "one_delivery_attempt": true,
+  "known_read_conflicts_retried": 1,
+  "github_push_performed": false
+}

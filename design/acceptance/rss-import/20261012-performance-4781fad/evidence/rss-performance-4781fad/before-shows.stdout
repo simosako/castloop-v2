@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "result": "catalog",
+  "snapshot_only": true,
+  "authorizes_operation": false,
+  "admission_state": "open",
+  "next_cursor": null,
+  "request": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "include_deleted": true,
+    "kind": "show"
+  },
+  "shows": [
+    {
+      "show_id": "otftalk-rss",
+      "lifecycle": "active",
+      "unfinished_operation": false,
+      "title": "[OMITTED_METADATA]",
+      "feed_url": "https://castloop-rss-r1.otftalk.com/podcasts/otftalk-rss/feed.xml"
+    }
+  ]
+}

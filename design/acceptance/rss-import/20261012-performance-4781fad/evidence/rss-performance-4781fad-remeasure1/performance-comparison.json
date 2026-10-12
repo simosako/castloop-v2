@@ -1,0 +1,445 @@
+{
+  "commit": "4781fadbbd8a7b5dd1d4957024b165d774e7e2c1",
+  "cli_sha256": "10caeff112769710cc8315548fe671ac592e69060db84d92219ae613cc8c25ce",
+  "worker": {
+    "commit": "4781fadbbd8a7b5dd1d4957024b165d774e7e2c1",
+    "worker_version_id": "6d3d011d-e720-42b6-80b0-41f2830128ff",
+    "open_drained": true
+  },
+  "job_id": "9a8c5969-f676-4a04-8b87-e6948628bf97",
+  "previous_job_id": "5798a64d-7e25-420e-907d-411d931cdee6",
+  "samples_per_version": 1,
+  "measurement": "same 36 published Episodes / same Episode unchanged metadata-only; no MP3 transfer or copy",
+  "comparisons": [
+    {
+      "component": "metadata staging CLI command",
+      "before_ms": 31648.538,
+      "after_ms": 33444.339,
+      "saved_ms": -1795.801,
+      "reduction_percent": -5.67,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication commit CLI command",
+      "before_ms": 10805.428,
+      "after_ms": 10440.071,
+      "saved_ms": 365.357,
+      "reduction_percent": 3.38,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "commit CLI return to published/released observation",
+      "before_ms": 96784.572,
+      "after_ms": 75634.929,
+      "saved_ms": 21149.643,
+      "reduction_percent": 21.85,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "consumer aligned service acquire start to service release end",
+      "before_ms": 96179,
+      "after_ms": 73978,
+      "saved_ms": 22201,
+      "reduction_percent": 23.08,
+      "boundary_note": "Old root 96727ms includes route/readiness prelude; subtract prelude using original service.acquire_invocation start, not subtraction of nested duration totals"
+    },
+    {
+      "component": "publication.guard",
+      "before_ms": 26949,
+      "after_ms": 12543,
+      "saved_ms": 14406,
+      "reduction_percent": 53.46,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.verify_staging",
+      "before_ms": 3911,
+      "after_ms": 3049,
+      "saved_ms": 862,
+      "reduction_percent": 22.04,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.unique_guid",
+      "before_ms": 7566,
+      "after_ms": 7617,
+      "saved_ms": -51,
+      "reduction_percent": -0.67,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.feed_inputs",
+      "before_ms": 20616,
+      "after_ms": 21400,
+      "saved_ms": -784,
+      "reduction_percent": -3.8,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.purge",
+      "before_ms": 2070,
+      "after_ms": 1077,
+      "saved_ms": 993,
+      "reduction_percent": 47.97,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.owner_release",
+      "before_ms": 1910,
+      "after_ms": 1785,
+      "saved_ms": 125,
+      "reduction_percent": 6.54,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.invocation_release",
+      "before_ms": 870,
+      "after_ms": 730,
+      "saved_ms": 140,
+      "reduction_percent": 16.09,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "progress/status writes including validation",
+      "before_ms": 16831,
+      "after_ms": 12025,
+      "saved_ms": 4806,
+      "reduction_percent": 28.55,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.progress.feed",
+      "before_ms": 1964,
+      "after_ms": 1453,
+      "saved_ms": 511,
+      "reduction_percent": 26.02,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.progress.finished",
+      "before_ms": 1887,
+      "after_ms": 1305,
+      "saved_ms": 582,
+      "reduction_percent": 30.84,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.progress.purge",
+      "before_ms": 2281,
+      "after_ms": 1912,
+      "saved_ms": 369,
+      "reduction_percent": 16.18,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.progress.validating",
+      "before_ms": 1765,
+      "after_ms": 1179,
+      "saved_ms": 586,
+      "reduction_percent": 33.2,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.progress.visibility",
+      "before_ms": 1906,
+      "after_ms": 1285,
+      "saved_ms": 621,
+      "reduction_percent": 32.58,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.status_write.processing",
+      "before_ms": 3803,
+      "after_ms": 2500,
+      "saved_ms": 1303,
+      "reduction_percent": 34.26,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "publication.status_write.published",
+      "before_ms": 3225,
+      "after_ms": 2391,
+      "saved_ms": 834,
+      "reduction_percent": 25.86,
+      "boundary_note": "Comparable phase boundary; independent single samples"
+    },
+    {
+      "component": "staging.claim",
+      "before_ms": 4734,
+      "after_ms": 5855,
+      "saved_ms": -1121,
+      "reduction_percent": -23.68,
+      "boundary_note": "Approximate: old entire management fetch trace versus new action wrapper; route/authorization prelude differs. No staging optimization in 4781fad"
+    },
+    {
+      "component": "staging.begin",
+      "before_ms": 2656,
+      "after_ms": 2811,
+      "saved_ms": -155,
+      "reduction_percent": -5.84,
+      "boundary_note": "Approximate: old entire management fetch trace versus new action wrapper; route/authorization prelude differs. No staging optimization in 4781fad"
+    },
+    {
+      "component": "staging.settle",
+      "before_ms": 3396,
+      "after_ms": 3359,
+      "saved_ms": 37,
+      "reduction_percent": 1.09,
+      "boundary_note": "Approximate: old entire management fetch trace versus new action wrapper; route/authorization prelude differs. No staging optimization in 4781fad"
+    },
+    {
+      "component": "staging.finish",
+      "before_ms": 14270,
+      "after_ms": 14295,
+      "saved_ms": -25,
+      "reduction_percent": -0.18,
+      "boundary_note": "Approximate: old entire management fetch trace versus new action wrapper; route/authorization prelude differs. No staging optimization in 4781fad"
+    },
+    {
+      "component": "staging.status",
+      "before_ms": 2624,
+      "after_ms": 2622,
+      "saved_ms": 2,
+      "reduction_percent": 0.08,
+      "boundary_note": "Approximate: old entire management fetch trace versus new action wrapper; route/authorization prelude differs. No staging optimization in 4781fad"
+    }
+  ],
+  "worker_phase_summary": {
+    "publication.audio": {
+      "count": 1,
+      "total_ms": 0,
+      "mean_ms": 0,
+      "min_ms": 0,
+      "max_ms": 0
+    },
+    "publication.claim": {
+      "count": 1,
+      "total_ms": 3273,
+      "mean_ms": 3273,
+      "min_ms": 3273,
+      "max_ms": 3273
+    },
+    "publication.commit": {
+      "count": 1,
+      "total_ms": 4741,
+      "mean_ms": 4741,
+      "min_ms": 4741,
+      "max_ms": 4741
+    },
+    "publication.consumer": {
+      "count": 1,
+      "total_ms": 73978,
+      "mean_ms": 73978,
+      "min_ms": 73978,
+      "max_ms": 73978
+    },
+    "publication.feed_inputs": {
+      "count": 1,
+      "total_ms": 21400,
+      "mean_ms": 21400,
+      "min_ms": 21400,
+      "max_ms": 21400
+    },
+    "publication.feed_write": {
+      "count": 1,
+      "total_ms": 622,
+      "mean_ms": 622,
+      "min_ms": 622,
+      "max_ms": 622
+    },
+    "publication.guard": {
+      "count": 8,
+      "total_ms": 12543,
+      "mean_ms": 1567.875,
+      "min_ms": 1472,
+      "max_ms": 1722
+    },
+    "publication.history_write": {
+      "count": 1,
+      "total_ms": 556,
+      "mean_ms": 556,
+      "min_ms": 556,
+      "max_ms": 556
+    },
+    "publication.invocation_release": {
+      "count": 1,
+      "total_ms": 730,
+      "mean_ms": 730,
+      "min_ms": 730,
+      "max_ms": 730
+    },
+    "publication.metadata_write": {
+      "count": 1,
+      "total_ms": 603,
+      "mean_ms": 603,
+      "min_ms": 603,
+      "max_ms": 603
+    },
+    "publication.owner_release": {
+      "count": 1,
+      "total_ms": 1785,
+      "mean_ms": 1785,
+      "min_ms": 1785,
+      "max_ms": 1785
+    },
+    "publication.progress.feed": {
+      "count": 1,
+      "total_ms": 1453,
+      "mean_ms": 1453,
+      "min_ms": 1453,
+      "max_ms": 1453
+    },
+    "publication.progress.finished": {
+      "count": 1,
+      "total_ms": 1305,
+      "mean_ms": 1305,
+      "min_ms": 1305,
+      "max_ms": 1305
+    },
+    "publication.progress.purge": {
+      "count": 1,
+      "total_ms": 1912,
+      "mean_ms": 1912,
+      "min_ms": 1912,
+      "max_ms": 1912
+    },
+    "publication.progress.validating": {
+      "count": 1,
+      "total_ms": 1179,
+      "mean_ms": 1179,
+      "min_ms": 1179,
+      "max_ms": 1179
+    },
+    "publication.progress.visibility": {
+      "count": 1,
+      "total_ms": 1285,
+      "mean_ms": 1285,
+      "min_ms": 1285,
+      "max_ms": 1285
+    },
+    "publication.purge": {
+      "count": 1,
+      "total_ms": 1077,
+      "mean_ms": 1077,
+      "min_ms": 1077,
+      "max_ms": 1077
+    },
+    "publication.status": {
+      "count": 40,
+      "total_ms": 31934,
+      "mean_ms": 798.35,
+      "min_ms": 593,
+      "max_ms": 1242
+    },
+    "publication.status_write.processing": {
+      "count": 2,
+      "total_ms": 2500,
+      "mean_ms": 1250,
+      "min_ms": 1192,
+      "max_ms": 1308
+    },
+    "publication.status_write.published": {
+      "count": 1,
+      "total_ms": 2391,
+      "mean_ms": 2391,
+      "min_ms": 2391,
+      "max_ms": 2391
+    },
+    "publication.unique_guid": {
+      "count": 1,
+      "total_ms": 7617,
+      "mean_ms": 7617,
+      "min_ms": 7617,
+      "max_ms": 7617
+    },
+    "publication.verify_staging": {
+      "count": 1,
+      "total_ms": 3049,
+      "mean_ms": 3049,
+      "min_ms": 3049,
+      "max_ms": 3049
+    }
+  },
+  "staging_phase_summary": {
+    "staging.begin": {
+      "count": 1,
+      "total_ms": 2811,
+      "mean_ms": 2811,
+      "min_ms": 2811,
+      "max_ms": 2811
+    },
+    "staging.claim": {
+      "count": 1,
+      "total_ms": 5855,
+      "mean_ms": 5855,
+      "min_ms": 5855,
+      "max_ms": 5855
+    },
+    "staging.finish": {
+      "count": 1,
+      "total_ms": 14295,
+      "mean_ms": 14295,
+      "min_ms": 14295,
+      "max_ms": 14295
+    },
+    "staging.settle": {
+      "count": 1,
+      "total_ms": 3359,
+      "mean_ms": 3359,
+      "min_ms": 3359,
+      "max_ms": 3359
+    },
+    "staging.status": {
+      "count": 3,
+      "total_ms": 2622,
+      "mean_ms": 874,
+      "min_ms": 842,
+      "max_ms": 917
+    }
+  },
+  "delivery": {
+    "event": "publication_delivery",
+    "job_id": "9a8c5969-f676-4a04-8b87-e6948628bf97",
+    "delivered_at": "2026-10-12T07:45:48.541Z",
+    "message_timestamp": "2026-10-12T07:45:47.081Z",
+    "attempts": 1
+  },
+  "queue_delivery_count_observed": 1,
+  "read_conflicts_retried": 1,
+  "timeline": {
+    "consumer_started_at": "2026-10-12T07:45:48.541Z",
+    "consumer_finished_at": "2026-10-12T07:47:02.519Z",
+    "queue_message_to_delivery_logged_ms_approx": 1460.0,
+    "old_root_consumer_wall_ms": 96727,
+    "old_aligned_consumer_wall_ms": 96179,
+    "old_route_setup_readiness_prelude_ms": 548,
+    "finished_progress_to_service_release_ms": 4906.0,
+    "commit_cli_return_to_observed_ms": 75634.929,
+    "cli_observed_at_ms": 1791791223466,
+    "consumer_finish_to_cli_observation_ms_approx": 947.0
+  },
+  "cli_poll": {
+    "count": 39,
+    "total_command_ms": 37611.34516399761,
+    "mean_command_ms": 964.3934657435285,
+    "sleep_seconds_between_commands": 1
+  },
+  "preservation": {
+    "feed_byte_unchanged": true,
+    "metadata_except_revision_updated_at_unchanged": true,
+    "inputs_cursor_local_toml_unchanged": true,
+    "service_open_drained": true,
+    "all_shows_idle": true,
+    "domains_match": true
+  },
+  "limits": [
+    "Worker clocks advance on I/O; not CPU or pure R2 processing time",
+    "Nested phase totals overlap consumer; do not sum into elapsed duration",
+    "New live logs do not expose binding counts; no live GET-count claim. Fixture GET 269->141 in developer docs is a different mock comparison",
+    "One sample each, not controlled concurrent A/B; instrumentation, deployment location, time/load may differ",
+    "Old consumer total 96727ms vs new phase has different route prelude; aligned comparison is additionally provided",
+    "Queue message-to-delivery log includes new route/readiness prelude; not direct transport-latency comparison with old trace root",
+    "Completed RSS import not republished; no initial/audio-only/full migration wait acceptance in this test",
+    "New code provisional RSS wait is 300s; wait-limit increase is not counted as performance improvement"
+  ]
+}

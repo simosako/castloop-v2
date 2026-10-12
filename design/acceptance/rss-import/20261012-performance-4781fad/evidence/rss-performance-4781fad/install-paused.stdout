@@ -1,0 +1,29 @@
+{
+  "result": "service",
+  "request": {
+    "service_id": "rsstest-1012-r1",
+    "action": "status"
+  },
+  "worker_version_id": "2bc0b330-2efe-43eb-94ed-0cb7856ae428",
+  "external_episode_guids": true,
+  "admission": {
+    "schema_version": 1,
+    "service_id": "rsstest-1012-r1",
+    "generation": 852,
+    "mode": "m6",
+    "state": "paused",
+    "invocations": [],
+    "pause_id": "73d5f00d-1042-4d0e-9b55-1cb9128ea874",
+    "last_resumed_pause_id": "14f7b08a-9e38-4c91-a56b-37c259d85704",
+    "runtime_readiness": {
+      "operation_id": "5b877568-d3d6-4f30-a341-31512e76e13e",
+      "deployment_id": "04f2bfb5-22cc-4458-b058-70a11afc19bd",
+      "worker_version_id": "2bc0b330-2efe-43eb-94ed-0cb7856ae428",
+      "service_config_sha256": "bd02fd6ce45769262e323f62b608f73a69663093c909c165b82fe04794a2b405",
+      "default_cache_disabled": true,
+      "cached_entrypoint": "CachedPublicAssets",
+      "cutover_verified": true,
+      "publication_routes_verified": true
+    }
+  }
+}

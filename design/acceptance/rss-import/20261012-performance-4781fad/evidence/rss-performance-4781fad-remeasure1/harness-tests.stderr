@@ -1,0 +1,11 @@
+test_attempt_limit (test_rss_performance_wait.PublicationWaitTest.test_attempt_limit) ... ok
+test_deadline_prevents_new_read (test_rss_performance_wait.PublicationWaitTest.test_deadline_prevents_new_read) ... ok
+test_exact_read_conflict_only (test_rss_performance_wait.PublicationWaitTest.test_exact_read_conflict_only) ... ok
+test_other_error_is_not_retried (test_rss_performance_wait.PublicationWaitTest.test_other_error_is_not_retried) ... ok
+test_read_conflicts_and_held_are_not_completion (test_rss_performance_wait.PublicationWaitTest.test_read_conflicts_and_held_are_not_completion) ... ok
+test_terminal_failure_stops (test_rss_performance_wait.PublicationWaitTest.test_terminal_failure_stops) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.000s
+
+OK
