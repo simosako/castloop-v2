@@ -15,7 +15,7 @@ export { lifecycleCommitKey, lifecycleCommitSchema, parseLifecycleCommitKey } fr
 export type { LifecycleCommit, LifecycleCommitTarget } from "./lifecycle-commit";
 export { lifecycleAdminRequestSchema, lifecycleAdminResponseSchema, lifecycleOperationRequestSchema } from "./lifecycle-admin";
 export type { LifecycleAdminRequest, LifecycleAdminResponse, LifecycleOperationRequest } from "./lifecycle-admin";
-export { parseStageReadbackReceipts, stageAssetSchema, stageControlRequest, stageDraftPrefix, stagePayloadKey, stagePayloadSchema,
+export { parseStageReadbackReceipts, parseStageUploadInputs, stageAssetSchema, stageControlRequest, stageDraftPrefix, stagePayloadKey, stagePayloadSchema,
   stageReadbackReceiptSchema, stageSettlementSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "./staging";
 export type { StageAsset, StagePayload, StageReadbackReceipt, StageSettlement, StageUploadProgress, StageUploadRequest } from "./staging";
 export { stagingAdminRequestSchema, stagingAdminResponseSchema, stagingOperationSchema } from "./staging-admin";

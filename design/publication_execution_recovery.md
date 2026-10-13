@@ -1,7 +1,8 @@
 # publication停止の診断と未知の実行tokenの保全
 
 Issue #13のShow公開と、別環境で報告された断続的なEpisode公開停止を扱う。
-2026-10-13の再調査時点では、Episodeの実機job・停止時ログは未取得であり、取消原因は確定していない。
+最初の再調査では別環境のEpisode停止時ログが未取得だった。後続の隔離試験ではcommit時の503と
+runtime resource failureを確認したが、Issue #13の全停止事例の原因は確定していない。
 本書はソースで確認した問題、修正、観測方法を区別する。
 
 ## 重要な訂正: DLQを根拠にした解放は無効
@@ -102,6 +103,82 @@ executionなしの同job retryは既存の厳密なowner/manifest/marker検査�
 この診断から昇格させて再送しない。実環境の操作・ログ設定変更は今回実施していない。
 
 ## ローカル検証と限界
+
+### commit管理HTTPのCPU削減（2026-10-14）
+
+隔離試験の34件目がcommit時に503で停止した。同時刻・同Worker/versionのGraphQLは
+`exceededResources` 1 request / 1 error、CPU 51.298 ms、wall 4.925239秒を示した。
+CPU制限超過が有力だが、集計にはjob IDがなく、個別`exceededCpu`や適用CPU上限を取得していない。
+`standard`設定や明示limitsの不在からPaid/Free・実効上限を推定しない。
+ownerはreserved、commit marker未確認、service invocationが残る。これは未知I/O終了や解放の証明ではない。
+
+承認された順序に従い、不変データの要求内再利用と再parse削減を実装した。
+
+- 最初の厳密検証から凍結control request・publication manifest・予約identity・hashの証明を作り、
+  reservedかつexecution未取得のcommit callback内だけで再利用する。callback終了・例外で失効し、
+  bucket/targetの変更・入れ子・別要求への持ち越しを拒否する。module全体の可変cacheは作らない。
+- Show controlのowner/action/対象/generation/hash/reservation identity/reserved・execution不在、
+  Show/Episode lifecycle、staging proofとpayload HEADのversion/ETag/size確認は元の境界に残す。
+  processing等からの既存marker照合は従来経路を使用する。markerの条件付きPUTと応答喪失照合も維持する。
+- staging JSONを公開の厳密検証factoryで一度parseし、その検証済み値からcontrol request、
+  canonical JSON、payload keyを導出する。既存公開helperの入力検証を取り除かず、hashの形式も変えない。
+- 通常の新規commitでは凍結control/manifest/予約GETがそれぞれ5→1回、初回Episodeのstaging parseが
+  10→2回になる。Show owner確認5回・Episode lifecycle確認6回・HEAD回数は変わらない。
+
+`scripts/test-support/benchmark-publication-commit.ts`は正式管理handlerをmock R2で測る。
+旧版`7f89878`と修正版を別Bunプロセスで交互に5回、各modeをwarmup 30回＋200回測定した。
+各回のprocess CPU平均の中央値は次の通り（Bun 1.4.2、同じ予約identityありのfixture）。
+
+| commit種別 | 旧版 CPU ms/回 | 修正版 CPU ms/回 | 削減 |
+| --- | ---: | ---: | ---: |
+| Show | 3.763 | 2.472 | 34.3% |
+| 初回Episode | 4.491 | 2.998 | 33.3% |
+| metadata-only | 3.456 | 2.189 | 36.6% |
+| audio-only | 3.295 | 2.004 | 39.2% |
+
+これはローカルBun/mockのCPUで、Workers CPUや実ネットワークの公開時間ではない。
+証跡はGit対象外の`.local-test-data/results/20261014/commit-cpu-e964763e/local/`に保持する。
+実機比較は新しい小容量serviceを版ごとに用意し、独立tmuxで逐次実行する。既存の残留token環境は
+再配備・再送・解除しない。通常規模試験・有料設定変更・資源削除はこの比較に含めない。
+③隣接する重複guardの整理はまだ実装せず、実機結果を見て必要性を判断する。
+回帰検証は1044 pass / 0 fail（116 files）、TypeScript検査と単一CLI/内蔵Worker buildが成功した。
+対象変更・owner/世代/lifecycle差し替え・HEAD version/size差し替え・期限外scope・不正初期record・
+条件付きPUT応答喪失・保留中PUTを検証した。CPU削減は未知の停止jobの復旧を可能にするものではない。
+
+#### 小容量の実機比較結果
+
+Git対象外の`commit-cpu-e964763e`試験は独立tmuxで実行し、2026-10-14（JST）に終了した。
+修正版service `i13-bc656f35`はShow＋初回Episode 3件＋metadata-only＋audio-onlyの6公開に成功した。
+feed・音源GET/HEAD/Range/SHA-256、完了済み取り込みの再実行、owner/registryの返却も確認した。
+旧版service `i13-d46cf12e`は4回のcommitに成功したが、3件目Episodeの状態照会失敗で試験を停止した。
+
+両版で取得できた同じ対象のcommit invocationのLive tail CPU（整数ms）とphase wallを比較した。
+各1回の逐次試験で、広い規模や長期の性能保証ではない。
+
+| 同じ対象のcommit | 旧版 CPU ms | 修正版 CPU ms | 旧版 wall ms | 修正版 wall ms |
+| --- | ---: | ---: | ---: | ---: |
+| Show | 44 | 18 | 5128 | 3599 |
+| 初回Episode A | 51 | 21 | 5838 | 4285 |
+| 初回Episode B | 38 | 21 | 5621 | 4076 |
+
+修正版のmetadata-only CPUは27msだったが、旧版は更新試験前に止まったため実機比較はない。
+初回Episode 1件とaudio-onlyの修正版commit phaseはtailで取得できていない。6 consumerの終了phaseは
+揃っているが、それを全commitログの完全配送の証明としない。採取healthが正常でも欠落はあり得る。
+GraphQLの秒単位window最大CPUにはRPC/Queueが混在するため、commit CPUとして流用しない。
+
+旧版の最後のEpisodeはmarkerあり・execution token/owner保持・status/progressなし・DLQ markerあり、
+serviceにはconsumer invocationが1件残った。GraphQLは公開commit直後のLAXで
+`scriptThrewException`（CPU 70.678ms / wall 28.604秒）と、後続の例外1件を示す。
+今回の分類は`exceededResources`ではなく、CPU制限超過と断定できない。tailは最初の例外invocation終了前に
+停止しており、履歴telemetry queryは403で個別例外を取得できなかった。停止した状態照会のHTTP statusも
+旧CLIの出力には残らない。GraphQLは時刻・versionによる照合で、job/traceとの直接結合ではない。
+未作成statusから特定の関数や未知I/O終了を推定しない。
+
+①②のcommit CPU削減は確認できたため、owner/HEAD確認を減らす③は今回は見送る。
+consumer例外は未解決の別調査対象として保全し、Issue #13全体の解消とは宣言しない。
+通常規模試験、既存停止環境の再配備、失敗jobの再送・解放、資源削除、Pushはこの比較では実施していない。
+実機CPUの照合は`metrics/matched-commit-comparison.json`、集計・取得範囲は`metrics/`、
+読み取り診断は`inspection/`、全試験の証跡は同じGit対象外directoryに保持する。
 
 ### 長時間試験のlive tail採取
 

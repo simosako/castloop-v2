@@ -1,11 +1,31 @@
 import { describe, expect, test } from "bun:test";
-import { parseShowControl, parseStageReadbackReceipts, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema } from "./index";
+import { parseShowControl, parseStageReadbackReceipts, parseStageUploadInputs, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema } from "./index";
 
 const base = { schema_version: 1, operation_id: crypto.randomUUID(), draft_job_id: crypto.randomUUID(), kind: "episode", show_id: "daily",
   episode_id: "first", expected_show_generation: 0, expected_episode_generation: 0, created_at: "2026-10-01T12:00:00Z",
   payloads: [{ asset: "audio", length_bytes: 300_000_000, sha256: "a".repeat(64) }] };
 
 describe("M6 staging manifest and settlement", () => {
+  test("validated staging inputs preserve canonical serialization, derived keys and strict validation", () => {
+    const cases = [base, { ...base, kind: "show", episode_id: undefined, expected_episode_generation: undefined,
+      payloads: [{ asset: "show_metadata", length_bytes: 100, sha256: "a".repeat(64) },
+        { asset: "cover_png", length_bytes: 10, sha256: "b".repeat(64) }] }];
+    for (const input of cases) {
+      const parsed = stageUploadRequestSchema.parse(input);
+      const result = parseStageUploadInputs(Object.fromEntries(Object.entries(input).reverse()));
+      expect(result.manifestSource).toBe(JSON.stringify(parsed));
+      expect(result.controlRequest).toEqual(stageControlRequest(parsed));
+      expect(result.payloadKeys).toEqual(parsed.payloads.map((payload) => ({ asset: payload.asset, key: stagePayloadKey(parsed, payload.asset) })));
+      for (const value of [result, result.request, result.request.payloads, ...result.request.payloads,
+        result.controlRequest, result.payloadKeys, ...result.payloadKeys]) expect(Object.isFrozen(value)).toBe(true);
+      expect(Object.isFrozen(input)).toBe(false);
+    }
+    for (const change of [{ secret: "private" }, { show_id: "../other" }, { payloads: [...base.payloads, ...base.payloads] },
+      { payloads: [{ ...base.payloads[0], asset: "cover_jpg" }] }]) {
+      expect(() => parseStageUploadInputs({ ...base, ...change })).toThrow();
+    }
+  });
+
   test("readback receipts are strict, ordered evidence for the frozen payloads", () => {
     const request = stageUploadRequestSchema.parse(base);
     const receipt = { ...request.payloads[0]!, etag: "saved-etag", version: "saved-version" };

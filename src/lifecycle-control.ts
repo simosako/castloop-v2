@@ -5,13 +5,19 @@ import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/
 import { requireShowReservationReady } from "./show-reservation-record";
 
 const VERIFIED_OPERATION = Symbol("verifiedShowOperation");
+const VERIFIED_CONTROL_REQUEST = Symbol("verifiedControlRequest");
+const VERIFIED_COMMIT_CONTROL = Symbol("verifiedCommitControl");
+type VerifiedControlRequest = Readonly<{ bucket: LifecycleControlEnv["CASTLOOP_BUCKET"]; request: Readonly<ControlRequest>;
+  hash: string; reservationId: string | undefined }>;
 type VerifiedOperation = Readonly<{ bucket: LifecycleControlEnv["CASTLOOP_BUCKET"]; request: Readonly<ControlRequest>;
   hash: string; reservationId: string | undefined; executionId?: string; verificationId?: string }>;
 export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head">;
-  [VERIFIED_OPERATION]?: VerifiedOperation };
+  [VERIFIED_OPERATION]?: VerifiedOperation;
+  [VERIFIED_COMMIT_CONTROL]?: VerifiedControlRequest & { isActive: () => boolean } };
 export type LifecycleReadEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head"> };
 export type ShowControlSnapshot = { value: ShowControl; etag: string };
-export type OwnedShowControlSnapshot = { value: ShowControl & { owner: NonNullable<ShowControl["owner"]> }; etag: string };
+export type OwnedShowControlSnapshot = { value: ShowControl & { owner: NonNullable<ShowControl["owner"]> }; etag: string;
+  [VERIFIED_CONTROL_REQUEST]?: VerifiedControlRequest };
 export type ShowExecution = { showId: string; jobId: string; generation: number; executionId: string };
 export type PublicVisibility = "public" | "not_found" | "gone";
 export type PublicVisibilitySnapshot = { visibility: "not_found" | "gone" } | {
@@ -155,6 +161,16 @@ async function requireOwnedOperation(env: LifecycleControlEnv, showId: string,
   if (!current || current.value.generation !== expectedGeneration || current.value.owner?.job_id !== jobId) {
     throw new Error("Operation no longer owns the Show");
   }
+  const commit = env[VERIFIED_COMMIT_CONTROL];
+  if (commit) {
+    if (!commit.isActive() || commit.bucket !== env.CASTLOOP_BUCKET || commit.request.show_id !== showId ||
+      commit.request.job_id !== jobId || commit.request.expected_show_generation + 1 !== expectedGeneration ||
+      current.value.reservation_id !== commit.reservationId || current.value.owner.state !== "reserved" ||
+      current.value.owner.execution_id !== undefined || !ownsRequest(current.value, commit.request, commit.hash)) {
+      throw new Error("Verified commit no longer matches its reserved Show owner");
+    }
+    return { ...current, value: { ...current.value, owner: current.value.owner } };
+  }
   const verified = env[VERIFIED_OPERATION];
   if (verified) {
     if (verified.bucket !== env.CASTLOOP_BUCKET || verified.request.show_id !== showId || verified.request.job_id !== jobId ||
@@ -171,10 +187,29 @@ async function requireOwnedOperation(env: LifecycleControlEnv, showId: string,
   if (!frozen) throw new Error("Frozen control request is missing");
   checkRecordSize(frozen);
   const request = parseControlRequest(await frozen.text());
-  if (request.show_id !== showId || !ownsRequest(current.value, request, await requestHash(request))) {
+  const hash = await requestHash(request);
+  if (request.show_id !== showId || !ownsRequest(current.value, request, hash)) {
     throw new Error("Frozen control request does not match the Show owner");
   }
-  return { ...current, value: { ...current.value, owner: current.value.owner } };
+  return { ...current, value: { ...current.value, owner: current.value.owner },
+    [VERIFIED_CONTROL_REQUEST]: Object.freeze({ bucket: env.CASTLOOP_BUCKET, request: Object.freeze(request), hash,
+      reservationId: current.value.reservation_id }) };
+}
+
+export async function withReservedPublicationControlEnv<T extends LifecycleControlEnv, Result>(env: T,
+  snapshot: OwnedShowControlSnapshot,
+  callback: (scoped: T, request: Readonly<ControlRequest>) => Promise<Result>): Promise<Result> {
+  const verified = snapshot[VERIFIED_CONTROL_REQUEST];
+  if (env[VERIFIED_OPERATION] || env[VERIFIED_COMMIT_CONTROL] || !verified || verified.bucket !== env.CASTLOOP_BUCKET ||
+    verified.request.action !== "publish" || snapshot.value.owner.state !== "reserved" ||
+    snapshot.value.owner.execution_id !== undefined || snapshot.value.reservation_id !== verified.reservationId ||
+    !ownsRequest(snapshot.value, verified.request, verified.hash)) {
+    throw new Error("Commit scope requires its validated reserved publication owner");
+  }
+  let active = true;
+  const scoped = { ...env, [VERIFIED_COMMIT_CONTROL]: Object.freeze({ ...verified, isActive: () => active }) };
+  try { return await callback(scoped, verified.request); }
+  finally { active = false; }
 }
 
 export async function createShowExecutionEnv<T extends LifecycleControlEnv>(env: T, execution: ShowExecution): Promise<T> {

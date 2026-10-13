@@ -67,6 +67,10 @@ export function parseStageReadbackReceipts(input: StageUploadRequest, receipts: 
 
 export function stageControlRequest(input: StageUploadRequest): ControlRequest {
   const request = stageUploadRequestSchema.parse(input);
+  return stageControlRequestFromParsed(request);
+}
+
+function stageControlRequestFromParsed(request: StageUploadRequest): ControlRequest {
   return controlRequestSchema.parse({ schema_version: 1, job_id: request.operation_id, show_id: request.show_id, kind: request.kind,
     ...(request.episode_id !== undefined ? { episode_id: request.episode_id, expected_episode_generation: request.expected_episode_generation } : {}),
     action: "stage", expected_show_generation: request.expected_show_generation, created_at: request.created_at });
@@ -74,15 +78,36 @@ export function stageControlRequest(input: StageUploadRequest): ControlRequest {
 
 export function stageDraftPrefix(input: StageUploadRequest): string {
   const request = stageUploadRequestSchema.parse(input);
+  return stageDraftPrefixFromParsed(request);
+}
+
+function stageDraftPrefixFromParsed(request: StageUploadRequest): string {
   return request.kind === "show" ? `staging/shows/${request.show_id}/${request.draft_job_id}` :
     `staging/episodes/${request.show_id}/${request.episode_id}/${request.draft_job_id}`;
 }
 
 export function stagePayloadKey(input: StageUploadRequest, asset: StageAsset): string {
   const request = stageUploadRequestSchema.parse(input);
+  return stagePayloadKeyFromParsed(request, asset);
+}
+
+function stagePayloadKeyFromParsed(request: StageUploadRequest, asset: StageAsset): string {
   if (!request.payloads.some((payload) => payload.asset === asset)) throw new Error("Asset is not included in the frozen staging request");
   const name = { show_metadata: "show.toml", cover_jpg: "cover.jpg", cover_png: "cover.png", episode_metadata: "episode.toml", audio: "audio.mp3" };
-  return `${stageDraftPrefix(request)}/${name[asset]}`;
+  return `${stageDraftPrefixFromParsed(request)}/${name[asset]}`;
+}
+
+export function parseStageUploadInputs(input: unknown): { request: StageUploadRequest; controlRequest: ControlRequest;
+  manifestSource: string; payloadKeys: ReadonlyArray<{ asset: StageAsset; key: string }> } {
+  const request = stageUploadRequestSchema.parse(input);
+  const controlRequest = stageControlRequestFromParsed(request);
+  const payloadKeys = request.payloads.map((payload) => Object.freeze({ asset: payload.asset,
+    key: stagePayloadKeyFromParsed(request, payload.asset) }));
+  for (const payload of request.payloads) Object.freeze(payload);
+  Object.freeze(request.payloads);
+  Object.freeze(request);
+  return Object.freeze({ request, controlRequest: Object.freeze(controlRequest), manifestSource: JSON.stringify(request),
+    payloadKeys: Object.freeze(payloadKeys) });
 }
 
 export const stageUploadProgressSchema = z.object({

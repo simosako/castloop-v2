@@ -1,20 +1,61 @@
 import { z } from "zod";
 import { controlRequestSchema, episodeCommitSchema, episodeRevisionSchema, parseControlRequest, parseEpisodeRevision, parseJobStatus, parseLifecycleProgress,
-  permitsControlAction, showCommitSchema, stageControlRequest, stagePayloadKey, stageUploadProgressSchema,
-  stageUploadRequestSchema, publicationCommitKey, publicationRequestSchema } from "../packages/shared/src/index";
-import type { EpisodeCommit, EpisodeRevision, PublicationRequest, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
-import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
+  parseStageUploadInputs, permitsControlAction, showCommitSchema, stageUploadProgressSchema,
+  publicationCommitKey, publicationManifestHash, publicationRequestSchema } from "../packages/shared/src/index";
+import type { ControlRequest, EpisodeCommit, EpisodeRevision, PublicationRequest, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
+import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation, withReservedPublicationControlEnv } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
 import { canonicalEnclosureUrl } from "./media-url";
 import { parsePublicAssetPath } from "./public-assets";
 import { matchesPublishedAudio } from "./publication-inputs";
-import { stageManifestHash } from "./staging-upload";
 
 export { publicationCommitKey, publicationRequestSchema } from "../packages/shared/src/index";
 export type { PublicationRequest } from "../packages/shared/src/index";
 export type PublicationOperation = { showId: string; jobId: string; generation: number };
 export type PublicationCommitTarget = { kind: "show" | "episode"; showId: string; jobId: string; episodeId?: string };
 export type OwnedPublication = { frozen: PublicationRequest; control: OwnedShowControlSnapshot };
+
+const VERIFIED_COMMIT_PUBLICATION = Symbol("verifiedCommitPublication");
+type CommitPublicationEnv = LifecycleControlEnv & { [VERIFIED_COMMIT_PUBLICATION]?: Readonly<{
+  bucket: LifecycleControlEnv["CASTLOOP_BUCKET"]; frozen: PublicationRequest;
+  request: Readonly<ControlRequest>; controlHash: string; isActive: () => boolean;
+}> };
+
+function verifiedCommit(env: CommitPublicationEnv, jobId: string) {
+  const verified = env[VERIFIED_COMMIT_PUBLICATION];
+  if (verified && (!verified.isActive() || verified.bucket !== env.CASTLOOP_BUCKET || verified.frozen.request.job_id !== jobId)) {
+    throw new InvalidFrozenPublication();
+  }
+  return verified;
+}
+
+async function hashSource(source: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function withPublicationCommitContext<T extends LifecycleControlEnv, Result>(env: T,
+  operation: PublicationOperation, callback: (scoped: T, manifestHash: string) => Promise<Result>): Promise<Result> {
+  if ((env as CommitPublicationEnv)[VERIFIED_COMMIT_PUBLICATION]) throw new InvalidFrozenPublication();
+  const owned = await requireOwnedPublication(env, operation);
+  if (owned.control.value.owner.state !== "reserved" || owned.control.value.owner.execution_id !== undefined) {
+    return callback(env, await publicationManifestHash(owned.frozen));
+  }
+  return withReservedPublicationControlEnv(env, owned.control, async (controlEnv, request) => {
+    if (JSON.stringify(request) !== JSON.stringify(owned.frozen.request)) throw new InvalidFrozenPublication();
+    const frozen = owned.frozen;
+    Object.freeze(frozen.request);
+    Object.freeze(frozen.commit);
+    Object.freeze(frozen.staged_uploads);
+    Object.freeze(frozen);
+    const manifestHash = await hashSource(JSON.stringify(frozen));
+    let active = true;
+    const scoped = { ...controlEnv, [VERIFIED_COMMIT_PUBLICATION]: Object.freeze({ bucket: env.CASTLOOP_BUCKET,
+      frozen, request, controlHash: owned.control.value.owner.request_sha256, isActive: () => active }) };
+    try { return await callback(scoped, manifestHash); }
+    finally { active = false; }
+  });
+}
 
 export class InvalidFrozenPublication extends Error {
   constructor() { super("Publication commit does not match its frozen request and target"); }
@@ -32,6 +73,8 @@ export function parsePublicationCommitKey(key: string): PublicationCommitTarget 
 }
 
 async function readFrozenRequest(env: LifecycleControlEnv, jobId: string): Promise<PublicationRequest> {
+  const verified = verifiedCommit(env, jobId);
+  if (verified) return verified.frozen;
   const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${jobId}/publication.json`);
   if (!object || object.size < 1 || object.size > 16384) throw new InvalidFrozenPublication();
   const source = await object.text();
@@ -52,12 +95,14 @@ export async function readFrozenPublicationCommit(env: LifecycleControlEnv, key:
   if (marker.kind !== target.kind || marker.show_id !== target.showId || marker.job_id !== target.jobId ||
     (marker.kind === "episode" ? marker.episode_id : undefined) !== target.episodeId) throw new InvalidFrozenPublication();
   const frozen = await readFrozenRequest(env, marker.job_id);
-  const controlObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${marker.job_id}/request.toml`);
-  if (!controlObject || controlObject.size < 1 || controlObject.size > 16384) throw new InvalidFrozenPublication();
-  const controlSource = await controlObject.text();
-  let request;
-  try { request = parseControlRequest(controlSource); }
-  catch { throw new InvalidFrozenPublication(); }
+  let request = verifiedCommit(env, marker.job_id)?.request;
+  if (!request) {
+    const controlObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${marker.job_id}/request.toml`);
+    if (!controlObject || controlObject.size < 1 || controlObject.size > 16384) throw new InvalidFrozenPublication();
+    const controlSource = await controlObject.text();
+    try { request = parseControlRequest(controlSource); }
+    catch { throw new InvalidFrozenPublication(); }
+  }
   if (JSON.stringify(marker) !== JSON.stringify(frozen.commit) || JSON.stringify(request) !== JSON.stringify(frozen.request)) {
     throw new InvalidFrozenPublication();
   }
@@ -69,8 +114,9 @@ export async function requireOwnedPublication(env: LifecycleControlEnv, operatio
   const control = await requireOwnedOperation(env, operation.showId, operation.jobId, operation.generation);
   const frozen = await readFrozenRequest(env, operation.jobId);
   const request = frozen.request;
+  const hash = verifiedCommit(env, operation.jobId)?.controlHash ?? await controlRequestHash(request);
   if (request.job_id !== operation.jobId || request.show_id !== operation.showId || request.expected_show_generation + 1 !== operation.generation ||
-    control.value.owner.action !== "publish" || await controlRequestHash(request) !== control.value.owner.request_sha256 ||
+    control.value.owner.action !== "publish" || hash !== control.value.owner.request_sha256 ||
     !permitsControlAction(control.value.lifecycle, "publish") || request.kind === "episode" && control.value.lifecycle !== "active") {
     throw new InvalidFrozenPublication();
   }
@@ -94,7 +140,8 @@ export async function requireOwnedPublication(env: LifecycleControlEnv, operatio
   return { frozen, control };
 }
 
-type StagedProof = { request: StageUploadRequest; progress: StageUploadProgress };
+type StagedProof = { request: StageUploadRequest; progress: StageUploadProgress;
+  payloadKeys: ReadonlyArray<{ asset: StageAsset; key: string }> };
 async function readStagedProof(env: LifecycleControlEnv, frozen: PublicationRequest, operationId: string): Promise<StagedProof> {
   const requestObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${operationId}/upload.json`);
   const progressObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${operationId}/upload-progress.json`);
@@ -102,7 +149,8 @@ async function readStagedProof(env: LifecycleControlEnv, frozen: PublicationRequ
   if (!requestObject || !progressObject || !statusObject || [requestObject, progressObject, statusObject].some((object) => object.size < 1 || object.size > 16384)) {
     throw new Error("Publication requires retained staging verification records");
   }
-  const request = stageUploadRequestSchema.parse(await requestObject.json<unknown>());
+  const inputs = parseStageUploadInputs(await requestObject.json<unknown>());
+  const request = inputs.request;
   const progress = stageUploadProgressSchema.parse(await progressObject.json<unknown>());
   const status = parseJobStatus(await statusObject.text());
   if (request.operation_id !== operationId || request.draft_job_id !== frozen.commit.job_id || request.show_id !== frozen.commit.show_id ||
@@ -110,14 +158,14 @@ async function readStagedProof(env: LifecycleControlEnv, frozen: PublicationRequ
     request.expected_show_generation + 1 > frozen.request.expected_show_generation ||
     request.expected_episode_generation !== frozen.request.expected_episode_generation ||
     progress.operation_id !== operationId || progress.show_id !== request.show_id || progress.show_generation !== request.expected_show_generation + 1 ||
-    progress.manifest_sha256 !== await stageManifestHash(request) || progress.phase !== "finished" || progress.outcome !== "staged" ||
+    progress.manifest_sha256 !== await hashSource(inputs.manifestSource) || progress.phase !== "finished" || progress.outcome !== "staged" ||
     progress.verified_assets.length !== request.payloads.length || status.schema_version !== 2 || status.state !== "completed" ||
     status.action !== "stage" || status.job_id !== operationId || status.show_id !== request.show_id || status.kind !== request.kind ||
     status.episode_id !== request.episode_id || status.show_generation !== progress.show_generation ||
-    status.request_sha256 !== await controlRequestHash(stageControlRequest(request))) {
+    status.request_sha256 !== await controlRequestHash(inputs.controlRequest)) {
     throw new Error("Staging verification does not match the publication target and generations");
   }
-  return { request, progress };
+  return { request, progress, payloadKeys: inputs.payloadKeys };
 }
 
 export async function verifyPublicationStaging(env: LifecycleControlEnv, operation: PublicationOperation,
@@ -167,7 +215,9 @@ export async function verifyPublicationStaging(env: LifecycleControlEnv, operati
         !verified || verified.sha256 !== payload.sha256 || verified.length_bytes !== payload.length_bytes) {
         throw new Error("Publication payload does not match its staging verification evidence");
       }
-      const head = await env.CASTLOOP_BUCKET.head(stagePayloadKey(proof.request, payload.asset));
+      const key = proof.payloadKeys.find((entry) => entry.asset === payload.asset)?.key;
+      if (!key) throw new Error("Publication payload has no validated staging key");
+      const head = await env.CASTLOOP_BUCKET.head(key);
       if (!head || head.etag !== verified.etag || !verified.version || head.version !== verified.version || head.size !== verified.length_bytes) {
         throw new Error("Staged payload changed after verification");
       }
