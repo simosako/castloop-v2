@@ -90,6 +90,13 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 音源保存だけでなくcatalog/世代保存まで含み、開始ログのみでも取消理由や解放の安全性を確定できない。
 このログには対応Workerが必要だが、残留tokenを通常更新のpause/drain条件から除外して配備しない。
 
+実機性能試験の採取には`scripts/test-support/worker-tail.ts`を使用できる（正式CLIの機能ではない）。
+同じWorkerのtail IDが複数観測者で共有される場合があるため、観測終了時はWebSocketだけを閉じ、
+tail削除APIを自動実行しない。ping/pongだけではremote tail削除による配送停止を検知できないので、
+IDの一覧照合と期限・health記録も必要。採取異常のある時間分布を完全な測定結果として扱わない。
+試験用起動コードは、実行中の変更要求を打ち切らずsettleを待ち、次の変更コマンドを拒否する。
+詳細は[採取時の注意](../design/publication_execution_recovery.md#長時間試験のlive-tail採取)を参照。
+
 性能比較は、公開済み36件Showのmetadata-only 1件更新を同じ条件で測る。完成済みimportの再実行では公開処理を測れない。CLI/Workerのcommitとjob IDを記録し、`publication.consumer`、`publication.guard`、`publication.feed_inputs`、`publication.unique_guid`、`staging.finish`と、CLIが`published / released`を確認するまでを比較する。実機更新は承認された試験環境で行う。
 
 この改修版は、検証済みEpisode情報をShow単位のカタログに保存する。CLIを更新し、通常更新手順でWorkerもdeploy・検証・明示resumeする。古いWorkerへのdowngradeは行わない。

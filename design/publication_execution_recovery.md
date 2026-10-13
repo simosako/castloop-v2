@@ -103,6 +103,32 @@ executionなしの同job retryは既存の厳密なowner/manifest/marker検査�
 
 ## ローカル検証と限界
 
+### 長時間試験のlive tail採取
+
+2026-10-13の隔離試験では、製品のログ出力ではなく試験用採取コードに不備があった。
+同じWorkerへのtail作成POSTが同じIDを返す場合があり、補助観測者の終了時DELETEが
+本観測者と共有するtailを削除した。WebSocketはcloseせず、ログ配送だけが停止することを再現した。
+そのため、切断イベントがないことや、取得分のoutcomeがokであることを全期間の正常性の証拠にしない。
+
+- `scripts/test-support/worker-tail.ts`を試験用採取helperとして使用する。正式CLI/Workerには組み込まない。
+- 観測者終了では自分のWebSocketだけを閉じる。tail作成receiptだけで排他的な所有権を推定せず、
+  共有tailへのDELETEを自動実行しない。remote tailは既存の期限で失効する。
+- 初期設定の送信、相関ping/pong、tail IDの一覧照合、期限、close/error、truncated/parse/保存失敗を確認する。
+  healthログにはtail ID・期限・固定reason・close codeを残すが、WebSocket URLや任意close reason・HTTP headerは保存しない。
+- 採取の異常はその試験の不完全な証跡として保持する。接続を戻しても過去の欠落を解消した扱いにしない。
+  次の変更コマンドを開始しないが、すでに実行中の変更コマンドやconsumerをkillしない。
+  逐次取り込みCLIを1コマンドで起動した場合は、そのコマンドのsettlementを待つ。helperは内部Episode境界へ介入しない。
+- helperのhealth正常は輸送・保存確認の範囲であり、platformのsamplingや欠落がない完全配送の保証ではない。
+  開始/終了phaseとjob件数を別途照合し、入れ子の時間は加算しない。
+- 長時間試験そのものもOpenCodeのLocation寿命から独立した管理プロセスで起動する。
+  これはログ採取の修正とは別の対策で、未知の既存owner/tokenを解放する根拠にはしない。
+
+採取helperの12回帰テストと実Bun WebSocketのping/pong確認が成功。隔離Workerでも、同じIDの補助観測者を
+WebSocket closeだけで終了した後に本観測者がログを受信し続けることを確認した。
+この修正後の全自動テストは1033 pass / 0 fail（115 files）、TypeScript検査は成功した。
+
+### 公開処理の回帰検証
+
 - 音源PUT、catalog、feed世代、published status、Show解放、service解放をそれぞれ保留し、
   開始のみのphaseと適切な残存ownerを検証した。I/O完了後は通常のpublished/releasedへ進む。
 - version不一致・owner照合例外・未消費PUT拒否でcancel完了を待ち、開始済みjournal/terminal GETと本文読取も待つ。
