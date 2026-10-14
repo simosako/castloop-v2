@@ -8,6 +8,12 @@ export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, pub
 export type { PublicationRequest } from "./publication-request";
 export { publicationAcceptanceProtocol, publicationAdminRequestSchema, publicationAdminResponseSchema, publicationOperationSchema } from "./publication-admin";
 export type { PublicationAdminRequest, PublicationAdminResponse, PublicationOperationIdentity } from "./publication-admin";
+export { publicationCommitProtocol, MAX_PUBLICATION_INTENT_BYTES, publicationQueueIdSchema,
+  publicationCommitIntentPayloadSchema, publicationCommitIntentSchema, publicationQueuedReceiptSchema,
+  publicationQueueSubmissionSchema, publicationSubmissionSummarySchema, publicationSubmissionRecordSchema,
+  parsePublicationCommitIntent, signPublicationCommitIntent, verifyPublicationCommitIntent, publicationIntentHash } from "./publication-queue";
+export type { PublicationCommitIntent, PublicationCommitIntentPayload, PublicationQueuedReceipt,
+  PublicationQueueSubmission, PublicationSubmissionRecord } from "./publication-queue";
 export { lifecycleFailureForPhase, lifecycleFailureMessages, lifecycleJobStatusSchema, lifecyclePhaseSchema, lifecycleProgressSchema,
   parseLifecycleProgress, stringifyLifecycleProgress } from "./lifecycle-job";
 export type { LifecycleFailure, LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";

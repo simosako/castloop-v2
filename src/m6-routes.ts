@@ -1,3 +1,4 @@
+import { publicationCommitKey, publicationManifestHash, publicationRequestSchema, verifyPublicationCommitIntent } from "../packages/shared/src/index";
 import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { handleM6ContentList } from "./content-list-admin";
@@ -6,6 +7,7 @@ import legacyWorker from "./index";
 import { createCachedPublicFetch } from "./lifecycle-cache";
 import type { CachedAssetBinding, LifecyclePurgeTarget } from "./lifecycle-cache";
 import { handleM6LifecycleAdmin } from "./lifecycle-admin";
+import { controlRequestHash } from "./lifecycle-control";
 import { consumeLifecycleCommit } from "./lifecycle-consumer";
 import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import { serveLifecyclePublicRequest } from "./lifecycle-gateway";
@@ -13,6 +15,7 @@ import { createLifecycleWorkerEffects, createPublicationWorkerEffects } from "./
 import { parsePublicAssetPath } from "./public-assets";
 import { handleM6PublicationAdmin } from "./publication-admin";
 import { consumeOwnedPublication } from "./publication-consumer";
+import { consumePublicationCommitIntent, requirePublicationIntentRuntime } from "./publication-queue-consumer";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
@@ -157,6 +160,36 @@ export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6Cand
   if (batch.queue !== config.queue_name && batch.queue !== config.dlq_name) throw new Error("M6 candidate received an unknown Queue");
   await requireCandidateReadiness(env, config);
   for (const message of batch.messages) {
+    if (message.body && typeof message.body === "object" && "family" in message.body && message.body.family === "publication_commit") {
+      const intent = await verifyPublicationCommitIntent(message.body, env.CASTLOOP_ADMIN_KEY);
+      if (!intent) {
+        console.error(JSON.stringify({ event: "publication_submission_blocked", reason_code: "intent_authentication_failed" }));
+        continue;
+      }
+      await requirePublicationIntentRuntime(intent, config, env.CASTLOOP_VERSION_METADATA.id);
+      const target = { showId: intent.operation.show_id };
+      logPublicationDelivery(intent.operation.job_id, message.timestamp, message.attempts);
+      await measureWorkerPhase(intent.operation.job_id, "publication.consumer", () =>
+        withServiceInvocation(env, config.service_id, "m6_consumer", async (invocation) => {
+          const gate = createM6DeliveryGate(env, invocation, { versionMetadata: env.CASTLOOP_VERSION_METADATA,
+            gatewayProtocol: "m6-uncached-gateway-v1", cachedAssets });
+          if (batch.queue === config.dlq_name) {
+            await gate(target);
+            const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${intent.operation.job_id}/publication.json`);
+            if (!object) throw new Error("Submission dead-letter requires its retained publication");
+            if (object.size < 1 || object.size > 16384) { await object.body?.cancel(); throw new Error("Submission dead-letter publication is oversized or empty"); }
+            const frozen = publicationRequestSchema.parse(await object.json<unknown>());
+            if (await publicationManifestHash(frozen) !== intent.manifest_sha256 || await controlRequestHash(frozen.request) !== intent.request_sha256 ||
+              frozen.request.job_id !== intent.operation.job_id || frozen.request.show_id !== intent.operation.show_id ||
+              frozen.request.expected_show_generation + 1 !== intent.operation.show_generation) {
+              throw new Error("Submission dead-letter differs from its frozen manifest/operation");
+            }
+            await recordDeadLetterDelivery(env, { id: message.id, body: { object: { key: publicationCommitKey(frozen.commit) } } });
+          } else await consumePublicationCommitIntent(env, intent, (execution, executionEnv) =>
+            createPublicationWorkerEffects(executionEnv, execution, { cachedAssets, checkDeliveryGate: gate }), () => gate(target));
+        }, intent.operation.job_id));
+      continue;
+    }
     const delivery = parseQueueDelivery(message.body);
     if (batch.queue !== config.dlq_name && !delivery) continue;
     const consume = async () => withServiceInvocation(env, config.service_id, "m6_consumer", async (invocation) => {

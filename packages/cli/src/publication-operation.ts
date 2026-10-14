@@ -1,14 +1,16 @@
-import { publicationAdminResponseSchema, publicationCommitKey, publicationRequestSchema, serviceConfigSchema, serviceOperationIdentity } from "@castloop/shared";
+import { publicationAdminResponseSchema, publicationCommitKey, publicationQueuedReceiptSchema, publicationRequestSchema, serviceConfigSchema, serviceOperationIdentity } from "@castloop/shared";
 import type { PublicationAdminResponse, PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { PublicationAdminClient, publicationClientOperation } from "./publication-client";
 import { validatePublicationClientState } from "./publication-journal";
 import type { PublicationClientState, PublicationJournal } from "./publication-journal";
+import { PublicationQueueClient } from "./publication-queue-client";
+import type { PublicationQueueTransport } from "./publication-queue-client";
 import { createHash } from "node:crypto";
 
 type Receipt<Result extends PublicationAdminResponse["result"]> = Extract<PublicationAdminResponse, { result: Result }>;
 export type PublicationOperationEffects = { publication: PublicationRequest; claim: () => Promise<Receipt<"claimed">>;
   commit: () => Promise<Receipt<"accepted">>; status: () => Promise<Receipt<"status">>; retry: () => Promise<Receipt<"requeued">>;
-  release: () => Promise<Receipt<"released">>; checkLocalInputs?: () => Promise<void> };
+  release: () => Promise<Receipt<"released">>; queueCommit?: PublicationQueueTransport; checkLocalInputs?: () => Promise<void> };
 
 function load(journal: PublicationJournal, effects: PublicationOperationEffects): PublicationClientState {
   const state = validatePublicationClientState(journal.load());
@@ -24,7 +26,9 @@ function receipt(state: PublicationClientState, input: unknown, expected: Public
     JSON.stringify(value.operation) !== JSON.stringify(publicationClientOperation(state.publication)) ||
     (value.result === "accepted" || value.result === "requeued") && value.key !== publicationCommitKey(state.publication.commit) || value.result === "status" &&
     (JSON.stringify(value.publication) !== JSON.stringify(state.publication) ||
-      value.request_sha256 !== createHash("sha256").update(JSON.stringify(state.publication.request)).digest("hex"))) {
+      value.request_sha256 !== createHash("sha256").update(JSON.stringify(state.publication.request)).digest("hex") ||
+      state.queue_submission && value.submission && (value.submission.submission_id !== state.queue_submission.intent.submission_id ||
+        value.submission.intent_sha256 !== state.queue_submission.intent_sha256))) {
     throw new Error("Publication receipt differs from the journal's frozen manifest/request");
   }
   return value;
@@ -34,6 +38,7 @@ export async function runPublicationClaim(journal: PublicationJournal, effects: 
   await journal.exclusively(async () => {
     const state = load(journal, effects);
     if (state.phase !== "prepared") throw new Error("Publication claim outcome is unknown or consumed; never replay its POST");
+    await effects.queueCommit?.preflight();
     await effects.checkLocalInputs?.();
     journal.save({ ...state, phase: "claim_requested" });
     const value = receipt(state, await effects.claim(), "claimed");
@@ -47,9 +52,18 @@ export async function runPublicationCommit(journal: PublicationJournal, effects:
     const state = load(journal, effects);
     if (state.phase !== "claimed") throw new Error("Publication commit outcome is unknown or consumed; never replay its POST");
     const status = receipt(state, await effects.status(), "status");
-    if (status.result !== "status" || status.ownership !== "held" || status.execution_active || status.marker_present ||
+    if (status.result !== "status" || status.ownership !== "held" || status.execution_active || status.marker_present || status.submission ||
       status.status?.state === "published" || status.status?.state === "abandoned" || status.status?.state === "failed") {
       throw new Error("Publication commit requires its unstarted held owner without active or unknown execution");
+    }
+    if (effects.queueCommit) {
+      const submission = await effects.queueCommit.prepare(state.publication);
+      await effects.checkLocalInputs?.();
+      const started = validatePublicationClientState({ ...state, phase: "submit_requested", queue_submission: submission });
+      journal.save(started);
+      const queued = publicationQueuedReceiptSchema.parse(await effects.queueCommit.send(started.queue_submission!));
+      journal.save({ ...started, phase: "queued", queued_receipt: queued });
+      return;
     }
     await effects.checkLocalInputs?.();
     journal.save({ ...state, phase: "commit_requested" });
@@ -74,7 +88,7 @@ export async function inspectPublicationOperation(journal: PublicationJournal, e
 export async function runPublicationRetry(journal: PublicationJournal, effects: PublicationOperationEffects): Promise<void> {
   await journal.exclusively(async () => {
     const state = load(journal, effects);
-    if (!["accepted", "committed"].includes(state.phase) || state.retry?.state === "requested") throw new Error("Publication retry outcome is unknown or its acceptance was not acknowledged; never replay its POST");
+    if (!["accepted", "committed", "queued"].includes(state.phase) || state.retry?.state === "requested") throw new Error("Publication retry outcome is unknown or its acceptance was not acknowledged; never replay its POST");
     const status = receipt(state, await effects.status(), "status");
     if (status.result !== "status" || status.ownership !== "held" || status.execution_active || !status.marker_present ||
       status.status?.state === "published" || status.status?.state === "abandoned" || status.status?.state === "failed") {
@@ -91,9 +105,10 @@ export async function runPublicationRetry(journal: PublicationJournal, effects: 
 export async function runPublicationRelease(journal: PublicationJournal, effects: PublicationOperationEffects): Promise<void> {
   await journal.exclusively(async () => {
     const state = load(journal, effects);
-    if (!["accepted", "committed"].includes(state.phase) || state.release?.state === "requested") {
+    if (!["accepted", "committed", "queued"].includes(state.phase) || state.release?.state === "requested") {
       throw new Error("Publication release outcome is unknown or its commit was not acknowledged; never replay its POST");
     }
+    if (state.phase === "queued") throw new Error("Publication execution and outstanding IO are not proven settled; preserve the Queue submission and tokens and inspect logs");
     const status = receipt(state, await effects.status(), "status");
     if (status.result !== "status" || status.ownership !== "held" || !status.marker_present ||
       status.status?.state === "published" || status.status?.state === "abandoned") {
@@ -113,6 +128,10 @@ export function createPublicationOperationEffects(configInput: ServiceConfig, in
   }
   const api = client ?? new PublicationAdminClient(config, adminKey);
   const publication = state.publication;
-  return { publication, claim: () => api.claim(publication), commit: () => api.commit(publication), retry: () => api.retry(publication),
-    release: () => api.release(publication), status: () => api.status(publication) };
+  return { publication, claim: () => api.claim(publication), commit: async () => {
+    if (!client) throw new Error("Publication commit requires the Queue transport; HTTP fallback is disabled");
+    return api.commit(publication);
+  }, retry: () => api.retry(publication),
+    release: () => api.release(publication), status: () => api.status(publication),
+    ...(!client ? { queueCommit: new PublicationQueueClient(config, adminKey) } : {}) };
 }

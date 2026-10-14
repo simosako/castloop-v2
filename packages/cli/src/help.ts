@@ -4,7 +4,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "publish-rss-import": {
     usage: "publish-rss-import DIRECTORY",
     description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
-      "Requires an open M7-compatible Worker, retained administrator key and Cloudflare upload credentials.\n" +
+      "Requires an open queue-commit-v1 Worker, retained administrator key and Cloudflare credentials with Queues Edit.\n" +
       "Validates all TOML and assets before registration; publishes the Show then Episodes sequentially.\n" +
       "Intermediate Episodes become public as jobs finish. The operation is not an atomic batch.\n" +
       "Re-running inspects acknowledged pending jobs and continues recorded progress without republishing completed inputs.\n" +
@@ -43,6 +43,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "publish-show": {
     usage: "publish-show ID",
     description: "Run from the service workspace after update-show. Submit the staged Show for publication.\n" +
+      "Requires queue-commit-v1 and Cloudflare Queues Edit. Queued does not prove marker creation or publication.\n" +
       "Check the returned job ID with job-status until published and ownership released.",
   },
   "update-episode": {
@@ -58,17 +59,19 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "publish-episode ID [MP3]",
     description: "Run from the Show directory. Submit staged Episode changes for publication.\n" +
       "Initial publication requires metadata and audio. Supply the original MP3 path whenever audio was staged.\n" +
-      "For metadata-only revisions omit MP3; unchanged published audio is reused.",
+      "For metadata-only revisions omit MP3; unchanged published audio is reused.\n" +
+      "Requires queue-commit-v1 and Cloudflare Queues Edit. Unknown submissions are never automatically resent.",
   },
   "job-status": {
     usage: "job-status JOB",
     description: "Run from the service workspace. Compare the retained publication journal with server status.\n" +
-      "Complete means published status and released ownership; a commit receipt only means queued.",
+      "Complete means published status and released ownership; queued alone does not prove marker creation.",
   },
   "retry-job": {
     usage: "retry-job JOB",
     description: "Run from the service workspace. Explicitly retry the same acknowledged publication commit.\n" +
-      "Requires its retained journal and settled execution; active or unknown owners/locks are not released.",
+      "Requires its retained journal, an existing verified marker and settled execution. Does not resend an unconfirmed Queue submission.\n" +
+      "Active or unknown owners/locks are not released.",
   },
   "release-job": {
     usage: "release-job JOB",

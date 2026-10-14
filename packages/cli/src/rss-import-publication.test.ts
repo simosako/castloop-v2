@@ -49,6 +49,13 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
         { status: 409, headers: { "Cache-Control": "no-store" } });
     }
     if (url.hostname === "api.cloudflare.com") {
+      if (url.pathname.endsWith("/queues")) return Response.json({ success: true,
+        result: [{ queue_id: "1".repeat(32), queue_name: setup.config.queue_name }] });
+      if (url.pathname.endsWith(`/queues/${"1".repeat(32)}`)) return Response.json({ success: true,
+        result: { queue_id: "1".repeat(32), queue_name: setup.config.queue_name } });
+      if (url.pathname.endsWith("/consumers")) return Response.json({ success: true, result: [{ script_name: setup.config.worker_name,
+        dead_letter_queue: setup.config.dlq_name, settings: { batch_size: 1, max_concurrency: 1, max_retries: 2 } }] });
+      if (url.pathname.endsWith("/messages")) return Response.json({ success: true });
       const key = url.pathname.slice(url.pathname.indexOf("/objects/") + 9);
       if (init?.method === "PUT") {
         const object = (await setup.bucket.put(key, new Uint8Array(await new Response(init.body).arrayBuffer())))!;
@@ -57,6 +64,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
       const object = await setup.bucket.get(key);
       return object ? new Response(new Uint8Array(object.bytes), { headers: { ETag: `"${object.etag}"` } }) : new Response(null, { status: 404 });
     }
+    if (url.pathname === "/admin/publication" && JSON.parse(String(init?.body)).action === "commit") throw new Error("HTTP commit must not be called");
     return fetchM6ManagementIntegration(new Request(input, init) as never, env as never, cachedAssets);
   }, { preconnect: globalThis.fetch.preconnect }));
   const commands: string[] = [];
@@ -88,7 +96,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
       if (command.startsWith("publish-")) {
         const job = readLocalPublicationJob(root, setup.config, (result as { job_id: string }).job_id).client_state!;
         await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: crypto.randomUUID(),
-          body: { object: { key: publicationCommitKey(job.publication.commit) } } }] } as never,
+          body: job.queue_submission!.intent }] } as never,
           env as never, cachedAssets);
       }
       return result;
@@ -99,7 +107,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
       const result = await effects.command(command, args);
       if (command === "service-status") { const { external_episode_guids: _feature, ...old } = result as Record<string, unknown>; return old; }
       return result;
-    } })).rejects.toThrow("M7-compatible");
+    } })).rejects.toThrow("queue-commit-v1-compatible");
     expect(commands).toEqual(["service-status"]);
     commands.length = 0;
     await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("status unavailable");
@@ -211,6 +219,13 @@ test("RSS import reports retained execution with DLQ history without authorizing
   const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(Object.assign(async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const url = new URL(String(input));
     if (url.hostname === "api.cloudflare.com") {
+      if (url.pathname.endsWith("/queues")) return Response.json({ success: true,
+        result: [{ queue_id: "1".repeat(32), queue_name: setup.config.queue_name }] });
+      if (url.pathname.endsWith(`/queues/${"1".repeat(32)}`)) return Response.json({ success: true,
+        result: { queue_id: "1".repeat(32), queue_name: setup.config.queue_name } });
+      if (url.pathname.endsWith("/consumers")) return Response.json({ success: true, result: [{ script_name: setup.config.worker_name,
+        dead_letter_queue: setup.config.dlq_name, settings: { batch_size: 1, max_concurrency: 1, max_retries: 2 } }] });
+      if (url.pathname.endsWith("/messages")) return Response.json({ success: true });
       const key = url.pathname.slice(url.pathname.indexOf("/objects/") + 9);
       if (init?.method === "PUT") {
         const object = (await setup.bucket.put(key, new Uint8Array(await new Response(init.body).arrayBuffer())))!;
@@ -227,7 +242,7 @@ test("RSS import reports retained execution with DLQ history without authorizing
       if (command === "publish-episode") throw new Error("Import must not publish an Episode while the Show execution is retained");
       const result = await runM6Command(root, setup.config, command, args, { workerSource: async () => "unused" });
       if (command === "publish-show") {
-        const jobId = z.object({ result: z.literal("publication-accepted"), job_id: z.uuid() }).strict().parse(result).job_id;
+        const jobId = z.object({ result: z.literal("publication-queued"), job_id: z.uuid() }).strict().parse(result).job_id;
         const job = readLocalPublicationJob(root, setup.config, jobId).client_state!;
         await acquireShowExecution(setup.env, "imported", jobId, job.publication.request.expected_show_generation + 1);
         await acquireServiceInvocation(setup.env, setup.config.service_id, "m6_consumer");

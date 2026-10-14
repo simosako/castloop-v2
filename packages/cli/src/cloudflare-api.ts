@@ -1,8 +1,8 @@
 import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, normalizeHostname, serviceConfigSchema, serviceManagementBaseUrl, stringifyToml, workerDeploymentsSnapshotSchema,
   workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema,
-  workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema } from "@castloop/shared";
+   workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema, parsePublicationCommitIntent, publicationQueueIdSchema } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
-   M6DeploymentReads, M6DeploymentSnapshot, M6RuntimeTarget, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ServiceConfig, WorkerVersionUploadReceipt } from "@castloop/shared";
+   M6DeploymentReads, M6DeploymentSnapshot, M6RuntimeTarget, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, PublicationCommitIntent, ServiceConfig, WorkerVersionUploadReceipt } from "@castloop/shared";
 import type { M6UpdateDeployReceipts } from "./m6-service-update";
 import { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
   M6_WORKER_COMPATIBILITY_DATE, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
@@ -353,6 +353,32 @@ export class CloudflareApi {
       if (page >= (data.result_info?.total_pages ?? 1)) break;
     }
     throw new Error(`Queue ${name} was not found in this Cloudflare account`);
+  }
+
+  async resolvePublicationQueue(configInput: ServiceConfig): Promise<string> {
+    const config = serviceConfigSchema.parse(configInput);
+    if (config.account_id !== this.accountId) throw new Error("Publication Queue belongs to another account");
+    const id = publicationQueueIdSchema.parse(await this.queueId(config.queue_name));
+    const value = await this.json<unknown>("GET", `/queues/${id}`);
+    if (!value || typeof value !== "object" || !("queue_id" in value) || !("queue_name" in value) ||
+      value.queue_id !== id || value.queue_name !== config.queue_name) throw new Error("Publication Queue identity was not verified");
+    const consumers = await this.json<ConsumerRecord[]>("GET", `/queues/${id}/consumers`);
+    if (!Array.isArray(consumers) || consumers.length !== 1 || !consumers[0] ||
+      (consumers[0].script_name ?? consumers[0].script) !== config.worker_name || consumers[0].settings?.batch_size !== 1 ||
+      consumers[0].settings?.max_concurrency !== 1 || consumers[0].settings?.max_retries !== 2 ||
+      consumers[0].dead_letter_queue !== config.dlq_name) throw new Error("Publication Queue has an unknown or incompatible consumer");
+    return id;
+  }
+
+  async publishPublicationIntent(queueId: string, input: PublicationCommitIntent): Promise<void> {
+    const id = publicationQueueIdSchema.parse(queueId);
+    const intent = parsePublicationCommitIntent(input);
+    try {
+      await this.json("POST", `/queues/${id}/messages`, { body: intent });
+    } catch (error) {
+      throw new Error("Queue submission was not acknowledged; preserve its frozen journal and held owner without replaying the POST. " +
+        "Check Cloudflare connectivity and Queues Edit permission", { cause: error });
+    }
   }
 
   private async existingWorker(name: string): Promise<WorkerSettings | null> {

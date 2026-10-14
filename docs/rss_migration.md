@@ -3,6 +3,8 @@
 v0.4.0のCLIとWorkerの両方が必要。v0.3.0以前のバイナリには含まれない。
 HTTP CPUの既存観測は15〜34msでWorkers Freeの10ms目標は未達。Freeでの安定稼働とIssue #13の完全解消は保証しない。[リリースの制限](release-v0.4.0.md)を確認する。
 
+**開発ブランチとの差分:** `feat/publication-queue-submit`では[段階A](../design/publication_queue_commit_stage_a.md)を実装し、commitだけをCLIから直接Queueへ送る。開発CLI／Worker両方、`publication_commit_protocol: "queue-commit-v1"`、Queues Editを含むCloudflare認証が必要。公開コマンドの応答は`publication-queued`、journalは`queued`となるが、marker作成や公開成功の証明ではない。`submit_requested`の結果不明は状態照会だけを行い、RSS公開コマンド・Queue POSTを再実行して復旧しない。下記のv0.4.0説明は公開版についてのもの。
+
 ## 対象
 
 - 管理者が移行する権利を持つ、公開RSS 2.0の番組。

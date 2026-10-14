@@ -3,8 +3,8 @@ import { controlRequestSchema, episodeCommitSchema, episodeRevisionSchema, parse
   parseStageUploadInputs, permitsControlAction, showCommitSchema, stageUploadProgressSchema,
   publicationCommitKey, publicationManifestHash, publicationRequestSchema } from "../packages/shared/src/index";
 import type { ControlRequest, EpisodeCommit, EpisodeRevision, PublicationRequest, ShowCommit, StageAsset, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
-import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation, withReservedPublicationControlEnv } from "./lifecycle-control";
-import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
+import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation, requireShowExecution, withReservedPublicationControlEnv } from "./lifecycle-control";
+import type { LifecycleControlEnv, OwnedShowControlSnapshot, ShowExecution } from "./lifecycle-control";
 import { canonicalEnclosureUrl } from "./media-url";
 import { parsePublicAssetPath } from "./public-assets";
 import { matchesPublishedAudio } from "./publication-inputs";
@@ -286,5 +286,31 @@ export async function commitOwnedPublication(env: LifecycleControlEnv, operation
   if (written) return { key, created: true };
   const raced = await readFrozenPublicationCommit(env, key);
   if (!raced || JSON.stringify(raced) !== JSON.stringify(frozen)) throw new InvalidFrozenPublication();
+  return { key, created: false };
+}
+
+export async function commitExecutingPublication(env: LifecycleControlEnv, execution: ShowExecution,
+  expected: { manifest_sha256: string; request_sha256: string }): Promise<{ key: string; created: boolean }> {
+  const owned = await requireOwnedPublication(env, execution, { allowPublishedResult: true });
+  if (await publicationManifestHash(owned.frozen) !== expected.manifest_sha256 ||
+    owned.control.value.owner.request_sha256 !== expected.request_sha256 ||
+    owned.control.value.owner.execution_id !== execution.executionId || owned.control.value.owner.state !== "processing") {
+    throw new InvalidFrozenPublication();
+  }
+  const key = publicationCommitKey(owned.frozen.commit);
+  const existing = await readFrozenPublicationCommit(env, key);
+  if (existing) return { key, created: false };
+  const latest = await requireOwnedPublication(env, execution, { allowPublishedResult: true });
+  if (JSON.stringify(latest.frozen) !== JSON.stringify(owned.frozen) ||
+    latest.control.value.owner.execution_id !== execution.executionId || latest.control.value.owner.state !== "processing") {
+    throw new InvalidFrozenPublication();
+  }
+  await requireShowExecution(env, execution);
+  const written = await env.CASTLOOP_BUCKET.put(key, JSON.stringify(owned.frozen.commit), {
+    onlyIf: new Headers({ "If-None-Match": "*" }),
+  });
+  if (written) return { key, created: true };
+  const raced = await readFrozenPublicationCommit(env, key);
+  if (!raced || JSON.stringify(raced) !== JSON.stringify(owned.frozen)) throw new InvalidFrozenPublication();
   return { key, created: false };
 }

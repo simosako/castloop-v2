@@ -159,7 +159,7 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
   const target = episodeId ? { kind: "episode" as const, show_id: showId, episode_id: episodeId } : { kind: "show" as const, show_id: showId };
   if (command.startsWith("publish-")) {
     const state = await publishLocalM6Draft(root, config, target, key, args[2] ? { audioPath: resolve(args[2]) } : {});
-    return { result: "publication-accepted", job_id: state.publication.request.job_id };
+    return { result: state.phase === "queued" ? "publication-queued" : "publication-accepted", job_id: state.publication.request.job_id };
   }
   const state = await updateLocalM6Draft(root, config, target, command === "update-show" ? { asset: "show" } : command === "update-episode" ?
     { asset: "episode_metadata" } : { asset: "audio", audio_path: resolve(args[2]!) }, key, {

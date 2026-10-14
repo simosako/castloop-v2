@@ -4,6 +4,8 @@
 **設計提案であり、実装・配備・権限変更はしていない。**
 [固定負担の削減案](http_acceptance_fixed_cost_optimization_plan.md)と比較する。
 
+2026-10-15追記: 管理者が段階Aの開発を承認し、v0.4.0を起点に`feat/publication-queue-submit`を作成した。[段階Aの実装契約](publication_queue_commit_stage_a.md)参照。以下は当初の比較・提案であり、段階B・別Worker分離・権限変更・Cloudflare配備は行っていない。
+
 ## 結論
 
 移譲できる。現在のCLIはCloudflare REST APIを直接使っているので、

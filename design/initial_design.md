@@ -2,6 +2,8 @@
 
 更新日: 2026-10-14。現在の公開版v0.4.0の構成と仕様をまとめる。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
 
+2026-10-15の開発差分: `feat/publication-queue-submit`でcommit全体を既存Queue invocationへ移す[段階A](publication_queue_commit_stage_a.md)を実装している。同期claim・staging・statusはHTTPに残し、claimまで移す段階Bは未実装。公開版v0.4.0には含まれず、以下の公開版仕様とは区別する。
+
 - v0.2.0: M6の新規初期化、通常更新、Show／Episodeの非公開化・復元・削除を公開。
 - v0.2.1: Show／Episode一覧を追加。
 - v0.3.0: 1サービスにつき1つの独自ドメインを追加・照会・削除できる。
