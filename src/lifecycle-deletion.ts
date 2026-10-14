@@ -54,7 +54,7 @@ export function classifyLifecycleDeletionKey(input: DeletionTarget, key: string)
   };
   if (key === `system/shows/${target.showId}/show.toml`) return "payload";
   if (parts[0] === "public" && parts[1] === "podcasts") {
-    if (target.kind === "show" && parts.length === 4 && /^(feed\.xml|cover\.(jpg|png))$/.test(parts[3])) return "payload";
+    if (target.kind === "show" && parts.length === 4 && /^(feed\.xml|cover\.(jpg|png)|episode-catalog\.json)$/.test(parts[3])) return "payload";
     if (parts.length === 6 && parts[3] === "episodes" && validEpisode(parts[4]) &&
       parts[5].endsWith(".mp3") && z.uuid().safeParse(parts[5].slice(0, -4)).success) return "payload";
   }

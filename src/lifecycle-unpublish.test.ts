@@ -110,7 +110,7 @@ describe("M6 unpublish state machine", () => {
     });
     expect(purges).toBe(1);
     expect((await readEpisodeLifecycle(setup.env, "daily", "first"))?.lifecycle).toBe("unpublished");
-    expect((await readShowControl(setup.env, "daily"))?.value.feed_generation).toBe(0);
+    expect((await readShowControl(setup.env, "daily"))?.value.feed_generation).toBe(1);
   });
 
   test("purge failure retains the stopped target and owner; retry does not rewrite a completed feed", async () => {

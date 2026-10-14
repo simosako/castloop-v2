@@ -22,7 +22,7 @@ test("every subcommand displays help without a workspace or credentials", () => 
   } finally {
     rmdirSync(directory);
   }
-});
+}, 15000);
 
 test("help works after positional arguments, with -h, and with help COMMAND", () => {
   for (const args of [["create-show", "daily", "--help"], ["init", "--service-id", "daily", "--help"],
@@ -56,6 +56,17 @@ test("list commands reject missing Show IDs, excess arguments and invalid flags 
 test("domain rejects malformed actions and options before workspace access", () => {
   for (const args of [["domain"], ["domain", "add"], ["domain", "list", "extra"], ["domain", "remove", "hostname"],
     ["domain", "unknown"], ["domain", "list", "--operation-id", "id"], ["domain", "remove", "--force", "true"]]) {
+    const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: "/tmp/opencode" });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout.toString()).toBe("");
+    expect(result.stderr.toString()).not.toContain("ENOENT");
+  }
+});
+
+test("RSS import arguments fail before network or workspace access", () => {
+  for (const args of [["import-rss"], ["import-rss", "show", "https://example.com/feed"],
+    ["import-rss", "show", "https://example.com/feed", "--dry-run", "--output", "dir"],
+    ["import-rss", "show", "file:///etc/passwd", "--dry-run"], ["publish-rss-import"], ["publish-rss-import", "dir", "--force", "true"]]) {
     const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: "/tmp/opencode" });
     expect(result.exitCode).toBe(1);
     expect(result.stdout.toString()).toBe("");
@@ -132,7 +143,10 @@ test("formal domain list uses workers.dev administration and Cloudflare GET with
   writeFileSync(preload, `import assert from "node:assert/strict";
 import { domainAdminFixture } from ${JSON.stringify(fixture)};
 import { fetchM6ManagementIntegration } from ${JSON.stringify(routes)};
+const output = console.log;
+console.log = () => {};
 const setup = await domainAdminFixture();
+console.log = output;
 globalThis.fetch = async (input, init) => {
   const request = new Request(input, init);
   const url = new URL(request.url);

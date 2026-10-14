@@ -22,6 +22,7 @@ pnpm-debug.log*
 # Local castloop runtime credentials and draft state
 .castloop/
 tmp/linux-smoke/
+/.local-test-data/
 
 # AWS SAM
 .aws-sam/

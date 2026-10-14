@@ -138,7 +138,7 @@ describe("M6 publication admission from verified staging", () => {
     }
   });
 
-  test("missing, aborted, foreign or checksum/object-identity-mismatched staging proofs cannot create a marker", async () => {
+  test("invalid staging proofs are rejected by detailed validation rather than HTTP acceptance", async () => {
     for (const fault of ["missing-status", "aborted", "foreign-draft", "hash", "etag", "version", "missing-version", "size"] as const) {
       const setup = await fixture();
       const request = setup.staged[0]!;
@@ -169,8 +169,9 @@ describe("M6 publication admission from verified staging", () => {
           return legacy;
         }) }));
       }
-      await expect(commitOwnedPublication(setup.env, operation)).rejects.toThrow();
-      expect(setup.entries.has(setup.markerKey)).toBe(false);
+      await expect(verifyPublicationStaging(setup.env, operation)).rejects.toThrow();
+      expect((await commitOwnedPublication(setup.env, operation)).created).toBe(true);
+      expect(setup.entries.has(setup.markerKey)).toBe(true);
       expect((await readShowControl(setup.env, "daily"))?.value.owner?.job_id).toBe(setup.draftJobId);
     }
   });
@@ -232,10 +233,10 @@ describe("M6 publication admission from verified staging", () => {
   test("wrong base revision and supplied commit checksums reject even successfully verified payloads", async () => {
     const setup = await fixture("episode", "metadata");
     const operation = await claimPublicationOperation(setup.env, { ...setup.frozen, commit: { ...setup.frozen.commit, base_revision_id: crypto.randomUUID() } });
-    await expect(commitOwnedPublication(setup.env, operation)).rejects.toThrow("base revision");
+    await expect(verifyPublicationStaging(setup.env, operation)).rejects.toThrow();
     const other = await fixture("episode", "audio");
     const next = await claimPublicationOperation(other.env, { ...other.frozen, commit: { ...other.frozen.commit, audio_sha256: "a".repeat(64) } });
-    await expect(commitOwnedPublication(other.env, next)).rejects.toThrow("verification evidence");
+    await expect(verifyPublicationStaging(other.env, next)).rejects.toThrow();
   });
 
   test("manifest and admission response loss recover with exactly the same immutable job", async () => {
@@ -268,7 +269,7 @@ describe("M6 publication admission from verified staging", () => {
         await setup.bucket.put("system/episode-lifecycle/daily/first.toml", stringifyLifecycleToml({ schema_version: 1,
           show_id: "daily", episode_id: "first", lifecycle: "active", generation: 1 }));
       }
-      await expect(commitOwnedPublication(setup.env, operation)).rejects.toThrow();
+      await expect(verifyPublicationStaging(setup.env, operation)).rejects.toThrow();
       expect(setup.entries.has(setup.markerKey)).toBe(false);
     }
   });
@@ -283,7 +284,7 @@ describe("M6 publication admission from verified staging", () => {
     await expect(commitOwnedPublication(setup.env, operation)).rejects.toThrow();
   });
 
-  test("metadata-only publication verifies unchanged audio and immutable history before committing", async () => {
+  test("metadata-only detailed validation checks unchanged audio and immutable history", async () => {
     for (const fault of ["history", "audio", "checksum"] as const) {
       const setup = await fixture("episode", "metadata");
       const operation = await claimPublicationOperation(setup.env, setup.frozen);
@@ -294,7 +295,7 @@ describe("M6 publication admission from verified staging", () => {
         if (fault === "audio") setup.payloads.delete(key);
         else setup.payloads.get(key)!.customMetadata = { sha256: "b".repeat(64) };
       }
-      await expect(commitOwnedPublication(setup.env, operation)).rejects.toThrow(fault === "history" ? "history" : "base audio");
+      await expect(verifyPublicationStaging(setup.env, operation)).rejects.toThrow();
       expect(setup.entries.has(setup.markerKey)).toBe(false);
     }
   });

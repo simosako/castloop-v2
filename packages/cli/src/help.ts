@@ -1,6 +1,25 @@
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
+  "publish-rss-import": {
+    usage: "publish-rss-import DIRECTORY",
+    description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
+      "Requires an open M7-compatible Worker, retained administrator key and Cloudflare upload credentials.\n" +
+      "Validates all TOML and assets before registration; publishes the Show then Episodes sequentially.\n" +
+      "Intermediate Episodes become public as jobs finish. The operation is not an atomic batch.\n" +
+      "Re-running inspects acknowledged pending jobs and continues recorded progress without republishing completed inputs.\n" +
+      "Unknown mutation outcomes remain blocked; preserve .castloop journals and inspect the existing jobs.\n" +
+      "Completion does not authorize removal of the old host or certify subscriber migration.",
+  },
+  "import-rss": {
+    usage: "import-rss SHOW_ID FEED_URL (--dry-run | --output DIRECTORY)",
+    description: "Import one RSS 2.0 podcast to local files without Cloudflare credentials or changes.\n" +
+      "--dry-run fetches only RSS and reports counts, missing fields and unsupported extensions.\n" +
+      "--output downloads the RSS snapshot, JPEG/PNG cover, MP3s and editable TOML into an empty directory.\n" +
+      "Repeat the same command to continue this snapshot without overwriting edited TOML.\n" +
+      "Preserve downloaded files and private .castloop records; review them before publication.\n" +
+      "Audio must be MP3 and at most 300,000,000 bytes. Local import does not migrate subscribers or remove the old host.",
+  },
   init: {
     usage: "init [dir] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
     description: "Create a service workspace and Cloudflare resources. Missing values are prompted on a terminal.\n" +
@@ -51,6 +70,11 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Run from the service workspace. Explicitly retry the same acknowledged publication commit.\n" +
       "Requires its retained journal and settled execution; active or unknown owners/locks are not released.",
   },
+  "release-job": {
+    usage: "release-job JOB",
+    description: "Disabled: dead-letter history does not prove that the current execution or IO ended.\n" +
+      "Preserve journals and tokens and inspect Worker logs. No token is released or commit requeued.",
+  },
   deploy: {
     usage: "deploy [--operation-id UUID]",
     description: "Run from the service workspace. Update an already initialized M6 service without converting data.\n" +
@@ -68,6 +92,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "init-reconcile": {
     usage: "init-reconcile OPERATION_UUID",
     description: "Reconcile a retained initialization only when the server already completed it paused. Does not redeploy or replay initialization.",
+  },
+  "update-service-continue": {
+    usage: "update-service-continue OPERATION_UUID",
+    description: "Explicitly activate an acknowledged upload only with a durable not-started activation checkpoint.\n" +
+      "Rechecks the retained owner, settings, version history and script ETag; never uploads again. Completes paused.\n" +
+      "Legacy upload-only journals, unknown activation requests and residual locks remain blocked.",
   },
   "update-service-verify": {
     usage: "update-service-verify OPERATION_UUID",

@@ -1,6 +1,6 @@
 # M6: 保存形式を変えない通常更新
 
-更新日: 2026-10-04
+更新日: 2026-10-12
 
 ## 範囲
 
@@ -14,7 +14,7 @@ M6稼働済みサービスのWorkerだけを更新する経路を、v0.2.0以降
 2. 凍結要求のpause ID・service generation・旧Worker version・config hashを照合する。live service token、unfinished Show owner（uploading/reserved/processing）、未完了Show登録があれば更新しない。
 3. Showの小さいcontrol recordだけを検査し、service ETagへのCASで`updating`を獲得する。このCASにより、検査中に起きたconsumer/token変更も拒否する。以降は管理/consumer/recovery/通常配信を閉じる。
 4. 準備時とupload直前に、Versions APIの最新uploadが旧Worker versionと一致することを確認する。durable journalの`deploy_requested`を保存してから、一度だけVersion Upload APIへPOSTする。凍結metadataは継承元UUIDと保持設定を含む意図全体であり、実multipartにはversion単位のmetadataだけを送り、APIが受理するinherit `version_id: "latest"`へ変換する。script単位のtags/logpush/tail consumer/placement/observabilityは変更しない。
-5. POST応答のversion ID・連番・script ETagを検証し、allowlist receiptだけを即座にjournalへfsync保存する。新versionの連番が旧versionの直後であること、最新二件がacknowledged versionと旧versionそのものであること、そのIDのimmutable version GETのscript ETag、旧deployment/凍結設定が維持されていることを確認してから、そのacknowledged versionだけを100%にするDeployment APIへ一度POSTする。途中の別upload/secret変更・未知の最新version・連番欠落では配備しない。Deployment POSTのIDを保存し、そのIDとGETの100% version・保持設定を照合する。POSTのstrategy/versionsが省略されていてもID自体は必須で、省略値を応答へ捏造しない。応答にversionsがあれば照合する。最新versionを見つけたことだけで自分のuploadとは扱わない。REST検査とは別にruntimeの配信・管理・consumerを検証する。
+5. POST応答のversion ID・連番・script ETagを検証し、allowlist receipt、upload前の旧deployment ID、activation未開始checkpointを新形式journalへ一緒にfsync保存する。新versionの連番が旧versionの直後であること、最新二件がacknowledged versionと旧versionそのものであること、そのIDのimmutable version GETのscript ETag、旧deployment/凍結設定が維持されていることを前後二回確認する。server ownerの再照合後、activation開始checkpointをfsync保存してから、そのacknowledged versionだけを100%にするDeployment APIへ一度POSTする。途中の別upload/secret変更・未知の最新version・連番欠落では配備しない。Deployment POSTのIDを保存し、そのIDとGETの100% version・保持設定を照合する。POSTのstrategy/versionsが省略されていてもID自体は必須で、省略値を応答へ捏造しない。応答にversionsがあれば照合する。最新versionを見つけたことだけで自分のuploadとは扱わない。REST検査とは別にruntimeの配信・管理・consumerを検証する。
 6. new targetをserver admissionへ固定し、検証前後のdeployment/settings/configを照合してreadinessをCAS更新する。完了はpausedのまま。再開は別の明示操作とする。
 
 admissionの旧`readiness`（legacy移行監査）は変更せず、新versionの稼働判定は`runtime_readiness`へ置く。停止/削除等の通常content制御も変更しない。requestは`system/service-updates/<operationId>/request.json`へ保持し、操作IDを別内容で再利用しない。
@@ -30,6 +30,20 @@ admissionの旧`readiness`（legacy移行監査）は変更せず、新version�
 ## 失敗と制約
 
 時間/HEAD不在だけでtokenやShow ownerを解放しない。upload/deployment/HTTP応答喪失ではrequestedを保持し、再送・旧readinessへのrollback・自動resumeは行わない。server上の同一targetに対する読み取り専用再検証と、clientによる不明な書込要求の再送は区別する。既存runtime-check記録に属するoperation IDは受付前に拒否し、初期化ID再利用による配備後の記録衝突を防ぐ。
+
+### Issue #11: upload受付後・activation前の中断
+
+開発版の新規journalは`schema_version: 2`。`phase: deploy_requested`に次のcheckpointを持つ。metadataやsource本文、secretは保持せず、既存凍結要求のhashとupload receiptを使う。
+
+- `activation_checkpoint: { previous_deployment_id, state: "not_started" }`: upload受付と同じatomic local journal replacementで保存する。以後のGET/検証失敗は、この状態を保持する。
+- `state: "requested"`: Deployment POSTより前にfsync保存する。保存失敗時にはPOSTしない。保存成功後にPOSTの応答が不明、受付receiptの保存に失敗、またはPOST前にプロセスが停止しても、未開始へ戻さず再送を拒否する。
+- `deployment_receipt`: acknowledged Deployment POSTの応答だけから保存する。receipt後のGET失敗には従来の`update-service-verify`を使う。completion応答喪失には`update-service-reconcile`を使う。
+
+`update-service-continue OPERATION_UUID`は同一journalのexclusive lockを取り、schema-v2・upload receipt・未開始checkpoint・deployment receiptなしの場合だけ続行する。Version POST、beginの再送、新しいsourceのbuildはしない。config hash・同一凍結request・旧readiness・pause ID・CAS獲得直後のgeneration・空invocation・未固定targetのserver ownerを照合し、RESTの前後snapshotで凍結settings、元deployment ID、最新二versionのID/連番、immutable upload versionのscript ETagを検証する。activation直前にも同じserver ownerを照合する。既存の`updating` CASが排他的な更新ownerであり、GETを新しいCASやCloudflareの原子的lockの代用とはしない。別ownerの採用や解放は行わない。activation・runtime completionに成功してもpausedで終了する。
+
+schema-v1は読み取りと両receiptに基づく既存verify/completion照合だけを維持する。**Issue #11に記載された旧形式upload-only journalは、この修正でも復旧しない。** 旧形式の同じdurable状態は未開始と応答不明を区別できず、現在旧deploymentが見えることも未知IOの不存在を証明しない。checkpointの推測・自動昇格・journal編集・手動activation・強制解除は禁止。旧形式の`prepared`も新protocolでは開始しない（serviceがpaused/drainedで旧操作未開始と確認済みの場合のみ別operation IDを使う）。新形式でも不明upload、requestedでdeployment receiptなし、残存lockは閉じたまま保持する。
+
+Cloudflare GETの一般retry・timeout変更は含めない。caught GET失敗後の明示続行に限定し、POST再送、時間による解除、万能な外部復旧は追加しない。mock限定テストで正式command runnerからの続行、再uploadなし、server CAS owner/paused完了、REST drift、checkpoint/receipt保存失敗、activation応答喪失、旧journalと残存lockの拒否を検証する。実Cloudflare環境の復旧・release受け入れとは区別する。
 
 現段階のShow-control検査は一回100件のbounded listであり、truncatedなら配備前に拒否する。runtime budgetを超える大規模サービスの更新手順は未対応で、この上限をサービス全体の公開仕様として決定したものではない。実機のruntime制約に適合することも公開前の受け入れ対象である。
 

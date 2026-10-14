@@ -73,6 +73,8 @@ export async function stepLifecycleDelete(env: LifecycleDeleteEnv, execution: Sh
         if (feed.writeFeed) {
           await effects.writeFeed(feed.episodes);
           await advanceLifecycleFeedGeneration(env, execution);
+        } else if (identity.kind === "episode") {
+          await advanceLifecycleFeedGeneration(env, execution);
         }
         await recordProgress({ phase: "purge" });
       } else {

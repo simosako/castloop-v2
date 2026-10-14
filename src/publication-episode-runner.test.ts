@@ -24,6 +24,24 @@ function effects(setup: Awaited<ReturnType<typeof episodePublicationFixture>>) {
 }
 
 describe("M6 owned Episode publication runner", () => {
+  test("imported opaque GUIDs survive staging, publication and immutable history", async () => {
+    const setup = await episodePublicationFixture(undefined, { guid: "old-host:episode:123", guid_is_permalink: true });
+    await consumeOwnedPublication(setup.env, setup.key, effects(setup).effects);
+    const revision = parseEpisodeRevision(setup.text(setup.metadataKey));
+    expect(revision.guid).toBe("old-host:episode:123");
+    expect(revision.guid_is_permalink).toBe(true);
+    expect(parseEpisodeRevision(setup.text(setup.historyKey))).toEqual(revision);
+    expect(setup.text(setup.feedKey)).toContain('<guid isPermaLink="true">old-host:episode:123</guid>');
+  });
+
+  test("publication rejects a permalink meaning changed from its immutable base", async () => {
+    const setup = await episodePublicationFixture("metadata");
+    await setup.bucket.put(`public/episodes/daily/${setup.episodeId}/revisions/${setup.base!.revision_id}.toml`,
+      stringifyToml({ ...setup.base!, guid_is_permalink: true }));
+    expect(await consumeOwnedPublication(setup.env, setup.key, effects(setup).effects)).toEqual({ state: "failed", reason: "validation_failed" });
+    expect(setup.entries.has(setup.historyKey)).toBe(false);
+  });
+
   test("initial, metadata-only and audio-only publication preserve identity and immutable history", async () => {
     for (const update of [undefined, "metadata", "audio"] as const) {
       const setup = await episodePublicationFixture(update);
@@ -160,7 +178,11 @@ describe("M6 owned Episode publication runner", () => {
     const stoppedKey = "public/episodes/daily/stopped/metadata.toml";
     const stopped = parseEpisodeRevision(setup.text(stoppedKey));
     await setup.bucket.put(stoppedKey, stringifyToml({ ...stopped, guid: setup.draft.guid }));
-    await expect(consumeOwnedPublication(setup.env, setup.key, effects(setup).effects)).rejects.toThrow("GUID is already used");
+    const catalogKey = "public/podcasts/daily/episode-catalog.json";
+    const catalog = JSON.parse(setup.text(catalogKey));
+    catalog.entries.find((entry: { revision: { episode_id: string } }) => entry.revision.episode_id === "stopped").revision.guid = setup.draft.guid;
+    await setup.bucket.put(catalogKey, JSON.stringify(catalog));
+    expect(await consumeOwnedPublication(setup.env, setup.key, effects(setup).effects)).toEqual({ state: "failed", reason: "validation_failed" });
     expect(setup.entries.has(setup.mediaKey)).toBe(false);
     expect(setup.entries.has(setup.historyKey)).toBe(false);
   });

@@ -1,10 +1,10 @@
 import { lifecycleFailureForPhase, lifecycleJobStatusSchema, parseEpisodeDraft, parseEpisodeRevision, parseJobStatus,
   parseShowControl, parseShowMetadata, stageControlRequest, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema,
-  stringifyToml } from "../packages/shared/src/index";
+  sameEpisodeIdentity, stringifyToml } from "../packages/shared/src/index";
 import type { LifecycleJobStatus, StagePayload, StageUploadProgress } from "../packages/shared/src/index";
 import { controlRequestHash, readEpisodeLifecycle, readShowControl } from "./lifecycle-control";
 import type { LifecycleControlEnv } from "./lifecycle-control";
-import { readStageUploadProgress, requireStageUpload, stageManifestHash, writeStageUploadProgress } from "./staging-upload";
+import { createStageVerificationEnv, readStageUploadProgress, requireStageUpload, stageManifestHash, writeStageUploadProgress } from "./staging-upload";
 import type { StageOperation, StageUploadSnapshot } from "./staging-upload";
 
 export type StageVerification = StageOperation & { verificationId: string };
@@ -96,7 +96,7 @@ async function verifyPayload(env: LifecycleControlEnv, verification: StageVerifi
     if (published) {
       if (published.size > 1_000_000) throw new Error("Published Episode metadata is oversized");
       const previous = parseEpisodeRevision(await published.text());
-      if (previous.episode_id !== episode.episode_id || previous.guid !== episode.guid || previous.published_at !== episode.published_at) {
+      if (!sameEpisodeIdentity(previous, episode)) {
         throw new Error("Episode identity and published_at must remain unchanged");
       }
     }
@@ -199,24 +199,25 @@ export async function runStageVerification(env: LifecycleControlEnv, operation: 
   }
   const verification = await acquireStageVerification(env, operation);
   try {
-    const snapshot = await requireStageVerification(env, verification);
-    let progress = (await readStageUploadProgress(env, verification, snapshot))!.value;
+    const scoped = await createStageVerificationEnv(env, verification);
+    const snapshot = await requireStageVerification(scoped, verification);
+    let progress = (await readStageUploadProgress(scoped, verification, snapshot))!.value;
     if (progress.phase !== "finished") {
-      await writeStatus(env, verification, "processing");
+      await writeStatus(scoped, verification, "processing");
       const { reason_code: _reason, ...cleanProgress } = progress;
       progress = cleanProgress;
       if (outcome === "staged" && progress.phase !== "verified") {
-        await writeStageUploadProgress(env, verification, { ...progress, phase: "verifying", verified_assets: [] }, verification.verificationId);
+        await writeStageUploadProgress(scoped, verification, { ...progress, phase: "verifying", verified_assets: [] }, verification.verificationId);
         const verified: StageUploadProgress["verified_assets"] = [];
-        for (const payload of snapshot.request.payloads) verified.push(await verifyPayload(env, verification, snapshot, payload));
+        for (const payload of snapshot.request.payloads) verified.push(await verifyPayload(scoped, verification, snapshot, payload));
         progress = stageUploadProgressSchema.parse({ ...progress, phase: "verified", verified_assets: verified });
-        await writeStageUploadProgress(env, verification, progress, verification.verificationId);
+        await writeStageUploadProgress(scoped, verification, progress, verification.verificationId);
       }
       progress = stageUploadProgressSchema.parse({ ...progress, phase: "finished", outcome, verified_assets: outcome === "aborted" ? [] : progress.verified_assets });
-      await writeStageUploadProgress(env, verification, progress, verification.verificationId);
+      await writeStageUploadProgress(scoped, verification, progress, verification.verificationId);
     } else if (progress.outcome !== outcome) throw new Error("Staging already finished with a different outcome");
-    await writeStatus(env, verification, "completed");
-    await finishVerification(env, verification);
+    await writeStatus(scoped, verification, "completed");
+    await finishVerification(scoped, verification);
   } catch (error) {
     if (await finishedOutcome(env, operation) === outcome) return;
     const snapshot = await requireStageVerification(env, verification);

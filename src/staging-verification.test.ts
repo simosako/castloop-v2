@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { episodeRevisionSchema, parseEpisodeDraft, parseJobStatus, parseShowMetadata, stagePayloadKey, stageUploadRequestSchema,
   stringifyLifecycleToml, stringifyToml } from "../packages/shared/src/index";
 import { acquireStageVerification, releaseStageVerification, runStageVerification } from "./staging-verification";
-import { beginStageUpload, claimStageUpload, readStageUploadProgress, requireStageUpload, settleStageUpload } from "./staging-upload";
+import { beginStageUpload, claimStageUpload, createStageVerificationEnv, readStageUploadProgress, requireStageUpload, settleStageUpload } from "./staging-upload";
 import { claimShowOperation, readShowControl } from "./lifecycle-control";
 import { lifecycleFixture } from "./test-support/lifecycle";
 import { createHash } from "node:crypto";
@@ -61,6 +61,47 @@ async function fixture(asset: "show" | "audio" | "episode_metadata" = "show", in
 }
 
 describe("M6 staging verification and admission completion", () => {
+  test("verification reuses only frozen records and still checks current owner, tokens, lifecycle and settlement", async () => {
+    const setup = await fixture("episode_metadata");
+    await setup.settle();
+    const verification = await acquireStageVerification(setup.env, setup.operation);
+    const reads: string[] = [];
+    const env = { CASTLOOP_BUCKET: { ...setup.bucket, async get(...args: Parameters<typeof setup.bucket.get>) {
+      reads.push(args[0]); return setup.bucket.get(...args);
+    } } } as never;
+    const scoped = await createStageVerificationEnv(env, verification);
+    reads.length = 0;
+    for (let i = 0; i < 5; i += 1) await requireStageUpload(scoped, verification);
+    expect(reads.filter((key) => key === "system/show-publications/daily.json")).toHaveLength(5);
+    expect(reads.filter((key) => key.endsWith("/upload.json") || key.endsWith("/request.toml") || key.includes("show-reservations"))).toHaveLength(0);
+    expect(reads.filter((key) => key === "system/episode-lifecycle/daily/first.toml")).toHaveLength(5);
+    await expect(createStageVerificationEnv(scoped, verification)).rejects.toThrow("invocations");
+    const control = (await readShowControl(setup.env, "daily"))!.value;
+    await setup.bucket.put("system/show-publications/daily.json", JSON.stringify({ ...control,
+      owner: { ...control.owner!, verification_id: crypto.randomUUID() } }));
+    await expect(requireStageUpload(scoped, verification)).rejects.toThrow();
+    await setup.bucket.put("system/show-publications/daily.json", JSON.stringify(control));
+    await expect(requireStageUpload(scoped, { ...verification, operationId: crypto.randomUUID() })).rejects.toThrow();
+    const foreign = { ...scoped, CASTLOOP_BUCKET: { ...scoped.CASTLOOP_BUCKET } };
+    await expect(requireStageUpload(foreign, verification)).rejects.toThrow();
+    await releaseStageVerification(setup.env, verification);
+    await expect(requireStageUpload(scoped, verification)).rejects.toThrow();
+  });
+
+  test("finish reads the immutable upload manifest only during scope establishment", async () => {
+    const setup = await fixture("episode_metadata");
+    await setup.settle();
+    const reads: string[] = [];
+    const env = { CASTLOOP_BUCKET: { ...setup.bucket, async get(...args: Parameters<typeof setup.bucket.get>) {
+      reads.push(args[0]); return setup.bucket.get(...args);
+    } } } as never;
+    await runStageVerification(env, setup.operation, "staged");
+    expect(reads.filter((key) => key.endsWith("/upload.json"))).toHaveLength(2);
+    expect(reads.filter((key) => key.endsWith("/request.toml")).length).toBeLessThanOrEqual(3);
+    expect(reads.filter((key) => key === "system/show-publications/daily.json").length).toBeGreaterThan(10);
+    expect(parseJobStatus(setup.entries.get(setup.statusKey)!.data).state).toBe("completed");
+  });
+
   test("Show and Episode finish from exact readback receipts without reading audio bodies or publishing private content", async () => {
     for (const asset of ["show", "audio", "episode_metadata"] as const) {
       const setup = await fixture(asset);
@@ -231,11 +272,12 @@ describe("M6 staging verification and admission completion", () => {
   });
 
   test("published Episode GUID and published_at remain immutable even for correctly hashed staging inputs", async () => {
-    for (const fault of ["guid", "published_at"] as const) {
+    for (const fault of ["guid", "published_at", "guid_is_permalink"] as const) {
       const setup = await fixture("episode_metadata");
       const bytes = setup.payloads.get(stagePayloadKey(setup.request, "episode_metadata"))!.bytes;
       const staged = parseEpisodeDraft(new TextDecoder().decode(bytes));
       const current = episodeRevisionSchema.parse({ ...staged, ...(fault === "guid" ? { guid: crypto.randomUUID() } :
+        fault === "guid_is_permalink" ? { guid_is_permalink: true } :
         { published_at: "2026-09-30T12:00:00Z" }), revision_id: crypto.randomUUID(),
         enclosure_url: `https://example.com/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`,
         content_type: "audio/mpeg", length_bytes: 1, duration_seconds: 1, sha256: "a".repeat(64), updated_at: "2026-10-01T12:00:00Z" });

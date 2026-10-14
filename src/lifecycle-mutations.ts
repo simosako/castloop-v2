@@ -3,6 +3,9 @@ import { parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsCo
 import type { EpisodeLifecycle } from "../packages/shared/src/index";
 import { requireShowExecution } from "./lifecycle-control";
 import type { LifecycleControlEnv, ShowExecution } from "./lifecycle-control";
+import { advanceEpisodeCatalog } from "./episode-catalog";
+import type { LifecycleFeedEnv } from "./lifecycle-feed";
+import { measureWorkerPhase } from "./worker-timing";
 
 export async function closeOwnedLifecycleTarget(env: LifecycleControlEnv, execution: ShowExecution): Promise<void> {
   const current = await requireShowExecution(env, execution);
@@ -36,14 +39,17 @@ export async function closeOwnedLifecycleTarget(env: LifecycleControlEnv, execut
   if (!written) throw new Error("Episode lifecycle changed before closing delivery");
 }
 
-export async function advanceLifecycleFeedGeneration(env: LifecycleControlEnv, execution: ShowExecution): Promise<void> {
-  const current = await requireShowExecution(env, execution);
-  if (current.value.last_feed_job_id === execution.jobId) return;
-  if (current.value.feed_generation === Number.MAX_SAFE_INTEGER) throw new Error("Feed generation is exhausted");
-  const value = parseShowControl({ ...current.value, feed_generation: current.value.feed_generation + 1,
-    last_feed_job_id: execution.jobId });
-  const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
-    onlyIf: { etagMatches: current.etag },
+export async function advanceLifecycleFeedGeneration(env: LifecycleFeedEnv, execution: ShowExecution): Promise<void> {
+  await measureWorkerPhase(execution.jobId, "publication.catalog_advance", () => advanceEpisodeCatalog(env, execution));
+  await measureWorkerPhase(execution.jobId, "publication.feed_generation_write", async () => {
+    const current = await requireShowExecution(env, execution);
+    if (current.value.last_feed_job_id === execution.jobId) return;
+    if (current.value.feed_generation === Number.MAX_SAFE_INTEGER) throw new Error("Feed generation is exhausted");
+    const value = parseShowControl({ ...current.value, feed_generation: current.value.feed_generation + 1,
+      last_feed_job_id: execution.jobId });
+    const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
+      onlyIf: { etagMatches: current.etag },
+    });
+    if (!written) throw new Error("Show control changed before feed generation advanced");
   });
-  if (!written) throw new Error("Show control changed before feed generation advanced");
 }

@@ -1,5 +1,5 @@
 import { episodeDraftFromRevision, parseEpisodeRevision, stagePayloadKey, stageUploadRequestSchema, stringifyToml } from "../../packages/shared/src/index";
-import type { StageAsset, StageUploadRequest } from "../../packages/shared/src/index";
+import type { EpisodeDraft, StageAsset, StageUploadRequest } from "../../packages/shared/src/index";
 import { readShowControl } from "../lifecycle-control";
 import { claimPublicationOperation, commitOwnedPublication, publicationRequestSchema } from "../publication-admission";
 import { consumeOwnedPublication } from "../publication-consumer";
@@ -8,7 +8,7 @@ import { runStageVerification } from "../staging-verification";
 import { publicationFixture } from "./publication";
 import { createHash } from "node:crypto";
 
-export async function episodePublicationFixture(update?: "metadata" | "audio") {
+export async function episodePublicationFixture(update?: "metadata" | "audio", identity?: Pick<EpisodeDraft, "guid" | "guid_is_permalink">) {
   const setup = await publicationFixture({ active: true, episodes: true });
   await consumeOwnedPublication(setup.env, setup.key, { async checkDeliveryGate() {}, async purge() {} });
   const episodeId = update ? "first" : "new-episode";
@@ -16,7 +16,7 @@ export async function episodePublicationFixture(update?: "metadata" | "audio") {
   const base = update ? parseEpisodeRevision(setup.text(`${prefix}/metadata.toml`)) : null;
   const draft = base ? { ...episodeDraftFromRevision(base), title: "Updated Episode title" } : {
     schema_version: 1 as const, episode_id: episodeId, guid: crypto.randomUUID(), title: "Initial Episode title",
-    description: "Private Episode description", published_at: "2026-10-01T12:00:00Z" };
+    description: "Private Episode description", published_at: "2026-10-01T12:00:00Z", ...identity };
   const metadata = new TextEncoder().encode(stringifyToml(draft));
   const audio = Uint8Array.from([73, 68, 51, 1, 2, 3]);
   const contents: Array<{ asset: StageAsset; bytes: Uint8Array }> = [];

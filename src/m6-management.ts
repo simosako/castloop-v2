@@ -4,6 +4,7 @@ import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
+import { ManagementReadConflict } from "./management-read-conflict";
 import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 
 export class M6ManagementServiceMismatch extends Error {
@@ -51,7 +52,7 @@ export async function withM6ManagementRead<T>(env: LifecycleReadEnv, serviceId: 
   const currentConfig = await env.CASTLOOP_BUCKET.head("system/service.toml");
   if (!current || current.etag !== snapshot.etag || JSON.stringify(current.value) !== JSON.stringify(snapshot.value) ||
     !currentConfig || currentConfig.etag !== configObject.etag || currentConfig.size !== configObject.size) {
-    throw new Error("Management snapshot changed during its read-only preview");
+    throw new ManagementReadConflict();
   }
   return result;
 }

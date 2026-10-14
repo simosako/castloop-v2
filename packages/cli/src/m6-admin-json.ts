@@ -8,6 +8,13 @@ const ROUTE_LABELS = { staging: "Staging", publication: "Publication", lifecycle
 
 export class M6AdminOperationRejected extends Error {}
 
+export class M6AdminVerificationError extends Error {
+  constructor(message: string, readonly reasonCode: "management_transport_failed" | "management_http_rejected" |
+    "management_response_invalid" | "management_identity_invalid" | "publication_status_changed" | "target_status_changed") {
+    super(`${message} [reason_code=${reasonCode}]`);
+  }
+}
+
 export async function readM6JsonResponse(response: Response, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
   const length = response.headers.get("Content-Length");
   if (response.headers.get("Cache-Control") !== "no-store" ||
@@ -56,7 +63,10 @@ export class M6AdminJsonClient {
     const label = ROUTE_LABELS[route];
     const body = JSON.stringify(input);
     if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
-    return this.send(new URL(`/admin/${route}`, this.managementBaseUrl), label, body, route === "target" ? 2_000_000 : RESPONSE_BUDGET);
+    const statusRead = route === "target" ? "target" : route === "publication" && "action" in input && input.action === "status" ? "publication" : undefined;
+    return this.send(new URL(`/admin/${route}`, this.managementBaseUrl), label, body,
+      route === "target" ? 2_000_000 : RESPONSE_BUDGET, statusRead,
+      route === "publication" && "action" in input && input.action === "commit" ? 202 : 200);
   }
 
   async getSetupProbe(operationId: string): Promise<unknown> {
@@ -70,7 +80,8 @@ export class M6AdminJsonClient {
     return this.send(new URL("/admin/health", this.managementBaseUrl), "Runtime health");
   }
 
-  private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET): Promise<unknown> {
+  private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET,
+    statusRead?: "target" | "publication", expectedStatus = 200): Promise<unknown> {
     let response: Response;
     try {
       response = await this.transport(url, {
@@ -78,10 +89,22 @@ export class M6AdminJsonClient {
         headers: { "X-Castloop-Key": this.adminKey, "User-Agent": "castloop-cli/0.1", "Content-Type": "application/json" }, body,
       });
     } catch {
-      throw new Error(`${label} request outcome is unknown; inspect retained ownership/progress without automatic retry`);
+      throw new M6AdminVerificationError(`${label} request outcome is unknown; inspect retained ownership/progress without automatic retry`,
+        "management_transport_failed");
     }
     try {
-      if (response.status !== 200) {
+      if (response.status !== expectedStatus) {
+        if (statusRead && response.status === 409) {
+          const value = await readM6JsonResponse(response);
+          if (value && typeof value === "object" && Object.keys(value).length === 3 &&
+            "error" in value && value.error === (statusRead === "target" ? "Target status changed during inspection" : "Publication status changed during inspection") &&
+            "reason_code" in value && value.reason_code === `${statusRead}_status_changed` &&
+            "service_id" in value && value.service_id === this.config.service_id) {
+            throw new M6AdminVerificationError(`${label} changed; only read-only inspection may be repeated`,
+              statusRead === "target" ? "target_status_changed" : "publication_status_changed");
+          }
+          throw new M6AdminVerificationError(`${label} response was not verified [http_status=${response.status}]`, "management_http_rejected");
+        }
         if (label === ROUTE_LABELS.domain && response.status === 409) {
           const value = await readM6JsonResponse(response);
           if (value && typeof value === "object" && "reason_code" in value && value.reason_code === "domain_operation_blocked") {
@@ -89,12 +112,13 @@ export class M6AdminJsonClient {
           }
         }
         if (response.body) await response.body.cancel();
-        throw new Error("Management operation was not confirmed");
+        throw new M6AdminVerificationError(`${label} response was not verified; management operation was not confirmed [http_status=${response.status}]`, "management_http_rejected");
       }
       return await readM6JsonResponse(response, maximumBytes);
     } catch (error) {
-      if (error instanceof M6AdminOperationRejected) throw error;
-      throw new Error(`${label} response was not verified; inspect retained ownership/progress without automatic retry`);
+      if (error instanceof M6AdminOperationRejected || error instanceof M6AdminVerificationError) throw error;
+      throw new M6AdminVerificationError(`${label} response was not verified; inspect retained ownership/progress without automatic retry`,
+        "management_response_invalid");
     }
   }
 }

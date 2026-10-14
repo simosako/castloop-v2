@@ -3,7 +3,7 @@ import { episodeRevisionSchema, parseLifecycleCommitKey,
 import type { EpisodeRevision } from "../packages/shared/src/index";
 import { readLifecycleCommit } from "./lifecycle-commit";
 import { readPublicVisibility, readShowControl, requireShowExecution } from "./lifecycle-control";
-import type { ShowExecution } from "./lifecycle-control";
+import type { LifecycleControlEnv, ShowExecution } from "./lifecycle-control";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import type { LifecycleConsumerEffects } from "./lifecycle-consumer";
 import type { LifecycleDeleteEnv } from "./lifecycle-delete-batch";
@@ -25,7 +25,7 @@ export async function createShowPublicationWorkerEffects(env: LifecycleDeleteEnv
   return createPublicationWorkerEffects(env, execution, bindings);
 }
 
-export async function createPublicationWorkerEffects(env: LifecycleDeleteEnv, execution: ShowExecution,
+export async function createPublicationWorkerEffects(env: LifecycleControlEnv, execution: ShowExecution,
   bindings: Pick<LifecycleWorkerBindings, "cachedAssets" | "checkDeliveryGate">): Promise<PublicationEffects> {
   const current = await requireShowExecution(env, execution);
   if (current.value.owner?.action !== "publish") throw new Error("Publication effects require a publish owner");

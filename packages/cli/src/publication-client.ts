@@ -1,7 +1,7 @@
 import { publicationAdminRequestSchema, publicationAdminResponseSchema, publicationCommitKey, publicationManifestHash,
   publicationOperationSchema, publicationRequestSchema } from "@castloop/shared";
 import type { PublicationAdminResponse, PublicationOperationIdentity, PublicationRequest, ServiceConfig } from "@castloop/shared";
-import { M6AdminJsonClient } from "./m6-admin-json";
+import { M6AdminJsonClient, M6AdminVerificationError } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
 import { createHash } from "node:crypto";
 
@@ -19,26 +19,29 @@ export class PublicationAdminClient {
     this.http = new M6AdminJsonClient(config, adminKey, transport);
   }
 
-  private async call(input: PublicationRequest, action: "claim" | "commit" | "retry" | "status"): Promise<PublicationAdminResponse> {
+  private async call(input: PublicationRequest, action: "claim" | "commit" | "retry" | "release" | "status"): Promise<PublicationAdminResponse> {
     const publication = publicationRequestSchema.parse(input);
     const operation = publicationClientOperation(publication);
     const hash = await publicationManifestHash(publication);
-    const identity = { schema_version: 1, service_id: this.http.config.service_id, action };
-    const request = publicationAdminRequestSchema.parse(action === "commit" || action === "retry" ? { ...identity, operation, manifest_sha256: hash } :
-      { ...identity, publication });
+    const identity = { schema_version: 1, service_id: this.http.config.service_id, action,
+      ...(action === "claim" || action === "commit" ? { acceptance_protocol: "queue-validation-v1" } : {}) };
+    const request = publicationAdminRequestSchema.parse(action === "commit" || action === "retry" || action === "release" ?
+      { ...identity, operation, manifest_sha256: hash } : { ...identity, publication });
     const payload = await this.http.post("publication", request);
     try {
       const value = publicationAdminResponseSchema.parse(payload);
-      const expected = { claim: "claimed", commit: "committed", retry: "requeued", status: "status" }[action];
+      const expected = { claim: "claimed", commit: "accepted", retry: "requeued", release: "released", status: "status" }[action];
       if (value.service_id !== this.http.config.service_id || value.result !== expected || value.manifest_sha256 !== hash ||
-        JSON.stringify(value.operation) !== JSON.stringify(operation) || (value.result === "committed" || value.result === "requeued") && value.key !== publicationCommitKey(publication.commit) ||
+        JSON.stringify(value.operation) !== JSON.stringify(operation) ||
+        (value.result === "accepted" || value.result === "requeued" || value.result === "released") && value.key !== publicationCommitKey(publication.commit) ||
         value.result === "status" && (JSON.stringify(value.publication) !== JSON.stringify(publication) ||
           value.request_sha256 !== createHash("sha256").update(JSON.stringify(publication.request)).digest("hex"))) {
         throw new Error("Publication response differs from its frozen manifest/control request");
       }
       return value;
     } catch {
-      throw new Error("Publication response was not verified; inspect retained ownership/progress without automatic retry");
+      throw new M6AdminVerificationError("Publication response was not verified; inspect retained ownership/progress without automatic retry",
+        "management_identity_invalid");
     }
   }
 
@@ -48,9 +51,9 @@ export class PublicationAdminClient {
     return value;
   }
 
-  async commit(publication: PublicationRequest): Promise<Result<"committed">> {
+  async commit(publication: PublicationRequest): Promise<Result<"accepted">> {
     const value = await this.call(publication, "commit");
-    if (value.result !== "committed") throw new Error("Invalid publication commit result");
+    if (value.result !== "accepted") throw new Error("Invalid publication acceptance result");
     return value;
   }
 
@@ -63,6 +66,12 @@ export class PublicationAdminClient {
   async retry(publication: PublicationRequest): Promise<Result<"requeued">> {
     const value = await this.call(publication, "retry");
     if (value.result !== "requeued") throw new Error("Invalid publication retry result");
+    return value;
+  }
+
+  async release(publication: PublicationRequest): Promise<Result<"released">> {
+    const value = await this.call(publication, "release");
+    if (value.result !== "released") throw new Error("Invalid publication release result");
     return value;
   }
 }

@@ -4,10 +4,20 @@ import { controlRequestSchema, parseControlRequest, parseEpisodeLifecycle, parse
 import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/shared/src/index";
 import { requireShowReservationReady } from "./show-reservation-record";
 
-export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head"> };
+const VERIFIED_OPERATION = Symbol("verifiedShowOperation");
+const VERIFIED_CONTROL_REQUEST = Symbol("verifiedControlRequest");
+const VERIFIED_COMMIT_CONTROL = Symbol("verifiedCommitControl");
+type VerifiedControlRequest = Readonly<{ bucket: LifecycleControlEnv["CASTLOOP_BUCKET"]; request: Readonly<ControlRequest>;
+  hash: string; reservationId: string | undefined }>;
+type VerifiedOperation = Readonly<{ bucket: LifecycleControlEnv["CASTLOOP_BUCKET"]; request: Readonly<ControlRequest>;
+  hash: string; reservationId: string | undefined; executionId?: string; verificationId?: string }>;
+export type LifecycleControlEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "put" | "head">;
+  [VERIFIED_OPERATION]?: VerifiedOperation;
+  [VERIFIED_COMMIT_CONTROL]?: VerifiedControlRequest & { isActive: () => boolean } };
 export type LifecycleReadEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head"> };
 export type ShowControlSnapshot = { value: ShowControl; etag: string };
-export type OwnedShowControlSnapshot = { value: ShowControl & { owner: NonNullable<ShowControl["owner"]> }; etag: string };
+export type OwnedShowControlSnapshot = { value: ShowControl & { owner: NonNullable<ShowControl["owner"]> }; etag: string;
+  [VERIFIED_CONTROL_REQUEST]?: VerifiedControlRequest };
 export type ShowExecution = { showId: string; jobId: string; generation: number; executionId: string };
 export type PublicVisibility = "public" | "not_found" | "gone";
 export type PublicVisibilitySnapshot = { visibility: "not_found" | "gone" } | {
@@ -151,15 +161,85 @@ async function requireOwnedOperation(env: LifecycleControlEnv, showId: string,
   if (!current || current.value.generation !== expectedGeneration || current.value.owner?.job_id !== jobId) {
     throw new Error("Operation no longer owns the Show");
   }
+  const commit = env[VERIFIED_COMMIT_CONTROL];
+  if (commit) {
+    if (!commit.isActive() || commit.bucket !== env.CASTLOOP_BUCKET || commit.request.show_id !== showId ||
+      commit.request.job_id !== jobId || commit.request.expected_show_generation + 1 !== expectedGeneration ||
+      current.value.reservation_id !== commit.reservationId || current.value.owner.state !== "reserved" ||
+      current.value.owner.execution_id !== undefined || !ownsRequest(current.value, commit.request, commit.hash)) {
+      throw new Error("Verified commit no longer matches its reserved Show owner");
+    }
+    return { ...current, value: { ...current.value, owner: current.value.owner } };
+  }
+  const verified = env[VERIFIED_OPERATION];
+  if (verified) {
+    if (verified.bucket !== env.CASTLOOP_BUCKET || verified.request.show_id !== showId || verified.request.job_id !== jobId ||
+      verified.request.expected_show_generation + 1 !== expectedGeneration || current.value.reservation_id !== verified.reservationId ||
+      (verified.executionId !== undefined ? current.value.owner.execution_id !== verified.executionId :
+        current.value.owner.state !== "uploading" || current.value.owner.verification_id !== verified.verificationId) ||
+      !ownsRequest(current.value, verified.request, verified.hash)) {
+      throw new Error("Verified request no longer matches its current Show execution");
+    }
+    return { ...current, value: { ...current.value, owner: current.value.owner } };
+  }
   await requireShowReservationReady(env, current.value);
   const frozen = await env.CASTLOOP_BUCKET.get(`system/jobs/${jobId}/request.toml`);
   if (!frozen) throw new Error("Frozen control request is missing");
   checkRecordSize(frozen);
   const request = parseControlRequest(await frozen.text());
-  if (request.show_id !== showId || !ownsRequest(current.value, request, await requestHash(request))) {
+  const hash = await requestHash(request);
+  if (request.show_id !== showId || !ownsRequest(current.value, request, hash)) {
     throw new Error("Frozen control request does not match the Show owner");
   }
-  return { ...current, value: { ...current.value, owner: current.value.owner } };
+  return { ...current, value: { ...current.value, owner: current.value.owner },
+    [VERIFIED_CONTROL_REQUEST]: Object.freeze({ bucket: env.CASTLOOP_BUCKET, request: Object.freeze(request), hash,
+      reservationId: current.value.reservation_id }) };
+}
+
+export async function withReservedPublicationControlEnv<T extends LifecycleControlEnv, Result>(env: T,
+  snapshot: OwnedShowControlSnapshot,
+  callback: (scoped: T, request: Readonly<ControlRequest>) => Promise<Result>): Promise<Result> {
+  const verified = snapshot[VERIFIED_CONTROL_REQUEST];
+  if (env[VERIFIED_OPERATION] || env[VERIFIED_COMMIT_CONTROL] || !verified || verified.bucket !== env.CASTLOOP_BUCKET ||
+    verified.request.action !== "publish" || snapshot.value.owner.state !== "reserved" ||
+    snapshot.value.owner.execution_id !== undefined || snapshot.value.reservation_id !== verified.reservationId ||
+    !ownsRequest(snapshot.value, verified.request, verified.hash)) {
+    throw new Error("Commit scope requires its validated reserved publication owner");
+  }
+  let active = true;
+  const scoped = { ...env, [VERIFIED_COMMIT_CONTROL]: Object.freeze({ ...verified, isActive: () => active }) };
+  try { return await callback(scoped, verified.request); }
+  finally { active = false; }
+}
+
+export async function createShowExecutionEnv<T extends LifecycleControlEnv>(env: T, execution: ShowExecution): Promise<T> {
+  if (env[VERIFIED_OPERATION]) throw new Error("A verified execution environment cannot be reused for another invocation");
+  const current = await requireShowExecution(env, execution);
+  return verifiedOperationEnv(env, current, { executionId: execution.executionId });
+}
+
+export async function createStageVerificationControlEnv<T extends LifecycleControlEnv>(env: T,
+  verification: { showId: string; operationId: string; generation: number; verificationId: string }): Promise<T> {
+  if (!verification.verificationId) throw new Error("Staging verification requires an acquired token");
+  if (env[VERIFIED_OPERATION]) throw new Error("A verified environment cannot be reused for another invocation");
+  const current = await requireOwnedOperation(env, verification.showId, verification.operationId, verification.generation);
+  if (current.value.owner.action !== "stage" || current.value.owner.state !== "uploading" ||
+    current.value.owner.verification_id !== verification.verificationId) throw new Error("Staging verification token does not match its owner");
+  return verifiedOperationEnv(env, current, { verificationId: verification.verificationId });
+}
+
+async function verifiedOperationEnv<T extends LifecycleControlEnv>(env: T, current: ShowControlSnapshot,
+  token: { executionId: string } | { verificationId: string }): Promise<T> {
+  const frozen = await env.CASTLOOP_BUCKET.get(`system/jobs/${current.value.owner!.job_id}/request.toml`);
+  if (!frozen) throw new Error("Frozen control request is missing");
+  checkRecordSize(frozen);
+  const request = parseControlRequest(await frozen.text());
+  const hash = await requestHash(request);
+  if (request.show_id !== current.value.show_id || !ownsRequest(current.value, request, hash)) {
+    throw new Error("Frozen control request changed during execution verification");
+  }
+  return { ...env, [VERIFIED_OPERATION]: Object.freeze({ bucket: env.CASTLOOP_BUCKET, request: Object.freeze(request), hash,
+    reservationId: current.value.reservation_id, ...token }) };
 }
 
 export async function beginShowOperation(env: LifecycleControlEnv, showId: string,
@@ -224,15 +304,21 @@ export async function finishShowOperation(env: LifecycleControlEnv,
     receipt.execution_id === execution.executionId) return snapshot!;
   const current = await requireShowExecution(env, execution);
   const owner = current.value.owner!;
-  const [statusObject, progressObject] = await Promise.all([
-    env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/status.toml`),
-    env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/progress.toml`),
-  ]);
-  if (!statusObject || !progressObject) throw new Error("Operation has no durable terminal status and progress");
-  checkRecordSize(statusObject);
-  checkRecordSize(progressObject);
-  const status = parseJobStatus(await statusObject.text());
-  const progress = parseLifecycleProgress(await progressObject.text());
+  const records = await Promise.allSettled((["status", "progress"] as const).map(async (name) => {
+    const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${execution.jobId}/${name}.toml`);
+    if (!object) return null;
+    if (object.size > MAX_CONTROL_BYTES) {
+      await object.body?.cancel();
+      throw new Error("Lifecycle control record exceeds the size limit");
+    }
+    return await object.text();
+  }));
+  const [statusRecord, progressRecord] = records;
+  if (statusRecord.status === "rejected") throw statusRecord.reason;
+  if (progressRecord.status === "rejected") throw progressRecord.reason;
+  if (statusRecord.value === null || progressRecord.value === null) throw new Error("Operation has no durable terminal status and progress");
+  const status = parseJobStatus(statusRecord.value);
+  const progress = parseLifecycleProgress(progressRecord.value);
   for (const record of [status, progress]) {
     if (!("request_sha256" in record) || record.job_id !== execution.jobId ||
       record.show_id !== execution.showId || record.show_generation !== execution.generation ||

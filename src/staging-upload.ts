@@ -1,12 +1,28 @@
 import { parseStageReadbackReceipts, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageSettlementSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "../packages/shared/src/index";
 import type { StageSettlement, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
-import { claimShowOperation, controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
+import { claimShowOperation, controlRequestHash, createStageVerificationControlEnv, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
 import { initializeOwnedEpisodeDraft, prepareNewEpisodeDraft } from "./staging-episode-draft";
 import type { StageEpisodeDraftEnv } from "./staging-episode-draft";
 
 export type StageOperation = { showId: string; operationId: string; generation: number };
 export type StageUploadSnapshot = { request: StageUploadRequest; manifestHash: string; control: OwnedShowControlSnapshot };
+const VERIFIED_MANIFEST = Symbol("verifiedStagingManifest");
+type StageVerificationEnv = LifecycleControlEnv & { [VERIFIED_MANIFEST]?: Readonly<{
+  request: StageUploadRequest; manifestHash: string; verificationId: string;
+}> };
+
+export async function createStageVerificationEnv(env: LifecycleControlEnv,
+  verification: StageOperation & { verificationId: string }): Promise<StageVerificationEnv> {
+  if ((env as StageVerificationEnv)[VERIFIED_MANIFEST]) throw new Error("Staging manifest cannot be reused across invocations");
+  const scoped = await createStageVerificationControlEnv(env, verification);
+  const snapshot = await requireStageUpload(scoped, verification);
+  for (const payload of snapshot.request.payloads) Object.freeze(payload);
+  Object.freeze(snapshot.request.payloads);
+  Object.freeze(snapshot.request);
+  return { ...scoped, [VERIFIED_MANIFEST]: Object.freeze({ request: snapshot.request,
+    manifestHash: snapshot.manifestHash, verificationId: verification.verificationId }) };
+}
 
 export async function stageManifestHash(input: StageUploadRequest): Promise<string> {
   const value = stageUploadRequestSchema.parse(input);
@@ -23,7 +39,9 @@ async function readManifest(env: LifecycleControlEnv, operationId: string): Prom
 export async function requireStageUpload(env: LifecycleControlEnv, operation: StageOperation): Promise<StageUploadSnapshot> {
   const control = await requireOwnedOperation(env, operation.showId, operation.operationId, operation.generation);
   if (control.value.owner.action !== "stage" || control.value.owner.state !== "uploading") throw new Error("Operation does not own staging admission");
-  const request = await readManifest(env, operation.operationId);
+  const verified = (env as StageVerificationEnv)[VERIFIED_MANIFEST];
+  if (verified && control.value.owner.verification_id !== verified.verificationId) throw new Error("Staging verification token changed");
+  const request = verified?.request ?? await readManifest(env, operation.operationId);
   if (request.operation_id !== operation.operationId || request.show_id !== operation.showId ||
     request.expected_show_generation + 1 !== operation.generation || await controlRequestHash(stageControlRequest(request)) !== control.value.owner.request_sha256) {
     throw new Error("Staging manifest does not match its admission owner");
@@ -38,7 +56,7 @@ export async function requireStageUpload(env: LifecycleControlEnv, operation: St
     }
   }
   if (await env.CASTLOOP_BUCKET.head(`${stageDraftPrefix(request)}/commit.json`)) throw new Error("Committed drafts cannot be uploaded again");
-  return { request, manifestHash: await stageManifestHash(request), control };
+  return { request, manifestHash: verified?.manifestHash ?? await stageManifestHash(request), control };
 }
 
 export async function readStageUploadProgress(env: LifecycleControlEnv, operation: StageOperation,

@@ -15,13 +15,13 @@ import { confirmLocalM6Lifecycle, executeLocalM6Lifecycle, previewLocalM6Lifecyc
 import { publishLocalM6Draft, updateLocalM6Draft } from "./m6-local-update";
 import { M6ServiceClient } from "./m6-service-client";
 import { createFreshM6InitializationJournal, openFreshM6InitializationJournal, reconcileFreshM6Initialization, runFreshM6Initialization } from "./m6-service-initialization";
-import { createM6UpdateJournal, readLocalM6Update, reconcileM6UpdateCompletion, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
+import { createM6UpdateJournal, readLocalM6Update, reconcileM6UpdateCompletion, resumeM6UpdateActivation, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
 import type { M6UpdateJournal } from "./m6-service-update";
 import { M6SetupClient } from "./m6-setup-client";
 import { M6UpdateClient } from "./m6-update-client";
 import { createM6UpdateRestEffects } from "./m6-update-rest";
 import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
-import { createPublicationOperationEffects, runPublicationRetry } from "./publication-operation";
+import { createPublicationOperationEffects, runPublicationRelease, runPublicationRetry } from "./publication-operation";
 import { readRemoteOperationStatus } from "./remote-operation-status";
 import { createShowRegistrationJournal } from "./show-registration-journal";
 import { createShowRegistrationEffects, runShowRegistration } from "./show-registration-operation";
@@ -32,11 +32,11 @@ import { existsSync, lstatSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export const M6_COMMAND_ARGUMENTS: Record<string, number> = {
-  init: 1, "init-reconcile": 1, "update-service": 1, "update-service-verify": 1, "update-service-reconcile": 1,
+  init: 1, "init-reconcile": 1, "update-service": 1, "update-service-continue": 1, "update-service-verify": 1, "update-service-reconcile": 1,
   "service-status": 0, "service-pause": 1, "service-resume": 1, "target-show": 1, "target-episode": 2,
   "list-shows": 0, "list-episodes": 1,
   "preview-show-lifecycle": 2, "preview-episode-lifecycle": 3, "lifecycle-execute": 3, "lifecycle-retry": 3,
-  "publication-retry": 1, "operation-status": 2, "create-show": 2, "create-episode": 2,
+  "publication-retry": 1, "publication-release": 1, "operation-status": 2, "create-show": 2, "create-episode": 2,
   "update-show": 1, "update-episode": 2, "update-episode-audio": 3, "publish-show": 1, "publish-episode": 3,
 };
 
@@ -63,6 +63,13 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
     const journal = createPublicationJournal(root, config, retained.client_state.publication);
     await runPublicationRetry(journal, createPublicationOperationEffects(config, journal.load(), key));
     return { result: "publication-requeued", job_id: args[0] };
+  }
+  if (command === "publication-release") {
+    const retained = readLocalPublicationJob(root, config, args[0]!);
+    if (!retained.client_state || retained.lock_present) throw new Error("Release requires its retained publication journal without an unknown lock");
+    const journal = createPublicationJournal(root, config, retained.client_state.publication);
+    await runPublicationRelease(journal, createPublicationOperationEffects(config, journal.load(), key));
+    return { result: "publication-released", job_id: args[0] };
   }
   if (command === "operation-status") return readRemoteOperationStatus(root, config, args[0]!, args[1]!, () => key);
   if (command === "lifecycle-execute") {
@@ -109,9 +116,10 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
     let journal: M6UpdateJournal;
     if (command !== "update-service") {
       const retained = readLocalM6Update(root, config, operationId);
-      if (!retained.state || retained.lockPresent) throw new Error("Verification requires its retained journal without an unknown lock");
+      if (!retained.state || retained.lockPresent) throw new Error("Update recovery requires its retained journal without an unknown lock");
       journal = await createM6UpdateJournal(root, config, retained.state.request);
-      if (command === "update-service-reconcile") await reconcileM6UpdateCompletion(journal, (request, target) => client.observeCompleted(request, target));
+      if (command === "update-service-continue") await resumeM6UpdateActivation(journal, effects);
+      else if (command === "update-service-reconcile") await reconcileM6UpdateCompletion(journal, (request, target) => client.observeCompleted(request, target));
       else if (retained.state.phase === "deploy_requested") await resumeM6UpdateDeploymentVerification(journal, effects);
       else await resumeM6UpdateCompletion(journal, effects);
     } else {
@@ -151,7 +159,7 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
   const target = episodeId ? { kind: "episode" as const, show_id: showId, episode_id: episodeId } : { kind: "show" as const, show_id: showId };
   if (command.startsWith("publish-")) {
     const state = await publishLocalM6Draft(root, config, target, key, args[2] ? { audioPath: resolve(args[2]) } : {});
-    return { result: "publication-committed", job_id: state.publication.request.job_id };
+    return { result: "publication-accepted", job_id: state.publication.request.job_id };
   }
   const state = await updateLocalM6Draft(root, config, target, command === "update-show" ? { asset: "show" } : command === "update-episode" ?
     { asset: "episode_metadata" } : { asset: "audio", audio_path: resolve(args[2]!) }, key, {

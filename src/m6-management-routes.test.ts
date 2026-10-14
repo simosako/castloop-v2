@@ -87,8 +87,9 @@ describe("unreleased M6 management fetch integration", () => {
     expect(claim.response.status).toBe(200);
     expect((await readShowControl(setup.env, "daily"))!.value.owner?.state).toBe("reserved");
     const commit = await run(env, assets, "/admin/publication", setup.body("commit"));
-    expect(commit.response.status).toBe(200);
-    expect(commit.body).toEqual({ schema_version: 1, service_id: "service", result: "committed",
+    expect(commit.response.status).toBe(202);
+    expect(commit.body).toEqual({ schema_version: 1, service_id: "service", result: "accepted",
+      acceptance_protocol: "queue-validation-v1", staging_verified: false,
       operation: setup.publicationOperation, manifest_sha256: digestOf(setup.frozen), key: setup.markerKey, created: true });
     expect((await readShowControl(setup.env, "daily"))!.value.owner?.state).toBe("reserved");
     const changed = { ...setup.body("commit"), manifest_sha256: "0".repeat(64) };
@@ -109,7 +110,7 @@ describe("unreleased M6 management fetch integration", () => {
     const env = routeEnv(setup, sent, setup.versionId);
     const assets = setup.cachedAssets;
     expect((await run(env, assets, "/admin/publication", setup.body("claim"))).response.status).toBe(200);
-    expect((await run(env, assets, "/admin/publication", setup.body("commit"))).response.status).toBe(200);
+    expect((await run(env, assets, "/admin/publication", setup.body("commit"))).response.status).toBe(202);
     await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: "message-1", body: { object: { key: setup.markerKey } } }] } as never,
       env, assets);
     const request = { schema_version: 1 as const, job_id: crypto.randomUUID(), show_id: "daily", kind: "episode" as const, episode_id: "next",

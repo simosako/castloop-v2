@@ -136,7 +136,7 @@ describe("durable target-local M6 draft identity", () => {
         expect((await rotateLocalDraft(setup.root, setup.config, setup.target, nextId, nextBase)).load()).toEqual(next.load());
         expect(JSON.parse(readFileSync(archive, "utf8"))).toEqual(frozen);
         await expect(rotateLocalDraft(setup.root, setup.config, setup.target, setup.id)).rejects.toThrow();
-        expect(publication.journal.load().phase).toBe("committed");
+        expect(publication.journal.load().phase).toBe("accepted");
       } finally { for (const stage of stages) await stage.sources.dispose(); setup.dispose(); }
     });
   }

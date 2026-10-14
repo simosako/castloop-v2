@@ -40,6 +40,7 @@ export const showControlSchema = z.object({
   generation,
   feed_generation: generation,
   last_feed_job_id: z.uuid().optional(),
+  episode_catalog_initialized: z.literal(true).optional(),
   owner: operationOwnerSchema.optional(),
   last_abandoned_operation: z.object({
     job_id: z.uuid(),

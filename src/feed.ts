@@ -2,8 +2,8 @@ import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index
 import { canonicalEnclosureUrl } from "./media-url";
 
 function escapeXml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;",
+  return value.replace(/[&<>"'\r]/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;", "\r": "&#13;",
   })[character] ?? character);
 }
 
@@ -15,7 +15,7 @@ function renderItem(episode: EpisodeRevision, showId: string, baseUrl: string): 
   return `    <item>\n` +
     `      <title>${escapeXml(episode.title)}</title>\n` +
     `      <description>${escapeXml(episode.description)}</description>\n` +
-    `      <guid isPermaLink="false">${escapeXml(episode.guid)}</guid>\n` +
+    `      <guid isPermaLink="${episode.guid_is_permalink ?? false}">${escapeXml(episode.guid)}</guid>\n` +
     `      <pubDate>${new Date(episode.published_at).toUTCString()}</pubDate>\n` +
     `      <enclosure url="${escapeXml(canonicalEnclosureUrl(episode, showId, baseUrl))}" length="${episode.length_bytes}" type="audio/mpeg" />\n` +
     `      <itunes:duration>${duration}</itunes:duration>\n` +

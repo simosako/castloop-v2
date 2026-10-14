@@ -1,6 +1,8 @@
 import { episodeRevisionSchema, stagePayloadKey, stageReadbackReceiptSchema, stageUploadRequestSchema, stringifyLifecycleToml, stringifyToml } from "../../packages/shared/src/index";
 import type { LifecycleState, StageReadbackReceipt, StageUploadRequest } from "../../packages/shared/src/index";
 import { readShowControl } from "../lifecycle-control";
+import { episodeCatalogKey } from "../episode-catalog";
+import type { EpisodeCatalog } from "../episode-catalog";
 import { claimPublicationOperation, commitOwnedPublication, publicationRequestSchema } from "../publication-admission";
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "../staging-upload";
 import { runStageVerification } from "../staging-verification";
@@ -78,6 +80,14 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
     await bucket.put(`public/episodes/daily/${episodeId}/metadata.toml`, stringifyToml(revision));
     await bucket.put(`public/episodes/daily/${episodeId}/revisions/${revision.revision_id}.toml`, stringifyToml(revision));
     await bucket.put(`public${new URL(revision.enclosure_url).pathname}`, "x", { sha256: revision.sha256, customMetadata: { sha256: revision.sha256 } });
+    const key = episodeCatalogKey("daily");
+    const existingCatalog = entries.get(key);
+    if (existingCatalog) {
+      const catalog: EpisodeCatalog = JSON.parse(new TextDecoder().decode(existingCatalog.bytes));
+      catalog.entries = [...catalog.entries.filter((entry) => entry.revision.episode_id !== episodeId),
+        { active: lifecycle === "active", revision }];
+      await bucket.put(key, JSON.stringify(catalog));
+    }
     return revision;
   }
   if (options.episodes) for (const [episodeId, lifecycle] of [["first", "active"], ["second", "active"], ["stopped", "unpublished"],

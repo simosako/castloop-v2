@@ -65,6 +65,8 @@ export async function runLifecycleUnpublish(env: LifecycleFeedEnv, execution: Sh
         if (feed.writeFeed) {
           await effects.writeFeed(feed.episodes);
           await advanceLifecycleFeedGeneration(env, execution);
+        } else if (owner.kind === "episode") {
+          await advanceLifecycleFeedGeneration(env, execution);
         }
         await recordProgress("purge");
       } else {
