@@ -88,7 +88,8 @@ CLI送信前journal永続化、403/応答喪失/receipt不一致時の非再送�
 36件のpublished Episodeを持つShow更新もローカルfixtureで確認し、既存音源への追加書き込みはなかった。
 これはCloudflare CPU・wallの測定ではない。公開版のpackage versionは変更せず、開発ビルドはSHA-256で識別する。
 
-Cloudflareへの配備・実機測定・権限変更は今回行わない。Queue CPU/wall、commit HTTP invocationの不在、
-小容量→36件Show更新の実測は別途、隔離環境と保持中ownerを確認して実施する。
+初回の実装依頼ではCloudflare配備・実機測定・権限変更を行わなかった。
+後続の管理者指示によるcommit・Push・隔離環境での測定は[2026-10-15実機結果](publication_queue_commit_measurement_20261015.md)参照。
+7公開が成功しHTTP commitは観測0だったが、残るHTTP CPUのFree目標は未達。権限・課金変更は行っていない。
 claim/staging/statusのHTTP CPUが残るため、サービス全体のFree適合・Issue #13の完全解消は主張しない。
 段階B（claimの非同期化）は未実装・未承認。

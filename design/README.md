@@ -18,6 +18,7 @@
 | [HTTP受付の固定負担改善計画](http_acceptance_fixed_cost_optimization_plan.md) | 818c642後のservice snapshot共有・同一loopback probe・現在値と再parseの分離。レビュー用の次改修案 |
 | [公開受付のQueue移譲案](publication_queue_delegation_options.md) | CLIからの直接Queue送信。段階Aは開発ブランチで実装、claimも移す段階Bは未承認 |
 | [Queue commit段階A](publication_queue_commit_stage_a.md) | 開発中のcommit intent/MAC、execution所有、queued journal、重複・応答喪失・保持の実装契約と試験 |
+| [Queue commitの実機測定](publication_queue_commit_measurement_20261015.md) | 7公開成功、HTTP commitなし、Queue CPUと残るclaim/status/staging HTTPのFree目標未達 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。v0.4.0の利用案内はdocs/rss_migration.md |
