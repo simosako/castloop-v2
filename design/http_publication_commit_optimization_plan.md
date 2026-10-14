@@ -3,6 +3,8 @@
 2026-10-14。調査対象はPush済みの`8f4c1ed3af14bbdb540bd2e04a5f17c9c17c9bff`。
 管理者がHTTP受付・Queue検証への変更を承認し、**事前測定をせず実装後に測定する**と指示した。
 以下の旧baseline分析を根拠に受付・consumer・CLIを実装した。P0の事前測定とP1の追加guard整理は行っていない。
+実装は`818c642`としてcommit/Push済み。残る固定負担の具体案は
+[次のHTTP受付改善計画](http_acceptance_fixed_cost_optimization_plan.md)を参照する。
 既存の安全条件は[publication停止の診断](publication_execution_recovery.md)と
 [承認済み方針](m6_review_queue.md)を維持する。
 
@@ -230,7 +232,7 @@ Queueの順序、同時実行数1、配送回数だけでは排他を保証で�
 
 ### 検証失敗を新しいFreezeにしない
 
-現在のShow/Episode runnerは、検証例外も`retrying`として保存してthrowする。
+検証移動前のShow/Episode runnerは、検証例外も`retrying`として保存してthrowしていた。
 Queue retryが尽きた後もDLQがstatusを自動的に`failed`へ変えるわけではない。
 このまま詳細検証だけを移すと、従来HTTPで拒否した入力でもCLIがpending待機を続ける。
 
@@ -254,13 +256,12 @@ Queue retryが尽きた後もDLQがstatusを自動的に`failed`へ変えるわ�
 
 ### 同じ境界の確認責務を1つにする（③）
 
-具体的な候補は、`verifyPublicationStaging`末尾の`requireOwnedPublication`と、
-その返却直後の`commitOwnedPublication`の`latest`確認。
-検証末尾から現在ownerを含むsnapshotを返し、同じmarker直前の境界で
-reserved/no executionまで確認する責務を1つにできるか検討する。
-ただし「同じ関数呼び出し内」だけでは安全根拠にならない。
-初期contextとcommit入口の間にはmanifest hashのawaitがあり、
-commit入口と検証開始の間にはmarker GETがあるので、一律に同じ境界とは扱わない。
+検討時は`verifyPublicationStaging`末尾のowner確認とcommit直前の確認が重複候補だったが、
+詳細検証のconsumer集約でこのHTTP重複は既に消えた。
+現在の初期contextとcommit入口の間にはmanifest hashのawaitがあり、
+commit入口と最終owner確認の間にはmarker GETがある。
+残る3回のowner確認を一律に同じ境界とは扱わない。
+service取得/返却のsnapshot共有、同一loopback probe、現在値の再parse削減は上記の次計画で整理した。
 
 - bucket/service/Worker version/job/generation/予約identityに束縛し、callback終了後は無効にする。
 - marker GET、staging/base検証、runtime RPC等のawaitの後とmarker PUT直前は現在ownerを再確認する。
