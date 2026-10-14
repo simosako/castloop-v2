@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-現在の公開版はv0.3.0。まず[全体設計](initial_design.md)を読み、操作方法は[プロジェクトREADME](../README.md)と[独自ドメイン利用案内](../docs/custom_domains.md)を参照する。
+現在の公開版はv0.4.0。まず[全体設計](initial_design.md)を読み、操作方法は[プロジェクトREADME](../README.md)、[RSS移行案内](../docs/rss_migration.md)、[独自ドメイン利用案内](../docs/custom_domains.md)を参照する。FreeのHTTP CPU目標未達・Issue #13の残る制限は[リリースノート](../docs/release-v0.4.0.md)で確認する。
 
 ## 開発時に参照する文書
 
@@ -19,7 +19,7 @@
 | [公開受付のQueue移譲案](publication_queue_delegation_options.md) | CLIからの直接Queue送信、commit/claimの非HTTP化、token・queued receipt・pause/重複/保持の変更。レビュー用 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |
-| [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針。実装中 |
+| [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。v0.4.0の利用案内はdocs/rss_migration.md |
 | [M7: 公開所要時間の改善案](m7_publication_performance_plan.md) | Issue #10の120秒待機上限と重複I/Oの分析・レビュー用計画 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
