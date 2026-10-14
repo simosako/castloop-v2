@@ -67,7 +67,7 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
   const initial = { schema_version: 1 as const, import_id: prepared.importId, identity, public_base_url: config.public_base_url,
     source_directory: prepared.root, input_sha256: prepared.inputSha256, step: 0, phase: "ready" as const };
   const service = m6ServiceAdminResponseSchema.parse(await effects.command("service-status", []));
-  if (!service.external_episode_guids || service.admission.state !== "open") {
+  if (!service.external_episode_guids || service.publication_acceptance_protocol !== "queue-validation-v1" || service.admission.state !== "open") {
     throw new Error("RSS publication requires an open M7-compatible Worker; update and explicitly resume first");
   }
   if (!present(storage.path)) {
@@ -125,7 +125,7 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
     });
     const command = (name: string, args: string[], publication = false) => async () => {
       const result = await effects.command(name, args);
-      return publication ? { jobId: z.object({ result: z.literal("publication-committed"), job_id: z.uuid() }).strict().parse(result).job_id } : {};
+      return publication ? { jobId: z.object({ result: z.literal("publication-accepted"), job_id: z.uuid() }).strict().parse(result).job_id } : {};
     };
     actions.push(command("update-show", [showId]), command("publish-show", [showId], true));
     for (const episode of prepared.episodes) {
@@ -159,7 +159,11 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
         if (server.status?.state === "published" && server.ownership === "released") {
           state = { ...state, phase: "ready", waiting_job_id: undefined }; save(); return;
         }
-        if (server.status?.state === "failed" || server.ownership === "superseded") throw new Error("RSS publication failed or was superseded; inspect the retained job");
+        if (server.status?.state === "failed") {
+          throw new Error(`Publication ${state.waiting_job_id} failed [reason_code=${server.status.reason_code ?? "validation_failed"}]; ` +
+            "preserve the frozen draft and held Show owner. Inspect the retained job; do not replay publication or release ownership");
+        }
+        if (server.ownership === "superseded") throw new Error("RSS publication was superseded; inspect the retained job");
         if (server.execution_active && server.dead_letter_present) {
           throw new Error(`Publication ${state.waiting_job_id} has dead-letter history and a retained execution token; ` +
             "execution may be active or interrupted. Preserve journals and tokens and inspect Worker logs; " +

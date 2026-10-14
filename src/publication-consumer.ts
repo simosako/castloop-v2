@@ -1,3 +1,4 @@
+import { parseJobStatus } from "../packages/shared/src/index";
 import { acquireShowExecution, controlRequestHash, createShowExecutionEnv, readShowControl } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import { LifecycleExecutionBusy, releaseSettledExecution } from "./lifecycle-consumer";
@@ -9,8 +10,9 @@ import { runOwnedShowPublication } from "./publication-show-runner";
 import { runOwnedEpisodePublication } from "./publication-episode-runner";
 import type { PublicationEffects } from "./publication-inputs";
 import { logPublicationExecutionBlocked, measureWorkerPhase } from "./worker-timing";
+import { lifecycleJobMatches } from "./lifecycle-job-store";
 
-export type PublicationConsumerResult = { state: "completed" } |
+export type PublicationConsumerResult = { state: "completed" } | { state: "failed"; reason: "validation_failed" } |
   { state: "ignored"; reason: "unmatched_path" | "missing_marker" | "stale_operation" } |
   { state: "invalid"; reason: "invalid_frozen_publication" };
 export type PublicationEffectFactory = (execution: ShowExecution, env: LifecycleFeedEnv) => PublicationEffects | Promise<PublicationEffects>;
@@ -21,6 +23,17 @@ export async function requeuePublicationOperation(env: LifecycleControlEnv, oper
   const key = publicationCommitKey(owned.frozen.commit);
   const marker = await readFrozenPublicationCommit(env, key);
   if (!marker || JSON.stringify(marker) !== JSON.stringify(owned.frozen)) throw new InvalidFrozenPublication();
+  const statusObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${operation.jobId}/status.toml`);
+  if (statusObject) {
+    if (statusObject.size < 1 || statusObject.size > 16384) throw new Error("Publication status is oversized or empty");
+    const status = parseJobStatus(await statusObject.text());
+    const request = owned.frozen.request;
+    if (status.schema_version !== 2 || !lifecycleJobMatches(status, { ...request,
+      show_generation: operation.generation, request_sha256: owned.control.value.owner.request_sha256 })) {
+      throw new Error("Publication retry status differs from its retained owner");
+    }
+    if (status.state === "failed") throw new Error("Publication validation failed; preserve its frozen request and held owner");
+  }
   const latest = await requireOwnedPublication(env, operation, { allowPublishedResult: true });
   if (JSON.stringify(latest.frozen) !== JSON.stringify(marker)) throw new InvalidFrozenPublication();
   if (latest.control.value.owner.execution_id || latest.control.value.owner.verification_id) throw new LifecycleExecutionBusy();
@@ -57,8 +70,12 @@ export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string
       createShowExecutionEnv(env, execution)) : env;
     const effects = typeof source === "function" ? await measureWorkerPhase(request.job_id, "publication.effects", () =>
       Promise.resolve(source(execution, executionEnv))) : source;
-    await measureWorkerPhase(request.job_id, "publication.runner", () => request.kind === "show" ?
+    const result = await measureWorkerPhase(request.job_id, "publication.runner", () => request.kind === "show" ?
       runOwnedShowPublication(env, execution, effects) : runOwnedEpisodePublication(executionEnv, execution, effects));
+    if (result === "failed") {
+      await measureWorkerPhase(request.job_id, "publication.execution_cleanup", () => releaseSettledExecution(env, execution));
+      return { state: "failed", reason: "validation_failed" };
+    }
   } catch (error) {
     if (await measureWorkerPhase(request.job_id, "publication.execution_cleanup", () => releaseSettledExecution(env, execution)) === "completed") {
       return { state: "completed" };

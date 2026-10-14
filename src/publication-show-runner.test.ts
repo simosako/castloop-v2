@@ -154,7 +154,9 @@ describe("M6 owned Show publication runner", () => {
         if (fault === "feed-cas" && args[0] === setup.feedKey && !conflict) { conflict = true; await setup.bucket.put(setup.feedKey, "other feed"); }
         return setup.bucket.put(...args);
       } } } as never;
-      await expect(consumeOwnedPublication(env, setup.key, bound.effects)).rejects.toThrow();
+      if (fault === "staging") {
+        expect(await consumeOwnedPublication(env, setup.key, bound.effects)).toEqual({ state: "failed", reason: "validation_failed" });
+      } else await expect(consumeOwnedPublication(env, setup.key, bound.effects)).rejects.toThrow();
       expect(setup.text(setup.feedKey)).toBe(fault === "feed-cas" ? "other feed" : "old feed");
       expect(bound.events).not.toContain("purge");
       expect((await readShowControl(setup.env, "daily"))?.value.owner?.job_id).toBe(setup.operation.jobId);

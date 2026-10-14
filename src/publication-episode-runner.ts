@@ -14,6 +14,7 @@ import { matchesPublishedAudio, publicationChecksum, readPublicationBytes, rende
 import type { PublicationEffects } from "./publication-inputs";
 import { measureWorkerPhase } from "./worker-timing";
 import { ensureEpisodeCatalog } from "./episode-catalog";
+import { parsePublicationInput, PublicationValidationFailure } from "./publication-validation";
 
 function text(bytes: Uint8Array): string {
   return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
@@ -28,7 +29,7 @@ async function uniqueGuid(env: LifecycleFeedEnv, execution: ShowExecution, revis
     throw new Error("Episode catalog no longer matches its immutable base revision");
   }
   if (catalog.value.entries.some((entry) => entry.revision.episode_id !== revision.episode_id && entry.revision.guid === revision.guid)) {
-    throw new Error("Episode GUID is already used by another Episode");
+    throw new PublicationValidationFailure();
   }
   await requireShowExecution(env, execution);
 }
@@ -69,7 +70,7 @@ async function persistAudio(env: LifecycleFeedEnv, execution: ShowExecution, com
 }
 
 export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, execution: ShowExecution,
-  effects: PublicationEffects): Promise<void> {
+  effects: PublicationEffects): Promise<void | "failed"> {
   const existing = await measureWorkerPhase(execution.jobId, "publication.runner_control", () => readShowControl(env, execution.showId));
   const receipt = existing?.value.last_finished_operation;
   if (receipt?.job_id === execution.jobId && receipt.generation === execution.generation && receipt.execution_id === execution.executionId) {
@@ -84,6 +85,8 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
   if (!marker || JSON.stringify(marker) !== JSON.stringify(owned.frozen)) throw new Error("Episode publication has no matching frozen commit");
   const commit = owned.frozen.commit;
   const journal = await measureWorkerPhase(execution.jobId, "publication.journal_read", () => readLifecycleJobJournal(env, execution));
+  if (journal.status?.state === "failed") return "failed";
+  const canRejectInputs = !journal.progress || ["admitted", "validating"].includes(journal.progress.phase);
   let progress = journal.progress ?? lifecycleProgressSchema.parse({ schema_version: 1, ...journal.identity, phase: "admitted",
     deleted_objects: 0, purge_confirmed: false, updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") });
   if (journal.status?.state === "published") {
@@ -112,10 +115,10 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
     await measureWorkerPhase(execution.jobId, `publication.progress.${phase}`, () => writeLifecycleProgress(env, execution, next));
     progress = next;
   }
-  async function recordStatus(state: "processing" | "retrying" | "published"): Promise<void> {
+  async function recordStatus(state: "processing" | "retrying" | "failed" | "published"): Promise<void> {
     await measureWorkerPhase(execution.jobId, `publication.status_write.${state}`, () => writeLifecycleJobStatus(env, execution, lifecycleJobStatusSchema.parse({ schema_version: 2, ...journal.identity,
       state, phase: progress.phase, ...(state === "published" ? { result_lifecycle: "active" } : {}),
-      ...(state === "retrying" ? lifecycleFailureForPhase(failurePhase) : {}) })));
+      ...(state === "retrying" || state === "failed" ? lifecycleFailureForPhase(failurePhase) : {}) })));
   }
   try {
     await guard();
@@ -131,11 +134,11 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
         let draft = base ? episodeDraftFromRevision(base) : null;
         if (commit.metadata_sha256) {
           const bytes = await readPublicationBytes(env, `staging/episodes/${execution.showId}/${commit.episode_id}/${execution.jobId}/episode.toml`, 1_000_000);
-          if (await publicationChecksum(bytes) !== commit.metadata_sha256) throw new Error("Episode metadata differs from its frozen commit");
-          draft = parseEpisodeDraft(text(bytes));
+          if (await publicationChecksum(bytes) !== commit.metadata_sha256) throw new PublicationValidationFailure();
+          draft = parsePublicationInput(() => parseEpisodeDraft(text(bytes)));
         }
         if (!draft || draft.episode_id !== commit.episode_id || base && !sameEpisodeIdentity(draft, base)) {
-          throw new Error("Episode identity and publication date must remain unchanged");
+          throw new PublicationValidationFailure();
         }
         const show = parseShowMetadata(text(await readPublicationBytes(env, `system/shows/${execution.showId}/show.toml`, 1_000_000)));
         const service = parseServiceConfig(text(await readPublicationBytes(env, "system/service.toml", 16384)));
@@ -213,13 +216,20 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
     await recordStatus("published");
     await measureWorkerPhase(execution.jobId, "publication.owner_release", () => finishShowOperation(env, execution));
   } catch (error) {
+    let rejected = false;
     await measureWorkerPhase(execution.jobId, "publication.failure_record", async () => {
       const current = await readShowControl(env, execution.showId);
       if (current?.value.last_finished_operation?.job_id === execution.jobId && current.value.last_finished_operation.generation === execution.generation &&
         current.value.last_finished_operation.execution_id === execution.executionId) return;
       const saved = await readLifecycleJobJournal(env, execution);
-      if (saved.status?.state !== "published" && saved.progress?.phase !== "finished") { progress = saved.progress ?? progress; await recordStatus("retrying"); }
+      if (saved.status?.state !== "published" && saved.progress?.phase !== "finished") {
+        progress = saved.progress ?? progress;
+        rejected = canRejectInputs && error instanceof PublicationValidationFailure &&
+          ["admitted", "validating"].includes(progress.phase);
+        await recordStatus(rejected ? "failed" : "retrying");
+      }
     });
+    if (rejected) return "failed";
     throw error;
   }
 }

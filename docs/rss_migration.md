@@ -49,7 +49,7 @@ download中に失敗したら、同じコマンド・同じ出力先で続行す
 export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...
 cd /path/to/service-workspace
 castloop service-status
-# external_episode_guids: true、admission.state: "open"を確認する。
+# external_episode_guids: true、publication_acceptance_protocol: "queue-validation-v1"、admission.state: "open"を確認する。
 castloop publish-rss-import /path/to/import
 ```
 
@@ -57,12 +57,20 @@ castloop publish-rss-import /path/to/import
 
 Episodeは古い公開日時から公開し、各jobの`published`／`released`を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
 
+2026-10-14の開発版ではHTTP commitを受付に限定した。`publish-show`／`publish-episode`の
+`publication-accepted`、HTTPの`202 / accepted`、local journalの`phase: "accepted"`は、
+凍結した要求とcommit markerの受付完了を示す。**staging検証済み・公開成功の応答ではない。**
+詳細なstaging証跡、payload identity、base revisionは既存Queue consumerが公開書き込み前に検証する。
+旧CLI／Workerとの混用はclaim/commitの受付プロトコル照合で拒否するため、CLIとWorkerを両方更新する。
+旧`committed` journalはそのまま読めるが、`accepted`へ自動変換せず、未知要求を再送しない。
+
 完了時に新RSSの番組情報、Episode件数、GUID・公開日時・説明、音源URLを照合し、`feed_url`を返す。`subscriber_migration_completed: false`は、購読者の移行は別途必要という意味。
 
 ### 停止した場合
 
 - 読み取り中に公開記録やサービス状態が変わった場合（`publication_status_changed`）だけ、既知jobの状態を再照会する。この計測用開発版は最大300回、待機開始から5分経過後は照会を追加しない。進行中のHTTP照会には別の要求timeoutがある。正式版の既定待機上限は性能改善後の実測で決定する。`published`／`released`の検証までは次の公開へ進まない。この識別には修正済みCLIとWorkerの両方が必要。
 - 公開receiptを保存済みのjobで状態照会に失敗した、または公開待機が終わらない場合は、同じコマンドでそのjobの確認から続けられる。完了済みの公開を再送しない。
+- 公開前の確定的な入力不一致は`failed / validation_failed`として表示し、待機を終了する。`ownership: "held"`のShow ownerと凍結draftは保持する。I/Oが終了した通常経路ではexecution/service tokenだけを返す。重複配送で公開へ進めず、`retry-job`も拒否する。draft編集、別jobへの置換、owner強制解除は復旧方法ではなく、安全な取消し操作は未提供。
 - heldなjobにDLQ履歴がある場合は早期停止し、token残留か、実行tokenを返却済みの失敗履歴かを表示する。DLQ markerは現在の実行・I/Oの終了証明ではない。前回追加した`release-job`／`publication-release`は安全条件を満たさず無効化したため使用しない。lock/owner/registryを保持し、[停止の診断手順](../design/publication_execution_recovery.md)で調べる。
 - 更新前の対象照会では、確認できた記録変化（`target_status_changed`）だけ最大3回照会する。その他のエラーは停止し、変更処理を始めていなければ進捗を`ready`に戻す。同じ取り込みコマンドで続行できる。HTTP拒否には`http_status`を表示する。
 - 修正前の`command_requested`記録も、Episode作成直後の最初の`update-episode`に限り続行できる。保持したworkspaceで下書きjournal／lockが未作成、ローカルTOMLが取り込み内容と一致、サーバーのEpisodeが未登録、Showがactive／openで所有者なし、照会前後のローカル記録が不変であることを確認する。確認できなければ停止する。通常更新は下書きjournalを保存してから変更要求を送るため、既存journalがあればこの復旧は適用しない。

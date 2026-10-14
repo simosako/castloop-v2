@@ -9,9 +9,10 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, publication: publicationRequestSchema,
-  manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), phase: z.enum(["prepared", "claim_requested", "claimed", "commit_requested", "committed"]),
+  manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), phase: z.enum(["prepared", "claim_requested", "claimed", "commit_requested", "committed", "accepted"]),
   claim_receipt: publicationOperationSchema.optional(),
-  commit_receipt: z.object({ key: z.string().min(1).max(256), created: z.boolean() }).strict().optional(),
+  commit_receipt: z.object({ key: z.string().min(1).max(256), created: z.boolean(),
+    acceptance_protocol: z.literal("queue-validation-v1").optional(), staging_verified: z.literal(false).optional() }).strict().optional(),
   retry: z.object({ attempt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), state: z.enum(["requested", "requeued"]),
     key: z.string().min(1).max(256).optional() }).strict().optional(),
   release: z.object({ attempt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), state: z.enum(["requested", "released"]),
@@ -22,13 +23,19 @@ export type PublicationClientState = z.infer<typeof stateSchema>;
 export type PublicationJournal = { load: () => PublicationClientState; save: (state: PublicationClientState) => void;
   exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
 
+function phaseIndex(phase: PublicationClientState["phase"]): number {
+  return phase === "accepted" ? 4 : stateSchema.shape.phase.options.indexOf(phase);
+}
+
 export function validatePublicationClientState(input: unknown): PublicationClientState {
   const state = stateSchema.parse(input);
-  const phase = stateSchema.shape.phase.options.indexOf(state.phase);
+  const phase = phaseIndex(state.phase);
   const origin = new URL(state.identity.public_base_url);
   if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" ||
     state.manifest_sha256 !== createHash("sha256").update(JSON.stringify(state.publication)).digest("hex") ||
     (phase >= 2) !== (state.claim_receipt !== undefined) || (phase === 4) !== (state.commit_receipt !== undefined) ||
+    (state.phase === "accepted") !== (state.commit_receipt?.acceptance_protocol !== undefined) ||
+    (state.phase === "accepted") !== (state.commit_receipt?.staging_verified === false) ||
     state.claim_receipt && JSON.stringify(state.claim_receipt) !== JSON.stringify(publicationClientOperation(state.publication)) ||
     state.commit_receipt && state.commit_receipt.key !== publicationCommitKey(state.publication.commit) || state.retry && (phase !== 4 ||
       state.retry.state === "requested" && state.retry.key !== undefined ||
@@ -79,20 +86,19 @@ export function createPublicationJournal(root: string, configInput: ServiceConfi
       storage.requireLock("Publication journal writes require its exclusive client lock");
       const next = validatePublicationClientState(input);
       const previous = load();
-      const phases = stateSchema.shape.phase.options;
-      const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
+      const distance = phaseIndex(next.phase) - phaseIndex(previous.phase);
       const retryChanged = JSON.stringify(next.retry) !== JSON.stringify(previous.retry);
-      const retryStarted = next.phase === "committed" && next.retry?.state === "requested" &&
+      const retryStarted = phaseIndex(next.phase) === 4 && next.retry?.state === "requested" &&
         (!previous.retry || previous.retry.state === "requeued") && next.retry.attempt === (previous.retry?.attempt ?? 0) + 1;
       const retryAcknowledged = previous.retry?.state === "requested" && next.retry?.state === "requeued" && next.retry.attempt === previous.retry.attempt;
       const releaseChanged = JSON.stringify(next.release) !== JSON.stringify(previous.release);
-      const releaseStarted = next.phase === "committed" && next.release?.state === "requested" &&
+      const releaseStarted = phaseIndex(next.phase) === 4 && next.release?.state === "requested" &&
         (!previous.release || previous.release.state === "released") && next.release.attempt === (previous.release?.attempt ?? 0) + 1;
       const releaseAcknowledged = previous.release?.state === "requested" && next.release?.state === "released" && next.release.attempt === previous.release.attempt;
       if (JSON.stringify(next.identity) !== JSON.stringify(previous.identity) || next.manifest_sha256 !== previous.manifest_sha256 ||
         distance < 0 || distance > 1 || distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) &&
-          !(previous.phase === "committed" && retryChanged && (retryStarted || retryAcknowledged)) &&
-          !(previous.phase === "committed" && releaseChanged && (releaseStarted || releaseAcknowledged)) ||
+          !(next.phase === previous.phase && phaseIndex(previous.phase) === 4 && retryChanged && (retryStarted || retryAcknowledged)) &&
+          !(next.phase === previous.phase && phaseIndex(previous.phase) === 4 && releaseChanged && (releaseStarted || releaseAcknowledged)) ||
         previous.claim_receipt && JSON.stringify(next.claim_receipt) !== JSON.stringify(previous.claim_receipt) ||
         previous.commit_receipt && JSON.stringify(next.commit_receipt) !== JSON.stringify(previous.commit_receipt) || distance !== 0 && (retryChanged || releaseChanged)) {
         throw new Error("Frozen publication journal cannot change, skip phases or replay an unknown request");

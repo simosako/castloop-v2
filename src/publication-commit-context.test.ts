@@ -20,7 +20,7 @@ async function fixture(mode: "show" | "episode" | "metadata" | "audio" = "episod
 
 describe("request-scoped publication commit inputs", () => {
   for (const mode of ["show", "episode", "metadata", "audio"] as const) {
-    test(`${mode}: reuses immutable inputs without removing mutable guards or HEAD checks`, async () => {
+    test(`${mode}: reuses immutable inputs and does not read staging proofs or payloads during acceptance`, async () => {
       const measurements: Array<{ request: number; publication: number; reservation: number; show: number; episode: number; heads: number }> = [];
       for (const scoped of [false, true]) {
         const setup = await fixture(mode);
@@ -43,11 +43,17 @@ describe("request-scoped publication commit inputs", () => {
           measurements.push({ request: calls(`system/jobs/${setup.operation.jobId}/request.toml`),
             publication: calls(`system/jobs/${setup.operation.jobId}/publication.json`), reservation: calls(reservationKey),
             show: calls(controlKey), episode: calls("system/episode-lifecycle/daily/next.toml"), heads: head.mock.calls.length });
-          expect(parse.mock.calls).toHaveLength(setup.stages.length);
+          expect(parse.mock.calls).toHaveLength(0);
+          expect(head.mock.calls).toHaveLength(0);
+          for (const stage of setup.stages) {
+            expect(calls(`system/jobs/${stage.operation_id}/upload.json`)).toBe(0);
+            expect(calls(`system/jobs/${stage.operation_id}/upload-progress.json`)).toBe(0);
+            expect(calls(`system/jobs/${stage.operation_id}/status.toml`)).toBe(0);
+          }
           expect(JSON.parse(await (await setup.env.CASTLOOP_BUCKET.get(setup.markerKey))!.text())).toEqual(setup.frozen.commit);
         } finally { get.mockRestore(); head.mockRestore(); parse.mockRestore(); }
       }
-      expect(measurements[0]).toMatchObject({ request: 5, publication: 5, reservation: 5 });
+      expect(measurements[0]).toMatchObject({ request: 3, publication: 3, reservation: 3 });
       expect(measurements[1]).toEqual({ ...measurements[0]!, request: 1, publication: 1, reservation: 1 });
     });
   }
@@ -100,25 +106,23 @@ describe("request-scoped publication commit inputs", () => {
     }
   });
 
-  test("final owner check and staged version/size checks remain effective", async () => {
-    for (const fault of ["owner", "version", "size"] as const) {
+  test("owner changes during the marker read still block the final marker write", async () => {
+    for (const fault of ["owner"] as const) {
       const setup = await fixture();
-      const original = setup.bucket.head.bind(setup.bucket);
-      const head = spyOn(setup.bucket, "head").mockImplementation(async (...args) => {
+      const original = setup.bucket.get.bind(setup.bucket);
+      const get = spyOn(setup.bucket, "get").mockImplementation(async (...args) => {
         const result = await original(...args);
-        if (!result || !args[0].endsWith("audio.mp3")) return result;
-        if (fault === "owner") {
+        if (args[0] === setup.markerKey && fault === "owner") {
           await setup.bucket.put(controlKey, JSON.stringify({ ...setup.saved,
             owner: { ...setup.saved.owner!, request_sha256: "a".repeat(64) } }));
-          return result;
         }
-        return { ...result, ...(fault === "size" ? { size: result.size + 1 } : { version: "changed-version" }) };
+        return result;
       });
       try {
         await expect(withPublicationCommitContext(setup.env, setup.operation,
           (scoped) => commitOwnedPublication(scoped, setup.operation))).rejects.toThrow();
         expect(setup.entries.has(setup.markerKey)).toBe(false);
-      } finally { head.mockRestore(); }
+      } finally { get.mockRestore(); }
     }
   });
 

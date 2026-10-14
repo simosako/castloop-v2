@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 
 type Receipt<Result extends PublicationAdminResponse["result"]> = Extract<PublicationAdminResponse, { result: Result }>;
 export type PublicationOperationEffects = { publication: PublicationRequest; claim: () => Promise<Receipt<"claimed">>;
-  commit: () => Promise<Receipt<"committed">>; status: () => Promise<Receipt<"status">>; retry: () => Promise<Receipt<"requeued">>;
+  commit: () => Promise<Receipt<"accepted">>; status: () => Promise<Receipt<"status">>; retry: () => Promise<Receipt<"requeued">>;
   release: () => Promise<Receipt<"released">>; checkLocalInputs?: () => Promise<void> };
 
 function load(journal: PublicationJournal, effects: PublicationOperationEffects): PublicationClientState {
@@ -22,7 +22,7 @@ function receipt(state: PublicationClientState, input: unknown, expected: Public
   const value = publicationAdminResponseSchema.parse(input);
   if (value.service_id !== state.identity.service_id || value.result !== expected || value.manifest_sha256 !== state.manifest_sha256 ||
     JSON.stringify(value.operation) !== JSON.stringify(publicationClientOperation(state.publication)) ||
-    (value.result === "committed" || value.result === "requeued") && value.key !== publicationCommitKey(state.publication.commit) || value.result === "status" &&
+    (value.result === "accepted" || value.result === "requeued") && value.key !== publicationCommitKey(state.publication.commit) || value.result === "status" &&
     (JSON.stringify(value.publication) !== JSON.stringify(state.publication) ||
       value.request_sha256 !== createHash("sha256").update(JSON.stringify(state.publication.request)).digest("hex"))) {
     throw new Error("Publication receipt differs from the journal's frozen manifest/request");
@@ -48,14 +48,15 @@ export async function runPublicationCommit(journal: PublicationJournal, effects:
     if (state.phase !== "claimed") throw new Error("Publication commit outcome is unknown or consumed; never replay its POST");
     const status = receipt(state, await effects.status(), "status");
     if (status.result !== "status" || status.ownership !== "held" || status.execution_active || status.marker_present ||
-      status.status?.state === "published" || status.status?.state === "abandoned") {
+      status.status?.state === "published" || status.status?.state === "abandoned" || status.status?.state === "failed") {
       throw new Error("Publication commit requires its unstarted held owner without active or unknown execution");
     }
     await effects.checkLocalInputs?.();
     journal.save({ ...state, phase: "commit_requested" });
-    const value = receipt(state, await effects.commit(), "committed");
-    if (value.result !== "committed") throw new Error("Invalid publication commit receipt");
-    journal.save({ ...state, phase: "committed", commit_receipt: { key: value.key, created: value.created } });
+    const value = receipt(state, await effects.commit(), "accepted");
+    if (value.result !== "accepted") throw new Error("Invalid publication acceptance receipt");
+    journal.save({ ...state, phase: "accepted", commit_receipt: { key: value.key, created: value.created,
+      acceptance_protocol: value.acceptance_protocol, staging_verified: value.staging_verified } });
   });
 }
 
@@ -73,10 +74,10 @@ export async function inspectPublicationOperation(journal: PublicationJournal, e
 export async function runPublicationRetry(journal: PublicationJournal, effects: PublicationOperationEffects): Promise<void> {
   await journal.exclusively(async () => {
     const state = load(journal, effects);
-    if (state.phase !== "committed" || state.retry?.state === "requested") throw new Error("Publication retry outcome is unknown or its commit was not acknowledged; never replay its POST");
+    if (!["accepted", "committed"].includes(state.phase) || state.retry?.state === "requested") throw new Error("Publication retry outcome is unknown or its acceptance was not acknowledged; never replay its POST");
     const status = receipt(state, await effects.status(), "status");
     if (status.result !== "status" || status.ownership !== "held" || status.execution_active || !status.marker_present ||
-      status.status?.state === "published" || status.status?.state === "abandoned") {
+      status.status?.state === "published" || status.status?.state === "abandoned" || status.status?.state === "failed") {
       throw new Error("Publication retry requires its unfinished held owner without active or unknown execution");
     }
     const started = validatePublicationClientState({ ...state, retry: { attempt: (state.retry?.attempt ?? 0) + 1, state: "requested" } });
@@ -90,7 +91,7 @@ export async function runPublicationRetry(journal: PublicationJournal, effects: 
 export async function runPublicationRelease(journal: PublicationJournal, effects: PublicationOperationEffects): Promise<void> {
   await journal.exclusively(async () => {
     const state = load(journal, effects);
-    if (state.phase !== "committed" || state.release?.state === "requested") {
+    if (!["accepted", "committed"].includes(state.phase) || state.release?.state === "requested") {
       throw new Error("Publication release outcome is unknown or its commit was not acknowledged; never replay its POST");
     }
     const status = receipt(state, await effects.status(), "status");

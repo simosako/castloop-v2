@@ -227,7 +227,7 @@ test("RSS import reports retained execution with DLQ history without authorizing
       if (command === "publish-episode") throw new Error("Import must not publish an Episode while the Show execution is retained");
       const result = await runM6Command(root, setup.config, command, args, { workerSource: async () => "unused" });
       if (command === "publish-show") {
-        const jobId = z.object({ result: z.literal("publication-committed"), job_id: z.uuid() }).strict().parse(result).job_id;
+        const jobId = z.object({ result: z.literal("publication-accepted"), job_id: z.uuid() }).strict().parse(result).job_id;
         const job = readLocalPublicationJob(root, setup.config, jobId).client_state!;
         await acquireShowExecution(setup.env, "imported", jobId, job.publication.request.expected_show_generation + 1);
         await acquireServiceInvocation(setup.env, setup.config.service_id, "m6_consumer");

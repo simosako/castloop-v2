@@ -8,7 +8,7 @@ import { acquireShowExecution } from "../../../src/lifecycle-control";
 import { SERVICE_ADMISSION_KEY, acquireServiceInvocation } from "../../../src/service-admission";
 import { publicationAdminFixture } from "../../../src/test-support/publication-admin";
 import { PublicationAdminClient } from "./publication-client";
-import { createPublicationJournal, readLocalPublicationJob } from "./publication-journal";
+import { createPublicationJournal, readLocalPublicationJob, validatePublicationClientState } from "./publication-journal";
 import type { PublicationJournal } from "./publication-journal";
 import { createPublicationOperationEffects, inspectPublicationOperation, runPublicationClaim, runPublicationCommit, runPublicationRelease, runPublicationRetry } from "./publication-operation";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -56,6 +56,39 @@ test("publication inspection rejects a local phase change during status without 
   } finally { rmSync(setup.root, { recursive: true, force: true }); }
 });
 
+test("accepted receipts are explicit and legacy committed journals remain readable without promotion", async () => {
+  const setup = await fixture();
+  await runPublicationClaim(setup.journal, setup.effects);
+  await runPublicationCommit(setup.journal, setup.effects);
+  const accepted = setup.journal.load();
+  expect(accepted.phase).toBe("accepted");
+  expect(accepted.commit_receipt).toMatchObject({ acceptance_protocol: "queue-validation-v1", staging_verified: false });
+  const legacyReceipt = { key: accepted.commit_receipt!.key, created: accepted.commit_receipt!.created };
+  expect(() => validatePublicationClientState({ ...accepted, commit_receipt: legacyReceipt })).toThrow();
+  expect(() => validatePublicationClientState({ ...accepted, phase: "committed" })).toThrow();
+  const legacy = validatePublicationClientState({ ...accepted, phase: "committed", commit_receipt: legacyReceipt });
+  const bytes = JSON.stringify(legacy);
+  writeFileSync(setup.file, bytes);
+  expect(readLocalPublicationJob(setup.root, setup.config, setup.frozen.request.job_id).client_state?.phase).toBe("committed");
+  expect(readFileSync(setup.file, "utf8")).toBe(bytes);
+});
+
+test("failed consumer validation is visible to the CLI and cannot trigger retry POST", async () => {
+  const setup = await fixture();
+  await runPublicationClaim(setup.journal, setup.effects);
+  await setup.bucket.put(`system/jobs/${setup.stages[0]!.operation_id}/upload-progress.json`, "malformed private proof");
+  await runPublicationCommit(setup.journal, setup.effects);
+  await setup.consume(setup.markerKey);
+  const status = await inspectPublicationOperation(setup.journal, setup.effects);
+  expect(status.server_status.status).toMatchObject({ state: "failed", reason_code: "validation_failed" });
+  expect(status.server_status).toMatchObject({ ownership: "held", execution_active: false, marker_present: true });
+  expect(status.client_state.phase).toBe("accepted");
+  const calls = setup.calls.length;
+  await expect(runPublicationRetry(setup.journal, setup.effects)).rejects.toThrow("unfinished held owner");
+  expect(setup.calls.slice(calls)).toEqual(["status"]);
+  expect(setup.journal.load().retry).toBeUndefined();
+});
+
 for (const mode of ["show", "episode", "metadata", "audio"] as const) {
   test(`durable publication ${mode} keeps claim/commit separate and completes through M6 Queue`, async () => {
     const setup = await fixture(mode);
@@ -65,7 +98,7 @@ for (const mode of ["show", "episode", "metadata", "audio"] as const) {
     expect(setup.text(setup.feedKey)).toBe(feed);
     expect(await setup.bucket.head(setup.markerKey)).toBeNull();
     await runPublicationCommit(setup.journal, setup.effects);
-    expect(setup.journal.load().phase).toBe("committed");
+    expect(setup.journal.load().phase).toBe("accepted");
     expect(setup.journal.load().commit_receipt?.key).toBe(setup.markerKey);
     expect(setup.text(setup.feedKey)).toBe(feed);
     expect((await readShowControl(setup.env, "daily"))!.value.owner?.state).toBe("reserved");
@@ -241,7 +274,7 @@ test("client rejects false manifest, result, identity and Episode commit-key rec
     { ...original, result: "claimed", key: undefined, created: undefined }]) {
     let sends = 0;
     const client = new PublicationAdminClient(setup.config, "private-secret", async () => {
-      sends += 1; return Response.json(value, { headers: { "Cache-Control": "no-store" } });
+      sends += 1; return Response.json(value, { status: 202, headers: { "Cache-Control": "no-store" } });
     });
     await expect(client.commit(setup.frozen)).rejects.toThrow("response was not verified");
     expect(sends).toBe(1);

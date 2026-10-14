@@ -12,7 +12,7 @@ type WorkerTimingPhase = "publication.consumer" | "publication.guard" | "publica
   "publication.feed_generation" | "publication.catalog_advance" | "publication.feed_generation_write" |
   "publication.visibility" |
   "publication.unique_guid" | "publication.audio" | "publication.feed_inputs" | "publication.purge" |
-  `publication.progress.${LifecycleProgress["phase"]}` | `publication.status_write.${"processing" | "retrying" | "published"}` |
+  `publication.progress.${LifecycleProgress["phase"]}` | `publication.status_write.${"processing" | "retrying" | "failed" | "published"}` |
   "publication.history_write" | "publication.metadata_write" | "publication.feed_write" | "publication.cover_write" |
   "publication.owner_release" | "publication.invocation_release" |
   "publication.claim" | "publication.commit" | "publication.retry" | "publication.release" | "publication.status" |

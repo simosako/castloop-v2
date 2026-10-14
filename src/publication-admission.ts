@@ -8,6 +8,7 @@ import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-
 import { canonicalEnclosureUrl } from "./media-url";
 import { parsePublicAssetPath } from "./public-assets";
 import { matchesPublishedAudio } from "./publication-inputs";
+import { parsePublicationInput, PublicationValidationFailure } from "./publication-validation";
 
 export { publicationCommitKey, publicationRequestSchema } from "../packages/shared/src/index";
 export type { PublicationRequest } from "../packages/shared/src/index";
@@ -143,16 +144,29 @@ export async function requireOwnedPublication(env: LifecycleControlEnv, operatio
 type StagedProof = { request: StageUploadRequest; progress: StageUploadProgress;
   payloadKeys: ReadonlyArray<{ asset: StageAsset; key: string }> };
 async function readStagedProof(env: LifecycleControlEnv, frozen: PublicationRequest, operationId: string): Promise<StagedProof> {
-  const requestObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${operationId}/upload.json`);
-  const progressObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${operationId}/upload-progress.json`);
-  const statusObject = await env.CASTLOOP_BUCKET.get(`system/jobs/${operationId}/status.toml`);
-  if (!requestObject || !progressObject || !statusObject || [requestObject, progressObject, statusObject].some((object) => object.size < 1 || object.size > 16384)) {
-    throw new Error("Publication requires retained staging verification records");
+  const records = await Promise.allSettled(["upload.json", "upload-progress.json", "status.toml"].map(async (name) => {
+    const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${operationId}/${name}`);
+    if (!object) throw new PublicationValidationFailure();
+    if (object.size < 1 || object.size > 16384) {
+      await object.body?.cancel();
+      throw new PublicationValidationFailure();
+    }
+    return await object.text();
+  }));
+  for (const record of records) {
+    if (record.status === "rejected" && !(record.reason instanceof PublicationValidationFailure)) throw record.reason;
   }
-  const inputs = parseStageUploadInputs(await requestObject.json<unknown>());
+  const sources = records.map((record) => {
+    if (record.status === "rejected") throw record.reason;
+    return record.value;
+  });
+  const requestSource = sources[0]!;
+  const inputs = parsePublicationInput(() => parseStageUploadInputs(JSON.parse(requestSource)));
   const request = inputs.request;
-  const progress = stageUploadProgressSchema.parse(await progressObject.json<unknown>());
-  const status = parseJobStatus(await statusObject.text());
+  const progressSource = sources[1]!;
+  const progress = parsePublicationInput(() => stageUploadProgressSchema.parse(JSON.parse(progressSource)));
+  const statusSource = sources[2]!;
+  const status = parsePublicationInput(() => parseJobStatus(statusSource));
   if (request.operation_id !== operationId || request.draft_job_id !== frozen.commit.job_id || request.show_id !== frozen.commit.show_id ||
     request.kind !== frozen.commit.kind || request.episode_id !== frozen.request.episode_id ||
     request.expected_show_generation + 1 > frozen.request.expected_show_generation ||
@@ -163,7 +177,7 @@ async function readStagedProof(env: LifecycleControlEnv, frozen: PublicationRequ
     status.action !== "stage" || status.job_id !== operationId || status.show_id !== request.show_id || status.kind !== request.kind ||
     status.episode_id !== request.episode_id || status.show_generation !== progress.show_generation ||
     status.request_sha256 !== await controlRequestHash(inputs.controlRequest)) {
-    throw new Error("Staging verification does not match the publication target and generations");
+    throw new PublicationValidationFailure();
   }
   return { request, progress, payloadKeys: inputs.payloadKeys };
 }
@@ -179,28 +193,38 @@ export async function verifyPublicationStaging(env: LifecycleControlEnv, operati
     if (frozen.commit.metadata_sha256) expected.set("episode_metadata", { sha256: frozen.commit.metadata_sha256 });
     if (frozen.commit.audio_sha256) expected.set("audio", { sha256: frozen.commit.audio_sha256, length: frozen.commit.audio_length_bytes });
     const currentObject = await env.CASTLOOP_BUCKET.get(`public/episodes/${operation.showId}/${frozen.commit.episode_id}/metadata.toml`);
-    if (currentObject && (currentObject.size < 1 || currentObject.size > 1_000_000)) throw new Error("Published Episode snapshot is oversized");
-    const current = currentObject ? parseEpisodeRevision(await currentObject.text()) : null;
+    if (currentObject && (currentObject.size < 1 || currentObject.size > 1_000_000)) {
+      await currentObject.body?.cancel();
+      throw new PublicationValidationFailure();
+    }
+    const currentSource = currentObject ? await currentObject.text() : null;
+    const current = currentSource === null ? null : parsePublicationInput(() => parseEpisodeRevision(currentSource));
     const lifecycle = await readEpisodeLifecycle(env, operation.showId, frozen.commit.episode_id);
     const candidate = options.publishedCandidate ? episodeRevisionSchema.parse(options.publishedCandidate) : null;
     const ownCurrent = candidate && candidate.revision_id === operation.jobId && candidate.episode_id === frozen.commit.episode_id &&
       JSON.stringify(current) === JSON.stringify(candidate);
     if (!ownCurrent && (frozen.commit.base_revision_id ? current?.revision_id !== frozen.commit.base_revision_id || lifecycle?.lifecycle !== "active" :
-      current !== null || lifecycle?.lifecycle !== "draft")) throw new Error("Publication base revision no longer matches its Episode");
-    if (current?.episode_id !== undefined && current.episode_id !== frozen.commit.episode_id) throw new Error("Published Episode snapshot targets another Episode");
+      current !== null || lifecycle?.lifecycle !== "draft")) throw new PublicationValidationFailure();
+    if (current?.episode_id !== undefined && current.episode_id !== frozen.commit.episode_id) throw new PublicationValidationFailure();
     if (current) {
       const history = await env.CASTLOOP_BUCKET.get(`public/episodes/${operation.showId}/${frozen.commit.episode_id}/revisions/${current.revision_id}.toml`);
-      if (!history || history.size < 1 || history.size > 1_000_000 || JSON.stringify(parseEpisodeRevision(await history.text())) !== JSON.stringify(current)) {
-        throw new Error("Publication base revision history is missing or inconsistent");
+      if (!history) throw new PublicationValidationFailure();
+      if (history.size < 1 || history.size > 1_000_000) {
+        await history.body?.cancel();
+        throw new PublicationValidationFailure();
+      }
+      const historySource = await history.text();
+      if (JSON.stringify(parsePublicationInput(() => parseEpisodeRevision(historySource))) !== JSON.stringify(current)) {
+        throw new PublicationValidationFailure();
       }
       if (!frozen.commit.audio_sha256) {
         const asset = parsePublicAssetPath(new URL(canonicalEnclosureUrl(current, operation.showId, "https://publication-validation.invalid")).pathname);
         if (asset?.kind !== "audio" || asset.showId !== operation.showId || asset.episodeId !== frozen.commit.episode_id) {
-          throw new Error("Publication base revision has an invalid immutable audio reference");
+          throw new PublicationValidationFailure();
         }
         const audio = await env.CASTLOOP_BUCKET.head(asset.key);
         if (!matchesPublishedAudio(audio, current.length_bytes, current.sha256)) {
-          throw new Error("Publication base audio is missing or inconsistent");
+          throw new PublicationValidationFailure();
         }
       }
     }
@@ -213,18 +237,18 @@ export async function verifyPublicationStaging(env: LifecycleControlEnv, operati
       const verified = proof.progress.verified_assets.find((asset) => asset.asset === payload.asset);
       if (!wanted || checked.has(payload.asset) || wanted.sha256 !== payload.sha256 || wanted.length !== undefined && wanted.length !== payload.length_bytes ||
         !verified || verified.sha256 !== payload.sha256 || verified.length_bytes !== payload.length_bytes) {
-        throw new Error("Publication payload does not match its staging verification evidence");
+        throw new PublicationValidationFailure();
       }
       const key = proof.payloadKeys.find((entry) => entry.asset === payload.asset)?.key;
-      if (!key) throw new Error("Publication payload has no validated staging key");
+      if (!key) throw new PublicationValidationFailure();
       const head = await env.CASTLOOP_BUCKET.head(key);
       if (!head || head.etag !== verified.etag || !verified.version || head.version !== verified.version || head.size !== verified.length_bytes) {
-        throw new Error("Staged payload changed after verification");
+        throw new PublicationValidationFailure();
       }
       checked.add(payload.asset);
     }
   }
-  if (checked.size !== expected.size) throw new Error("Publication staging verification is incomplete");
+  if (checked.size !== expected.size) throw new PublicationValidationFailure();
   await requireOwnedPublication(env, operation);
   return frozen;
 }
@@ -255,9 +279,9 @@ export async function commitOwnedPublication(env: LifecycleControlEnv, operation
   if (snapshot.control.value.owner.state !== "reserved" || snapshot.control.value.owner.execution_id) {
     throw new Error("Only unstarted publication admission can create its commit marker");
   }
-  const frozen = await verifyPublicationStaging(env, operation);
   const latest = await requireOwnedPublication(env, operation);
   if (latest.control.value.owner.state !== "reserved" || latest.control.value.owner.execution_id) throw new Error("Publication started before its commit marker");
+  const frozen = latest.frozen;
   const written = await env.CASTLOOP_BUCKET.put(key, JSON.stringify(frozen.commit), { onlyIf: new Headers({ "If-None-Match": "*" }) });
   if (written) return { key, created: true };
   const raced = await readFrozenPublicationCommit(env, key);

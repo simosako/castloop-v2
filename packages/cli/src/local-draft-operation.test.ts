@@ -118,7 +118,7 @@ describe("owned target-local staging and publication orchestration", () => {
           expect(await setup.bucket.head(`${stageDraftPrefix(uploaded.upload)}/commit.json`)).toBeNull();
         }
         const publication = await setup.publish();
-        expect(publication.phase).toBe("committed");
+        expect(publication.phase).toBe("accepted");
         expect(readLocalDraft(setup.root, setup.config, setup.target).client_state?.phase).toBe("frozen");
         expect(readLocalDraft(setup.root, setup.config, setup.target).lock_present).toBe(false);
         const requests = [...setup.requests];
@@ -248,7 +248,7 @@ describe("M6 updates derive durable draft IDs and generation/base snapshots", ()
         const published = await setup.publishAutomatically();
         expect(published.publication.request.job_id).toBe(draftId);
         expect(published.publication.request.created_at).toBe("2026-10-02T12:01:00Z");
-        expect(published.phase).toBe("committed");
+        expect(published.phase).toBe("accepted");
         expect(setup.requests.filter((action) => action === "target:inspect")).toHaveLength(assets.length + 1);
       } finally { setup.dispose(); }
     });

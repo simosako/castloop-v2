@@ -56,11 +56,12 @@ export async function handleM6PublicationAdmin(request: Request, env: Publicatio
         return withPublicationCommitContext(env, operation, async (scoped, manifestHash) => {
           if (manifestHash !== input.manifest_sha256) throw new Error("Publication input differs from its retained manifest");
           const committed = await commitOwnedPublication(scoped, operation);
-          return publicationAdminResponseSchema.parse({ ...identity, result: "committed", operation: input.operation,
+          return publicationAdminResponseSchema.parse({ ...identity, result: "accepted", acceptance_protocol: input.acceptance_protocol,
+            staging_verified: false, operation: input.operation,
             manifest_sha256: input.manifest_sha256, ...committed });
         });
       }));
-    return reply(result);
+    return reply(result, result.result === "accepted" ? 202 : 200);
   } catch (error) {
     if (input.action === "status" && error instanceof ManagementReadConflict) {
       return reply({ error: "Publication status changed during inspection", reason_code: "publication_status_changed",

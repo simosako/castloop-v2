@@ -11,11 +11,12 @@ import { publicationCommitKey, readFrozenPublicationCommit, requireOwnedPublicat
 import { publicationChecksum, readPublicationBytes, renderPublicationFeed } from "./publication-inputs";
 import type { PublicationEffects } from "./publication-inputs";
 import { measureWorkerPhase } from "./worker-timing";
+import { parsePublicationInput, PublicationValidationFailure } from "./publication-validation";
 
 export type ShowPublicationEffects = PublicationEffects;
 
 export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: ShowExecution,
-  effects: ShowPublicationEffects): Promise<void> {
+  effects: ShowPublicationEffects): Promise<void | "failed"> {
   const existing = await measureWorkerPhase(execution.jobId, "publication.runner_control", () => readShowControl(env, execution.showId));
   const receipt = existing?.value.last_finished_operation;
   if (receipt?.job_id === execution.jobId && receipt.generation === execution.generation && receipt.execution_id === execution.executionId) {
@@ -29,6 +30,8 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
   if (!marker || JSON.stringify(marker) !== JSON.stringify(owned.frozen)) throw new Error("Show publication has no matching frozen commit");
   const commit = owned.frozen.commit;
   const journal = await measureWorkerPhase(execution.jobId, "publication.journal_read", () => readLifecycleJobJournal(env, execution));
+  if (journal.status?.state === "failed") return "failed";
+  const canRejectInputs = !journal.progress || ["admitted", "validating"].includes(journal.progress.phase);
   let progress = journal.progress ?? lifecycleProgressSchema.parse({ schema_version: 1, ...journal.identity, phase: "admitted",
     deleted_objects: 0, purge_confirmed: false, updated_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") });
   if (journal.status?.state === "published") {
@@ -56,10 +59,10 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
     await measureWorkerPhase(execution.jobId, `publication.progress.${phase}`, () => writeLifecycleProgress(env, execution, next));
     progress = next;
   }
-  async function recordStatus(state: "processing" | "retrying" | "published"): Promise<void> {
+  async function recordStatus(state: "processing" | "retrying" | "failed" | "published"): Promise<void> {
     await measureWorkerPhase(execution.jobId, `publication.status_write.${state}`, () => writeLifecycleJobStatus(env, execution, lifecycleJobStatusSchema.parse({ schema_version: 2, ...journal.identity,
       state, phase: progress.phase, ...(state === "published" ? { result_lifecycle: "active" } : {}),
-      ...(state === "retrying" ? lifecycleFailureForPhase(failurePhase) : {}) })));
+      ...(state === "retrying" || state === "failed" ? lifecycleFailureForPhase(failurePhase) : {}) })));
   }
   async function overwrite(key: string, value: string | Uint8Array, contentType?: string): Promise<void> {
     await guard();
@@ -83,15 +86,15 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
       const metadata = await readPublicationBytes(env, `${prefix}/show.toml`, 1_000_000);
       const cover = await readPublicationBytes(env, `${prefix}/cover.${commit.cover_extension}`, 5_000_000);
       if (await publicationChecksum(metadata) !== commit.metadata_sha256 || await publicationChecksum(cover) !== commit.cover_sha256) {
-        throw new Error("Show publication payload differs from its frozen commit");
+        throw new PublicationValidationFailure();
       }
-      const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(metadata);
-      const show = parseShowMetadata(source);
+      const source = parsePublicationInput(() => new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(metadata));
+      const show = parsePublicationInput(() => parseShowMetadata(source));
       const extension = show.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg";
-      if (show.show_id !== execution.showId || extension !== commit.cover_extension) throw new Error("Show publication metadata targets another Show or cover type");
+      if (show.show_id !== execution.showId || extension !== commit.cover_extension) throw new PublicationValidationFailure();
       const validCover = extension === "jpg" ? cover.length >= 3 && cover[0] === 255 && cover[1] === 216 && cover[2] === 255 :
         cover.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => cover[index] === byte);
-      if (!validCover) throw new Error("Show publication cover has an invalid image signature");
+      if (!validCover) throw new PublicationValidationFailure();
       const showKey = `system/shows/${execution.showId}/show.toml`;
       const current = await env.CASTLOOP_BUCKET.head(showKey);
       const control = await requireShowExecution(env, execution);
@@ -144,6 +147,7 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
     await recordStatus("published");
     await measureWorkerPhase(execution.jobId, "publication.owner_release", () => finishShowOperation(env, execution));
   } catch (error) {
+    let rejected = false;
     await measureWorkerPhase(execution.jobId, "publication.failure_record", async () => {
       const current = await readShowControl(env, execution.showId);
       if (current?.value.last_finished_operation?.job_id === execution.jobId && current.value.last_finished_operation.generation === execution.generation &&
@@ -151,9 +155,12 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
       const saved = await readLifecycleJobJournal(env, execution);
       if (saved.status?.state !== "published" && saved.progress?.phase !== "finished") {
         progress = saved.progress ?? progress;
-        await recordStatus("retrying");
+        rejected = canRejectInputs && error instanceof PublicationValidationFailure &&
+          ["admitted", "validating"].includes(progress.phase);
+        await recordStatus(rejected ? "failed" : "retrying");
       }
     });
+    if (rejected) return "failed";
     throw error;
   }
 }

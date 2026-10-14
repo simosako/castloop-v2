@@ -23,16 +23,17 @@ export class PublicationAdminClient {
     const publication = publicationRequestSchema.parse(input);
     const operation = publicationClientOperation(publication);
     const hash = await publicationManifestHash(publication);
-    const identity = { schema_version: 1, service_id: this.http.config.service_id, action };
+    const identity = { schema_version: 1, service_id: this.http.config.service_id, action,
+      ...(action === "claim" || action === "commit" ? { acceptance_protocol: "queue-validation-v1" } : {}) };
     const request = publicationAdminRequestSchema.parse(action === "commit" || action === "retry" || action === "release" ?
       { ...identity, operation, manifest_sha256: hash } : { ...identity, publication });
     const payload = await this.http.post("publication", request);
     try {
       const value = publicationAdminResponseSchema.parse(payload);
-      const expected = { claim: "claimed", commit: "committed", retry: "requeued", release: "released", status: "status" }[action];
+      const expected = { claim: "claimed", commit: "accepted", retry: "requeued", release: "released", status: "status" }[action];
       if (value.service_id !== this.http.config.service_id || value.result !== expected || value.manifest_sha256 !== hash ||
         JSON.stringify(value.operation) !== JSON.stringify(operation) ||
-        (value.result === "committed" || value.result === "requeued" || value.result === "released") && value.key !== publicationCommitKey(publication.commit) ||
+        (value.result === "accepted" || value.result === "requeued" || value.result === "released") && value.key !== publicationCommitKey(publication.commit) ||
         value.result === "status" && (JSON.stringify(value.publication) !== JSON.stringify(publication) ||
           value.request_sha256 !== createHash("sha256").update(JSON.stringify(publication.request)).digest("hex"))) {
         throw new Error("Publication response differs from its frozen manifest/control request");
@@ -50,9 +51,9 @@ export class PublicationAdminClient {
     return value;
   }
 
-  async commit(publication: PublicationRequest): Promise<Result<"committed">> {
+  async commit(publication: PublicationRequest): Promise<Result<"accepted">> {
     const value = await this.call(publication, "commit");
-    if (value.result !== "committed") throw new Error("Invalid publication commit result");
+    if (value.result !== "accepted") throw new Error("Invalid publication acceptance result");
     return value;
   }
 

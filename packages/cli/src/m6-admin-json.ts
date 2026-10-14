@@ -65,7 +65,8 @@ export class M6AdminJsonClient {
     if (Buffer.byteLength(body) > 16384) throw new Error(`${label} request exceeds its record budget`);
     const statusRead = route === "target" ? "target" : route === "publication" && "action" in input && input.action === "status" ? "publication" : undefined;
     return this.send(new URL(`/admin/${route}`, this.managementBaseUrl), label, body,
-      route === "target" ? 2_000_000 : RESPONSE_BUDGET, statusRead);
+      route === "target" ? 2_000_000 : RESPONSE_BUDGET, statusRead,
+      route === "publication" && "action" in input && input.action === "commit" ? 202 : 200);
   }
 
   async getSetupProbe(operationId: string): Promise<unknown> {
@@ -79,7 +80,8 @@ export class M6AdminJsonClient {
     return this.send(new URL("/admin/health", this.managementBaseUrl), "Runtime health");
   }
 
-  private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET, statusRead?: "target" | "publication"): Promise<unknown> {
+  private async send(url: URL, label: string, body?: string, maximumBytes = RESPONSE_BUDGET,
+    statusRead?: "target" | "publication", expectedStatus = 200): Promise<unknown> {
     let response: Response;
     try {
       response = await this.transport(url, {
@@ -91,7 +93,7 @@ export class M6AdminJsonClient {
         "management_transport_failed");
     }
     try {
-      if (response.status !== 200) {
+      if (response.status !== expectedStatus) {
         if (statusRead && response.status === 409) {
           const value = await readM6JsonResponse(response);
           if (value && typeof value === "object" && Object.keys(value).length === 3 &&

@@ -87,7 +87,7 @@ for (const mode of ["show", "episode", "metadata", "audio"] as const) {
     expect(await setup.bucket.head(setup.markerKey)).toBeNull();
     await writeFile(setup.local.metadataPath, original);
     await runPublicationCommit(setup.journal, setup.effects);
-    expect(setup.journal.load().phase).toBe("committed");
+    expect(setup.journal.load().phase).toBe("accepted");
   });
 }
 

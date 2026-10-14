@@ -86,7 +86,8 @@ export async function writeLifecycleJobStatus(env: LifecycleControlEnv, executio
   const existing = await jobObject(env, execution, "status");
   if (existing) {
     const previous = checkedStatus(await existing.text(), identity);
-    if (["published", "completed", "abandoned"].includes(previous.state)) {
+    if (["published", "completed", "abandoned"].includes(previous.state) ||
+      previous.action === "publish" && previous.state === "failed") {
       if (JSON.stringify(previous) === JSON.stringify(value)) return;
       throw new Error("Terminal lifecycle status cannot be changed");
     }

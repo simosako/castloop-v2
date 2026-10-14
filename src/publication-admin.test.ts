@@ -44,8 +44,10 @@ describe("unreleased M6 publication admission and commit boundary", () => {
       expect(setup.entries.has(setup.markerKey)).toBe(false);
       expect((await readShowControl(setup.env, "daily"))?.value.owner?.state).toBe("reserved");
       const committed = await setup.publicationSuccess(setup.body("commit"));
-      expect(committed.result).toBe("committed");
-      if (committed.result !== "committed") throw new Error("Expected commit result");
+      expect(committed.result).toBe("accepted");
+      if (committed.result !== "accepted") throw new Error("Expected acceptance result");
+      expect(committed.acceptance_protocol).toBe("queue-validation-v1");
+      expect(committed.staging_verified).toBe(false);
       expect(committed.created).toBe(true);
       expect(committed.key).toBe(setup.markerKey);
       expect(JSON.parse(setup.text(setup.markerKey))).toEqual(setup.frozen.commit);
@@ -109,7 +111,7 @@ describe("unreleased M6 publication admission and commit boundary", () => {
     const pauseId = crypto.randomUUID();
     await pauseServiceAdmission(setup.env, "service", pauseId);
     expect((await setup.call(setup.body("claim"))).status).toBe(409);
-    expect((await setup.publicationSuccess(setup.body("commit"))).result).toBe("committed");
+    expect((await setup.publicationSuccess(setup.body("commit"))).result).toBe("accepted");
     await queueM6Candidate({ queue: "test-queue", messages: [{ id: "publication", body: { object: { key: setup.markerKey } } }] } as never,
       setup.candidateEnv, setup.cachedAssets);
     expect((await readServiceAdmission(setup.env, "service"))?.value.state).toBe("paused");
@@ -117,28 +119,42 @@ describe("unreleased M6 publication admission and commit boundary", () => {
     expect((await readShowControl(setup.env, "daily"))?.value.owner).toBeUndefined();
   });
 
-  test("changed payload after verification refuses commit, retains admission and never publishes an older copy", async () => {
+  test("changed payload is accepted but fails consumer validation without publishing an older copy", async () => {
     const setup = await publicationAdminFixture();
     await setup.publicationSuccess(setup.body("claim"));
     await setup.bucket.put(stagePayloadKey(setup.stages[0]!, "show_metadata"), "Private changed metadata");
     const result = await setup.call(setup.body("commit"));
-    expect(result.status).toBe(409);
+    expect(result.status).toBe(202);
     expect(await result.text()).not.toContain("Private changed metadata");
-    expect(setup.entries.has(setup.markerKey)).toBe(false);
+    expect(setup.entries.has(setup.markerKey)).toBe(true);
     expect((await readShowControl(setup.env, "daily"))?.value.owner?.state).toBe("reserved");
+    const before = [...setup.entries].filter(([key]) => key.startsWith("public/") || key.startsWith("system/shows/"));
+    await queueM6Candidate({ queue: "test-queue", messages: [{ id: "publication", body: { object: { key: setup.markerKey } } }] } as never,
+      setup.candidateEnv, setup.cachedAssets);
+    expect(parseJobStatus(setup.text(`system/jobs/${setup.publicationOperation.job_id}/status.toml`))).toMatchObject({
+      state: "failed", phase: "validating", reason_code: "validation_failed" });
+    expect([...setup.entries].filter(([key]) => key.startsWith("public/") || key.startsWith("system/shows/"))).toEqual(before);
+    expect((await readShowControl(setup.env, "daily"))?.value.owner).toMatchObject({ state: "processing", job_id: setup.publicationOperation.job_id });
+    expect((await readShowControl(setup.env, "daily"))?.value.owner?.execution_id).toBeUndefined();
     expect((await readServiceAdmission(setup.env, "service"))?.value.invocations).toEqual([]);
   });
 
-  test("missing staging status/proof and changed Episode base revision fail without a commit marker", async () => {
+  test("missing staging status/proof and changed Episode base fail after acceptance without public writes", async () => {
     for (const change of ["status", "proof", "base"] as const) {
       const setup = await publicationAdminFixture("metadata");
       await setup.publicationSuccess(setup.body("claim"));
       if (change === "status") setup.entries.delete(`system/jobs/${setup.stages[0]!.operation_id}/status.toml`);
       if (change === "proof") setup.entries.delete(`system/jobs/${setup.stages[0]!.operation_id}/upload-progress.json`);
       if (change === "base") await setup.addEpisode("next", "active");
-      expect((await setup.call(setup.body("commit"))).status).toBe(409);
-      expect(setup.entries.has(setup.markerKey)).toBe(false);
-      expect((await readShowControl(setup.env, "daily"))?.value.owner?.state).toBe("reserved");
+      const before = [...setup.entries].filter(([key]) => key.startsWith("public/") || key.startsWith("system/shows/"));
+      expect((await setup.call(setup.body("commit"))).status).toBe(202);
+      expect(setup.entries.has(setup.markerKey)).toBe(true);
+      await queueM6Candidate({ queue: "test-queue", messages: [{ id: "publication", body: { object: { key: setup.markerKey } } }] } as never,
+        setup.candidateEnv, setup.cachedAssets);
+      expect(parseJobStatus(setup.text(`system/jobs/${setup.publicationOperation.job_id}/status.toml`)).state).toBe("failed");
+      expect([...setup.entries].filter(([key]) => key.startsWith("public/") || key.startsWith("system/shows/"))).toEqual(before);
+      expect((await readShowControl(setup.env, "daily"))?.value.owner?.execution_id).toBeUndefined();
+      expect((await readServiceAdmission(setup.env, "service"))?.value.invocations).toEqual([]);
     }
   });
 
@@ -163,8 +179,8 @@ describe("unreleased M6 publication admission and commit boundary", () => {
     await setup.publicationSuccess(setup.body("commit"));
     const etag = setup.entries.get(setup.markerKey)!.etag;
     const duplicate = await setup.publicationSuccess(setup.body("commit"));
-    expect(duplicate.result).toBe("committed");
-    if (duplicate.result !== "committed") throw new Error("Expected commit receipt");
+    expect(duplicate.result).toBe("accepted");
+    if (duplicate.result !== "accepted") throw new Error("Expected acceptance receipt");
     expect(duplicate.created).toBe(false);
     expect(setup.entries.get(setup.markerKey)!.etag).toBe(etag);
     expect(setup.writes.filter((key) => key === setup.markerKey)).toHaveLength(1);
@@ -204,17 +220,16 @@ describe("unreleased M6 publication admission and commit boundary", () => {
     }
   });
 
-  test("live commit verification remains registered through pause and the final cache gate", async () => {
+  test("live marker PUT remains registered through pause and the final cache gate", async () => {
     const setup = await publicationAdminFixture();
     await setup.publicationSuccess(setup.body("claim"));
     const started = Promise.withResolvers<void>();
     const ended = Promise.withResolvers<void>();
-    const original = setup.env.CASTLOOP_BUCKET.head.bind(setup.env.CASTLOOP_BUCKET);
-    const payloadKey = stagePayloadKey(setup.stages[0]!, "show_metadata");
-    setup.env.CASTLOOP_BUCKET.head = (async (key: string) => {
-      if (key === payloadKey) { started.resolve(); await ended.promise; }
-      return original(key);
-    }) as typeof setup.env.CASTLOOP_BUCKET.head;
+    const original = setup.env.CASTLOOP_BUCKET.put.bind(setup.env.CASTLOOP_BUCKET);
+    setup.env.CASTLOOP_BUCKET.put = (async (...args: Parameters<typeof original>) => {
+      if (args[0] === setup.markerKey) { started.resolve(); await ended.promise; }
+      return original(...args);
+    }) as typeof setup.env.CASTLOOP_BUCKET.put;
     const pending = setup.call(setup.body("commit"));
     await started.promise;
     const held = (await readServiceAdmission(setup.env, "service"))!.value.invocations;
@@ -225,7 +240,7 @@ describe("unreleased M6 publication admission and commit boundary", () => {
     expect((await readShowControl(setup.env, "daily"))?.value.owner?.state).toBe("reserved");
     expect(setup.entries.has(setup.markerKey)).toBe(false);
     ended.resolve();
-    expect((await pending).status).toBe(200);
+    expect((await pending).status).toBe(202);
     expect((await readServiceAdmission(setup.env, "service"))?.value.invocations).toEqual([]);
     expect((await readServiceAdmission(setup.env, "service"))?.value.state).toBe("paused");
   });

@@ -53,6 +53,7 @@ export async function publicationAdminFixture(mode: "show" | "episode" | "metada
     sent.push((body as { object: { key: string } }).object.key);
   } } };
   const body = (action: "claim" | "commit" | "retry") => ({ schema_version: 1, service_id: "service", action,
+    ...(action === "claim" || action === "commit" ? { acceptance_protocol: "queue-validation-v1" } : {}),
     ...(action === "claim" ? { publication: frozen } : { operation: publicationOperation,
       manifest_sha256: sha256(new TextEncoder().encode(JSON.stringify(frozen))) }) });
   const http = (input: unknown, secret = "private-secret", method = "POST") => new Request("https://current.example/admin/publication", {
@@ -65,7 +66,7 @@ export async function publicationAdminFixture(mode: "show" | "episode" | "metada
   };
   const publicationSuccess = async (input: unknown): Promise<PublicationAdminResponse> => {
     const response = await call(input);
-    if (response.status !== 200) throw new Error(`Publication API failed with HTTP ${response.status}`);
+    if (response.status !== 200 && response.status !== 202) throw new Error(`Publication API failed with HTTP ${response.status}`);
     return publicationAdminResponseSchema.parse(await response.json<unknown>());
   };
   const purges: LifecyclePurgeTarget[] = [];
