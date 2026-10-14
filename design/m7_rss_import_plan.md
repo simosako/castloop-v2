@@ -177,14 +177,14 @@ Appleの案内ではGUIDの維持と、redirect等の少なくとも4週間の�
 
 ## 実装状況
 
-M7開発ブランチ`feat/m7-rss-import`で以下を接続した。公開済みv0.3.0の機能説明ではない。
+M7開発ブランチ`feat/m7-rss-import`で以下を接続し、v0.4.0に含めた。以下の2026-10-12の試験・未完了記述は当時の履歴であり、現在の利用条件と待機上限は[RSS移行案内](../docs/rss_migration.md)を参照する。v0.4.0は各job最大300回・5分後に新しい照会を開始しない仕様。FreeのHTTP CPU適合とIssue #13の完全解消は保証しない。
 
 - GUID文字列schema、任意`guid_is_permalink`、共通の公開後identity比較、RSS出力。
 - namespace対応のRSS解析、dry-run、画像・MP3・TOMLのローカル保存、同じスナップショットからのdownload再開。
 - 全件の公開前検証と`publish-rss-import`による既存runnerの逐次実行。確認済み待機jobの再照会と、未知変更要求の再送拒否。
 - 認証付き`service-status`の`external_episode_guids: true`で対応Workerを確認し、旧WorkerにはShow登録を始めない。設定ファイルの自己申告では判定しない。
 - 実行進捗は1つの小さいcursor記録に置き、既存の登録・staging・publication journalへの処理を再利用する。共通journal保存・lock実装を使用する。
-- [M7開発版の利用・切替案内](../docs/rss_migration.md)。
+- [RSS移行の利用・切替案内](../docs/rss_migration.md)。
 
 自動テストでは2 Episodeの取り込みから正式runner・Queue consumer・新RSS照合までを通し、状態照会中断後の続行、GUIDと音源内容の維持、旧Worker拒否、未知変更要求の再送拒否を検証する。実Cloudflare環境での受け入れと、配布版としての公開判定は別途必要。
 

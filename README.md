@@ -2,13 +2,15 @@
 
 Serverless podcast hosting on Cloudflare: one private R2 bucket and one public Worker per service, multiple Shows, managed through a standalone CLI.
 
-**v0.3.0 supports Show/Episode publication, listings, unpublishing, restoration, deletion, and custom domains.** It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md). The [design overview](design/initial_design.md) describes the current architecture and development history.
+**v0.4.0 adds one-time RSS migration and publication performance/diagnostic improvements**, retaining Show/Episode publication, listings, unpublishing, restoration, deletion, and custom domains. It supports new M6 services and compatible updates of initialized M6 services. It does not convert or adopt v0.1.x services. The older [v0.1.2 binary](https://github.com/simosako/castloop-v2/releases/tag/v0.1.2) has different commands and no lifecycle operations; its historical instructions are in [the Linux smoke guide](docs/linux_smoke_test.md). The [design overview](design/initial_design.md) describes the current architecture and development history.
+
+**Known limitation:** observed publication HTTP CPU was 15–34ms, above the Workers Free 10ms target. This release does not guarantee stable Free-tier operation or complete resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13). No paid-plan change is automatic. See the [v0.4.0 release notes](docs/release-v0.4.0.md).
 
 ## Build and install
 
 ### Install the release binary
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.3.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.3.0). In the download directory:
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.4.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.4.0). In the download directory:
 
 ```sh
 sha256sum --check SHA256SUMS
@@ -18,7 +20,7 @@ export PATH="$HOME/.local/bin:$PATH"
 castloop --version
 ```
 
-The version must be `0.3.0`. Keep the two license files with the binary and add `$HOME/.local/bin` to your shell's PATH for future sessions.
+The version must be `0.4.0`. Keep the two license files with the binary and add `$HOME/.local/bin` to your shell's PATH for future sessions.
 
 The target Linux x86-64 machine needs no Bun, Node.js, Wrangler, source tree, `ffprobe`, or R2 S3 credentials. Enable R2 and Queues and supply an account-scoped Cloudflare API token with Workers Scripts, Workers R2 Storage, and Queues read/write permissions. Never store it in TOML or Git. Experimental macOS/Windows cross-builds are not distributed or runtime-verified.
 
@@ -72,7 +74,7 @@ Updates stage inputs without publishing. For metadata-only Episode revisions, ru
 
 Use JPEG or PNG cover art; a published Show's cover extension cannot be changed. Restore unpublished content before editing it. A future `published_at` does not schedule publication: only an explicit publish command starts it.
 
-MP3s are limited to 300,000,000 bytes. The CLI validates duration, uploads and reads back the complete object to verify its size/SHA-256 and identity. The Worker checks that evidence against R2 HEAD; R2 verifies SHA-256 when saving immutable published audio. Workers Paid is not required by this implementation. Staging audio has no automatic expiration or general cleanup command in this MVP.
+MP3s are limited to 300,000,000 bytes. The CLI validates duration, uploads and reads back the complete object to verify its size/SHA-256 and identity. The Worker checks that evidence against R2 HEAD; R2 verifies SHA-256 when saving immutable published audio. The earlier 300 MB acceptance does not establish that v0.4.0's HTTP endpoints meet Free-tier CPU limits. Staging audio has no automatic expiration or general cleanup command in this MVP.
 
 ## List Shows and Episodes
 
@@ -128,11 +130,11 @@ castloop service-status
 castloop service-resume NEW_PAUSE_UUID
 ```
 
-Pause blocks new mutations; v0.3.0 Workers also return HTTP 503 for paused public delivery. Paused does not necessarily mean drained, and an HTTP response alone is not proof that old operations ended. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update in this MVP. Installing a binary or publishing a release does not update Cloudflare Workers automatically.
+Pause blocks new mutations; v0.3.0 and later Workers also return HTTP 503 for paused public delivery. Paused does not necessarily mean drained, and an HTTP response alone is not proof that old operations ended. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update in this MVP. Installing a binary or publishing a release does not update Cloudflare Workers automatically. v0.4.0 publication requires both the new CLI and its deployed Worker; mixed publication protocols are rejected. Do not downgrade after using external GUIDs or the new Episode catalog.
 
 ## Custom domains
 
-v0.3.0 provides `domain add HOSTNAME`, `domain list`, and `domain remove`, with one hostname per service. Use an active/full Cloudflare Zone in the same account; check Workers Scripts Write, Zone Read, and DNS Read permissions. Upgrade an existing M6 Worker with the compatible-update procedure above before using these commands.
+v0.3.0 and later provide `domain add HOSTNAME`, `domain list`, and `domain remove`, with one hostname per service. Use an active/full Cloudflare Zone in the same account; check Workers Scripts Write, Zone Read, and DNS Read permissions. Upgrade an existing M6 Worker with the compatible-update procedure above before using these commands.
 
 Domain operations require explicit pause/drain and finish paused; resume explicitly after checking completion. `public_base_url` is the canonical Podcast URL, while `workers_dev_base_url` remains the same Worker's HTTPS workers.dev origin for CLI administration. Both hosts serve the same public content without redirects. DNS/TLS probes send no secrets. Removal restores workers.dev URLs without deleting media, revisions or GUIDs; normal deployment preserves a matching Custom Domain connection.
 
@@ -146,25 +148,28 @@ Preserve the workspace, journals, locks and remote owners after any error. Do no
 - Historical jobs may report `ownership: "superseded"` after a later operation. Use `target-show ID` or `target-episode SHOW_ID EPISODE_ID` for current ownership; this does not authorize retrying an old job.
 - Read-only inspections can be unverified while progress changes. Repeat only read-only inspection; never replay a mutation or release ownership on that basis.
 - `retry-job JOB_UUID` and `lifecycle-retry JOB_UUID REQUEST_SHA256 ACK` explicitly retry the same acknowledged commit only when execution has safely settled; they refuse active/unknown execution.
+- `release-job` / `publication-release` are disabled. DLQ history, elapsed time, and absent objects do not prove that old I/O ended and never authorize token release.
 - `init-reconcile OPERATION_UUID` and `update-service-reconcile OPERATION_UUID` reconcile already completed, paused server operations with retained local requests. They do not repeat deployments. `update-service-verify OPERATION_UUID` continues only an acknowledged deployment's verification.
-- In development builds, `update-service-continue OPERATION_UUID` explicitly continues an uploaded Worker only when its schema-v2 journal records `activation_checkpoint.state = "not_started"`. It rechecks the same retained server owner, frozen settings, original deployment, latest two versions/sequence and uploaded script ETag before activating that exact version once. It never re-uploads, rolls back or resumes delivery; successful runtime verification finishes paused. Use `update-service-verify` instead if both upload and deployment receipts were saved.
+- In v0.4.0, `update-service-continue OPERATION_UUID` explicitly continues an uploaded Worker only when its schema-v2 journal records `activation_checkpoint.state = "not_started"`. It rechecks the same retained server owner, frozen settings, original deployment, latest two versions/sequence and uploaded script ETag before activating that exact version once. It never re-uploads, rolls back or resumes delivery; successful runtime verification finishes paused. Use `update-service-verify` instead if both upload and deployment receipts were saved.
 - Legacy schema-v1 upload-only journals (including Issue #11's interrupted operation) cannot prove activation never started and remain blocked. Do not edit/upgrade their journals, manually activate, infer safety from the old deployment, or clear owners/locks. Schema-v2 `"requested"` without a deployment receipt also remains blocked, even if no POST seems visible or time has elapsed. A caught pre-activation GET failure can retain a continuable checkpoint; a forcibly interrupted process with a residual lock cannot. A legacy `prepared` journal cannot start the new protocol; only use a new operation ID after independently confirming the service is paused/drained and the old operation never began.
 - Initialization journals are `.castloop/service-initializations/SERVICE_ID.json`; update journals are `.castloop/service-updates/SERVICE_ID/OPERATION_UUID.json`. Retain these and their locks. Re-running `init` is not a recovery method for a started operation.
 - HTTP 403: check account/token scope and permissions. Local inputs changed after staging: restage only an editable, unclaimed draft; committed/unknown operations stay frozen.
 
 The single REST PUT recovery model retains [unverified assumption U1](design/m6_upload_recovery_options.md): a PUT is assumed not to write later after client disconnection. This is not a Cloudflare guarantee. Owner/generation checks and explicit IO settlement remain required.
 
-## Development and release scope
+## RSS migration and publication acceptance
 
-The M7 development branch adds one-time RSS migration into a new Show, with local download/review followed by explicit sequential publication. It is not part of the published v0.3.0 binary. See [M7 development usage](docs/rss_migration.md) and the [approved plan](design/m7_rss_import_plan.md).
+v0.4.0 provides `import-rss SHOW_ID RSS_URL --dry-run`, `import-rss SHOW_ID RSS_URL --output DIRECTORY`, and `publish-rss-import DIRECTORY` for one-time RSS migration into a new Show. Download and review locally before explicit sequential publication. GUIDs and publication dates are preserved; recurring synchronization, adoption of an existing Show, and subscriber migration are not provided. See [RSS migration usage and recovery](docs/rss_migration.md) and the [approved plan](design/m7_rss_import_plan.md).
 
-Development publication uses the `queue-validation-v1` acceptance protocol. Update both CLI and Worker: `publish-show`/`publish-episode` return `publication-accepted`, and the HTTP `202 accepted` receipt confirms a frozen request/marker, not validation or publication success. The existing Queue consumer validates staged inputs before public writes. Wait for `published / released`. Deterministic pre-write input failures report `failed / validation_failed`; preserve the held Show owner and frozen draft, and do not retry, edit or force-release them. Legacy `committed` journals remain readable without automatic conversion. See [HTTP acceptance design](design/http_publication_commit_optimization_plan.md).
+v0.4.0 publication uses the `queue-validation-v1` acceptance protocol. Update both CLI and Worker: `publish-show`/`publish-episode` return `publication-accepted`, and the HTTP `202 accepted` receipt confirms a frozen request/marker, not validation or publication success. The existing Queue consumer validates staged inputs before public writes. Wait for `published / released`. Deterministic pre-write input failures report `failed / validation_failed`; preserve the held Show owner and frozen draft, and do not retry, edit or force-release them. Legacy `committed` journals remain readable without automatic conversion. See [HTTP acceptance design](design/http_publication_commit_optimization_plan.md).
+
+RSS publication waits for each acknowledged job for at most 300 status attempts and starts no new status request after five minutes. An in-flight HTTP request has its own timeout. A pending job retains its cursor; rerunning the same import inspects that job without replaying publication. The [direct Queue submission proposal](design/publication_queue_delegation_options.md) is future development, not part of v0.4.0.
 
 The [design document index](design/README.md) separates current references from archived development history.
 
 Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.
 
-[M6 acceptance](design/archive/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.3.0 release notes](docs/release-v0.3.0.md), [v0.2.1 release notes](docs/release-v0.2.1.md), and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
+[M6 acceptance](design/archive/m6_standalone_acceptance.md) and [approved scope](design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.4.0 release notes](docs/release-v0.4.0.md), [v0.3.0 release notes](docs/release-v0.3.0.md), [v0.2.1 release notes](docs/release-v0.2.1.md), and [v0.2.0 release notes](docs/release-v0.2.0.md) for the published scope. Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
 
 Existing M6 workspaces without `workers_dev_base_url` retain their original workers.dev URL and configuration hash until an owned domain change saves the field. [Live Cloudflare acceptance passed](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md), including removal and restored workers.dev delivery. Earlier interrupted trial operations remain retained; their unknown requests or tokens are not released by this version.
 

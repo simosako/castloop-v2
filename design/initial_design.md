@@ -1,10 +1,11 @@
 # castloop v2 デザインドキュメント
 
-更新日: 2026-10-11。現在の公開版v0.3.0の構成と仕様をまとめる。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
+更新日: 2026-10-14。現在の公開版v0.4.0の構成と仕様をまとめる。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
 
 - v0.2.0: M6の新規初期化、通常更新、Show／Episodeの非公開化・復元・削除を公開。
 - v0.2.1: Show／Episode一覧を追加。
 - v0.3.0: 1サービスにつき1つの独自ドメインを追加・照会・削除できる。
+- v0.4.0: RSSから新規Showへの一度限りの移行、Episodeカタログ、公開受付とQueue検証の分離、停止診断と限定的なWorker更新続行を追加。CLIから直接Queueへの送信は次期案であり未実装。
 
 配布・実機検証の対象はLinux x86-64。新規M6サービスと初期化済みM6サービスの互換更新に対応し、v0.1.xのデータ変換・既存資源の採用は行わない。M0〜M5の経緯は後半のマイルストーンと各実装ログに残す。
 
@@ -14,7 +15,7 @@
 - 管理者が、自分のcloudflareアカウントにサービスをデプロイして利用することを想定する。不特定多数にサービスを公開してIDを作成させるようなものではない。
 - 一人の管理者が複数のShow(ポッドキャスト番組)を作ることが可能
 - ホスト先はCloudflare Workers・R2・Queues
-- Cloudflareの無料枠を活用し、現在の機能にWorkers Paidを必須としない。どの運用規模でも無料になることは保証しない
+- Cloudflareの無料枠活用を目指す。ただしv0.4.0の公開HTTP CPUの既存観測15〜34msはFreeの10ms目標未達であり、Freeでの安定稼働を保証しない。課金プランを自動変更しない
 - Serverlessを活用し、運用の手間がかからない構成にする
 - castloop CLIを提供し、このCLIで管理者はEpisodeを更新するなどの管理作業を行う
 - GUIよりCLIを充実させ、自動化（AIエージェントから操作を含む）を実行しやすい環境を提供する
@@ -40,7 +41,7 @@
 - 公開URLはworkers.devを標準とし、独自ドメインは任意とする。R2の公開URLは使わない
 - `public_base_url`はRSSの正規URLの基点、`workers_dev_base_url`は同じWorkerの管理API接続先としてサービス設定で保持する。Showごとの`media_base_url`は設けない。既存M6設定で管理URLが未記録なら、元のworkers.dev公開URLを管理接続先に使う
 - ローカルTOMLを編集元とし、R2には検証済みの公開スナップショットとジョブの状態を置く
-- `update-show`はShow情報・カバー画像、`update-episode`と`update-episode-audio`はそれぞれEpisodeのメタデータと音源をR2の`staging/`へ置くだけで公開しない。`publish-show`または`publish-episode`だけが検証済みの下書きにcommit markerを配置し、R2 Event Notificationから同じmanaged Cloudflare Queueへ通知する。Queue consumerのWorkerが後続処理を行う
+- `update-show`はShow情報・カバー画像、`update-episode`と`update-episode-audio`はそれぞれEpisodeのメタデータと音源をR2の`staging/`へ置くだけで公開しない。`publish-show`または`publish-episode`だけが凍結した公開要求にcommit markerを配置し、R2 Event Notificationから同じmanaged Cloudflare Queueへ通知する。`queue-validation-v1`のHTTP `202 accepted`は受付完了であり、staging検証・公開成功ではない。Queue consumerが詳細検証してから公開し、`published / released`で完了する。確定的な公開前入力失敗は`failed / validation_failed`としてShow ownerと凍結draftを保持する
 - main Queue consumerはbatch size 1・同時実行1・`max_retries: 2`。FIFOやexactly-onceは前提にしない。Show controlのR2 binding CASで、同じShowの登録・staging・publication・lifecycleを排他し、owner／generation／execution tokenを照合する。単なるconsumerの並列制限や時刻で公開順序を決めない
 - 公開状態はR2のservice admission・Show control・Episode lifecycleで管理する。入力Show／Episode TOMLから公開状態を変更させない
 - RSS 2.0とApple Podcasts互換を基準とし、strictなTOML schemaを使う。`published_at`は引用符付きRFC 3339文字列とし、RSS出力時にRFC 2822へ変換する
@@ -51,8 +52,8 @@
 
 - 管理者はDashboardでR2・Queuesを利用可能にし、Workers Scripts・Workers R2 Storage・Queuesの読み書き権限を持つaccount-scoped API tokenを取得する。CLIは`CLOUDFLARE_ACCOUNT_ID`と`CLOUDFLARE_API_TOKEN`を使い、資源作成・配備・R2 uploadをCloudflare REST APIへ直接送る。Wrangler、Node.js、Bun、`ffprobe`、別のR2 S3 credentialは管理者の実行環境には不要
 - API tokenはTOMLやGitへ保存せず、配信Workerへも渡さない。Worker管理API用の別の管理鍵を`.castloop/`に保存し、Workerのsecret bindingと照合する。CLIの管理APIは常にworkers.devへ接続する
-- MP3上限は**300,000,000 bytes**。CLIで送信前に上限・MP3・再生時間を検証し、単一REST PUT後に全量を読み戻してsize・SHA-256・ETag／versionを照合する。Workerは認証付きreceiptとR2 HEADを照合し、音源を全量再ハッシュしない。新しい公開音源はR2 bindingへSHA-256を渡してstream保存し、native checksumを確認する。[300 MBの実機受け入れ](archive/m6_standalone_acceptance.md)は合格済みで、Workers Paidを必要条件にしない
-- R2 REST PUTの`If-Match`をR2 binding CASと同一視しない。切断後のPUTが遅れて書き込まないという[未検証の仮定U1](./m6_upload_recovery_options.md)はCloudflareの保証ではない。経過時間やHEAD不在だけでownerを解放しない
+- MP3上限は**300,000,000 bytes**。CLIで送信前に上限・MP3・再生時間を検証し、単一REST PUT後に全量を読み戻してsize・SHA-256・ETag／versionを照合する。Workerは認証付きreceiptとR2 HEADを照合し、音源を全量再ハッシュしない。新しい公開音源はR2 bindingへSHA-256を渡してstream保存し、native checksumを確認する。[300 MBの実機受け入れ](archive/m6_standalone_acceptance.md)は合格済みだが、サービス全体のFree適合を証明するものではない
+- R2 REST PUTの`If-Match`をR2 binding CASと同一視しない。切断後のPUTが遅れて書き込まないという[未検証の仮定U1](./m6_upload_recovery_options.md)はCloudflareの保証ではない。経過時間やHEAD不在だけでownerを解放しない。300 MBの受け入れはv0.4.0のHTTP CPUがFree上限に収まる証明ではない
 
 ## 利用シナリオ（概要）
 
@@ -150,6 +151,14 @@ R2 Event Notificationは`staging/` prefix・`commit.json` suffixのobject-create
 - request・status・progressをR2へ永続化し、cache purge成功まで公開完了にしない。一時的なconsumer失敗はQueueで有限回再試行し、尽きたメッセージはDLQへ送る。恒久的失敗はallowlistの理由を記録する。DLQ配送だけでR2 statusが更新されるわけではない。管理者の`retry-job`は同じ確認済みcommitと実行終了証拠を使い、active／unknown executionを拒否する
 - staging音源の一般cleanupコマンドや自動期限は設けていない。通常更新では公開音源・revision履歴を保持し、明示lifecycle deleteだけがpayloadを削除する。D1や自作R2 queueは使わない
 
+### RSSからの移行
+
+`import-rss SHOW_ID RSS_URL --dry-run`でRSSを検査し、`--output DIRECTORY`で素材とTOMLをローカルへ取得する。内容確認後、サービスrootの`publish-rss-import DIRECTORY`で新規Showへ順番に公開する。外部GUID・公開日時を維持し、既存Showへの追加・定期同期・旧ホストの削除はしない。
+
+各jobの待機は最大300回で、開始から5分後は新しい状態照会を始めない。進行中のHTTP要求には別timeoutがある。受付済みpending jobのcursorを保持し、同じコマンドの続行はそのjobの確認から行う。未知mutationを再送しない。[利用案内](../docs/rss_migration.md)参照。
+
+未変更Episodeはprivateカタログを再利用する。初回構築は全件を読み、構築済みカタログの欠落・破損・世代不一致は自動再構築しない。GUID／音源／revisionを保持し、旧Workerへのdowngradeは行わない。
+
 ### 一覧・非公開化・復元・削除
 
 - サービスrootで`list-shows`／`list-episodes SHOW_ID`を使う。1要求で最大20件のcontrolを走査し、続きは`--cursor`で取得する。削除済みIDは`--include-deleted`で表示する。ローカルだけのEpisode TOMLは一覧に含めない
@@ -202,12 +211,13 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 
 public/podcasts/<showId>/feed.xml
 public/podcasts/<showId>/cover.<ext>
+public/podcasts/<showId>/episode-catalog.json
 public/podcasts/<showId>/episodes/<episodeId>/<revisionId>.mp3
 public/episodes/<showId>/<episodeId>/metadata.toml
 public/episodes/<showId>/<episodeId>/revisions/<revisionId>.toml
 ```
 
-主なkeyを列挙しており、probe等の運用keyは省略する。公開URLは`/podcasts/<showId>/feed.xml`、`cover.<ext>`、`episodes/<episodeId>/<revisionId>.mp3`だけを対応するpublic keyへ写像する。`system/`・`staging/`・公開用metadata TOMLは配信しない。
+主なkeyを列挙しており、probe等の運用keyは省略する。公開URLは`/podcasts/<showId>/feed.xml`、`cover.<ext>`、`episodes/<episodeId>/<revisionId>.mp3`だけを対応するpublic keyへ写像する。`system/`・`staging/`・公開用metadata TOML・Episodeカタログは配信しない。
 
 Episodeの未変更入力は`base_revision_id`へ固定する。uploadの全量読み戻し証拠は`upload-progress.json`、公開音源のSHA-256はR2 native checksumとcustom metadataへ保存する。publicationのmarkerは`publish-*`、lifecycleのmarkerは確認済み`lifecycle-execute`で最後に書く。
 

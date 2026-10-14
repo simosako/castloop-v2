@@ -1,6 +1,7 @@
-# RSSからのPodcast移行（M7開発版）
+# RSSからのPodcast移行（v0.4.0）
 
-この機能はM7ブランチの開発版向け。公開済みv0.3.0バイナリには含まれない。CLIとWorkerの両方にM7対応が必要。
+v0.4.0のCLIとWorkerの両方が必要。v0.3.0以前のバイナリには含まれない。
+HTTP CPUの既存観測は15〜34msでWorkers Freeの10ms目標は未達。Freeでの安定稼働とIssue #13の完全解消は保証しない。[リリースの制限](release-v0.4.0.md)を確認する。
 
 ## 対象
 
@@ -43,7 +44,7 @@ download中に失敗したら、同じコマンド・同じ出力先で続行す
 
 ## 2. 確認した内容を公開する
 
-サービスworkspaceで、対応する開発版CLIを使用する。既存Workerの更新は[通常更新手順](../README.md#compatible-worker-updates)に従い、最後に明示resumeする。
+サービスworkspaceで、v0.4.0のCLIを使用する。既存Workerの更新は[通常更新手順](../README.md#compatible-worker-updates)に従い、最後に明示resumeする。
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...
@@ -57,7 +58,7 @@ castloop publish-rss-import /path/to/import
 
 Episodeは古い公開日時から公開し、各jobの`published`／`released`を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
 
-2026-10-14の開発版ではHTTP commitを受付に限定した。`publish-show`／`publish-episode`の
+v0.4.0ではHTTP commitを受付に限定した。`publish-show`／`publish-episode`の
 `publication-accepted`、HTTPの`202 / accepted`、local journalの`phase: "accepted"`は、
 凍結した要求とcommit markerの受付完了を示す。**staging検証済み・公開成功の応答ではない。**
 詳細なstaging証跡、payload identity、base revisionは既存Queue consumerが公開書き込み前に検証する。
@@ -68,7 +69,7 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 
 ### 停止した場合
 
-- 読み取り中に公開記録やサービス状態が変わった場合（`publication_status_changed`）だけ、既知jobの状態を再照会する。この計測用開発版は最大300回、待機開始から5分経過後は照会を追加しない。進行中のHTTP照会には別の要求timeoutがある。正式版の既定待機上限は性能改善後の実測で決定する。`published`／`released`の検証までは次の公開へ進まない。この識別には修正済みCLIとWorkerの両方が必要。
+- 読み取り中に公開記録やサービス状態が変わった場合（`publication_status_changed`）だけ、既知jobの状態を再照会する。v0.4.0は各jobで最大300回、待機開始から5分経過後は照会を追加しない。進行中のHTTP照会には別の要求timeoutがあり、CLI全体が必ず5分以内に終了するという意味ではない。`published`／`released`の検証までは次の公開へ進まない。この識別には対応CLIとWorkerの両方が必要。
 - 公開receiptを保存済みのjobで状態照会に失敗した、または公開待機が終わらない場合は、同じコマンドでそのjobの確認から続けられる。完了済みの公開を再送しない。
 - 公開前の確定的な入力不一致は`failed / validation_failed`として表示し、待機を終了する。`ownership: "held"`のShow ownerと凍結draftは保持する。I/Oが終了した通常経路ではexecution/service tokenだけを返す。重複配送で公開へ進めず、`retry-job`も拒否する。draft編集、別jobへの置換、owner強制解除は復旧方法ではなく、安全な取消し操作は未提供。
 - heldなjobにDLQ履歴がある場合は早期停止し、token残留か、実行tokenを返却済みの失敗履歴かを表示する。DLQ markerは現在の実行・I/Oの終了証明ではない。前回追加した`release-job`／`publication-release`は安全条件を満たさず無効化したため使用しない。lock/owner/registryを保持し、[停止の診断手順](../design/publication_execution_recovery.md)で調べる。
@@ -83,7 +84,7 @@ Episodeは古い公開日時から公開し、各jobの`published`／`released`�
 
 ### Workerの時間ログと性能比較
 
-この開発版Workerは、Cloudflare Workers LogsへJSONログを出力する。Dashboardの対象WorkerのObservabilityでjob IDを検索する。
+v0.4.0のWorkerは、Cloudflare Workers LogsへJSONログを出力する。Dashboardの対象WorkerのObservabilityでjob IDを検索する。
 
 - `event: "worker_phase_started"`: `job_id`、固定`phase`、`timing_id`、`started_at`。処理のawait前に出す。
 - `event: "worker_timing"`: 同じ`timing_id`と`job_id`／`phase`、`outcome`、`started_at`、`finished_at`、`duration_ms`。
@@ -107,7 +108,7 @@ IDの一覧照合と期限・health記録も必要。採取異常のある時間
 
 性能比較は、公開済み36件Showのmetadata-only 1件更新を同じ条件で測る。完成済みimportの再実行では公開処理を測れない。CLI/Workerのcommitとjob IDを記録し、`publication.consumer`、`publication.guard`、`publication.feed_inputs`、`publication.unique_guid`、`staging.finish`と、CLIが`published / released`を確認するまでを比較する。実機更新は承認された試験環境で行う。
 
-この改修版は、検証済みEpisode情報をShow単位のカタログに保存する。CLIを更新し、通常更新手順でWorkerもdeploy・検証・明示resumeする。古いWorkerへのdowngradeは行わない。
+v0.4.0は、検証済みEpisode情報をShow単位のカタログに保存する。CLIを更新し、通常更新手順でWorkerもdeploy・検証・明示resumeする。古いWorkerへのdowngradeは行わない。
 
 - 既存Showの最初の公開更新ではカタログ構築のため全件を読む。このjobの時間は「初回構築」として別に記録し、published/releasedとservice invocation解放を確認する。
 - 次の同一metadata-only更新1jobを通常更新として測る。GUID/feed入力の時間とstaging finishを4781fadの測定と比較し、前後のfeed byte一致、GUID・音源参照不変、所有権解放を確認する。
