@@ -6,6 +6,12 @@ import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
 export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
 export type { PublicationRequest } from "./publication-request";
+export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKey, sqliteVerifiedUploadSchema,
+  sqlitePublicationRuntimeSchema, sqlitePublicationRequestSchema, sqlitePublicationStatusSchema,
+  sqlitePublicationFailureSchema, sqlitePublicationBlockSchema, parseSqlitePublicationRequest,
+  sqlitePublicationRequestHash } from "./sqlite-publication";
+export type { SqliteUploadIdentity, SqliteVerifiedUpload, SqlitePublicationRuntime, SqlitePublicationRequest,
+  SqlitePublicationStatus, SqlitePublicationFailure, SqlitePublicationBlock } from "./sqlite-publication";
 export { asyncManagementProtocol, MAX_MANAGEMENT_BYTES, managementCommandSchema, managementIntentPayloadSchema,
   managementIntentSchema, managementSubmissionSchema, managementResultPayloadSchema, managementResultSchema, managementStatusSchema,
   parseManagementIntent, signManagementIntent, verifyManagementIntent, managementIntentHash,
