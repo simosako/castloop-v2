@@ -2,7 +2,8 @@
 
 2026-10-15。管理者が[構成比較の案C](async_management_architecture_options.md)の実装とテストを承認。
 `feat/publication-queue-submit`の開発コードであり、v0.4.0公開版ではない。
-今回Cloudflareへ配備・upload・資源変更はしていない。実機CPU測定も未実施。
+実装依頼時にはCloudflare配備・upload・実機測定は行わなかった。
+後続の別承認による隔離環境への配備と測定は[案C実機結果](async_management_measurement_20261015.md)参照。
 
 ## 対象と経路
 
@@ -126,5 +127,7 @@ upload完了はstagedで止める。実際のpublication `commit.json`はconsume
 - CLIのstart/complete/publish POST応答喪失と非再送、旧readiness拒否、期限後の非polling、RSS cursorの非再mutation。
 
 `bun test`: **1,115成功・0失敗**（123 files）、`npm run check`、Linux単独バイナリbuild/help確認が成功。
-これはCloudflare CPU/wall計測や実機300 MBの再受入れではない。新配備・性能測定は別途承認後に小容量から行う。
+これは実装時のローカル確認であり、実機300 MBの再受入れではない。
+後続の実機測定は1,116テスト成功後の`e60a114`で、小容量から36件へ進み7公開が成功した。
+管理HTTPは観測0、公開feedは最大11ms、総wallは増えた。詳細/限界は上記の測定文書参照。
 公開版/package versionは0.4.0のまま。Issue #13の恒久解消・全HTTPのFree適合は主張しない。

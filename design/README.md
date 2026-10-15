@@ -22,6 +22,7 @@
 | [現行HTTPの順序・CPU整理](http_execution_cpu_breakdown_20261015.md) | staging/publicationの呼び出し順、要求全体CPU、共通guardとfinish/statusの処理内容、未測定の内部CPU |
 | [管理処理の非同期化・構成比較](async_management_architecture_options.md) | 案Cの実装/テスト承認と他案の比較。資源/権限変更・配備は別承認 |
 | [案C: Queue/R2管理経路](async_management_implementation.md) | 開発中のstart/complete/publish、署名済みgrant/result、async admission、journal・未知IO・回帰試験 |
+| [案Cの実機測定](async_management_measurement_20261015.md) | 隔離配備と7公開成功、管理HTTPなし、Queue CPU、feed最大11msと総wall増加の制限 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。v0.4.0の利用案内はdocs/rss_migration.md |
