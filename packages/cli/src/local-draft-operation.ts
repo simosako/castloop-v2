@@ -16,6 +16,10 @@ import type { StagingClientState } from "./staging-journal";
 import { createStagingOperationEffects, runStagingBeginAndUpload, runStagingClaim, runStagingFinish, runStagingSettle } from "./staging-operation";
 import { createStagingRestPut } from "./staging-rest";
 import type { StagingRestOptions } from "./staging-rest";
+import { runAsyncDraftPublication, runAsyncDraftUpload } from "./async-draft-operation";
+import { ManagementQueueClient } from "./management-queue-client";
+import type { ManagementQueueTransport } from "./management-queue-client";
+import { ManagementR2Reader } from "./management-r2";
 
 type StagingHeader = Omit<StageUploadRequest, "payloads" | "draft_job_id" | "kind" | "show_id" | "episode_id">;
 type PublicationHeader = Omit<PublicationRequest["request"], "job_id" | "kind" | "show_id" | "episode_id">;
@@ -27,6 +31,7 @@ const publicationHeaderSchema = z.object({ schema_version: publicationRequestSch
   expected_episode_generation: publicationRequestSchema.shape.request.shape.expected_episode_generation,
   created_at: publicationRequestSchema.shape.request.shape.created_at }).strict();
 export type LocalDraftStagingOptions = { rest: StagingRestOptions; expectedDraftJobId?: string;
+  management?: ManagementQueueTransport;
   client?: Pick<StagingAdminClient, "claim" | "begin" | "settle" | "finish" | "status"> };
 
 function existingDraft(root: string, config: ServiceConfig, target: LocalDraftTarget): LocalDraftJournal {
@@ -70,10 +75,15 @@ export async function runLocalDraftStaging(root: string, configInput: ServiceCon
         assertDraft(journal, attached);
       };
       const guarded = { ...effects, checkLocalInputs };
-      await runStagingClaim(prepared.journal, guarded);
-      await runStagingBeginAndUpload(prepared.journal, guarded);
-      await runStagingSettle(prepared.journal, guarded, { put_requests_settled: true, no_more_puts: true });
-      await runStagingFinish(prepared.journal, guarded);
+      if (!options.client) {
+        await runAsyncDraftUpload(prepared.journal, options.management ?? new ManagementQueueClient(config, adminKey,
+          { reader: new ManagementR2Reader(config, options.rest) }), adminKey, put, checkLocalInputs);
+      } else {
+        await runStagingClaim(prepared.journal, guarded);
+        await runStagingBeginAndUpload(prepared.journal, guarded);
+        await runStagingSettle(prepared.journal, guarded, { put_requests_settled: true, no_more_puts: true });
+        await runStagingFinish(prepared.journal, guarded);
+      }
       assertDraft(journal, attached);
       return prepared.journal.load();
     } finally { await prepared.sources.dispose(); }
@@ -83,7 +93,7 @@ export async function runLocalDraftStaging(root: string, configInput: ServiceCon
 export async function runLocalDraftPublication(root: string, configInput: ServiceConfig, target: LocalDraftTarget,
   request: PublicationHeader, options: Omit<LocalPublicationPreparation, "stagedOperationIds">, adminKey: string,
   client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "release" | "status">,
-  expectedDraftJobId?: string): Promise<PublicationClientState> {
+  expectedDraftJobId?: string, management?: ManagementQueueTransport): Promise<PublicationClientState> {
   const config = serviceConfigSchema.parse(configInput);
   const header = publicationHeaderSchema.parse(request);
   const journal = existingDraft(root, config, target);
@@ -104,8 +114,11 @@ export async function runLocalDraftPublication(root: string, configInput: Servic
       assertDraft(journal, frozen);
     };
     const guarded = { ...prepared.effects, checkLocalInputs };
-    await runPublicationClaim(prepared.journal, guarded);
-    await runPublicationCommit(prepared.journal, guarded);
+    if (!client) await runAsyncDraftPublication(prepared.journal, management ?? new ManagementQueueClient(config, adminKey), checkLocalInputs);
+    else {
+      await runPublicationClaim(prepared.journal, guarded);
+      await runPublicationCommit(prepared.journal, guarded);
+    }
     assertDraft(journal, frozen);
     editor.acknowledgeCommit();
     return prepared.journal.load();

@@ -144,6 +144,17 @@ describe("test-only Worker tail collector", () => {
     tail.stop();
   });
 
+  test("keeps option C command timings without retaining raw content or credentials", () => {
+    const jobId = crypto.randomUUID();
+    const phases = ["management.stage-start", "management.upload-complete", "management.publish"];
+    const result = sanitizeTailInvocation(JSON.stringify({ outcome: "ok", cpuTime: 20, wallTime: 100,
+      logs: phases.map((phase) => ({ message: [JSON.stringify({ event: "worker_timing", job_id: jobId, phase,
+        timing_id: crypto.randomUUID(), duration_ms: 50, outcome: "success", title: "private-title", token: "private-token" })] })) }));
+    expect(result.logs.map((log) => log.phase)).toEqual(phases);
+    expect(result.cpu_time).toBe(20);
+    expect(JSON.stringify(result)).not.toContain("private-");
+  });
+
   test("a connection that never opens fails within its deadline", async () => {
     const setup = fixture();
     await expect(startWorkerTail({ ...setup.options, socket: () => setup.socket as unknown as TailSocket,

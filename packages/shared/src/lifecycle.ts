@@ -17,6 +17,7 @@ const operationOwnerSchema = z.object({
   request_sha256: checksum,
   execution_id: z.uuid().optional(),
   verification_id: z.uuid().optional(),
+  command_execution_id: z.uuid().optional(),
 }).strict().superRefine((value, context) => {
   if ((value.kind === "episode") !== (value.episode_id !== undefined)) {
     context.addIssue({ code: "custom", message: "Only Episode operations require an Episode ID" });
@@ -29,6 +30,9 @@ const operationOwnerSchema = z.object({
   }
   if (value.verification_id && (value.action !== "stage" || value.state !== "uploading")) {
     context.addIssue({ code: "custom", message: "Only staging admission can hold an upload verification token" });
+  }
+  if (value.command_execution_id && value.action !== "stage") {
+    context.addIssue({ code: "custom", message: "Only staging admission can hold a management command execution" });
   }
 });
 

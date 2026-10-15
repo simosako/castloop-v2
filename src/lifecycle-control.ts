@@ -126,14 +126,21 @@ function ownsRequest(control: ShowControl, request: ControlRequest, hash: string
 }
 
 export async function claimShowOperation(env: LifecycleControlEnv, input: unknown,
-  options: { allowNewEpisodeDraft?: boolean } = {}): Promise<ShowControlSnapshot> {
+  options: { allowNewEpisodeDraft?: boolean; commandExecutionId?: string; publicationExecutionId?: string } = {}): Promise<ShowControlSnapshot> {
   const request = controlRequestSchema.parse(input);
+  if (options.commandExecutionId && request.action !== "stage" || options.publicationExecutionId && request.action !== "publish") {
+    throw new Error("Command execution kind differs from its control action");
+  }
   const current = await readShowControl(env, request.show_id);
   if (!current) throw new Error("Show lifecycle control is not initialized");
   await requireShowReservationReady(env, current.value);
   const hash = await requestHash(request);
   if (current.value.owner) {
     if (!ownsRequest(current.value, request, hash)) throw new Error("Show has an unfinished operation");
+    if (current.value.owner.command_execution_id !== options.commandExecutionId ||
+      options.publicationExecutionId && current.value.owner.execution_id && current.value.owner.execution_id !== options.publicationExecutionId) {
+      throw new Error("Another management command is still executing this operation");
+    }
     await freezeRequest(env, request, hash);
     return current;
   }
@@ -145,13 +152,16 @@ export async function claimShowOperation(env: LifecycleControlEnv, input: unknow
   const value = parseShowControl({ ...current.value, generation: current.value.generation + 1,
     owner: { job_id: request.job_id, kind: request.kind, action: request.action,
       ...(request.episode_id ? { episode_id: request.episode_id } : {}),
-      state: request.action === "stage" ? "uploading" : "reserved", request_sha256: hash } });
+      state: request.action === "stage" ? "uploading" : options.publicationExecutionId ? "processing" : "reserved", request_sha256: hash,
+      ...(options.commandExecutionId ? { command_execution_id: options.commandExecutionId } : {}),
+      ...(options.publicationExecutionId ? { execution_id: options.publicationExecutionId } : {}) } });
   const written = await env.CASTLOOP_BUCKET.put(showControlKey(request.show_id), JSON.stringify(value), {
     onlyIf: { etagMatches: current.etag },
   });
   if (written) return { value, etag: written.etag };
   const updated = await readShowControl(env, request.show_id);
-  if (updated && ownsRequest(updated.value, request, hash)) return updated;
+  if (updated && ownsRequest(updated.value, request, hash) && updated.value.owner?.command_execution_id === options.commandExecutionId &&
+    (!options.publicationExecutionId || updated.value.owner?.execution_id === options.publicationExecutionId)) return updated;
   throw new Error("Show control changed while claiming the operation");
 }
 

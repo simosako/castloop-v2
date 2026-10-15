@@ -12,7 +12,7 @@ export const m6SetupRequestSchema = z.object({ target: m6RuntimeTargetSchema, up
 });
 export const m6SetupRecordSchema = z.object({ schema_version: z.literal(1), request: m6SetupRequestSchema,
   cache_purge_verified: z.literal(true),
-  queue_receipt: z.object({ worker_version_id: z.uuid() }).strict().optional(),
+  queue_receipt: z.object({ worker_version_id: z.uuid(), management_protocol: z.literal("queue-management-v1").optional() }).strict().optional(),
 }).strict().superRefine((value, context) => {
   if (value.queue_receipt && value.queue_receipt.worker_version_id !== value.request.target.worker_version_id) {
     context.addIssue({ code: "custom", message: "Runtime probe Queue receipt differs from its frozen request" });

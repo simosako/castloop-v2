@@ -60,6 +60,7 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
   if (command === "publication-retry") {
     const retained = readLocalPublicationJob(root, config, args[0]!);
     if (!retained.client_state || retained.lock_present) throw new Error("Retry requires its retained publication journal without an unknown lock");
+    if (retained.client_state.async_submission) throw new Error("Async retry is not authorized; preserve the frozen request and inspect R2 results without replay");
     const journal = createPublicationJournal(root, config, retained.client_state.publication);
     await runPublicationRetry(journal, createPublicationOperationEffects(config, journal.load(), key));
     return { result: "publication-requeued", job_id: args[0] };
@@ -67,6 +68,7 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
   if (command === "publication-release") {
     const retained = readLocalPublicationJob(root, config, args[0]!);
     if (!retained.client_state || retained.lock_present) throw new Error("Release requires its retained publication journal without an unknown lock");
+    if (retained.client_state.async_submission) throw new Error("Async release is not authorized; preserve journals and any retained execution token");
     const journal = createPublicationJournal(root, config, retained.client_state.publication);
     await runPublicationRelease(journal, createPublicationOperationEffects(config, journal.load(), key));
     return { result: "publication-released", job_id: args[0] };
@@ -159,7 +161,7 @@ export async function runM6Command(root: string, config: ServiceConfig, command:
   const target = episodeId ? { kind: "episode" as const, show_id: showId, episode_id: episodeId } : { kind: "show" as const, show_id: showId };
   if (command.startsWith("publish-")) {
     const state = await publishLocalM6Draft(root, config, target, key, args[2] ? { audioPath: resolve(args[2]) } : {});
-    return { result: state.phase === "queued" ? "publication-queued" : "publication-accepted", job_id: state.publication.request.job_id };
+    return { result: state.phase === "queued" || state.phase === "async_queued" ? "publication-queued" : "publication-accepted", job_id: state.publication.request.job_id };
   }
   const state = await updateLocalM6Draft(root, config, target, command === "update-show" ? { asset: "show" } : command === "update-episode" ?
     { asset: "episode_metadata" } : { asset: "audio", audio_path: resolve(args[2]!) }, key, {

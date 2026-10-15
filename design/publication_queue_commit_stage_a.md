@@ -2,6 +2,7 @@
 
 2026-10-15。v0.4.0 (`8e722ca`)を起点とする`feat/publication-queue-submit`。
 管理者が[移譲案](publication_queue_delegation_options.md)の段階Aを承認した。公開版・Cloudflare配備済みコードではない。
+段階Aの経緯を保存した文書。後続承認により、現在の開発CLIのcontent経路は[案C](async_management_implementation.md)へ進んだ。
 
 ## 経路と対象
 
@@ -92,4 +93,5 @@ CLI送信前journal永続化、403/応答喪失/receipt不一致時の非再送�
 後続の管理者指示によるcommit・Push・隔離環境での測定は[2026-10-15実機結果](publication_queue_commit_measurement_20261015.md)参照。
 7公開が成功しHTTP commitは観測0だったが、残るHTTP CPUのFree目標は未達。権限・課金変更は行っていない。
 claim/staging/statusのHTTP CPUが残るため、サービス全体のFree適合・Issue #13の完全解消は主張しない。
-段階B（claimの非同期化）は未実装・未承認。
+段階A実装時点では段階B（claimの非同期化）は未実装・未承認だった。
+後続の案C承認でclaim/staging/result読取も非HTTP化した。今回の案Cは未配備・未実機測定。

@@ -253,7 +253,7 @@ export async function verifyPublicationStaging(env: LifecycleControlEnv, operati
   return frozen;
 }
 
-export async function claimPublicationOperation(env: LifecycleControlEnv, input: unknown): Promise<PublicationOperation> {
+export async function claimPublicationOperation(env: LifecycleControlEnv, input: unknown, publicationExecutionId?: string): Promise<PublicationOperation> {
   const frozen = publicationRequestSchema.parse(input);
   const markerKey = publicationCommitKey(frozen.commit);
   if (await env.CASTLOOP_BUCKET.head(markerKey)) {
@@ -265,7 +265,7 @@ export async function claimPublicationOperation(env: LifecycleControlEnv, input:
   if (!written && JSON.stringify(await readFrozenRequest(env, frozen.request.job_id)) !== JSON.stringify(frozen)) {
     throw new Error("Publication job ID already has a different frozen manifest");
   }
-  await claimShowOperation(env, frozen.request);
+  await claimShowOperation(env, frozen.request, { publicationExecutionId });
   const operation = { showId: frozen.request.show_id, jobId: frozen.request.job_id, generation: frozen.request.expected_show_generation + 1 };
   await requireOwnedPublication(env, operation);
   return operation;

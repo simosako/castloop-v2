@@ -6,6 +6,12 @@ import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
 export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
 export type { PublicationRequest } from "./publication-request";
+export { asyncManagementProtocol, MAX_MANAGEMENT_BYTES, managementCommandSchema, managementIntentPayloadSchema,
+  managementIntentSchema, managementSubmissionSchema, managementResultPayloadSchema, managementResultSchema, managementStatusSchema,
+  parseManagementIntent, signManagementIntent, verifyManagementIntent, managementIntentHash,
+  signManagementResult, verifyManagementResult, managementRequestPrefix, managementOperationId } from "./async-management";
+export type { ManagementCommand, ManagementIntentPayload, ManagementIntent, ManagementSubmission,
+  ManagementResultPayload, ManagementResult, ManagementStatus } from "./async-management";
 export { publicationAcceptanceProtocol, publicationAdminRequestSchema, publicationAdminResponseSchema, publicationOperationSchema } from "./publication-admin";
 export type { PublicationAdminRequest, PublicationAdminResponse, PublicationOperationIdentity } from "./publication-admin";
 export { publicationCommitProtocol, MAX_PUBLICATION_INTENT_BYTES, publicationQueueIdSchema,

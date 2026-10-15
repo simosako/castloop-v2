@@ -1,4 +1,5 @@
-import type { ServiceConfig } from "@castloop/shared";
+import { managementStatusSchema } from "@castloop/shared";
+import type { ManagementStatus, ServiceConfig } from "@castloop/shared";
 import { LifecycleAdminClient } from "./lifecycle-client";
 import { validateLifecycleClientState } from "./lifecycle-journal";
 import { readLocalOperationStatus } from "./local-operation-status";
@@ -11,11 +12,13 @@ import { ShowRegistrationClient } from "./show-registration-client";
 import { validateShowRegistrationState } from "./show-registration-journal";
 import { StagingAdminClient } from "./staging-client";
 import { validateStagingClientState } from "./staging-journal";
+import { ManagementQueueClient } from "./management-queue-client";
+import { ManagementR2Reader } from "./management-r2";
 
 export type RemoteOperationStatus = Omit<LocalOperationStatus, "remote_state_checked"> & {
   remote_state_checked: true;
   server_status: Awaited<ReturnType<StagingAdminClient["status"]>> | Awaited<ReturnType<PublicationAdminClient["status"]>> |
-    Awaited<ReturnType<LifecycleAdminClient["status"]>> | Awaited<ReturnType<ShowRegistrationClient["status"]>>;
+    Awaited<ReturnType<LifecycleAdminClient["status"]>> | Awaited<ReturnType<ShowRegistrationClient["status"]>> | ManagementStatus;
 };
 
 export class RemoteOperationStatusError extends Error {
@@ -39,10 +42,22 @@ export async function readRemoteOperationStatus(root: string, config: ServiceCon
     let server: RemoteOperationStatus["server_status"];
     if (local.family === "staging") {
       const state = validateStagingClientState(local.client_state);
-      server = await new StagingAdminClient(config, key, transport).status(state.upload);
+      const submission = state.async_complete ?? state.async_start;
+      server = submission ? managementStatusSchema.parse({ result: "management-status", protocol: "queue-management-v1",
+        request_id: submission.intent.request_id, snapshot_only: true, authorizes_recovery: false,
+        response: await new ManagementQueueClient(config, key, { reader: new ManagementR2Reader(config, {
+          accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+          transport: (input, init) => transport(new URL(String(input)), init ?? {}),
+        }) }).result(submission) }) : await new StagingAdminClient(config, key, transport).status(state.upload);
     } else if (local.family === "publication") {
       const state = validatePublicationClientState(local.client_state);
-      server = await new PublicationAdminClient(config, key, transport).status(state.publication);
+      const submission = state.async_submission;
+      server = submission ? managementStatusSchema.parse({ result: "management-status", protocol: "queue-management-v1",
+        request_id: submission.intent.request_id, snapshot_only: true, authorizes_recovery: false,
+        response: await new ManagementQueueClient(config, key, { reader: new ManagementR2Reader(config, {
+          accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+          transport: (input, init) => transport(new URL(String(input)), init ?? {}),
+        }) }).result(submission) }) : await new PublicationAdminClient(config, key, transport).status(state.publication);
     } else if (local.family === "lifecycle") {
       const state = validateLifecycleClientState(local.client_state);
       server = await new LifecycleAdminClient(config, key, transport).status({ schema_version: 1,

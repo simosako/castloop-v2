@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { m6ServiceAdminResponseSchema, parseEpisodeDraft, parseShowMetadata, publicationAdminResponseSchema,
+import { managementStatusSchema, m6ServiceAdminResponseSchema, parseEpisodeDraft, parseShowMetadata, publicationAdminResponseSchema,
   serviceOperationIdentity, targetInspectionResponseSchema } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { localJournalEntryExists as present, syncLocalJournalDirectory } from "./local-journal-path";
@@ -68,8 +68,9 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
     source_directory: prepared.root, input_sha256: prepared.inputSha256, step: 0, phase: "ready" as const };
   const service = m6ServiceAdminResponseSchema.parse(await effects.command("service-status", []));
   if (!service.external_episode_guids || service.publication_acceptance_protocol !== "queue-validation-v1" ||
-    service.publication_commit_protocol !== "queue-commit-v1" || service.admission.state !== "open") {
-    throw new Error("RSS publication requires an open queue-commit-v1-compatible Worker; update and explicitly resume first");
+    service.publication_commit_protocol !== "queue-commit-v1" || service.management_protocol !== "queue-management-v1" ||
+    service.admission.runtime_readiness?.management_protocol !== "queue-management-v1" || service.admission.state !== "open") {
+    throw new Error("RSS publication requires an open queue-commit-v1-compatible and queue-management-v1-ready Worker; update and explicitly resume first");
   }
   if (!present(storage.path)) {
     if (present(directory)) throw new Error("RSS publication requires a new local Show");
@@ -152,6 +153,22 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
           result = await effects.command("operation-status", ["publication", state.waiting_job_id!]) as { server_status?: unknown };
         } catch (error) {
           if (!(error instanceof RemoteOperationStatusError) || error.reasonCode !== "publication_status_changed") throw error;
+          await effects.wait();
+          continue;
+        }
+        if (result.server_status && typeof result.server_status === "object" && "result" in result.server_status &&
+          result.server_status.result === "management-status") {
+          const receipt = managementStatusSchema.parse(result.server_status);
+          const server = receipt.response;
+          if (server && (server.action !== "publish" || server.request_id !== receipt.request_id)) throw new Error("Async publication status belongs to another operation");
+          if (server?.state === "published") {
+            state = { ...state, phase: "ready", waiting_job_id: undefined }; save(); return;
+          }
+          if (server && ["failed", "rejected", "blocked"].includes(server.state)) {
+            throw new Error(`Publication ${state.waiting_job_id} stopped [state=${server.state}, reason_code=${server.reason_code}]; ` +
+              (server.state === "blocked" ? "dead-letter history does not authorize release. " : "") +
+              "Preserve the frozen request and any retained owner without replay or release");
+          }
           await effects.wait();
           continue;
         }

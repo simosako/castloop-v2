@@ -1,4 +1,4 @@
-import { publicationCommitKey, publicationManifestHash, publicationRequestSchema, verifyPublicationCommitIntent } from "../packages/shared/src/index";
+import { publicationCommitKey, publicationManifestHash, publicationRequestSchema, verifyPublicationCommitIntent, verifyManagementIntent } from "../packages/shared/src/index";
 import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { handleM6ContentList } from "./content-list-admin";
@@ -31,6 +31,7 @@ import { handleM6ServiceAdmin } from "./m6-service-admin";
 import { readM6ServiceConfiguration } from "./m6-runtime-readiness";
 import { logPublicationDelivery, measureWorkerPhase } from "./worker-timing";
 import { handleM6UpdateAdmin } from "./m6-update-admin";
+import { consumeManagementIntent } from "./management-queue-consumer";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -158,8 +159,24 @@ export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6Cand
   if (!batch.messages.length) return;
   const config = await serviceConfig(env);
   if (batch.queue !== config.queue_name && batch.queue !== config.dlq_name) throw new Error("M6 candidate received an unknown Queue");
-  await requireCandidateReadiness(env, config);
+  if (!batch.messages.some((message) => message.body && typeof message.body === "object" && "family" in message.body && message.body.family === "management")) {
+    await requireCandidateReadiness(env, config);
+  }
   for (const message of batch.messages) {
+    if (message.body && typeof message.body === "object" && "family" in message.body && message.body.family === "management") {
+      const intent = await verifyManagementIntent(message.body, env.CASTLOOP_ADMIN_KEY);
+      if (!intent) {
+        console.error(JSON.stringify({ event: "management_command_blocked", reason_code: "intent_authentication_failed" }));
+        continue;
+      }
+      console.log(JSON.stringify({ event: "management_delivery", request_id: intent.request_id, action: intent.command.action,
+        queue_kind: batch.queue === config.dlq_name ? "dead_letter" : "primary", attempts: message.attempts ?? null }));
+      await consumeManagementIntent(env, intent, config, env.CASTLOOP_ADMIN_KEY,
+        { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1", cachedAssets },
+        (gate) => (execution, executionEnv) => createPublicationWorkerEffects(executionEnv, execution, { cachedAssets, checkDeliveryGate: gate }),
+        batch.queue === config.dlq_name);
+      continue;
+    }
     if (message.body && typeof message.body === "object" && "family" in message.body && message.body.family === "publication_commit") {
       const intent = await verifyPublicationCommitIntent(message.body, env.CASTLOOP_ADMIN_KEY);
       if (!intent) {

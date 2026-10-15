@@ -4,7 +4,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "publish-rss-import": {
     usage: "publish-rss-import DIRECTORY",
     description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
-      "Requires an open queue-commit-v1 Worker, retained administrator key and Cloudflare credentials with Queues Edit.\n" +
+      "Requires an open queue-management-v1-ready Worker, retained administrator key and Cloudflare credentials with Queues Edit.\n" +
       "Validates all TOML and assets before registration; publishes the Show then Episodes sequentially.\n" +
       "Intermediate Episodes become public as jobs finish. The operation is not an atomic batch.\n" +
       "Re-running inspects acknowledged pending jobs and continues recorded progress without republishing completed inputs.\n" +
@@ -38,21 +38,24 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "update-show": {
     usage: "update-show ID",
-    description: "Run from the service workspace. Stage local Show metadata and cover art without publishing.",
+    description: "Run from the service workspace. Stage local Show metadata and cover art without publishing.\n" +
+      "Requires queue-management-v1 readiness and Cloudflare credentials with Queues Edit. Waits for an R2 grant before upload.",
   },
   "publish-show": {
     usage: "publish-show ID",
     description: "Run from the service workspace after update-show. Submit the staged Show for publication.\n" +
-      "Requires queue-commit-v1 and Cloudflare Queues Edit. Queued does not prove marker creation or publication.\n" +
-      "Check the returned job ID with job-status until published and ownership released.",
+      "Requires queue-management-v1 readiness and Cloudflare Queues Edit. Queued does not prove admission, marker creation or publication.\n" +
+      "Check the returned job ID with job-status until server_status.response.state is published.",
   },
   "update-episode": {
     usage: "update-episode ID",
-    description: "Run from the Show directory. Stage Episode metadata without uploading audio or publishing.",
+    description: "Run from the Show directory. Stage Episode metadata without uploading audio or publishing.\n" +
+      "Requires queue-management-v1 readiness and Cloudflare credentials with Queues Edit.",
   },
   "update-episode-audio": {
     usage: "update-episode-audio ID MP3",
     description: "Run from the Show directory. Validate and stage MP3 audio (at most 300,000,000 bytes).\n" +
+      "Requires queue-management-v1 readiness and Cloudflare credentials with Queues Edit.\n" +
       "This does not publish. Initial publication also requires update-episode.",
   },
   "publish-episode": {
@@ -60,18 +63,19 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Run from the Show directory. Submit staged Episode changes for publication.\n" +
       "Initial publication requires metadata and audio. Supply the original MP3 path whenever audio was staged.\n" +
       "For metadata-only revisions omit MP3; unchanged published audio is reused.\n" +
-      "Requires queue-commit-v1 and Cloudflare Queues Edit. Unknown submissions are never automatically resent.",
+      "Requires queue-management-v1 readiness and Cloudflare Queues Edit. Unknown submissions are never automatically resent.",
   },
   "job-status": {
     usage: "job-status JOB",
     description: "Run from the service workspace. Compare the retained publication journal with server status.\n" +
-      "Complete means published status and released ownership; queued alone does not prove marker creation.",
+      "New jobs read authenticated private R2 results and require Cloudflare credentials; response.state published proves this operation completed.\n" +
+      "Legacy jobs retain published/released status. Neither a result nor queued proves global service quiescence or authorizes recovery.",
   },
   "retry-job": {
     usage: "retry-job JOB",
     description: "Run from the service workspace. Explicitly retry the same acknowledged publication commit.\n" +
       "Requires its retained journal, an existing verified marker and settled execution. Does not resend an unconfirmed Queue submission.\n" +
-      "Active or unknown owners/locks are not released.",
+      "New async management requests cannot be retried by this command. Active or unknown owners/locks are not released.",
   },
   "release-job": {
     usage: "release-job JOB",
@@ -185,7 +189,8 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "operation-status FAMILY ID",
     description: "Run from the service workspace. Compare a frozen local M6 operation with its read-only server status.\n" +
       "FAMILY must be staging, publication, lifecycle or show-registration; IDs match local-operation-status.\n" +
-      "Requires the local administrator key and an M6 management status route. No Cloudflare API token is required.\n" +
+      "Requires the local administrator key. New async content jobs use private R2 and require Cloudflare account/API credentials.\n" +
+      "Legacy jobs use the M6 management status route without a Cloudflare API token.\n" +
       "This does not send mutations, update local phases, remove locks, release tokens, authorize recovery or certify M6 readiness.\n" +
       "Legacy Workers and migration-only candidate routes reject this inspection.",
   },

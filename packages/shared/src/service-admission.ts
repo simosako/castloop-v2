@@ -6,7 +6,8 @@ const checksum = z.string().regex(/^[a-f0-9]{64}$/);
 export const m6RuntimeTargetSchema = z.object({ operation_id: uuid, deployment_id: uuid, worker_version_id: uuid,
   service_config_sha256: checksum }).strict();
 export const m6RuntimeReadinessSchema = m6RuntimeTargetSchema.extend({ default_cache_disabled: z.literal(true),
-  cached_entrypoint: z.literal("CachedPublicAssets"), cutover_verified: z.literal(true), publication_routes_verified: z.literal(true) }).strict();
+  cached_entrypoint: z.literal("CachedPublicAssets"), cutover_verified: z.literal(true), publication_routes_verified: z.literal(true),
+  management_protocol: z.literal("queue-management-v1").optional() }).strict();
 export const m6ServiceUpdateRequestSchema = z.object({ operation_id: uuid,
   service_id: z.string().max(20).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   expected_service_generation: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), pause_id: uuid,

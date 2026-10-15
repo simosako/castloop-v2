@@ -13,6 +13,7 @@ import { RSS_IMPORT_AUDIO, RSS_IMPORT_SOURCE, rssImportTransport } from "./test-
 import { fetchM6ManagementIntegration, queueM6Candidate } from "../../../src/m6-routes";
 import type { M6CachedLoopback } from "../../../src/m6-routes";
 import { acquireShowExecution } from "../../../src/lifecycle-control";
+import { claimPublicationOperation } from "../../../src/publication-admission";
 import { acquireServiceInvocation } from "../../../src/service-admission";
 import { completeM6ServiceInitialization, prepareM6ServiceInitialization } from "../../../src/m6-service-initialization";
 import { resumeServiceAdmission } from "../../../src/service-admission";
@@ -24,6 +25,9 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
   const setup = await m6InitializationFixture();
   await prepareM6ServiceInitialization(setup.env, setup.target);
   await completeM6ServiceInitialization(setup.env, setup.target, setup.checks);
+  const admission = JSON.parse(setup.text("system/lifecycle-service.json"));
+  await setup.bucket.put("system/lifecycle-service.json", JSON.stringify({ ...admission,
+    runtime_readiness: { ...admission.runtime_readiness, management_protocol: "queue-management-v1" } }));
   await resumeServiceAdmission(setup.env, setup.config.service_id, setup.target.operation_id);
   const parent = mkdtempSync("/tmp/opencode/castloop-rss-publication-");
   const root = join(parent, "workspace"), output = join(parent, "import");
@@ -55,8 +59,17 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
         result: { queue_id: "1".repeat(32), queue_name: setup.config.queue_name } });
       if (url.pathname.endsWith("/consumers")) return Response.json({ success: true, result: [{ script_name: setup.config.worker_name,
         dead_letter_queue: setup.config.dlq_name, settings: { batch_size: 1, max_concurrency: 1, max_retries: 2 } }] });
-      if (url.pathname.endsWith("/messages")) return Response.json({ success: true });
+      if (url.pathname.endsWith("/messages")) {
+        const intent = JSON.parse(String(init?.body)).body;
+        if (intent.command.action !== "publish") await queueM6Candidate({ queue: setup.config.queue_name,
+          messages: [{ id: crypto.randomUUID(), body: intent }] } as never, env as never, cachedAssets);
+        return Response.json({ success: true });
+      }
       const key = url.pathname.slice(url.pathname.indexOf("/objects/") + 9);
+      if (key === "system/show-publications/imported.json" && rejectTargetRead) {
+        rejectTargetRead = false;
+        throw new Error("Read-only target snapshot unavailable");
+      }
       if (init?.method === "PUT") {
         const object = (await setup.bucket.put(key, new Uint8Array(await new Response(init.body).arrayBuffer())))!;
         return Response.json({ success: true, result: { key, size: object.size, etag: object.etag, version: object.version } });
@@ -65,6 +78,9 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
       return object ? new Response(new Uint8Array(object.bytes), { headers: { ETag: `"${object.etag}"` } }) : new Response(null, { status: 404 });
     }
     if (url.pathname === "/admin/publication" && JSON.parse(String(init?.body)).action === "commit") throw new Error("HTTP commit must not be called");
+    if (url.pathname === "/admin/staging" || url.pathname === "/admin/publication") {
+      throw new Error("Content management must not call HTTP");
+    }
     return fetchM6ManagementIntegration(new Request(input, init) as never, env as never, cachedAssets);
   }, { preconnect: globalThis.fetch.preconnect }));
   const commands: string[] = [];
@@ -72,15 +88,6 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
   let continuousConflict = false;
   const conflictedJobs = new Set<string>();
   let waits = 0;
-  const originalHead = setup.bucket.head.bind(setup.bucket);
-  let changedKey: string | undefined;
-  setup.bucket.head = (async (key: string) => {
-    if (key === changedKey) {
-      changedKey = undefined;
-      await setup.bucket.put(key, setup.text(key));
-    }
-    return originalHead(key);
-  }) as typeof setup.bucket.head;
   const effects: RssPublicationEffects = {
     async command(command, args) {
       commands.push(command);
@@ -89,14 +96,14 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
         if (continuousConflict) throw new RemoteOperationStatusError("publication_status_changed");
         if (!conflictedJobs.has(args[1]!)) {
           conflictedJobs.add(args[1]!);
-          changedKey = `system/jobs/${args[1]}/status.toml`;
+          throw new RemoteOperationStatusError("publication_status_changed");
         }
       }
       const result = await runM6Command(root, setup.config, command, args, { workerSource: async () => "unused" });
       if (command.startsWith("publish-")) {
         const job = readLocalPublicationJob(root, setup.config, (result as { job_id: string }).job_id).client_state!;
         await queueM6Candidate({ queue: setup.config.queue_name, messages: [{ id: crypto.randomUUID(),
-          body: job.queue_submission!.intent }] } as never,
+          body: job.async_submission!.intent }] } as never,
           env as never, cachedAssets);
       }
       return result;
@@ -122,7 +129,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
     await expect(publishRssImport(root, setup.config, output, { ...effects, async command(command, args) {
       if (command === "update-episode") rejectTargetRead = true;
       return effects.command(command, args);
-    } })).rejects.toThrow("management_http_rejected");
+    } })).rejects.toThrow("target snapshot unavailable");
     const cursorFile = join(root, ".castloop", "rss-imports", setup.config.service_id,
       `${JSON.parse(readFileSync(join(output, "import.json"), "utf8")).import_id}.json`);
     expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toMatchObject({ phase: "ready", step: 5 });
@@ -197,6 +204,9 @@ test("RSS import reports retained execution with DLQ history without authorizing
   const setup = await m6InitializationFixture();
   await prepareM6ServiceInitialization(setup.env, setup.target);
   await completeM6ServiceInitialization(setup.env, setup.target, setup.checks);
+  const admissionBefore = JSON.parse(setup.text("system/lifecycle-service.json"));
+  await setup.bucket.put("system/lifecycle-service.json", JSON.stringify({ ...admissionBefore,
+    runtime_readiness: { ...admissionBefore.runtime_readiness, management_protocol: "queue-management-v1" } }));
   await resumeServiceAdmission(setup.env, setup.config.service_id, setup.target.operation_id);
   const parent = mkdtempSync("/tmp/opencode/castloop-rss-frozen-");
   const root = join(parent, "workspace"), output = join(parent, "import");
@@ -225,7 +235,12 @@ test("RSS import reports retained execution with DLQ history without authorizing
         result: { queue_id: "1".repeat(32), queue_name: setup.config.queue_name } });
       if (url.pathname.endsWith("/consumers")) return Response.json({ success: true, result: [{ script_name: setup.config.worker_name,
         dead_letter_queue: setup.config.dlq_name, settings: { batch_size: 1, max_concurrency: 1, max_retries: 2 } }] });
-      if (url.pathname.endsWith("/messages")) return Response.json({ success: true });
+      if (url.pathname.endsWith("/messages")) {
+        const intent = JSON.parse(String(init?.body)).body;
+        if (intent.command.action !== "publish") await queueM6Candidate({ queue: setup.config.queue_name,
+          messages: [{ id: crypto.randomUUID(), body: intent }] } as never, env as never, cachedAssets);
+        return Response.json({ success: true });
+      }
       const key = url.pathname.slice(url.pathname.indexOf("/objects/") + 9);
       if (init?.method === "PUT") {
         const object = (await setup.bucket.put(key, new Uint8Array(await new Response(init.body).arrayBuffer())))!;
@@ -244,15 +259,18 @@ test("RSS import reports retained execution with DLQ history without authorizing
       if (command === "publish-show") {
         const jobId = z.object({ result: z.literal("publication-queued"), job_id: z.uuid() }).strict().parse(result).job_id;
         const job = readLocalPublicationJob(root, setup.config, jobId).client_state!;
+        await claimPublicationOperation(setup.env, job.publication);
         await acquireShowExecution(setup.env, "imported", jobId, job.publication.request.expected_show_generation + 1);
         await acquireServiceInvocation(setup.env, setup.config.service_id, "m6_consumer");
         await setup.bucket.put(`system/jobs/${jobId}/dlq.json`, JSON.stringify({ key: publicationCommitKey(job.publication.commit) }));
+        await queueM6Candidate({ queue: setup.config.dlq_name, messages: [{ id: crypto.randomUUID(), body: job.async_submission!.intent }] } as never,
+          env as never, cachedAssets);
       }
       return result;
     }, async readFeed() { return setup.text("public/podcasts/imported/feed.xml"); }, async wait() { waits++; }, report() {},
   };
   try {
-    await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("dead-letter history and a retained execution token");
+    await expect(publishRssImport(root, setup.config, output, effects)).rejects.toThrow("dead-letter history does not authorize release");
     expect(waits).toBe(0);
     const importId = JSON.parse(readFileSync(join(output, "import.json"), "utf8")).import_id;
     const cursorFile = join(root, ".castloop", "rss-imports", setup.config.service_id, `${importId}.json`);
@@ -262,7 +280,7 @@ test("RSS import reports retained execution with DLQ history without authorizing
     const control = setup.text("system/show-publications/imported.json");
     const admission = setup.text("system/lifecycle-service.json");
     await expect(runM6Command(root, setup.config, "publication-release", [jobId], { workerSource: async () => "unused" }))
-      .rejects.toThrow("not proven settled");
+      .rejects.toThrow("not authorized");
     expect(sent).toEqual([]);
     expect(setup.text("system/show-publications/imported.json")).toBe(control);
     expect(setup.text("system/lifecycle-service.json")).toBe(admission);

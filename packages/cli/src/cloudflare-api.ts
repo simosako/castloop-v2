@@ -1,8 +1,8 @@
 import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, normalizeHostname, serviceConfigSchema, serviceManagementBaseUrl, stringifyToml, workerDeploymentsSnapshotSchema,
   workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema,
-   workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema, parsePublicationCommitIntent, publicationQueueIdSchema } from "@castloop/shared";
+   workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema, parsePublicationCommitIntent, publicationQueueIdSchema, parseManagementIntent } from "@castloop/shared";
 import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
-   M6DeploymentReads, M6DeploymentSnapshot, M6RuntimeTarget, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, PublicationCommitIntent, ServiceConfig, WorkerVersionUploadReceipt } from "@castloop/shared";
+   M6DeploymentReads, M6DeploymentSnapshot, M6RuntimeTarget, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ManagementIntent, PublicationCommitIntent, ServiceConfig, WorkerVersionUploadReceipt } from "@castloop/shared";
 import type { M6UpdateDeployReceipts } from "./m6-service-update";
 import { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
   M6_WORKER_COMPATIBILITY_DATE, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
@@ -378,6 +378,15 @@ export class CloudflareApi {
     } catch (error) {
       throw new Error("Queue submission was not acknowledged; preserve its frozen journal and held owner without replaying the POST. " +
         "Check Cloudflare connectivity and Queues Edit permission", { cause: error });
+    }
+  }
+
+  async publishManagementIntent(queueId: string, input: ManagementIntent): Promise<void> {
+    const id = publicationQueueIdSchema.parse(queueId);
+    const intent = parseManagementIntent(input);
+    try { await this.json("POST", `/queues/${id}/messages`, { body: intent }); }
+    catch (error) {
+      throw new Error("Management submission was not acknowledged; preserve its frozen journal without retry or HTTP fallback", { cause: error });
     }
   }
 

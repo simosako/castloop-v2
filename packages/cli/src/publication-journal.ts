@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicationCommitKey, publicationOperationSchema, publicationRequestSchema, publicationQueuedReceiptSchema,
-  publicationQueueSubmissionSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema, serviceOperationIdentity as identityFromConfig } from "@castloop/shared";
+  publicationQueueSubmissionSchema, managementSubmissionSchema, serviceConfigSchema, serviceIdentitySchema as identitySchema, serviceOperationIdentity as identityFromConfig } from "@castloop/shared";
 import type { PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { publicationClientOperation } from "./publication-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
@@ -10,7 +10,8 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, publication: publicationRequestSchema,
-  manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), phase: z.enum(["prepared", "claim_requested", "claimed", "commit_requested", "committed", "accepted", "submit_requested", "queued"]),
+  manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), phase: z.enum(["prepared", "claim_requested", "claimed", "commit_requested", "committed", "accepted", "submit_requested", "queued", "async_submit_requested", "async_queued"]),
+  async_submission: managementSubmissionSchema.optional(),
   queue_submission: publicationQueueSubmissionSchema.optional(), queued_receipt: publicationQueuedReceiptSchema.optional(),
   claim_receipt: publicationOperationSchema.optional(),
   commit_receipt: z.object({ key: z.string().min(1).max(256), created: z.boolean(),
@@ -26,6 +27,8 @@ export type PublicationJournal = { load: () => PublicationClientState; save: (st
   exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
 
 function phaseIndex(phase: PublicationClientState["phase"]): number {
+  if (phase === "async_submit_requested") return 1;
+  if (phase === "async_queued") return 2;
   if (phase === "submit_requested") return 3;
   return ["accepted", "committed", "queued"].includes(phase) ? 4 : stateSchema.shape.phase.options.indexOf(phase);
 }
@@ -34,6 +37,19 @@ export function validatePublicationClientState(input: unknown): PublicationClien
   const state = stateSchema.parse(input);
   const phase = phaseIndex(state.phase);
   const origin = new URL(state.identity.public_base_url);
+  if (state.phase === "async_submit_requested" || state.phase === "async_queued") {
+    const submission = state.async_submission;
+    if (!submission || submission.intent.command.action !== "publish" || submission.intent.service_id !== state.identity.service_id ||
+      JSON.stringify(submission.intent.command.publication) !== JSON.stringify(state.publication) ||
+      submission.intent_sha256 !== createHash("sha256").update(JSON.stringify(submission.intent)).digest("hex") ||
+      state.manifest_sha256 !== createHash("sha256").update(JSON.stringify(state.publication)).digest("hex") ||
+      origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" ||
+      state.claim_receipt || state.commit_receipt || state.queue_submission || state.queued_receipt || state.retry || state.release) {
+      throw new Error("Async publication must retain its frozen submission without claiming admission or publication");
+    }
+    return state;
+  }
+  if (state.async_submission) throw new Error("Legacy publication cannot adopt an async submission");
   if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" ||
     state.manifest_sha256 !== createHash("sha256").update(JSON.stringify(state.publication)).digest("hex") ||
     (phase >= 2) !== (state.claim_receipt !== undefined) || (["accepted", "committed"].includes(state.phase)) !== (state.commit_receipt !== undefined) ||
@@ -115,6 +131,10 @@ export function createPublicationJournal(root: string, configInput: ServiceConfi
         (!previous.release || previous.release.state === "released") && next.release.attempt === (previous.release?.attempt ?? 0) + 1;
       const releaseAcknowledged = previous.release?.state === "requested" && next.release?.state === "released" && next.release.attempt === previous.release.attempt;
       if (JSON.stringify(next.identity) !== JSON.stringify(previous.identity) || next.manifest_sha256 !== previous.manifest_sha256 ||
+        next.phase.startsWith("async_") && !(previous.phase === "prepared" && next.phase === "async_submit_requested" ||
+          previous.phase === "async_submit_requested" && next.phase === "async_queued") ||
+        previous.phase.startsWith("async_") && !next.phase.startsWith("async_") ||
+        previous.async_submission && JSON.stringify(next.async_submission) !== JSON.stringify(previous.async_submission) ||
         distance < 0 || distance > 1 || distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) &&
           !(next.phase === previous.phase && phaseIndex(previous.phase) === 4 && retryChanged && (retryStarted || retryAcknowledged)) &&
           !(next.phase === previous.phase && phaseIndex(previous.phase) === 4 && releaseChanged && (releaseStarted || releaseAcknowledged)) ||

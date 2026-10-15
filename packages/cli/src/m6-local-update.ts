@@ -10,7 +10,9 @@ import { readLocalPublicationJob } from "./publication-journal";
 import type { PublicationClientState } from "./publication-journal";
 import { readLocalStagingOperation } from "./staging-journal";
 import type { StagingClientState } from "./staging-journal";
-import { TargetInspectionClient } from "./target-inspection-client";
+import type { TargetInspectionClient } from "./target-inspection-client";
+import { ManagementTargetInspection } from "./management-target-inspection";
+import type { ManagementQueueTransport } from "./management-queue-client";
 
 type Inspection = Pick<TargetInspectionClient, "inspect">;
 export class LocalUpdateInspectionError extends Error {
@@ -20,6 +22,7 @@ export class LocalUpdateInspectionError extends Error {
 }
 export type M6LocalUpdateOptions = LocalDraftStagingOptions & { inspector?: Inspection; now?: () => Date };
 export type M6LocalPublishOptions = { audioPath?: string; inspector?: Inspection; now?: () => Date;
+  management?: ManagementQueueTransport;
   client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "release" | "status"> };
 
 function timestamp(now?: () => Date): string {
@@ -40,7 +43,7 @@ async function inspect(root: string, config: ServiceConfig, target: LocalDraftTa
   const request = targetInspectionRequestSchema.parse({ schema_version: 1, service_id: config.service_id, ...target });
   const before = readLocalDraft(root, config, target);
   if (before.lock_present) throw new Error("Preserve the retained local draft lock");
-  const response = targetInspectionResponseSchema.parse(await (inspector ?? new TargetInspectionClient(config, adminKey)).inspect(request));
+  const response = targetInspectionResponseSchema.parse(await (inspector ?? new ManagementTargetInspection(config)).inspect(request));
   if (JSON.stringify(response.request) !== JSON.stringify(request) ||
     JSON.stringify(readLocalDraft(root, config, target)) !== JSON.stringify(before)) throw new Error("Target or local draft changed during inspection");
   if (response.admission_state !== "open" || response.unfinished_show_operation || !response.show ||
@@ -94,5 +97,5 @@ export async function publishLocalM6Draft(root: string, configInput: ServiceConf
   return runLocalDraftPublication(root, config, target, { schema_version: 1, action: "publish", ...generations,
     created_at: retained?.created_at ?? timestamp(options.now) },
     { ...(snapshot.current_revision ? { baseRevision: snapshot.current_revision } : {}), ...(options.audioPath ? { audioPath: options.audioPath } : {}) },
-    adminKey, options.client, state.draft_job_id);
+    adminKey, options.client, state.draft_job_id, options.management);
 }

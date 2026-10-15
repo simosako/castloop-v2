@@ -64,5 +64,6 @@ export async function verifyM6SetupRuntime(env: M6InitializationEnv & { CASTLOOP
   await requireM6SetupOwner(env, request);
   if ((await readM6SetupRecord(env, request))?.etag !== record.etag) throw new Error("Runtime verification record changed during its checks");
   return m6RuntimeReadinessSchema.parse({ ...request.target, default_cache_disabled: true, cached_entrypoint: "CachedPublicAssets",
-    cutover_verified: true, publication_routes_verified: true });
+    cutover_verified: true, publication_routes_verified: true,
+    ...(record.value.queue_receipt.management_protocol ? { management_protocol: record.value.queue_receipt.management_protocol } : {}) });
 }

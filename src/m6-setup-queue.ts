@@ -18,6 +18,7 @@ export async function consumeM6SetupProbe(batch: { queue: string; messages: read
   if (!record.value.queue_receipt) {
     const next = m6SetupRecordSchema.parse({ ...record.value, queue_receipt: {
       worker_version_id: env.CASTLOOP_VERSION_METADATA.id,
+      management_protocol: "queue-management-v1",
     } });
     if (!await env.CASTLOOP_BUCKET.put(m6SetupRecordKey(request.target.operation_id), JSON.stringify(next), { onlyIf: { etagMatches: record.etag } })) {
       const current = await readM6SetupRecord(env, request);

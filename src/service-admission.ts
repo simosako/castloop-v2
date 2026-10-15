@@ -64,11 +64,14 @@ export async function initializeServiceAdmission(env: LifecycleControlEnv, servi
 }
 
 export async function acquireServiceInvocation(env: LifecycleControlEnv, serviceId: string,
-  input: ServiceInvocationKind): Promise<ServiceInvocation> {
+  input: ServiceInvocationKind, expected?: { admissionWindowId: string; workerVersionId: string }): Promise<ServiceInvocation> {
   const kind = serviceInvocationKindSchema.parse(input);
   const token = crypto.randomUUID();
   for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
     const snapshot = await requireService(env, serviceId);
+    if (expected && (verifiedM6Snapshot(snapshot, expected.workerVersionId).value.last_resumed_pause_id !== expected.admissionWindowId)) {
+      throw new ServiceAdmissionBlocked();
+    }
     const mode = kind.startsWith("legacy_") ? "legacy" : "m6";
     if (snapshot.value.mode !== mode || snapshot.value.url_change || ["migrating", "initializing", "updating"].includes(snapshot.value.state) ||
       snapshot.value.state === "paused" && kind.endsWith("_admin")) throw new ServiceAdmissionBlocked();
