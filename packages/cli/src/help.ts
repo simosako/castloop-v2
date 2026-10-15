@@ -21,10 +21,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Audio must be MP3 and at most 300,000,000 bytes. Local import does not migrate subscribers or remove the old host.",
   },
   init: {
-    usage: "init [dir] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
+    usage: "init [dir] [--publication-protocol sqlite-sequential-v1] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
     description: "Create a service workspace and Cloudflare resources. Missing values are prompted on a terminal.\n" +
       "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Creates only new resources and completes paused.\n" +
-      "Use service-status, then service-resume with its pause ID. Never rerun an initialization with an unknown outcome.",
+      "schema_version=1: use service-status, then service-resume with its pause ID. Never rerun an initialization with an unknown outcome.\n" +
+      "Development: --publication-protocol sqlite-sequential-v1 creates a fresh SQLite DO service without Queues.\n" +
+      "SQLite initialization verifies Alarm/R2/cache readiness and finishes paused; resume with a NEW window UUID. Existing services are not converted.",
   },
   "create-show": {
     usage: "create-show ID [--site-url URL]",
@@ -123,8 +125,9 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Explicitly pause delivery and new mutations. Existing owners must finish; no elapsed-time release is performed.",
   },
   "service-resume": {
-    usage: "service-resume PAUSE_UUID",
-    description: "Resume only the exact paused service after runtime verification and settlement of existing owners.",
+    usage: "service-resume UUID",
+    description: "Resume only the exact paused service after runtime verification and settlement of existing owners.\n" +
+      "schema_version=1 requires its PAUSE_UUID. sqlite-sequential-v1 requires a NEW admission-window UUID, not the pause command UUID.",
   },
   "target-show": {
     usage: "target-show SHOW_ID",
@@ -199,5 +202,8 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
 export function commandHelp(command: string): string {
   const help = Object.hasOwn(COMMAND_HELP, command) ? COMMAND_HELP[command] : undefined;
   if (!help) throw new Error(`Unknown command: ${command}`);
-  return `Usage: castloop ${help.usage}\n\n${help.description}\n\nOptions:\n  --help, -h  Show this help`;
+  const sqlite = ["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode", "job-status"].includes(command) ?
+    "\n\nSQLite development workspaces (schema_version=2): unique R2 uploads, no Queue grants/Queues Edit, explicit DO submission and bounded completion polling.\n" +
+    "succeeded proves this operation completed, not global quiescence. Unknown requests are never resent; retry/release and lifecycle/deploy/domain are not implemented." : "";
+  return `Usage: castloop ${help.usage}\n\n${help.description}${sqlite}\n\nOptions:\n  --help, -h  Show this help`;
 }

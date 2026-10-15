@@ -63,12 +63,36 @@ function checkedRecord(input: unknown): SqliteDraftRecord {
   return record;
 }
 
+export function sqliteDraftFileName(target: Pick<SqliteDraftTarget, "kind" | "show_id" | "episode_id">): string {
+  return `${target.kind === "show" ? `show-${target.show_id}` : `episode-${target.show_id.length}-${target.show_id}-${target.episode_id}`}.json`;
+}
+
+export async function readSqliteDraftRecord(root: string, config: SqliteServiceConfig,
+  target: Pick<SqliteDraftTarget, "kind" | "show_id" | "episode_id">): Promise<SqliteDraftRecord | null> {
+  try {
+    const record = checkedRecord(createLocalJournalStorage(root, "sqlite-drafts", config.service_id, sqliteDraftFileName(target)).read());
+    if (record.service_id !== config.service_id || record.service_config_sha256 !== await sqliteServiceConfigHash(config) ||
+      record.target.kind !== target.kind || record.target.show_id !== target.show_id || record.target.episode_id !== target.episode_id) throw new Error("SQLite draft identity differs");
+    if (record.publication && await sqlitePublicationRequestHash(record.publication.request) !== record.publication.request_sha256) throw new Error("SQLite draft publication hash differs");
+    return record;
+  } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+}
+
+export async function readSqliteArchivedDraft(root: string, config: SqliteServiceConfig, jobId: string): Promise<SqliteDraftRecord | null> {
+  fields.job_id.parse(jobId);
+  try {
+    const record = checkedRecord(createLocalJournalStorage(root, "sqlite-publications", config.service_id, `${jobId}.json`).read());
+    if (record.target.job_id !== jobId || record.service_id !== config.service_id || record.service_config_sha256 !== await sqliteServiceConfigHash(config) ||
+      !record.publication || await sqlitePublicationRequestHash(record.publication.request) !== record.publication.request_sha256) throw new Error("Archived SQLite publication differs");
+    return record;
+  } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+}
+
 export async function openSqliteDraftJournal(root: string, input: SqliteServiceConfig,
   targetInput: SqliteDraftTarget): Promise<SqliteDraftJournal> {
   const config = sqliteServiceConfigSchema.parse(input), target = sqliteDraftTargetSchema.parse(targetInput);
   const hash = await sqliteServiceConfigHash(config);
-  const name = target.kind === "show" ? `show-${target.show_id}` : `episode-${target.show_id.length}-${target.show_id}-${target.episode_id}`;
-  const storage = createLocalJournalStorage(root, "sqlite-drafts", config.service_id, `${name}.json`);
+  const storage = createLocalJournalStorage(root, "sqlite-drafts", config.service_id, sqliteDraftFileName(target));
   const initial = checkedRecord({ schema_version: 1, protocol: sqlitePublicationProtocol, service_id: config.service_id,
     service_config_sha256: hash, target, assets: [] });
   storage.initialize(initial);

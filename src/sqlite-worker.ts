@@ -5,6 +5,7 @@ import type { PublicCacheProps } from "./public-assets";
 import { purgeLifecycleCache, serveCachedLifecycleAsset } from "./lifecycle-cache";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
+import type { SqlitePublicationExecutor } from "./sqlite-publication-alarm";
 import type { PreparedSqlitePublication } from "./sqlite-publication-executor";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
@@ -34,7 +35,8 @@ export class SqliteCachedAssets extends WorkerEntrypoint<SqliteWorkerEnv, Public
 export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
   private readonly initialized: Promise<void>;
   private runtime!: SqliteServiceRuntime;
-  private runner!: SqlitePublicationAlarm<PreparedSqlitePublication>;
+  private executor!: SqlitePublicationExecutor<PreparedSqlitePublication>;
+  private alarmRuntime!: () => SqliteServiceRuntime;
   private publicationHttp!: (request: Request) => Promise<Response>;
   private serviceHttp!: (request: Request) => Promise<Response>;
   constructor(ctx: DurableObjectState, env: SqliteWorkerEnv) {
@@ -48,9 +50,10 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
       const queue = new SqlitePublicationQueue(this.ctx.storage, identity), content = new SqlitePublicationContent(this.ctx.storage);
       const cache = { describe: () => this.ctx.exports.SqliteCachedAssets.describeRuntime(),
         purge: (showId: string) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId }) };
-      this.runtime = new SqliteServiceRuntime(this.ctx.storage, queue, content, this.env.CASTLOOP_BUCKET, config, cache);
-      this.runner = new SqlitePublicationAlarm(queue, createSqlitePublicationExecutor(content, this.env.CASTLOOP_BUCKET, config,
-        { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) }));
+      this.alarmRuntime = () => new SqliteServiceRuntime(this.ctx.storage, queue, content, this.env.CASTLOOP_BUCKET, config, cache);
+      this.runtime = this.alarmRuntime();
+      this.executor = createSqlitePublicationExecutor(content, this.env.CASTLOOP_BUCKET, config,
+        { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) });
       this.publicationHttp = createSqlitePublicationHttp(queue, this.env.CASTLOOP_ADMIN_KEY, () => this.runtime.ready());
       this.serviceHttp = createSqliteServiceHttp(this.runtime, this.env.CASTLOOP_ADMIN_KEY);
     });
@@ -65,7 +68,8 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
   }
   async alarm(): Promise<void> {
     await this.initialized;
-    if (!await this.runtime.alarm()) await this.runner.alarm();
+    const runtime = this.alarmRuntime();
+    if (!await runtime.alarm()) await new SqlitePublicationAlarm(runtime.queue, this.executor).alarm();
   }
 }
 

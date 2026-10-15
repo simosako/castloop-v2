@@ -3,7 +3,7 @@ import { MAX_SQLITE_PUBLICATION_BYTES, parseSqlitePublicationRequest, sqlitePubl
 import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteServiceConfig, SqliteServiceStatus } from "@castloop/shared";
 import type { R2RestTransport } from "./verified-r2-put";
 
-async function readJson(response: Response): Promise<unknown> {
+export async function readSqliteManagementJson(response: Response): Promise<unknown> {
   if (!response.body || response.headers.get("Cache-Control") !== "no-store" || response.headers.has("Content-Range") ||
     response.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
     await response.body?.cancel();
@@ -50,7 +50,7 @@ export class SqlitePublicationClient {
       await response.body?.cancel();
       throw new Error(`SQLite management request was not verified (HTTP ${response.status}); no automatic retry`);
     }
-    try { return await readJson(response); }
+    try { return await readSqliteManagementJson(response); }
     catch { throw new Error("SQLite management response body was not verified; preserve the request without automatic retry"); }
   }
 

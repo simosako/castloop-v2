@@ -199,11 +199,11 @@ tmux独立実行と既存の異常通知supervisorを用い、異常時は後続
 | --- | --- |
 | P0 | 本書保存、旧比較書の位置付け修正、別branch作成。既存未commit変更は保持 |
 | P1 | strict公開/upload参照schema、一意key、要求hash、SQLite schema、FIFO/重複排除、pause/drain、状態遷移を実装。Show/Episode content保存はP4で接続するため未実装 |
-| P2 | executor分離したAlarm実行基盤を実装。単一job、I/O await、再生成後のrunningブロック、allowlistログをテスト。実DO class/bindingとCloudflare runtime検証は未接続 |
-| P3 | 新config専用の一意upload、private local journal、明示submit/status/waitを内部CLI moduleとして実装。正式コマンドへの分岐・対象inspectionはP5で接続するため未公開 |
+| P2 | executor分離したAlarm実行基盤と実DO classへ接続。単一job、I/O await、再生成後のrunningブロックをローカル検証。Cloudflare runtime実証は未実施 |
+| P3 | 新config専用の一意upload、private local journal、明示submit/status/waitを実装し、正式CLIのschema version 2分岐へ接続 |
 | P4 | SQLite content indexと実Show/Episode公開executorを接続。Show、初回Episode、metadata-only/audio-only、Show metadata/cover更新をローカル検証。lifecycle操作の実行は未実装 |
-| P5 | DO内で使う認証付きsubmit/status HTTP handlerと配信判定coreを追加。実DO class/binding、外側Worker、正式CLI分岐、init/readiness、実Cache purge・GET/HEAD/Range配信は未接続 |
-| P6 | 未実装。既存CLI/Workerの既定経路は切り替えていない |
+| P5 | 別Worker入口、実DO/SQLite binding、cache owner、正式CLI、fresh REST init/readiness、公開配信を接続しローカル結合検証。Cloudflare実機での配備・purge・output gate・再配送の受け入れは未実施 |
+| P6 | lifecycle、一覧、互換更新、domain、移行は未実装。新方式では明示拒否。schema version 1の既存経路・既存環境は切り替えていない |
 
 追加した主なファイル:
 
@@ -248,7 +248,34 @@ commit承認後、先行診断を`6a13b1b`、基盤を`075e4e5`へ分けて保�
 
 P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run check`、Linux単体CLI build/`--help`、`git diff --check`成功。同じbaseの後続conflict、異なるEpisodeのFIFO、音源checksum不正、書込応答不明、purge失敗、実行中/purge待機、pause中の既受付drain、content/成功/次回起動のrollback、破損要求、HTTP認証/size/readiness拒否を含む。
 
-次はP5の実DO class/binding、正式CLIと対象inspection、新規init/readiness、Workers Cachingを含む配信の接続。内部moduleが通っただけで正式CLIによる新方式の公開が利用可能、Issue #13解消、性能目標達成とは扱わない。Cloudflareへの配備・実機測定、既存環境の変更やpushはしていない。
+上記P4検証時点では、Cloudflareへの配備・実機測定、既存環境の変更やpushはしていなかった。
+
+### P5: 実DO・fresh init・正式CLI・配信
+
+管理者のpush指示を受け、`8cc331a`までを`origin/feat/sqlite-sequential-publication`へ保存して開発を続けた。実DO/gateway接続は`2f59ab5`にcommitした。
+
+- `src/sqlite-worker.ts`: 別のWorker module。`SqlitePublicationService extends DurableObject`、`SqliteCachedAssets extends WorkerEntrypoint`を実platform型で実装した。native storage/R2をadapterへの強制castなしで接続する。constructorの`blockConcurrencyWhile`は設定hashと短いSQL初期化だけで、外部I/Oや公開job全体を囲まない。
+- native Alarmはplatformがhandlerを逐次実行する契約を利用し、invocationごとにsetup/公開実行器を作る。仮にhard interruption後も同じDO instanceが残っても、古いメモリ内busy flagでretryを黙ってackしない。SQLiteのrunningを検出してblockedにするだけで、旧IOの終了を推定・強制解放しない。coreの同一invocation内再入防止と、native invocation間の永続判定を分離した。
+- `src/sqlite-service-runtime.ts`/`sqlite-service-http.ts`: 初期状態はpaused。正確なruntime/config/operationに束縛してAlarm起動を保存し、実handler内でR2のservice TOML、同versionのcache owner、purgeを確認してからreadyを保存する。途中runningの再生成・probe失敗はblockedとし、初期化を自動再実行しない。ready後も明示resumeが必要。
+- `src/sqlite-gateway.ts`: outer gatewayのcacheを無効化し、public requestごとにDOの最新scalar判定を読み、許可したpathだけをnamed cache entrypointへ渡す。認証header/queryをcacheへ渡さず、外向け応答は再検証必須。現時点ではworkers.devのみで、独自ドメインを暗黙に採用しない。
+- content schemaを**2**へ進め、完了transactionで更新する`feed_generation`をcache propsに入れた。purge後に旧応答が遅れてcacheへ入っても、新世代のfeedがそのentryを使わない。R2 feed/coverを全面世代別pointer方式にする変更ではない。Episode公開はfeed/対象Episodeをpurgeし、無関係な音源cache全体を消さない。
+- `packages/shared/src/sqlite-worker-deployment.ts`: `exports`の`durable-object / storage: sqlite`でnamespaceを宣言する。Cloudflareの現行APIでは`exports`と`migrations`が排他的なので併用しない。新規versionのcompatibility dateは2026-10-16。default cache無効・named cache有効、version分離、logs/traces有効を明記し、CPU/billing設定は変更しない。
+- `packages/cli/src/sqlite-cloudflare.ts`/`sqlite-initialization.ts`: 既存bucket/Workerを採用しないfresh-only REST初期化。resource/PUT/deploy/access要求前にprivate journalを保存し、設定・version ETag・単一100%配備・namespaceのWorker/class・preview無効を照合する。API token/秘密鍵/body/sourceをjournalへ写さずhash/receiptだけを保持する。Alarmの実行probe後にも配備を再読取し、pausedで終了する。
+- 応答不明のresource/PUT/deployは再送しない。`init-reconcile`は保存済みreceiptと、既に完了した同じsetupのready/paused/drainedをread-onlyで照合するだけで、未知deployを採用しない。初期化phaseとreceipt/namespace証拠の有無はstrictに束縛する。
+- 手書きの新configから初期化する場合も、秘密鍵作成前に`.castloop/`とMP3のignore設定を保存する。symlink等の不正な`.gitignore`は追跡せず、資源作成前に停止する。新config・journalはfsyncしてから後続操作へ進む。
+- `packages/cli/src/index.ts`/`sqlite-commands.ts`: `init --publication-protocol sqlite-sequential-v1`とschema version 2の正式分岐を追加した。登録・local draft・update/publish・target/job/service status・pause/resumeを接続。登録やcontrolの未知POSTも繰り返さず、既知登録の読取照合だけを許す。旧configの暗黙昇格や未対応操作のfallbackはない。
+- `scripts/build-cli.ts`: 新旧Worker bundleを同じBun executableへ埋め込む。既存schema version 1の既定経路、既存Workerのruntime exportは変更しない（追加したglobal module型は型専用）。
+
+ローカル検証:
+
+- 全体`bun test`: **1,297 pass / 0 fail**（139 files、80.54秒）。型検査、Linux単体CLI buildと新しいinit/resume helpを確認。
+- 独立processで正式`index.ts`を起動し、init→paused→明示resume→Show/Episode作成→upload/publication→job-status→pauseまでwalkthroughした。通信だけをtest専用preloadでloopback fixtureへ向け、外部アクセスを拒否した。本番コードへtest用endpoint/credentialを埋め込んでいない。
+- 模擬Cloudflare RESTで各resource/PUT/deploy/accessの応答喪失、setup応答喪失の読取照合、異なるnamespace/cache設定、blocked probeを検証。gatewayでは最新判定・遅い旧cache fillの世代分離、Range/条件付き要求の転送、認証/query非転送、HEADと非公開の拒否を検証。
+- 実DO class/entrypointは型検査とbrowser bundleの検証。**実機DOのoutput gate/Alarm再配送、実Workers Cache purge、CF APIの応答形・Free制限・性能は、このローカルfixtureだけでは実証していない。** standalone build成功と、同じ入口のsource-process walkthroughも区別する。
+- 全体回帰で見つかった旧listコマンドの引数検査順序を修正し、workspaceへ触る前の拒否を維持した。
+
+操作例・回復制限は[SQLite開発版ガイド](../docs/sqlite_sequential_development.md)を参照する。
+次はP6と、新規隔離環境での実機受け入れ計画の準備。既存サービス移行や実機配備は別承認であり、今回の開発ではCloudflare資源・実データを変更していない。Issue #13恒久解消、Free適合、36件性能目標達成、release readinessはまだ示していない。
 
 ## 参照
 
