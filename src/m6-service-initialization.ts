@@ -4,6 +4,7 @@ import { matchesM6RuntimeTarget, readM6RuntimeConfiguration, verifyM6RuntimeRead
 import type { M6RuntimeChecks, M6RuntimeEnv } from "./m6-runtime-readiness";
 import { readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import { m6SetupRecordKey } from "./m6-setup-record";
+import { preparePublicDeliveryConfiguration, putPublicDeliveryRecord } from "./public-delivery-records";
 
 export type M6InitializationEnv = M6RuntimeEnv & {
   CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head" | "put" | "list">;
@@ -31,7 +32,7 @@ export async function prepareM6ServiceInitialization(env: M6InitializationEnv, i
   await requireEmptyService(env);
   const value = serviceAdmissionSchema.parse({ schema_version: 1, service_id: config.service_id, generation: 0,
     mode: "m6", state: "initializing", invocations: [], initialization: target });
-  await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, JSON.stringify(value), { onlyIf: new Headers({ "If-None-Match": "*" }) });
+  await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(value), { onlyIf: new Headers({ "If-None-Match": "*" }) });
   const current = await readServiceAdmission(env, config.service_id);
   if (!matchesM6RuntimeTarget(current?.value.initialization, target) && !matchesM6RuntimeTarget(current?.value.runtime_readiness, target)) {
     throw new Error("Fresh M6 initialization admission conflicted; preserve the retained owner");
@@ -52,9 +53,10 @@ export async function completeM6ServiceInitialization(env: M6InitializationEnv, 
   const readiness = await verifyM6RuntimeReadiness(env, target, configuration, checks);
   await requireEmptyService(env, target);
   const { initialization: _initialization, ...value } = snapshot.value;
+  await preparePublicDeliveryConfiguration(env, config.service_id, configuration.etag);
   const next = serviceAdmissionSchema.parse({ ...value, generation: value.generation + 1, state: "paused",
     pause_id: target.operation_id, runtime_readiness: readiness });
-  const saved = await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } });
+  const saved = await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } });
   if (!saved) {
     const current = await readServiceAdmission(env, config.service_id);
     if (!matchesM6RuntimeTarget(current?.value.runtime_readiness, target)) throw new Error("Fresh M6 admission changed before completion");

@@ -7,6 +7,7 @@ import { claimPublicationOperation, commitOwnedPublication, publicationRequestSc
 import { beginStageUpload, claimStageUpload, settleStageUpload } from "../staging-upload";
 import { runStageVerification } from "../staging-verification";
 import { reserveM6Show } from "../show-registration";
+import { publicDeliveryMetadata } from "../public-delivery-records";
 import { createHash } from "node:crypto";
 
 export const PUBLICATION_SHOW_TEXT = "schema_version = 1\nshow_id = 'daily'\ntitle = 'New Show title'\ndescription = 'Private description'\nlanguage = 'en'\nauthor = 'Author'\nowner_name = 'Owner'\nowner_email = 'owner@example.com'\ncategories = ['Arts']\nexplicit = false\nsite_url = 'https://example.com'\nimage_path = 'cover.jpg'\n";
@@ -70,8 +71,9 @@ export async function publicationFixture(options: { active?: boolean; episodes?:
     await bucket.put("public/podcasts/daily/feed.xml", "old feed");
   }
   async function addEpisode(episodeId: string, lifecycle: LifecycleState) {
-    await bucket.put(`system/episode-lifecycle/daily/${episodeId}.toml`, stringifyLifecycleToml({ schema_version: 1,
-      show_id: "daily", episode_id: episodeId, lifecycle, generation: 0 }));
+    const lifecycleKey = `system/episode-lifecycle/daily/${episodeId}.toml`;
+    const lifecycleSource = stringifyLifecycleToml({ schema_version: 1, show_id: "daily", episode_id: episodeId, lifecycle, generation: 0 });
+    await bucket.put(lifecycleKey, lifecycleSource, { customMetadata: publicDeliveryMetadata(lifecycleKey, lifecycleSource) });
     if (lifecycle === "draft" || lifecycle === "deleted") return null;
     const revision = episodeRevisionSchema.parse({ schema_version: 1, episode_id: episodeId, guid: crypto.randomUUID(),
       title: `Saved ${episodeId}`, description: "Saved description", published_at: "2026-09-01T12:34:56+09:00",

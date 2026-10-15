@@ -10,6 +10,7 @@ import { pauseServiceAdmission, readServiceAdmission, resumeServiceAdmission, SE
 import { migrationFixture } from "./test-support/migration";
 import { publicationFixture } from "./test-support/publication";
 import { episodePublicationFixture } from "./test-support/episode-publication";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 
 const feedPath = "/podcasts/daily/feed.xml";
 const request = (path = feedPath, method = "GET", headers: HeadersInit = {}) =>
@@ -65,7 +66,9 @@ describe("M6 candidate state-first gateway", () => {
     expect((await fetchM6Candidate(request(), setup.env, setup.loopback)).status).toBe(304);
     const calls = setup.events.length;
     for (const [state, status] of [["unpublished", 404], ["deleting", 410], ["deleted", 410]] as const) {
-      await setup.bucket.put("system/show-publications/daily.json", JSON.stringify({ schema_version: 2, show_id: "daily", lifecycle: state, generation: 1, feed_generation: 1 }));
+      const key = "system/show-publications/daily.json";
+      await putPublicDeliveryRecord(setup.env, key, JSON.stringify({ schema_version: 2, show_id: "daily", lifecycle: state, generation: 1, feed_generation: 1 }),
+        { onlyIf: { etagMatches: setup.entries.get(key)!.etag } });
       const result = await fetchM6Candidate(request(feedPath, "HEAD", { "If-None-Match": '"test"' }), setup.env, setup.loopback);
       expect(result.status).toBe(status);
       expect(result.headers.get("Cache-Control")).toBe("no-store");

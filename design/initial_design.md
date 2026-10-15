@@ -233,6 +233,8 @@ MP3を変換せずprivate R2へ保存し、Worker経由で配信する。CLIの`
 
 同じWorker内のdefault gatewayはキャッシュせず、毎要求service・Show・Episodeの状態を検査する。許可された要求だけをWorkers Caching有効の`CachedPublicAssets`へ渡す。generationを内部cacheの識別に含め、hostの変更に依存しないcache URLを使う。
 
+開発ブランチでは[配信判定の事前生成](public_delivery_projection.md)を採用した。管理側でstrict検証した正本と同じ条件付きPUTに小さいR2 metadataを保存し、通常HTTPでは最新metadataのHEADだけで判定する。既存controlの準備はpause/drain済みの互換更新へ含め、旧移行の全文検証は独立した互換経路として維持する。これはv0.4.0 releaseの変更や実機10ms達成の宣言ではない。
+
 | 層 | キャッシュ方針 |
 | --- | --- |
 | 外向けの成功response | `Cache-Control: public, max-age=0, must-revalidate`。304でもgatewayを通し、`immutable`を付けない |

@@ -5,6 +5,7 @@ import type { M6RuntimeChecks, M6RuntimeConfiguration, M6RuntimeEnv } from "./m6
 import { readServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import type { ServiceAdmissionSnapshot } from "./service-admission";
 import { readSettledShowControls } from "./service-quiescence";
+import { preparePublicDeliveryConfiguration, preparePublicDeliveryControls, putPublicDeliveryRecord } from "./public-delivery-records";
 
 export type M6UpdateEnv = M6RuntimeEnv & { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head" | "put" | "list"> };
 
@@ -46,7 +47,7 @@ export async function beginM6ServiceUpdate(env: M6UpdateEnv, input: M6ServiceUpd
   }
   const next = serviceAdmissionSchema.parse({ ...snapshot.value, generation: snapshot.value.generation + 1,
     state: "updating", update: { request } });
-  if (!await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } })) {
+  if (!await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } })) {
     throw new Error("Service admission changed before compatible update; do not deploy");
   }
 }
@@ -67,7 +68,7 @@ export async function prepareM6ServiceUpdate(env: M6UpdateEnv, input: M6ServiceU
   }
   if (!snapshot.value.update!.target) {
     const next = serviceAdmissionSchema.parse({ ...snapshot.value, generation: snapshot.value.generation + 1, update: { request, target } });
-    if (!await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } })) {
+    if (!await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } })) {
       throw new Error("Compatible update target admission conflicted; preserve the retained owner");
     }
     snapshot = await readServiceAdmission(env, request.service_id);
@@ -82,9 +83,19 @@ export async function completeM6ServiceUpdate(env: M6UpdateEnv, input: M6Service
   const { configuration, snapshot, target } = await prepareM6ServiceUpdate(env, input, targetInput);
   if (matchesM6RuntimeTarget(snapshot.value.runtime_readiness, target)) return snapshot.value.runtime_readiness!;
   const readiness = await verifyM6RuntimeReadiness(env, target, configuration, checks);
+  const checkOwner = async () => {
+    const current = await readServiceAdmission(env, configuration.config.service_id);
+    if (!current || current.etag !== snapshot.etag || current.value.state !== "updating" || current.value.invocations.length ||
+      !matchesM6RuntimeTarget(current.value.update?.target, target)) throw new Error("Compatible update admission changed during public delivery preparation");
+  };
+  await checkOwner();
+  await readSettledShowControls(env);
+  await preparePublicDeliveryControls(env, checkOwner);
+  await preparePublicDeliveryConfiguration(env, configuration.config.service_id, configuration.etag);
+  await checkOwner();
   const { update: _update, ...value } = snapshot.value;
   const next = serviceAdmissionSchema.parse({ ...value, generation: value.generation + 1, state: "paused", runtime_readiness: readiness });
-  if (!await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } })) {
+  if (!await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: snapshot.etag } })) {
     const current = await readServiceAdmission(env, configuration.config.service_id);
     if (!matchesM6RuntimeTarget(current?.value.runtime_readiness, target)) throw new Error("Compatible update admission changed during completion");
     return current!.value.runtime_readiness!;

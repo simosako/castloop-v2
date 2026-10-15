@@ -1,6 +1,7 @@
 import { managementRequestPrefix, m6ServiceConfigHash, parseShowControl, publicationManifestHash,
   stageControlRequest, stagePayloadKey, verifyManagementIntent } from "../packages/shared/src/index";
 import type { ManagementIntent, ManagementResult, ServiceConfig } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { acquireShowExecution, controlRequestHash, readEpisodeLifecycle, readShowControl, requireOwnedOperation } from "./lifecycle-control";
 import { LifecycleExecutionBusy, releaseSettledExecution } from "./lifecycle-consumer";
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
@@ -24,7 +25,7 @@ async function acquireStageCommand(env: LifecycleFeedEnv, operation: StageOperat
     throw new LifecycleExecutionBusy();
   }
   const value = parseShowControl({ ...current.value, owner: { ...current.value.owner, command_execution_id: executionId } });
-  if (!await env.CASTLOOP_BUCKET.put(`system/show-publications/${operation.showId}.json`, JSON.stringify(value),
+  if (!await putPublicDeliveryRecord(env, `system/show-publications/${operation.showId}.json`, JSON.stringify(value),
     { onlyIf: { etagMatches: current.etag } })) throw new LifecycleExecutionBusy();
 }
 
@@ -38,7 +39,7 @@ async function releaseStageCommand(env: LifecycleFeedEnv, operation: StageOperat
   }
   const { command_execution_id: _token, ...owner } = current.value.owner;
   const value = parseShowControl({ ...current.value, owner });
-  if (!await env.CASTLOOP_BUCKET.put(`system/show-publications/${operation.showId}.json`, JSON.stringify(value),
+  if (!await putPublicDeliveryRecord(env, `system/show-publications/${operation.showId}.json`, JSON.stringify(value),
     { onlyIf: { etagMatches: current.etag } })) throw new Error("Staging command execution return conflicted");
 }
 

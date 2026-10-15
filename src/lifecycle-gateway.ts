@@ -1,5 +1,5 @@
-import { readPublicVisibilitySnapshot } from "./lifecycle-control";
-import type { LifecycleReadEnv } from "./lifecycle-control";
+import { readPublicDeliverySnapshot } from "./public-delivery-state";
+import type { LifecycleReadEnv, PublicVisibilitySnapshot } from "./lifecycle-control";
 import { parsePublicAssetPath, publicAssetCacheProps } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
 
@@ -13,12 +13,13 @@ function rejected(request: Request, status: 404 | 410 | 503): Response {
 }
 
 export async function serveLifecyclePublicRequest(request: Request, env: LifecycleReadEnv,
-  cachedFetch: CachedPublicFetch): Promise<Response | null> {
+  cachedFetch: CachedPublicFetch, readVisibility: (env: LifecycleReadEnv, showId: string,
+    episodeId?: string) => Promise<PublicVisibilitySnapshot> = readPublicDeliverySnapshot): Promise<Response | null> {
   if (request.method !== "GET" && request.method !== "HEAD") return null;
   const asset = parsePublicAssetPath(new URL(request.url).pathname);
   if (!asset) return null;
   try {
-    const snapshot = await readPublicVisibilitySnapshot(env, asset.showId, asset.kind === "audio" ? asset.episodeId : undefined);
+    const snapshot = await readVisibility(env, asset.showId, asset.kind === "audio" ? asset.episodeId : undefined);
     if (snapshot.visibility !== "public") return rejected(request, snapshot.visibility === "gone" ? 410 : 404);
     const response = await cachedFetch(request, asset, publicAssetCacheProps(asset, snapshot));
     const headers = new Headers(response.headers);

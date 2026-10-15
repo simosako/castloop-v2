@@ -2,6 +2,7 @@ import { migrationApplyProgressSchema, serviceAdmissionSchema, serviceInvocation
 import type { M6ServiceReadiness, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 import { measureWorkerPhase } from "./worker-timing";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 
 export const SERVICE_ADMISSION_KEY = "system/lifecycle-service.json";
 const MAX_RECORD_BYTES = 16384;
@@ -50,7 +51,7 @@ async function write(env: LifecycleControlEnv, snapshot: ServiceAdmissionSnapsho
   const value = serviceAdmissionSchema.parse({ ...input, generation: snapshot.value.generation + 1 });
   const source = JSON.stringify(value);
   if (new TextEncoder().encode(source).length > MAX_RECORD_BYTES) throw new Error("Service admission exceeds its record budget");
-  return Boolean(await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, source, { onlyIf: { etagMatches: snapshot.etag } }));
+  return Boolean(await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, source, { onlyIf: { etagMatches: snapshot.etag } }));
 }
 export { write as compareAndSetServiceAdmission };
 
@@ -59,7 +60,7 @@ export async function initializeServiceAdmission(env: LifecycleControlEnv, servi
   if (existing) return;
   const value = serviceAdmissionSchema.parse({ schema_version: 1, service_id: serviceId, generation: 0,
     mode: "legacy", state: "open", invocations: [] });
-  await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, JSON.stringify(value), { onlyIf: new Headers({ "If-None-Match": "*" }) });
+  await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(value), { onlyIf: new Headers({ "If-None-Match": "*" }) });
   await requireService(env, serviceId);
 }
 

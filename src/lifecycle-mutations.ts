@@ -1,6 +1,7 @@
 import { parseControlRequest, parseEpisodeLifecycle, parseShowControl, permitsControlAction,
   stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { EpisodeLifecycle } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { requireShowExecution } from "./lifecycle-control";
 import type { LifecycleControlEnv, ShowExecution } from "./lifecycle-control";
 import { advanceEpisodeCatalog } from "./episode-catalog";
@@ -16,7 +17,7 @@ export async function closeOwnedLifecycleTarget(env: LifecycleControlEnv, execut
     if (current.value.lifecycle === state) return;
     if (!permitsControlAction(current.value.lifecycle, owner.action)) throw new Error("Show changed before closing delivery");
     const value = parseShowControl({ ...current.value, lifecycle: state });
-    const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
+    const written = await putPublicDeliveryRecord(env, `system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
       onlyIf: { etagMatches: current.etag },
     });
     if (!written) throw new Error("Show control changed before closing delivery");
@@ -35,7 +36,7 @@ export async function closeOwnedLifecycleTarget(env: LifecycleControlEnv, execut
   if (!permitsControlAction(episode.lifecycle, owner.action) || episode.generation !== request.expected_episode_generation ||
     episode.generation === Number.MAX_SAFE_INTEGER) throw new Error("Episode changed before closing delivery");
   const value: EpisodeLifecycle = { ...episode, lifecycle: state, generation: episode.generation + 1, last_job_id: execution.jobId };
-  const written = await env.CASTLOOP_BUCKET.put(key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: object.etag } });
+  const written = await putPublicDeliveryRecord(env, key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: object.etag } });
   if (!written) throw new Error("Episode lifecycle changed before closing delivery");
 }
 
@@ -47,7 +48,7 @@ export async function advanceLifecycleFeedGeneration(env: LifecycleFeedEnv, exec
     if (current.value.feed_generation === Number.MAX_SAFE_INTEGER) throw new Error("Feed generation is exhausted");
     const value = parseShowControl({ ...current.value, feed_generation: current.value.feed_generation + 1,
       last_feed_job_id: execution.jobId });
-    const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
+    const written = await putPublicDeliveryRecord(env, `system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
       onlyIf: { etagMatches: current.etag },
     });
     if (!written) throw new Error("Show control changed before feed generation advanced");

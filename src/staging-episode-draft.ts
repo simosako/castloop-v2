@@ -1,5 +1,6 @@
 import { episodeLifecycleSchema, stageControlRequest, stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { StageUploadRequest } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { controlRequestHash, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv } from "./lifecycle-control";
 
@@ -50,7 +51,7 @@ export async function initializeOwnedEpisodeDraft(env: StageEpisodeDraftEnv, req
   await requireUnusedEpisodePaths(env, request);
   await requireInitializationOwner(env, request);
   const key = `system/episode-lifecycle/${request.show_id}/${request.episode_id}.toml`;
-  const written = await env.CASTLOOP_BUCKET.put(key, stringifyLifecycleToml(initial), { onlyIf: new Headers({ "If-None-Match": "*" }) });
+  const written = await putPublicDeliveryRecord(env, key, stringifyLifecycleToml(initial), { onlyIf: new Headers({ "If-None-Match": "*" }) });
   if (!written && JSON.stringify(await readEpisodeLifecycle(env, request.show_id, request.episode_id!)) !== JSON.stringify(initial)) {
     throw new Error("Episode lifecycle initialization conflicted; retained Show ownership must be inspected");
   }

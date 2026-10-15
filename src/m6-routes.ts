@@ -32,6 +32,8 @@ import { readM6ServiceConfiguration } from "./m6-runtime-readiness";
 import { logPublicationDelivery, measureWorkerPhase } from "./worker-timing";
 import { handleM6UpdateAdmin } from "./m6-update-admin";
 import { consumeManagementIntent } from "./management-queue-consumer";
+import { readPublicServiceDelivery } from "./public-delivery-state";
+import { readPublicVisibilitySnapshot } from "./lifecycle-control";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -61,14 +63,20 @@ async function requireCandidateReadiness(env: M6CandidateEnv, config: ServiceCon
   await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
 }
 
-async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Promise<string | undefined> {
-  const current = await readServiceAdmission(env, config.service_id);
-  if (current?.value.state === "migrating") {
-    return readBootstrapDeliveryWindow(env, current.value, env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_VERSION_METADATA?.tag);
+async function deliveryGate(env: M6CandidateEnv): Promise<{ migrationId?: string; legacy: boolean }> {
+  const delivery = await readPublicServiceDelivery(env, env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_DLQ_NAME);
+  if (delivery.mode === "m6") return { legacy: false };
+  const config = await serviceConfig(env);
+  if (config.service_id !== delivery.serviceId) throw new Error("Legacy delivery belongs to another service");
+  if (delivery.mode === "legacy") {
+    const ready = await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
+    if (ready.value.state !== "open") throw new Error("Public delivery requires open service admission");
+    return { legacy: true };
   }
-  const ready = await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
-  if (ready.value.state !== "open") throw new Error("Public delivery requires open service admission");
-  return undefined;
+  const current = await readServiceAdmission(env, config.service_id);
+  if (!current) throw new Error("Migration delivery admission is missing");
+  return { legacy: true, migrationId: await readBootstrapDeliveryWindow(env, current.value,
+    env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_VERSION_METADATA?.tag) };
 }
 
 async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
@@ -108,9 +116,9 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   if (asset) {
     if (request.method !== "GET" && request.method !== "HEAD") return reply(request, { error: "method not allowed" }, 405);
     try {
-      const config = await serviceConfig(env);
-      const migrationId = await deliveryMigration(env, config);
-      const response = await serveLifecyclePublicRequest(request, env, createCachedPublicFetch(cachedAssets));
+      const { migrationId, legacy } = await deliveryGate(env);
+      const response = await serveLifecyclePublicRequest(request, env, createCachedPublicFetch(cachedAssets),
+        legacy ? readPublicVisibilitySnapshot : undefined);
       if (!response) throw new Error("M6 public path was not handled by its lifecycle gateway");
       const headers = new Headers(response.headers);
       headers.set("X-Castloop-Worker-Version", env.CASTLOOP_VERSION_METADATA.id);

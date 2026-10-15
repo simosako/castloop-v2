@@ -3,6 +3,7 @@ import type { ShowControl, ShowRegistrationRequest, ShowRegistrationResponse } f
 import { readShowControl } from "./lifecycle-control";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 import { readShowReservation } from "./show-reservation-record";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 
 export type ShowRegistrationEnv = LifecycleControlEnv & { CASTLOOP_BUCKET: Pick<R2Bucket, "list"> };
 
@@ -27,7 +28,7 @@ export async function reserveM6Show(env: ShowRegistrationEnv, input: ShowRegistr
   if (!control) {
     if (reservation) throw new Error("Existing reservation without Show control requires recovery, not registration");
     await requireUnusedShowPaths(env, request.show_id);
-    const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${request.show_id}.json`, JSON.stringify(initialControl(request)),
+    const written = await putPublicDeliveryRecord(env, `system/show-publications/${request.show_id}.json`, JSON.stringify(initialControl(request)),
       { onlyIf: new Headers({ "If-None-Match": "*" }) });
     control = await readShowControl(env, request.show_id);
     if (!written && control?.value.reservation_id !== request.reservation_id) throw new Error("Another registration already owns this Show ID");

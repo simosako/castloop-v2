@@ -1,6 +1,6 @@
 # M6: 新規初期化と稼働判定の分離
 
-更新日: 2026-10-04
+更新日: 2026-10-15
 
 ## 範囲
 
@@ -16,6 +16,7 @@
 - `packages/cli/src/m6-initialization-rest.ts` / `cloudflare-api.ts`: 新規資源のREST作成、衝突を拒否するWorker名のclaim、凍結metadataの単一PUT、Queue/notification設定と配備検査を担当する。runtime検証をREST設定から推測しない。
 - `packages/shared/src/m6-worker-deployment.ts`: CLIとWorkerが同じ配備検査を使用する。Cloudflare応答から、secret/author/未管理設定を除いた最小snapshotを作る。
 - `src/m6-setup-*` / `packages/cli/src/m6-setup-client.ts`: 認証付きprepare/status/probe/completeと、実HTTP・loopback・Queue往復の検証を担当する。別の汎用状態機械や独立したchallenge IDを設けず、凍結operation IDを再利用する。
+- 開発版の`src/public-delivery-records.ts`: runtime検証後、検証済みconfig ETagに束縛してService TOMLへ[配信用metadata](public_delivery_projection.md)を準備する。service admissionのprojectionも本文CASと同時に更新し、paused完了・明示resumeの条件を維持する。公開HTTPはこれらの小さなmetadataをHEADで確認する。
 
 ## 手順と失敗
 

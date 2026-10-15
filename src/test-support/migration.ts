@@ -4,7 +4,7 @@ import { PUBLICATION_SERVICE_TEXT, PUBLICATION_SHOW_TEXT } from "./publication";
 import type { MigrationApplyEffects } from "../lifecycle-migration-apply";
 
 export async function migrationFixture(pageSize = 1000) {
-  const entries = new Map<string, { data: string; size: number; etag: string }>();
+  const entries = new Map<string, { data: string; size: number; etag: string; customMetadata?: Record<string, string> }>();
   const writes: string[] = [];
   let version = 0;
   const bucket = {
@@ -13,12 +13,13 @@ export async function migrationFixture(pageSize = 1000) {
       return entry ? { key, ...entry, text: async () => entry.data, json: async () => JSON.parse(entry.data) } : null;
     },
     async head(key: string) { const entry = entries.get(key); return entry ? { key, ...entry } : null; },
-    async put(key: string, data: string, options?: { onlyIf?: Headers | { etagMatches: string } }) {
+    async put(key: string, data: string, options?: { onlyIf?: Headers | { etagMatches?: string }; customMetadata?: Record<string, string> }) {
       const previous = entries.get(key);
       if (options?.onlyIf instanceof Headers && previous) return null;
       if (options?.onlyIf && !(options.onlyIf instanceof Headers) && previous?.etag !== options.onlyIf.etagMatches) return null;
       const etag = String(++version);
-      entries.set(key, { data, size: new TextEncoder().encode(data).length, etag });
+      entries.set(key, { data, size: new TextEncoder().encode(data).length, etag,
+        ...(options?.customMetadata ? { customMetadata: options.customMetadata } : {}) });
       writes.push(key);
       return { key, etag };
     },

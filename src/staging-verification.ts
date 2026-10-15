@@ -2,6 +2,7 @@ import { lifecycleFailureForPhase, lifecycleJobStatusSchema, parseEpisodeDraft, 
   parseShowControl, parseShowMetadata, stageControlRequest, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema,
   sameEpisodeIdentity, stringifyToml } from "../packages/shared/src/index";
 import type { LifecycleJobStatus, StagePayload, StageUploadProgress } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { controlRequestHash, readEpisodeLifecycle, readShowControl } from "./lifecycle-control";
 import type { LifecycleControlEnv } from "./lifecycle-control";
 import { createStageVerificationEnv, readStageUploadProgress, requireStageUpload, stageManifestHash, writeStageUploadProgress } from "./staging-upload";
@@ -21,7 +22,7 @@ export async function acquireStageVerification(env: LifecycleControlEnv, operati
   if (snapshot.control.value.owner.verification_id) throw new Error("Another staging verification is still running");
   const verificationId = crypto.randomUUID();
   const value = parseShowControl({ ...snapshot.control.value, owner: { ...snapshot.control.value.owner, verification_id: verificationId } });
-  const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${operation.showId}.json`, JSON.stringify(value), {
+  const written = await putPublicDeliveryRecord(env, `system/show-publications/${operation.showId}.json`, JSON.stringify(value), {
     onlyIf: { etagMatches: snapshot.control.etag },
   });
   if (!written) throw new Error("Staging admission changed before verification started");
@@ -42,7 +43,7 @@ export async function releaseStageVerification(env: LifecycleControlEnv, verific
   if (snapshot.control.value.owner.verification_id !== verification.verificationId) throw new Error("Invocation no longer owns its staging verification token");
   const { verification_id: _token, ...owner } = snapshot.control.value.owner;
   const value = parseShowControl({ ...snapshot.control.value, owner });
-  const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${verification.showId}.json`, JSON.stringify(value), {
+  const written = await putPublicDeliveryRecord(env, `system/show-publications/${verification.showId}.json`, JSON.stringify(value), {
     onlyIf: { etagMatches: snapshot.control.etag },
   });
   if (!written) throw new Error("Staging admission changed before verification ended");
@@ -171,7 +172,7 @@ async function finishVerification(env: LifecycleControlEnv, verification: StageV
   const value = parseShowControl({ ...withoutOwner, last_finished_upload: { operation_id: verification.operationId,
     generation: verification.generation, verification_id: verification.verificationId,
     request_sha256: snapshot.control.value.owner.request_sha256, manifest_sha256: snapshot.manifestHash, outcome: progress.outcome } });
-  const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${verification.showId}.json`, JSON.stringify(value), {
+  const written = await putPublicDeliveryRecord(env, `system/show-publications/${verification.showId}.json`, JSON.stringify(value), {
     onlyIf: { etagMatches: latest.control.etag },
   });
   if (!written) throw new Error("Staging admission changed before completion");

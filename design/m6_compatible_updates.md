@@ -1,6 +1,6 @@
 # M6: 保存形式を変えない通常更新
 
-更新日: 2026-10-12
+更新日: 2026-10-15
 
 ## 範囲
 
@@ -15,7 +15,7 @@ M6稼働済みサービスのWorkerだけを更新する経路を、v0.2.0以降
 3. Showの小さいcontrol recordだけを検査し、service ETagへのCASで`updating`を獲得する。このCASにより、検査中に起きたconsumer/token変更も拒否する。以降は管理/consumer/recovery/通常配信を閉じる。
 4. 準備時とupload直前に、Versions APIの最新uploadが旧Worker versionと一致することを確認する。durable journalの`deploy_requested`を保存してから、一度だけVersion Upload APIへPOSTする。凍結metadataは継承元UUIDと保持設定を含む意図全体であり、実multipartにはversion単位のmetadataだけを送り、APIが受理するinherit `version_id: "latest"`へ変換する。script単位のtags/logpush/tail consumer/placement/observabilityは変更しない。
 5. POST応答のversion ID・連番・script ETagを検証し、allowlist receipt、upload前の旧deployment ID、activation未開始checkpointを新形式journalへ一緒にfsync保存する。新versionの連番が旧versionの直後であること、最新二件がacknowledged versionと旧versionそのものであること、そのIDのimmutable version GETのscript ETag、旧deployment/凍結設定が維持されていることを前後二回確認する。server ownerの再照合後、activation開始checkpointをfsync保存してから、そのacknowledged versionだけを100%にするDeployment APIへ一度POSTする。途中の別upload/secret変更・未知の最新version・連番欠落では配備しない。Deployment POSTのIDを保存し、そのIDとGETの100% version・保持設定を照合する。POSTのstrategy/versionsが省略されていてもID自体は必須で、省略値を応答へ捏造しない。応答にversionsがあれば照合する。最新versionを見つけたことだけで自分のuploadとは扱わない。REST検査とは別にruntimeの配信・管理・consumerを検証する。
-6. new targetをserver admissionへ固定し、検証前後のdeployment/settings/configを照合してreadinessをCAS更新する。完了はpausedのまま。再開は別の明示操作とする。
+6. new targetをserver admissionへ固定し、検証前後のdeployment/settings/configを照合してreadinessをCAS更新する。開発版では、その前にexact owner/updating/空registryを照合しながら既存Show/Episode controlとService TOMLの[配信用metadata](public_delivery_projection.md)を準備する。本文・generationは変更しないが、metadata-only PUTのupload version/ETag不変は仮定しない。準備失敗でもupdatingを保持する。完了はpausedのまま。再開は別の明示操作とする。
 
 admissionの旧`readiness`（legacy移行監査）は変更せず、新versionの稼働判定は`runtime_readiness`へ置く。停止/削除等の通常content制御も変更しない。requestは`system/service-updates/<operationId>/request.json`へ保持し、操作IDを別内容で再利用しない。
 
