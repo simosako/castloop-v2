@@ -25,6 +25,7 @@
 | [案Cの実機測定](async_management_measurement_20261015.md) | 隔離配備と7公開成功、管理HTTPなし、Queue CPU、feed最大11msと総wall増加の制限 |
 | [公開feedのCPU調査](feed_delivery_cpu_investigation_20261015.md) | 11msの観測範囲、毎回の設定/状態検証、ローカルprofileと安全条件を維持する改善候補 |
 | [配信判定の事前生成](public_delivery_projection.md) | 管理側のstrict検証と原子的metadata生成、通常HTTPのHEAD-only判定、互換更新時の準備と旧移行の分離 |
+| [配信判定事前生成の実機測定](public_delivery_projection_measurement_20261015.md) | 同一feedの配備前後比較、metadata-only公開後の確認、CPUの帰属とtail識別子の補正 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。v0.4.0の利用案内はdocs/rss_migration.md |

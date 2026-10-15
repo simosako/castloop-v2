@@ -1,8 +1,9 @@
 # 配信判定の事前生成
 
 2026-10-15。管理者が「管理処理で検証・事前生成し、HTTPでは最新の小さな配信判定だけ読む」設計の開発を承認した。
-`feat/publication-queue-submit`の開発実装であり、main/v0.4.0 releaseや既存Cloudflare環境は変更していない。
-[feed CPU調査](feed_delivery_cpu_investigation_20261015.md)を受けた変更で、実機の10ms達成は未検証。
+`feat/publication-queue-submit`の開発実装であり、main/v0.4.0 releaseは変更していない。
+開発後の別承認で隔離環境への[互換配備・実機測定](public_delivery_projection_measurement_20261015.md)を実施した。
+[feed CPU調査](feed_delivery_cpu_investigation_20261015.md)を受けた変更で、feedは改善したが内部音源GETに10ms超過が残り、全HTTPの達成は未確定。
 
 ## 採用方式
 
@@ -99,7 +100,8 @@ service metadataの`migration`/`legacy`からだけこの経路へ入り、通�
 
 これらはローカルの自動テストであり、Cloudflare実機CPU/キャッシュ挙動の再測定とは区別する。
 残る管理HTTP、起動/GC、Queue処理のCPUやservice全体のFree適合、Issue #13の恒久解消は証明しない。
-新たな配備・実機測定は別承認後に行う。
+開発後の別承認による実機結果は[測定記録](public_delivery_projection_measurement_20261015.md)を参照する。
+追加配備・他endpointの最適化・権限/課金変更には、その結果だけで進まない。
 
 ## 参照
 
