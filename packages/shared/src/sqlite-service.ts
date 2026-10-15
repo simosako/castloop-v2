@@ -7,7 +7,7 @@ const origin = z.url().refine((value) => {
   const url = new URL(value);
   return url.protocol === "https:" && !url.username && !url.password && !url.port &&
     !url.search && !url.hash && url.pathname === "/";
-}, "Expected an HTTPS origin without credentials, path, query or port");
+}, "Expected an HTTPS origin without credentials, path, query or port").transform((value) => new URL(value).origin);
 
 export const sqliteServiceConfigSchema = z.object({ schema_version: z.literal(2),
   publication_protocol: z.literal(sqlitePublicationProtocol), service_id: sqlitePublicationRuntimeSchema.shape.service_id,

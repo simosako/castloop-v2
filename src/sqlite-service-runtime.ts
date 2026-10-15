@@ -90,7 +90,7 @@ export class SqliteServiceRuntime {
         if (cached.worker_version_id !== identity.worker_version_id || cached.service_config_sha256 !== identity.service_config_sha256 || !cached.cache_enabled) {
           throw new Error("Runtime cache owner differs");
         }
-        await this.cache.purge(`probe-${setup.operation_id.slice(0, 8)}`);
+        await this.cache.purge(`probe-${setup.operation_id.slice(0, 8).toLowerCase()}`);
         this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'ready' WHERE id = 1");
         await this.storage.sync();
       } catch {

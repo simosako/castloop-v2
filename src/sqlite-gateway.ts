@@ -7,8 +7,8 @@ export async function serveSqliteGateway(request: Request, managementOrigin: str
   cachedFetch: (request: Request, props: PublicCacheProps) => Promise<Response>): Promise<Response> {
   const url = new URL(request.url);
   try {
+    if (url.origin !== managementOrigin) return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
     if (url.pathname.startsWith("/admin/")) {
-      if (url.origin !== managementOrigin) return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
       return await service.fetch(request);
     }
     const asset = parsePublicAssetPath(url.pathname);

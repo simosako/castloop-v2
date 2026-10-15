@@ -103,4 +103,7 @@ test("the native Worker is a separate bundle with real DO and cached entrypoint 
   const source = await output.outputs[0].text();
   expect(source).toContain("SqlitePublicationService"); expect(source).toContain("SqliteCachedAssets");
   expect(source).not.toContain("queueM6Candidate");
+  const legacy = await Bun.build({ entrypoints: ["src/worker.ts"], target: "browser", external: ["cloudflare:workers"] });
+  expect(legacy.success).toBe(true);
+  expect(await legacy.outputs[0].text()).not.toContain("SqlitePublicationService");
 });

@@ -22,7 +22,7 @@ type PreparedShow = { kind: "show"; request: SqlitePublicationRequest; metadata:
 type PreparedEpisode = { kind: "episode"; request: SqlitePublicationRequest; revision: EpisodeRevision;
   audio?: SqliteVerifiedUpload; audioRevisionId: string; feed: string };
 export type PreparedSqlitePublication = PreparedShow | PreparedEpisode;
-export type SqlitePublicationEffects = { purge: (target: { showId: string; cover: boolean }) => Promise<void>; now?: () => string };
+export type SqlitePublicationEffects = { purge: (target: { showId: string; cover: boolean; episodeId?: string }) => Promise<void>; now?: () => string };
 
 function input<T>(parse: () => T): T {
   try { return parse(); } catch { throw new SqlitePublicationInputError("validation_failed"); }
@@ -147,7 +147,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         duration_seconds: audio?.duration_seconds ?? target.base!.duration_seconds, sha256: audio?.sha256 ?? target.base!.sha256,
         updated_at: (effects.now ?? (() => new Date().toISOString().replace(/\.\d{3}Z$/, "Z")))() }));
       store.requireUniqueGuid(request.show_id, revision);
-      const media = audioKey(revision, request.show_id);
+      const media = audio ? input(() => audioKey(revision, request.show_id)) : audioKey(revision, request.show_id);
       if (!target.base) {
         await requireEmpty(bucket, `public/episodes/${request.show_id}/${request.episode_id}/`);
         await requireEmpty(bucket, `public/podcasts/${request.show_id}/episodes/${request.episode_id}/`);
@@ -180,7 +180,8 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         await put(bucket, `public/episodes/${showId}/${prepared.revision.episode_id}/metadata.toml`, stringifyToml(prepared.revision), "application/toml");
       }
       await put(bucket, `public/podcasts/${showId}/feed.xml`, prepared.feed, "application/rss+xml; charset=utf-8");
-      await effects.purge({ showId, cover: prepared.kind === "show" });
+      await effects.purge({ showId, cover: prepared.kind === "show",
+        ...(prepared.kind === "episode" ? { episodeId: prepared.revision.episode_id } : {}) });
     },
     commit(prepared) {
       if (prepared.kind === "show") store.commitShow(prepared.request, prepared.metadata, prepared.extension);

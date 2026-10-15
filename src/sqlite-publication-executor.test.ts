@@ -30,7 +30,7 @@ async function fixture() {
   const objects = sqlitePublicationBucket(), content = new SqlitePublicationContent(setup.storage);
   const reservationId = crypto.randomUUID();
   content.registerShow("daily", reservationId);
-  const purges: Array<{ showId: string; cover: boolean }> = [];
+  const purges: Array<{ showId: string; cover: boolean; episodeId?: string }> = [];
   const hooks: { purge?: () => Promise<void> } = {};
   const executor = createSqlitePublicationExecutor(content, objects.bucket, config, { async purge(target) {
     purges.push(target); await hooks.purge?.();
@@ -78,7 +78,7 @@ test("real executor publishes a registered Show and Episode using no R2 lock/sta
   expect(setup.content.episodes("daily")).toEqual([current]);
   expect(setup.text("public/podcasts/daily/feed.xml")).toContain('<guid isPermaLink="false">stable-first</guid>');
   expect(setup.text("public/podcasts/daily/feed.xml")).toContain("Fri, 16 Oct 2026 03:00:00 GMT");
-  expect(setup.purges).toEqual([{ showId: "daily", cover: true }, { showId: "daily", cover: false }]);
+  expect(setup.purges).toEqual([{ showId: "daily", cover: true }, { showId: "daily", cover: false, episodeId: "first" }]);
   expect(setup.calls.some((call) => /^system\/(?:jobs|show-publications|lifecycle-service|episode-lifecycle|management-requests)/.test(call.key))).toBe(false);
   expect([...setup.entries.keys()].some((key) => key.endsWith("commit.json"))).toBe(false);
   expect(setup.content.delivery(`/podcasts/daily/episodes/first/${episode.job_id}.mp3`).status).toBe(200);

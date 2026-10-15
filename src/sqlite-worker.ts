@@ -3,6 +3,7 @@ import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../packages/
 import { sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
 import type { PublicCacheProps } from "./public-assets";
 import { purgeLifecycleCache, serveCachedLifecycleAsset } from "./lifecycle-cache";
+import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
 import type { PreparedSqlitePublication } from "./sqlite-publication-executor";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
@@ -27,7 +28,7 @@ export class SqliteCachedAssets extends WorkerEntrypoint<SqliteWorkerEnv, Public
       service_config_sha256: await sqliteServiceConfigHash(sqliteServiceConfigSchema.parse(JSON.parse(this.env.CASTLOOP_SQLITE_CONFIG))),
       cache_enabled: this.ctx.cache !== undefined };
   }
-  async invalidate(showId: string): Promise<void> { await purgeLifecycleCache(this.ctx.cache, { showId }); }
+  async invalidate(target: LifecyclePurgeTarget): Promise<void> { await purgeLifecycleCache(this.ctx.cache, target); }
 }
 
 export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
@@ -40,16 +41,16 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     super(ctx, env);
     this.initialized = this.ctx.blockConcurrencyWhile(async () => {
       const config = sqliteServiceConfigSchema.parse(JSON.parse(this.env.CASTLOOP_SQLITE_CONFIG));
-      if (config.service_id !== this.env.CASTLOOP_SERVICE_ID || config.workers_dev_base_url !== this.env.CASTLOOP_MANAGEMENT_ORIGIN ||
+      if (config.service_id !== this.env.CASTLOOP_SERVICE_ID || config.public_base_url !== config.workers_dev_base_url || config.workers_dev_base_url !== this.env.CASTLOOP_MANAGEMENT_ORIGIN ||
         !this.ctx.id.equals(this.env.CASTLOOP_SQLITE.idFromName(`service/${config.service_id}`))) throw new Error("SQLite namespace identity differs");
       const identity = sqlitePublicationRuntimeSchema.parse({ service_id: config.service_id,
         worker_version_id: this.env.CASTLOOP_VERSION_METADATA.id, service_config_sha256: await sqliteServiceConfigHash(config) });
       const queue = new SqlitePublicationQueue(this.ctx.storage, identity), content = new SqlitePublicationContent(this.ctx.storage);
       const cache = { describe: () => this.ctx.exports.SqliteCachedAssets.describeRuntime(),
-        purge: (showId: string) => this.ctx.exports.SqliteCachedAssets.invalidate(showId) };
+        purge: (showId: string) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId }) };
       this.runtime = new SqliteServiceRuntime(this.ctx.storage, queue, content, this.env.CASTLOOP_BUCKET, config, cache);
       this.runner = new SqlitePublicationAlarm(queue, createSqlitePublicationExecutor(content, this.env.CASTLOOP_BUCKET, config,
-        { purge: ({ showId }) => cache.purge(showId) }));
+        { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) }));
       this.publicationHttp = createSqlitePublicationHttp(queue, this.env.CASTLOOP_ADMIN_KEY, () => this.runtime.ready());
       this.serviceHttp = createSqliteServiceHttp(this.runtime, this.env.CASTLOOP_ADMIN_KEY);
     });

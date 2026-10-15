@@ -53,6 +53,7 @@ test("administration is workers.dev-only and invalid paths or methods never ente
   const cached = async () => { throw new Error("Unexpected cache access"); };
   expect((await serveSqliteGateway(new Request(`${management}/admin/sqlite-service/health`), management, service, cached)).status).toBe(200);
   expect((await serveSqliteGateway(new Request("https://public.example/admin/sqlite-service/health"), management, service, cached)).status).toBe(404);
+  expect((await serveSqliteGateway(new Request(`https://public.example${feed}`), management, service, cached)).status).toBe(404);
   for (const path of ["/system/service.toml", "/staging/uploads/private", "/podcasts/daily/not-approved"]) {
     expect((await serveSqliteGateway(new Request(`${management}${path}`), management, service, cached)).status).toBe(404);
   }

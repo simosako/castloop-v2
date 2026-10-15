@@ -21,6 +21,8 @@ test("SQLite service config does not require or adopt Queue settings", () => {
 });
 
 test("SQLite administration has an exact HTTPS workers.dev origin", () => {
+  expect(sqliteServiceConfigSchema.parse({ ...config, workers_dev_base_url: `${config.workers_dev_base_url}/`,
+    public_base_url: `${config.public_base_url}/` })).toEqual(config);
   for (const field of ["public_base_url", "workers_dev_base_url"]) {
     for (const value of ["http://example.com", "https://user:secret@example.com", "https://example.com/path",
       "https://example.com?x=1", "https://example.com#fragment", "https://example.com:8080"]) {
