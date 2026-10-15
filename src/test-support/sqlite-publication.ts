@@ -62,7 +62,7 @@ export function sqlitePublicationRequest(runtime: SqlitePublicationRuntime, wind
   const payloads: SqliteVerifiedUpload[] = assets.map((asset) => {
     const uploadId = crypto.randomUUID();
     return { upload_id: uploadId, asset, key: sqliteUploadKey({ show_id: showId, draft_job_id: jobId, upload_id: uploadId, asset }),
-      length_bytes: 100, sha256: "b".repeat(64), etag: "verified-etag", verified: true,
+      length_bytes: 100, sha256: "b".repeat(64), etag: "verified-etag", version: "verified-version", verified: true,
       ...(asset === "audio" ? { duration_seconds: 1 } : {}) };
   });
   return parseSqlitePublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", ...runtime,

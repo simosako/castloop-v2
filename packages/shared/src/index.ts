@@ -4,6 +4,7 @@ import { lifecycleJobStatusSchema } from "./lifecycle-job";
 import { lifecycleStateSchema } from "./lifecycle";
 import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
+import type { SqliteServiceConfig } from "./sqlite-service";
 export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
 export type { PublicationRequest } from "./publication-request";
 export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKey, sqliteVerifiedUploadSchema,
@@ -12,6 +13,8 @@ export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKe
   sqlitePublicationRequestHash } from "./sqlite-publication";
 export type { SqliteUploadIdentity, SqliteVerifiedUpload, SqlitePublicationRuntime, SqlitePublicationRequest,
   SqlitePublicationStatus, SqlitePublicationFailure, SqlitePublicationBlock } from "./sqlite-publication";
+export { sqliteServiceConfigSchema, sqliteServiceStatusSchema, parseSqliteServiceConfig, sqliteServiceConfigHash } from "./sqlite-service";
+export type { SqliteServiceConfig, SqliteServiceStatus } from "./sqlite-service";
 export { asyncManagementProtocol, MAX_MANAGEMENT_BYTES, managementCommandSchema, managementIntentPayloadSchema,
   managementIntentSchema, managementSubmissionSchema, managementResultPayloadSchema, managementResultSchema, managementStatusSchema,
   parseManagementIntent, signManagementIntent, verifyManagementIntent, managementIntentHash,
@@ -283,6 +286,6 @@ export function parseEpisodeRevision(source: string): EpisodeRevision {
   return episodeRevisionSchema.parse(parseToml(source));
 }
 
-export function stringifyToml(value: ServiceConfig | ShowMetadata | EpisodeDraft | EpisodeRevision | JobStatus): string {
+export function stringifyToml(value: ServiceConfig | SqliteServiceConfig | ShowMetadata | EpisodeDraft | EpisodeRevision | JobStatus): string {
   return TOML.stringify(value as TOML.JsonMap);
 }

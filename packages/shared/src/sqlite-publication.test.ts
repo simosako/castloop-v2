@@ -54,12 +54,15 @@ describe("SQLite sequential publication protocol", () => {
     const audio = request().payloads[1];
     expect(sqliteVerifiedUploadSchema.safeParse({ ...audio, length_bytes: 300_000_000 }).success).toBe(true);
     for (const change of [{ length_bytes: 300_000_001 }, { length_bytes: 0 }, { duration_seconds: undefined },
-      { duration_seconds: 1.5 }, { etag: "unsafe\nheader" }, { sha256: "invalid" }, { secret: "private" }]) {
+      { duration_seconds: 1.5 }, { etag: "unsafe\nheader" }, { etag: '"quoted"' }, { version: undefined },
+      { version: "unsafe\nversion" }, { sha256: "invalid" }, { secret: "private" }]) {
       expect(sqliteVerifiedUploadSchema.safeParse({ ...audio, ...change }).success).toBe(false);
     }
     const metadata = request().payloads[0];
     expect(sqliteVerifiedUploadSchema.safeParse({ ...metadata, length_bytes: 1_000_001 }).success).toBe(false);
     expect(sqliteVerifiedUploadSchema.safeParse({ ...metadata, duration_seconds: 1 }).success).toBe(false);
+    const cover = sqlitePublicationRequest(runtime, crypto.randomUUID(), { kind: "show" }).payloads[1];
+    expect(sqliteVerifiedUploadSchema.safeParse({ ...cover, length_bytes: 5_000_001 }).success).toBe(false);
   });
 
   test("hash binds the canonical strict request, independent of object property order", async () => {

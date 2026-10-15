@@ -19,12 +19,13 @@ export function sqliteUploadKey(input: SqliteUploadIdentity): string {
 
 export const sqliteVerifiedUploadSchema = z.object({ upload_id: z.uuid(), asset: assetSchema,
   key: z.string().min(1).max(256), length_bytes: z.number().int().positive().max(300_000_000), sha256: hash,
-  etag: z.string().min(1).max(256).regex(/^[\x21-\x7e]+$/), verified: z.literal(true),
+  etag: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
+  version: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/), verified: z.literal(true),
   duration_seconds: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
 }).strict().superRefine((value, context) => {
   if ((value.asset === "audio") !== (value.duration_seconds !== undefined) ||
     value.asset.endsWith("metadata") && value.length_bytes > 1_000_000 ||
-    value.asset.startsWith("cover_") && value.length_bytes > 10_000_000) {
+    value.asset.startsWith("cover_") && value.length_bytes > 5_000_000) {
     context.addIssue({ code: "custom", message: "Verified upload has invalid asset size or duration" });
   }
 });

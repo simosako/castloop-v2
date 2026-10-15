@@ -199,7 +199,8 @@ tmux独立実行と既存の異常通知supervisorを用い、異常時は後続
 | P0 | 本書保存、旧比較書の位置付け修正、別branch作成。既存未commit変更は保持 |
 | P1 | strict公開/upload参照schema、一意key、要求hash、SQLite schema、FIFO/重複排除、pause/drain、状態遷移を実装。Show/Episode content保存はP4で接続するため未実装 |
 | P2 | executor分離したAlarm実行基盤を実装。単一job、I/O await、再生成後のrunningブロック、allowlistログをテスト。実DO class/bindingとCloudflare runtime検証は未接続 |
-| P3〜P6 | 未実装。既存CLI/Workerの既定経路は切り替えていない |
+| P3 | 新config専用の一意upload、private local journal、明示submit/status/waitを内部CLI moduleとして実装。正式コマンドへの分岐・対象inspectionはP5で接続するため未公開 |
+| P4〜P6 | 未実装。既存CLI/Workerの既定経路は切り替えていない |
 
 追加した主なファイル:
 
@@ -214,9 +215,22 @@ tmux独立実行と既存の異常通知supervisorを用い、異常時は後続
 - 全体`bun test`: **1,208 pass / 0 fail**（130 files、78.62秒）。以前からのローカル診断修正も保持したworking tree全体の結果。
 - `npm run check`成功、`npm run build:cli -- linux-x64`成功、`git diff --check`成功。
 - Bun SQLiteのテストfixtureがAlarm予約/transactionを模擬している。**DO上の起動予約の原子性・output gate・再配送動作の実証とは区別する。**
-- Cloudflare資源・実データの変更、配備、移行、実機性能測定、commit/pushは行っていない。
+- 基盤検証時点ではCloudflare資源・実データの変更、配備、移行、実機性能測定、commit/pushは行っていない。
 
-次の作業はP3の一意upload/local journal・submitと、P4の実公開executor。基盤が通っただけで新方式による公開が利用可能、Issue #13解消、性能目標達成とは扱わない。
+### P3の内部CLI module
+
+- `packages/shared/src/sqlite-service.ts`: schema version 2の新config。Queues/DLQ不要、旧configを拒否し、完全な設定hashと正確な管理用workers.dev originを束縛する。
+- `packages/cli/src/sqlite-draft.ts`、`sqlite-draft-journal.ts`: 同じ対象の未公開job IDを保持し、編集ごとに別upload keyを使う。確認済み素材だけを登録し、公開要求を送信前にfsyncする。既知の完了/確定失敗をarchiveするまでは別draftへ置換しない。
+- `sqlite-upload.ts`: PUT前に試行を保存し、成功と全量GET/hash/ETag確認後だけmanifestへ登録する。既存REST upload/readbackとprivate source snapshotを共用するが、旧R2 ownerやstage-start/upload-completeは呼ばない。receiptのversionも保持し、cover上限5MBを維持する。
+- `sqlite-publication-client.ts`: 認証付きの小さいHTTP要求、strict/bounded/no-store応答、service/config/request hash/sequence照合。応答不明や404では再POSTしない。既に凍結した`publish()`もstatus読取だけ。waitは最大300回・新規読取開始5分まで。
+- audio-onlyではローカルmetadataをbase revisionのcanonical metadata hashと照合する。metadata-onlyでは音源PUTなし。stage後のローカル編集を古いstagingのまま公開しない。
+- journalは新しい`sqlite-*` namespace。旧journalの昇格、旧HTTP/Queueへのfallback、未確認PUTのキー再利用、公開完了前のdraft置換はない。
+
+P3までの検証: **1,239 pass / 0 fail**（132 files、74.47秒）、型検査・Linux単体CLI build成功。新CLIとBun SQLiteキューを接続したローカル回帰で、Show/Episode、metadata-only/audio-only、7種類のPUT/検証失敗、送信前後の応答喪失、status改変/rollback、pause、待機上限を確認した。この段階のAlarm executorはテスト用であり、実公開・Cloudflare上のDO動作の受け入れではない。
+
+commit承認後、先行診断を`6a13b1b`、基盤を`075e4e5`へ分けて保存した。push/配備/既存環境の変更はしていない。
+
+次の作業はP4の実公開executorとSQLite content index。内部moduleが通っただけで正式CLIによる新方式の公開が利用可能、Issue #13解消、性能目標達成とは扱わない。
 
 ## 参照
 
