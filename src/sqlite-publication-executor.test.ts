@@ -259,7 +259,7 @@ test("the binding verifies streamed audio checksums without buffering MP3 in the
 
 test("invalid content schema and corrupt frozen requests never reset content or execute an effect", async () => {
   const setup = await fixture(); await setup.publishShow();
-  setup.storage.sql.exec("UPDATE publication_content_schema SET version = 2 WHERE id = 1");
+  setup.storage.sql.exec("UPDATE publication_content_schema SET version = 99 WHERE id = 1");
   expect(() => new SqlitePublicationContent(setup.storage)).toThrow("Unsupported");
   expect(setup.content.registerShow("daily", setup.reservationId).state_version).toBe(1);
   const episode = await setup.request("episode");

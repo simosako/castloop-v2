@@ -6,11 +6,12 @@ import { SqlitePublicationInputError } from "./sqlite-publication-alarm";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 
 type Lifecycle = "draft" | "published" | "unpublished" | "deleted";
-type ShowRow = { show_id: string; reservation_id: string; state_version: number; lifecycle: Lifecycle };
+type ShowRow = { show_id: string; reservation_id: string; state_version: number; feed_generation: number; lifecycle: Lifecycle };
 type EpisodeRow = { show_id: string; episode_id: string; lifecycle: Lifecycle; revision_id: string | null };
 export type SqliteContentTarget = { show: ShowRow; metadata: ShowMetadata | null; coverExtension: "jpg" | "png" | null;
   episode: EpisodeRow | null; base: EpisodeRevision | null };
-export type SqliteDeliveryDecision = { status: 200; key: string; content_type: string } | { status: 404 | 410 | 503 };
+export type SqliteDeliveryDecision = { status: 200; key: string; content_type: string;
+  cache_props: { showGeneration: number; feedGeneration?: number; episodeGeneration?: number } } | { status: 404 | 410 | 503 };
 
 export class SqlitePublicationContent {
   constructor(private readonly storage: PublicationQueueStorage) {
@@ -19,10 +20,10 @@ export class SqlitePublicationContent {
       if (queue?.version !== 2) throw new Error("Initialize the matching publication queue before its content index");
       storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_content_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");
       const schema = storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0];
-      if (schema && schema.version !== 1) throw new Error("Unsupported publication content schema; do not reset stored content");
-      storage.sql.exec("INSERT OR IGNORE INTO publication_content_schema (id, version) VALUES (1, 1)");
+      if (schema && schema.version !== 2) throw new Error("Unsupported publication content schema; do not reset stored content");
+      storage.sql.exec("INSERT OR IGNORE INTO publication_content_schema (id, version) VALUES (1, 2)");
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_shows (show_id TEXT PRIMARY KEY, reservation_id TEXT UNIQUE NOT NULL,
-        state_version INTEGER NOT NULL, lifecycle TEXT NOT NULL CHECK(lifecycle IN ('draft', 'published', 'unpublished', 'deleted')))`);
+        state_version INTEGER NOT NULL, feed_generation INTEGER NOT NULL, lifecycle TEXT NOT NULL CHECK(lifecycle IN ('draft', 'published', 'unpublished', 'deleted')))`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_show_content (show_id TEXT PRIMARY KEY, metadata_json TEXT NOT NULL,
         cover_extension TEXT NOT NULL CHECK(cover_extension IN ('jpg', 'png')))`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_episodes (show_id TEXT NOT NULL, episode_id TEXT NOT NULL,
@@ -48,13 +49,30 @@ export class SqlitePublicationContent {
       const service = this.storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
       const pending = this.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM publication_jobs WHERE state IN ('queued', 'running', 'blocked')").toArray()[0]!.count;
       if (service?.state !== "open" || pending) throw new Error("Show registration requires open, drained publication admission");
-      this.storage.sql.exec("INSERT INTO publication_shows (show_id, reservation_id, state_version, lifecycle) VALUES (?, ?, 0, 'draft')", showId, reservationId);
+      this.storage.sql.exec("INSERT INTO publication_shows (show_id, reservation_id, state_version, feed_generation, lifecycle) VALUES (?, ?, 0, 0, 'draft')", showId, reservationId);
       return this.show(showId)!;
     });
   }
 
   private show(showId: string): ShowRow | null {
     return this.storage.sql.exec<ShowRow>("SELECT * FROM publication_shows WHERE show_id = ?", showId).toArray()[0] ?? null;
+  }
+
+  inspect(showId: string, episodeId?: string): { show: ShowRow | null; episode: EpisodeRow | null; base: EpisodeRevision | null } {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    if (episodeId !== undefined) sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
+    return this.storage.transactionSync(() => {
+      const show = this.show(showId);
+      const episode = episodeId === undefined ? null : this.storage.sql.exec<EpisodeRow>(
+        "SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?", showId, episodeId).toArray()[0] ?? null;
+      const saved = episode?.lifecycle === "published" ? this.storage.sql.exec<{ revision_json: string }>(
+        "SELECT revision_json FROM publication_episode_content WHERE show_id = ? AND episode_id = ?", showId, episodeId!).toArray()[0] : null;
+      const base = saved ? episodeRevisionSchema.parse(JSON.parse(saved.revision_json)) : null;
+      if (episode?.lifecycle === "published" && (!base || base.revision_id !== episode.revision_id || base.episode_id !== episodeId)) {
+        throw new Error("Episode inspection has inconsistent content");
+      }
+      return { show, episode, base };
+    });
   }
 
   requireRunning(input: SqlitePublicationRequest): SqlitePublicationRequest {
@@ -116,6 +134,7 @@ export class SqlitePublicationContent {
       ON CONFLICT(show_id) DO UPDATE SET metadata_json = excluded.metadata_json, cover_extension = excluded.cover_extension`,
     request.show_id, JSON.stringify(showMetadataSchema.parse(metadata)), extension);
     this.storage.sql.exec("UPDATE publication_shows SET lifecycle = 'published', state_version = state_version + 1 WHERE show_id = ?", request.show_id);
+    this.advanceFeed(request);
   }
 
   commitEpisode(request: SqlitePublicationRequest, revision: EpisodeRevision, audioRevisionId: string, newAudio: boolean): void {
@@ -132,6 +151,12 @@ export class SqlitePublicationContent {
     this.storage.sql.exec(`INSERT INTO publication_episode_content (show_id, episode_id, guid, revision_json) VALUES (?, ?, ?, ?)
       ON CONFLICT(show_id, episode_id) DO UPDATE SET guid = excluded.guid, revision_json = excluded.revision_json`,
     request.show_id, revision.episode_id, revision.guid, JSON.stringify(episodeRevisionSchema.parse(revision)));
+    this.advanceFeed(request);
+  }
+
+  private advanceFeed(request: SqlitePublicationRequest): void {
+    this.storage.sql.exec(`UPDATE publication_shows SET feed_generation =
+      (SELECT sequence FROM publication_jobs WHERE job_id = ? AND state = 'running') WHERE show_id = ?`, request.job_id, request.show_id);
   }
 
   delivery(path: string): SqliteDeliveryDecision {
@@ -156,7 +181,9 @@ export class SqlitePublicationContent {
         if (!this.storage.sql.exec<{ audio_revision_id: string }>(`SELECT audio_revision_id FROM publication_media
           WHERE show_id = ? AND episode_id = ? AND audio_revision_id = ?`, asset.showId, asset.episodeId, asset.revisionId).toArray().length) return { status: 404 };
       }
-      return { status: 200, key: asset.key, content_type: asset.contentType };
+      const cache_props = asset.kind === "feed" ? { showGeneration: show.state_version, feedGeneration: show.feed_generation } :
+        asset.kind === "audio" ? { showGeneration: show.state_version, episodeGeneration: 0 } : { showGeneration: show.state_version };
+      return { status: 200, key: asset.key, content_type: asset.contentType, cache_props };
     });
   }
 }
