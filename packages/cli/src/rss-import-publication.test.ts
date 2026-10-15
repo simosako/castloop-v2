@@ -68,7 +68,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
       const key = url.pathname.slice(url.pathname.indexOf("/objects/") + 9);
       if (key === "system/show-publications/imported.json" && rejectTargetRead) {
         rejectTargetRead = false;
-        throw new Error("Read-only target snapshot unavailable");
+        return new Response(null, { status: 403 });
       }
       if (init?.method === "PUT") {
         const object = (await setup.bucket.put(key, new Uint8Array(await new Response(init.body).arrayBuffer())))!;
@@ -129,7 +129,7 @@ test("RSS import uses formal runners, resumes an acknowledged job without new mu
     await expect(publishRssImport(root, setup.config, output, { ...effects, async command(command, args) {
       if (command === "update-episode") rejectTargetRead = true;
       return effects.command(command, args);
-    } })).rejects.toThrow("target snapshot unavailable");
+    } })).rejects.toThrow("http_status=403");
     const cursorFile = join(root, ".castloop", "rss-imports", setup.config.service_id,
       `${JSON.parse(readFileSync(join(output, "import.json"), "utf8")).import_id}.json`);
     expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toMatchObject({ phase: "ready", step: 5 });
