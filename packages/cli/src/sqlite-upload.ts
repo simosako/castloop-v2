@@ -1,5 +1,6 @@
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema, sqliteUploadKey, sqliteVerifiedUploadSchema } from "@castloop/shared";
 import type { SqliteServiceConfig, StagePayload } from "@castloop/shared";
+import { sqliteDraftAssetSchema } from "./sqlite-draft-journal";
 import type { SqliteDraftAsset, SqliteDraftTarget } from "./sqlite-draft-journal";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { freezePayloadSources } from "./staging-sources";
@@ -23,8 +24,8 @@ export async function uploadSqliteDraftAssets(root: string, input: SqliteService
         draft_job_id: target.job_id, upload_id: uploadId, asset: payload.asset }), source_path: resolve(root, paths[index]!),
         ...(payload.asset === "audio" ? { duration_seconds: duration } : {}) };
     });
-    for (const { source_path: _, ...intent } of intents) {
-      sqliteVerifiedUploadSchema.parse({ ...intent, verified: true, etag: "preflight", version: "preflight" });
+    for (const { source_path, ...intent } of intents) {
+      sqliteDraftAssetSchema.parse({ source_path, upload: { ...intent, verified: true, etag: "preflight", version: "preflight" } });
     }
     const storage = createLocalJournalStorage(root, "sqlite-uploads", config.service_id, `${crypto.randomUUID()}.json`);
     const record = { schema_version: 1, protocol: "sqlite-sequential-v1", service_id: config.service_id,

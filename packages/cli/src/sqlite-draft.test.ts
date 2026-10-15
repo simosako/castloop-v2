@@ -222,6 +222,27 @@ test("repeated editing preserves the draft ID but never overwrites a previous up
   expect(setup.attemptRecords()).toHaveLength(2);
 });
 
+test("a partially uploaded Show pair is retained as an attempt but never becomes a draft manifest", async () => {
+  const setup = await fixture("show");
+  setup.faults.put = async () => {
+    if (setup.calls.filter((call) => call.method === "PUT").length === 2) setup.faults.r2 = "lost";
+  };
+  await expect(setup.draft.stage({ asset: "show" })).rejects.toThrow();
+  expect(setup.objects.size).toBe(2);
+  expect((await setup.draft.read()).assets).toEqual([]);
+  expect(setup.attemptRecords()[0].state).toBe("put_requested");
+  expect(setup.management).toEqual([]);
+});
+
+test("hyphenated Show and Episode targets use distinct local draft identities", async () => {
+  const setup = await fixture();
+  const first = await SqliteDraft.open(setup.root, setup.config, { ...setup.target, show_id: "a-b", episode_id: "c" }, setup.options);
+  const second = await SqliteDraft.open(setup.root, setup.config, { ...setup.target, show_id: "a", episode_id: "b-c" }, setup.options);
+  expect((await first.read()).target).toMatchObject({ show_id: "a-b", episode_id: "c" });
+  expect((await second.read()).target).toMatchObject({ show_id: "a", episode_id: "b-c" });
+  expect(readdirSync(join(setup.root, ".castloop", "sqlite-drafts", setup.config.service_id)).filter((name) => name.endsWith(".json"))).toHaveLength(3);
+});
+
 for (const fault of ["lost_before", "lost_after", "http"] as const) {
   test(`submit ${fault} retains its frozen request and repeated publish only observes`, async () => {
     const setup = await fixture("episode", true);

@@ -1,4 +1,4 @@
-import { sqlitePublicationFailureSchema } from "../packages/shared/src/sqlite-publication";
+import { sqlitePublicationFailureSchema, sqlitePublicationRequestHash } from "../packages/shared/src/sqlite-publication";
 import type { SqlitePublicationFailure, SqlitePublicationRequest, SqlitePublicationStatus } from "../packages/shared/src/sqlite-publication";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 
@@ -14,6 +14,7 @@ export class SqlitePublicationInputError extends Error {
 export type SqlitePublicationExecutor<Prepared> = {
   validate: (request: SqlitePublicationRequest) => Promise<Prepared>;
   publish: (prepared: Prepared) => Promise<void>;
+  commit?: (prepared: Prepared) => undefined;
 };
 export type SqlitePublicationEvent = { event: "sqlite_publication"; phase: "started" | "succeeded" | "failed" | "blocked";
   job_id: string; request_id: string; sequence: number; reason_code?: SqlitePublicationStatus["reason_code"] };
@@ -45,6 +46,11 @@ export class SqlitePublicationAlarm<Prepared> {
         return job;
       }
       await this.queue.confirm();
+      if (await sqlitePublicationRequestHash(claim.request) !== claim.job.request_sha256) {
+        const job = await this.queue.block(claim.job.job_id, "stored_request_invalid");
+        this.emit(job, "blocked");
+        return job;
+      }
       this.emit(claim.job, "started");
       let prepared: Prepared;
       try { prepared = await this.executor.validate(claim.request); }
@@ -60,7 +66,7 @@ export class SqlitePublicationAlarm<Prepared> {
         this.emit(job, "blocked");
         return job;
       }
-      const job = await this.queue.finish(claim.job.job_id);
+      const job = await this.queue.finish(claim.job.job_id, undefined, () => this.executor.commit?.(prepared));
       this.emit(job, "succeeded");
       return job;
     } finally { this.executing = false; }

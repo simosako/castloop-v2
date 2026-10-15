@@ -168,6 +168,15 @@ describe("SQLite publication FIFO", () => {
     expect(value.database.query("SELECT COUNT(*) AS count FROM publication_jobs").get()).toEqual({ count: 1 });
   });
 
+  test("the earlier internal queue schema is rejected without implicit conversion", async () => {
+    const value = fixture();
+    const request = value.request();
+    await value.queue.enqueue(request);
+    value.database.exec("UPDATE publication_queue_schema SET version = 1");
+    expect(() => new SqlitePublicationQueue(value.storage, value.runtime)).toThrow("Unsupported");
+    expect(value.database.query("SELECT job_id FROM publication_jobs").get()).toEqual({ job_id: request.job_id });
+  });
+
   test("requests and interrupted execution survive closing and reopening SQLite", async () => {
     const directory = mkdtempSync("/tmp/opencode/castloop-sqlite-");
     const path = join(directory, "queue.sqlite");

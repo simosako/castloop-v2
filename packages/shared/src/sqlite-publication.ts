@@ -56,7 +56,7 @@ export const sqlitePublicationRequestSchema = z.object({ schema_version: z.liter
 
 export const sqlitePublicationFailureSchema = z.enum(["validation_failed", "base_conflict", "target_unavailable",
   "stale_window", "runtime_mismatch"]);
-export const sqlitePublicationBlockSchema = z.enum(["execution_interrupted", "validation_unavailable", "execution_failed"]);
+export const sqlitePublicationBlockSchema = z.enum(["execution_interrupted", "validation_unavailable", "execution_failed", "stored_request_invalid"]);
 export const sqlitePublicationStatusSchema = z.object({ protocol: z.literal(sqlitePublicationProtocol),
   service_id: slug(20), request_id: z.uuid(), job_id: z.uuid(), request_sha256: hash,
   sequence: counter.refine((value) => value > 0), state: z.enum(["queued", "running", "succeeded", "failed", "blocked"]),

@@ -106,6 +106,7 @@ Alarmsの標準retryは最大6回だが、それを公開副作用の自動再�
 - 現行R2 owner/manifest/progress helperをDO RPCへ一対一で置換しない。guard重複を引き継がない。
 - schema検証、音源receipt/保存内容の照合、RSS生成、immutable media、cache処理を再利用する。参照素材の確認はjob開始時と必要な利用箇所へ限定する。
 - feed等の複数R2 objectとSQLiteは分散transactionにならない。途中失敗では後続を止め、公開可否・feedと音源の整合性を回帰テストする。無停止・一括原子公開は約束しない。
+- 固定keyへの途中書込みを配信しないため、実行中/blockedの対象Showは配信判定を503にする。別Showの配信は継続できる。SQLiteの小さいscalarだけで判定し、job本文やcontent metadataを配信ごとにparseしない。
 - 配信の最新service/Show/Episode状態はDOの小さい読取で判定し、許可された既存public keyをWorkers Caching/R2から配信する。配信判定をTTL cacheしない。
 - GET/HEAD/Range/304、承認済みrevision以外の拒否、非公開404・削除410・paused 503、外向け再検証必須とpurge-before-completionを維持する。
 - 公開HTTPから毎回TOMLやjob履歴をparseせず、MP3をDO経由で中継しない。
@@ -200,7 +201,9 @@ tmux独立実行と既存の異常通知supervisorを用い、異常時は後続
 | P1 | strict公開/upload参照schema、一意key、要求hash、SQLite schema、FIFO/重複排除、pause/drain、状態遷移を実装。Show/Episode content保存はP4で接続するため未実装 |
 | P2 | executor分離したAlarm実行基盤を実装。単一job、I/O await、再生成後のrunningブロック、allowlistログをテスト。実DO class/bindingとCloudflare runtime検証は未接続 |
 | P3 | 新config専用の一意upload、private local journal、明示submit/status/waitを内部CLI moduleとして実装。正式コマンドへの分岐・対象inspectionはP5で接続するため未公開 |
-| P4〜P6 | 未実装。既存CLI/Workerの既定経路は切り替えていない |
+| P4 | SQLite content indexと実Show/Episode公開executorを接続。Show、初回Episode、metadata-only/audio-only、Show metadata/cover更新をローカル検証。lifecycle操作の実行は未実装 |
+| P5 | DO内で使う認証付きsubmit/status HTTP handlerと配信判定coreを追加。実DO class/binding、外側Worker、正式CLI分岐、init/readiness、実Cache purge・GET/HEAD/Range配信は未接続 |
+| P6 | 未実装。既存CLI/Workerの既定経路は切り替えていない |
 
 追加した主なファイル:
 
@@ -230,7 +233,22 @@ P3までの検証: **1,239 pass / 0 fail**（132 files、74.47秒）、型検査
 
 commit承認後、先行診断を`6a13b1b`、基盤を`075e4e5`へ分けて保存した。push/配備/既存環境の変更はしていない。
 
-次の作業はP4の実公開executorとSQLite content index。内部moduleが通っただけで正式CLIによる新方式の公開が利用可能、Issue #13解消、性能目標達成とは扱わない。
+### P4の実公開executorとcontent index
+
+- `src/sqlite-publication-content.ts`: 永久Show reservation、Show state version、Episode current/base、GUIDの一意性、不変音源indexをSQLiteへ保存する。本文を保持するcontent tableと小さいidentity/運用recordを分離した。異なるEpisodeの公開ではShow state versionを進めない。
+- `src/sqlite-publication-executor.ts`: strict TOML/対象/base/receiptの検証、既存RSS renderer、不変音源/history、current/feed/cover保存とpurgeを接続した。R2にlock/status/progress/commit markerを書かない。初回対象に既存公開objectがあれば採用せず、既存音源はmetadata-onlyで再コピーしない。
+- 新音源はreceiptのsize/ETag/versionを照合したstreamをR2 bindingへ渡し、bindingのSHA-256検証と保存結果を確認する。音源全量をWorkerメモリへbufferせず、失敗時はcurrent/feedを進めない。CLIのMP3解析と全量readbackはP3で維持している。
+- `SqlitePublicationExecutor.commit`を短い同期SQL callbackとして追加し、**purge後のcontent更新・job成功・次のAlarm予約を同じstorage transaction**へ入れた。途中失敗ではSQLをrollbackし、残るrunningは再配送時にblockedにする。公開IO自体をそのtransactionへ入れない。
+- 配信判定coreはapproved pathと最新service/Show/Episode状態・承認済み音源indexだけを見る。paused、実行中、blockedは503、unpublishedは404、deletedは410。lifecycle試験で状態を直接設定してgateを検証しただけで、物理delete runnerの実装/受け入れではない。
+- 配信判定でjob本文をparseしないようqueueの内部SQLite schemaを**2**へ進め、`show_id`をscalar列へ保存した。以前の内部schema 1や未知versionは再初期化/暗黙変換せず拒否する。実環境の移行は実施していない。
+- 凍結要求の破損・hash不一致は`blocked / stored_request_invalid`にして通知する。queuedのままAlarm retryだけが尽きる経路を避け、後続や公開IOを開始しない。
+- `src/sqlite-publication-http.ts`: DO内で使う認証付きの小さいsubmit/status handler。既存auth/bounded readerを再利用し、readiness未確認では新規受付を拒否する。このcallbackを実環境でtrueにするsetup/readinessの配線はまだない。
+
+ローカル結合試験では実際の`SqliteDraft`から、PUT/readback→認証HTTP handler→SQLite FIFO→実公開executor→完了pollまで接続した。Showと2件Episodeを公開し、metadata-only更新の音源/履歴/GUID/日時を保持した。R2はmemory binding fixture、Alarm/storage transactionとpurgeはローカルの模擬であり、Cloudflare runtimeの永続性や実Cache purgeの実証ではない。
+
+P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run check`、Linux単体CLI build/`--help`、`git diff --check`成功。同じbaseの後続conflict、異なるEpisodeのFIFO、音源checksum不正、書込応答不明、purge失敗、実行中/purge待機、pause中の既受付drain、content/成功/次回起動のrollback、破損要求、HTTP認証/size/readiness拒否を含む。
+
+次はP5の実DO class/binding、正式CLIと対象inspection、新規init/readiness、Workers Cachingを含む配信の接続。内部moduleが通っただけで正式CLIによる新方式の公開が利用可能、Issue #13解消、性能目標達成とは扱わない。Cloudflareへの配備・実機測定、既存環境の変更やpushはしていない。
 
 ## 参照
 

@@ -17,7 +17,7 @@ export type PublicationQueueStorage = {
   sync: () => Promise<void>;
 };
 type ServiceRow = SqlitePublicationRuntime & { state: "open" | "paused"; admission_window_id: string | null };
-type JobRow = { sequence: number; request_id: string; job_id: string; request_sha256: string; request_json: string;
+type JobRow = { sequence: number; request_id: string; job_id: string; show_id: string; request_sha256: string; request_json: string;
   state: SqlitePublicationStatus["state"]; reason_code: string | null };
 export type PublicationQueueSnapshot = { state: "open" | "paused"; admission_window_id: string | null;
   queued: number; active: SqlitePublicationStatus | null; drained: boolean };
@@ -36,14 +36,14 @@ export class SqlitePublicationQueue {
     storage.transactionSync(() => {
       storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_queue_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");
       const schema = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
-      if (schema && schema.version !== 1) throw new Error("Unsupported SQLite publication schema; do not reset stored state");
-      storage.sql.exec("INSERT OR IGNORE INTO publication_queue_schema (id, version) VALUES (1, 1)");
+      if (schema && schema.version !== 2) throw new Error("Unsupported SQLite publication schema; do not reset stored state");
+      storage.sql.exec("INSERT OR IGNORE INTO publication_queue_schema (id, version) VALUES (1, 2)");
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_service (
         id INTEGER PRIMARY KEY CHECK(id = 1), service_id TEXT NOT NULL, worker_version_id TEXT NOT NULL,
         service_config_sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('open', 'paused')), admission_window_id TEXT)`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_jobs (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
-        request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL,
+        show_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL,
         state TEXT NOT NULL CHECK(state IN ('queued', 'running', 'succeeded', 'failed', 'blocked')), reason_code TEXT)`);
       storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_jobs_pending ON publication_jobs (state, sequence)");
       storage.sql.exec("CREATE UNIQUE INDEX IF NOT EXISTS publication_one_active ON publication_jobs ((1)) WHERE state IN ('running', 'blocked')");
@@ -111,8 +111,8 @@ export class SqlitePublicationQueue {
       if (request.worker_version_id !== service.worker_version_id || request.service_config_sha256 !== service.service_config_sha256 ||
         request.admission_window_id !== service.admission_window_id) throw new Error("Publication runtime or resume window is stale");
       if (this.active()?.state === "blocked") throw new Error("SQLite publication queue is blocked; inspect the retained job");
-      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, request_sha256, request_json, state)
-        VALUES (?, ?, ?, ?, 'queued')`, request.request_id, request.job_id, hash, source);
+      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, state)
+        VALUES (?, ?, ?, ?, ?, 'queued')`, request.request_id, request.job_id, request.show_id, hash, source);
       await this.schedule();
       return this.statusRow(this.byJob(request.job_id));
     });
@@ -122,6 +122,11 @@ export class SqlitePublicationQueue {
     this.requireRuntime();
     const row = this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE request_id = ?", requestId).toArray()[0];
     return row ? this.statusRow(row) : null;
+  }
+
+  identity(): SqlitePublicationRuntime {
+    this.requireRuntime();
+    return { ...this.runtime };
   }
 
   snapshot(): PublicationQueueSnapshot {
@@ -162,23 +167,29 @@ export class SqlitePublicationQueue {
       if (active) return { state: active.state === "blocked" ? "blocked" : "interrupted", job: this.statusRow(active) };
       const row = this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE state = 'queued' ORDER BY sequence LIMIT 1").toArray()[0];
       if (!row) return { state: "idle" };
-      const request = parseSqlitePublicationRequest(JSON.parse(row.request_json));
-      if (request.service_id !== this.runtime.service_id || request.worker_version_id !== this.runtime.worker_version_id ||
-        request.service_config_sha256 !== this.runtime.service_config_sha256 || request.request_id !== row.request_id || request.job_id !== row.job_id) {
-        throw new Error("Stored publication request differs from its runtime or job");
+      let request: SqlitePublicationRequest;
+      try {
+        request = parseSqlitePublicationRequest(JSON.parse(row.request_json));
+        if (request.service_id !== this.runtime.service_id || request.worker_version_id !== this.runtime.worker_version_id ||
+          request.service_config_sha256 !== this.runtime.service_config_sha256 || request.request_id !== row.request_id || request.job_id !== row.job_id || request.show_id !== row.show_id ||
+          request.admission_window_id !== service.admission_window_id || JSON.stringify(request) !== row.request_json) throw new Error("Stored request differs");
+      } catch {
+        this.storage.sql.exec("UPDATE publication_jobs SET state = 'blocked', reason_code = 'stored_request_invalid' WHERE job_id = ?", row.job_id);
+        return { state: "blocked", job: this.statusRow(this.byJob(row.job_id)) };
       }
-      if (request.admission_window_id !== service.admission_window_id) throw new Error("Stored publication has another admission window");
       this.storage.sql.exec("UPDATE publication_jobs SET state = 'running' WHERE job_id = ? AND state = 'queued'", row.job_id);
       return { state: "claimed", job: this.statusRow(this.byJob(row.job_id)), request };
     });
   }
 
-  async finish(jobId: string, failure?: SqlitePublicationFailure): Promise<SqlitePublicationStatus> {
+  async finish(jobId: string, failure?: SqlitePublicationFailure, apply?: () => undefined): Promise<SqlitePublicationStatus> {
     if (failure !== undefined) sqlitePublicationFailureSchema.parse(failure);
+    if (failure !== undefined && apply) throw new Error("Failed input cannot commit publication content");
     return this.storage.transaction(async () => {
       this.requireRuntime();
       const current = this.byJob(jobId);
       if (current.state !== "running") throw new Error("Only the running publication can finish");
+      if (apply && apply() !== undefined) throw new Error("Publication content commit must be synchronous");
       this.storage.sql.exec("UPDATE publication_jobs SET state = ?, reason_code = ? WHERE job_id = ?",
         failure === undefined ? "succeeded" : "failed", failure ?? null, jobId);
       await this.schedule();
