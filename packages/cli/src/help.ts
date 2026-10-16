@@ -116,7 +116,9 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "update-service-verify": {
     usage: "update-service-verify OPERATION_UUID",
-    description: "Continue verification of an acknowledged deployment using its retained journal. Never re-upload an unknown deployment.",
+    description: "Continue verification of an acknowledged deployment using its retained journal. Never re-upload an unknown deployment.\n" +
+      "SQLite: only an exact verified journal with unchanged source/configuration and no prior activation request.\n" +
+      "Waits for the recorded native version, then requests its first activation/probe and finishes paused. Unknown activation remains blocked.",
   },
   "update-service-reconcile": {
     usage: "update-service-reconcile OPERATION_UUID",
@@ -208,7 +210,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
 export function commandHelp(command: string): string {
   const help = Object.hasOwn(COMMAND_HELP, command) ? COMMAND_HELP[command] : undefined;
   if (!help) throw new Error(`Unknown command: ${command}`);
-  const sqlite = ["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode", "job-status", "preview-show-lifecycle", "preview-episode-lifecycle", "lifecycle-execute", "operation-status", "publish-rss-import", "deploy", "update-service-reconcile"].includes(command) ?
+  const sqlite = ["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode", "job-status", "preview-show-lifecycle", "preview-episode-lifecycle", "lifecycle-execute", "operation-status", "publish-rss-import", "deploy", "update-service-verify", "update-service-reconcile"].includes(command) ?
     "\n\nSQLite development workspaces (schema_version=2): unique R2 uploads, no Queue grants/Queues Edit, explicit DO submission and bounded completion polling.\n" +
     "Lifecycle preview/execution supports only unpublish/restore of saved snapshots, with the reviewed hash and confirm; deletion is not implemented.\n" +
     "publish-rss-import supports new Shows only and preserves imported GUIDs/dates. A retained pending publication is observed, never resubmitted.\n" +

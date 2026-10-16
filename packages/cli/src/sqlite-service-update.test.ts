@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { initializeSqliteService } from "./sqlite-initialization";
-import { readSqliteServiceUpdate, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
+import { continueSqliteServiceUpdateVerification, readSqliteServiceUpdate, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
 import { runSqliteCommand } from "./sqlite-commands";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -92,4 +92,71 @@ test("open services refuse deployment, and successive completed code updates ret
   const second = await update("next compatible source", crypto.randomUUID());
   expect(second.receipt!.worker_version_id).not.toBe(first.receipt!.worker_version_id);
   expect(value.runtime.health()).toMatchObject({ publication_ready: true, state: "paused" });
+});
+
+test("acknowledged old native versions are observed finitely without replaying deployment or activation", async () => {
+  const { value, id } = await fixture(), oldVersion = value.runtime.health().worker_version_id;
+  value.calls.length = 0;
+  let oldReplies = 2, waits = 0;
+  const transport: typeof value.transport = async (input, init) => {
+    const response = await value.transport(input, init);
+    if (new URL(input instanceof Request ? input.url : input).pathname.includes("/update-status/") && oldReplies-- > 0) {
+      const body = await response.json() as Record<string, unknown>;
+      return new Response(JSON.stringify({ ...body, worker_version_id: oldVersion }), { headers: response.headers });
+    }
+    return response;
+  };
+  const result = await updateSqliteService(value.root, value.config, id, "new source", { ...value.options, transport },
+    { attempts: 3, delay: async () => { waits++; } });
+  expect(result.phase).toBe("ready"); expect(waits).toBe(2);
+  expect(value.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+  expect(value.calls.filter((call) => call.path.endsWith("update-prepare") && call.method === "POST")).toHaveLength(1);
+  expect(value.calls.filter((call) => call.path.endsWith("update-activate") && call.method === "POST")).toHaveLength(1);
+});
+
+test("verified unactivated deployments explicitly continue only the first activation with frozen inputs", async () => {
+  const { value, id } = await fixture(), oldVersion = value.runtime.health().worker_version_id;
+  let stale = true;
+  const transport: typeof value.transport = async (input, init) => {
+    const response = await value.transport(input, init);
+    if (stale && new URL(input instanceof Request ? input.url : input).pathname.includes("/update-status/")) {
+      const body = await response.json() as Record<string, unknown>;
+      return new Response(JSON.stringify({ ...body, worker_version_id: oldVersion }), { headers: response.headers });
+    }
+    return response;
+  };
+  const options = { ...value.options, transport };
+  await expect(updateSqliteService(value.root, value.config, id, "new source", options, wait)).rejects.toThrow("continue verification");
+  expect(readSqliteServiceUpdate(value.root, value.config, id)?.phase).toBe("verified");
+  expect(value.calls.some((call) => call.path.endsWith("update-activate"))).toBe(false);
+  value.calls.length = 0;
+  await expect(continueSqliteServiceUpdateVerification(value.root, value.config, id, "changed", options, wait)).rejects.toThrow("exact verified");
+  expect(value.calls).toHaveLength(0); stale = false;
+  const result = await runSqliteCommand(value.root, value.config, "update-service-verify", [id], {
+    workerSource: async () => "new source", cloudflare: options, transport });
+  expect(result).toMatchObject({ phase: "ready" });
+  const mutations = value.calls.filter((call) => call.method !== "GET");
+  expect(mutations).toHaveLength(1); expect(mutations[0].path.endsWith("update-activate")).toBe(true);
+  value.calls.length = 0;
+  await expect(continueSqliteServiceUpdateVerification(value.root, value.config, id, "new source", options, wait)).rejects.toThrow("no prior activation");
+  expect(value.calls).toHaveLength(0);
+});
+
+test("unknown native versions are not adopted and prior activation requests cannot be continued", async () => {
+  const { value, id } = await fixture();
+  const transport: typeof value.transport = async (input, init) => {
+    const response = await value.transport(input, init);
+    if (new URL(input instanceof Request ? input.url : input).pathname.includes("/update-status/")) {
+      const body = await response.json() as Record<string, unknown>;
+      return new Response(JSON.stringify({ ...body, worker_version_id: crypto.randomUUID() }), { headers: response.headers });
+    }
+    return response;
+  };
+  await expect(updateSqliteService(value.root, value.config, id, "new source", { ...value.options, transport }, wait)).rejects.toThrow("exact maintenance");
+  expect(readSqliteServiceUpdate(value.root, value.config, id)?.phase).toBe("verified");
+  expect(value.calls.some((call) => call.path.endsWith("update-activate"))).toBe(false);
+  const pending = await fixture(); pending.value.faults.deferUpdateProbe = true;
+  await expect(pending.update()).rejects.toThrow("remains unconfirmed"); pending.value.calls.length = 0;
+  await expect(continueSqliteServiceUpdateVerification(pending.value.root, pending.value.config, pending.id, "new source", pending.value.options, wait)).rejects.toThrow("no prior activation");
+  expect(pending.value.calls).toHaveLength(0);
 });

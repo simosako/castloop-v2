@@ -56,6 +56,32 @@
 長時間試験はtmux内のsupervisorから起動する。新しい証跡ディレクトリと一度限りのlaunch markerを使い、古いrunnerや完了要求を再起動しない。
 成功通知は次のresume・追加試験・削除の許可ではない。
 
+## 互換更新の初回停止と修正
+
+`4d6effc`の実機runnerは11:12:50 UTC、公開0件、互換更新のnative version照合で停止した。
+証跡は`.local-test-data/results/20261016/sqlite-followup-8bdcc47f/`。
+準備と1回の配備は応答確認済み、journalは`verified`。新配備は`8ace6fc5-aa21-49f5-ac88-f9d3c50ef82e`、
+deploymentは`1d87471a-8c9b-4720-a7e6-08f82f882152`。namespaceとsource/ETagは元と同じ。
+activationはまだ要求しておらず、resume・RSS登録/転送/公開も未開始。
+
+11:13:45のGET-only照合ではRESTは新version、DOは旧`7be73256-30a7-4261-b0d8-9a6b39d695a6`だった。
+DOの同じ更新要求はprepared、ready=false/paused/drained、active=null/queued=0。
+Cloudflare文書は、WorkerとDOのcode更新がeventually consistentで、秒〜分のversion差があり得るとする。
+この観測は即時一致を前提としたCLIの不足を示すが、伝播完了までの時間・原因の全てを確定したものではない。
+
+CLIは、完全に一致するprepared要求の旧versionだけを最大120回GETで観測するよう修正した。
+未確認応答や別versionを採用せず、timeout後もverifiedを保持する。
+正式`update-service-verify`はそのexact verified journalと不変source/config/metadata/receipt/namespaceからのみ、
+新native versionを照合して未要求のactivationを1回だけ行う。既知の配備を再送せず、未知activationの再実行も行わない。
+`update-service-reconcile`は従来どおりGET-onlyである。
+
+修正後は**1,383件成功 / 0失敗（149 files、91.37秒）**、型検査・単体CLI buildが成功。
+11:19:26の追加GET-only照合で、DOも記録済み新versionを返し、同じprepared/paused/drained状態を保持していた。
+伝播時刻は旧versionを観測した11:13:45と、この確認の間であり、正確な所要時間は測定していない。
+継続は同じ更新の初回activationと未開始のRSS公開だけで、新しい配備は行わない。
+
+参照：[Durable Objects known issues — code updates](https://developers.cloudflare.com/durable-objects/platform/known-issues/#code-updates)。
+
 ## 関連
 
 - [先行実機試験と欠測](sqlite_sequential_measurement_20261016.md)

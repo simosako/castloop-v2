@@ -15,7 +15,7 @@ import { continueSqliteInitialization, initializeSqliteService, reconcileSqliteI
 import { readLocalMetadata } from "./local-metadata-read";
 import { executeSqliteLifecycle, previewSqliteLifecycle, readSqliteLifecycleStatus } from "./sqlite-lifecycle";
 import { readBoundedLocalJournal } from "./local-journal-read";
-import { reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
+import { continueSqliteServiceUpdateVerification, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -75,6 +75,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (command === "init-reconcile" && args.length === 1) return reconcileSqliteInitialization(root, config, args[0], cf);
   if (command === "init-continue-verification" && args.length === 1 && options.workerSource) return continueSqliteInitialization(root, config, args[0], await options.workerSource(), cf);
   if (command === "update-service" && args.length === 1 && options.workerSource) return updateSqliteService(root, config, args[0], await options.workerSource(), cf);
+  if (command === "update-service-verify" && args.length === 1 && options.workerSource) return continueSqliteServiceUpdateVerification(root, config, args[0], await options.workerSource(), cf);
   if (command === "update-service-reconcile" && args.length === 1) return reconcileSqliteServiceUpdate(root, config, args[0], cf);
   if (command === "service-status" && !args.length) return client.health();
   if (command === "list-shows" && !args.length || command === "list-episodes" && args.length === 1) {

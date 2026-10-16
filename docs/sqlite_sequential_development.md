@@ -94,6 +94,17 @@ castloop update-service-reconcile UPDATE_UUID
 これはGETによる照合とローカル記録の確定だけで、未知deployの採用・再配備・probeの再実行・強制解放を行わない。
 独自ドメインや設定変更、schema変換はこの更新コマンドの対象外。
 
+RESTの配備成功直後でも、DOがしばらく旧versionで応答する場合がある。
+CLIは一致するprepared状態の旧versionだけを有限回GETで観測し、記録済み新versionになるまでactivationしない。
+この待機だけで停止し、journalが`verified`（配備応答・REST照合済み、activation未要求）の場合に限り、次で続けられる。
+
+```sh
+castloop update-service-verify UPDATE_UUID
+```
+
+これは読み取り専用ではない。凍結source/config/metadataと既知receipt/namespaceを再照合し、新native versionで**初回activation/probeだけ**を行う。
+配備・準備・R2 uploadは繰り返さない。`activation_requested`や未知prepare/deployには使えず、完了後はpausedのまま。
+
 ## ローカルRSS取り込みの公開
 
 既存の`import-rss`で作ったローカル取り込みをレビューした後、サービスrootで実行する。
