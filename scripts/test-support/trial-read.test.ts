@@ -79,4 +79,13 @@ describe("bounded read-only trial observation", () => {
     await expect(readTrialObject(url, { ...f.options, maximumBytes: 0 })).rejects.toThrow("Invalid");
     await expect(readTrialObject(url, { ...f.options, maximumAttempts: 4 })).rejects.toThrow("Invalid");
   });
+  test("bounds decoded bytes without confusing compressed Content-Length with payload length", async () => {
+    const f = fixture();
+    const result = await readTrialObject(url, { ...f.options, transport: async (_url, init) => {
+      expect(new Headers(init.headers).get("Accept-Encoding")).toBe("identity");
+      return new Response("metadata", { headers: { ETag: "ok", "Content-Encoding": "gzip", "Content-Length": "100" } });
+    } }); expect(result.bytes.length).toBe(8);
+    await expect(readTrialObject(url, { ...f.options, transport: async () => new Response("short", {
+      headers: { ETag: "ok", "Content-Length": "10" } }) })).rejects.toThrow("partial_response");
+  });
 });

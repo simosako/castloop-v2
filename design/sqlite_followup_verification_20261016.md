@@ -30,6 +30,8 @@
 開発後の全自動テストは**1,378件成功 / 0失敗（149 files）**。TypeScriptチェック、Linux単体CLIのbuildも成功。
 追加回帰はGETの有限retry/総予算/IO終了/秘密非出力、取消し後のmutation禁止と正確な照合、
 終端purge失敗、CPU/jobログ欠測とversion・entrypoint混同の防止、通知での欠測/timeout表示を対象とする。
+実機runnerの接続時に、圧縮応答のContent-Lengthをdecoded bytesと誤比較しないことと、
+完了済み互換更新の正確なoperation/new versionを含む照合を追加した。共通試験部品の56件も成功した。
 この段階ではCloudflareの変更はまだ行っていない。
 
 ## 2. 実機確認の順序・境界

@@ -30,7 +30,8 @@ function retryAfter(response: Response): number {
 
 async function readAttempt(url: string, options: Options, signal: AbortSignal): Promise<Result> {
   let response: Response;
-  try { response = await (options.transport ?? fetch)(url, { method: "GET", headers: options.headers,
+  const headers = new Headers(options.headers); headers.set("Accept-Encoding", "identity");
+  try { response = await (options.transport ?? fetch)(url, { method: "GET", headers,
     redirect: "error", cache: "no-store", signal }); }
   catch { throw new ReadFailure(signal.aborted ? "observation_timeout" : "transport_error", true); }
   const reader = response.body?.getReader();
@@ -41,7 +42,8 @@ async function readAttempt(url: string, options: Options, signal: AbortSignal): 
     if (options.requireEtag && !response.headers.get("ETag")) throw new ReadFailure("missing_etag", false, response.status);
     if (!reader) throw new ReadFailure("missing_body", false, response.status);
     const declared = response.headers.get("Content-Length");
-    if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > options.maximumBytes)) throw new ReadFailure("size_limit", false, response.status);
+    const identityEncoding = !response.headers.has("Content-Encoding") || response.headers.get("Content-Encoding") === "identity";
+    if (identityEncoding && declared !== null && (!/^\d+$/.test(declared) || Number(declared) > options.maximumBytes)) throw new ReadFailure("size_limit", false, response.status);
     const chunks: Uint8Array[] = []; let length = 0;
     for (;;) {
       let chunk: ReadableStreamReadResult<Uint8Array>;
@@ -52,7 +54,7 @@ async function readAttempt(url: string, options: Options, signal: AbortSignal): 
       if (length > options.maximumBytes) throw new ReadFailure("size_limit", false, response.status);
       chunks.push(chunk.value);
     }
-    if (declared !== null && Number(declared) !== length) throw new ReadFailure("partial_response", false, response.status);
+    if (identityEncoding && declared !== null && Number(declared) !== length) throw new ReadFailure("partial_response", false, response.status);
     if (signal.aborted) throw new ReadFailure("observation_timeout", true, response.status);
     const bytes = new Uint8Array(length); let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }

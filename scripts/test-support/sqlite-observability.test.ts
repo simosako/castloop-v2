@@ -57,6 +57,14 @@ describe("SQLite trial trace classification", () => {
       { ...health, service_config_sha256: "f".repeat(64) }]) expect(() => verifySqliteObservationCheckpoint(runtime, invalid, [])).toThrow();
     expect(() => verifySqliteObservationCheckpoint(runtime, health, [{ expected, observed: { ...status, state: "running" } }])).toThrow("exact");
   });
+  test("completed compatible updates require their exact operation and new runtime", () => {
+    const updated = { ...health, runtime_update: { operation_id: probeId, state: "completed", previous_worker_version_id: jobId, new_worker_version_id: version } };
+    expect(() => verifySqliteObservationCheckpoint(runtime, updated, [])).toThrow("exact");
+    verifySqliteObservationCheckpoint({ ...runtime, completed_update_operation_id: probeId }, updated, [{ expected, observed: status }]);
+    expect(() => verifySqliteObservationCheckpoint({ ...runtime, completed_update_operation_id: requestId }, updated, [])).toThrow("exact");
+    expect(() => verifySqliteObservationCheckpoint({ ...runtime, completed_update_operation_id: probeId }, { ...updated,
+      runtime_update: { ...updated.runtime_update, state: "activated" } }, [])).toThrow("exact");
+  });
 });
 
 describe("SQLite measurement coverage", () => {

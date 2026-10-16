@@ -74,14 +74,18 @@ export function classifySqliteInvocation(row: SqliteInvocation): "ok" | "reconci
   return "failed";
 }
 
-type Runtime = { service_id: string; worker_version_id: string; service_config_sha256: string; admission_window_id: string | null };
+type Runtime = { service_id: string; worker_version_id: string; service_config_sha256: string; admission_window_id: string | null;
+  completed_update_operation_id?: string };
 type Job = { job_id: string; request_id: string; request_sha256: string };
 export function verifySqliteObservationCheckpoint(expected: Runtime, healthInput: unknown,
   jobs: Array<{ expected: Job; observed: unknown }>): void {
   const health = sqliteHealthSchema.parse(healthInput);
+  const updateVerified = expected.completed_update_operation_id === undefined ? health.runtime_update === null :
+    health.runtime_update?.operation_id === expected.completed_update_operation_id && health.runtime_update.state === "completed" &&
+    health.runtime_update.new_worker_version_id === expected.worker_version_id;
   if (health.service_id !== expected.service_id || health.worker_version_id !== expected.worker_version_id ||
     health.service_config_sha256 !== expected.service_config_sha256 || health.admission_window_id !== expected.admission_window_id || !health.publication_ready || !health.drained ||
-    health.queued !== 0 || health.active !== null || health.runtime_update !== null) throw new Error("Observation checkpoint does not prove the exact ready, drained runtime");
+    health.queued !== 0 || health.active !== null || !updateVerified) throw new Error("Observation checkpoint does not prove the exact ready, drained runtime");
   for (const job of jobs) {
     const status = sqlitePublicationStatusSchema.parse(job.observed);
     if (status.service_id !== expected.service_id || status.job_id !== job.expected.job_id || status.request_id !== job.expected.request_id ||
