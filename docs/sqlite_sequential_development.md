@@ -1,7 +1,7 @@
 # SQLite逐次公開方式の開発版
 
 `feat/sqlite-sequential-publication`向け。**公開済みv0.4.0の機能ではない**。
-2026-10-16の隔離実機試験では初期化・小容量機能gateを通過したが、通常規模は14/36件成功・15件目のpurge段階でblockedとなった。修正版の実機再試験と全体受け入れは未完了。詳細は[測定記録](../design/sqlite_sequential_measurement_20261016.md)を参照。
+2026-10-16の最初の実機試験は15件目のpurge段階でblockedとなった。別途承認された新環境では、修正版`da7c4bd`で小容量・36件公開・metadata-only 10回・一覧を通過し、pausedで終了した。観測runnerの中断とCPU欠測は残るため、全Free適合・恒久的なIssue #13解消・release受け入れとは区別する。詳細は[測定記録](../design/sqlite_sequential_measurement_20261016.md)を参照。
 新しい隔離環境だけを対象とし、既存サービスや旧journalを変換しない。
 
 ## 対応範囲

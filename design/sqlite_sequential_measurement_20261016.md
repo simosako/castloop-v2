@@ -89,6 +89,61 @@ tailのAlarm frameは3件しかなく、14成功jobのうち8件はjobログも�
 
 修正版はこのblocked環境へ配備していない。試験用processは終了し、証跡・途中出力・jobを保全した。強制解除、削除、新環境の追加作成、permission/plan/CPU上限変更は行わない。blockedの安全な復旧または別の新規隔離環境について管理者と決めるまでは、36件再試験へ進めない。Issue #13恒久解消、全HTTPのFree適合、release readinessは未確立。
 
+## 修正版の再試験: 別途承認された新規環境
+
+管理者が新しい隔離環境1つの作成・配備を明示承認したため、旧blocked環境を保持したまま、`sq16r-6ec01dc6`を対象に再試験を開始した。sourceはpush済み`da7c4bd`、証跡は`.local-test-data/results/20261016/sqlite-retest-6ec01dc6`。
+
+- 正式単体CLI・runner・importした監視helper・使用するmetadata/cover/短尺MP3のhashを起動前に凍結した。
+- 独立tmuxと通知先を検証したsupervisorで実行する。初期化→小容量の機能gate→36件とmetadata-only 10回を同じ一度限りのrunnerで行い、異常時は後続mutationを止める。
+- 初回Episodeは合計39件、Showは2件まで。原音源を再送せず、予定MP3 uploadは3,780,105 bytes、総payload上限25MB。正常終了時はpaused/drainedへ戻す。
+- 旧環境の変更、追加の互換配備、cleanup・削除・強制解除・移行・権限/課金/CPU制限変更は対象外。結果不明の再送や新jobへの置換もしない。
+- native初期化と小容量gateは通過した。Workerは`7be73256-30a7-4261-b0d8-9a6b39d695a6`、namespaceは`ea16615b38a94698805758bf18bb0458`。通常規模は実行中であり、36件完走とCPU収録完備はまだ示していない。
+
+再試験の最初のrunnerは6 publication jobs成功後、成功したstatus GETの外側HTTP traceが`canceled / HTTP 200`となったため、監視側が停止した。stderrは空で、native snapshotはready/open/drained、activeなしだった。読取GETのcancelを公開失敗と即断せず、成功したCLI body・正確なjob identity・runtime・drainedを照合してから新規操作へ進むよう試験側を修正した。POSTや未知I/Oをこの例外へ含めず、別の異常・例外・truncationは停止扱いのまま。
+
+継続証跡は`.local-test-data/results/20261016/sqlite-retest-6ec01dc6-continue-72186cd8`。旧6件のstatusとrevisionを読み取りで再照合して、残り7件だけを実行し、09:07:13 UTCに小容量合計13件のgateが通過した。資源作成・upload・公開要求・配備を再送せず、Worker sourceも変更していない。
+
+最初の6件を含む区間では外側HTTP CPU最大2ms、内部cache HTTP最大6msだったが、31 public probes中3件のCPUが欠け、DOのtail/GraphQLデータも未収録だった。これは**DO CPUが0だったという意味ではない**。機能完了の証拠と観測データの欠落を分離し、通常規模後にも収録範囲を明示する。
+
+### 再試験の最終結果
+
+**新環境では小容量gate、36件公開、メタデータ更新10回、MP3不変、一覧20/16件、終了時pauseを通過した。** 3つの実行証跡にあるjob IDは重複なしで6＋53＋1＝60件。小容量13件と、通常規模Show 1件・Episode 36件・metadata-only 10件の合計である。既知の完了jobは再送していない。
+
+| 測定対象 | 結果 |
+| --- | --- |
+| 通常規模Show＋36 Episodeの初回公開 | 242.398秒 |
+| 36 Episodeだけの連続区間 | 235.441秒。1件ごとのcreate/upload/publishは中央値6.336秒、p95 7.789秒、最大7.889秒 |
+| 初回Episodeのpublishコマンド | n=36、中央値2.456秒、p95 3.454秒、最大3.480秒 |
+| metadata-onlyのstage＋publish（直接保存できた値） | 最初の8回＋後の10回目のn=9。中央値4.329秒、p95/最大5.043秒 |
+| 9回目のstage＋publish | commandの要求・完了UTCから9.663秒と復元。元の直接測定値は保存前の観測中断で欠けている |
+| 復元値を含めたmetadata-only 10回 | 中央値4.362秒、p95/最大9.663秒。ただし9回目と10回目の間は中断・読取照合を挟み、連続10回のbenchmarkとは呼ばない |
+| 外側HTTP CPU（収録分） | n=510、最大3ms |
+| 内部cache-owner HTTP CPU（収録分） | n=22、最大6ms。GraphQLの選択区間Worker最大6.143ms |
+| 新規MP3 upload / 終了時R2 storage | 3,780,105 bytes / 18,909,589 bytes（233 objects）。原音源の転送なし、metadata-onlyのMP3 inventory変化なし |
+
+既存方式の36件Show metadata-onlyの中央値170.759秒に対し、今回の取得値は大きく短い。ただし連続10回の完全測定ではなく、単一アカウント・短尺音源・限定回数の観測である。完全なFree適合や将来の最大時間、300MB転送性能を保証しない。
+
+### 53件完了通知の理由と、未実施1件の完了
+
+`...-continue-72186cd8`は、36件公開後のmetadata-only 9回目もCLI exit=0で成功した後、revisionをR2 RESTから読み取る確認で約30秒後に停止した。stderrは空、tail healthは正常でnative失敗分類もなかった。旧failure記録は例外名を`unclassified`にしており、**観測用GETのtimeoutと整合するが、保存証跡だけで元の例外名やネットワーク原因は確定しない**。
+
+読み取り調査で9回目のcurrent revision・36件feedへの反映・MP3 inventory不変を確認した。nativeもready/open/drained、activeなしであり、旧試験のような`blocked / execution_failed`ではなかった。
+
+残りの10回目だけを新しいjobとして実行し、成功済み9回目は再送しなかった。最後の証跡は`.local-test-data/results/20261016/sqlite-retest-6ec01dc6-continue-96b186c6`。この実行のpublication数は1件だが、累計では60件となる。原本の異常終了記録・通知outboxは書き換えず保持した。観測helperでは以後`TimeoutError`/`AbortError`を固定分類で記録し、最後のrunnerは観測用revision GETのtimeoutだけを最大2回の読取で扱う。PUT/POSTやjobの再送ではない。
+
+09:20:59 UTCの終了snapshotは同じWorker versionでready/paused/drained、queued=0、activeなし。外側feed GETは503、最終runnerとsupervisorはexit=0、通知outboxはacknowledged。旧blocked環境には触れず、新たな資源追加、再配備、強制解除、削除、権限/課金/CPU上限変更もしていない。
+
+### CPU収録の限界
+
+- tracked public probes 97件中、CPU identityを確認できたのは89件。8件の欠測は残したまま報告する。後から行った読取probeで同じ測定値を埋め直さない。
+- 60 job中35件はjobログを取得できず、tailのAlarm frameも7件だけだった。`succeeded`がDO status traceへ付く問題もあり、取得できたframeのCPUをjob全体のAlarm CPUと断定しない。
+- GraphQLの初回照会で空だったDOデータは、別名のfollow-up証跡で一部補完できた。選択区間のAlarm集計は7＋51＋1＝59 invocationで全範囲の対応までは確定せず、最大wallは2.327秒。periodic CPU合計は2.780秒で、setup/status/RPC等を含む期間集計であり、Alarmのみ・job別ではない。元の空の応答も保持した。
+- DO traceには最大50msのCPUがあったが、DO invocationは通常HTTP WorkerのFree 10ms枠と別である。これを外側HTTP CPUやAlarm総CPUとして報告しない。
+- 取得できた通常HTTP/cache HTTP frameに10ms超過はなく、GraphQLの該当Worker errorsも0。ただし欠測があるため、全HTTPのFree適合が証明されたとはしない。
+- purge再試行の診断と12秒待機を示すwall延長は今回未観測。1回に統合したpurgeで全jobが成功したことは確認できたが、providerのrate-limit拒否から再試行する分岐の実機受け入れまでは示していない。
+
+今回の36件公開では、publicationのfreeze・CPU timeout・blocked jobは観測しなかった。**Issue #13の恒久解消やrelease readinessの確定とは区別する。** ローカル試験processは終了した。pause/drainedは登録済みjobのsnapshotであり、未登録upload不存在や旧環境の回復・削除権限を示さない。
+
 ## 公式仕様の参照
 
 - [Workers Cache purge: 同時指定・結果・常にFree tierの制限](https://developers.cloudflare.com/workers/cache/purge/)

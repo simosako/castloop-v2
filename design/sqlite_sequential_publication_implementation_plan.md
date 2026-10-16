@@ -337,8 +337,10 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 上記のローカルbaseline後、管理者の実機試験指示に基づき、`sq16-668cbdfa`だけを新規作成した。[測定記録](sqlite_sequential_measurement_20261016.md)が実際の到達点を示す。
 
 - native初期化、3件の小容量公開・配信・更新・可逆lifecycleは成功。REST settingsにexportsがない応答形をCLIで修正し、既知receiptから検証を継続した。
-- 36件試験は14件成功、15件目がcache purge段階でblocked。全件完成、36件metadata-only性能、互換更新の実機gateは未完了。CPU収録欠落も残る。
-- SQLite専用purgeを1回へ統合し、明確に拒否されたrate limitだけ同じ実行内で有限待機/再試行する修正と固定phaseログを追加した。未知結果やblocked jobの再実行はしない。修正版は実機未配備。
+- 最初の36件試験は14件成功、15件目がcache purge段階でblockedとなり、その環境を保全した。
+- SQLite専用purgeを1回へ統合し、明確に拒否されたrate limitだけ同じ実行内で有限待機/再試行する修正と固定phaseログを追加した。未知結果やblocked jobの再実行はしない。
+- 別途承認された新環境`sq16r-6ec01dc6`でのsource `da7c4bd`の追試では、小容量13件、通常規模Show＋36 Episode、metadata-only 10件、一覧20/16件を通過し、累計60 distinct jobsが成功した。ready/paused/drainedで終了した。原音源は再送せず、新規MP3は3.78MBだった。
+- 36件Showの初回公開は242.398秒。metadata-onlyの直接取得9値は中央値4.329秒で、残る1値はcommand時刻から9.663秒に復元した。観測側の中断を挟んでおり、連続10回のbenchmarkとは区別する。97 public probes中8件のCPU identity欠測などが残るため、Issue #13恒久解消や全Free適合・release readinessとはしない。詳細は測定記録へ残した。
 - 最新ローカル全体回帰は1,349 pass / 0 fail、型検査とLinux CLI build成功。模擬36件rate-limit試験を、36件実機成功へ読み替えない。
 - blocked環境を保全する。新隔離環境、強制解除・削除、権限/plan変更、移行は追加承認なしに行わない。
 
