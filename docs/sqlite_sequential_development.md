@@ -9,7 +9,8 @@
 - Show登録、Show/Episodeのローカル作成、素材upload、公開、status、pause/resume、fresh init。
 - metadata-onlyは既存音源を再利用。audio-onlyはmetadataのbaseも照合する。
 - GET/HEAD/Range/条件付き応答は既存配信部品を利用し、外側gatewayが毎回DOの最新配信判定を見る。
-- 新規環境はworkers.devのみ。**一覧、lifecycle、deploy/互換更新、独自ドメイン、既存移行、RSSのサーバー公開連携、retry/releaseは未対応**。旧方式へfallbackしない。
+- `list-shows`/`list-episodes`はSQLiteの20件ずつの一覧。`--json`、`--include-deleted`、`--cursor`に対応し、R2のmetadata列挙はしない。cursorはruntimeと検索条件へ束縛する。ローカルだけのdraftは含めない。
+- 新規環境はworkers.devのみ。**lifecycle、deploy/互換更新、独自ドメイン、既存移行、RSSのサーバー公開連携、retry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
 

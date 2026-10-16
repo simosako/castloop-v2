@@ -203,7 +203,7 @@ tmux独立実行と既存の異常通知supervisorを用い、異常時は後続
 | P3 | 新config専用の一意upload、private local journal、明示submit/status/waitを実装し、正式CLIのschema version 2分岐へ接続 |
 | P4 | SQLite content indexと実Show/Episode公開executorを接続。Show、初回Episode、metadata-only/audio-only、Show metadata/cover更新をローカル検証。lifecycle操作の実行は未実装 |
 | P5 | 別Worker入口、実DO/SQLite binding、cache owner、正式CLI、fresh REST init/readiness、公開配信を接続しローカル結合検証。Cloudflare実機での配備・purge・output gate・再配送の受け入れは未実施 |
-| P6 | lifecycle、一覧、互換更新、domain、移行は未実装。新方式では明示拒否。schema version 1の既存経路・既存環境は切り替えていない |
+| P6 | SQLite一覧を接続済み。lifecycle、互換更新、domain、移行は未実装。未対応操作は新方式で明示拒否。schema version 1の既存経路・既存環境は切り替えていない |
 
 追加した主なファイル:
 
@@ -276,6 +276,13 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 
 操作例・回復制限は[SQLite開発版ガイド](../docs/sqlite_sequential_development.md)を参照する。
 次はP6と、新規隔離環境での実機受け入れ計画の準備。既存サービス移行や実機配備は別承認であり、今回の開発ではCloudflare資源・実データを変更していない。Issue #13恒久解消、Free適合、36件性能目標達成、release readinessはまだ示していない。
+
+### P6a: SQLite一覧
+
+- `list-shows`/`list-episodes`を正式CLIと認証付きDO読取へ接続した。20件のkeyset pagination、削除済みの明示表示、JSON/表形式、親状態と未完了操作の表示に対応する。
+- R2列挙や本文読取をせず、SQLで必要なtitle/dateだけを射影する。queued/running/blockedのShow本文は一覧へ返さない。cursorはservice/config/version/kind/親/削除表示条件へ束縛する。
+- 一覧はsnapshotであり、公開可否・quiescence・回復権限を証明しない。pausedでも読取可能。cursorを同一時点の固定snapshotとは扱わない。
+- 一覧のpagination/条件改変/親状態/不正応答と正式CLI入口をローカル検証した。Cloudflare実機操作は行っていない。
 
 ## 参照
 

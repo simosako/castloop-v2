@@ -1,4 +1,5 @@
 import { sqliteRuntimeRequestSchema, sqliteResumeRequestSchema, sqliteRegistrationSchema } from "../packages/shared/src/sqlite-service-api";
+import { sqliteCatalogRequestSchema } from "../packages/shared/src/sqlite-catalog";
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
@@ -17,12 +18,13 @@ export function createSqliteServiceHttp(runtime: SqliteServiceRuntime, key: stri
         if (parts.length < 1 || parts.length > 2 || parts.some((part) => !part)) return reply({ error: "invalid_target" }, 400);
         return reply(await runtime.inspect(parts[0], parts[1]));
       }
-      if (!["prepare", "pause", "resume", "register-show"].includes(path)) return reply({ error: "not_found" }, 404);
+      if (!["prepare", "pause", "resume", "register-show", "catalog"].includes(path)) return reply({ error: "not_found" }, 404);
       if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
       if (request.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json" || request.headers.has("Content-Encoding")) return reply({ error: "invalid_input" }, 400);
       const body = await readBoundedAdminJson(request);
       if (path === "prepare") return reply(await runtime.prepare(sqliteRuntimeRequestSchema.parse(body)), 202);
       if (!runtime.ready()) return reply({ error: "runtime_not_ready" }, 503);
+      if (path === "catalog") return reply(runtime.catalog(sqliteCatalogRequestSchema.parse(body)));
       if (path === "pause") {
         runtime.requireTarget(sqliteRuntimeRequestSchema.parse(body));
         runtime.queue.pause(); return reply(runtime.health());

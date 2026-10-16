@@ -204,7 +204,14 @@ async function main(): Promise<unknown> {
   const workspace = loadWorkspaceConfig(root);
   if (workspace.schema_version === 2) {
     const { runSqliteCommand } = await import("./sqlite-commands");
-    return runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource });
+    const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
+      ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
+    if (listing && !flags.json) {
+      const { formatSqliteCatalog } = await import("./sqlite-catalog");
+      const { sqliteCatalogResponseSchema } = await import("../../shared/src/sqlite-catalog");
+      return formatSqliteCatalog(sqliteCatalogResponseSchema.parse(result));
+    }
+    return result;
   }
   if (command === "job-status") { command = "operation-status"; positional.unshift("publication"); }
   if (command === "retry-job") command = "publication-retry";

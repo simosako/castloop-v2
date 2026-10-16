@@ -72,7 +72,7 @@ test("unknown pause/resume outcomes are never resent or treated as recovery auth
 
 test("unsupported SQLite commands fail explicitly without legacy fallback or remote mutations", async () => {
   const value = await fixture(); value.calls.length = 0;
-  for (const command of ["deploy", "release-job", "retry-job", "lifecycle-execute", "list-shows", "migration-status"]) {
+  for (const command of ["deploy", "release-job", "retry-job", "lifecycle-execute", "migration-status"]) {
     await expect(value.command(command, [])).rejects.toThrow("no legacy fallback");
   }
   expect(value.calls).toEqual([]);

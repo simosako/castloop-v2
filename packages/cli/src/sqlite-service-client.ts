@@ -4,6 +4,8 @@ import { sqliteHealthSchema, sqliteInspectionSchema } from "../../shared/src/sql
 import type { SqliteHealth, SqliteInspection, SqliteRuntimeRequest } from "../../shared/src/sqlite-service-api";
 import { readSqliteManagementJson } from "./sqlite-publication-client";
 import type { R2RestTransport } from "./verified-r2-put";
+import { sqliteCatalogRequestSchema, sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
+import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../../shared/src/sqlite-catalog";
 
 export class SqliteServiceClient {
   readonly config: SqliteServiceConfig;
@@ -28,6 +30,12 @@ export class SqliteServiceClient {
   }
   async health(): Promise<SqliteHealth> {
     const value = sqliteHealthSchema.parse(await this.call("health")); await this.identity(value); return value;
+  }
+  async catalog(input: SqliteCatalogRequest): Promise<SqliteCatalogResponse> {
+    const request = sqliteCatalogRequestSchema.parse(input), value = sqliteCatalogResponseSchema.parse(await this.call("catalog", request));
+    await this.identity(value);
+    if (JSON.stringify(value.request) !== JSON.stringify(request)) throw new Error("SQLite catalog response differs from its exact request");
+    return value;
   }
   async prepare(request: SqliteRuntimeRequest): Promise<SqliteHealth> {
     const value = sqliteHealthSchema.parse(await this.call("prepare", request)); await this.identity(value);

@@ -17,7 +17,8 @@ import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions };
+export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
+  listOptions?: { includeDeleted?: boolean; cursor?: string } };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
 const controlSchema = z.object({ action: z.enum(["pause", "resume"]), request: sqliteRuntimeRequestSchema, window: z.uuid().optional(),
@@ -70,6 +71,10 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf };
   if (command === "init-reconcile" && args.length === 1) return reconcileSqliteInitialization(root, config, args[0], cf);
   if (command === "service-status" && !args.length) return client.health();
+  if (command === "list-shows" && !args.length || command === "list-episodes" && args.length === 1) {
+    return client.catalog({ kind: command === "list-shows" ? "show" : "episode", ...(command === "list-episodes" ? { show_id: validateId(args[0], "show") } : {}),
+      include_deleted: options.listOptions?.includeDeleted ?? false, ...(options.listOptions?.cursor ? { cursor: options.listOptions.cursor } : {}) });
+  }
   if (["service-pause", "service-resume"].includes(command) && args.length === 1) {
     const id = z.uuid().parse(args[0]), action = command === "service-pause" ? "pause" : "resume";
     const journal = createLocalJournalStorage(root, "sqlite-controls", config.service_id, `${id}.json`);

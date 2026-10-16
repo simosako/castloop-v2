@@ -8,6 +8,8 @@ import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
 import { publicationChecksum } from "./publication-inputs";
+import { readSqliteCatalog } from "./sqlite-catalog";
+import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../packages/shared/src/sqlite-catalog";
 
 type SetupRow = { operation_id: string; state: "scheduled" | "running" | "ready" | "blocked"; request_json: string };
 export type SqliteCacheRuntime = { worker_version_id: string; service_config_sha256: string; cache_enabled: boolean };
@@ -25,6 +27,10 @@ export class SqliteServiceRuntime {
     return this.storage.sql.exec<SetupRow>("SELECT operation_id, state, request_json FROM publication_runtime_setup WHERE id = 1").toArray()[0] ?? null;
   }
   ready(): boolean { return this.setup()?.state === "ready"; }
+  catalog(request: SqliteCatalogRequest): SqliteCatalogResponse {
+    if (!this.ready()) throw new Error("SQLite runtime is not ready");
+    return readSqliteCatalog(this.storage, request, this.queue.identity(), this.config.public_base_url);
+  }
   requireTarget(input: SqliteRuntimeRequest): SqliteRuntimeRequest {
     const request = sqliteRuntimeRequestSchema.parse(input), identity = this.queue.identity();
     if (request.service_id !== identity.service_id || request.worker_version_id !== identity.worker_version_id ||

@@ -43,6 +43,8 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     await command(["update-episode", "first"], directory); await command(["update-episode-audio", "first", "audio.mp3"], directory);
     const publication = await command(["publish-episode", "first"], directory); expect(publication).toMatchObject({ state: "succeeded" });
     expect(await command(["job-status", String(publication.job_id)])).toMatchObject({ status: { state: "succeeded" } });
+    expect(await command(["list-shows", "--json"])).toMatchObject({ shows: [{ show_id: "daily", lifecycle: "published" }] });
+    expect(await command(["list-episodes", "daily", "--json"])).toMatchObject({ episodes: [{ episode_id: "first", lifecycle: "published" }] });
     await command(["service-pause", crypto.randomUUID()]);
     expect(await command(["service-status"])).toMatchObject({ state: "paused", drained: true });
     expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
