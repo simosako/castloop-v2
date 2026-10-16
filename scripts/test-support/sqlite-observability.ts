@@ -18,10 +18,10 @@ const frameSchema = z.object({
   cpuTime: z.number().finite().nonnegative().optional(), wallTime: z.number().finite().nonnegative().optional(),
   truncated: z.boolean().default(false), entrypoint: z.unknown().optional(), durableObjectId: z.unknown().optional(),
   scriptVersion: z.object({ id: z.unknown().optional() }).optional(),
-  event: z.object({ entrypoint: z.unknown().optional(), durableObjectId: z.unknown().optional(), scheduledTime: z.number().finite().optional(),
+  event: z.object({ entrypoint: z.unknown().optional(), durableObjectId: z.unknown().optional(), scheduledTime: z.union([z.number().finite(), z.iso.datetime()]).optional(),
     request: z.object({ url: z.string(), method: z.string(), headers: z.record(z.string(), z.unknown()).optional() }).optional(),
     response: z.object({ status: z.number().int().min(100).max(599) }).optional(),
-    rpcMethod: z.unknown().optional(), methodName: z.unknown().optional() }).default({}),
+    rpcMethod: z.unknown().optional(), methodName: z.unknown().optional() }).nullable().default({}),
   logs: z.array(z.object({ message: z.array(z.unknown()) })).default([]),
   exceptions: z.array(z.unknown()).default([]),
 });
@@ -32,12 +32,28 @@ export type SqliteInvocation = {
   path?: string; method?: string; probe_id?: string; status?: number; truncated: boolean;
   exception_count: number; unrecognized_logs: number; logs: z.infer<typeof diagnosticSchema>[];
 };
+export class SqliteTailFrameError extends Error {
+  constructor(readonly reasonCode: "frame_format_unverified" | "frame_json_unverified" | "frame_schema_unverified", readonly fields: string[] = []) {
+    super(`SQLite tail capture was not verified: ${reasonCode}`); this.name = "SqliteTailFrameError";
+  }
+}
 
 export function sanitizeSqliteInvocation(data: unknown): SqliteInvocation {
   const text = typeof data === "string" ? data : data instanceof ArrayBuffer ? new TextDecoder().decode(data) :
     ArrayBuffer.isView(data) ? new TextDecoder().decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)) : null;
-  if (text === null) throw new Error("Unsupported SQLite tail frame");
-  const raw = frameSchema.parse(JSON.parse(text)), event = raw.event, request = event.request;
+  if (text === null) throw new SqliteTailFrameError("frame_format_unverified");
+  let input: unknown;
+  try { input = JSON.parse(text) as unknown; } catch { throw new SqliteTailFrameError("frame_json_unverified"); }
+  const parsed = frameSchema.safeParse(input);
+  if (!parsed.success) {
+    const fields = ["outcome", "eventTimestamp", "cpuTime", "wallTime", "truncated", "scriptVersion", "event.scheduledTime",
+      "event.request.url", "event.request.method", "event.request.headers", "event.response", "event", "logs", "exceptions"];
+    throw new SqliteTailFrameError("frame_schema_unverified", [...new Set(parsed.error.issues.map((issue) => {
+      const path = issue.path.join("."); return fields.find((field) => path === field || path.startsWith(`${field}.`)) ?? "other";
+    }))]);
+  }
+  const raw = parsed.data;
+  const event: NonNullable<typeof raw.event> = raw.event ?? {}, request = event.request;
   const logs: SqliteInvocation["logs"] = []; let unrecognizedLogs = 0;
   for (const log of raw.logs) for (const value of log.message) {
     try { const parsed = diagnosticSchema.safeParse(typeof value === "string" ? JSON.parse(value) : value);
@@ -124,7 +140,8 @@ export type SqliteCoverage = {
   missing_probe_cpu: string[]; jobs_missing_logs: string[]; frames_without_expected_version: number;
   capture_complete: boolean; alarm_cpu_attribution_verified: false;
 };
-export function summarizeSqliteCoverage(rows: SqliteInvocation[], probes: Array<{ id: string }>, jobs: Array<{ job_id: string }>, versionId: string): SqliteCoverage {
+export function summarizeSqliteCoverage(rows: SqliteInvocation[], probes: Array<{ id: string }>, jobs: Array<{ job_id: string }>, versionId: string,
+  capture: { capture_complete: boolean }): SqliteCoverage {
   const matching = rows.filter((row) => row.worker_version_id === versionId);
   const probeCoverage = probes.map(({ id }) => {
     const frames = matching.filter((row) => row.kind === "outer-http" && row.probe_id === id && typeof row.cpu_ms === "number");
@@ -137,7 +154,7 @@ export function summarizeSqliteCoverage(rows: SqliteInvocation[], probes: Array<
   return { probes: probeCoverage, jobs: jobCoverage, missing_probe_cpu: probeCoverage.filter((probe) => !probe.captured).map((probe) => probe.probe_id),
     jobs_missing_logs: jobCoverage.filter((job) => !job.started || !job.succeeded).map((job) => job.job_id),
     frames_without_expected_version: rows.length - matching.length,
-    capture_complete: probeCoverage.every((probe) => probe.captured) && jobCoverage.every((job) => job.started && job.succeeded) &&
+    capture_complete: capture.capture_complete && probeCoverage.every((probe) => probe.captured) && jobCoverage.every((job) => job.started && job.succeeded) &&
       rows.every((row) => row.worker_version_id === versionId && !row.truncated && row.kind !== "unknown"),
     alarm_cpu_attribution_verified: false as const };
 }

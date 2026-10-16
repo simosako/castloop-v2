@@ -8,12 +8,17 @@ const health = { ...runtime, protocol: "sqlite-sequential-v1", invocation_id: re
   admission_window_id: requestId, queued: 0, active: null, drained: true, setup: { operation_id: requestId, state: "ready" }, runtime_update: null };
 const expected = { job_id: jobId, request_id: requestId, request_sha256: "b".repeat(64) };
 const status = { ...expected, service_id: "trial", protocol: "sqlite-sequential-v1", sequence: 1, state: "succeeded" };
+const captured = { capture_complete: true };
 const frame = (overrides: object = {}) => sanitizeSqliteInvocation(JSON.stringify({ outcome: "ok", cpuTime: 0,
   scriptVersion: { id: version }, event: { request: { url: `https://trial.invalid/admin/sqlite-publication/jobs/${requestId}?token=private`, method: "GET",
     headers: { Authorization: "Bearer private", "X-Castloop-Probe": probeId } }, response: { status: 200 } }, ...overrides }));
 const log = (phase = "succeeded") => ({ message: [JSON.stringify({ event: "sqlite_publication", phase, job_id: jobId, request_id: requestId, sequence: 1, private: "never-log" })] });
 
 describe("SQLite trial trace classification", () => {
+  test("nullable platform events stay unclassified rather than becoming HTTP measurements", () => {
+    const row = frame({ event: null }); expect(row.kind).toBe("unknown");
+    expect(summarizeSqliteCoverage([row], [], [], version, captured).capture_complete).toBe(false);
+  });
   test("captures safe identity/CPU fields, not queries, headers, object IDs, exceptions, or arbitrary logs", () => {
     const row = frame({ logs: [log(), { message: ["private log", { secret: "private" }] }], exceptions: [{ name: "private", message: "private" }] });
     expect(row.probe_id).toBe(probeId); expect(row.cpu_ms).toBe(0); expect(row.kind).toBe("outer-http");
@@ -33,6 +38,8 @@ describe("SQLite trial trace classification", () => {
     const row = frame({ outcome: "canceled", entrypoint: "SqlitePublicationService", durableObjectId: "private", event: { scheduledTime: 1 } });
     expect(row.kind).toBe("do-alarm"); expect(classifySqliteInvocation(row)).toBe("reconcile");
     expect(classifySqliteInvocation(frame({ outcome: "canceled", entrypoint: "SqlitePublicationService", event: { scheduledTime: 1 } }))).toBe("failed");
+    const serialized = frame({ outcome: "canceled", entrypoint: "SqlitePublicationService", durableObjectId: "private", event: { scheduledTime: "2026-10-16T11:22:02.000Z" } });
+    expect(serialized.kind).toBe("do-alarm"); expect(classifySqliteInvocation(serialized)).toBe("reconcile");
   });
   test("canceled mutation/other read, truncated frame, exceptions and unrecognized logs stop safely", () => {
     const base = { outcome: "canceled" };
@@ -71,15 +78,16 @@ describe("SQLite measurement coverage", () => {
   test("DO status traces with completion logs never count as outer HTTP or total Alarm CPU", () => {
     const rows = [frame({ entrypoint: "SqlitePublicationService", durableObjectId: "private", cpuTime: 50, logs: [log()] }),
       frame({ entrypoint: "SqliteCachedAssets", cpuTime: 6 }), frame({ entrypoint: "UnknownEntrypoint", cpuTime: 1 })];
-    const result = summarizeSqliteCoverage(rows, [{ id: probeId }], [{ job_id: jobId }], version);
+    const result = summarizeSqliteCoverage(rows, [{ id: probeId }], [{ job_id: jobId }], version, captured);
     expect(result.missing_probe_cpu).toEqual([probeId]); expect(result.jobs_missing_logs).toEqual([jobId]);
     expect(result.jobs[0]?.succeeded).toBe(true); expect(result.alarm_cpu_attribution_verified).toBe(false); expect(result.capture_complete).toBe(false);
   });
   test("zero CPU is captured; version mismatch, duplicates and missing starts remain explicit", () => {
     const row = frame({ logs: [log("started"), log()] });
-    expect(summarizeSqliteCoverage([row], [{ id: probeId }], [{ job_id: jobId }], version)).toMatchObject({ capture_complete: true, missing_probe_cpu: [] });
+    expect(summarizeSqliteCoverage([row], [{ id: probeId }], [{ job_id: jobId }], version, captured)).toMatchObject({ capture_complete: true, missing_probe_cpu: [] });
+    expect(summarizeSqliteCoverage([row], [{ id: probeId }], [{ job_id: jobId }], version, { capture_complete: false }).capture_complete).toBe(false);
     for (const rows of [[row, row], [frame({ scriptVersion: { id: jobId } })], [frame({ scriptVersion: {} })]]) {
-      expect(summarizeSqliteCoverage(rows, [{ id: probeId }], [], version).capture_complete).toBe(false);
+      expect(summarizeSqliteCoverage(rows, [{ id: probeId }], [], version, captured).capture_complete).toBe(false);
     }
   });
 });

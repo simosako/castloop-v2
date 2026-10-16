@@ -80,6 +80,25 @@ CLIは、完全に一致するprepared要求の旧versionだけを最大120回GE
 伝播時刻は旧versionを観測した11:13:45と、この確認の間であり、正確な所要時間は測定していない。
 継続は同じ更新の初回activationと未開始のRSS公開だけで、新しい配備は行わない。
 
+### 初回activation完了後の観測停止
+
+`20c2a43`の正式`update-service-verify`は、11:22:06 UTCにexit 0 / readyで完了した。
+同じ配備・namespaceに対する初回activationとnative Alarm/R2/cache/purge probeであり、再配備はない。
+証跡は`.local-test-data/results/20261016/sqlite-followup-b2180705/`。
+
+その後、監視側のframe schema不具合で、RSSを始める前に停止した。
+生成済みplatform型の`TraceItemAlarmEventInfo.scheduledTime`は`Date`であり、JSONでは日時文字列になる。
+新collectorは数値だけを許しており、この正規形式に対応していなかった。native 19 framesに対し保存18 rowsで1件が欠けた。
+raw frameを保存していないため、欠けた1件の値やCPUは復元できない。
+
+collectorをJSON日時文字列/数値へ対応させ、拒否時にはallowlisted field名と固定reasonだけを保存するよう修正した。
+null eventはHTTPに分類しない。採取拒否件数・最初の診断と総frame/保存row数も保持する。
+coverage集計へcollectorの完全性を必須入力とし、採取失敗があるのに`measurement: complete`とする不具合も修正した。
+古いrun-resultのcomplete表示はこの誤判定であり、原記録を書き換えず、本節で欠測と明示する。
+修正後の全自動テストは**1,385件成功 / 0失敗（149 files、90.42秒）**。共通試験部品58件、型検査とprivate runnerの型検査も成功した。
+
+完了済みupdate/activation/probeは繰り返さない。次はready/paused/drainedをGET-onlyで照合し、未開始のresume・RSS公開だけを実行する。
+
 参照：[Durable Objects known issues — code updates](https://developers.cloudflare.com/durable-objects/platform/known-issues/#code-updates)。
 
 ## 関連
