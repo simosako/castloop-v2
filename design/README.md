@@ -30,6 +30,7 @@
 | [試験通知・R2読取診断](trial_notifications_and_r2_read_diagnostics.md) | tmux独立監視と同一OpenCode sessionへの通知、一時GETの有限再試行、診断のallowlist |
 | [SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md) | 一意upload→DO SQLite FIFO→Alarm。実DO入口・fresh init/readiness・正式CLI・配信接続のローカル実装と残る実機/P6の範囲 |
 | [SQLite開発版の操作・制限](../docs/sqlite_sequential_development.md) | schema version 2の明示init、公開・pause/resume、未知IOの保全、未対応操作と実機未検証の範囲 |
+| [SQLite実機受け入れ・測定](sqlite_sequential_measurement_20261016.md) | 新規隔離環境の段階試験、初回REST応答形の修正、既知の配備を再送しない検証継続と測定範囲 |
 | [制御状態の保存先・公開方式の再検討](control_plane_storage_reconsideration_20261016.md) | R2/DO/D1の比較履歴。DO＋Queuesと全面的な公開先切替を必須とした案は最新計画で修正 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [管理機能候補](podcast_management_features_draft.md) | 一覧の採用結果と未採用の候補 |

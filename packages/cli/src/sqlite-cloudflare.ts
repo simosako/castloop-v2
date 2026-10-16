@@ -10,7 +10,7 @@ const uuid = z.uuid(), hash = z.string().min(1).max(256);
 const evidenceSchema = z.object({ worker_version_id: uuid, deployment_id: uuid, namespace_id: z.string().regex(/^[a-f0-9]{32}$/), script_etag: hash }).strict();
 export type SqliteDeploymentEvidence = z.infer<typeof evidenceSchema>;
 const record = z.record(z.string(), z.unknown());
-const settingsSchema = z.object({ bindings: z.array(record), exports: record, compatibility_date: z.string(),
+const settingsSchema = z.object({ bindings: z.array(record), exports: record.optional(), compatibility_date: z.string(),
   compatibility_flags: z.array(z.string()), cache_options: z.object({ enabled: z.boolean(), cross_version_cache: z.boolean() }),
   observability: z.object({ enabled: z.boolean(), logs: z.object({ enabled: z.boolean() }), traces: z.object({ enabled: z.boolean() }) }) });
 const deploymentSchema = z.object({ deployments: z.array(z.object({ id: uuid, versions: z.array(z.object({ version_id: uuid, percentage: z.number() })) })) });
@@ -91,15 +91,16 @@ export class SqliteCloudflareApi {
       await this.json("POST", `${this.path()}/subdomain`, { enabled: true, previews_enabled: false }));
     if (!value.enabled) throw new Error("SQLite workers.dev access was not verified");
   }
-  private checkSettings(input: unknown): { namespaceId: string; fingerprint: string } {
+  private checkSettings(input: unknown, versionExports: Record<string, unknown>): { namespaceId: string; fingerprint: string } {
     const settings = settingsSchema.parse(input), expected = buildSqliteWorkerMetadata(this.config, "comparison-only");
+    const exports = settings.exports ?? versionExports;
     if (settings.compatibility_date !== SQLITE_WORKER_COMPATIBILITY_DATE ||
       JSON.stringify(settings.compatibility_flags) !== JSON.stringify(expected.compatibility_flags) ||
       JSON.stringify(settings.cache_options) !== JSON.stringify(expected.cache_options) ||
       !settings.observability.enabled || !settings.observability.logs.enabled || !settings.observability.traces.enabled ||
-      JSON.stringify(Object.keys(settings.exports).sort()) !== JSON.stringify(Object.keys(expected.exports).sort())) throw new Error("SQLite runtime settings differ");
+      JSON.stringify(Object.keys(exports).sort()) !== JSON.stringify(Object.keys(expected.exports).sort())) throw new Error("SQLite runtime settings differ");
     for (const [name, value] of Object.entries(expected.exports)) {
-      const actual = record.parse(settings.exports[name]);
+      const actual = record.parse(exports[name]);
       if (actual.type !== value.type || actual.container !== undefined || actual.state !== undefined && actual.state !== "created" ||
         ("storage" in value ? actual.storage !== value.storage : record.parse(actual.cache).enabled !== value.cache.enabled)) throw new Error("SQLite runtime exports differ");
     }
@@ -111,29 +112,30 @@ export class SqliteCloudflareApi {
         (actual.class_name !== undefined && actual.class_name !== binding.class_name || actual.script_name !== undefined && actual.script_name !== this.config.worker_name)) throw new Error("SQLite binding target differs");
     }
     const namespaceId = z.string().regex(/^[a-f0-9]{32}$/).parse(settings.bindings.find((binding) => binding.name === "CASTLOOP_SQLITE")!.namespace_id);
-    return { namespaceId, fingerprint: JSON.stringify({ exports: settings.exports, bindings: settings.bindings.map(({ text, ...binding }) => binding),
+    return { namespaceId, fingerprint: JSON.stringify({ exports, bindings: settings.bindings.map(({ text, ...binding }) => binding),
       compatibility_date: settings.compatibility_date, cache_options: settings.cache_options }) };
   }
   async inspect(expected: { worker_version_id: string; deployment_id: string; script_etag: string }): Promise<SqliteDeploymentEvidence> {
     const first = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`), expected.worker_version_id);
     if (first.id !== expected.deployment_id) throw new Error("SQLite deployment receipt differs");
     const settingsInput = settingsSchema.parse(await this.json("GET", `${this.path()}/settings`));
-    const settings = this.checkSettings(settingsInput);
     const version = z.object({ id: uuid, resources: z.object({ bindings: z.array(record), script: z.object({ etag: hash }),
-      script_runtime: settingsSchema.pick({ exports: true, compatibility_date: true, compatibility_flags: true }) }) }).parse(await this.json("GET", `${this.path()}/versions/${expected.worker_version_id}`));
+      script_runtime: settingsSchema.pick({ compatibility_date: true, compatibility_flags: true }).extend({ exports: record,
+        cache_options: settingsSchema.shape.cache_options.optional() }) }) }).parse(await this.json("GET", `${this.path()}/versions/${expected.worker_version_id}`));
+    const settings = this.checkSettings(settingsInput, version.resources.script_runtime.exports);
     if (version.id !== expected.worker_version_id || version.resources.script.etag !== expected.script_etag ||
-      this.checkSettings({ ...settingsInput, ...version.resources.script_runtime, bindings: version.resources.bindings }).namespaceId !== settings.namespaceId) throw new Error("SQLite uploaded version differs");
+      this.checkSettings({ ...settingsInput, ...version.resources.script_runtime, bindings: version.resources.bindings }, version.resources.script_runtime.exports).namespaceId !== settings.namespaceId) throw new Error("SQLite uploaded version differs");
     let namespaceVerified = false;
     for (let page = 1; page <= 100; page++) {
       const namespaces = z.array(record).parse(
         await this.json("GET", `/workers/durable_objects/namespaces?page=${page}&per_page=100`));
       const found = namespaces.find((item) => item.id === settings.namespaceId);
-      if (found) { namespaceVerified = found.script === this.config.worker_name && found.class === "SqlitePublicationService"; break; }
+      if (found) { namespaceVerified = found.script === this.config.worker_name && found.class === "SqlitePublicationService" && found.use_sqlite === true; break; }
       if (namespaces.length < 100) break;
     }
     if (!namespaceVerified) throw new Error("SQLite namespace does not belong to the expected Worker class");
     z.object({ enabled: z.literal(true), previews_enabled: z.literal(false) }).parse(await this.json("GET", `${this.path()}/subdomain`));
-    const after = this.checkSettings(await this.json("GET", `${this.path()}/settings`));
+    const after = this.checkSettings(await this.json("GET", `${this.path()}/settings`), version.resources.script_runtime.exports);
     const last = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`), expected.worker_version_id);
     if (after.fingerprint !== settings.fingerprint || JSON.stringify(last) !== JSON.stringify(first)) throw new Error("SQLite runtime changed during inspection");
     return evidenceSchema.parse({ ...expected, namespace_id: settings.namespaceId });

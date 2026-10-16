@@ -102,6 +102,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "init-reconcile OPERATION_UUID",
     description: "Reconcile a retained initialization only when the server already completed it paused. Does not redeploy or replay initialization.",
   },
+  "init-continue-verification": {
+    usage: "init-continue-verification OPERATION_UUID",
+    description: "SQLite development only: continue verified setup after an acknowledged deployment/access configuration.\n" +
+      "Requires unchanged frozen source/configuration and a fresh paused runtime with no setup request.\n" +
+      "Never recreates resources, uploads configuration, redeploys, or resends a previously requested setup. init-reconcile remains read-only.",
+  },
   "update-service-continue": {
     usage: "update-service-continue OPERATION_UUID",
     description: "Explicitly activate an acknowledged upload only with a durable not-started activation checkpoint.\n" +

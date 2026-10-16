@@ -6,6 +6,7 @@ import { administratorKey } from "./administrator-key";
 import { SqliteCloudflareApi } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { createLocalJournalStorage } from "./local-journal-storage";
+import type { LocalJournalStorage } from "./local-journal-storage";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import type { R2RestOptions } from "./verified-r2-put";
 import { createHash } from "node:crypto";
@@ -79,31 +80,56 @@ export async function initializeSqliteService(root: string, configInput: SqliteS
     save("worker_requested"); await api.createWorker(); save("worker_created");
     save("deploy_requested"); const receipt = await api.deploy(source, key); save("deployed", { receipt });
     save("access_requested"); await api.enableAccess(receipt.worker_version_id); save("access_enabled");
-    const evidence = await api.inspect(receipt); save("verified", { namespace_id: evidence.namespace_id });
-    let reachable = false;
-    for (let index = 0; index < wait.attempts; index++) {
-      try { const health = await client.health();
-        if (health.worker_version_id !== receipt.worker_version_id || health.state !== "paused" || !health.drained || health.setup !== null) throw new Error("Unexpected fresh runtime");
-        reachable = true; break;
-      } catch { if (index + 1 < wait.attempts) await wait.delay(); }
+    return completeSqliteSetup(journal, state, api, client, wait);
+  });
+}
+
+async function completeSqliteSetup(journal: LocalJournalStorage, input: SqliteInitializationState, api: SqliteCloudflareApi,
+  client: SqliteServiceClient, wait: { attempts: number; delay: () => Promise<void> }): Promise<SqliteInitializationState> {
+  let state = input;
+  if (!["access_enabled", "verified"].includes(state.phase) || !state.receipt) throw new Error("SQLite setup has no acknowledged deployment/access evidence");
+  const receipt = state.receipt, evidence = await api.inspect(receipt);
+  if (state.namespace_id && state.namespace_id !== evidence.namespace_id) throw new Error("SQLite setup namespace changed");
+  const save = (phase: SqliteInitializationState["phase"], fields: Partial<SqliteInitializationState> = {}) => {
+    state = stateSchema.parse({ ...state, ...fields, phase }); journal.replace(state);
+  };
+  save("verified", { namespace_id: evidence.namespace_id });
+  let reachable = false;
+  for (let index = 0; index < wait.attempts; index++) {
+    try { const health = await client.health();
+      if (health.worker_version_id !== receipt.worker_version_id || health.state !== "paused" || !health.drained || health.setup !== null || health.publication_ready) throw new Error("Unexpected fresh runtime");
+      reachable = true; break;
+    } catch { if (index + 1 < wait.attempts) await wait.delay(); }
+  }
+  if (!reachable) throw new Error("Expected fresh paused SQLite runtime was not verified; no setup was submitted");
+  const request = { operation_id: state.operation_id, service_id: api.config.service_id, worker_version_id: receipt.worker_version_id,
+    service_config_sha256: state.service_config_sha256 };
+  save("setup_requested");
+  try { await client.prepare(request); }
+  catch { console.error(JSON.stringify({ event: "sqlite_initialization", operation_id: state.operation_id, reason_code: "setup_submission_unconfirmed" })); }
+  for (let index = 0; index < wait.attempts; index++) {
+    const health = await client.health();
+    if (health.worker_version_id !== receipt.worker_version_id || health.setup && health.setup.operation_id !== state.operation_id ||
+      health.state !== "paused" || !health.drained) throw new Error("SQLite initialization runtime differs; no automatic replay");
+    if (health.setup?.state === "blocked") throw new Error("SQLite runtime probe is blocked; preserve initialization evidence");
+    if (health.publication_ready && health.setup?.state === "ready") {
+      await api.inspect(receipt); save("ready"); return state;
     }
-    if (!reachable) throw new Error("Expected fresh paused SQLite runtime was not verified; no setup was submitted");
-    const request = { operation_id: operationId, service_id: config.service_id, worker_version_id: receipt.worker_version_id,
-      service_config_sha256: initial.service_config_sha256 };
-    save("setup_requested");
-    try { await client.prepare(request); }
-    catch { console.error(JSON.stringify({ event: "sqlite_initialization", operation_id: operationId, reason_code: "setup_submission_unconfirmed" })); }
-    for (let index = 0; index < wait.attempts; index++) {
-      const health = await client.health();
-      if (health.worker_version_id !== receipt.worker_version_id || health.setup && health.setup.operation_id !== operationId ||
-        health.state !== "paused" || !health.drained) throw new Error("SQLite initialization runtime differs; no automatic replay");
-      if (health.setup?.state === "blocked") throw new Error("SQLite runtime probe is blocked; preserve initialization evidence");
-      if (health.publication_ready && health.setup?.state === "ready") {
-        await api.inspect(receipt); save("ready"); return state;
-      }
-      if (index + 1 < wait.attempts) await wait.delay();
-    }
-    throw new Error("SQLite runtime setup remains unconfirmed; preserve the journal without resending");
+    if (index + 1 < wait.attempts) await wait.delay();
+  }
+  throw new Error("SQLite runtime setup remains unconfirmed; preserve the journal without resending");
+}
+
+export async function continueSqliteInitialization(root: string, config: SqliteServiceConfig, operationId: string, source: string,
+  options: R2RestOptions, wait: { attempts: number; delay: () => Promise<void> } = { attempts: 120, delay: () => Bun.sleep(1000) }): Promise<SqliteInitializationState> {
+  if (!Number.isSafeInteger(wait.attempts) || wait.attempts < 1 || wait.attempts > 120) throw new Error("Invalid SQLite initialization observation limit");
+  const journal = local(root, config), key = administratorKey(root);
+  return journal.exclusively(async () => {
+    const state = stateSchema.parse(journal.read());
+    if (state.operation_id !== operationId || state.service_config_sha256 !== await sqliteServiceConfigHash(config) ||
+      state.worker_source_sha256 !== digest(source) || state.worker_metadata_sha256 !== digest(JSON.stringify(buildSqliteWorkerMetadata(config, key))) ||
+      !["access_enabled", "verified"].includes(state.phase)) throw new Error("SQLite continuation requires the exact acknowledged deployment before its first setup submission; unknown mutations are not replayed");
+    return completeSqliteSetup(journal, state, new SqliteCloudflareApi(config, options), new SqliteServiceClient(config, key, options.transport), wait);
   });
 }
 

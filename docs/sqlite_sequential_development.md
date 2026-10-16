@@ -144,6 +144,15 @@ castloop service-status
 **サーバーで既にready/paused/drainedの完了を読取確認できる場合だけ**ローカル記録を確定する。
 未知deployの探索・採用・再配備や強制掃除を行うコマンドではない。
 
+配備とworkers.dev有効化が応答確認済みで、REST検証だけが停止し、setupをまだ送っていない場合は、次の明示操作で検証と初回setupだけを続けられる。
+
+```sh
+castloop init-continue-verification INIT_UUID
+```
+
+対象は元journalの`access_enabled`/`verified`だけ。凍結source/config/metadata hashが一致し、native setupが存在せずpaused/drainedの場合に限定する。
+resource作成・設定PUT・配備・access変更は再送しない。`setup_requested`やblockedのprobeを再試行するコマンドでもない。
+
 物理deleteと未登録uploadのsettlement契約は未実装。現行staging keyだけでは未登録音源をEpisodeへ確実に対応付けられない。空のキューを根拠にbucketやprefixを削除しない。
 
 ## 検証の限界

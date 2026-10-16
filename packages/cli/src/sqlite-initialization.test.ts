@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { initializeSqliteService, readSqliteInitialization, reconcileSqliteInitialization } from "./sqlite-initialization";
+import { continueSqliteInitialization, initializeSqliteService, readSqliteInitialization, reconcileSqliteInitialization } from "./sqlite-initialization";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
 import { existsSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
@@ -115,4 +115,42 @@ test("private-state ignore rules override earlier negations without rewriting us
   expect(ignored.exitCode).toBe(0); expect(ignored.stdout.toString().trim().split("\n")).toEqual([".castloop/secrets.json", "sample.mp3"]);
   await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait);
   expect(readFileSync(file, "utf8")).toBe(protectedSource);
+});
+
+test("real-shaped settings without exports are verified against mandatory pinned-version exports", async () => {
+  const value = await fixture();
+  expect((await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, wait)).phase).toBe("ready");
+  const missing = await fixture(); missing.faults.missingVersionExports = true;
+  await expect(initializeSqliteService(missing.root, missing.config, crypto.randomUUID(), "source", missing.options, wait)).rejects.toThrow();
+  expect(missing.calls.some((call) => call.path.endsWith("/prepare"))).toBe(false);
+  expect(missing.runtime.ready()).toBe(false);
+});
+
+test("explicit verification continuation submits setup once without replaying acknowledged resource or deployment mutations", async () => {
+  const value = await fixture(), id = crypto.randomUUID(); value.faults.failFirstInspection = true;
+  await expect(initializeSqliteService(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow();
+  expect(readSqliteInitialization(value.root, value.config)!.phase).toBe("access_enabled");
+  value.calls.length = 0;
+  await expect(continueSqliteInitialization(value.root, value.config, id, "changed", value.options, wait)).rejects.toThrow("exact acknowledged");
+  expect(value.calls).toEqual([]);
+  expect((await continueSqliteInitialization(value.root, value.config, id, "source", value.options, wait)).phase).toBe("ready");
+  expect(value.calls.filter((call) => call.method !== "GET")).toEqual([{ method: "POST", path: "/admin/sqlite-service/prepare" }]);
+  const count = value.calls.length;
+  await expect(continueSqliteInitialization(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow("exact acknowledged");
+  expect(value.calls).toHaveLength(count);
+});
+
+test("continuation rejects unknown deployment/access and already-submitted blocked setup before any remote call", async () => {
+  for (const lost of ["deploy", "access"] as const) {
+    const value = await fixture(), id = crypto.randomUUID(); value.faults.lost = lost;
+    await expect(initializeSqliteService(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow();
+    value.calls.length = 0;
+    await expect(continueSqliteInitialization(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow("unknown mutations");
+    expect(value.calls).toEqual([]);
+  }
+  const blocked = await fixture(), id = crypto.randomUUID(); blocked.faults.failPurge = true;
+  await expect(initializeSqliteService(blocked.root, blocked.config, id, "source", blocked.options, wait)).rejects.toThrow("blocked");
+  blocked.calls.length = 0;
+  await expect(continueSqliteInitialization(blocked.root, blocked.config, id, "source", blocked.options, wait)).rejects.toThrow("unknown mutations");
+  expect(blocked.calls).toEqual([]);
 });

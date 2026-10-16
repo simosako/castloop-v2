@@ -37,7 +37,7 @@ export async function sqliteServiceFixture() {
   const calls: Array<{ method: string; path: string }> = [];
   const faults: { lost?: "bucket" | "config" | "worker" | "deploy" | "access" | "setup" | "register" | "control" | "update-prepare" | "activation";
     namespace?: boolean; settings?: boolean; existing?: "bucket" | "worker" | "empty"; failPurge?: boolean; afterPublish?: () => Promise<void>;
-    afterDeploy?: () => void; deferUpdateProbe?: boolean } = {};
+    afterDeploy?: () => void; deferUpdateProbe?: boolean; missingVersionExports?: boolean; failFirstInspection?: boolean } = {};
   const json = (result: unknown) => Response.json({ success: true, result });
   const settings = (): Record<string, unknown> & { bindings: Array<Record<string, unknown>> } => {
     if (!metadata) throw new Error("Missing deployed settings");
@@ -46,7 +46,8 @@ export async function sqliteServiceFixture() {
       if (binding.type === "durable_object_namespace") return { ...binding, namespace_id: namespaceId };
       return binding;
     });
-    return { ...metadata, bindings, ...(faults.settings ? { cache_options: { enabled: true, cross_version_cache: true } } : {}) };
+    const { exports, ...current } = metadata;
+    return { ...current, bindings, ...(faults.settings ? { cache_options: { enabled: true, cross_version_cache: true } } : {}) };
   };
   const deployment = () => ({ deployments: [{ id: deploymentId, strategy: "percentage", versions: [{ version_id: actual.worker_version_id, percentage: 100 }] }] });
   const transport: R2RestTransport = async (input, init) => {
@@ -93,7 +94,10 @@ export async function sqliteServiceFixture() {
     }
     if (path === "/workers/subdomain") return json({ subdomain: "example" });
     if (path === "/workers/workers" && request.method === "POST") { workerCreated = true; lost("worker"); return json({ name: config.worker_name }); }
-    if (path.endsWith("/settings")) return metadata ? json(settings()) : faults.existing === "worker" ? json({ unknown: true }) : new Response(null, { status: 404 });
+    if (path.endsWith("/settings")) {
+      if (metadata && faults.failFirstInspection) { faults.failFirstInspection = false; return json({ invalid: true }); }
+      return metadata ? json(settings()) : faults.existing === "worker" ? json({ unknown: true }) : new Response(null, { status: 404 });
+    }
     if (path === `/workers/scripts/${config.worker_name}` && request.method === "PUT") {
       if (!workerCreated) throw new Error("Worker must be created first");
       const updating = metadata !== null;
@@ -108,13 +112,14 @@ export async function sqliteServiceFixture() {
     if (path.includes("/versions/")) {
       const current = settings();
       return json({ id: actual.worker_version_id, resources: { bindings: current.bindings, script: { etag },
-        script_runtime: { exports: current.exports, compatibility_date: current.compatibility_date, compatibility_flags: current.compatibility_flags } } });
+        script_runtime: { ...(faults.missingVersionExports ? {} : { exports: metadata!.exports }), compatibility_date: current.compatibility_date,
+          compatibility_flags: current.compatibility_flags, cache_options: current.cache_options } } });
     }
     if (path.endsWith("/subdomain")) {
       if (request.method === "POST") { access = true; lost("access"); }
       return json({ enabled: access, previews_enabled: false });
     }
-    if (path === "/workers/durable_objects/namespaces") return json([{ id: namespaceId, script: faults.namespace ? "other-worker" : config.worker_name, class: "SqlitePublicationService" }]);
+    if (path === "/workers/durable_objects/namespaces") return json([{ id: namespaceId, script: faults.namespace ? "other-worker" : config.worker_name, class: "SqlitePublicationService", use_sqlite: true }]);
     throw new Error(`Unhandled fixture route ${request.method} ${path}`);
   };
   return { ...queue, ...objects, root, config, content, get runtime() { return runtime; }, get queue() { return nativeQueue; }, purges, calls, faults, metadata: () => metadata,
