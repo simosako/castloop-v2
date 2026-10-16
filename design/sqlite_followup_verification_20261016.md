@@ -99,6 +99,49 @@ coverage集計へcollectorの完全性を必須入力とし、採取失敗があ
 
 完了済みupdate/activation/probeは繰り返さない。次はready/paused/drainedをGET-onlyで照合し、未開始のresume・RSS公開だけを実行する。
 
+## 最終結果（2026-10-17 JST追記）
+
+残るRSS確認は`.local-test-data/results/20261016/sqlite-followup-d2bfc94b/`で通過した。
+UTC 2026-10-16 22:05:27開始、22:06:07にsupervisor exit 0 / notification acknowledgedで終了。
+最初に同じ更新のready/paused/drained、receipt/version/config/namespaceと旧R2 inventoryをGET-onlyで再照合し、
+`update-service-reconcile`だけを使った。deploy・activation・probeは繰り返していない。
+
+- 正式`publish-rss-import`で新Show`rss-8bdcc47f`と小容量3 Episode、計**4 jobすべてsucceeded**。
+  CLI全体22.277秒。元の1.5GB音源は転送せず、MP3 uploadは合計**801,568 bytes**。
+  ローカルRSS準備は保存済みfixture transportで行っており、公開インターネットからの取得試験ではない。
+- GUID、`isPermaLink`のtrue/false、公開日時、metadata、内部音源URL、全量音源hash/sizeを確認。
+  各音源のGET/HEAD/Range/ETag条件付き304、feed3件と既存36件feedのbyte不変を確認した。
+- 新規RSSの登録前から存在した**233 objectsすべてkey/ETag/size不変**。
+  bucket snapshotは253 objects / **24,869,390 bytes**。削除、強制解放、新規資源や権限・課金変更はない。
+- 最終状態は`publication_ready=true / paused / drained=true / active=null / queued=0`。
+  update/setupは同じoperationでcompleted/ready、新RSS feedは503。全ローカル試験プロセスが終了した。
+
+### CPU・ログの取得範囲
+
+最終runnerはnative 64 framesを64 rowsとして保存し、**schema拒否0、採取faultなし**。
+ただしsocket/collector正常は全要求の配送保証ではない。
+
+| 種別 | 採取件数 | CPU最大 |
+| --- | ---: | ---: |
+| 外側HTTP | 54 | 2 ms |
+| cache owner HTTP | 6 | 2 ms |
+| cache RPC | 4 | 1 ms |
+
+公開probe **19件中15件**だけCPU identityを捕捉した。最後のRange/条件付きGET、既存feed再確認、paused feed確認の計4件が欠測。
+DO/Alarm frameは0件、4 jobの開始・完了ログも欠けた。unknown logを捨てて欠けたのではなく、保存64 framesにこれらのDOイベントが含まれなかった。
+配送・sampling・tail有効化の伝播・終了時の遅延のどれが原因かは確定していない。
+`run-result`・supervisor・通知は正しく**機能passed / measurement incomplete**とした。
+元の欠測を後日の別GETで埋めず、CPU値も推定しない。HTTP最大2msをDO/Alarm全体CPUや全Free適合の証明にはしない。
+
+### 今回完了した範囲と残る確認
+
+共通観測部品の開発・回帰、正式CLIの互換更新と新RSS公開の実機確認は完了。
+新方式でも300,000,001 bytesの入力をPUT前に拒否する自動回帰を確認したが、**300,000,000 bytesの新経路実機公開は行っていない**。
+実機のpurge rate-limit negative acknowledgment/retry、完全なDO/Alarm CPU採取、恒久的なIssue #13解消・release readinessは未確認。
+追加の負荷試験や大容量転送、resume、再配備・再activation、cleanup等はこの完了通知から開始しない。
+
+集計はprivate `followup-summary.json`。素材・raw証跡・鍵・local journalはGitへ追加していない。
+
 参照：[Durable Objects known issues — code updates](https://developers.cloudflare.com/durable-objects/platform/known-issues/#code-updates)。
 
 ## 関連
