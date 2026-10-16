@@ -27,7 +27,7 @@ export class SqliteCloudflareApi {
     try { response = await (this.options.transport ?? fetch)(`${this.base}${path}`, { method, body, redirect: "error",
       signal: AbortSignal.timeout(method === "PUT" ? 120000 : 30000), headers: { Authorization: `Bearer ${this.options.apiToken}`,
         ...(contentType ? { "Content-Type": contentType } : {}) } }); }
-    catch { throw new Error("Cloudflare request outcome is unknown; preserve the initialization journal without retry"); }
+    catch { throw new Error("Cloudflare request outcome is unknown; preserve the operation journal without retry"); }
     if (response.status === 404 && absent) { await response.body?.cancel(); return null; }
     if (![200, 201].includes(response.status) || !response.body || response.headers.has("Content-Range")) {
       await response.body?.cancel(); throw new Error(`Cloudflare request was not verified (HTTP ${response.status})`);
@@ -137,5 +137,12 @@ export class SqliteCloudflareApi {
     const last = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`), expected.worker_version_id);
     if (after.fingerprint !== settings.fingerprint || JSON.stringify(last) !== JSON.stringify(first)) throw new Error("SQLite runtime changed during inspection");
     return evidenceSchema.parse({ ...expected, namespace_id: settings.namespaceId });
+  }
+  async current(): Promise<SqliteDeploymentEvidence> {
+    const deployment = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`));
+    const versionId = deployment.versions[0].version_id;
+    const version = z.object({ id: uuid, resources: z.object({ script: z.object({ etag: hash }) }) }).parse(await this.json("GET", `${this.path()}/versions/${versionId}`));
+    if (version.id !== versionId) throw new Error("SQLite current version differs");
+    return this.inspect({ worker_version_id: versionId, deployment_id: deployment.id, script_etag: version.resources.script.etag });
   }
 }

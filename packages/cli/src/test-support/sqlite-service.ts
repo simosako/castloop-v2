@@ -9,6 +9,8 @@ import { SqliteServiceRuntime } from "../../../../src/sqlite-service-runtime";
 import { createSqliteServiceHttp } from "../../../../src/sqlite-service-http";
 import { sqlitePublicationFixture } from "../../../../src/test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "../../../../src/test-support/sqlite-publication-bucket";
+import { SqlitePublicationQueue } from "../../../../src/sqlite-publication-queue";
+import { selectSqliteRuntime } from "../../../../src/sqlite-runtime-update";
 import { administratorKey } from "../administrator-key";
 import type { R2RestTransport } from "../verified-r2-put";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -21,14 +23,21 @@ export async function sqliteServiceFixture() {
   writeFileSync(join(root, "castloop.toml"), stringifyToml(config));
   const queue = sqlitePublicationFixture({ resume: false, runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
   const objects = sqlitePublicationBucket(), content = new SqlitePublicationContent(queue.storage), purges: string[] = [];
-  const runtime = new SqliteServiceRuntime(queue.storage, queue.queue, content, objects.bucket, config, {
-    describe: async () => ({ ...queue.runtime, cache_enabled: true }), purge: async (id) => { purges.push(id); } });
-  const runner = new SqlitePublicationAlarm(queue.queue, createSqlitePublicationExecutor(content, objects.bucket, config, { purge: async ({ showId }) => { purges.push(showId); } }), () => {});
-  const namespaceId = "b".repeat(32), deploymentId = crypto.randomUUID(), etag = "frozen-script-etag";
+  let actual = queue.runtime, nativeQueue = queue.queue;
+  const boot = () => {
+    nativeQueue = new SqlitePublicationQueue(queue.storage, selectSqliteRuntime(queue.storage, actual));
+    return new SqliteServiceRuntime(queue.storage, nativeQueue, content, objects.bucket, config, {
+      describe: async () => ({ ...actual, cache_enabled: true }), purge: async (id) => { purges.push(id); } }, actual);
+  };
+  let runtime = boot();
+  const runner = () => new SqlitePublicationAlarm(nativeQueue, createSqlitePublicationExecutor(content, objects.bucket, config, { purge: async ({ showId }) => { purges.push(showId); } }), () => {});
+  const namespaceId = "b".repeat(32);
+  let deploymentId = crypto.randomUUID(), etag = "frozen-script-etag";
   let bucketCreated = false, workerCreated = false, metadata: Record<string, unknown> | null = null, access = false;
   const calls: Array<{ method: string; path: string }> = [];
-  const faults: { lost?: "bucket" | "config" | "worker" | "deploy" | "access" | "setup" | "register" | "control";
-    namespace?: boolean; settings?: boolean; existing?: "bucket" | "worker" | "empty"; failPurge?: boolean; afterPublish?: () => Promise<void> } = {};
+  const faults: { lost?: "bucket" | "config" | "worker" | "deploy" | "access" | "setup" | "register" | "control" | "update-prepare" | "activation";
+    namespace?: boolean; settings?: boolean; existing?: "bucket" | "worker" | "empty"; failPurge?: boolean; afterPublish?: () => Promise<void>;
+    afterDeploy?: () => void; deferUpdateProbe?: boolean } = {};
   const json = (result: unknown) => Response.json({ success: true, result });
   const settings = (): Record<string, unknown> & { bindings: Array<Record<string, unknown>> } => {
     if (!metadata) throw new Error("Missing deployed settings");
@@ -39,7 +48,7 @@ export async function sqliteServiceFixture() {
     });
     return { ...metadata, bindings, ...(faults.settings ? { cache_options: { enabled: true, cross_version_cache: true } } : {}) };
   };
-  const deployment = () => ({ deployments: [{ id: deploymentId, strategy: "percentage", versions: [{ version_id: queue.runtime.worker_version_id, percentage: 100 }] }] });
+  const deployment = () => ({ deployments: [{ id: deploymentId, strategy: "percentage", versions: [{ version_id: actual.worker_version_id, percentage: 100 }] }] });
   const transport: R2RestTransport = async (input, init) => {
     const request = new Request(input, init), url = new URL(request.url), path = url.pathname.replace(`/client/v4/accounts/${config.account_id}`, "");
     calls.push({ method: request.method, path: `${path}${url.search}` });
@@ -54,11 +63,17 @@ export async function sqliteServiceFixture() {
         }
         if (path.endsWith("/register-show")) lost("register");
         if (path.endsWith("/resume") || path.endsWith("/pause")) lost("control");
+        if (path.endsWith("/update-prepare")) lost("update-prepare");
+        if (path.endsWith("/update-activate") && response.ok) {
+          if (faults.failPurge) objects.hooks.beforeGet = async () => { throw new Error("probe unavailable"); };
+          if (!faults.deferUpdateProbe) { queue.clearAlarm(); await runtime.alarm(); }
+          lost("activation");
+        }
         return response;
       }
-      const response = await createSqlitePublicationHttp(queue.queue, key, () => runtime.ready())(request);
+      const response = await createSqlitePublicationHttp(nativeQueue, key, () => runtime.ready())(request);
       if (path.endsWith("/jobs") && request.method === "POST" && response.status === 202) {
-        queue.clearAlarm(); await runner.alarm(); await faults.afterPublish?.();
+        queue.clearAlarm(); await runner().alarm(); await faults.afterPublish?.();
       }
       return response;
     }
@@ -81,13 +96,18 @@ export async function sqliteServiceFixture() {
     if (path.endsWith("/settings")) return metadata ? json(settings()) : faults.existing === "worker" ? json({ unknown: true }) : new Response(null, { status: 404 });
     if (path === `/workers/scripts/${config.worker_name}` && request.method === "PUT") {
       if (!workerCreated) throw new Error("Worker must be created first");
+      const updating = metadata !== null;
       const form = await request.formData(); metadata = JSON.parse(String(form.get("metadata")));
+      if (updating) {
+        actual = { ...actual, worker_version_id: crypto.randomUUID() }; deploymentId = crypto.randomUUID(); etag = crypto.randomUUID(); runtime = boot();
+        faults.afterDeploy?.();
+      }
       lost("deploy"); return json({ etag });
     }
     if (path.endsWith("/deployments")) return json(deployment());
     if (path.includes("/versions/")) {
       const current = settings();
-      return json({ id: queue.runtime.worker_version_id, resources: { bindings: current.bindings, script: { etag },
+      return json({ id: actual.worker_version_id, resources: { bindings: current.bindings, script: { etag },
         script_runtime: { exports: current.exports, compatibility_date: current.compatibility_date, compatibility_flags: current.compatibility_flags } } });
     }
     if (path.endsWith("/subdomain")) {
@@ -97,7 +117,7 @@ export async function sqliteServiceFixture() {
     if (path === "/workers/durable_objects/namespaces") return json([{ id: namespaceId, script: faults.namespace ? "other-worker" : config.worker_name, class: "SqlitePublicationService" }]);
     throw new Error(`Unhandled fixture route ${request.method} ${path}`);
   };
-  return { ...queue, ...objects, root, config, content, runtime, purges, calls, faults, metadata: () => metadata,
+  return { ...queue, ...objects, root, config, content, get runtime() { return runtime; }, get queue() { return nativeQueue; }, purges, calls, faults, metadata: () => metadata,
     options: { accountId: config.account_id, apiToken: "private-token", transport }, transport,
     close() { queue.close(); rmSync(root, { recursive: true, force: true }); } };
 }

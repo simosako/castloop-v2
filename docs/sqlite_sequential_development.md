@@ -12,7 +12,8 @@
 - `list-shows`/`list-episodes`はSQLiteの20件ずつの一覧。`--json`、`--include-deleted`、`--cursor`に対応し、R2のmetadata列挙はしない。cursorはruntimeと検索条件へ束縛する。ローカルだけのdraftは含めない。
 - Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
 - レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
-- 新規環境はworkers.devのみ。**物理削除、deploy/互換更新、独自ドメイン、既存移行、retry/releaseは未対応**。旧方式へfallbackしない。
+- 同じconfig/SQLite schema/namespaceのcode-only互換更新を`deploy`で扱う。明示pause/drain後に実行し、新versionのprobe後もpausedを維持する。
+- 新規環境はworkers.devのみ。**物理削除、独自ドメイン、既存移行、retry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
 
@@ -67,6 +68,30 @@ castloop publish-episode first
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
 - 凍結後は素材を変更しない。次の編集では、既知の完了/確定入力失敗を確認・archiveして別draft IDに進む。
 
+## 互換Worker更新
+
+```sh
+castloop service-pause PAUSE_OPERATION_UUID
+castloop service-status
+# Wait until paused, drained and publication_ready are all true.
+castloop deploy --operation-id UPDATE_UUID
+castloop service-status
+castloop service-resume NEW_WINDOW_UUID
+```
+
+未完了job、blocked、未確認runtime、設定変更、別namespace、古いcontent schemaがある場合は配備へ進まない。
+更新準備をDOへ保存した後は、更新完了までresume・登録・公開・配信を閉じる。新versionでAlarm/R2/cache owner/purgeを再検証し、成功してからreadyにする。
+R2 payloadの書換えやresource作成は行わない。キューがdrainedでも未登録uploadがないとは判断せず、物理削除の許可に使わない。
+
+unknownな準備/配備/activationを再送しない。配備receiptと正確なsetup完了を読取確認できる場合だけ、次を使える。
+
+```sh
+castloop update-service-reconcile UPDATE_UUID
+```
+
+これはGETによる照合とローカル記録の確定だけで、未知deployの採用・再配備・probeの再実行・強制解放を行わない。
+独自ドメインや設定変更、schema変換はこの更新コマンドの対象外。
+
 ## ローカルRSS取り込みの公開
 
 既存の`import-rss`で作ったローカル取り込みをレビューした後、サービスrootで実行する。
@@ -119,7 +144,7 @@ castloop service-status
 **サーバーで既にready/paused/drainedの完了を読取確認できる場合だけ**ローカル記録を確定する。
 未知deployの探索・採用・再配備や強制掃除を行うコマンドではない。
 
-物理deleteと未登録uploadのsettlement契約は未実装。空のキューを根拠にbucketやprefixを削除しない。
+物理deleteと未登録uploadのsettlement契約は未実装。現行staging keyだけでは未登録音源をEpisodeへ確実に対応付けられない。空のキューを根拠にbucketやprefixを削除しない。
 
 ## 検証の限界
 

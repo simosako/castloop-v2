@@ -6,6 +6,8 @@ import { readSqliteManagementJson } from "./sqlite-publication-client";
 import type { R2RestTransport } from "./verified-r2-put";
 import { sqliteCatalogRequestSchema, sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../../shared/src/sqlite-catalog";
+import { sqliteUpdateActivateSchema, sqliteUpdatePrepareSchema, sqliteUpdateResultSchema } from "../../shared/src/sqlite-runtime-update";
+import type { SqliteUpdateActivate, SqliteUpdatePrepare, SqliteUpdateResult } from "../../shared/src/sqlite-runtime-update";
 
 export class SqliteServiceClient {
   readonly config: SqliteServiceConfig;
@@ -30,6 +32,18 @@ export class SqliteServiceClient {
   }
   async health(): Promise<SqliteHealth> {
     const value = sqliteHealthSchema.parse(await this.call("health")); await this.identity(value); return value;
+  }
+  async update(action: "prepare" | "activate" | "status", input: SqliteUpdatePrepare | SqliteUpdateActivate): Promise<SqliteUpdateResult> {
+    const request = action === "activate" ? sqliteUpdateActivateSchema.parse(input) : sqliteUpdatePrepareSchema.parse(input);
+    let prepared: SqliteUpdatePrepare;
+    if (action === "activate") {
+      const { new_worker_version_id, deployment_id, script_etag, ...base } = sqliteUpdateActivateSchema.parse(input); prepared = base;
+    } else prepared = sqliteUpdatePrepareSchema.parse(input);
+    const value = sqliteUpdateResultSchema.parse(await this.call(action === "status" ? `update-status/${request.operation_id}` : `update-${action}`, action === "status" ? undefined : request)); await this.identity(value);
+    if (JSON.stringify(value.request) !== JSON.stringify(prepared) || value.update.operation_id !== request.operation_id ||
+      value.update.previous_worker_version_id !== request.worker_version_id || action === "activate" &&
+      (value.worker_version_id !== sqliteUpdateActivateSchema.parse(input).new_worker_version_id || value.update.new_worker_version_id !== value.worker_version_id)) throw new Error("SQLite update result differs from its frozen request");
+    return value;
   }
   async catalog(input: SqliteCatalogRequest): Promise<SqliteCatalogResponse> {
     const request = sqliteCatalogRequestSchema.parse(input), value = sqliteCatalogResponseSchema.parse(await this.call("catalog", request));

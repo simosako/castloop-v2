@@ -202,10 +202,11 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
 export function commandHelp(command: string): string {
   const help = Object.hasOwn(COMMAND_HELP, command) ? COMMAND_HELP[command] : undefined;
   if (!help) throw new Error(`Unknown command: ${command}`);
-  const sqlite = ["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode", "job-status", "preview-show-lifecycle", "preview-episode-lifecycle", "lifecycle-execute", "operation-status", "publish-rss-import"].includes(command) ?
+  const sqlite = ["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode", "job-status", "preview-show-lifecycle", "preview-episode-lifecycle", "lifecycle-execute", "operation-status", "publish-rss-import", "deploy", "update-service-reconcile"].includes(command) ?
     "\n\nSQLite development workspaces (schema_version=2): unique R2 uploads, no Queue grants/Queues Edit, explicit DO submission and bounded completion polling.\n" +
     "Lifecycle preview/execution supports only unpublish/restore of saved snapshots, with the reviewed hash and confirm; deletion is not implemented.\n" +
     "publish-rss-import supports new Shows only and preserves imported GUIDs/dates. A retained pending publication is observed, never resubmitted.\n" +
-    "succeeded proves this operation completed, not global quiescence. Unknown requests are never resent; retry/release and deploy/domain are not implemented." : "";
+    "deploy supports paused/drained code-only updates of the same config/schema/namespace, probes the new runtime and finishes paused. Reconcile is read-only.\n" +
+    "succeeded proves this operation completed, not global quiescence. Unknown requests are never resent; retry/release, deletion and domain changes are not implemented." : "";
   return `Usage: castloop ${help.usage}\n\n${help.description}${sqlite}\n\nOptions:\n  --help, -h  Show this help`;
 }

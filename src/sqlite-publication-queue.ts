@@ -30,7 +30,7 @@ export class PublicationQueueConflict extends Error {
 }
 
 export class SqlitePublicationQueue {
-  constructor(private readonly storage: PublicationQueueStorage, private readonly runtime: SqlitePublicationRuntime,
+  constructor(private readonly storage: PublicationQueueStorage, private runtime: SqlitePublicationRuntime,
     private readonly now: () => number = Date.now) {
     this.runtime = sqlitePublicationRuntimeSchema.parse(runtime);
     storage.transactionSync(() => {
@@ -213,4 +213,17 @@ export class SqlitePublicationQueue {
   }
 
   async confirm(): Promise<void> { await this.storage.sync(); }
+
+  async changeRuntime(input: SqlitePublicationRuntime, apply: () => undefined): Promise<void> {
+    const next = sqlitePublicationRuntimeSchema.parse(input);
+    await this.storage.transaction(async () => {
+      const current = this.requireRuntime(), snapshot = this.snapshot();
+      if (current.service_id !== next.service_id || current.service_config_sha256 !== next.service_config_sha256 ||
+        current.worker_version_id === next.worker_version_id || snapshot.state !== "paused" || !snapshot.drained) throw new Error("SQLite runtime change requires compatible drained maintenance");
+      if (apply() !== undefined) throw new Error("SQLite runtime preparation must be synchronous");
+      this.storage.sql.exec("UPDATE publication_service SET worker_version_id = ? WHERE id = 1", next.worker_version_id);
+      await this.storage.setAlarm(this.now());
+    });
+    this.runtime = next;
+  }
 }

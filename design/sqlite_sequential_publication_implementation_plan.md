@@ -203,7 +203,7 @@ tmux独立実行と既存の異常通知supervisorを用い、異常時は後続
 | P3 | 新config専用の一意upload、private local journal、明示submit/status/waitを実装し、正式CLIのschema version 2分岐へ接続 |
 | P4 | SQLite content indexと実Show/Episode公開executorを接続。Show、初回Episode、metadata-only/audio-only、Show metadata/cover更新をローカル検証。lifecycle操作の実行は未実装 |
 | P5 | 別Worker入口、実DO/SQLite binding、cache owner、正式CLI、fresh REST init/readiness、公開配信を接続しローカル結合検証。Cloudflare実機での配備・purge・output gate・再配送の受け入れは未実施 |
-| P6 | SQLite一覧と可逆lifecycleを接続済み。物理削除、互換更新、domain、移行は未実装。未対応操作は新方式で明示拒否。schema version 1の既存経路・既存環境は切り替えていない |
+| P6 | SQLite一覧、可逆lifecycle、RSS取り込み公開、code-only互換更新を接続済み。物理削除、domain、移行は未実装。未対応操作は新方式で明示拒否。schema version 1の既存経路・既存環境は切り替えていない |
 
 追加した主なファイル:
 
@@ -302,6 +302,33 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 - 公開前にstaged receiptのmetadata/cover/audio hashをレビュー済みの取り込みと照合する。事前検証後のMP3差し替え、入力編集、既存Show採用、公開checkpoint喪失、最終feed読取失敗を回帰試験した。
 - 36件の小さいMP3を使い、正式command runner→SQLite FIFO→実executor→feed照合のローカル結合を完了した。実DO・Cloudflare転送・CPU性能試験ではなく、実機36件目標の達成を主張しない。
 - この時点の全体`bun test`: **1,324 pass / 0 fail**（143 files、92.39秒）、型検査・Linux CLI build成功。
+
+### P6d: 互換Worker更新の実装契約
+
+同じservice/config/SQLite schema/DO namespaceのcode-only更新だけを扱う。domainや旧形式移行と混ぜない。
+
+1. CLIは明示的にpaused/drained/readyであることと、現在のREST version/ETag/namespaceを照合する。source/metadata hash、旧version、operation IDをlocal journalへ凍結する。
+2. 旧DOへ更新準備を一度だけ登録する。SQLiteに要求を保存し、resume・登録・新規公開・配信を閉じる。旧queued/running/blockedがある場合は準備しない。
+3. CLIが同じWorkerへ一度だけPUT配備する。成功receipt後に単一100%配備・binding/cache/namespace・version ETagを照合する。unknown PUTは再送せず、記録を保持する。
+4. 新DO constructorは、同configで正確な更新準備が残る場合だけ旧runtimeをmaintenance用に開く。公開可能へ昇格しない。実際の新versionとREST証拠を照合済みの認証要求により、paused/drainedのままruntime変更と新Alarm予約をtransactionへ保存する。
+5. 新versionのAlarmでR2設定・cache owner/purgeを再検証する。成功してから更新を完了し、pausedを維持する。resumeには新しいwindow UUIDを要求する。
+6. 準備/配備/activationの応答不明は再送しない。read-only reconcileは、保存済みreceiptと同じsetupの完了を確認するだけ。未知versionの採用や旧I/Oの強制解放はしない。
+
+本節はローカル実装用の契約であり、Cloudflareへの実配備・資源変更の許可ではない。
+
+実装は`src/sqlite-runtime-update.ts`と`packages/cli/src/sqlite-service-update.ts`。更新準備・旧runtime・source/metadata hash・receipt・namespaceを束縛し、DO内のruntime変更と新probe予約を同じtransactionへ保存する。新DOが旧identityで開くのはmaintenance中だけであり、未確認versionを公開可能にしない。Alarm成功時のsetup readyと更新完了も同じ同期SQL transactionで記録する。
+
+ローカル回帰では、既存Show/Episode/音源の保持、新versionでのmetadata-only公開、複数回のcode更新、明示pause/drain、古い要求拒否、準備/配備/activationの応答喪失、namespace不一致、probe失敗、runtime/Alarm予約のrollback、GET-only reconcileを検証した。正式source CLI入口でも`deploy`まで接続した。実Cloudflare API/DO/cacheの受け入れとは区別する。
+
+全体`bun test`: **1,337 pass / 0 fail**（145 files、90.63秒）、型検査・Linux CLI build・deploy help成功。正式source CLIのinit→公開→一覧→停止/復元→pause→deployはさらに10回連続で成功した。先行の一過性PUT/検証失敗は再現しておらず、原因を確定・解消したとは主張しない。
+
+### 残る境界と未対応操作
+
+- **物理削除**: DOは未登録uploadを知らず、現行の`staging/uploads/<show>/<draft>/<upload>/<file>`にもEpisode IDがない。未登録のaudio-only draftをEpisodeへ確実に対応付けられない。したがって、queue drainedだけで全writer終了や対象payloadの完全列挙を推定してはならない。Episodeへ束縛したupload key/記録と、upload停止・settlementの限定契約が必要。未確認PUTを時間経過/HEAD不在だけで終了扱いにしたり、Episode削除の代わりにShow全体をprefix削除したりしない。upload前のサーバーロックを復活させる変更も、この判断を省略して追加しない。
+- **独自ドメイン**: 今回のcode-only更新は同じconfig hash/origin専用。domainはconfig hash・正規URL・feed・旧URL配信・TLS/routeの検証を伴うため、別の管理操作としてSQLiteへ統合する必要がある。既存R2/Queueのdomain経路へfallbackしない。現行gatewayは未検証hostを拒否したままにする。
+- **既存環境/内部schemaの移行**: 別計画・別承認のまま。過去のsourceがあるだけで変換、既存資源採用、配備を行わない。
+- **blocked/unknownのretry/release**: 初期計画の対象外を維持する。可逆lifecycleやcode更新が成功したことを、別jobや残存I/Oの解除権限としない。
+- **実機受け入れ**: native output gate、Alarm再配送、R2/CacheとREST応答形、300MB転送、Free制限と36件性能はローカルfixtureだけでは確定しない。実機計画と別承認後に確認する。今回の開発ではCloudflare資源・実データを変更していない。
 
 ## 参照
 

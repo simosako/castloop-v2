@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { sqliteUpdateSummarySchema } from "./sqlite-runtime-update";
 
 export const sqliteRuntimeRequestSchema = sqlitePublicationRuntimeSchema.extend({ operation_id: z.uuid() }).strict();
 export const sqliteResumeRequestSchema = sqliteRuntimeRequestSchema.extend({ admission_window_id: z.uuid() }).strict();
@@ -9,6 +10,7 @@ export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protoc
   invocation_id: z.uuid(), publication_ready: z.boolean(), state: z.enum(["open", "paused"]), admission_window_id: z.uuid().nullable(),
   queued: z.number().int().nonnegative(), active: z.enum(["running", "blocked"]).nullable(), drained: z.boolean(),
   setup: z.object({ operation_id: z.uuid(), state: z.enum(["scheduled", "running", "ready", "blocked"]) }).strict().nullable(),
+  runtime_update: sqliteUpdateSummarySchema.nullable().optional(),
 }).strict();
 export const sqliteInspectionSchema = sqlitePublicationRuntimeSchema.extend({ protocol: z.literal(sqlitePublicationProtocol),
   state: z.enum(["open", "paused"]), admission_window_id: z.uuid().nullable(), publication_ready: z.literal(true),

@@ -16,6 +16,7 @@ import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { SqliteCacheRuntime } from "./sqlite-service-runtime";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
 import { serveSqliteGateway } from "./sqlite-gateway";
+import { selectSqliteRuntime } from "./sqlite-runtime-update";
 
 export type SqliteWorkerEnv = { CASTLOOP_BUCKET: R2Bucket; CASTLOOP_ADMIN_KEY: string;
   CASTLOOP_VERSION_METADATA: WorkerVersionMetadata; CASTLOOP_SQLITE_CONFIG: string;
@@ -47,10 +48,10 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
         !this.ctx.id.equals(this.env.CASTLOOP_SQLITE.idFromName(`service/${config.service_id}`))) throw new Error("SQLite namespace identity differs");
       const identity = sqlitePublicationRuntimeSchema.parse({ service_id: config.service_id,
         worker_version_id: this.env.CASTLOOP_VERSION_METADATA.id, service_config_sha256: await sqliteServiceConfigHash(config) });
-      const queue = new SqlitePublicationQueue(this.ctx.storage, identity), content = new SqlitePublicationContent(this.ctx.storage);
+      const queue = new SqlitePublicationQueue(this.ctx.storage, selectSqliteRuntime(this.ctx.storage, identity)), content = new SqlitePublicationContent(this.ctx.storage);
       const cache = { describe: () => this.ctx.exports.SqliteCachedAssets.describeRuntime(),
         purge: (showId: string) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId }) };
-      this.alarmRuntime = () => new SqliteServiceRuntime(this.ctx.storage, queue, content, this.env.CASTLOOP_BUCKET, config, cache);
+      this.alarmRuntime = () => new SqliteServiceRuntime(this.ctx.storage, queue, content, this.env.CASTLOOP_BUCKET, config, cache, identity);
       this.runtime = this.alarmRuntime();
       this.executor = createSqlitePublicationExecutor(content, this.env.CASTLOOP_BUCKET, config,
         { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) });

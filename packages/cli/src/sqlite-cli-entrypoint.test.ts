@@ -54,6 +54,8 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     }
     await command(["service-pause", crypto.randomUUID()]);
     expect(await command(["service-status"])).toMatchObject({ state: "paused", drained: true });
+    expect(await command(["deploy", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
+    expect(await command(["service-status"])).toMatchObject({ publication_ready: true, state: "paused", runtime_update: { state: "completed" } });
     expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
   } finally { server.stop(true); setup.close(); }
 }, 30000);

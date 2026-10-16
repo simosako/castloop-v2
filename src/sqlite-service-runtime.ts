@@ -10,6 +10,8 @@ import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
 import { publicationChecksum } from "./publication-inputs";
 import { readSqliteCatalog } from "./sqlite-catalog";
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../packages/shared/src/sqlite-catalog";
+import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
+import { pendingSqliteUpdate, SqliteRuntimeUpdates } from "./sqlite-runtime-update";
 
 type SetupRow = { operation_id: string; state: "scheduled" | "running" | "ready" | "blocked"; request_json: string };
 export type SqliteCacheRuntime = { worker_version_id: string; service_config_sha256: string; cache_enabled: boolean };
@@ -17,16 +19,19 @@ export type SqliteRuntimeCache = { describe: () => Promise<SqliteCacheRuntime>; 
 
 export class SqliteServiceRuntime {
   private probing = false;
+  readonly updates: SqliteRuntimeUpdates;
   constructor(private readonly storage: PublicationQueueStorage, readonly queue: SqlitePublicationQueue,
     readonly content: SqlitePublicationContent, private readonly bucket: SqlitePublicationBucket,
-    private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache) {
+    private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache,
+    private readonly actual: SqlitePublicationRuntime = queue.identity()) {
     storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_runtime_setup (id INTEGER PRIMARY KEY CHECK(id = 1),
       operation_id TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('scheduled', 'running', 'ready', 'blocked')), request_json TEXT NOT NULL)`);
+    this.updates = new SqliteRuntimeUpdates(storage, queue, actual, () => this.ready());
   }
   private setup(): SetupRow | null {
     return this.storage.sql.exec<SetupRow>("SELECT operation_id, state, request_json FROM publication_runtime_setup WHERE id = 1").toArray()[0] ?? null;
   }
-  ready(): boolean { return this.setup()?.state === "ready"; }
+  ready(): boolean { return this.setup()?.state === "ready" && this.queue.identity().worker_version_id === this.actual.worker_version_id && !pendingSqliteUpdate(this.storage); }
   catalog(request: SqliteCatalogRequest): SqliteCatalogResponse {
     if (!this.ready()) throw new Error("SQLite runtime is not ready");
     return readSqliteCatalog(this.storage, request, this.queue.identity(), this.config.public_base_url);
@@ -39,10 +44,10 @@ export class SqliteServiceRuntime {
   }
   health(): SqliteHealth {
     const snapshot = this.queue.snapshot(), setup = this.setup();
-    return sqliteHealthSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", invocation_id: crypto.randomUUID(),
+    return sqliteHealthSchema.parse({ ...this.actual, protocol: "sqlite-sequential-v1", invocation_id: crypto.randomUUID(),
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
-      setup: setup ? { operation_id: setup.operation_id, state: setup.state } : null });
+      setup: setup ? { operation_id: setup.operation_id, state: setup.state } : null, runtime_update: this.updates.summary() });
   }
   async prepare(input: SqliteRuntimeRequest): Promise<SqliteHealth> {
     const request = this.requireTarget(input), source = JSON.stringify(request);
@@ -61,7 +66,7 @@ export class SqliteServiceRuntime {
   }
   async alarm(): Promise<boolean> {
     const setup = this.setup();
-    if (setup?.state === "ready") return false;
+    if (setup?.state === "ready") return pendingSqliteUpdate(this.storage);
     if (!setup || this.probing) return true;
     if (setup.state === "blocked") return true;
     if (setup.state === "running") {
@@ -97,7 +102,11 @@ export class SqliteServiceRuntime {
           throw new Error("Runtime cache owner differs");
         }
         await this.cache.purge(`probe-${setup.operation_id.slice(0, 8).toLowerCase()}`);
-        this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'ready' WHERE id = 1");
+        this.storage.transactionSync(() => {
+          this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'ready' WHERE id = 1");
+          this.storage.sql.exec(`UPDATE publication_runtime_updates SET state = 'completed' WHERE operation_id = ? AND state = 'activated'
+            AND json_extract(activation_json, '$.new_worker_version_id') = ?`, setup.operation_id, identity.worker_version_id);
+        });
         await this.storage.sync();
       } catch {
         this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'blocked' WHERE id = 1");
