@@ -23,7 +23,11 @@ type PreparedEpisode = { kind: "episode"; request: SqlitePublicationRequest; rev
   audio?: SqliteVerifiedUpload; audioRevisionId: string; feed: string };
 type PreparedLifecycle = { kind: "lifecycle"; request: SqlitePublicationRequest; feed?: string };
 export type PreparedSqlitePublication = PreparedShow | PreparedEpisode | PreparedLifecycle;
-export type SqlitePublicationEffects = { purge: (target: { showId: string; cover: boolean; episodeId?: string }) => Promise<void>; now?: () => string };
+export type SqlitePublicationEffectFailure = { event: "sqlite_publication_effect_failed"; job_id: string; request_id: string;
+  phase: "show_metadata" | "cover" | "audio" | "revision" | "episode_metadata" | "feed" | "cache_purge";
+  reason_code: "publication_effect_unverified" };
+export type SqlitePublicationEffects = { purge: (target: { showId: string; cover: boolean; episodeId?: string }) => Promise<void>;
+  now?: () => string; onFailure?: (event: SqlitePublicationEffectFailure) => void };
 
 function input<T>(parse: () => T): T {
   try { return parse(); } catch { throw new SqlitePublicationInputError("validation_failed"); }
@@ -108,6 +112,16 @@ async function persistAudio(bucket: SqlitePublicationBucket, prepared: PreparedE
 export function createSqlitePublicationExecutor(store: SqlitePublicationContent, bucket: SqlitePublicationBucket,
   configInput: SqliteServiceConfig, effects: SqlitePublicationEffects): SqlitePublicationExecutor<PreparedSqlitePublication> {
   const config = sqliteServiceConfigSchema.parse(configInput);
+  const perform = async (request: SqlitePublicationRequest, phase: SqlitePublicationEffectFailure["phase"], operation: () => Promise<void>) => {
+    try { await operation(); }
+    catch {
+      const event: SqlitePublicationEffectFailure = { event: "sqlite_publication_effect_failed", job_id: request.job_id,
+        request_id: request.request_id, phase, reason_code: "publication_effect_unverified" };
+      if (effects.onFailure) effects.onFailure(event);
+      else console.error(JSON.stringify(event));
+      throw new Error("SQLite publication effect was not verified");
+    }
+  };
   return {
     async validate(inputRequest) {
       const request = store.requireRunning(inputRequest);
@@ -187,24 +201,25 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
     },
     async publish(prepared) {
       const showId = prepared.request.show_id;
+      const run = (phase: SqlitePublicationEffectFailure["phase"], operation: () => Promise<void>) => perform(prepared.request, phase, operation);
       if (prepared.kind === "lifecycle") {
-        if (prepared.feed !== undefined) await put(bucket, `public/podcasts/${showId}/feed.xml`, prepared.feed, "application/rss+xml; charset=utf-8");
-        await effects.purge({ showId, cover: prepared.request.kind === "show", ...(prepared.request.kind === "episode" ? { episodeId: prepared.request.episode_id! } : {}) });
+        if (prepared.feed !== undefined) await run("feed", () => put(bucket, `public/podcasts/${showId}/feed.xml`, prepared.feed!, "application/rss+xml; charset=utf-8"));
+        await run("cache_purge", () => effects.purge({ showId, cover: prepared.request.kind === "show", ...(prepared.request.kind === "episode" ? { episodeId: prepared.request.episode_id! } : {}) }));
         return;
       }
       if (prepared.kind === "show") {
-        await put(bucket, `system/shows/${showId}/show.toml`, stringifyToml(prepared.metadata), "application/toml");
-        await put(bucket, `public/podcasts/${showId}/cover.${prepared.extension}`, prepared.cover,
-          prepared.extension === "jpg" ? "image/jpeg" : "image/png");
+        await run("show_metadata", () => put(bucket, `system/shows/${showId}/show.toml`, stringifyToml(prepared.metadata), "application/toml"));
+        await run("cover", () => put(bucket, `public/podcasts/${showId}/cover.${prepared.extension}`, prepared.cover,
+          prepared.extension === "jpg" ? "image/jpeg" : "image/png"));
       } else {
-        await persistAudio(bucket, prepared);
-        await put(bucket, `public/episodes/${showId}/${prepared.revision.episode_id}/revisions/${prepared.revision.revision_id}.toml`,
-          stringifyToml(prepared.revision), "application/toml", true);
-        await put(bucket, `public/episodes/${showId}/${prepared.revision.episode_id}/metadata.toml`, stringifyToml(prepared.revision), "application/toml");
+        await run("audio", () => persistAudio(bucket, prepared));
+        await run("revision", () => put(bucket, `public/episodes/${showId}/${prepared.revision.episode_id}/revisions/${prepared.revision.revision_id}.toml`,
+          stringifyToml(prepared.revision), "application/toml", true));
+        await run("episode_metadata", () => put(bucket, `public/episodes/${showId}/${prepared.revision.episode_id}/metadata.toml`, stringifyToml(prepared.revision), "application/toml"));
       }
-      await put(bucket, `public/podcasts/${showId}/feed.xml`, prepared.feed, "application/rss+xml; charset=utf-8");
-      await effects.purge({ showId, cover: prepared.kind === "show",
-        ...(prepared.kind === "episode" ? { episodeId: prepared.revision.episode_id } : {}) });
+      await run("feed", () => put(bucket, `public/podcasts/${showId}/feed.xml`, prepared.feed, "application/rss+xml; charset=utf-8"));
+      await run("cache_purge", () => effects.purge({ showId, cover: prepared.kind === "show",
+        ...(prepared.kind === "episode" ? { episodeId: prepared.revision.episode_id } : {}) }));
     },
     commit(prepared) {
       if (prepared.kind === "lifecycle") store.commitLifecycle(prepared.request);

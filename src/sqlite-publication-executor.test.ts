@@ -5,8 +5,10 @@ import type { SqlitePublicationRequest, SqliteVerifiedUpload } from "../packages
 import { sqliteServiceConfigHash } from "../packages/shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../packages/shared/src/sqlite-service";
 import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
+import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
+import type { SqlitePublicationEffectFailure } from "./sqlite-publication-executor";
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
 import { createHash } from "node:crypto";
@@ -31,10 +33,11 @@ async function fixture() {
   const reservationId = crypto.randomUUID();
   content.registerShow("daily", reservationId);
   const purges: Array<{ showId: string; cover: boolean; episodeId?: string }> = [];
+  const effectFailures: SqlitePublicationEffectFailure[] = [];
   const hooks: { purge?: () => Promise<void> } = {};
   const executor = createSqlitePublicationExecutor(content, objects.bucket, config, { async purge(target) {
     purges.push(target); await hooks.purge?.();
-  }, now: () => "2026-10-16T13:00:00Z" });
+  }, now: () => "2026-10-16T13:00:00Z", onFailure: (event) => effectFailures.push(event) });
   const events: unknown[] = [];
   const runner = new SqlitePublicationAlarm(setup.queue, executor, (event) => events.push(event));
   async function payload(jobId: string, asset: SqliteVerifiedUpload["asset"], source: string | Uint8Array): Promise<SqliteVerifiedUpload> {
@@ -71,7 +74,7 @@ async function fixture() {
       kind: episodeId === undefined ? "show" : "episode", show_id: "daily", expected_show_state_version: target.show!.state_version,
       ...(episodeId === undefined ? {} : { episode_id: episodeId, base_revision_id: target.base!.revision_id, expected_episode_lifecycle_version: target.episode!.lifecycle_version }), payloads: [] });
   };
-  return { ...setup, ...objects, bucketHooks: objects.hooks, config, content, reservationId, purges, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, lifecycle };
+  return { ...setup, ...objects, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, lifecycle };
 }
 
 test("Episode lifecycle removes all revision delivery and restores the same snapshot without audio or metadata writes", async () => {
@@ -283,6 +286,52 @@ test("purge failure blocks later jobs and closes delivery even after the fixed f
   expect(setup.calls).toEqual([]);
   expect(setup.queue.status(next.request_id)?.state).toBe("queued");
   expect(JSON.stringify(setup.events)).not.toMatch(/Private title|private@example|secret/);
+  expect(setup.effectFailures).toEqual([{ event: "sqlite_publication_effect_failed", job_id: update.job_id,
+    request_id: update.request_id, phase: "cache_purge", reason_code: "publication_effect_unverified" }]);
+  expect(JSON.stringify(setup.effectFailures)).not.toMatch(/Private title|private@example|secret/);
+});
+
+test("purge rejection waiting retains the running job and closed delivery without replaying R2 output", async () => {
+  const setup = await fixture(); await setup.publishShow();
+  const episode = await setup.request("episode");
+  let calls = 0, enter!: () => void, release!: () => void;
+  const entered = new Promise<void>((resolve) => { enter = resolve; }), released = new Promise<void>((resolve) => { release = resolve; });
+  setup.hooks.purge = () => purgeSqliteCache({ async purge() { return { success: ++calls === 2, errors: [{ code: 999, message: "Rate limit exceeded" }] }; } }, { showId: "daily", episodeId: "first" }, {
+    delay: async (milliseconds) => { expect(milliseconds).toBe(12000); enter(); await released; }, onEvent: () => {},
+  });
+  setup.calls.length = 0;
+  const running = setup.run(episode);
+  await entered;
+  try {
+    expect(setup.queue.status(episode.request_id)?.state).toBe("running");
+    expect(setup.queue.snapshot().drained).toBe(false);
+    expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+    expect(setup.content.episodes("daily")).toEqual([]);
+    expect(await setup.runner.alarm()).toEqual({ state: "busy" });
+  } finally { release(); }
+  expect((await running).state).toBe("succeeded");
+  expect(setup.calls.filter((call) => call.method === "PUT").map((call) => call.key)).toEqual([
+    `public/podcasts/daily/episodes/first/${episode.job_id}.mp3`,
+    `public/episodes/daily/first/revisions/${episode.job_id}.toml`, "public/episodes/daily/first/metadata.toml", "public/podcasts/daily/feed.xml",
+  ]);
+  expect(calls).toBe(2);
+  expect(setup.effectFailures).toEqual([]);
+});
+
+test("36 sequential publications tolerate acknowledged purge throttling without duplicate media writes", async () => {
+  const setup = await fixture(); await setup.publishShow();
+  let tokens = 25, waits = 0, purges = 0;
+  setup.hooks.purge = () => purgeSqliteCache({ async purge() {
+    purges++; const success = tokens > 0; if (success) tokens--;
+    return { success, errors: success ? [] : [{ code: 999, message: "Rate limit exceeded" }] };
+  } }, { showId: "daily" }, { delay: async (milliseconds) => { expect(milliseconds).toBe(12000); tokens++; waits++; }, onEvent: () => {} });
+  setup.calls.length = 0;
+  for (let index = 0; index < 36; index++) await setup.publishEpisode(`episode-${index}`);
+  expect(setup.content.episodes("daily")).toHaveLength(36);
+  expect(setup.calls.filter((call) => call.method === "PUT" && call.key.startsWith("public/") && call.key.endsWith(".mp3"))).toHaveLength(36);
+  expect(waits).toBe(11);
+  expect(purges).toBe(47);
+  expect(setup.queue.snapshot().drained).toBe(true);
 });
 
 test("an unknown write blocks without overwriting history or retrying any output", async () => {
@@ -296,6 +345,8 @@ test("an unknown write blocks without overwriting history or retrying any output
   expect(await setup.runner.alarm()).toMatchObject({ state: "blocked", reason_code: "execution_failed" });
   const writes = setup.calls.filter((call) => call.method === "PUT");
   expect(writes).toHaveLength(1);
+  expect(setup.effectFailures).toEqual([{ event: "sqlite_publication_effect_failed", job_id: episode.job_id,
+    request_id: episode.request_id, phase: "audio", reason_code: "publication_effect_unverified" }]);
   expect((await setup.runner.alarm()).state).toBe("blocked");
   expect(setup.calls.filter((call) => call.method === "PUT")).toEqual(writes);
 });

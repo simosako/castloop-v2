@@ -332,6 +332,16 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 - **blocked/unknownのretry/release**: 初期計画の対象外を維持する。可逆lifecycleやcode更新が成功したことを、別jobや残存I/Oの解除権限としない。
 - **実機受け入れ**: native output gate、Alarm再配送、R2/CacheとREST応答形、300MB転送、Free制限と36件性能はローカルfixtureだけでは確定しない。実機計画と別承認後に確認する。今回の開発ではCloudflare資源・実データを変更していない。
 
+### P7: 承認済み隔離実機試験の到達点
+
+上記のローカルbaseline後、管理者の実機試験指示に基づき、`sq16-668cbdfa`だけを新規作成した。[測定記録](sqlite_sequential_measurement_20261016.md)が実際の到達点を示す。
+
+- native初期化、3件の小容量公開・配信・更新・可逆lifecycleは成功。REST settingsにexportsがない応答形をCLIで修正し、既知receiptから検証を継続した。
+- 36件試験は14件成功、15件目がcache purge段階でblocked。全件完成、36件metadata-only性能、互換更新の実機gateは未完了。CPU収録欠落も残る。
+- SQLite専用purgeを1回へ統合し、明確に拒否されたrate limitだけ同じ実行内で有限待機/再試行する修正と固定phaseログを追加した。未知結果やblocked jobの再実行はしない。修正版は実機未配備。
+- 最新ローカル全体回帰は1,349 pass / 0 fail、型検査とLinux CLI build成功。模擬36件rate-limit試験を、36件実機成功へ読み替えない。
+- blocked環境を保全する。新隔離環境、強制解除・削除、権限/plan変更、移行は追加承認なしに行わない。
+
 ## 参照
 
 - [DO Alarms](https://developers.cloudflare.com/durable-objects/api/alarms/): 一つのAlarm、at-least-once、有限retry。

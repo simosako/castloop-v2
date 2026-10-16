@@ -2,8 +2,9 @@ import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../packages/shared/src/sqlite-service";
 import { sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
 import type { PublicCacheProps } from "./public-assets";
-import { purgeLifecycleCache, serveCachedLifecycleAsset } from "./lifecycle-cache";
+import { serveCachedLifecycleAsset } from "./lifecycle-cache";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
+import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
 import type { SqlitePublicationExecutor } from "./sqlite-publication-alarm";
 import type { PreparedSqlitePublication } from "./sqlite-publication-executor";
@@ -30,7 +31,7 @@ export class SqliteCachedAssets extends WorkerEntrypoint<SqliteWorkerEnv, Public
       service_config_sha256: await sqliteServiceConfigHash(sqliteServiceConfigSchema.parse(JSON.parse(this.env.CASTLOOP_SQLITE_CONFIG))),
       cache_enabled: this.ctx.cache !== undefined };
   }
-  async invalidate(target: LifecyclePurgeTarget): Promise<void> { await purgeLifecycleCache(this.ctx.cache, target); }
+  async invalidate(target: LifecyclePurgeTarget): Promise<void> { await purgeSqliteCache(this.ctx.cache, target); }
 }
 
 export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {

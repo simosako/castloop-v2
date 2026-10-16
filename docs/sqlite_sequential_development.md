@@ -1,6 +1,7 @@
 # SQLite逐次公開方式の開発版
 
-`feat/sqlite-sequential-publication`向け。**公開済みv0.4.0の機能ではなく、Cloudflare実機受け入れ・性能測定は未実施**。
+`feat/sqlite-sequential-publication`向け。**公開済みv0.4.0の機能ではない**。
+2026-10-16の隔離実機試験では初期化・小容量機能gateを通過したが、通常規模は14/36件成功・15件目のpurge段階でblockedとなった。修正版の実機再試験と全体受け入れは未完了。詳細は[測定記録](../design/sqlite_sequential_measurement_20261016.md)を参照。
 新しい隔離環境だけを対象とし、既存サービスや旧journalを変換しない。
 
 ## 対応範囲
@@ -17,7 +18,7 @@
 
 ## 初期化
 
-次は管理者が新環境の作成・配備を承認した場合の操作例であり、本開発作業中に実行したものではない。
+次は管理者が新環境の作成・配備を承認した場合の操作例。隔離試験への承認を、既存サービスや別環境の変更許可として流用しない。
 
 ```sh
 castloop init ./new-service --publication-protocol sqlite-sequential-v1 \
@@ -66,6 +67,7 @@ castloop publish-episode first
 - 初回Episodeにはmetadataと音源が両方必要。その後はmetadata-only/audio-onlyが可能。
 - `publish-*`は要求をローカルへ凍結してDOへ送信し、完了を最大300回・新規poll開始5分まで待つ。
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
+- SQLite cache ownerはtag/prefixを1回のpurgeへまとめる。明確なrate-limit拒否だけは同じrunning実行内で12秒間隔・最大6 attemptsを行い、保存をやり直さない。未知応答・恒久拒否は停止する。この有限待機はblocked jobのretry/release機能ではない。
 - 凍結後は素材を変更しない。次の編集では、既知の完了/確定入力失敗を確認・archiveして別draft IDに進む。
 
 ## 互換Worker更新
