@@ -70,17 +70,25 @@ export async function putVerifiedR2Object(config: { account_id: string; bucket_n
   const transport = options.transport ?? fetch;
   const url = `https://api.cloudflare.com/client/v4/accounts/${config.account_id}/r2/buckets/${config.bucket_name}/objects/${target.key}`;
   let response: Response | undefined;
+  let phase: "put" | "put_receipt" | "source_completed" | "readback" | "readback_verify" = "put";
   try {
     response = await transport(url, { method: "PUT", body, redirect: "error", signal: controller.signal,
       headers: { Authorization: `Bearer ${options.apiToken}`, "Content-Type": target.contentType, "Content-Length": String(target.length) } });
     if (response.status !== 200) throw new Error("Staging REST PUT failed or has an unknown outcome");
+    phase = "put_receipt";
     const receipt = await readReceipt(response, target);
+    phase = "source_completed";
     requireConsumed();
+    phase = "readback";
+    response = undefined;
     response = await transport(url, { method: "GET", redirect: "error", cache: "no-store", signal: controller.signal,
       headers: { Authorization: `Bearer ${options.apiToken}`, "Accept-Encoding": "identity" } });
+    phase = "readback_verify";
     await verifyResponse(response, target, receipt.etag);
     return receipt;
   } catch {
+    console.error(JSON.stringify({ event: "r2_verified_put_failed", phase, reason_code: "put_or_readback_unverified",
+      ...(response ? { http_status: response.status } : {}) }));
     throw new Error("Staging REST PUT/verification failed; no automatic retry or remote termination proof");
   } finally {
     controller.abort();
