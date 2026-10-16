@@ -21,7 +21,8 @@ type PreparedShow = { kind: "show"; request: SqlitePublicationRequest; metadata:
   cover: Uint8Array; extension: "jpg" | "png"; feed: string };
 type PreparedEpisode = { kind: "episode"; request: SqlitePublicationRequest; revision: EpisodeRevision;
   audio?: SqliteVerifiedUpload; audioRevisionId: string; feed: string };
-export type PreparedSqlitePublication = PreparedShow | PreparedEpisode;
+type PreparedLifecycle = { kind: "lifecycle"; request: SqlitePublicationRequest; feed?: string };
+export type PreparedSqlitePublication = PreparedShow | PreparedEpisode | PreparedLifecycle;
 export type SqlitePublicationEffects = { purge: (target: { showId: string; cover: boolean; episodeId?: string }) => Promise<void>; now?: () => string };
 
 function input<T>(parse: () => T): T {
@@ -115,6 +116,23 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
       }
       const target = store.target(request);
       const episodes = store.episodes(request.show_id);
+      if (request.action !== "publish") {
+        const restored = request.kind === "episode" && request.action === "restore" ? [target.base!] : [];
+        const visible = request.kind === "episode" ? [...episodes.filter((episode) => episode.episode_id !== request.episode_id), ...restored] : episodes;
+        if (request.action === "restore") {
+          for (const revision of request.kind === "show" ? visible : restored) {
+            const media = audioKey(revision, request.show_id);
+            store.requireMedia(request.show_id, revision, media.revisionId);
+            const object = await bucket.head(media.key);
+            const checksum = object?.checksums.sha256;
+            const hash = checksum ? [...new Uint8Array(checksum)].map((byte) => byte.toString(16).padStart(2, "0")).join("") : null;
+            if (!object || object.size !== revision.length_bytes || hash !== revision.sha256 || object.customMetadata?.sha256 !== revision.sha256) throw new SqlitePublicationInputError("validation_failed");
+          }
+          if (request.kind === "show" && !await bucket.head(`public/podcasts/${request.show_id}/cover.${target.coverExtension!}`)) throw new SqlitePublicationInputError("validation_failed");
+        }
+        const writeFeed = request.kind === "show" ? request.action === "restore" : target.show.lifecycle === "published";
+        return { kind: "lifecycle", request, ...(writeFeed ? { feed: input(() => renderPublicationFeed(target.metadata!, visible, config.public_base_url, target.coverExtension!)) } : {}) };
+      }
       if (request.kind === "show") {
         const metadataPayload = request.payloads.find((payload) => payload.asset === "show_metadata")!;
         const coverPayload = request.payloads.find((payload) => payload.asset.startsWith("cover_"))!;
@@ -169,6 +187,11 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
     },
     async publish(prepared) {
       const showId = prepared.request.show_id;
+      if (prepared.kind === "lifecycle") {
+        if (prepared.feed !== undefined) await put(bucket, `public/podcasts/${showId}/feed.xml`, prepared.feed, "application/rss+xml; charset=utf-8");
+        await effects.purge({ showId, cover: prepared.request.kind === "show", ...(prepared.request.kind === "episode" ? { episodeId: prepared.request.episode_id! } : {}) });
+        return;
+      }
       if (prepared.kind === "show") {
         await put(bucket, `system/shows/${showId}/show.toml`, stringifyToml(prepared.metadata), "application/toml");
         await put(bucket, `public/podcasts/${showId}/cover.${prepared.extension}`, prepared.cover,
@@ -184,7 +207,8 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         ...(prepared.kind === "episode" ? { episodeId: prepared.revision.episode_id } : {}) });
     },
     commit(prepared) {
-      if (prepared.kind === "show") store.commitShow(prepared.request, prepared.metadata, prepared.extension);
+      if (prepared.kind === "lifecycle") store.commitLifecycle(prepared.request);
+      else if (prepared.kind === "show") store.commitShow(prepared.request, prepared.metadata, prepared.extension);
       else store.commitEpisode(prepared.request, prepared.revision, prepared.audioRevisionId, prepared.audio !== undefined);
     },
   };

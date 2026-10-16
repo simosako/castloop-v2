@@ -16,9 +16,11 @@ export const sqliteInspectionSchema = sqlitePublicationRuntimeSchema.extend({ pr
   show_lifecycle: z.enum(["missing", "draft", "published", "unpublished", "deleted"]),
   reservation_id: z.uuid().nullable(), expected_show_state_version: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
   episode_lifecycle: z.enum(["missing", "published", "unpublished", "deleted"]).optional(),
+  expected_episode_lifecycle_version: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   base_revision_id: z.uuid().optional(), base_metadata_sha256: sqlitePublicationRuntimeSchema.shape.service_config_sha256.optional(),
 }).strict().superRefine((value, context) => {
   if ((value.episode_id !== undefined) !== (value.episode_lifecycle !== undefined) ||
+    (value.episode_id !== undefined) !== (value.expected_episode_lifecycle_version !== undefined) ||
     (value.base_revision_id !== undefined) !== (value.base_metadata_sha256 !== undefined)) {
     context.addIssue({ code: "custom", message: "Target inspection has inconsistent Episode evidence" });
   }

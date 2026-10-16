@@ -3,7 +3,8 @@ import { MAX_SQLITE_PUBLICATION_BYTES, parseSqlitePublicationRequest, sqlitePubl
 import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteServiceConfig, SqliteServiceStatus } from "@castloop/shared";
 import type { R2RestTransport } from "./verified-r2-put";
 
-export async function readSqliteManagementJson(response: Response): Promise<unknown> {
+export async function readSqliteManagementJson(response: Response, maximum = MAX_SQLITE_PUBLICATION_BYTES): Promise<unknown> {
+  if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 65536) throw new Error("Invalid SQLite response limit");
   if (!response.body || response.headers.get("Cache-Control") !== "no-store" || response.headers.has("Content-Range") ||
     response.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
     await response.body?.cancel();
@@ -17,7 +18,7 @@ export async function readSqliteManagementJson(response: Response): Promise<unkn
       const chunk = await reader.read();
       if (chunk.done) break;
       length += chunk.value.byteLength;
-      if (length > MAX_SQLITE_PUBLICATION_BYTES) throw new Error("SQLite management response exceeds its limit");
+      if (length > maximum) throw new Error("SQLite management response exceeds its limit");
       chunks.push(chunk.value);
     }
     return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks))) as unknown;

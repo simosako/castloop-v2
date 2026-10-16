@@ -10,8 +10,9 @@ const fields = sqlitePublicationRequestSchema.shape;
 export const sqliteDraftTargetSchema = z.object({ job_id: fields.job_id, kind: fields.kind, show_id: fields.show_id,
   episode_id: fields.episode_id, expected_show_state_version: fields.expected_show_state_version,
   base_revision_id: fields.base_revision_id, base_metadata_sha256: fields.service_config_sha256.optional(),
+  expected_episode_lifecycle_version: fields.expected_episode_lifecycle_version,
 }).strict().superRefine((value, context) => {
-  if (value.kind === "show" ? value.episode_id !== undefined || value.base_revision_id !== undefined || value.base_metadata_sha256 !== undefined :
+  if (value.kind === "show" ? value.episode_id !== undefined || value.base_revision_id !== undefined || value.base_metadata_sha256 !== undefined || value.expected_episode_lifecycle_version !== undefined :
     value.episode_id === undefined || (value.base_revision_id !== undefined) !== (value.base_metadata_sha256 !== undefined)) {
     context.addIssue({ code: "custom", message: "Draft target requires its exact Episode base and metadata identity" });
   }
@@ -53,7 +54,7 @@ function checkedRecord(input: unknown): SqliteDraftRecord {
   if (record.publication) {
     const request = parseSqlitePublicationRequest(record.publication.request);
     const { base_metadata_sha256: _, ...target } = record.target;
-    if (request.service_id !== record.service_id || request.service_config_sha256 !== record.service_config_sha256 ||
+    if (request.action !== "publish" || request.service_id !== record.service_id || request.service_config_sha256 !== record.service_config_sha256 ||
       Object.entries(target).some(([key, value]) => request[key as keyof SqlitePublicationRequest] !== value) ||
       JSON.stringify(request.payloads) !== JSON.stringify(record.assets.map((entry) => entry.upload))) {
       throw new Error("SQLite frozen publication differs from its draft");

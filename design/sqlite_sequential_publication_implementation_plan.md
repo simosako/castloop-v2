@@ -203,7 +203,7 @@ tmux独立実行と既存の異常通知supervisorを用い、異常時は後続
 | P3 | 新config専用の一意upload、private local journal、明示submit/status/waitを実装し、正式CLIのschema version 2分岐へ接続 |
 | P4 | SQLite content indexと実Show/Episode公開executorを接続。Show、初回Episode、metadata-only/audio-only、Show metadata/cover更新をローカル検証。lifecycle操作の実行は未実装 |
 | P5 | 別Worker入口、実DO/SQLite binding、cache owner、正式CLI、fresh REST init/readiness、公開配信を接続しローカル結合検証。Cloudflare実機での配備・purge・output gate・再配送の受け入れは未実施 |
-| P6 | SQLite一覧を接続済み。lifecycle、互換更新、domain、移行は未実装。未対応操作は新方式で明示拒否。schema version 1の既存経路・既存環境は切り替えていない |
+| P6 | SQLite一覧と可逆lifecycleを接続済み。物理削除、互換更新、domain、移行は未実装。未対応操作は新方式で明示拒否。schema version 1の既存経路・既存環境は切り替えていない |
 
 追加した主なファイル:
 
@@ -283,6 +283,16 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 - R2列挙や本文読取をせず、SQLで必要なtitle/dateだけを射影する。queued/running/blockedのShow本文は一覧へ返さない。cursorはservice/config/version/kind/親/削除表示条件へ束縛する。
 - 一覧はsnapshotであり、公開可否・quiescence・回復権限を証明しない。pausedでも読取可能。cursorを同一時点の固定snapshotとは扱わない。
 - 一覧のpagination/条件改変/親状態/不正応答と正式CLI入口をローカル検証した。Cloudflare実機操作は行っていない。
+
+### P6b: 可逆lifecycle
+
+- Show/Episodeの`unpublish`/`restore`を公開と同じstrict要求・SQLite FIFO・Alarm・purge後の完了transactionへ接続した。削除は引き続きschema/CLIとも拒否する。
+- 非公開化は全revisionの配信を遮断し、Episodeはfeedから除外する。Showを止めても子の状態を上書きせず、停止中の子非公開化はfeedを書かない。Show復元時は個別停止Episodeを含めない。
+- 復元は保存済みSQLite contentだけを利用し、必要な不変音源のindex/HEADを照合してfeedを再生成する。GUID・日時・revision・音源URLを維持し、音源/history/current metadataを新規保存しない。ローカル編集は入力にしない。
+- content schemaを**3**へ進め、Episodeの`lifecycle_version`を追加した。停止/復元で進め、期待値をdraft/要求/inspectionへ束縛する。revisionが同じまま停止→復元するABAを拒否し、無関係なEpisodeのdraftは一律staleにしない。cacheも同じ世代で分離する。queue schemaは2のまま。以前のcontent schemaは自動変換しない。
+- `preview-*-lifecycle`は読取だけ。`lifecycle-execute PLAN HASH confirm`は送信前に要求をprivate journalへ保存し、未知POSTを再送しない。`job-status`と`operation-status lifecycle`で同じ要求を照合する。queuedを成功と表示しない。
+- ローカル回帰で、全revision遮断、親子停止、snapshot不変、ABA、purge待機/失敗、SQL完了rollback、再配送非再実行、送信応答喪失を検証した。Cloudflare実機の証明ではない。
+- 全体回帰は**1,312 pass / 0 fail**（141 files、85.60秒）、型検査・Linux CLI build成功。先行実行でsource CLIのMP3 PUT/検証が1件失敗したが、同じ全体試験の再実行では再現しなかった。原因は断定せず、PUT/receipt/source完了/readback/検証のallowlist段階とHTTP statusだけを記録する診断を追加した。任意例外・key・token・本文をログへ出さず、確認条件を緩めたりPUTを再送したりしない。
 
 ## 参照
 

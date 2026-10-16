@@ -35,18 +35,25 @@ export const sqlitePublicationRuntimeSchema = z.object({ service_id: slug(20), w
 
 export const sqlitePublicationRequestSchema = z.object({ schema_version: z.literal(1),
   protocol: z.literal(sqlitePublicationProtocol), service_id: slug(20), request_id: z.uuid(), job_id: z.uuid(),
-  action: z.literal("publish"), kind: z.enum(["show", "episode"]), show_id: slug(32), episode_id: slug(80).optional(),
+  action: z.enum(["publish", "unpublish", "restore"]), kind: z.enum(["show", "episode"]), show_id: slug(32), episode_id: slug(80).optional(),
   worker_version_id: z.uuid(), service_config_sha256: hash, admission_window_id: z.uuid(),
   expected_show_state_version: counter, base_revision_id: z.uuid().optional(),
-  payloads: z.array(sqliteVerifiedUploadSchema).min(1).max(2),
+  expected_episode_lifecycle_version: counter.optional(), payloads: z.array(sqliteVerifiedUploadSchema).max(2),
 }).strict().superRefine((value, context) => {
   const assets = value.payloads.map((payload) => payload.asset);
+  if (value.action !== "publish") {
+    if (assets.length || (value.kind === "show" ? value.episode_id !== undefined || value.base_revision_id !== undefined || value.expected_episode_lifecycle_version !== undefined :
+      value.episode_id === undefined || value.base_revision_id === undefined || value.expected_episode_lifecycle_version === undefined)) {
+      context.addIssue({ code: "custom", message: "Lifecycle requests require an exact saved target and no uploads" });
+    }
+    return;
+  }
   const validKind = value.kind === "episode" ? value.episode_id !== undefined &&
     assets.every((asset) => asset === "episode_metadata" || asset === "audio") &&
     (value.base_revision_id !== undefined || assets.includes("episode_metadata") && assets.includes("audio")) :
-    value.episode_id === undefined && value.base_revision_id === undefined && assets.includes("show_metadata") &&
+    value.episode_id === undefined && value.base_revision_id === undefined && value.expected_episode_lifecycle_version === undefined && assets.includes("show_metadata") &&
     (assets.includes("cover_jpg") || assets.includes("cover_png"));
-  if (!validKind || new Set(assets).size !== assets.length ||
+  if (!assets.length || !validKind || new Set(assets).size !== assets.length ||
     new Set(value.payloads.map((payload) => payload.upload_id)).size !== value.payloads.length ||
     value.payloads.some((payload) => payload.key !== sqliteUploadKey({ show_id: value.show_id,
       draft_job_id: value.job_id, upload_id: payload.upload_id, asset: payload.asset }))) {

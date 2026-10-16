@@ -64,8 +64,110 @@ async function fixture() {
   };
   const publishShow = async () => { const value = await request("show"); expect((await run(value)).state).toBe("succeeded"); return value; };
   const publishEpisode = async (episodeId = "first") => { const value = await request("episode", episodeId); expect((await run(value)).state).toBe("succeeded"); return value; };
-  return { ...setup, ...objects, bucketHooks: objects.hooks, config, content, reservationId, purges, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode };
+  const lifecycle = (action: "unpublish" | "restore", episodeId?: string) => {
+    const target = content.inspect("daily", episodeId);
+    return parseSqlitePublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", ...setup.runtime,
+      admission_window_id: setup.windowId, request_id: crypto.randomUUID(), job_id: crypto.randomUUID(), action,
+      kind: episodeId === undefined ? "show" : "episode", show_id: "daily", expected_show_state_version: target.show!.state_version,
+      ...(episodeId === undefined ? {} : { episode_id: episodeId, base_revision_id: target.base!.revision_id, expected_episode_lifecycle_version: target.episode!.lifecycle_version }), payloads: [] });
+  };
+  return { ...setup, ...objects, bucketHooks: objects.hooks, config, content, reservationId, purges, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, lifecycle };
 }
+
+test("Episode lifecycle removes all revision delivery and restores the same snapshot without audio or metadata writes", async () => {
+  const value = await fixture(); await value.publishShow(); const first = await value.publishEpisode(); await value.publishEpisode("second");
+  const update = await value.request("episode", "first", first.job_id);
+  expect((await value.run(update)).state).toBe("succeeded");
+  const base = value.content.inspect("daily", "first").base!, paths = [first.job_id, update.job_id].map((id) => `/podcasts/daily/episodes/first/${id}.mp3`);
+  const previous = value.content.delivery(paths[0]);
+  const preserved = new Map([...value.entries].filter(([key]) => key.endsWith(".mp3") || key.endsWith(".toml")).map(([key, object]) => [key, object.etag]));
+  value.calls.length = 0;
+  const stop = value.lifecycle("unpublish", "first"); expect((await value.run(stop)).state).toBe("succeeded");
+  for (const path of paths) expect(value.content.delivery(path).status).toBe(404);
+  expect(value.text("public/podcasts/daily/feed.xml")).not.toContain("Private first");
+  expect(value.text("public/podcasts/daily/feed.xml")).toContain("Private second");
+  expect(value.purges.at(-1)).toEqual({ showId: "daily", cover: false, episodeId: "first" });
+  expect((await value.run(value.lifecycle("restore", "first"))).state).toBe("succeeded");
+  expect(value.content.inspect("daily", "first").base).toEqual(base);
+  expect(value.text("public/podcasts/daily/feed.xml")).toContain("Private first");
+  for (const path of paths) expect(value.content.delivery(path).status).toBe(200);
+  expect(value.content.delivery(paths[0])).not.toEqual(previous);
+  for (const [key, etag] of preserved) expect(value.entries.get(key)!.etag).toBe(etag);
+  expect(value.calls.filter((call) => call.method === "PUT").every((call) => call.key.endsWith("feed.xml"))).toBe(true);
+  const puts = value.calls.filter((call) => call.method === "PUT").length;
+  expect((await value.queue.enqueue(stop)).state).toBe("succeeded"); value.clearAlarm(); await value.runner.alarm();
+  expect(value.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
+});
+
+test("Show restore never revives individually unpublished Episodes, including child stops while the Show is hidden", async () => {
+  const value = await fixture(); await value.publishShow(); const first = await value.publishEpisode(); const second = await value.publishEpisode("second"); await value.publishEpisode("third");
+  expect((await value.run(value.lifecycle("unpublish", "first"))).state).toBe("succeeded");
+  expect((await value.run(value.lifecycle("unpublish"))).state).toBe("succeeded");
+  expect(value.content.delivery("/podcasts/daily/feed.xml").status).toBe(404);
+  expect(value.content.delivery("/podcasts/daily/cover.jpg").status).toBe(404);
+  value.calls.length = 0;
+  expect((await value.run(value.lifecycle("unpublish", "second"))).state).toBe("succeeded");
+  expect(value.calls.some((call) => call.method === "PUT")).toBe(false);
+  expect(await value.run(value.lifecycle("restore", "first"))).toMatchObject({ state: "failed", reason_code: "target_unavailable" });
+  expect((await value.run(value.lifecycle("restore"))).state).toBe("succeeded");
+  const feed = value.text("public/podcasts/daily/feed.xml");
+  expect(feed).toContain("Private third"); expect(feed).not.toContain("Private first"); expect(feed).not.toContain("Private second");
+  for (const request of [first, second]) expect(value.content.delivery(`/podcasts/daily/episodes/${request.episode_id}/${request.job_id}.mp3`).status).toBe(404);
+});
+
+test("lifecycle versions prevent Episode ABA without invalidating unrelated Episode drafts", async () => {
+  const value = await fixture(); await value.publishShow(); const first = await value.publishEpisode(); const second = await value.publishEpisode("second");
+  const old = await value.request("episode", "first", first.job_id, "metadata"), unrelated = await value.request("episode", "second", second.job_id, "metadata");
+  const oldStop = value.lifecycle("unpublish", "first");
+  expect((await value.run(value.lifecycle("unpublish", "first"))).state).toBe("succeeded");
+  expect((await value.run(value.lifecycle("restore", "first"))).state).toBe("succeeded");
+  expect(await value.run(old)).toMatchObject({ state: "failed", reason_code: "base_conflict" });
+  expect(await value.run(oldStop)).toMatchObject({ state: "failed", reason_code: "base_conflict" });
+  expect((await value.run(unrelated)).state).toBe("succeeded");
+  const current = value.content.inspect("daily", "first"), fresh = await value.request("episode", "first", first.job_id, "metadata");
+  expect((await value.run({ ...fresh, expected_episode_lifecycle_version: current.episode!.lifecycle_version })).state).toBe("succeeded");
+});
+
+test("lifecycle purge keeps the target gated and completion pending, then blocks the FIFO on failure", async () => {
+  const value = await fixture(); await value.publishShow(); await value.publishEpisode();
+  const stop = value.lifecycle("unpublish", "first"), next = value.lifecycle("unpublish");
+  await value.queue.enqueue(stop); await value.queue.enqueue(next); value.clearAlarm();
+  let reject!: () => void, entered!: () => void;
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  value.hooks.purge = () => { entered(); return new Promise<void>((_, fail) => { reject = () => fail(new Error("private diagnostic")); }); };
+  const running = value.runner.alarm(); await started;
+  expect(value.queue.status(stop.request_id)!.state).toBe("running");
+  expect(value.content.inspect("daily", "first").episode!.lifecycle).toBe("published");
+  expect(value.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+  reject(); expect(await running).toMatchObject({ state: "blocked", reason_code: "execution_failed" });
+  const count = value.calls.length; await value.runner.alarm();
+  expect(value.calls).toHaveLength(count); expect(value.queue.status(next.request_id)!.state).toBe("queued");
+  expect(JSON.stringify(value.events)).not.toContain("private diagnostic");
+});
+
+test("restore refuses missing immutable media before writes and does not silently revive deleted or draft targets", async () => {
+  const value = await fixture(); await value.publishShow(); const episode = await value.publishEpisode();
+  await value.run(value.lifecycle("unpublish", "first"));
+  value.entries.delete(`public/podcasts/daily/episodes/first/${episode.job_id}.mp3`); value.calls.length = 0;
+  expect(await value.run(value.lifecycle("restore", "first"))).toMatchObject({ state: "failed", reason_code: "validation_failed" });
+  expect(value.calls.some((call) => call.method === "PUT")).toBe(false);
+  const deleted = value.lifecycle("restore", "first");
+  value.storage.sql.exec("UPDATE publication_episodes SET lifecycle = 'deleted' WHERE episode_id = 'first'");
+  expect(await value.run(deleted)).toMatchObject({ state: "failed", reason_code: "target_unavailable" });
+});
+
+test("lifecycle SQL completion and next Alarm roll back together, and interrupted IO is never rerun", async () => {
+  const value = await fixture(); await value.publishShow(); await value.publishEpisode();
+  const stop = value.lifecycle("unpublish", "first"), next = value.lifecycle("unpublish");
+  await value.queue.enqueue(stop); await value.queue.enqueue(next); value.clearAlarm(); value.failAlarm();
+  await expect(value.runner.alarm()).rejects.toThrow();
+  expect(value.queue.status(stop.request_id)!.state).toBe("running");
+  expect(value.content.inspect("daily", "first").episode!.lifecycle).toBe("published");
+  const count = value.calls.length;
+  const restarted = new SqlitePublicationAlarm(value.queue, value.executor, () => {});
+  expect(await restarted.alarm()).toMatchObject({ state: "blocked", reason_code: "execution_interrupted" });
+  expect(value.calls).toHaveLength(count); expect(value.queue.status(next.request_id)!.state).toBe("queued");
+});
 
 test("real executor publishes a registered Show and Episode using no R2 lock/status records", async () => {
   const setup = await fixture();

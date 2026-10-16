@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +46,12 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     expect(await command(["job-status", String(publication.job_id)])).toMatchObject({ status: { state: "succeeded" } });
     expect(await command(["list-shows", "--json"])).toMatchObject({ shows: [{ show_id: "daily", lifecycle: "published" }] });
     expect(await command(["list-episodes", "daily", "--json"])).toMatchObject({ episodes: [{ episode_id: "first", lifecycle: "published" }] });
+    for (const action of ["unpublish", "restore"]) {
+      const plan = sqliteLifecyclePlanSchema.parse(await command(["preview-episode-lifecycle", "daily", "first", action]));
+      const file = join(setup.root, "reviewed-plan.json"); writeFileSync(file, JSON.stringify(plan));
+      expect(await command(["lifecycle-execute", file, plan.request_sha256, "confirm"])).toMatchObject({ state: "queued" });
+      expect(await command(["job-status", plan.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
+    }
     await command(["service-pause", crypto.randomUUID()]);
     expect(await command(["service-status"])).toMatchObject({ state: "paused", drained: true });
     expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);

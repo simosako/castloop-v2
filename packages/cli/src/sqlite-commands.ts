@@ -13,6 +13,8 @@ import { createLocalJournalStorage, writeSyncedLocalFile } from "./local-journal
 import { ensureLocalJournalParents, syncLocalJournalDirectory } from "./local-journal-path";
 import { initializeSqliteService, reconcileSqliteInitialization, readSqliteInitialization } from "./sqlite-initialization";
 import { readLocalMetadata } from "./local-metadata-read";
+import { executeSqliteLifecycle, previewSqliteLifecycle, readSqliteLifecycleStatus } from "./sqlite-lifecycle";
+import { readBoundedLocalJournal } from "./local-journal-read";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -109,8 +111,18 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   }
   if (command === "target-show" && args.length === 1) return client.inspect(validateId(args[0], "show"));
   if (command === "target-episode" && args.length === 2) return client.inspect(validateId(args[0], "show"), validateId(args[1], "episode"));
+  if (command === "preview-show-lifecycle" && args.length === 2) return previewSqliteLifecycle(config, key, validateId(args[0], "show"), args[1], undefined, options.transport);
+  if (command === "preview-episode-lifecycle" && args.length === 3) return previewSqliteLifecycle(config, key, validateId(args[0], "show"), args[2], validateId(args[1], "episode"), options.transport);
+  if (command === "lifecycle-execute" && args.length === 3) return executeSqliteLifecycle(root, config, key, readBoundedLocalJournal(resolve(root, args[0])), args[1], args[2], options.transport);
+  if (command === "operation-status" && args.length === 2 && args[0] === "lifecycle") {
+    const status = await readSqliteLifecycleStatus(root, config, key, args[1], options.transport);
+    if (status === undefined) throw new Error("No matching SQLite lifecycle journal");
+    return { job_id: args[1], status, snapshot_only: true, authorizes_recovery: false };
+  }
   if (command === "job-status" && args.length === 1) {
     const jobId = z.uuid().parse(args[0]);
+    const lifecycleStatus = await readSqliteLifecycleStatus(root, config, key, jobId, options.transport);
+    if (lifecycleStatus !== undefined) return { job_id: jobId, status: lifecycleStatus, snapshot_only: true, authorizes_recovery: false };
     const archived = await readSqliteArchivedDraft(root, config, jobId);
     if (archived?.publication) {
       const status = await new SqlitePublicationClient(config, key, options.transport).observe(archived.publication.request);
@@ -159,6 +171,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     if (inspected.state !== "open" || !["draft", "published"].includes(inspected.show_lifecycle) || inspected.expected_show_state_version === null ||
       episodeCommand && (inspected.show_lifecycle !== "published" || !["missing", "published"].includes(inspected.episode_lifecycle!))) throw new Error("SQLite target is not available for this draft");
     target = { ...targetId, job_id: crypto.randomUUID(), expected_show_state_version: inspected.expected_show_state_version,
+      ...(episodeCommand ? { expected_episode_lifecycle_version: inspected.expected_episode_lifecycle_version } : {}),
       ...(inspected.base_revision_id ? { base_revision_id: inspected.base_revision_id, base_metadata_sha256: inspected.base_metadata_sha256 } : {}) };
   }
   const draft = await SqliteDraft.open(root, config, target, draftOptions);

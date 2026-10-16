@@ -43,6 +43,16 @@ describe("SQLite sequential publication protocol", () => {
     }
   });
 
+  test("reversible lifecycle requires an exact saved target without payloads, and deletion remains unsupported", () => {
+    const value = request(), lifecycle = { ...value, action: "unpublish", payloads: [], base_revision_id: crypto.randomUUID(), expected_episode_lifecycle_version: 0 };
+    expect(parseSqlitePublicationRequest(lifecycle).action).toBe("unpublish");
+    expect(parseSqlitePublicationRequest({ ...lifecycle, action: "restore" }).action).toBe("restore");
+    for (const change of [{ action: "delete" }, { payloads: value.payloads }, { base_revision_id: undefined }, { expected_episode_lifecycle_version: undefined }, { title: "private" }]) {
+      expect(() => parseSqlitePublicationRequest({ ...lifecycle, ...change })).toThrow();
+    }
+    expect(() => parseSqlitePublicationRequest({ ...value, payloads: [] })).toThrow();
+  });
+
   test("Show publication binds metadata and exactly one cover", () => {
     const value = sqlitePublicationRequest(runtime, crypto.randomUUID(), { kind: "show" });
     expect(parseSqlitePublicationRequest(value).kind).toBe("show");

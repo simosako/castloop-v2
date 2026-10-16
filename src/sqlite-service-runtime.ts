@@ -115,7 +115,8 @@ export class SqliteServiceRuntime {
       state: snapshot.state, admission_window_id: snapshot.admission_window_id, show_id: showId,
       show_lifecycle: target.show?.lifecycle ?? "missing", reservation_id: target.show?.reservation_id ?? null,
       expected_show_state_version: target.show?.state_version ?? null,
-      ...(episodeId !== undefined ? { episode_id: episodeId, episode_lifecycle: target.episode?.lifecycle ?? "missing" } : {}),
+      ...(episodeId !== undefined ? { episode_id: episodeId, episode_lifecycle: target.episode?.lifecycle ?? "missing",
+        expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0 } : {}),
       ...(target.base ? { base_revision_id: target.base.revision_id, base_metadata_sha256: digest } : {}) });
   }
 }

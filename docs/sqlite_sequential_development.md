@@ -10,7 +10,8 @@
 - metadata-onlyは既存音源を再利用。audio-onlyはmetadataのbaseも照合する。
 - GET/HEAD/Range/条件付き応答は既存配信部品を利用し、外側gatewayが毎回DOの最新配信判定を見る。
 - `list-shows`/`list-episodes`はSQLiteの20件ずつの一覧。`--json`、`--include-deleted`、`--cursor`に対応し、R2のmetadata列挙はしない。cursorはruntimeと検索条件へ束縛する。ローカルだけのdraftは含めない。
-- 新規環境はworkers.devのみ。**lifecycle、deploy/互換更新、独自ドメイン、既存移行、RSSのサーバー公開連携、retry/releaseは未対応**。旧方式へfallbackしない。
+- Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
+- 新規環境はworkers.devのみ。**物理削除、deploy/互換更新、独自ドメイン、既存移行、RSSのサーバー公開連携、retry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
 
@@ -64,6 +65,24 @@ castloop publish-episode first
 - `publish-*`は要求をローカルへ凍結してDOへ送信し、完了を最大300回・新規poll開始5分まで待つ。
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
 - 凍結後は素材を変更しない。次の編集では、既知の完了/確定入力失敗を確認・archiveして別draft IDに進む。
+
+## 非公開化・復元
+
+サービスrootで、例えば次のように操作する。
+
+```sh
+castloop preview-episode-lifecycle my-show first unpublish > plan.json
+# Review the target, action and request_sha256 in plan.json.
+castloop lifecycle-execute plan.json REQUEST_SHA256 confirm
+castloop job-status JOB_UUID
+```
+
+Show単位は`preview-show-lifecycle my-show unpublish`、復元は`restore`を指定する。
+previewは読取だけ。`lifecycle-execute`の`queued`は完了ではなく、同じjobの`succeeded`まで確認する。
+非公開化は全revisionの直リンクを止め、Episodeだけの場合はfeedからも除外する。payloadは削除しないため、ストレージ使用量は減らない。
+Show停止は子Episodeの状態を上書きしない。Show復元でも個別停止Episodeは復活しない。
+復元はGUID・日時・音源URL・revisionを変えず、未公開のローカル編集も取り込まない。
+Episodeの停止/復元世代を照合するため、一度停止・復元を挟んだ古いdraftが同じrevisionを根拠に公開されることはない。
 
 ## 異常時
 

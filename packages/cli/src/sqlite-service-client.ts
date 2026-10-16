@@ -22,7 +22,7 @@ export class SqliteServiceClient {
       if (response.status !== (path === "prepare" ? 202 : 200)) {
         await response.body?.cancel(); throw new Error("Unverified service response");
       }
-      return await readSqliteManagementJson(response);
+      return await readSqliteManagementJson(response, path === "catalog" ? 65536 : 16384);
     } catch { throw new Error("SQLite service request was not verified; preserve its journal without automatic replay"); }
   }
   private async identity(value: { service_id: string; service_config_sha256: string }): Promise<void> {
