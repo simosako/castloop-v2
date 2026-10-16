@@ -11,7 +11,8 @@
 - GET/HEAD/Range/条件付き応答は既存配信部品を利用し、外側gatewayが毎回DOの最新配信判定を見る。
 - `list-shows`/`list-episodes`はSQLiteの20件ずつの一覧。`--json`、`--include-deleted`、`--cursor`に対応し、R2のmetadata列挙はしない。cursorはruntimeと検索条件へ束縛する。ローカルだけのdraftは含めない。
 - Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
-- 新規環境はworkers.devのみ。**物理削除、deploy/互換更新、独自ドメイン、既存移行、RSSのサーバー公開連携、retry/releaseは未対応**。旧方式へfallbackしない。
+- レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
+- 新規環境はworkers.devのみ。**物理削除、deploy/互換更新、独自ドメイン、既存移行、retry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
 
@@ -65,6 +66,22 @@ castloop publish-episode first
 - `publish-*`は要求をローカルへ凍結してDOへ送信し、完了を最大300回・新規poll開始5分まで待つ。
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
 - 凍結後は素材を変更しない。次の編集では、既知の完了/確定入力失敗を確認・archiveして別draft IDに進む。
+
+## ローカルRSS取り込みの公開
+
+既存の`import-rss`で作ったローカル取り込みをレビューした後、サービスrootで実行する。
+
+```sh
+castloop publish-rss-import ./reviewed-import
+```
+
+既存/削除済みShowを採用せず、新しいShowとして順次公開する。元のGUID・permalink属性・公開日時を保持し、音源は新しいサービスへ保存する。
+途中のEpisodeも完了ごとに公開され、全件一括の原子公開ではない。最後にpublic feedのmetadata・件数・identity・内部音源URLを照合する。
+subscriber移行や旧ホスト撤去の完了を意味しない。
+
+再実行は完了済みの公開を繰り返さない。保存済みpublication jobがある公開途中停止は、**そのjob IDのstatusを読むだけ**で照合・待機する。
+未確認のupload/登録/ローカルinstallは自動再実行しない。取り込み元の編集、別draftへの置換、不明な要求の再送で先へ進めない。
+公開前にstaged receiptをレビュー済みmetadata/cover/audioと照合し、事前検証後の素材差し替えも拒否する。
 
 ## 非公開化・復元
 

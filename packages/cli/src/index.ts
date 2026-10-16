@@ -164,7 +164,11 @@ async function main(): Promise<unknown> {
     allowedFlags(flags, []);
     if (positional.length !== 1) throw new Error(commandHelp(command));
     const root = process.cwd();
-    const config = loadConfig(root);
+    const config = loadWorkspaceConfig(root);
+    if (config.schema_version === 2) {
+      const { publishSqliteRssImport } = await import("./sqlite-rss-publication");
+      return publishSqliteRssImport(root, config, positional[0]!);
+    }
     const { createRssPublicationEffects, publishRssImport } = await import("./rss-import-publication");
     return publishRssImport(root, config, positional[0]!, createRssPublicationEffects(root, config, workerSource));
   }

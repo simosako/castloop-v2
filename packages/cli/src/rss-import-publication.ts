@@ -47,7 +47,7 @@ export function createRssPublicationEffects(root: string, config: ServiceConfig,
 
 function metadataText(bytes: Buffer): string { return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
 
-async function writeImportedMetadata(source: string, target: string, expected: object): Promise<void> {
+export async function writeImportedMetadata(source: string, target: string, expected: object): Promise<void> {
   const bytes = await readLocalMetadata(source);
   const actual = target.endsWith("show.toml") ? parseShowMetadata(metadataText(bytes)) : parseEpisodeDraft(metadataText(bytes));
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error("Import metadata changed after publication preparation");
@@ -218,7 +218,7 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
   });
 }
 
-function verifyImportedFeed(prepared: PreparedRssImport, feedUrl: string, source: string): void {
+export function verifyImportedFeed(prepared: PreparedRssImport, feedUrl: string, source: string): void {
   const published = parseRssImportFeed(source, prepared.show.show_id, feedUrl, 32_000_000);
   for (const field of ["title", "description", "language", "author", "owner_name", "owner_email", "site_url", "explicit", "show_type", "copyright"] as const) {
     if (published.show[field] !== prepared.show[field]) throw new Error("Published RSS Show metadata differs from the import");

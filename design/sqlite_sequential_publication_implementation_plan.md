@@ -294,6 +294,15 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 - ローカル回帰で、全revision遮断、親子停止、snapshot不変、ABA、purge待機/失敗、SQL完了rollback、再配送非再実行、送信応答喪失を検証した。Cloudflare実機の証明ではない。
 - 全体回帰は**1,312 pass / 0 fail**（141 files、85.60秒）、型検査・Linux CLI build成功。先行実行でsource CLIのMP3 PUT/検証が1件失敗したが、同じ全体試験の再実行では再現しなかった。原因は断定せず、PUT/receipt/source完了/readback/検証のallowlist段階とHTTP statusだけを記録する診断を追加した。任意例外・key・token・本文をログへ出さず、確認条件を緩めたりPUTを再送したりしない。
 
+### P6c: RSS取り込みの公開接続
+
+- schema version 2の`publish-rss-import`を新専用runnerへ分岐した。旧R2/Queue管理runnerへfallbackしない。local import/preflight、metadataの安全な保存、最終feed照合だけを共用する。
+- Show→Episodeを順次stage/明示publishする。元のGUID・permalink属性・日時を保持し、最終feedの内容・件数・identity・内部音源URLを確認する。subscriber移行完了や一括原子公開とは扱わない。
+- source/config/input hashとcursorをprivateな`sqlite-rss-imports`へ保存し、公開stepでは**送信前に正確なdraft job ID**を保存する。凍結済みの同じjobだけをstatus照合・bounded waitで継続し、未知のupload/登録/installは再実行しない。別のcurrent draft/jobへ置換して進めない。
+- 公開前にstaged receiptのmetadata/cover/audio hashをレビュー済みの取り込みと照合する。事前検証後のMP3差し替え、入力編集、既存Show採用、公開checkpoint喪失、最終feed読取失敗を回帰試験した。
+- 36件の小さいMP3を使い、正式command runner→SQLite FIFO→実executor→feed照合のローカル結合を完了した。実DO・Cloudflare転送・CPU性能試験ではなく、実機36件目標の達成を主張しない。
+- この時点の全体`bun test`: **1,324 pass / 0 fail**（143 files、92.39秒）、型検査・Linux CLI build成功。
+
 ## 参照
 
 - [DO Alarms](https://developers.cloudflare.com/durable-objects/api/alarms/): 一つのAlarm、at-least-once、有限retry。
