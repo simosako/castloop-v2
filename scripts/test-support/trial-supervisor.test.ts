@@ -55,6 +55,15 @@ async function localTrial(result: object | undefined, code: number, notifyFails 
   } finally { rmSync(evidence, { recursive: true, force: true }); }
 }
 
+test("measurement gaps and read timeouts are notified separately from publication success", async () => {
+  const passed = await localTrial({ result: "passed", completed_publications: 3, measurement: "incomplete" }, 0);
+  expect(passed.exit).toBe(0); expect(passed.notifications.at(-1)).toContain("欠測あり");
+  expect(passed.summary.measurement).toBe("incomplete");
+  const stopped = await localTrial({ result: "stopped", completed_publications: 3, reason_code: "observation_timeout" }, 1);
+  expect(stopped.exit).toBe(1); expect(stopped.notifications.at(-1)).toContain("observation_timeout");
+  expect(stopped.notifications.at(-1)).toContain("公開完了=3件");
+});
+
 test("nonzero CLI exit is notified and propagated instead of swallowed by a waiter", async () => {
   const result = await localTrial({ result: "stopped", completed_publications: 29 }, 1);
   expect(result.exit).toBe(1); expect(result.notifications[0]).toContain("異常停止");

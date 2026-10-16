@@ -9,7 +9,9 @@ const receiptSchema = z.object({ data: z.object({ id: z.string(), sessionID: z.s
 const pendingSchema = z.object({ id: z.string(), sessionID: z.string(), type: z.literal("synthetic"), payload: z.object({ text: z.string() }) });
 const messageSchema = z.object({ data: z.object({ id: z.string(), type: z.literal("synthetic"), text: z.string() }) });
 const resultSchema = z.object({ result: z.enum(["passed", "stopped"]), phase: z.string().optional(),
-  completed_publications: z.number().int().nonnegative().optional(), publications: z.number().int().nonnegative().optional() });
+  completed_publications: z.number().int().nonnegative().optional(), publications: z.number().int().nonnegative().optional(),
+  measurement: z.enum(["complete", "incomplete", "not_measured"]).optional(),
+  reason_code: z.enum(["observation_timeout", "observation_unverified", "native_invocation_failed", "trial_check_unverified"]).optional() });
 
 function save(path: string, value: unknown): void {
   const temporary = `${path}.${process.pid}.tmp`;
@@ -119,11 +121,16 @@ export async function superviseTrial(options: TrialSupervisorOptions): Promise<n
   const terminal = resultSchema.safeParse(source);
   const passed = code === 0 && terminal?.success === true && terminal.data.result === "passed";
   const completed = terminal?.success ? terminal.data.completed_publications ?? terminal.data.publications : undefined;
+  const measurement = terminal.success ? terminal.data.measurement : undefined;
+  const reason = terminal.success ? terminal.data.reason_code : undefined;
   const text = `試験${passed ? "完了" : "異常停止"}を検知しました。CLI exit=${code}、公開完了=${completed ?? "未確認"}件。証跡: ${relative}。` +
+    (measurement ? `測定証跡=${measurement === "complete" ? "取得完了" : measurement === "incomplete" ? "欠測あり" : "未測定"}。` : "") +
+    (reason ? `停止分類=${reason}。` : "") +
     "結果・stderr・通知outboxを確認して報告してください。これは通知であり、再実行・再送・強制解除の許可ではありません。";
   await notify(passed ? "passed" : "stopped", text);
   const exitCode = passed && outbox.every((entry) => entry.state === "acknowledged") ? 0 : code || 1;
   save(join(evidence, "supervisor-result.json"), { at: new Date().toISOString(), runner_exit_code: code,
-    exit_code: exitCode, terminal_verified: terminal?.success === true, notification_acknowledged: outbox.every((entry) => entry.state === "acknowledged") });
+    exit_code: exitCode, terminal_verified: terminal?.success === true, measurement: measurement ?? "unspecified", reason_code: reason,
+    notification_acknowledged: outbox.every((entry) => entry.state === "acknowledged") });
   return exitCode;
 }
