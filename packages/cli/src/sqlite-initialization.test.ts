@@ -102,3 +102,17 @@ test("a symlink gitignore is never followed and prevents secret creation or remo
   expect(existsSync(join(value.root, ".castloop", "secrets.json"))).toBe(false);
   expect(value.calls).toEqual([]);
 });
+
+test("private-state ignore rules override earlier negations without rewriting user rules or growing on repeated init", async () => {
+  const value = await fixture(), id = crypto.randomUUID(), file = join(value.root, ".gitignore");
+  const original = "user-file\n.castloop/\n!.castloop/\n*.mp3\n!*.mp3\n";
+  writeFileSync(file, original);
+  await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait);
+  const protectedSource = readFileSync(file, "utf8");
+  expect(protectedSource).toBe(`${original}.castloop/\n*.mp3\n`);
+  expect(Bun.spawnSync(["git", "init", "--quiet"], { cwd: value.root }).exitCode).toBe(0);
+  const ignored = Bun.spawnSync(["git", "check-ignore", "--", ".castloop/secrets.json", "sample.mp3"], { cwd: value.root });
+  expect(ignored.exitCode).toBe(0); expect(ignored.stdout.toString().trim().split("\n")).toEqual([".castloop/secrets.json", "sample.mp3"]);
+  await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait);
+  expect(readFileSync(file, "utf8")).toBe(protectedSource);
+});

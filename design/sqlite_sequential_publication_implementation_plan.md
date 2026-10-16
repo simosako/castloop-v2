@@ -322,6 +322,8 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 
 全体`bun test`: **1,337 pass / 0 fail**（145 files、90.63秒）、型検査・Linux CLI build・deploy help成功。正式source CLIのinit→公開→一覧→停止/復元→pause→deployはさらに10回連続で成功した。先行の一過性PUT/検証失敗は再現しておらず、原因を確定・解消したとは主張しない。
 
+最終hardeningでは、SQLite初期化時の`.gitignore`に既存の否定ルールがあっても、末尾の`.castloop/`/`*.mp3`で保護するようにした。元のuser ruleを上書きせず、繰り返し初期化で追記が増え続けないことと、隔離したローカルGit repositoryの`check-ignore`で秘密鍵/MP3が除外されることを確認した。最終全体回帰は**1,338 pass / 0 fail**（145 files、90.45秒）、型検査・Linux CLI build成功。
+
 ### 残る境界と未対応操作
 
 - **物理削除**: DOは未登録uploadを知らず、現行の`staging/uploads/<show>/<draft>/<upload>/<file>`にもEpisode IDがない。未登録のaudio-only draftをEpisodeへ確実に対応付けられない。したがって、queue drainedだけで全writer終了や対象payloadの完全列挙を推定してはならない。Episodeへ束縛したupload key/記録と、upload停止・settlementの限定契約が必要。未確認PUTを時間経過/HEAD不在だけで終了扱いにしたり、Episode削除の代わりにShow全体をprefix削除したりしない。upload前のサーバーロックを復活させる変更も、この判断を省略して追加しない。

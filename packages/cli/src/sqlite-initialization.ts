@@ -35,8 +35,13 @@ function protectLocalState(root: string): void {
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.size > 1_000_000) throw new Error("Workspace gitignore must be a bounded regular file");
     const source = readFileSync(fd, "utf8"), lines = source.split(/\r?\n/);
-    const additions = [".castloop/", "*.mp3"].filter((line) => !lines.includes(line));
-    if (additions.length) writeFileSync(fd, `${source && !source.endsWith("\n") ? "\n" : ""}${additions.join("\n")}\n`);
+    if (lines.at(-1) === "") lines.pop();
+    const rules = [".castloop/", "*.mp3"];
+    if (JSON.stringify(lines.slice(-2)) !== JSON.stringify(rules)) {
+      const addition = `${source && !source.endsWith("\n") ? "\n" : ""}${rules.join("\n")}\n`;
+      if (Buffer.byteLength(source) + Buffer.byteLength(addition) > 1_000_000) throw new Error("Workspace gitignore protection exceeds its size limit");
+      writeFileSync(fd, addition);
+    }
     fsyncSync(fd);
   } finally { closeSync(fd); }
   syncLocalJournalDirectory(root);
