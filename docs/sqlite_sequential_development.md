@@ -1,6 +1,6 @@
-# SQLite逐次公開方式（v0.5.0）
+# SQLite逐次公開方式（v0.5.0以降）
 
-v0.5.0で明示指定できる`sqlite-sequential-v1`方式の操作ガイド。v0.4.0には含まれない。
+v0.5.0で明示指定できる`sqlite-sequential-v1`方式の操作ガイド。v0.4.0には含まれない。v0.5.1は同じprotocolのまま、RSSテキストのXML 1.0検証と`castloop.toml`の上限付き・symlink拒否読み取りを追加する。
 新規SQLiteサービスを対象とし、既存Queueサービスや旧journalを変換しない。
 flag省略時は既存のschema-version-1 defaultのままである。
 
@@ -9,7 +9,7 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 これは中断を挟む短尺音源試験であり、全負荷のFree適合・Issue #13恒久解消や大容量公開を保証しない。
 初回purge blocked・旧試験の欠測は[先行測定](../design/sqlite_sequential_measurement_20261016.md)、
 互換更新・正式RSSの受け入れは[追加確認](../design/sqlite_followup_verification_20261016.md)に区別して残している。
-リリースの全範囲は[v0.5.0リリースノート](release-v0.5.0.md)を参照。
+リリースの全範囲は[v0.5.1リリースノート](release-v0.5.1.md)と[v0.5.0リリースノート](release-v0.5.0.md)を参照。
 
 ## 対応範囲
 
