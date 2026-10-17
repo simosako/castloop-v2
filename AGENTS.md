@@ -130,13 +130,11 @@ Follow the commands and conventions below.
 ## References
 - Design docs: `design/`.
 
-<!-- CODEGRAPH_START -->
-## CodeGraph
+## CodeGraph in Git Worktrees
 
-In repositories indexed by CodeGraph (a `.codegraph/` directory exists at the repo root), reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+The CodeGraph index under `.codegraph/` is local machine data and is not tracked by git (only `.codegraph/.gitignore` is). A fresh worktree therefore contains an empty `.codegraph/` directory and CodeGraph reports the project as not initialized.
 
-- **MCP tool** (when available): `codegraph_explore` answers most code questions in one call — the relevant symbols' verbatim source plus the call paths between them, including dynamic-dispatch hops grep can't follow. Name a file or symbol in the query to read its current line-numbered source. If it's listed but deferred, load it by name via tool search.
-- **Shell** (always works): `codegraph explore "<symbol names or question>"` prints the same output.
-
-If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is the user's decision.
-<!-- CODEGRAPH_END -->
+- Run `codegraph init -y` in a worktree immediately after creating it, before starting any agent work there. For this repository the initial build takes about 10 seconds and roughly 40 MB per worktree.
+- Do not symlink a worktree's `.codegraph/` to the main checkout's index and do not copy the database file. The index is keyed to the tree it was built from, so edits made in the worktree would be invisible or inconsistent, and the daemon lock and socket files would be shared.
+- Do not fall back to querying the main checkout's index for code you are editing in a worktree; it can return symbols from a different branch.
+- The index lives inside the worktree, so `git worktree remove` deletes it with the worktree and no separate cleanup is needed.
