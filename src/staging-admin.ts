@@ -20,7 +20,7 @@ function wireOperation(operation: StageOperation): StagingOperation {
 
 export async function handleM6StagingAdmin(request: Request, env: StagingAdminEnv, bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/staging") return null;
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
   if (request.method !== "POST") return reply({ error: "method not allowed" }, 405);
   let input: StagingAdminRequest;
   try { input = stagingAdminRequestSchema.parse(await readBoundedAdminJson(request)); }

@@ -10,7 +10,7 @@ export function createSqliteServiceHttp(runtime: SqliteServiceRuntime, key: stri
   return async (request) => {
     const url = new URL(request.url), path = url.pathname.slice("/admin/sqlite-service/".length);
     if (!url.pathname.startsWith("/admin/sqlite-service/")) return reply({ error: "not_found" }, 404);
-    if (!authenticated(request, key)) return reply({ error: "unauthorized" }, 401);
+    if (!await authenticated(request, key)) return reply({ error: "unauthorized" }, 401);
     if (url.search || url.hash) return reply({ error: "invalid_route" }, 400);
     try {
       if (path === "health" && request.method === "GET") return reply(runtime.health());

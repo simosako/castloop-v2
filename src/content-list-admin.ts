@@ -69,7 +69,7 @@ async function listContent(env: Env, bindings: M6DeliveryGateBindings, input: Co
 
 export async function handleM6ContentList(request: Request, env: Env, bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/catalog") return null;
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
   if (request.method !== "POST") return reply({ error: "method not allowed" }, 405);
   let input: ContentListRequest;
   try { input = contentListRequestSchema.parse(await readBoundedAdminJson(request)); }

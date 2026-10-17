@@ -7,7 +7,7 @@ import { pauseServiceAdmission, readServiceAdmission, resumeServiceAdmission } f
 import { adminReply as reply } from "./admin-reply";
 
 export async function handleM6ServiceAdmin(request: Request, env: M6RuntimeEnv & { CASTLOOP_ADMIN_KEY: string }): Promise<Response> {
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "service_unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "service_unauthorized" }, 401);
   if (request.method !== "POST") return reply({ reason_code: "service_method_invalid" }, 405);
   let input;
   try { input = m6ServiceAdminRequestSchema.parse(await readBoundedAdminJson(request)); }

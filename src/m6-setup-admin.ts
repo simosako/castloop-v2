@@ -17,7 +17,7 @@ type SetupEnv = M6InitializationEnv & { CASTLOOP_ADMIN_KEY: string; CASTLOOP_QUE
 export async function handleM6SetupAdmin(request: Request, env: SetupEnv, runtime: M6SetupRuntime): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/admin/setup/")) return null;
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "setup_unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "setup_unauthorized" }, 401);
   const route = url.pathname.slice("/admin/setup/".length);
   if (!["prepare", "status", "probe", "complete"].includes(route)) return reply({ reason_code: "setup_route_unknown" }, 404);
   if (request.method !== (route === "probe" ? "GET" : "POST")) return reply({ reason_code: "setup_method_invalid" }, 405);

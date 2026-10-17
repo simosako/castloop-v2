@@ -11,7 +11,7 @@ import { adminReply as reply } from "./admin-reply";
 export async function handleM6ShowRegistrationAdmin(request: Request, env: ShowRegistrationEnv & { CASTLOOP_ADMIN_KEY: string },
   bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/shows") return null;
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
   if (request.method !== "POST") return reply({ error: "method not allowed" }, 405);
   let input: ShowRegistrationRequest;
   try { input = showRegistrationRequestSchema.parse(await readBoundedAdminJson(request)); }
