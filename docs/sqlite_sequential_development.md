@@ -71,6 +71,7 @@ castloop publish-episode first
 
 - `create-*`は公開しない。`update-*`は一意のR2 keyへのuploadとローカルreceipt保存だけで、サーバーのstage-start許可を待たない。
 - MP3上限は300,000,000 bytes。MP3解析・サイズ・全量readback/hash・ETag/versionを確認した素材だけを公開manifestへ登録する。
+- upload sourceは最終bytesを転送する前にEOFまで確認する。HTTP 200だけでは成功にせず、receiptと全量readback検証を維持する（[Issue #30の調査・修正](../design/cli_upload_source_completion.md)）。
 - 初回Episodeにはmetadataと音源が両方必要。その後はmetadata-only/audio-onlyが可能。
 - `publish-*`は要求をローカルへ凍結してDOへ送信し、完了を最大300回・新規poll開始5分まで待つ。
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。

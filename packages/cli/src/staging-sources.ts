@@ -4,7 +4,6 @@ import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { chmod, lstat, mkdir, mkdtemp, open, rmdir, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { Readable } from "node:stream";
 import { finished } from "node:stream/promises";
 
 export type FrozenPayloadSources = {
@@ -140,9 +139,29 @@ export async function freezePayloadSources(root: string, input: readonly StagePa
       const handle = await open(snapshots[index]!, constants.O_RDONLY | constants.O_NOFOLLOW);
       const stream = handle.createReadStream();
       const settled = finished(stream, { cleanup: true }).catch(() => undefined);
-      const requireConsumed = () => { if (!stream.readableEnded) throw new Error("PUT responded before its owned source finished"); };
+      const iterator = stream[Symbol.asyncIterator]();
+      const expected = payloads[index]!.length_bytes;
+      let length = 0;
+      let completed = false;
+      const body = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          const chunk = await iterator.next();
+          if (chunk.done) throw new Error("Staging snapshot ended before its frozen size");
+          length += chunk.value.length;
+          if (length > expected) throw new Error("Staging snapshot exceeds its frozen size");
+          if (length === expected) {
+            // Observe EOF before exposing the final bytes to a Content-Length transport.
+            if (!(await iterator.next()).done) throw new Error("Staging snapshot exceeds its frozen size");
+            completed = true;
+            controller.enqueue(chunk.value);
+            controller.close();
+          } else controller.enqueue(chunk.value);
+        },
+        cancel() { stream.destroy(); },
+      }, { highWaterMark: 0 });
+      const requireConsumed = () => { if (!completed) throw new Error("PUT responded before its owned source finished"); };
       try {
-        await consume(Readable.toWeb(stream) as unknown as ReadableStream<Uint8Array>, requireConsumed);
+        await consume(body, requireConsumed);
         requireConsumed();
       } finally { stream.destroy(); await settled; await handle.close(); }
     }),
