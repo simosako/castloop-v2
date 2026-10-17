@@ -1,7 +1,7 @@
 import { SaxesParser } from "saxes";
 import { episodeDraftSchema, episodeGuidSchema, showMetadataSchema, validateId } from "@castloop/shared";
 import type { EpisodeDraft, ShowMetadata } from "@castloop/shared";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 const ITUNES = "http://www.itunes.com/dtds/podcast-1.0.dtd";
 const CONTENT = "http://purl.org/rss/1.0/modules/content/";
@@ -144,7 +144,7 @@ export function parseRssImportFeed(source: string, showId: string, feedUrl: stri
       const guid = episodeGuidSchema.parse(value(item, "guid"));
       if (guids.has(guid)) throw new Error("Duplicate Episode GUID");
       guids.add(guid);
-      const episodeId = `ep-${createHash("sha256").update(guid).digest("hex")}`;
+      const episodeId = `ep-${sha256HexSync(guid)}`;
       if (ids.has(episodeId)) throw new Error("Derived Episode ID collision");
       ids.add(episodeId);
       const permalink = one(item, "guid")!.attributes.isPermaLink;

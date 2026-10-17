@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import { BoundedReadError, collectStreamBytes, retryAfterMilliseconds } from "../../packages/cli/src/bounded-http-read";
+import { sha256HexSync } from "../../packages/cli/src/sha256";
 
 type Reason = "transport_error" | "observation_timeout" | "http_error" | "partial_response" |
   "missing_body" | "missing_etag" | "size_limit" | "body_read_failed" | "cleanup_failed" | "deadline_exceeded";
@@ -21,51 +22,37 @@ class ReadFailure extends Error {
   constructor(readonly code: Reason, readonly retryable: boolean, readonly status?: number, readonly retryAfterMs = 0) { super(code); }
 }
 
-function retryAfter(response: Response): number {
-  const value = response.headers.get("Retry-After");
-  if (value === null) return 0;
-  const milliseconds = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) * 1000 : Date.parse(value) - Date.now();
-  return Number.isFinite(milliseconds) ? Math.max(0, Math.ceil(milliseconds)) : 0;
-}
-
 async function readAttempt(url: string, options: Options, signal: AbortSignal): Promise<Result> {
   let response: Response;
   const headers = new Headers(options.headers); headers.set("Accept-Encoding", "identity");
   try { response = await (options.transport ?? fetch)(url, { method: "GET", headers,
     redirect: "error", cache: "no-store", signal }); }
   catch { throw new ReadFailure(signal.aborted ? "observation_timeout" : "transport_error", true); }
-  const reader = response.body?.getReader();
-  let terminal = false;
+  const declared = response.headers.get("Content-Length");
+  const identityEncoding = !response.headers.has("Content-Encoding") || response.headers.get("Content-Encoding") === "identity";
   try {
-    if (response.status !== 200) throw new ReadFailure("http_error", [408, 429, 500, 502, 503, 504].includes(response.status), response.status, retryAfter(response));
+    const wait = retryAfterMilliseconds(response);
+    if (response.status !== 200) throw new ReadFailure("http_error", [408, 429, 500, 502, 503, 504].includes(response.status), response.status,
+      wait !== undefined && Number.isFinite(wait) ? wait : 0);
     if (response.headers.has("Content-Range")) throw new ReadFailure("partial_response", false, response.status);
     if (options.requireEtag && !response.headers.get("ETag")) throw new ReadFailure("missing_etag", false, response.status);
-    if (!reader) throw new ReadFailure("missing_body", false, response.status);
-    const declared = response.headers.get("Content-Length");
-    const identityEncoding = !response.headers.has("Content-Encoding") || response.headers.get("Content-Encoding") === "identity";
+    if (!response.body) throw new ReadFailure("missing_body", false, response.status);
     if (identityEncoding && declared !== null && (!/^\d+$/.test(declared) || Number(declared) > options.maximumBytes)) throw new ReadFailure("size_limit", false, response.status);
-    const chunks: Uint8Array[] = []; let length = 0;
-    for (;;) {
-      let chunk: ReadableStreamReadResult<Uint8Array>;
-      try { chunk = await reader.read(); }
-      catch { terminal = true; throw new ReadFailure(signal.aborted ? "observation_timeout" : "body_read_failed", true, response.status); }
-      if (chunk.done) { terminal = true; break; }
-      length += chunk.value.byteLength;
-      if (length > options.maximumBytes) throw new ReadFailure("size_limit", false, response.status);
-      chunks.push(chunk.value);
-    }
-    if (identityEncoding && declared !== null && Number(declared) !== length) throw new ReadFailure("partial_response", false, response.status);
-    if (signal.aborted) throw new ReadFailure("observation_timeout", true, response.status);
-    const bytes = new Uint8Array(length); let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-    return { bytes, headers: response.headers, status: response.status };
-  } finally {
-    if (reader) {
-      try { if (!terminal) await reader.cancel(); }
-      catch { throw new ReadFailure("cleanup_failed", false, response.status); }
-      finally { reader.releaseLock(); }
-    }
+  } catch (error) {
+    try { await response.body?.cancel(); }
+    catch { throw new ReadFailure("cleanup_failed", false, response.status); }
+    throw error;
   }
+  let bytes: Uint8Array;
+  try { bytes = await collectStreamBytes(response.body!, options.maximumBytes); }
+  catch (error) {
+    if (!(error instanceof BoundedReadError)) throw error;
+    throw new ReadFailure(error.code === "body_read_failed" && signal.aborted ? "observation_timeout" : error.code,
+      error.code === "body_read_failed", response.status);
+  }
+  if (identityEncoding && declared !== null && Number(declared) !== bytes.length) throw new ReadFailure("partial_response", false, response.status);
+  if (signal.aborted) throw new ReadFailure("observation_timeout", true, response.status);
+  return { bytes, headers: response.headers, status: response.status };
 }
 
 export async function readTrialObject(url: string, options: Options): Promise<Result> {
@@ -75,7 +62,7 @@ export async function readTrialObject(url: string, options: Options): Promise<Re
     !Number.isSafeInteger(attemptTimeout) || attemptTimeout < 1 || attemptTimeout > timeout ||
     !Number.isSafeInteger(maximum) || maximum < 1 || maximum > 3) throw new Error("Invalid bounded trial GET options");
   const now = options.now ?? (() => performance.now()), delay = options.delay ?? ((ms: number) => Bun.sleep(ms));
-  const start = now(), target = createHash("sha256").update(url).digest("hex");
+  const start = now(), target = sha256HexSync(url);
   for (let attempt = 1; attempt <= maximum; attempt++) {
     const remaining = timeout - (now() - start);
     let failure: ReadFailure;

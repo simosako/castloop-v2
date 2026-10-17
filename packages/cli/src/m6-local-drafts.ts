@@ -1,24 +1,20 @@
 import { episodeDraftSchema, parseShowMetadata, showMetadataSchema, stringifyToml, validateId } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { readLocalMetadata } from "./local-metadata-read";
+import { syncLocalJournalDirectory } from "./local-journal-path";
+import { writeSyncedLocalFile } from "./local-journal-storage";
 import { createShowRegistrationJournal, readLocalShowRegistration } from "./show-registration-journal";
 import { randomUUID } from "node:crypto";
-import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 function requireDirectory(path: string): void {
   if (!lstatSync(path).isDirectory()) throw new Error("Local draft parent must be a real directory, not a symlink");
 }
 
-function syncDirectory(path: string): void {
-  const fd = openSync(path, "r");
-  try { fsyncSync(fd); } finally { closeSync(fd); }
-}
-
 function writeNewDraft(file: string, source: string, directory: string): void {
-  const fd = openSync(file, "wx", 0o600);
-  try { writeFileSync(fd, source); fsyncSync(fd); } finally { closeSync(fd); }
-  syncDirectory(directory);
+  writeSyncedLocalFile(file, () => source);
+  syncLocalJournalDirectory(directory);
 }
 
 async function withRegisteredShow<T>(root: string, config: ServiceConfig, showId: string, action: () => Promise<T>): Promise<T> {
@@ -45,7 +41,7 @@ export async function createM6LocalShowDraft(root: string, config: ServiceConfig
     const directory = join(root, showId);
     const file = join(directory, "show.toml");
     mkdirSync(directory, { mode: 0o700 });
-    syncDirectory(root);
+    syncLocalJournalDirectory(root);
     writeNewDraft(file, stringifyToml(draft), directory);
     return file;
   });

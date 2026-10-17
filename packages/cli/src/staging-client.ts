@@ -3,7 +3,7 @@ import { stageControlRequest, stagePayloadKey, stageUploadRequestSchema, staging
 import type { ServiceConfig, StageReadbackReceipt, StageSettlement, StageUploadRequest, StagingAdminRequest, StagingAdminResponse, StagingOperation } from "@castloop/shared";
 import { M6AdminJsonClient } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 type Result<Name extends StagingAdminResponse["result"]> = Extract<StagingAdminResponse, { result: Name }>;
 export type StagePutTarget = Extract<StagingAdminResponse, { result: "started" }>["payloads"][number];
@@ -43,8 +43,8 @@ export class StagingAdminClient {
         throw new Error("Staging PUT permission differs from its exact keys, sizes or checksums");
       }
       if (value.result === "status" && (JSON.stringify(value.upload) !== JSON.stringify(upload) ||
-        value.manifest_sha256 !== createHash("sha256").update(JSON.stringify(upload)).digest("hex") ||
-        value.request_sha256 !== createHash("sha256").update(JSON.stringify(stageControlRequest(upload))).digest("hex"))) {
+        value.manifest_sha256 !== sha256HexSync(JSON.stringify(upload)) ||
+        value.request_sha256 !== sha256HexSync(JSON.stringify(stageControlRequest(upload))))) {
         throw new Error("Staging status differs from its frozen manifest/control request");
       }
       return value;

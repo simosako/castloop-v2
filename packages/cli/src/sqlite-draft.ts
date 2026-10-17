@@ -11,7 +11,7 @@ import type { SqliteManagementReadBudget } from "./sqlite-management-http";
 import { uploadSqliteDraftAssets } from "./sqlite-upload";
 import { assertLocalStagingSource, inspectLocalStagingSource } from "./staging-sources";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
-import { createHash } from "node:crypto";
+import { sha256HexSync as sha256 } from "./sha256";
 import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -20,7 +20,6 @@ const selectionSchema = z.discriminatedUnion("asset", [z.object({ asset: z.liter
   z.object({ asset: z.literal("audio"), audio_path: z.string().min(1).max(2048) }).strict()]);
 export type SqliteDraftSelection = z.infer<typeof selectionSchema>;
 export type SqliteDraftOptions = { administratorKey: string; managementTransport?: R2RestTransport; r2?: R2RestOptions };
-const sha256 = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 export class SqliteDraft {
   private constructor(private readonly root: string, private readonly config: SqliteServiceConfig,

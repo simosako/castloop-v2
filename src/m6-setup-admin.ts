@@ -11,12 +11,9 @@ import { readM6RuntimeConfiguration } from "./m6-runtime-readiness";
 import type { M6RuntimeChecks } from "./m6-runtime-readiness";
 import { readServiceAdmission } from "./service-admission";
 import { completeM6ServiceUpdate, prepareM6ServiceUpdate } from "./m6-service-update";
+import { adminReply as reply } from "./admin-reply";
 
 type SetupEnv = M6InitializationEnv & { CASTLOOP_ADMIN_KEY: string; CASTLOOP_QUEUE: Pick<Queue, "send"> };
-function reply(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
-}
-
 export async function handleM6SetupAdmin(request: Request, env: SetupEnv, runtime: M6SetupRuntime): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/admin/setup/")) return null;

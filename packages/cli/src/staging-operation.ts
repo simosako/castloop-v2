@@ -4,7 +4,7 @@ import { StagingAdminClient, stagingClientOperation, stagingClientTargets } from
 import type { StagePutTarget } from "./staging-client";
 import { validateStagingClientState } from "./staging-journal";
 import type { StagingClientState, StagingJournal } from "./staging-journal";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 type Receipt<Result extends StagingAdminResponse["result"]> = Extract<StagingAdminResponse, { result: Result }>;
 export type StagingOperationEffects = { upload: StageUploadRequest; claim: () => Promise<Receipt<"claimed">>;
@@ -27,8 +27,8 @@ function receipt(state: StagingClientState, input: unknown, result: StagingAdmin
     JSON.stringify(value.operation) !== JSON.stringify(stagingClientOperation(state.upload)) ||
     value.result === "started" && JSON.stringify(value.payloads) !== JSON.stringify(stagingClientTargets(state.upload)) ||
     value.result === "status" && (JSON.stringify(value.upload) !== JSON.stringify(state.upload) ||
-      value.manifest_sha256 !== createHash("sha256").update(JSON.stringify(state.upload)).digest("hex") ||
-      value.request_sha256 !== createHash("sha256").update(JSON.stringify(stageControlRequest(state.upload))).digest("hex"))) {
+      value.manifest_sha256 !== sha256HexSync(JSON.stringify(state.upload)) ||
+      value.request_sha256 !== sha256HexSync(JSON.stringify(stageControlRequest(state.upload))))) {
     throw new Error("Staging receipt differs from its frozen manifest/operation");
   }
   return value;

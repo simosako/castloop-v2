@@ -4,7 +4,9 @@ import type { LifecycleAdminRequest, ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
-import { createHash } from "node:crypto";
+import { bindLocalJournal } from "./validated-local-journal";
+import type { ValidatedLocalJournal } from "./validated-local-journal";
+import { sha256HexSync } from "./sha256";
 import { join } from "node:path";
 
 const claimSchema = lifecycleAdminRequestSchema.transform((value, context) => {
@@ -23,14 +25,13 @@ const stateSchema = z.object({ schema_version: z.literal(1), identity: identityS
 }).strict();
 
 export type LifecycleClientState = z.infer<typeof stateSchema>;
-export type LifecycleJournal = { load: () => LifecycleClientState; save: (state: LifecycleClientState) => void;
-  exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
+export type LifecycleJournal = ValidatedLocalJournal<LifecycleClientState>;
 
 export function expectedLifecycleOperation(claim: LifecycleClientState["claim"]): z.infer<typeof lifecycleCommitSchema> {
   const request = claimSchema.parse(claim).request;
   return lifecycleCommitSchema.parse({ schema_version: 1, kind: request.kind, job_id: request.job_id, show_id: request.show_id,
     ...(request.episode_id ? { episode_id: request.episode_id } : {}), action: request.action,
-    show_generation: request.expected_show_generation + 1, request_sha256: createHash("sha256").update(JSON.stringify(request)).digest("hex") });
+    show_generation: request.expected_show_generation + 1, request_sha256: sha256HexSync(JSON.stringify(request)) });
 }
 
 export function validateLifecycleClientState(input: unknown): LifecycleClientState {
@@ -74,21 +75,16 @@ export function createLifecycleJournal(root: string, configInput: ServiceConfig,
   const config = serviceConfigSchema.parse(configInput);
   const prepared = validateLifecycleClientState({ schema_version: 1, identity: identityFromConfig(config), claim: input, phase: "prepared" });
   const storage = createLocalJournalStorage(root, "lifecycle-jobs", config.service_id, `${prepared.claim.request.job_id}.json`);
-  const load = (): LifecycleClientState => {
-    const state = validateLifecycleClientState(storage.read());
-    if (!matchesConfig(state, config) || JSON.stringify(state.claim) !== JSON.stringify(prepared.claim)) {
-      throw new Error("This job already has a different frozen lifecycle request");
-    }
-    return state;
-  };
   storage.initialize(prepared);
-  load();
-  return {
-    load,
-    save: (input) => {
-      storage.requireLock("Lifecycle journal writes require its exclusive client lock");
-      const next = validateLifecycleClientState(input);
-      const previous = load();
+  return bindLocalJournal(storage, {
+    parse: validateLifecycleClientState,
+    lockMessage: "Lifecycle journal writes require its exclusive client lock",
+    assertIdentity: (state) => {
+      if (!matchesConfig(state, config) || JSON.stringify(state.claim) !== JSON.stringify(prepared.claim)) {
+        throw new Error("This job already has a different frozen lifecycle request");
+      }
+    },
+    assertTransition: (previous, next) => {
       const phases = stateSchema.shape.phase.options;
       const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
       const retryChanged = JSON.stringify(next.retry) !== JSON.stringify(previous.retry);
@@ -104,8 +100,6 @@ export function createLifecycleJournal(root: string, configInput: ServiceConfig,
         distance !== 0 && retryChanged) {
         throw new Error("Frozen lifecycle journal cannot change, skip phases or replay an unknown request");
       }
-      storage.replace(next);
     },
-    exclusively: storage.exclusively,
-  };
+  });
 }

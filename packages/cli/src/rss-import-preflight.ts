@@ -6,6 +6,7 @@ import { createLocalJournalStorage } from "./local-journal-storage";
 import { readLocalMetadata } from "./local-metadata-read";
 import { parseRssImportFeed } from "./rss-import-feed";
 import { hashRssImportFile, readRssImportSnapshot, rssImportAssetSchema, rssImportControlSchema, rssImportCoverExtension } from "./rss-import-local";
+import { sha256HexSync } from "./sha256";
 import { createHash } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -22,7 +23,7 @@ export async function prepareRssImportPublication(output: string): Promise<Prepa
   const state = rssImportControlSchema.parse(control.read());
   validateId(state.show_id, "show");
   const source = await readRssImportSnapshot(join(root, "source.xml"));
-  if (!state.final_url || createHash("sha256").update(source).digest("hex") !== state.feed_sha256) {
+  if (!state.final_url || sha256HexSync(source) !== state.feed_sha256) {
     throw new Error("RSS snapshot differs from its retained import record");
   }
   const feed = parseRssImportFeed(source, state.show_id, state.final_url);

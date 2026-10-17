@@ -1,5 +1,6 @@
 import { parseEpisodeRevision, targetInspectionRequestSchema, targetInspectionResponseSchema } from "../packages/shared/src/index";
 import type { TargetInspectionRequest, TargetInspectionResponse } from "../packages/shared/src/index";
+import { adminReply as reply } from "./admin-reply";
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import { readEpisodeLifecycle, readShowControl } from "./lifecycle-control";
@@ -59,7 +60,6 @@ async function inspectTarget(env: Env, bindings: M6DeliveryGateBindings, input: 
 
 export async function handleM6TargetInspection(request: Request, env: Env, bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/target") return null;
-  const reply = (data: object, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
   if (request.method !== "POST") return reply({ error: "method not allowed" }, 405);
   let input: TargetInspectionRequest;

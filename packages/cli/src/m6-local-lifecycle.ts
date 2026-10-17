@@ -8,7 +8,7 @@ import type { LifecycleClientState, LifecycleJournal } from "./lifecycle-journal
 import { createLifecycleOperationEffects, runLifecycleClaim, runLifecycleCommit } from "./lifecycle-operation";
 import type { LocalDraftTarget } from "./local-draft-journal";
 import { TargetInspectionClient } from "./target-inspection-client";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 type Preview = Extract<LifecycleAdminResponse, { result: "preview" }>;
 type Confirmation = Extract<LifecycleAdminRequest, { action: "claim" }>["confirmation"];
@@ -27,7 +27,7 @@ export function confirmLocalM6Lifecycle(action: LifecycleOperationRequest["actio
 }
 
 function requestHash(request: LifecycleOperationRequest): string {
-  return createHash("sha256").update(JSON.stringify(request)).digest("hex");
+  return sha256HexSync(JSON.stringify(request));
 }
 
 export function validateM6LifecyclePlan(configInput: ServiceConfig, input: unknown): M6LifecyclePlan {

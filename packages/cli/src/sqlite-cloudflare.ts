@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { stringifyToml } from "@castloop/shared";
+import { sha256Hex, stringifyToml } from "@castloop/shared";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata, SQLITE_WORKER_COMPATIBILITY_DATE } from "../../shared/src/sqlite-worker-deployment";
@@ -60,8 +60,7 @@ export class SqliteCloudflareApi {
   }
   async uploadConfig(): Promise<void> {
     const bytes = new TextEncoder().encode(stringifyToml(this.config));
-    const sha256 = await crypto.subtle.digest("SHA-256", bytes);
-    const digest = [...new Uint8Array(sha256)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    const digest = await sha256Hex(bytes);
     let consumed = false;
     const body = new ReadableStream<Uint8Array>({ pull(controller) { controller.enqueue(bytes); controller.close(); consumed = true; } });
     await putVerifiedR2Object(this.config, { key: "system/service.toml", length: bytes.length, sha256: digest, contentType: "application/toml" }, body,

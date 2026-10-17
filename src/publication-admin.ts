@@ -10,13 +10,10 @@ import { inspectPublication } from "./publication-inspection";
 import { ManagementReadConflict } from "./management-read-conflict";
 import { requeuePublicationOperation } from "./publication-consumer";
 import { measureWorkerPhase } from "./worker-timing";
+import { adminReply as reply } from "./admin-reply";
 
 export type PublicationAdminEnv = LifecycleControlEnv & { CASTLOOP_ADMIN_KEY: string;
   CASTLOOP_QUEUE: { send: (body: { object: { key: string } }) => Promise<unknown> } };
-
-function reply(input: object, status = 200): Response {
-  return Response.json(input, { status, headers: { "Cache-Control": "no-store" } });
-}
 
 export async function handleM6PublicationAdmin(request: Request, env: PublicationAdminEnv, bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/publication") return null;

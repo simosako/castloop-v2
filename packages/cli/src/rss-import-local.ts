@@ -8,6 +8,7 @@ import { readLocalMetadata } from "./local-metadata-read";
 import { receiveRssAsset, validateRssSourceUrl } from "./rss-import-download";
 import type { RssAssetTransport } from "./rss-import-download";
 import { parseRssImportFeed, RSS_IMPORT_MAXIMUM_BYTES } from "./rss-import-feed";
+import { sha256HexSync } from "./sha256";
 import { createHash, randomUUID } from "node:crypto";
 import { constants, lstatSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { link, open, unlink } from "node:fs/promises";
@@ -91,7 +92,7 @@ export async function importRssLocally(showId: string, sourceUrl: string, output
     if (!present(snapshot)) {
       const fetched = await fetchFeed(sourceUrl, transport);
       parseRssImportFeed(fetched.source, showId, fetched.url);
-      const sha256 = createHash("sha256").update(fetched.source).digest("hex");
+      const sha256 = sha256HexSync(fetched.source);
       if (state.feed_sha256 && (state.feed_sha256 !== sha256 || state.final_url !== fetched.url)) {
         throw new Error("RSS changed after import preparation; keep the original import and use a new directory");
       }
@@ -104,7 +105,7 @@ export async function importRssLocally(showId: string, sourceUrl: string, output
       syncLocalJournalDirectory(root);
     }
     const source = await readRssImportSnapshot(snapshot);
-    if (!state.feed_sha256 || !state.final_url || createHash("sha256").update(source).digest("hex") !== state.feed_sha256) {
+    if (!state.feed_sha256 || !state.final_url || sha256HexSync(source) !== state.feed_sha256) {
       throw new Error("RSS snapshot does not match its retained import record");
     }
     const feed = parseRssImportFeed(source, showId, state.final_url);

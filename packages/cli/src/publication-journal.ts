@@ -6,7 +6,9 @@ import { publicationClientOperation } from "./publication-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
-import { createHash } from "node:crypto";
+import { bindLocalJournal } from "./validated-local-journal";
+import type { ValidatedLocalJournal } from "./validated-local-journal";
+import { sha256HexSync } from "./sha256";
 import { join } from "node:path";
 
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, publication: publicationRequestSchema,
@@ -23,8 +25,7 @@ const stateSchema = z.object({ schema_version: z.literal(1), identity: identityS
 }).strict();
 
 export type PublicationClientState = z.infer<typeof stateSchema>;
-export type PublicationJournal = { load: () => PublicationClientState; save: (state: PublicationClientState) => void;
-  exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
+export type PublicationJournal = ValidatedLocalJournal<PublicationClientState>;
 
 function phaseIndex(phase: PublicationClientState["phase"]): number {
   if (phase === "async_submit_requested") return 1;
@@ -41,8 +42,8 @@ export function validatePublicationClientState(input: unknown): PublicationClien
     const submission = state.async_submission;
     if (!submission || submission.intent.command.action !== "publish" || submission.intent.service_id !== state.identity.service_id ||
       JSON.stringify(submission.intent.command.publication) !== JSON.stringify(state.publication) ||
-      submission.intent_sha256 !== createHash("sha256").update(JSON.stringify(submission.intent)).digest("hex") ||
-      state.manifest_sha256 !== createHash("sha256").update(JSON.stringify(state.publication)).digest("hex") ||
+      submission.intent_sha256 !== sha256HexSync(JSON.stringify(submission.intent)) ||
+      state.manifest_sha256 !== sha256HexSync(JSON.stringify(state.publication)) ||
       origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" ||
       state.claim_receipt || state.commit_receipt || state.queue_submission || state.queued_receipt || state.retry || state.release) {
       throw new Error("Async publication must retain its frozen submission without claiming admission or publication");
@@ -51,7 +52,7 @@ export function validatePublicationClientState(input: unknown): PublicationClien
   }
   if (state.async_submission) throw new Error("Legacy publication cannot adopt an async submission");
   if (origin.protocol !== "https:" || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" ||
-    state.manifest_sha256 !== createHash("sha256").update(JSON.stringify(state.publication)).digest("hex") ||
+    state.manifest_sha256 !== sha256HexSync(JSON.stringify(state.publication)) ||
     (phase >= 2) !== (state.claim_receipt !== undefined) || (["accepted", "committed"].includes(state.phase)) !== (state.commit_receipt !== undefined) ||
     (["submit_requested", "queued"].includes(state.phase)) !== (state.queue_submission !== undefined) ||
     (state.phase === "queued") !== (state.queued_receipt !== undefined) ||
@@ -72,9 +73,9 @@ export function validatePublicationClientState(input: unknown): PublicationClien
       submission_id: intent.submission_id, operation: publicationClientOperation(state.publication), manifest_sha256: state.manifest_sha256,
       intent_sha256: submission.intent_sha256, queue_id: submission.queue_id };
     if (intent.service_id !== state.identity.service_id || intent.manifest_sha256 !== state.manifest_sha256 ||
-      intent.request_sha256 !== createHash("sha256").update(JSON.stringify(state.publication.request)).digest("hex") ||
+      intent.request_sha256 !== sha256HexSync(JSON.stringify(state.publication.request)) ||
       JSON.stringify(intent.operation) !== JSON.stringify(publicationClientOperation(state.publication)) ||
-      submission.intent_sha256 !== createHash("sha256").update(JSON.stringify(intent)).digest("hex") ||
+      submission.intent_sha256 !== sha256HexSync(JSON.stringify(intent)) ||
       state.queued_receipt && JSON.stringify(state.queued_receipt) !== JSON.stringify(expectedReceipt)) {
       throw new Error("Queue submission or receipt differs from its frozen publication identity");
     }
@@ -104,23 +105,18 @@ export function createPublicationJournal(root: string, configInput: ServiceConfi
   const config = serviceConfigSchema.parse(configInput);
   const publication = publicationRequestSchema.parse(input);
   const prepared = validatePublicationClientState({ schema_version: 1, identity: identityFromConfig(config), publication, phase: "prepared",
-    manifest_sha256: createHash("sha256").update(JSON.stringify(publication)).digest("hex") });
+    manifest_sha256: sha256HexSync(JSON.stringify(publication)) });
   const storage = createLocalJournalStorage(root, "publication-jobs", config.service_id, `${publication.request.job_id}.json`);
-  const load = (): PublicationClientState => {
-    const state = validatePublicationClientState(storage.read());
-    if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || state.manifest_sha256 !== prepared.manifest_sha256) {
-      throw new Error("This job already has a different frozen publication manifest");
-    }
-    return state;
-  };
   storage.initialize(prepared);
-  load();
-  return {
-    load,
-    save: (input) => {
-      storage.requireLock("Publication journal writes require its exclusive client lock");
-      const next = validatePublicationClientState(input);
-      const previous = load();
+  return bindLocalJournal(storage, {
+    parse: validatePublicationClientState,
+    lockMessage: "Publication journal writes require its exclusive client lock",
+    assertIdentity: (state) => {
+      if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || state.manifest_sha256 !== prepared.manifest_sha256) {
+        throw new Error("This job already has a different frozen publication manifest");
+      }
+    },
+    assertTransition: (previous, next) => {
       const distance = phaseIndex(next.phase) - phaseIndex(previous.phase);
       const retryChanged = JSON.stringify(next.retry) !== JSON.stringify(previous.retry);
       const retryStarted = phaseIndex(next.phase) === 4 && next.retry?.state === "requested" &&
@@ -146,8 +142,6 @@ export function createPublicationJournal(root: string, configInput: ServiceConfi
         previous.commit_receipt && JSON.stringify(next.commit_receipt) !== JSON.stringify(previous.commit_receipt) || distance !== 0 && (retryChanged || releaseChanged)) {
         throw new Error("Frozen publication journal cannot change, skip phases or replay an unknown request");
       }
-      storage.replace(next);
     },
-    exclusively: storage.exclusively,
-  };
+  });
 }

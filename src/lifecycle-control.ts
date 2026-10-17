@@ -1,6 +1,6 @@
 import { controlRequestSchema, parseControlRequest, parseEpisodeLifecycle, parseJobStatus,
   parseLifecycleProgress, parseShowControl,
-  permitsControlAction, stringifyLifecycleToml, validateId } from "../packages/shared/src/index";
+  permitsControlAction, sha256Hex, stringifyLifecycleToml, validateId } from "../packages/shared/src/index";
 import type { ControlRequest, EpisodeLifecycle, ShowControl } from "../packages/shared/src/index";
 import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { requireShowReservationReady } from "./show-reservation-record";
@@ -66,8 +66,7 @@ export async function readEpisodeLifecycle(env: LifecycleReadEnv, showId: string
 }
 
 async function requestHash(request: ControlRequest): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(request)));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(JSON.stringify(request));
 }
 
 export { requestHash as controlRequestHash, requireOwnedOperation, requireEligibleTarget };

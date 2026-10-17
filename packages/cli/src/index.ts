@@ -14,8 +14,9 @@ import { loadWorkspaceConfig } from "./workspace-config";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { syncLocalJournalDirectory } from "./local-journal-path";
+import { protectLocalState } from "./workspace-protection";
 import { randomBytes, randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -133,11 +134,7 @@ async function init(target: string, flags: Record<string, string>): Promise<unkn
   if (retained.lockPresent || retained.state && retained.state.phase !== "prepared") {
     throw new Error("Initialization already started; inspect its journal or use init-reconcile only for an acknowledged completed initialization");
   }
-  const ignore = join(root, ".gitignore");
-  if (!existsSync(ignore)) writeFileSync(ignore, "");
-  const existing = readFileSync(ignore, "utf8");
-  const additions = [".castloop/", "*.mp3"].filter((line) => !existing.split(/\r?\n/).includes(line));
-  if (additions.length) appendFileSync(ignore, `${existing && !existing.endsWith("\n") ? "\n" : ""}${additions.join("\n")}\n`);
+  protectLocalState(root);
   return runM6Command(root, config, "init", [flags["operation-id"] ?? retained.state?.request.operation_id ?? randomUUID()], { workerSource });
 }
 

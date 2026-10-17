@@ -1,4 +1,4 @@
-import { parseStageReadbackReceipts, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageSettlementSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "../packages/shared/src/index";
+import { parseStageReadbackReceipts, sha256Hex, stageControlRequest, stageDraftPrefix, stagePayloadKey, stageSettlementSchema, stageUploadProgressSchema, stageUploadRequestSchema } from "../packages/shared/src/index";
 import type { StageSettlement, StageUploadProgress, StageUploadRequest } from "../packages/shared/src/index";
 import { claimShowOperation, controlRequestHash, createStageVerificationControlEnv, readEpisodeLifecycle, requireOwnedOperation } from "./lifecycle-control";
 import type { LifecycleControlEnv, OwnedShowControlSnapshot } from "./lifecycle-control";
@@ -30,9 +30,7 @@ export async function createStageVerificationEnv(env: LifecycleControlEnv,
 }
 
 export async function stageManifestHash(input: StageUploadRequest): Promise<string> {
-  const value = stageUploadRequestSchema.parse(input);
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(JSON.stringify(stageUploadRequestSchema.parse(input)));
 }
 
 async function readManifest(env: LifecycleControlEnv, operationId: string): Promise<StageUploadRequest> {

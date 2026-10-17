@@ -7,7 +7,7 @@ import { createStagingJournal, readLocalStagingOperation } from "./staging-journ
 import type { StagingJournal } from "./staging-journal";
 import { assertLocalStagingSource, freezeStagingSources, inspectLocalStagingSource } from "./staging-sources";
 import type { FrozenStagingSources } from "./staging-sources";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -33,7 +33,7 @@ export type PreparedLocalStagingUpload = {
 };
 
 function metadataPayload(asset: "show_metadata" | "episode_metadata", bytes: Buffer): StagePayload {
-  return { asset, length_bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
+  return { asset, length_bytes: bytes.length, sha256: sha256HexSync(bytes) };
 }
 
 export async function prepareLocalStagingUpload(root: string, config: ServiceConfig, input: Omit<StageUploadRequest, "payloads">,

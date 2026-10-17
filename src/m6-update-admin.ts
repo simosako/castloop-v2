@@ -3,10 +3,10 @@ import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import { beginM6ServiceUpdate } from "./m6-service-update";
 import type { M6UpdateEnv } from "./m6-service-update";
+import { adminReply as reply } from "./admin-reply";
 
 export async function handleM6UpdateAdmin(request: Request, env: M6UpdateEnv & { CASTLOOP_ADMIN_KEY: string }): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/update/begin") return null;
-  const reply = (body: object, status: number) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "update_unauthorized" }, 401);
   if (request.method !== "POST") return reply({ reason_code: "update_method_invalid" }, 405);
   let input;

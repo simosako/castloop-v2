@@ -4,6 +4,8 @@ import type { M6RuntimeReadiness, M6RuntimeTarget, M6ServiceUpdateRequest, Servi
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { ensureLocalJournalParents, localJournalEntryExists } from "./local-journal-path";
 import { workerPayloadHash } from "./worker-upload-hash";
+import { bindLocalJournal } from "./validated-local-journal";
+import type { ValidatedLocalJournal } from "./validated-local-journal";
 
 const stateSchema = z.object({ schema_version: z.union([z.literal(1), z.literal(2)]), config: serviceConfigSchema, request: m6ServiceUpdateRequestSchema,
   phase: z.enum(["prepared", "begin_requested", "admitted", "deploy_requested", "deployed", "completion_requested", "completed"]),
@@ -12,8 +14,7 @@ const stateSchema = z.object({ schema_version: z.union([z.literal(1), z.literal(
     state: z.enum(["not_started", "requested"]) }).strict().optional(),
   target: m6RuntimeTargetSchema.optional(), runtime_readiness: m6RuntimeReadinessSchema.optional() }).strict();
 export type M6UpdateClientState = z.infer<typeof stateSchema>;
-export type M6UpdateJournal = { load: () => M6UpdateClientState; save: (state: M6UpdateClientState) => void;
-  exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
+export type M6UpdateJournal = ValidatedLocalJournal<M6UpdateClientState>;
 export type M6UpdateDeployReceipts = { uploaded: (receipt: WorkerVersionUploadReceipt, previousDeploymentId: string) => void;
   activating: () => void;
   deployed: (receipt: { deployment_id: string; worker_version_id: string }) => void };
@@ -69,39 +70,35 @@ export async function createM6UpdateJournal(root: string, configInput: ServiceCo
     throw new Error("Compatible update configuration differs from its frozen request");
   }
   const storage = createLocalJournalStorage(root, "service-updates", config.service_id, `${request.operation_id}.json`);
-  const load = (): M6UpdateClientState => {
-    const state = validate(storage.read());
-    if (JSON.stringify(state.config) !== JSON.stringify(config) || JSON.stringify(state.request) !== JSON.stringify(request)) {
-      throw new Error("Compatible update journal belongs to another frozen request");
-    }
-    return state;
-  };
   storage.initialize({ schema_version: 2, config, request, phase: "prepared" });
-  load();
-  return { load, exclusively: storage.exclusively, save: (input) => {
-    storage.requireLock();
-    const next = validate(input);
-    const previous = load();
-    const phases = stateSchema.shape.phase.options;
-    const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
-    const { upload_receipt: _previousUpload, deployment_receipt: _previousDeployment, activation_checkpoint: previousCheckpoint, ...previousState } = previous;
-    const { upload_receipt: _nextUpload, deployment_receipt: _nextDeployment, activation_checkpoint: nextCheckpoint, ...nextState } = next;
-    const checkpointChanged = JSON.stringify(previousCheckpoint) !== JSON.stringify(nextCheckpoint);
-    if (checkpointChanged && !(previous.schema_version === 2 && previous.phase === "deploy_requested" && next.phase === "deploy_requested" &&
-      (!previousCheckpoint && !previous.upload_receipt && next.upload_receipt && nextCheckpoint?.state === "not_started" ||
-        previousCheckpoint?.state === "not_started" && nextCheckpoint?.state === "requested" &&
-        previousCheckpoint.previous_deployment_id === nextCheckpoint.previous_deployment_id))) {
-      throw new Error("Compatible update cannot infer or rewrite its activation checkpoint");
-    }
-    if (next.schema_version !== previous.schema_version || JSON.stringify(next.config) !== JSON.stringify(config) || JSON.stringify(next.request) !== JSON.stringify(request) ||
-      distance < 0 || distance > 1 || distance === 0 && JSON.stringify(nextState) !== JSON.stringify(previousState) ||
-      previous.upload_receipt && JSON.stringify(previous.upload_receipt) !== JSON.stringify(next.upload_receipt) ||
-      previous.deployment_receipt && JSON.stringify(previous.deployment_receipt) !== JSON.stringify(next.deployment_receipt) ||
-      previous.phase !== "deploy_requested" && (JSON.stringify(previous.upload_receipt) !== JSON.stringify(next.upload_receipt) ||
-        JSON.stringify(previous.deployment_receipt) !== JSON.stringify(next.deployment_receipt)) ||
-      previous.target && JSON.stringify(previous.target) !== JSON.stringify(next.target)) throw new Error("Compatible update cannot rewrite receipts or skip phases");
-    storage.replace(next);
-  } };
+  return bindLocalJournal(storage, {
+    parse: validate,
+    assertIdentity: (state) => {
+      if (JSON.stringify(state.config) !== JSON.stringify(config) || JSON.stringify(state.request) !== JSON.stringify(request)) {
+        throw new Error("Compatible update journal belongs to another frozen request");
+      }
+    },
+    assertTransition: (previous, next) => {
+      const phases = stateSchema.shape.phase.options;
+      const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
+      const { upload_receipt: _previousUpload, deployment_receipt: _previousDeployment, activation_checkpoint: previousCheckpoint, ...previousState } = previous;
+      const { upload_receipt: _nextUpload, deployment_receipt: _nextDeployment, activation_checkpoint: nextCheckpoint, ...nextState } = next;
+      const checkpointChanged = JSON.stringify(previousCheckpoint) !== JSON.stringify(nextCheckpoint);
+      if (checkpointChanged && !(previous.schema_version === 2 && previous.phase === "deploy_requested" && next.phase === "deploy_requested" &&
+        (!previousCheckpoint && !previous.upload_receipt && next.upload_receipt && nextCheckpoint?.state === "not_started" ||
+          previousCheckpoint?.state === "not_started" && nextCheckpoint?.state === "requested" &&
+          previousCheckpoint.previous_deployment_id === nextCheckpoint.previous_deployment_id))) {
+        throw new Error("Compatible update cannot infer or rewrite its activation checkpoint");
+      }
+      if (next.schema_version !== previous.schema_version || JSON.stringify(next.config) !== JSON.stringify(config) || JSON.stringify(next.request) !== JSON.stringify(request) ||
+        distance < 0 || distance > 1 || distance === 0 && JSON.stringify(nextState) !== JSON.stringify(previousState) ||
+        previous.upload_receipt && JSON.stringify(previous.upload_receipt) !== JSON.stringify(next.upload_receipt) ||
+        previous.deployment_receipt && JSON.stringify(previous.deployment_receipt) !== JSON.stringify(next.deployment_receipt) ||
+        previous.phase !== "deploy_requested" && (JSON.stringify(previous.upload_receipt) !== JSON.stringify(next.upload_receipt) ||
+          JSON.stringify(previous.deployment_receipt) !== JSON.stringify(next.deployment_receipt)) ||
+        previous.target && JSON.stringify(previous.target) !== JSON.stringify(next.target)) throw new Error("Compatible update cannot rewrite receipts or skip phases");
+    },
+  });
 }
 
 function deployReceipts(journal: M6UpdateJournal): M6UpdateDeployReceipts {

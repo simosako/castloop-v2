@@ -2,7 +2,7 @@ import { lifecycleAdminRequestSchema, lifecycleAdminResponseSchema, lifecycleCom
 import type { LifecycleAdminRequest, LifecycleAdminResponse, ServiceConfig } from "@castloop/shared";
 import { M6AdminJsonClient } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 type Input<Action extends LifecycleAdminRequest["action"]> = Extract<LifecycleAdminRequest, { action: Action }>;
 type Result<Name extends LifecycleAdminResponse["result"]> = Extract<LifecycleAdminResponse, { result: Name }>;
@@ -24,7 +24,7 @@ export class LifecycleAdminClient {
     const results = { "dry-run": "preview", status: "status", claim: "claimed", commit: "committed", retry: "requeued" } as const;
     if (results[request.action] !== expected) throw new Error("Lifecycle action differs from the requested client operation");
     if (request.service_id !== this.config.service_id) throw new Error("Lifecycle request belongs to another service");
-    const hash = createHash("sha256").update(JSON.stringify(request.request)).digest("hex");
+    const hash = sha256HexSync(JSON.stringify(request.request));
     const operation = lifecycleCommitSchema.parse({ schema_version: 1, job_id: request.request.job_id, show_id: request.request.show_id,
       kind: request.request.kind, ...(request.request.episode_id ? { episode_id: request.request.episode_id } : {}),
       action: request.request.action, show_generation: request.request.expected_show_generation + 1, request_sha256: hash });

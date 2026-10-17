@@ -4,6 +4,7 @@ import { lifecycleJobStatusSchema } from "./lifecycle-job";
 import { lifecycleStateSchema } from "./lifecycle";
 import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
+import { sha256Hex } from "./sha256";
 import type { SqliteServiceConfig } from "./sqlite-service";
 export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
 export type { PublicationRequest } from "./publication-request";
@@ -44,6 +45,7 @@ export type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from
 export { showRegistrationRequestSchema, showRegistrationResponseSchema, showReservationSchema } from "./show-registration";
 export type { ShowRegistrationRequest, ShowRegistrationResponse, ShowReservation } from "./show-registration";
 export { validateId } from "./ids";
+export { sha256Hex, toHex } from "./sha256";
 export { normalizeHostname } from "./hostname";
 export { domainAdminRequestSchema, domainAdminResponseSchema, domainOperationRequestSchema, domainRuntimeProbeSchema } from "./domain-admin";
 export type { DomainAdminRequest, DomainAdminResponse, DomainOperationRequest, DomainConnectionReceipt } from "./domain-admin";
@@ -244,9 +246,7 @@ export function parseServiceConfig(source: string): ServiceConfig {
 }
 
 export async function m6ServiceConfigHash(config: ServiceConfig): Promise<string> {
-  const source = JSON.stringify(serviceConfigSchema.parse(config));
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(JSON.stringify(serviceConfigSchema.parse(config)));
 }
 
 export function parseShowMetadata(source: string): ShowMetadata {

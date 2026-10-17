@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 export function workerPayloadHash(input: string | object): string {
-  return createHash("sha256").update(typeof input === "string" ? input : JSON.stringify(input)).digest("hex");
+  return sha256HexSync(typeof input === "string" ? input : JSON.stringify(input));
 }

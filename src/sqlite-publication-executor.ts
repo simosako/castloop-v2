@@ -1,5 +1,5 @@
 import { episodeDraftFromRevision, episodeRevisionSchema, parseEpisodeDraft, parsePublicAssetPath,
-  parseShowMetadata, sameEpisodeIdentity, stringifyToml } from "../packages/shared/src/index";
+  parseShowMetadata, sameEpisodeIdentity, stringifyToml, toHex } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import type { SqlitePublicationRequest, SqliteVerifiedUpload } from "../packages/shared/src/sqlite-publication";
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../packages/shared/src/sqlite-service";
@@ -101,7 +101,7 @@ async function persistAudio(bucket: SqlitePublicationBucket, prepared: PreparedE
     const result = await bucket.put(key, object.body, { onlyIf: new Headers({ "If-None-Match": "*" }),
       sha256: payload.sha256, customMetadata: { sha256: payload.sha256 }, httpMetadata: { contentType: "audio/mpeg" } });
     const checksum = result?.checksums.sha256;
-    const hash = checksum ? [...new Uint8Array(checksum)].map((byte) => byte.toString(16).padStart(2, "0")).join("") : null;
+    const hash = checksum ? toHex(checksum) : null;
     if (!result || result.key !== key || result.size !== payload.length_bytes || hash !== payload.sha256 ||
       result.customMetadata?.sha256 !== payload.sha256) throw new Error("Immutable audio write was not verified");
   } finally {
@@ -139,7 +139,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
             store.requireMedia(request.show_id, revision, media.revisionId);
             const object = await bucket.head(media.key);
             const checksum = object?.checksums.sha256;
-            const hash = checksum ? [...new Uint8Array(checksum)].map((byte) => byte.toString(16).padStart(2, "0")).join("") : null;
+            const hash = checksum ? toHex(checksum) : null;
             if (!object || object.size !== revision.length_bytes || hash !== revision.sha256 || object.customMetadata?.sha256 !== revision.sha256) throw new SqlitePublicationInputError("validation_failed");
           }
           if (request.kind === "show" && !await bucket.head(`public/podcasts/${request.show_id}/cover.${target.coverExtension!}`)) throw new SqlitePublicationInputError("validation_failed");
@@ -190,7 +190,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         store.requireMedia(request.show_id, revision, media.revisionId);
         const object = await bucket.head(media.key);
         const checksum = object?.checksums.sha256;
-        const hash = checksum ? [...new Uint8Array(checksum)].map((byte) => byte.toString(16).padStart(2, "0")).join("") : null;
+        const hash = checksum ? toHex(checksum) : null;
         if (!object || object.size !== revision.length_bytes || hash !== revision.sha256 || object.customMetadata?.sha256 !== revision.sha256) {
           throw new SqlitePublicationInputError("validation_failed");
         }

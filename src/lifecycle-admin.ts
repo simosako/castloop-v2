@@ -11,14 +11,11 @@ import type { DeletionReadEnv } from "./lifecycle-deletion";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import { inspectLifecycleJob } from "./lifecycle-inspection";
 import { M6ManagementServiceMismatch, withM6ManagementInvocation, withM6ManagementRead } from "./m6-management";
+import { adminReply as reply } from "./admin-reply";
 
 export type LifecycleAdminEnv = LifecycleControlEnv & DeletionReadEnv & { CASTLOOP_ADMIN_KEY: string; CASTLOOP_QUEUE: Pick<Queue, "send"> };
 type PreviewInput = Extract<LifecycleAdminRequest, { action: "dry-run" }>;
 type Preview = Extract<LifecycleAdminResponse, { result: "preview" }>;
-
-function reply(input: object, status = 200): Response {
-  return Response.json(input, { status, headers: { "Cache-Control": "no-store" } });
-}
 
 async function previewLifecycle(env: LifecycleAdminEnv, bindings: M6DeliveryGateBindings, input: PreviewInput, hash: string): Promise<Preview> {
   return withM6ManagementRead(env, input.service_id, bindings, async (admission) => {

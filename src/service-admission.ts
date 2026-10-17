@@ -1,4 +1,4 @@
-import { serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema } from "../packages/shared/src/index";
+import { serviceAdmissionSchema, serviceInvocationKindSchema, serviceMigrationRequestSchema, sha256Hex } from "../packages/shared/src/index";
 import type { M6ServiceReadiness, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 import { measureWorkerPhase } from "./worker-timing";
@@ -144,8 +144,7 @@ export async function resumeServiceAdmission(env: LifecycleControlEnv, serviceId
 }
 
 async function migrationRequestHash(request: ServiceMigrationRequest): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(request)));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(JSON.stringify(request));
 }
 
 export async function claimServiceMigration(env: LifecycleControlEnv, input: unknown): Promise<void> {

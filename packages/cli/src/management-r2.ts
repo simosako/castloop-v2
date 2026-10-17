@@ -1,7 +1,8 @@
 import { m6ServiceConfigHash, parseServiceConfig, serviceAdmissionSchema, serviceConfigSchema } from "@castloop/shared";
 import type { ServiceAdmission, ServiceConfig } from "@castloop/shared";
+import { BoundedReadError, collectStreamBytes, retryAfterMilliseconds } from "./bounded-http-read";
 import type { StagingRestOptions } from "./staging-rest";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 export type ManagementObject = { source: string; etag: string };
 export type ManagementReader = { read: (key: string, maximum?: number) => Promise<ManagementObject | null> };
@@ -35,13 +36,6 @@ function keyFamily(key: string): string {
   return "other_system";
 }
 
-function retryAfter(response: Response): number | undefined {
-  const value = response.headers.get("Retry-After");
-  if (value === null) return undefined;
-  const milliseconds = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) * 1000 : Date.parse(value) - Date.now();
-  return Number.isFinite(milliseconds) ? Math.max(0, Math.ceil(milliseconds)) : undefined;
-}
-
 async function cancelResponse(response: Response, evidence: ResponseEvidence): Promise<void> {
   try { await response.body?.cancel(); }
   catch { throw new ManagementReadFailure("response_cleanup_failed", false, evidence); }
@@ -64,7 +58,7 @@ export class ManagementR2Reader implements ManagementReader {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid management read timeout");
     const now = this.options.now ?? (() => performance.now()), started = now(), deadline = started + timeoutMs;
     const signal = AbortSignal.timeout(timeoutMs), maximumAttempts = 3;
-    const keyHash = createHash("sha256").update(key).digest("hex");
+    const keyHash = sha256HexSync(key);
     for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
       try {
         if (signal.aborted || now() >= deadline) throw new ManagementReadFailure("deadline_exceeded", false);
@@ -102,33 +96,24 @@ export class ManagementR2Reader implements ManagementReader {
     const reason = response.status !== 200 ? "http_error" : !response.body ? "missing_body" :
       response.headers.has("content-range") ? "partial_response" : !response.headers.get("ETag") ? "missing_etag" : undefined;
     if (reason) {
-      const delay = retryAfter(response);
+      const parsedDelay = retryAfterMilliseconds(response);
+      const delay = parsedDelay !== undefined && Number.isFinite(parsedDelay) ? parsedDelay : undefined;
       await cancelResponse(response, evidence);
       throw new ManagementReadFailure(reason, [408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(response.status), evidence, delay);
     }
-    const reader = response.body!.getReader();
-    try {
-      const chunks: Uint8Array[] = [];
-      let size = 0;
-      for (;;) {
-        const chunk = await reader.read();
-        if (chunk.done) break;
-        size += chunk.value.length;
-        if (size > maximum) throw new ManagementReadFailure("size_limit", false, evidence);
-        chunks.push(chunk.value);
-      }
-      if (!size) throw new ManagementReadFailure("empty_object", false, evidence);
-      let source: string;
-      try { source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks)); }
-      catch { throw new ManagementReadFailure("invalid_utf8", false, evidence); }
-      return { source, etag: response.headers.get("ETag")! };
-    } catch (error) {
-      throw error instanceof ManagementReadFailure ? error : new ManagementReadFailure("body_read_failed", true, evidence);
-    } finally {
-      try { await reader.cancel(); }
-      catch { throw new ManagementReadFailure("response_cleanup_failed", false, evidence); }
-      finally { reader.releaseLock(); }
+    let bytes: Uint8Array;
+    try { bytes = await collectStreamBytes(response.body!, maximum, true); }
+    catch (error) {
+      if (!(error instanceof BoundedReadError)) throw error;
+      if (error.code === "size_limit") throw new ManagementReadFailure("size_limit", false, evidence);
+      if (error.code === "cleanup_failed") throw new ManagementReadFailure("response_cleanup_failed", false, evidence);
+      throw new ManagementReadFailure("body_read_failed", true, evidence);
     }
+    if (!bytes.length) throw new ManagementReadFailure("empty_object", false, evidence);
+    let source: string;
+    try { source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
+    catch { throw new ManagementReadFailure("invalid_utf8", false, evidence); }
+    return { source, etag: response.headers.get("ETag")! };
   }
 }
 

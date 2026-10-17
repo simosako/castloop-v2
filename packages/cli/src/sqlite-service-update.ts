@@ -9,7 +9,7 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import type { LocalJournalStorage } from "./local-journal-storage";
 import type { R2RestOptions } from "./verified-r2-put";
-import { createHash } from "node:crypto";
+import { sha256HexSync as digest } from "./sha256";
 
 const receipt = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
 const evidence = receipt.extend({ namespace_id: z.string().regex(/^[a-f0-9]{32}$/) }).strict();
@@ -26,7 +26,6 @@ const defaultWait: UpdateWait = { attempts: 120, delay: () => Bun.sleep(1000) };
 const local = (root: string, config: SqliteServiceConfig, id: string) => {
   z.uuid().parse(id); return createLocalJournalStorage(root, "sqlite-service-updates", config.service_id, `${id}.json`);
 };
-const digest = (source: string) => createHash("sha256").update(source).digest("hex");
 export function readSqliteServiceUpdate(root: string, config: SqliteServiceConfig, operationId: string): SqliteServiceUpdateState | null {
   try { return stateSchema.parse(local(root, config, operationId).read()); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }

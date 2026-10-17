@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { controlRequestSchema } from "./lifecycle";
 import { publishedTimestampSchema } from "./metadata-time";
+import { sha256Hex } from "./sha256";
 
 export const showCommitSchema = z.object({
   schema_version: z.literal(1), kind: z.literal("show"), show_id: controlRequestSchema.shape.show_id, job_id: z.uuid(),
@@ -51,6 +52,5 @@ export function publicationCommitKey(commit: PublicationRequest["commit"]): stri
 }
 
 export async function publicationManifestHash(input: PublicationRequest): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(publicationRequestSchema.parse(input))));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(JSON.stringify(publicationRequestSchema.parse(input)));
 }

@@ -10,7 +10,7 @@ import { createLocalPublicationEffects } from "./publication-sources";
 import type { LocalPublicationInputs } from "./publication-sources";
 import { readLocalStagingOperation } from "./staging-journal";
 import { assertLocalStagingSource } from "./staging-sources";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -83,7 +83,7 @@ export async function prepareLocalPublication(root: string, configInput: Service
   }
   const publication = publicationRequestSchema.parse({ schema_version: 1, request, commit, staged_uploads: ids });
   const prepared = validatePublicationClientState({ schema_version: 1, identity: serviceOperationIdentity(config), publication, phase: "prepared",
-    manifest_sha256: createHash("sha256").update(JSON.stringify(publication)).digest("hex") });
+    manifest_sha256: sha256HexSync(JSON.stringify(publication)) });
   const guarded = createLocalPublicationEffects(config, prepared, adminKey, local, client);
   const checkStages = () => {
     for (let index = 0; index < ids.length; index++) {

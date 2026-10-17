@@ -6,6 +6,8 @@ import { createLocalJournalStorage, writeSyncedLocalFile } from "./local-journal
 import { ensureLocalJournalParents, localJournalEntryExists, syncLocalJournalDirectory } from "./local-journal-path";
 import { readLocalMetadata } from "./local-metadata-read";
 import { workerPayloadHash } from "./worker-upload-hash";
+import { bindLocalJournal } from "./validated-local-journal";
+import type { ValidatedLocalJournal } from "./validated-local-journal";
 import { lstatSync, readdirSync, renameSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -14,8 +16,7 @@ const stateSchema = z.object({ schema_version: z.literal(1), config: serviceConf
   pending: z.object({ action: z.enum(["begin", "step", "complete", "claim-connection", "connection", "return-connection"]),
     execution_id: z.uuid().optional() }).strict().optional() }).strict();
 export type DomainClientState = z.infer<typeof stateSchema>;
-export type DomainJournal = { load: () => DomainClientState; save: (state: DomainClientState) => void;
-  exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
+export type DomainJournal = ValidatedLocalJournal<DomainClientState>;
 
 export function domainTargetConfig(state: Pick<DomainClientState, "config" | "request">): ServiceConfig {
   return serviceConfigSchema.parse({ ...state.config, public_base_url: state.request.public_base_url,
@@ -61,29 +62,25 @@ export function readLocalDomainChanges(root: string, config: ServiceConfig): Arr
 export function createDomainJournal(root: string, config: ServiceConfig, request: DomainOperationRequest): DomainJournal {
   const initial = validate({ schema_version: 1, config, request, completed: false });
   const storage = createLocalJournalStorage(root, "domain-changes", config.service_id, `${request.operation_id}.json`);
-  const load = () => {
-    const state = validate(storage.read());
-    if (JSON.stringify(state.config) !== JSON.stringify(initial.config) || JSON.stringify(state.request) !== JSON.stringify(initial.request)) {
-      throw new Error("Domain journal has another permanent frozen request");
-    }
-    return state;
-  };
   storage.initialize(initial);
-  load();
-  return { load, exclusively: storage.exclusively, save: (input) => {
-    storage.requireLock();
-    const next = validate(input);
-    const previous = load();
-    const phases = ["feeds", "configured", "complete"];
-    if (JSON.stringify(next.config) !== JSON.stringify(previous.config) || JSON.stringify(next.request) !== JSON.stringify(previous.request) ||
-      previous.completed && JSON.stringify(next) !== JSON.stringify(previous) || previous.connection_receipt &&
-      JSON.stringify(next.connection_receipt) !== JSON.stringify(previous.connection_receipt) || previous.progress &&
-      (!next.progress || phases.indexOf(next.progress.phase) < phases.indexOf(previous.progress.phase) || previous.progress.after_show_id &&
-        (!next.progress.after_show_id || next.progress.after_show_id < previous.progress.after_show_id))) {
-      throw new Error("Domain journal cannot rewrite receipts, frozen inputs or completed progress");
-    }
-    storage.replace(next);
-  } };
+  return bindLocalJournal(storage, {
+    parse: validate,
+    assertIdentity: (state) => {
+      if (JSON.stringify(state.config) !== JSON.stringify(initial.config) || JSON.stringify(state.request) !== JSON.stringify(initial.request)) {
+        throw new Error("Domain journal has another permanent frozen request");
+      }
+    },
+    assertTransition: (previous, next) => {
+      const phases = ["feeds", "configured", "complete"];
+      if (JSON.stringify(next.config) !== JSON.stringify(previous.config) || JSON.stringify(next.request) !== JSON.stringify(previous.request) ||
+        previous.completed && JSON.stringify(next) !== JSON.stringify(previous) || previous.connection_receipt &&
+        JSON.stringify(next.connection_receipt) !== JSON.stringify(previous.connection_receipt) || previous.progress &&
+        (!next.progress || phases.indexOf(next.progress.phase) < phases.indexOf(previous.progress.phase) || previous.progress.after_show_id &&
+          (!next.progress.after_show_id || next.progress.after_show_id < previous.progress.after_show_id))) {
+        throw new Error("Domain journal cannot rewrite receipts, frozen inputs or completed progress");
+      }
+    },
+  });
 }
 
 export async function synchronizeDomainConfig(root: string, state: DomainClientState): Promise<void> {

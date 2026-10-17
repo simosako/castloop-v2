@@ -1,5 +1,6 @@
 import type { R2RestTransport } from "./verified-r2-put";
-import { createHash } from "node:crypto";
+import { BoundedReadError, collectStreamBytes, retryAfterMilliseconds } from "./bounded-http-read";
+import { sha256HexSync } from "./sha256";
 
 type ReadFailureCode = "transport_error" | "observation_timeout" | "http_error" | "invalid_response" |
   "body_read_failed" | "length_mismatch" | "size_limit" | "invalid_utf8" | "invalid_json" | "cleanup_failed" | "deadline_exceeded";
@@ -25,32 +26,27 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
     response.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
     await cancelBody(response); throw new ReadFailure("invalid_response", false);
   }
-  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
-  let length = 0, terminal = false;
   const declared = response.headers.get("Content-Length"), encoding = response.headers.get("Content-Encoding");
   const compareLength = encoding === null || encoding === "identity";
   try {
     if (compareLength && declared !== null && (!/^\d+$/.test(declared) || !Number.isSafeInteger(Number(declared)))) throw new ReadFailure("invalid_response", false);
     if (compareLength && declared !== null && Number(declared) > maximum) throw new ReadFailure("size_limit", false);
-    for (;;) {
-      let chunk: ReadableStreamReadResult<Uint8Array>;
-      try { chunk = await reader.read(); }
-      catch { terminal = true; throw new ReadFailure(signal?.aborted ? "observation_timeout" : "body_read_failed", true); }
-      if (chunk.done) { terminal = true; break; }
-      length += chunk.value.byteLength;
-      if (length > maximum) throw new ReadFailure("size_limit", false);
-      chunks.push(chunk.value);
-    }
-    if (signal?.aborted) throw new ReadFailure("observation_timeout", true);
-    if (compareLength && declared !== null && Number(declared) !== length) throw new ReadFailure("length_mismatch", true);
-    let source: string;
-    try { source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks)); }
-    catch { throw new ReadFailure("invalid_utf8", false); }
-    try { return JSON.parse(source) as unknown; } catch { throw new ReadFailure("invalid_json", false); }
-  } finally {
-    try { if (!terminal) { try { await reader.cancel(); } catch { throw new ReadFailure("cleanup_failed", false); } } }
-    finally { reader.releaseLock(); }
+  } catch (error) {
+    await cancelBody(response); throw error;
   }
+  let bytes: Uint8Array;
+  try { bytes = await collectStreamBytes(response.body, maximum); }
+  catch (error) {
+    if (!(error instanceof BoundedReadError)) throw error;
+    throw new ReadFailure(error.code === "body_read_failed" && signal?.aborted ? "observation_timeout" : error.code,
+      error.code === "body_read_failed");
+  }
+  if (signal?.aborted) throw new ReadFailure("observation_timeout", true);
+  if (compareLength && declared !== null && Number(declared) !== bytes.length) throw new ReadFailure("length_mismatch", true);
+  let source: string;
+  try { source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
+  catch { throw new ReadFailure("invalid_utf8", false); }
+  try { return JSON.parse(source) as unknown; } catch { throw new ReadFailure("invalid_json", false); }
 }
 
 function readPath(path: string): boolean {
@@ -62,19 +58,12 @@ function readPath(path: string): boolean {
     parts.every((part, index) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(part) && part.length <= (index === 0 ? 32 : 80));
 }
 
-function retryAfter(response: Response): number {
-  const value = response.headers.get("Retry-After");
-  if (value === null) return 0;
-  const milliseconds = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) * 1000 : Date.parse(value) - Date.now();
-  return Number.isNaN(milliseconds) ? 0 : Math.max(0, Math.ceil(milliseconds));
-}
-
 export async function readSqliteManagementGet(url: URL, headers: HeadersInit, options: GetOptions = {}): Promise<unknown | null> {
   const timeout = options.timeoutMs ?? 30000, maximum = options.maximumBytes ?? 16384, attempts = 3;
   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || !readPath(url.pathname) ||
     !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 || maximum > 65536) throw new Error("Invalid bounded SQLite management GET");
   const now = options.now ?? (() => performance.now()), delay = options.delay ?? ((ms: number) => Bun.sleep(ms));
-  const start = now(), deadline = start + timeout, target = createHash("sha256").update(url.href).digest("hex");
+  const start = now(), deadline = start + timeout, target = sha256HexSync(url.href);
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const remaining = deadline - now();
     let failure: ReadFailure;
@@ -89,7 +78,7 @@ export async function readSqliteManagementGet(url: URL, headers: HeadersInit, op
           await cancelBody(response); return null;
         }
         if (response.status !== 200) {
-          const wait = retryAfter(response);
+          const wait = retryAfterMilliseconds(response) ?? 0;
           await cancelBody(response);
           throw new ReadFailure("http_error", [408, 429, 500, 502, 503, 504].includes(response.status), response.status, wait);
         }

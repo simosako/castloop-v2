@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { controlRequestSchema } from "./lifecycle";
+import { hmacSha256Hex, verifyHmacSha256Hex } from "./hmac";
+import { sha256Hex, utf8Bytes } from "./sha256";
 import { serviceAdmissionSchema } from "./service-admission";
 
 export const publicationCommitProtocol = "queue-commit-v1" as const;
@@ -40,31 +42,28 @@ export const publicationSubmissionRecordSchema = z.object({ schema_version: z.li
 });
 export type PublicationSubmissionRecord = z.infer<typeof publicationSubmissionRecordSchema>;
 
-function bytes(source: string): Uint8Array<ArrayBuffer> { return new Uint8Array(new TextEncoder().encode(source)); }
-function hex(value: ArrayBuffer): string { return [...new Uint8Array(value)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
-async function key(secret: string): Promise<CryptoKey> {
+function requireKey(secret: string): string {
   if (!secret) throw new Error("Publication intent requires an administrator key");
-  return crypto.subtle.importKey("raw", bytes(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  return secret;
 }
-function signedBytes(input: PublicationCommitIntentPayload): Uint8Array<ArrayBuffer> {
-  return bytes(`castloop/publication-commit/queue-commit-v1\n${JSON.stringify(publicationCommitIntentPayloadSchema.parse(input))}`);
+function signedMessage(input: PublicationCommitIntentPayload): string {
+  return `castloop/publication-commit/queue-commit-v1\n${JSON.stringify(publicationCommitIntentPayloadSchema.parse(input))}`;
 }
 export async function signPublicationCommitIntent(input: PublicationCommitIntentPayload, secret: string): Promise<PublicationCommitIntent> {
   const payload = publicationCommitIntentPayloadSchema.parse(input);
-  return publicationCommitIntentSchema.parse({ ...payload, mac: hex(await crypto.subtle.sign("HMAC", await key(secret), signedBytes(payload))) });
+  return publicationCommitIntentSchema.parse({ ...payload, mac: await hmacSha256Hex(signedMessage(payload), requireKey(secret)) });
 }
 export function parsePublicationCommitIntent(input: unknown): PublicationCommitIntent {
   const intent = publicationCommitIntentSchema.parse(input);
-  if (bytes(JSON.stringify(intent)).length > MAX_PUBLICATION_INTENT_BYTES) throw new Error("Publication intent exceeds its size limit");
+  if (utf8Bytes(JSON.stringify(intent)).length > MAX_PUBLICATION_INTENT_BYTES) throw new Error("Publication intent exceeds its size limit");
   return intent;
 }
 export async function verifyPublicationCommitIntent(input: unknown, secret: string): Promise<PublicationCommitIntent | null> {
   let intent: PublicationCommitIntent;
   try { intent = parsePublicationCommitIntent(input); } catch { return null; }
   const { mac, ...payload } = intent;
-  const signature = Uint8Array.from(mac.match(/../g)!, (part) => Number.parseInt(part, 16));
-  return await crypto.subtle.verify("HMAC", await key(secret), signature, signedBytes(payload)) ? intent : null;
+  return await verifyHmacSha256Hex(signedMessage(payload), mac, requireKey(secret)) ? intent : null;
 }
 export async function publicationIntentHash(input: PublicationCommitIntent): Promise<string> {
-  return hex(await crypto.subtle.digest("SHA-256", bytes(JSON.stringify(parsePublicationCommitIntent(input)))));
+  return sha256Hex(JSON.stringify(parsePublicationCommitIntent(input)));
 }

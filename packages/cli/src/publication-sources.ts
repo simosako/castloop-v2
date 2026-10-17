@@ -9,7 +9,7 @@ import { validateStagingClientState } from "./staging-journal";
 import type { StagingClientState } from "./staging-journal";
 import { assertLocalStagingSource } from "./staging-sources";
 import { readLocalMetadata } from "./local-metadata-read";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 import { dirname, resolve } from "node:path";
 
 export type LocalPublicationInputs = {
@@ -70,7 +70,7 @@ export function createLocalPublicationEffects(config: ServiceConfig, input: Publ
   return { ...effects, checkLocalInputs: async () => {
     const bytes = await readLocalMetadata(metadataPath);
     const metadataAsset = checked.get(commit.kind === "show" ? "show_metadata" : "episode_metadata");
-    if (metadataAsset && (bytes.length !== metadataAsset.length_bytes || createHash("sha256").update(bytes).digest("hex") !== metadataAsset.sha256)) {
+    if (metadataAsset && (bytes.length !== metadataAsset.length_bytes || sha256HexSync(bytes) !== metadataAsset.sha256)) {
       throw new Error("Local metadata differs from its staged draft; explicitly stage the latest edit before publication");
     }
     const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
