@@ -2,6 +2,7 @@ import { episodeDraftFromRevision, episodeRevisionSchema, lifecycleFailureForPha
   parseEpisodeDraft, parseEpisodeLifecycle, parseEpisodeRevision, parseServiceConfig, parseShowMetadata, stringifyLifecycleToml,
   sameEpisodeIdentity, stringifyToml } from "../packages/shared/src/index";
 import type { EpisodeCommit, EpisodeRevision, LifecycleProgress } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { finishShowOperation, readShowControl, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import { readLifecycleFeedInputs } from "./lifecycle-feed";
@@ -204,7 +205,7 @@ export async function runOwnedEpisodePublication(env: LifecycleFeedEnv, executio
           if (episode.show_id !== execution.showId || episode.episode_id !== commit.episode_id || !["draft", "active"].includes(episode.lifecycle) ||
             episode.generation !== expected || expected === Number.MAX_SAFE_INTEGER) throw new Error("Episode lifecycle changed before opening publication");
           await requireShowExecution(env, execution);
-          const written = await env.CASTLOOP_BUCKET.put(key, stringifyLifecycleToml({ ...episode, lifecycle: "active", generation: expected + 1,
+          const written = await putPublicDeliveryRecord(env, key, stringifyLifecycleToml({ ...episode, lifecycle: "active", generation: expected + 1,
             last_job_id: execution.jobId }), { onlyIf: { etagMatches: object.etag } });
           if (!written) throw new Error("Episode lifecycle changed before opening publication");
         }

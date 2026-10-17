@@ -3,7 +3,7 @@ import { z } from "zod";
 const sessionSchema = z.object({ id: z.string().min(1), url: z.url(), expires_at: z.iso.datetime() });
 const diagnosticSchema = z.object({
   event: z.enum(["worker_phase_started", "worker_timing", "publication_delivery", "publication_execution_blocked"]),
-  job_id: z.uuid(), phase: z.string().regex(/^(publication|staging)\.[a-z_.]+$/).optional(),
+  job_id: z.uuid(), phase: z.string().regex(/^(?:(publication|staging)\.[a-z_.]+|management\.(stage-start|upload-complete|publish))$/).optional(),
   timing_id: z.uuid().optional(), started_at: z.iso.datetime().optional(), finished_at: z.iso.datetime().optional(),
   duration_ms: z.number().finite().nonnegative().optional(), outcome: z.enum(["success", "error"]).optional(),
   delivered_at: z.iso.datetime().optional(), message_timestamp: z.iso.datetime().nullable().optional(),

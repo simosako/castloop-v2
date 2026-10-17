@@ -3,6 +3,7 @@ import { createCachedPublicFetch, purgeLifecycleCache, serveCachedLifecycleAsset
 import { parsePublicAssetPath } from "./public-assets";
 import { serveLifecyclePublicRequest } from "./lifecycle-gateway";
 import { lifecycleFixture } from "./test-support/lifecycle";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 
 const AUDIO_PATH = "/podcasts/daily/episodes/first/6cefc5cc-5d0c-4cc7-8e3d-aa99711b74e2.mp3";
 const DATA = new TextEncoder().encode("0123456789abcdefghij");
@@ -165,7 +166,8 @@ describe("M6 cached public asset handler and purge", () => {
     expect(response!.headers.get("Cache-Control")).toBe("public, max-age=0, must-revalidate");
     expect(response!.headers.get("Cache-Tag")).toBeNull();
     const control = JSON.parse(setup.entries.get("system/show-publications/daily.json")!.data);
-    await setup.bucket.put("system/show-publications/daily.json", JSON.stringify({ ...control, lifecycle: "unpublished" }));
+    await putPublicDeliveryRecord(setup.env, "system/show-publications/daily.json", JSON.stringify({ ...control, lifecycle: "unpublished" }),
+      { onlyIf: { etagMatches: setup.entries.get("system/show-publications/daily.json")!.etag } });
     const count = media.calls.length;
     const denied = await serveLifecyclePublicRequest(new Request(request.url, { headers: { "If-None-Match": '"revision-etag"' } }), setup.env, transport);
     expect(denied!.status).toBe(404);

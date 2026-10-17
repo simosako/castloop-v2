@@ -7,12 +7,13 @@ import { join, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { finished } from "node:stream/promises";
 
-export type FrozenStagingSources = {
-  upload: StageUploadRequest;
+export type FrozenPayloadSources = {
+  payloads: readonly StagePayload[];
   assertCurrent: () => Promise<void>;
   withPayload: (index: number, consume: (body: ReadableStream<Uint8Array>, requireConsumed: () => void) => Promise<void>) => Promise<void>;
   dispose: () => Promise<void>;
 };
+export type FrozenStagingSources = FrozenPayloadSources & { upload: StageUploadRequest };
 
 async function checkDirectory(path: string): Promise<void> {
   await mkdir(path, { mode: 0o700, recursive: true });
@@ -93,12 +94,19 @@ export async function freezeStagingSources(root: string, input: StageUploadReque
   for (const payload of upload.payloads) Object.freeze(payload);
   Object.freeze(upload.payloads);
   Object.freeze(upload);
-  if (paths.length !== upload.payloads.length) throw new Error("Every frozen staging asset requires exactly one local source");
+  return { upload, ...await freezePayloadSources(root, upload.payloads, paths) };
+}
+
+export async function freezePayloadSources(root: string, input: readonly StagePayload[], paths: readonly string[]): Promise<FrozenPayloadSources> {
+  const payloads = Object.freeze(input.map((payload) => Object.freeze(stagePayloadSchema.parse(payload))));
+  if (!payloads.length || payloads.length > 2 || paths.length !== payloads.length) {
+    throw new Error("Every frozen staging asset requires exactly one local source");
+  }
   const originals = paths.map((path) => resolve(root, path));
   const local = join(resolve(root), ".castloop");
   await checkDirectory(local);
   const directory = await mkdtemp(join(local, "upload-inputs-"));
-  const snapshots = upload.payloads.map((_, index) => join(directory, String(index)));
+  const snapshots = payloads.map((_, index) => join(directory, String(index)));
   const remove = async () => {
     for (const path of snapshots) {
       try { await unlink(path); } catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
@@ -107,7 +115,7 @@ export async function freezeStagingSources(root: string, input: StageUploadReque
   };
   try {
     for (let index = 0; index < snapshots.length; index += 1) {
-      await checkSource(originals[index]!, upload.payloads[index]!, snapshots[index]!);
+      await checkSource(originals[index]!, payloads[index]!, snapshots[index]!);
       await chmod(snapshots[index]!, 0o400);
     }
   } catch (error) { await remove(); throw error; }
@@ -120,15 +128,15 @@ export async function freezeStagingSources(root: string, input: StageUploadReque
     try { await work(); } finally { active = false; }
   };
   return {
-    upload,
+    payloads,
     assertCurrent: () => exclusively(async () => {
-      for (let index = 0; index < originals.length; index += 1) await checkSource(originals[index]!, upload.payloads[index]!);
+      for (let index = 0; index < originals.length; index += 1) await checkSource(originals[index]!, payloads[index]!);
     }),
     withPayload: (index, consume) => exclusively(async () => {
       if (!Number.isInteger(index) || !snapshots[index] || used.has(index)) throw new Error("Staging source cannot be replayed or selected outside its manifest");
       used.add(index);
-      await checkSource(originals[index]!, upload.payloads[index]!);
-      await checkSource(snapshots[index]!, upload.payloads[index]!);
+      await checkSource(originals[index]!, payloads[index]!);
+      await checkSource(snapshots[index]!, payloads[index]!);
       const handle = await open(snapshots[index]!, constants.O_RDONLY | constants.O_NOFOLLOW);
       const stream = handle.createReadStream();
       const settled = finished(stream, { cleanup: true }).catch(() => undefined);

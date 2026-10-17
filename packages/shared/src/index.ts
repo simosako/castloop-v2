@@ -4,10 +4,31 @@ import { lifecycleJobStatusSchema } from "./lifecycle-job";
 import { lifecycleStateSchema } from "./lifecycle";
 import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
+import type { SqliteServiceConfig } from "./sqlite-service";
 export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
 export type { PublicationRequest } from "./publication-request";
+export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKey, sqliteVerifiedUploadSchema,
+  sqlitePublicationRuntimeSchema, sqlitePublicationRequestSchema, sqlitePublicationStatusSchema,
+  sqlitePublicationFailureSchema, sqlitePublicationBlockSchema, parseSqlitePublicationRequest,
+  sqlitePublicationRequestHash } from "./sqlite-publication";
+export type { SqliteUploadIdentity, SqliteVerifiedUpload, SqlitePublicationRuntime, SqlitePublicationRequest,
+  SqlitePublicationStatus, SqlitePublicationFailure, SqlitePublicationBlock } from "./sqlite-publication";
+export { sqliteServiceConfigSchema, sqliteServiceStatusSchema, parseSqliteServiceConfig, sqliteServiceConfigHash } from "./sqlite-service";
+export type { SqliteServiceConfig, SqliteServiceStatus } from "./sqlite-service";
+export { asyncManagementProtocol, MAX_MANAGEMENT_BYTES, managementCommandSchema, managementIntentPayloadSchema,
+  managementIntentSchema, managementSubmissionSchema, managementResultPayloadSchema, managementResultSchema, managementStatusSchema,
+  parseManagementIntent, signManagementIntent, verifyManagementIntent, managementIntentHash,
+  signManagementResult, verifyManagementResult, managementRequestPrefix, managementOperationId } from "./async-management";
+export type { ManagementCommand, ManagementIntentPayload, ManagementIntent, ManagementSubmission,
+  ManagementResultPayload, ManagementResult, ManagementStatus } from "./async-management";
 export { publicationAcceptanceProtocol, publicationAdminRequestSchema, publicationAdminResponseSchema, publicationOperationSchema } from "./publication-admin";
 export type { PublicationAdminRequest, PublicationAdminResponse, PublicationOperationIdentity } from "./publication-admin";
+export { publicationCommitProtocol, MAX_PUBLICATION_INTENT_BYTES, publicationQueueIdSchema,
+  publicationCommitIntentPayloadSchema, publicationCommitIntentSchema, publicationQueuedReceiptSchema,
+  publicationQueueSubmissionSchema, publicationSubmissionSummarySchema, publicationSubmissionRecordSchema,
+  parsePublicationCommitIntent, signPublicationCommitIntent, verifyPublicationCommitIntent, publicationIntentHash } from "./publication-queue";
+export type { PublicationCommitIntent, PublicationCommitIntentPayload, PublicationQueuedReceipt,
+  PublicationQueueSubmission, PublicationSubmissionRecord } from "./publication-queue";
 export { lifecycleFailureForPhase, lifecycleFailureMessages, lifecycleJobStatusSchema, lifecyclePhaseSchema, lifecycleProgressSchema,
   parseLifecycleProgress, stringifyLifecycleProgress } from "./lifecycle-job";
 export type { LifecycleFailure, LifecycleJobStatus, LifecycleProgress } from "./lifecycle-job";
@@ -265,6 +286,6 @@ export function parseEpisodeRevision(source: string): EpisodeRevision {
   return episodeRevisionSchema.parse(parseToml(source));
 }
 
-export function stringifyToml(value: ServiceConfig | ShowMetadata | EpisodeDraft | EpisodeRevision | JobStatus): string {
+export function stringifyToml(value: ServiceConfig | SqliteServiceConfig | ShowMetadata | EpisodeDraft | EpisodeRevision | JobStatus): string {
   return TOML.stringify(value as TOML.JsonMap);
 }

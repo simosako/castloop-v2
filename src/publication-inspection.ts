@@ -1,5 +1,6 @@
 import { episodeCommitSchema, parseControlRequest, parseJobStatus, parseLifecycleProgress, publicationAdminResponseSchema,
-  publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "../packages/shared/src/index";
+  publicationCommitKey, publicationIntentHash, publicationManifestHash, publicationRequestSchema,
+  publicationSubmissionRecordSchema, showCommitSchema } from "../packages/shared/src/index";
 import type { PublicationAdminResponse, PublicationRequest } from "../packages/shared/src/index";
 import { controlRequestHash, readShowControl } from "./lifecycle-control";
 import type { LifecycleReadEnv } from "./lifecycle-control";
@@ -14,11 +15,11 @@ export async function inspectPublication(env: LifecycleReadEnv, serviceId: strin
   const requestHash = await controlRequestHash(request);
   const keys = [`system/jobs/${request.job_id}/publication.json`, `system/jobs/${request.job_id}/request.toml`,
     `system/jobs/${request.job_id}/status.toml`, `system/jobs/${request.job_id}/progress.toml`,
-    `system/jobs/${request.job_id}/dlq.json`, publicationCommitKey(frozen.commit)];
+    `system/jobs/${request.job_id}/dlq.json`, publicationCommitKey(frozen.commit), `system/jobs/${request.job_id}/queue-submission.json`];
   const before = await readShowControl(env, request.show_id);
   if (!before) throw new Error("Publication inspection requires retained Show control");
   const records = await Promise.all(keys.map((key) => env.CASTLOOP_BUCKET.get(key)));
-  const [manifestObject, requestObject, statusObject, progressObject, deadLetterObject, markerObject] = records;
+  const [manifestObject, requestObject, statusObject, progressObject, deadLetterObject, markerObject, submissionObject] = records;
   if (!manifestObject || records.some((object) => object && (object.size < 1 || object.size > 16384))) {
     throw new Error("Publication inspection record is missing or oversized");
   }
@@ -43,6 +44,13 @@ export async function inspectPublication(env: LifecycleReadEnv, serviceId: strin
   const status = statusObject ? parseJobStatus(await statusObject.text()) : null;
   if (status && status.schema_version !== 2) throw new Error("Publication inspection cannot adopt a legacy status");
   const progress = progressObject ? parseLifecycleProgress(await progressObject.text()) : null;
+  const submission = submissionObject ? publicationSubmissionRecordSchema.parse(await submissionObject.json<unknown>()) : null;
+  if (submission && (submission.intent.service_id !== serviceId || submission.intent.manifest_sha256 !== hash ||
+    submission.intent.request_sha256 !== requestHash || submission.intent.operation.show_id !== request.show_id ||
+    submission.intent.operation.job_id !== request.job_id || submission.intent.operation.show_generation !== generation ||
+    await publicationIntentHash(submission.intent) !== submission.result.intent_sha256)) {
+    throw new Error("Publication submission differs from its frozen manifest/request");
+  }
   const after = await readShowControl(env, request.show_id);
   const current = await Promise.all(keys.map((key) => env.CASTLOOP_BUCKET.head(key)));
   if (!after || before.etag !== after.etag || JSON.stringify(before.value) !== JSON.stringify(after.value) ||
@@ -63,7 +71,8 @@ export async function inspectPublication(env: LifecycleReadEnv, serviceId: strin
     operation: { show_id: request.show_id, job_id: request.job_id, show_generation: generation }, manifest_sha256: hash, request_sha256: requestHash,
     status, progress, ownership: held ? "held" : released ? "released" : control.generation < generation ? "unclaimed" : "superseded",
     execution_active: held && !!control.owner?.execution_id, marker_present: markerObject !== null,
-    dead_letter_present: deadLetterObject !== null, staging_verified: false, authorizes_recovery: false });
+    dead_letter_present: deadLetterObject !== null, ...(submission ? { submission: submission.result } : {}),
+    staging_verified: false, authorizes_recovery: false });
   if (value.result !== "status") throw new Error("Invalid publication inspection result");
   return value;
 }

@@ -154,7 +154,7 @@ function openLocalDraftJournal(root: string, configInput: ServiceConfig, target:
       storage.requireLock("Local draft writes require the exclusive target lock");
       const state = load();
       const job = publication(state);
-      if (!["accepted", "committed"].includes(job.phase) || !state.publication_sha256 || state.phase === "editable") {
+      if (!["accepted", "committed", "queued", "async_queued"].includes(job.phase) || !state.publication_sha256 || state.phase === "editable") {
         throw new Error("Freeze completion only from an exact acknowledged local commit, never a status observation");
       }
       if (state.phase !== "frozen") save({ ...state, phase: "frozen" });

@@ -65,19 +65,26 @@ export async function consumeOwnedPublication(env: LifecycleFeedEnv, key: string
   }
   const execution = await measureWorkerPhase(request.job_id, "publication.execution_acquire", () =>
     acquireShowExecution(env, request.show_id, request.job_id, current.value.generation));
+  return runPublicationExecution(env, execution, request.kind, source);
+}
+
+export async function runPublicationExecution(env: LifecycleFeedEnv, execution: ShowExecution, kind: "show" | "episode",
+  source: PublicationEffects | PublicationEffectFactory, beforeRun?: (executionEnv: LifecycleFeedEnv) => Promise<void>):
+  Promise<PublicationConsumerResult> {
   try {
-    const executionEnv = request.kind === "episode" ? await measureWorkerPhase(request.job_id, "publication.execution_context", () =>
+    const executionEnv = kind === "episode" ? await measureWorkerPhase(execution.jobId, "publication.execution_context", () =>
       createShowExecutionEnv(env, execution)) : env;
-    const effects = typeof source === "function" ? await measureWorkerPhase(request.job_id, "publication.effects", () =>
+    await beforeRun?.(executionEnv);
+    const effects = typeof source === "function" ? await measureWorkerPhase(execution.jobId, "publication.effects", () =>
       Promise.resolve(source(execution, executionEnv))) : source;
-    const result = await measureWorkerPhase(request.job_id, "publication.runner", () => request.kind === "show" ?
+    const result = await measureWorkerPhase(execution.jobId, "publication.runner", () => kind === "show" ?
       runOwnedShowPublication(env, execution, effects) : runOwnedEpisodePublication(executionEnv, execution, effects));
     if (result === "failed") {
-      await measureWorkerPhase(request.job_id, "publication.execution_cleanup", () => releaseSettledExecution(env, execution));
+      await measureWorkerPhase(execution.jobId, "publication.execution_cleanup", () => releaseSettledExecution(env, execution));
       return { state: "failed", reason: "validation_failed" };
     }
   } catch (error) {
-    if (await measureWorkerPhase(request.job_id, "publication.execution_cleanup", () => releaseSettledExecution(env, execution)) === "completed") {
+    if (await measureWorkerPhase(execution.jobId, "publication.execution_cleanup", () => releaseSettledExecution(env, execution)) === "completed") {
       return { state: "completed" };
     }
     throw error;

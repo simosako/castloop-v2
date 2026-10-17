@@ -2,6 +2,7 @@ import { z } from "zod";
 import { controlRequestSchema } from "./lifecycle";
 import { lifecycleJobStatusSchema, lifecycleProgressSchema } from "./lifecycle-job";
 import { publicationRequestSchema } from "./publication-request";
+import { publicationSubmissionSummarySchema } from "./publication-queue";
 import { serviceAdmissionSchema } from "./service-admission";
 
 export const publicationOperationSchema = z.object({ show_id: controlRequestSchema.shape.show_id,
@@ -56,7 +57,7 @@ export const publicationAdminResponseSchema = z.discriminatedUnion("result", [
   z.object({ ...identity, result: z.literal("status"), publication: publicationRequestSchema, operation: publicationOperationSchema,
     manifest_sha256: hash, request_sha256: hash, status: lifecycleJobStatusSchema.nullable(), progress: lifecycleProgressSchema.nullable(),
     ownership: z.enum(["unclaimed", "held", "released", "superseded"]), execution_active: z.boolean(), marker_present: z.boolean(),
-    dead_letter_present: z.boolean(),
+    dead_letter_present: z.boolean(), submission: publicationSubmissionSummarySchema.optional(),
     staging_verified: z.literal(false), authorizes_recovery: z.literal(false) }).strict().superRefine((value, context) => {
       const request = value.publication.request;
       if (value.operation.show_id !== request.show_id || value.operation.job_id !== request.job_id ||

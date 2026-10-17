@@ -2,6 +2,7 @@ import { episodeLifecycleSchema, lifecycleFailureForPhase, lifecycleJobStatusSch
   parseControlRequest, parseEpisodeLifecycle, parseServiceConfig, parseShowControl, parseShowMetadata,
   stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { EpisodeRevision, LifecycleProgress, ServiceConfig, ShowMetadata } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { finishShowOperation, readShowControl, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import { readLifecycleFeedInputs } from "./lifecycle-feed";
@@ -59,7 +60,7 @@ async function openRestoredTarget(env: LifecycleFeedEnv, execution: ShowExecutio
     if (current.value.lifecycle === "active") return;
     if (current.value.lifecycle !== "unpublished") throw new Error("Show is no longer eligible for restoration");
     const value = parseShowControl({ ...current.value, lifecycle: "active" });
-    const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
+    const written = await putPublicDeliveryRecord(env, `system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
       onlyIf: { etagMatches: current.etag },
     });
     if (!written) throw new Error("Show changed before restoration");
@@ -81,7 +82,7 @@ async function openRestoredTarget(env: LifecycleFeedEnv, execution: ShowExecutio
   const value = episodeLifecycleSchema.parse({ ...episode, lifecycle: "active", generation: episode.generation + 1,
     last_job_id: execution.jobId });
   await requireShowExecution(env, execution);
-  const written = await env.CASTLOOP_BUCKET.put(key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: object.etag } });
+  const written = await putPublicDeliveryRecord(env, key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: object.etag } });
   if (!written) throw new Error("Episode changed before its restoration was saved");
 }
 

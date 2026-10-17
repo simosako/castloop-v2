@@ -11,6 +11,11 @@ const VERIFIED_MANIFEST = Symbol("verifiedStagingManifest");
 type StageVerificationEnv = LifecycleControlEnv & { [VERIFIED_MANIFEST]?: Readonly<{
   request: StageUploadRequest; manifestHash: string; verificationId: string;
 }> };
+const COMMAND_EXECUTION = Symbol("stagingCommandExecution");
+type CommandEnv = LifecycleControlEnv & { [COMMAND_EXECUTION]?: string };
+export function stageCommandEnv<T extends LifecycleControlEnv>(env: T, executionId: string): T {
+  return { ...env, [COMMAND_EXECUTION]: executionId };
+}
 
 export async function createStageVerificationEnv(env: LifecycleControlEnv,
   verification: StageOperation & { verificationId: string }): Promise<StageVerificationEnv> {
@@ -39,6 +44,9 @@ async function readManifest(env: LifecycleControlEnv, operationId: string): Prom
 export async function requireStageUpload(env: LifecycleControlEnv, operation: StageOperation): Promise<StageUploadSnapshot> {
   const control = await requireOwnedOperation(env, operation.showId, operation.operationId, operation.generation);
   if (control.value.owner.action !== "stage" || control.value.owner.state !== "uploading") throw new Error("Operation does not own staging admission");
+  if (control.value.owner.command_execution_id !== (env as CommandEnv)[COMMAND_EXECUTION]) {
+    throw new Error("Another staging management command is still executing");
+  }
   const verified = (env as StageVerificationEnv)[VERIFIED_MANIFEST];
   if (verified && control.value.owner.verification_id !== verified.verificationId) throw new Error("Staging verification token changed");
   const request = verified?.request ?? await readManifest(env, operation.operationId);
@@ -116,7 +124,8 @@ export async function claimStageUpload(env: StageEpisodeDraftEnv, input: unknown
   if (!written && await stageManifestHash(await readManifest(env, request.operation_id)) !== hash) {
     throw new Error("Upload operation ID already has a different staging manifest");
   }
-  await claimShowOperation(env, stageControlRequest(request), { allowNewEpisodeDraft: newEpisode });
+  await claimShowOperation(env, stageControlRequest(request), { allowNewEpisodeDraft: newEpisode,
+    commandExecutionId: (env as CommandEnv)[COMMAND_EXECUTION] });
   if (newEpisode) await initializeOwnedEpisodeDraft(env, request);
   const operation = { showId: request.show_id, operationId: request.operation_id, generation: request.expected_show_generation + 1 };
   const snapshot = await requireStageUpload(env, operation);

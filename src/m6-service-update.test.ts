@@ -1,14 +1,20 @@
 import { expect, test } from "bun:test";
-import { m6SetupRecordKey, parseShowControl, serviceAdmissionSchema } from "../packages/shared/src/index";
+import { m6SetupRecordKey, parseShowControl, serviceAdmissionSchema, stringifyLifecycleToml } from "../packages/shared/src/index";
 import { beginM6ServiceUpdate, completeM6ServiceUpdate } from "./m6-service-update";
 import { acquireServiceInvocation, readServiceAdmission, releaseServiceInvocation, requireM6ServiceRuntime,
   resumeServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import { m6UpdateFixture as fixture } from "./test-support/m6-update";
+import { publicDeliveryMetadata } from "./public-delivery-records";
+import { readPublicDeliverySnapshot, readPublicServiceDelivery } from "./public-delivery-state";
 
 test("compatible update closes IO, verifies the new runtime, preserves every content record and requires explicit resume", async () => {
   const setup = await fixture();
   await setup.bucket.put("system/show-publications/daily.json", JSON.stringify(parseShowControl({ schema_version: 2,
     show_id: "daily", lifecycle: "active", generation: 5, feed_generation: 3 })));
+  for (const [episodeId, lifecycle] of [["first", "active"], ["stopped", "unpublished"], ["deleted", "deleted"]] as const) {
+    await setup.bucket.put(`system/episode-lifecycle/daily/${episodeId}.toml`, stringifyLifecycleToml({ schema_version: 1,
+      show_id: "daily", episode_id: episodeId, lifecycle, generation: 7 }));
+  }
   for (const key of ["public/podcasts/daily/feed.xml", "public/podcasts/daily/episodes/first/revision.mp3",
     "public/episodes/daily/first/revisions/revision.toml", "staging/retained/audio.mp3", "system/jobs/retained/status.toml"]) {
     await setup.bucket.put(key, "retained-content");
@@ -27,13 +33,64 @@ test("compatible update closes IO, verifies the new runtime, preserves every con
   const completed = (await readServiceAdmission(setup.env, setup.config.service_id))!.value;
   expect(completed.state).toBe("paused");
   expect(completed.update).toBeUndefined();
-  for (const [key, value] of content) expect(setup.entries.get(key)).toEqual(value);
+  for (const [key, value] of content) {
+    const current = setup.entries.get(key)!;
+    if (key === "system/service.toml" || key.startsWith("system/show-publications/") || key.startsWith("system/episode-lifecycle/")) {
+      expect(current.bytes).toEqual(value.bytes);
+      expect(current.size).toBe(value.size);
+      expect(current.customMetadata).toEqual(publicDeliveryMetadata(key, new TextDecoder().decode(value.bytes)));
+    } else expect(current).toEqual(value);
+  }
   expect([...setup.entries.keys()].some((key) => key.startsWith("system/lifecycle-migrations/"))).toBe(false);
+  await expect(readPublicServiceDelivery(setup.newEnv, setup.newTarget.worker_version_id, setup.config.dlq_name)).rejects.toThrow("open runtime");
+  expect(await readPublicDeliverySnapshot(setup.newEnv, "daily", "first")).toEqual({ visibility: "public", showId: "daily",
+    showGeneration: 5, feedGeneration: 3, episodeId: "first", episodeGeneration: 7 });
+  expect(await readPublicDeliverySnapshot(setup.newEnv, "daily", "stopped")).toEqual({ visibility: "not_found" });
+  expect(await readPublicDeliverySnapshot(setup.newEnv, "daily", "deleted")).toEqual({ visibility: "gone" });
   await completeM6ServiceUpdate(setup.newEnv, setup.request, setup.newTarget, {
     inspectDeployment: async () => { throw new Error("No duplicate verification"); }, verifyRuntime: async () => { throw new Error("No reactivation"); } });
   await expect(requireM6ServiceRuntime(setup.env, setup.config.service_id, setup.versionId)).rejects.toThrow("Worker version");
   await resumeServiceAdmission(setup.newEnv, setup.config.service_id, setup.request.pause_id);
+  expect(await readPublicServiceDelivery(setup.newEnv, setup.newTarget.worker_version_id, setup.config.dlq_name)).toEqual({ serviceId: "service", mode: "m6" });
   expect((await requireM6ServiceRuntime(setup.newEnv, setup.config.service_id, setup.newTarget.worker_version_id)).readiness).toEqual(setup.newReadiness);
+});
+
+test("projection preparation awaits its owned IO and a settled failure retains the exact update without opening delivery", async () => {
+  const setup = await fixture();
+  const key = "system/show-publications/daily.json";
+  const source = JSON.stringify({ schema_version: 2, show_id: "daily", lifecycle: "active", generation: 5, feed_generation: 3 });
+  await setup.bucket.put(key, source);
+  await beginM6ServiceUpdate(setup.env, setup.request);
+  const started = Promise.withResolvers<void>();
+  const settled = Promise.withResolvers<void>();
+  const pendingEnv = { ...setup.newEnv, CASTLOOP_BUCKET: { ...setup.bucket,
+    async put(...args: Parameters<typeof setup.bucket.put>) {
+      if (args[0] === key) {
+        started.resolve();
+        await settled.promise;
+        await setup.bucket.put(...args);
+        throw new Error("Delivery preparation response lost");
+      }
+      return await setup.bucket.put(...args);
+    },
+  } } as never;
+  const completion = (async () => {
+    try { await completeM6ServiceUpdate(pendingEnv, setup.request, setup.newTarget, setup.updateChecks); return null; }
+    catch (error) { return error; }
+  })();
+  await started.promise;
+  try {
+    const held = (await readServiceAdmission(setup.env, setup.config.service_id))!.value;
+    expect(held.state).toBe("updating");
+    expect(held.update!.target).toEqual(setup.newTarget);
+    await expect(resumeServiceAdmission(setup.newEnv, setup.config.service_id, setup.request.pause_id)).rejects.toThrow("pause owner");
+    await expect(readPublicServiceDelivery(setup.newEnv, setup.newTarget.worker_version_id, setup.config.dlq_name)).rejects.toThrow("open runtime");
+  } finally { settled.resolve(); }
+  expect(String(await completion)).toContain("response lost");
+  expect(setup.text(key)).toBe(source);
+  expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("updating");
+  await completeM6ServiceUpdate(setup.newEnv, setup.request, setup.newTarget, setup.updateChecks);
+  expect((await readServiceAdmission(setup.env, setup.config.service_id))!.value.state).toBe("paused");
 });
 
 test("compatible updates retain unknown invocation/upload/publication owners and refuse incomplete registration", async () => {

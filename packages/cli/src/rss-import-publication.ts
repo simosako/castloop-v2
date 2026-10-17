@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { m6ServiceAdminResponseSchema, parseEpisodeDraft, parseShowMetadata, publicationAdminResponseSchema,
+import { managementStatusSchema, m6ServiceAdminResponseSchema, parseEpisodeDraft, parseShowMetadata, publicationAdminResponseSchema,
   serviceOperationIdentity, targetInspectionResponseSchema } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { localJournalEntryExists as present, syncLocalJournalDirectory } from "./local-journal-path";
@@ -47,7 +47,7 @@ export function createRssPublicationEffects(root: string, config: ServiceConfig,
 
 function metadataText(bytes: Buffer): string { return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
 
-async function writeImportedMetadata(source: string, target: string, expected: object): Promise<void> {
+export async function writeImportedMetadata(source: string, target: string, expected: object): Promise<void> {
   const bytes = await readLocalMetadata(source);
   const actual = target.endsWith("show.toml") ? parseShowMetadata(metadataText(bytes)) : parseEpisodeDraft(metadataText(bytes));
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error("Import metadata changed after publication preparation");
@@ -67,8 +67,10 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
   const initial = { schema_version: 1 as const, import_id: prepared.importId, identity, public_base_url: config.public_base_url,
     source_directory: prepared.root, input_sha256: prepared.inputSha256, step: 0, phase: "ready" as const };
   const service = m6ServiceAdminResponseSchema.parse(await effects.command("service-status", []));
-  if (!service.external_episode_guids || service.publication_acceptance_protocol !== "queue-validation-v1" || service.admission.state !== "open") {
-    throw new Error("RSS publication requires an open M7-compatible Worker; update and explicitly resume first");
+  if (!service.external_episode_guids || service.publication_acceptance_protocol !== "queue-validation-v1" ||
+    service.publication_commit_protocol !== "queue-commit-v1" || service.management_protocol !== "queue-management-v1" ||
+    service.admission.runtime_readiness?.management_protocol !== "queue-management-v1" || service.admission.state !== "open") {
+    throw new Error("RSS publication requires an open queue-commit-v1-compatible and queue-management-v1-ready Worker; update and explicitly resume first");
   }
   if (!present(storage.path)) {
     if (present(directory)) throw new Error("RSS publication requires a new local Show");
@@ -125,7 +127,7 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
     });
     const command = (name: string, args: string[], publication = false) => async () => {
       const result = await effects.command(name, args);
-      return publication ? { jobId: z.object({ result: z.literal("publication-accepted"), job_id: z.uuid() }).strict().parse(result).job_id } : {};
+      return publication ? { jobId: z.object({ result: z.enum(["publication-accepted", "publication-queued"]), job_id: z.uuid() }).strict().parse(result).job_id } : {};
     };
     actions.push(command("update-show", [showId]), command("publish-show", [showId], true));
     for (const episode of prepared.episodes) {
@@ -154,6 +156,22 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
           await effects.wait();
           continue;
         }
+        if (result.server_status && typeof result.server_status === "object" && "result" in result.server_status &&
+          result.server_status.result === "management-status") {
+          const receipt = managementStatusSchema.parse(result.server_status);
+          const server = receipt.response;
+          if (server && (server.action !== "publish" || server.request_id !== receipt.request_id)) throw new Error("Async publication status belongs to another operation");
+          if (server?.state === "published") {
+            state = { ...state, phase: "ready", waiting_job_id: undefined }; save(); return;
+          }
+          if (server && ["failed", "rejected", "blocked"].includes(server.state)) {
+            throw new Error(`Publication ${state.waiting_job_id} stopped [state=${server.state}, reason_code=${server.reason_code}]; ` +
+              (server.state === "blocked" ? "dead-letter history does not authorize release. " : "") +
+              "Preserve the frozen request and any retained owner without replay or release");
+          }
+          await effects.wait();
+          continue;
+        }
         const server = publicationAdminResponseSchema.parse(result.server_status);
         if (server.result !== "status") throw new Error("Publication returned an unexpected status receipt");
         if (server.status?.state === "published" && server.ownership === "released") {
@@ -163,6 +181,7 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
           throw new Error(`Publication ${state.waiting_job_id} failed [reason_code=${server.status.reason_code ?? "validation_failed"}]; ` +
             "preserve the frozen draft and held Show owner. Inspect the retained job; do not replay publication or release ownership");
         }
+        if (server.submission?.state === "rejected") throw new Error("Publication submission was rejected; preserve its journal and held owner without replaying the POST");
         if (server.ownership === "superseded") throw new Error("RSS publication was superseded; inspect the retained job");
         if (server.execution_active && server.dead_letter_present) {
           throw new Error(`Publication ${state.waiting_job_id} has dead-letter history and a retained execution token; ` +
@@ -199,7 +218,7 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
   });
 }
 
-function verifyImportedFeed(prepared: PreparedRssImport, feedUrl: string, source: string): void {
+export function verifyImportedFeed(prepared: PreparedRssImport, feedUrl: string, source: string): void {
   const published = parseRssImportFeed(source, prepared.show.show_id, feedUrl, 32_000_000);
   for (const field of ["title", "description", "language", "author", "owner_name", "owner_email", "site_url", "explicit", "show_type", "copyright"] as const) {
     if (published.show[field] !== prepared.show[field]) throw new Error("Published RSS Show metadata differs from the import");

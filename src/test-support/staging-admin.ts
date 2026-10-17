@@ -7,6 +7,7 @@ import { consumeOwnedPublication } from "../publication-consumer";
 import { SERVICE_ADMISSION_KEY } from "../service-admission";
 import { handleM6StagingAdmin } from "../staging-admin";
 import type { StagingAdminEnv } from "../staging-admin";
+import { preparePublicDeliveryConfiguration, publicDeliveryMetadata } from "../public-delivery-records";
 import { publicationFixture, PUBLICATION_SHOW_TEXT } from "./publication";
 import { createHash } from "node:crypto";
 
@@ -19,7 +20,9 @@ export async function stagingAdminFixture(kind: "show" | "audio" | "episode_meta
     invocations: [], readiness: { migration_id: crypto.randomUUID(), plan_sha256: "a".repeat(64), deployment_id: crypto.randomUUID(),
       worker_version_id: versionId, completed_execution_id: crypto.randomUUID(), default_cache_disabled: true, cached_entrypoint: "CachedPublicAssets",
       old_cache_purged: true, cutover_verified: true, old_io_quiesced: true, publication_routes_verified: true } });
-  await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify(service));
+  await preparePublicDeliveryConfiguration(setup.env, config.service_id);
+  await setup.bucket.put(SERVICE_ADMISSION_KEY, JSON.stringify(service),
+    { customMetadata: publicDeliveryMetadata(SERVICE_ADMISSION_KEY, JSON.stringify(service)) });
   const contents: Array<{ asset: StageAsset; bytes: Uint8Array }> = kind === "show" ? [
     { asset: "show_metadata", bytes: new TextEncoder().encode(PUBLICATION_SHOW_TEXT) },
     { asset: "cover_jpg", bytes: Uint8Array.from([255, 216, 255, 2]) },

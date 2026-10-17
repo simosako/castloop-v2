@@ -15,8 +15,9 @@ type WorkerTimingPhase = "publication.consumer" | "publication.guard" | "publica
   `publication.progress.${LifecycleProgress["phase"]}` | `publication.status_write.${"processing" | "retrying" | "failed" | "published"}` |
   "publication.history_write" | "publication.metadata_write" | "publication.feed_write" | "publication.cover_write" |
   "publication.owner_release" | "publication.invocation_release" |
-  "publication.claim" | "publication.commit" | "publication.retry" | "publication.release" | "publication.status" |
-  "staging.claim" | "staging.begin" | "staging.settle" | "staging.finish" | "staging.status";
+  "publication.claim" | "publication.commit" | "publication.queue_commit" | "publication.retry" | "publication.release" | "publication.status" |
+  "staging.claim" | "staging.begin" | "staging.settle" | "staging.finish" | "staging.status" |
+  "management.stage-start" | "management.upload-complete" | "management.publish";
 
 function emit(record: object): void {
   try { console.log(JSON.stringify(record)); }

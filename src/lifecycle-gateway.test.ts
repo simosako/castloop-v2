@@ -3,6 +3,7 @@ import { serveLifecyclePublicRequest } from "./lifecycle-gateway";
 import { episodeLifecycleSchema, stringifyLifecycleToml } from "../packages/shared/src/index";
 import type { LifecycleState } from "../packages/shared/src/index";
 import type { PublicCacheProps } from "./public-assets";
+import { publicDeliveryMetadata } from "./public-delivery-records";
 
 const revision = crypto.randomUUID();
 const audioPath = `/podcasts/daily/episodes/first/${revision}.mp3`;
@@ -13,17 +14,17 @@ function fixture(showState: LifecycleState = "active", episodeState: LifecycleSt
     lifecycle: episodeState, generation: 4 });
   const reads: string[] = [];
   const env = { CASTLOOP_BUCKET: {
-    async get(key: string) {
+    async get() { throw new Error("Public delivery must not read control bodies"); },
+    async head(key: string) {
       reads.push(key);
       if (key === "system/show-publications/daily.json") return {
-        size: 256, etag: "show", json: async () => show,
+        size: 256, etag: "show", customMetadata: publicDeliveryMetadata(key, JSON.stringify(show)),
       };
       if (key === "system/episode-lifecycle/daily/first.toml") return {
-        size: 256, etag: "episode", text: async () => stringifyLifecycleToml(episode),
+        size: 256, etag: "episode", customMetadata: publicDeliveryMetadata(key, stringifyLifecycleToml(episode)),
       };
       return null;
     },
-    async head() { return null; },
   } } as never;
   return { env, reads, stopShow(state: LifecycleState) { show = { ...show, lifecycle: state, generation: show.generation + 1 }; },
     stopEpisode(state: LifecycleState) { episode = { ...episode, lifecycle: state, generation: episode.generation + 1 }; } };
@@ -125,8 +126,8 @@ describe("M6 uncached gateway delivery", () => {
   test("state corruption, read failure or cached transport failure returns 503 without cached fallback", async () => {
     const setup = fixture();
     const failures = [
-      { CASTLOOP_BUCKET: { async get() { throw new Error("R2 unavailable"); } } } as never,
-      { CASTLOOP_BUCKET: { async get() { return { size: 100, json: async () => ({ bad: "record" }) }; } } } as never,
+      { CASTLOOP_BUCKET: { async head() { throw new Error("R2 unavailable"); } } } as never,
+      { CASTLOOP_BUCKET: { async head() { return { size: 100, customMetadata: {} }; } } } as never,
     ];
     for (const env of failures) {
       const response = await serveLifecyclePublicRequest(new Request(`https://public.example${audioPath}`, { method: "HEAD" }), env,

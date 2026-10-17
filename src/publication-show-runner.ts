@@ -1,6 +1,7 @@
 import { lifecycleFailureForPhase, lifecycleJobStatusSchema, lifecycleProgressSchema, parseServiceConfig,
   parseShowControl, parseShowMetadata } from "../packages/shared/src/index";
 import type { LifecycleProgress } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { finishShowOperation, readShowControl, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import { readLifecycleFeedInputs } from "./lifecycle-feed";
@@ -134,7 +135,7 @@ export async function runOwnedShowPublication(env: LifecycleFeedEnv, execution: 
         const current = await requireShowExecution(env, execution);
         if (current.value.lifecycle === "draft") {
           const value = parseShowControl({ ...current.value, lifecycle: "active" });
-          const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
+          const written = await putPublicDeliveryRecord(env, `system/show-publications/${execution.showId}.json`, JSON.stringify(value), {
             onlyIf: { etagMatches: current.etag },
           });
           if (!written) throw new Error("Show lifecycle changed before opening publication");

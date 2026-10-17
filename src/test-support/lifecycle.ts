@@ -1,9 +1,10 @@
 import { stringifyLifecycleToml } from "../../packages/shared/src/index";
 import type { ControlRequest } from "../../packages/shared/src/index";
 import { claimShowOperation } from "../lifecycle-control";
+import { publicDeliveryMetadata } from "../public-delivery-records";
 
 export async function lifecycleFixture(options: { kind?: "show" | "episode"; action?: ControlRequest["action"] } = {}) {
-  const entries = new Map<string, { data: string; size: number; etag: string }>();
+  const entries = new Map<string, { data: string; size: number; etag: string; customMetadata?: Record<string, string> }>();
   const writes: string[] = [];
   let version = 0;
   const bucket = {
@@ -12,12 +13,13 @@ export async function lifecycleFixture(options: { kind?: "show" | "episode"; act
       return entry ? { key, ...entry, text: async () => entry.data, json: async () => JSON.parse(entry.data) } : null;
     },
     async head(key: string) { const entry = entries.get(key); return entry ? { key, ...entry } : null; },
-    async put(key: string, data: string, options?: { onlyIf?: Headers | { etagMatches: string } }) {
+    async put(key: string, data: string, options?: { onlyIf?: Headers | { etagMatches?: string }; customMetadata?: Record<string, string> }) {
       const previous = entries.get(key);
       if (options?.onlyIf instanceof Headers && previous) return null;
       if (options?.onlyIf && !(options.onlyIf instanceof Headers) && previous?.etag !== options.onlyIf.etagMatches) return null;
       const etag = String(++version);
-      entries.set(key, { data, size: new TextEncoder().encode(data).length, etag });
+      entries.set(key, { data, size: new TextEncoder().encode(data).length, etag,
+        ...(options?.customMetadata ? { customMetadata: options.customMetadata } : {}) });
       writes.push(key);
       return { key, etag };
     },
@@ -35,9 +37,12 @@ export async function lifecycleFixture(options: { kind?: "show" | "episode"; act
   const action = options.action ?? "unpublish";
   await bucket.put("system/show-publications/daily.json", JSON.stringify({ schema_version: 2, show_id: "daily",
     lifecycle: kind === "show" && action === "restore" ? "unpublished" : "active", generation: 0, feed_generation: 0 }));
-  if (kind === "episode") await bucket.put("system/episode-lifecycle/daily/first.toml", stringifyLifecycleToml({
-    schema_version: 1, show_id: "daily", episode_id: "first", lifecycle: action === "restore" ? "unpublished" : "active", generation: 0,
-  }));
+  if (kind === "episode") {
+    const key = "system/episode-lifecycle/daily/first.toml";
+    const source = stringifyLifecycleToml({ schema_version: 1, show_id: "daily", episode_id: "first",
+      lifecycle: action === "restore" ? "unpublished" : "active", generation: 0 });
+    await bucket.put(key, source, { customMetadata: publicDeliveryMetadata(key, source) });
+  }
   const jobId = crypto.randomUUID();
   const request: ControlRequest = { schema_version: 1, kind, action, job_id: jobId, show_id: "daily", expected_show_generation: 0,
     created_at: "2026-10-01T12:00:00Z", ...(kind === "episode" ? { episode_id: "first", expected_episode_generation: 0 } : {}) };

@@ -1,13 +1,17 @@
 import { z } from "zod";
-import { parseStageReadbackReceipts, serviceConfigSchema, serviceIdentitySchema as identitySchema, serviceOperationIdentity as identityFromConfig, stageReadbackReceiptSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
+import { managementSubmissionSchema, managementResultSchema, parseStageReadbackReceipts, serviceConfigSchema, serviceIdentitySchema as identitySchema, serviceOperationIdentity as identityFromConfig, stageReadbackReceiptSchema, stageUploadRequestSchema, stagingOperationSchema } from "@castloop/shared";
 import type { ServiceConfig, StageUploadRequest } from "@castloop/shared";
 import { stagingClientOperation, stagingClientTargets } from "./staging-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, upload: stageUploadRequestSchema,
+  async_start: managementSubmissionSchema.optional(), async_complete: managementSubmissionSchema.optional(),
+  start_queued: z.literal(true).optional(), complete_queued: z.literal(true).optional(),
+  grant_result: managementResultSchema.optional(), complete_result: managementResultSchema.optional(),
   phase: z.enum(["prepared", "claim_requested", "claimed", "begin_requested", "begin_acknowledged", "puts_running", "puts_settled",
     "settlement_requested", "settled", "finish_requested", "finished"]),
   claim_receipt: stagingOperationSchema.optional(),
@@ -27,6 +31,31 @@ export function validateStagingClientState(input: unknown): StagingClientState {
   const origin = new URL(state.identity.public_base_url);
   const phase = stateSchema.shape.phase.options.indexOf(state.phase);
   const operation = stagingClientOperation(state.upload);
+  if (state.async_start) {
+    const start = state.async_start;
+    if (phase < 1 || start.intent.command.action !== "stage-start" || start.intent.service_id !== state.identity.service_id ||
+      JSON.stringify(start.intent.command.upload) !== JSON.stringify(state.upload) ||
+      start.intent_sha256 !== createHash("sha256").update(JSON.stringify(start.intent)).digest("hex") ||
+      (phase >= 2) !== (state.grant_result !== undefined) || state.grant_result &&
+      (state.grant_result.state !== "granted" || state.grant_result.request_id !== start.intent.request_id ||
+        state.grant_result.intent_sha256 !== start.intent_sha256 || state.grant_result.service_id !== state.identity.service_id ||
+        JSON.stringify(state.grant_result.payloads) !== JSON.stringify(stagingClientTargets(state.upload))) ||
+      phase >= 2 && !state.start_queued || (phase >= 7) !== (state.async_complete !== undefined) ||
+      (phase >= 8) !== (state.complete_result !== undefined)) throw new Error("Async staging journal differs from its frozen request/grant");
+    if (state.async_complete) {
+      const complete = state.async_complete;
+      if (complete.intent.service_id !== state.identity.service_id || complete.intent.command.action !== "upload-complete" ||
+        JSON.stringify(complete.intent.command.upload) !== JSON.stringify(state.upload) ||
+        complete.intent.command.grant_request_id !== start.intent.request_id || complete.intent.command.outcome !== state.put_outcome ||
+        JSON.stringify(complete.intent.command.settlement.readback_receipts) !== JSON.stringify(state.readback_receipts) ||
+        complete.intent_sha256 !== createHash("sha256").update(JSON.stringify(complete.intent)).digest("hex") ||
+        state.complete_result && (state.complete_result.state !== state.put_outcome || state.complete_result.request_id !== complete.intent.request_id ||
+          state.complete_result.service_id !== state.identity.service_id || state.complete_result.intent_sha256 !== complete.intent_sha256) ||
+        phase >= 8 && !state.complete_queued) throw new Error("Async upload completion differs from its frozen settlement");
+    } else if (state.complete_queued || state.complete_result) throw new Error("Upload completion has no frozen request");
+  } else if (state.async_complete || state.start_queued || state.complete_queued || state.grant_result || state.complete_result) {
+    throw new Error("Async upload evidence requires its frozen start request");
+  }
   if (state.readback_receipts !== undefined && (phase < 6 ||
     parseStageReadbackReceipts(state.upload, state.readback_receipts).length !== state.acknowledged_puts)) {
     throw new Error("Staging journal readback receipts do not match its acknowledged PUTs");
@@ -82,8 +111,20 @@ export function createStagingJournal(root: string, configInput: ServiceConfig, i
       const previous = load();
       const phases = stateSchema.shape.phase.options;
       const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
+      const acknowledgeQueue = next.phase === previous.phase &&
+        (next.phase === "claim_requested" && !previous.start_queued && next.start_queued &&
+          JSON.stringify(validateStagingClientState({ ...previous, start_queued: true })) === JSON.stringify(next) ||
+        next.phase === "settlement_requested" && !previous.complete_queued && next.complete_queued &&
+          JSON.stringify(validateStagingClientState({ ...previous, complete_queued: true })) === JSON.stringify(next));
       if (JSON.stringify(next.identity) !== JSON.stringify(previous.identity) || JSON.stringify(next.upload) !== JSON.stringify(previous.upload) ||
-        distance < 0 || distance > 1 || distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) ||
+        distance < 0 || distance > 1 || distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) && !acknowledgeQueue ||
+        !previous.async_start && next.async_start && previous.phase !== "prepared" ||
+        !previous.async_complete && next.async_complete && previous.phase !== "puts_settled" ||
+        previous.async_start && JSON.stringify(next.async_start) !== JSON.stringify(previous.async_start) ||
+        previous.async_complete && JSON.stringify(next.async_complete) !== JSON.stringify(previous.async_complete) ||
+        previous.grant_result && JSON.stringify(next.grant_result) !== JSON.stringify(previous.grant_result) ||
+        previous.complete_result && JSON.stringify(next.complete_result) !== JSON.stringify(previous.complete_result) ||
+        previous.start_queued && !next.start_queued || previous.complete_queued && !next.complete_queued ||
         previous.claim_receipt && JSON.stringify(next.claim_receipt) !== JSON.stringify(previous.claim_receipt) ||
         previous.begin_receipt && JSON.stringify(next.begin_receipt) !== JSON.stringify(previous.begin_receipt) ||
         previous.put_outcome && (next.put_outcome !== previous.put_outcome || next.acknowledged_puts !== previous.acknowledged_puts ||

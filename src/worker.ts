@@ -6,7 +6,7 @@ export { CachedPublicAssets } from "./lifecycle-cached-entrypoint";
 
 declare global {
   namespace Cloudflare {
-    interface GlobalProps { mainModule: typeof import("./worker"); }
+    interface GlobalProps { mainModule: typeof import("./worker") & Omit<typeof import("./sqlite-worker"), "default">; }
   }
 }
 

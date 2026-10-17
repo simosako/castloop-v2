@@ -1,5 +1,7 @@
 # 独自ドメイン（v0.3.0）
 
+このガイドは既存Queue方式（`schema_version = 1`）向けです。v0.5.0のSQLite方式では独自ドメインは未対応で、旧方式へfallbackしません。
+
 この機能はv0.3.0のCLIと、そのバイナリで配備したWorkerの両方が必要です。v0.2.1以前のバイナリにはありません。[run4の実機受け入れ](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)で、追加・配信・非公開化／復元・通常deploy・削除・workers.devへの復帰・最終停止まで合格しました。[Issue #6](https://github.com/simosako/castloop-v2/issues/6)・[Issue #7](https://github.com/simosako/castloop-v2/issues/7)の修正も確認済みです。
 
 実機検証は[専用hostnameでの受け入れ手順](custom_domain_live_acceptance.md)を参照してください。
@@ -14,7 +16,7 @@
 
 ## 追加
 
-既存M6サービスでは最初に[通常更新手順](../README.md#compatible-worker-updates)に従い、v0.3.0でdeployしてください。domain操作自体はWorkerを再配備しません。その後、service workspaceで実行します。
+既存M6サービスでは最初に[Queue方式の通常更新手順](queue_service.md#compatible-worker-updates)に従い、対応Workerをdeployしてください。domain操作自体はWorkerを再配備しません。その後、service workspaceで実行します。
 
 ```sh
 castloop service-pause NEW_PAUSE_UUID

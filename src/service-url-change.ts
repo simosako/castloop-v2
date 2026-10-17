@@ -1,6 +1,7 @@
 import { m6ServiceConfigHash, serviceConfigSchema, serviceManagementBaseUrl,
   serviceUrlChangeProgressSchema, serviceUrlChangeRequestSchema, stringifyToml } from "../packages/shared/src/index";
 import type { DomainConnectionReceipt, ServiceUrlChangeProgress, ServiceUrlChangeRequest } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
 import { readActiveShowFeedInputs, readPublishedFeedSource, writePublishedFeed } from "./lifecycle-feed";
@@ -214,7 +215,7 @@ export async function stepServiceUrlChange(env: ServiceUrlChangeEnv, input: Serv
     }
     await guard();
     if (current.hash !== request.target_service_config_sha256 &&
-      !await env.CASTLOOP_BUCKET.put("system/service.toml", stringifyToml(current.target), { onlyIf: { etagMatches: current.etag } })) {
+      !await putPublicDeliveryRecord(env, "system/service.toml", stringifyToml(current.target), { onlyIf: { etagMatches: current.etag } })) {
       throw new Error("URL change configuration write conflicted");
     }
     if ((await configuration(env, request)).hash !== request.target_service_config_sha256) throw new Error("URL change configuration did not converge");

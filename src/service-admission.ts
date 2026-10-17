@@ -2,6 +2,7 @@ import { migrationApplyProgressSchema, serviceAdmissionSchema, serviceInvocation
 import type { M6ServiceReadiness, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest } from "../packages/shared/src/index";
 import type { LifecycleControlEnv, LifecycleReadEnv } from "./lifecycle-control";
 import { measureWorkerPhase } from "./worker-timing";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 
 export const SERVICE_ADMISSION_KEY = "system/lifecycle-service.json";
 const MAX_RECORD_BYTES = 16384;
@@ -50,7 +51,7 @@ async function write(env: LifecycleControlEnv, snapshot: ServiceAdmissionSnapsho
   const value = serviceAdmissionSchema.parse({ ...input, generation: snapshot.value.generation + 1 });
   const source = JSON.stringify(value);
   if (new TextEncoder().encode(source).length > MAX_RECORD_BYTES) throw new Error("Service admission exceeds its record budget");
-  return Boolean(await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, source, { onlyIf: { etagMatches: snapshot.etag } }));
+  return Boolean(await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, source, { onlyIf: { etagMatches: snapshot.etag } }));
 }
 export { write as compareAndSetServiceAdmission };
 
@@ -59,16 +60,19 @@ export async function initializeServiceAdmission(env: LifecycleControlEnv, servi
   if (existing) return;
   const value = serviceAdmissionSchema.parse({ schema_version: 1, service_id: serviceId, generation: 0,
     mode: "legacy", state: "open", invocations: [] });
-  await env.CASTLOOP_BUCKET.put(SERVICE_ADMISSION_KEY, JSON.stringify(value), { onlyIf: new Headers({ "If-None-Match": "*" }) });
+  await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(value), { onlyIf: new Headers({ "If-None-Match": "*" }) });
   await requireService(env, serviceId);
 }
 
 export async function acquireServiceInvocation(env: LifecycleControlEnv, serviceId: string,
-  input: ServiceInvocationKind): Promise<ServiceInvocation> {
+  input: ServiceInvocationKind, expected?: { admissionWindowId: string; workerVersionId: string }): Promise<ServiceInvocation> {
   const kind = serviceInvocationKindSchema.parse(input);
   const token = crypto.randomUUID();
   for (let attempt = 0; attempt < CONFLICT_ATTEMPTS; attempt += 1) {
     const snapshot = await requireService(env, serviceId);
+    if (expected && (verifiedM6Snapshot(snapshot, expected.workerVersionId).value.last_resumed_pause_id !== expected.admissionWindowId)) {
+      throw new ServiceAdmissionBlocked();
+    }
     const mode = kind.startsWith("legacy_") ? "legacy" : "m6";
     if (snapshot.value.mode !== mode || snapshot.value.url_change || ["migrating", "initializing", "updating"].includes(snapshot.value.state) ||
       snapshot.value.state === "paused" && kind.endsWith("_admin")) throw new ServiceAdmissionBlocked();

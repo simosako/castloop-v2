@@ -1,6 +1,7 @@
 import { episodeLifecycleSchema, parseControlRequest, parseEpisodeLifecycle, parseShowControl,
   stringifyLifecycleToml, validateId } from "../packages/shared/src/index";
 import type { EpisodeLifecycle, LifecycleProgress } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import type { DeletionDeliveryCheck, LifecycleDeleteEnv } from "./lifecycle-delete-batch";
@@ -59,7 +60,7 @@ export async function stepShowDeletionTombstones(env: LifecycleDeleteEnv, execut
     if (entry.value.lifecycle === "deleted") continue;
     await requireShowExecution(env, execution);
     const value = episodeLifecycleSchema.parse({ ...entry.value, lifecycle: "deleted", last_job_id: execution.jobId });
-    const written = await env.CASTLOOP_BUCKET.put(entry.key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: entry.etag } });
+    const written = await putPublicDeliveryRecord(env, entry.key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: entry.etag } });
     if (!written) throw new Error("Child tombstone write conflicted");
     changed += 1;
   }
@@ -81,7 +82,7 @@ export async function finalizeOwnedDeletionTarget(env: LifecycleDeleteEnv, execu
     if (current.value.lifecycle === "deleted") return;
     if (current.value.lifecycle !== "deleting") throw new Error("Show cannot complete deletion from its current state");
     const value = parseShowControl({ ...current.value, lifecycle: "deleted" });
-    const written = await env.CASTLOOP_BUCKET.put(`system/show-publications/${target.showId}.json`, JSON.stringify(value), {
+    const written = await putPublicDeliveryRecord(env, `system/show-publications/${target.showId}.json`, JSON.stringify(value), {
       onlyIf: { etagMatches: current.etag },
     });
     if (!written) throw new Error("Show changed before its deletion tombstone was completed");
@@ -100,6 +101,6 @@ export async function finalizeOwnedDeletionTarget(env: LifecycleDeleteEnv, execu
   if (episode.lifecycle !== "deleting") throw new Error("Episode must remain deleting until finalization");
   await requireShowExecution(env, execution);
   const value = episodeLifecycleSchema.parse({ ...episode, lifecycle: "deleted" });
-  const written = await env.CASTLOOP_BUCKET.put(key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: object.etag } });
+  const written = await putPublicDeliveryRecord(env, key, stringifyLifecycleToml(value), { onlyIf: { etagMatches: object.etag } });
   if (!written) throw new Error("Episode changed before its deletion tombstone was completed");
 }

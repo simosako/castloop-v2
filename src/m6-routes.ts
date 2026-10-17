@@ -1,3 +1,4 @@
+import { publicationCommitKey, publicationManifestHash, publicationRequestSchema, verifyPublicationCommitIntent, verifyManagementIntent } from "../packages/shared/src/index";
 import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { handleM6ContentList } from "./content-list-admin";
@@ -6,6 +7,7 @@ import legacyWorker from "./index";
 import { createCachedPublicFetch } from "./lifecycle-cache";
 import type { CachedAssetBinding, LifecyclePurgeTarget } from "./lifecycle-cache";
 import { handleM6LifecycleAdmin } from "./lifecycle-admin";
+import { controlRequestHash } from "./lifecycle-control";
 import { consumeLifecycleCommit } from "./lifecycle-consumer";
 import { createM6DeliveryGate } from "./lifecycle-delivery-gate";
 import { serveLifecyclePublicRequest } from "./lifecycle-gateway";
@@ -13,6 +15,7 @@ import { createLifecycleWorkerEffects, createPublicationWorkerEffects } from "./
 import { parsePublicAssetPath } from "./public-assets";
 import { handleM6PublicationAdmin } from "./publication-admin";
 import { consumeOwnedPublication } from "./publication-consumer";
+import { consumePublicationCommitIntent, requirePublicationIntentRuntime } from "./publication-queue-consumer";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
@@ -28,6 +31,9 @@ import { handleM6ServiceAdmin } from "./m6-service-admin";
 import { readM6ServiceConfiguration } from "./m6-runtime-readiness";
 import { logPublicationDelivery, measureWorkerPhase } from "./worker-timing";
 import { handleM6UpdateAdmin } from "./m6-update-admin";
+import { consumeManagementIntent } from "./management-queue-consumer";
+import { readPublicServiceDelivery } from "./public-delivery-state";
+import { readPublicVisibilitySnapshot } from "./lifecycle-control";
 
 export type M6CandidateEnv = {
   CASTLOOP_BUCKET: R2Bucket;
@@ -57,14 +63,20 @@ async function requireCandidateReadiness(env: M6CandidateEnv, config: ServiceCon
   await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
 }
 
-async function deliveryMigration(env: M6CandidateEnv, config: ServiceConfig): Promise<string | undefined> {
-  const current = await readServiceAdmission(env, config.service_id);
-  if (current?.value.state === "migrating") {
-    return readBootstrapDeliveryWindow(env, current.value, env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_VERSION_METADATA?.tag);
+async function deliveryGate(env: M6CandidateEnv): Promise<{ migrationId?: string; legacy: boolean }> {
+  const delivery = await readPublicServiceDelivery(env, env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_DLQ_NAME);
+  if (delivery.mode === "m6") return { legacy: false };
+  const config = await serviceConfig(env);
+  if (config.service_id !== delivery.serviceId) throw new Error("Legacy delivery belongs to another service");
+  if (delivery.mode === "legacy") {
+    const ready = await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
+    if (ready.value.state !== "open") throw new Error("Public delivery requires open service admission");
+    return { legacy: true };
   }
-  const ready = await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
-  if (ready.value.state !== "open") throw new Error("Public delivery requires open service admission");
-  return undefined;
+  const current = await readServiceAdmission(env, config.service_id);
+  if (!current) throw new Error("Migration delivery admission is missing");
+  return { legacy: true, migrationId: await readBootstrapDeliveryWindow(env, current.value,
+    env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_VERSION_METADATA?.tag) };
 }
 
 async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
@@ -104,9 +116,9 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   if (asset) {
     if (request.method !== "GET" && request.method !== "HEAD") return reply(request, { error: "method not allowed" }, 405);
     try {
-      const config = await serviceConfig(env);
-      const migrationId = await deliveryMigration(env, config);
-      const response = await serveLifecyclePublicRequest(request, env, createCachedPublicFetch(cachedAssets));
+      const { migrationId, legacy } = await deliveryGate(env);
+      const response = await serveLifecyclePublicRequest(request, env, createCachedPublicFetch(cachedAssets),
+        legacy ? readPublicVisibilitySnapshot : undefined);
       if (!response) throw new Error("M6 public path was not handled by its lifecycle gateway");
       const headers = new Headers(response.headers);
       headers.set("X-Castloop-Worker-Version", env.CASTLOOP_VERSION_METADATA.id);
@@ -155,8 +167,54 @@ export async function queueM6Candidate(batch: MessageBatch<unknown>, env: M6Cand
   if (!batch.messages.length) return;
   const config = await serviceConfig(env);
   if (batch.queue !== config.queue_name && batch.queue !== config.dlq_name) throw new Error("M6 candidate received an unknown Queue");
-  await requireCandidateReadiness(env, config);
+  if (!batch.messages.some((message) => message.body && typeof message.body === "object" && "family" in message.body && message.body.family === "management")) {
+    await requireCandidateReadiness(env, config);
+  }
   for (const message of batch.messages) {
+    if (message.body && typeof message.body === "object" && "family" in message.body && message.body.family === "management") {
+      const intent = await verifyManagementIntent(message.body, env.CASTLOOP_ADMIN_KEY);
+      if (!intent) {
+        console.error(JSON.stringify({ event: "management_command_blocked", reason_code: "intent_authentication_failed" }));
+        continue;
+      }
+      console.log(JSON.stringify({ event: "management_delivery", request_id: intent.request_id, action: intent.command.action,
+        queue_kind: batch.queue === config.dlq_name ? "dead_letter" : "primary", attempts: message.attempts ?? null }));
+      await consumeManagementIntent(env, intent, config, env.CASTLOOP_ADMIN_KEY,
+        { versionMetadata: env.CASTLOOP_VERSION_METADATA, gatewayProtocol: "m6-uncached-gateway-v1", cachedAssets },
+        (gate) => (execution, executionEnv) => createPublicationWorkerEffects(executionEnv, execution, { cachedAssets, checkDeliveryGate: gate }),
+        batch.queue === config.dlq_name);
+      continue;
+    }
+    if (message.body && typeof message.body === "object" && "family" in message.body && message.body.family === "publication_commit") {
+      const intent = await verifyPublicationCommitIntent(message.body, env.CASTLOOP_ADMIN_KEY);
+      if (!intent) {
+        console.error(JSON.stringify({ event: "publication_submission_blocked", reason_code: "intent_authentication_failed" }));
+        continue;
+      }
+      await requirePublicationIntentRuntime(intent, config, env.CASTLOOP_VERSION_METADATA.id);
+      const target = { showId: intent.operation.show_id };
+      logPublicationDelivery(intent.operation.job_id, message.timestamp, message.attempts);
+      await measureWorkerPhase(intent.operation.job_id, "publication.consumer", () =>
+        withServiceInvocation(env, config.service_id, "m6_consumer", async (invocation) => {
+          const gate = createM6DeliveryGate(env, invocation, { versionMetadata: env.CASTLOOP_VERSION_METADATA,
+            gatewayProtocol: "m6-uncached-gateway-v1", cachedAssets });
+          if (batch.queue === config.dlq_name) {
+            await gate(target);
+            const object = await env.CASTLOOP_BUCKET.get(`system/jobs/${intent.operation.job_id}/publication.json`);
+            if (!object) throw new Error("Submission dead-letter requires its retained publication");
+            if (object.size < 1 || object.size > 16384) { await object.body?.cancel(); throw new Error("Submission dead-letter publication is oversized or empty"); }
+            const frozen = publicationRequestSchema.parse(await object.json<unknown>());
+            if (await publicationManifestHash(frozen) !== intent.manifest_sha256 || await controlRequestHash(frozen.request) !== intent.request_sha256 ||
+              frozen.request.job_id !== intent.operation.job_id || frozen.request.show_id !== intent.operation.show_id ||
+              frozen.request.expected_show_generation + 1 !== intent.operation.show_generation) {
+              throw new Error("Submission dead-letter differs from its frozen manifest/operation");
+            }
+            await recordDeadLetterDelivery(env, { id: message.id, body: { object: { key: publicationCommitKey(frozen.commit) } } });
+          } else await consumePublicationCommitIntent(env, intent, (execution, executionEnv) =>
+            createPublicationWorkerEffects(executionEnv, execution, { cachedAssets, checkDeliveryGate: gate }), () => gate(target));
+        }, intent.operation.job_id));
+      continue;
+    }
     const delivery = parseQueueDelivery(message.body);
     if (batch.queue !== config.dlq_name && !delivery) continue;
     const consume = async () => withServiceInvocation(env, config.service_id, "m6_consumer", async (invocation) => {

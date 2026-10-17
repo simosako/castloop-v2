@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { episodeRevisionSchema, parseEpisodeRevision, parseShowControl, validateId } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowControl } from "../packages/shared/src/index";
+import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { readEpisodeLifecycle, requireShowExecution } from "./lifecycle-control";
 import type { ShowExecution } from "./lifecycle-control";
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
@@ -149,7 +150,7 @@ async function markCatalogInitialized(env: LifecycleFeedEnv, execution: ShowExec
   const control = await requireShowExecution(env, execution);
   if (control.value.episode_catalog_initialized) return;
   const value = parseShowControl({ ...control.value, episode_catalog_initialized: true });
-  if (!await env.CASTLOOP_BUCKET.put(`system/show-publications/${execution.showId}.json`, JSON.stringify(value),
+  if (!await putPublicDeliveryRecord(env, `system/show-publications/${execution.showId}.json`, JSON.stringify(value),
     { onlyIf: { etagMatches: control.etag } })) throw new Error("Show changed before catalog initialization was recorded");
 }
 
