@@ -1,0 +1,131 @@
+import { afterEach, expect, spyOn, test } from "bun:test";
+import { stringifyToml } from "@castloop/shared";
+import { loadWorkspaceConfig } from "./workspace-config";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import * as fsPromises from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
+import { join } from "node:path";
+
+const roots: string[] = [];
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+const queueConfig = { schema_version: 1 as const, service_id: "service", account_id: "a".repeat(32),
+  bucket_name: "private-bucket", worker_name: "test-worker", queue_name: "test-queue", dlq_name: "test-dlq",
+  public_base_url: "https://test-worker.example.workers.dev" };
+const sqliteConfig = { schema_version: 2 as const, publication_protocol: "sqlite-sequential-v1" as const,
+  service_id: queueConfig.service_id, account_id: queueConfig.account_id, bucket_name: queueConfig.bucket_name,
+  worker_name: queueConfig.worker_name, public_base_url: queueConfig.public_base_url,
+  workers_dev_base_url: queueConfig.public_base_url };
+
+function fixture(source: string | Buffer) {
+  const root = mkdtempSync("/tmp/opencode/castloop-workspace-config-");
+  roots.push(root);
+  const file = join(root, "castloop.toml");
+  writeFileSync(file, source);
+  return { root, file };
+}
+
+test("workspace config preserves Queue and SQLite routing, strict schemas and valid UTF-8 comments", async () => {
+  for (const config of [queueConfig, sqliteConfig]) {
+    const source = `${stringifyToml(config)}\n# 日本語😀\n`;
+    const setup = fixture(source);
+    expect(await loadWorkspaceConfig(setup.root)).toEqual(config);
+    expect(readFileSync(setup.file, "utf8")).toBe(source);
+    writeFileSync(setup.file, `${source}api_token = "not-allowed"\n`);
+    await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow();
+  }
+  const setup = fixture(stringifyToml(queueConfig).replace("schema_version = 1", "schema_version = 3"));
+  await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow();
+});
+
+test("workspace config refuses symbolic links without following or modifying their targets", async () => {
+  const setup = fixture(stringifyToml(queueConfig));
+  const target = join(setup.root, "target.toml");
+  writeFileSync(target, readFileSync(setup.file));
+  rmSync(setup.file);
+  symlinkSync(target, setup.file);
+  await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
+  expect(readFileSync(target, "utf8")).toBe(stringifyToml(queueConfig));
+});
+
+test("workspace config enforces the byte budget before parsing otherwise valid TOML", async () => {
+  const source = `${stringifyToml(sqliteConfig)}\n#`;
+  const setup = fixture(source.padEnd(16384, "x"));
+  expect(await loadWorkspaceConfig(setup.root)).toEqual(sqliteConfig);
+  for (const bytes of [Buffer.from(source.padEnd(16385, "x")), Buffer.alloc(0)]) {
+    writeFileSync(setup.file, bytes);
+    await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
+    expect(readFileSync(setup.file)).toEqual(bytes);
+  }
+});
+
+test("workspace config rejects invalid UTF-8 even inside ignored TOML comments", async () => {
+  const source = Buffer.concat([Buffer.from(`${stringifyToml(queueConfig)}\n# `), Buffer.from([0xff])]);
+  const setup = fixture(source);
+  await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
+  expect(readFileSync(setup.file)).toEqual(source);
+});
+
+test("workspace config rejects missing files, directories and FIFOs without waiting for writers", async () => {
+  const setup = fixture("");
+  rmSync(setup.file);
+  await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
+  mkdirSync(setup.file);
+  await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
+  rmSync(setup.file, { recursive: true });
+  expect(Bun.spawnSync(["mkfifo", setup.file]).exitCode).toBe(0);
+  await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
+}, 3000);
+
+test("workspace config rejects growth, truncation and same-size changes and closes its descriptor", async () => {
+  const originalOpen = fsPromises.open;
+  for (const change of ["grow", "truncate", "same-size", "oversize", "read-error"] as const) {
+    const setup = fixture(`${stringifyToml(queueConfig)}\n# before\n`);
+    const handles: FileHandle[] = [];
+    const open = spyOn(fsPromises, "open").mockImplementation(async (...args) => {
+      const handle = await originalOpen(...args);
+      handles.push(handle);
+      const snapshot = await handle.stat({ bigint: true });
+      spyOn(handle, "stat").mockResolvedValueOnce(snapshot);
+      if (change === "grow") appendFileSync(setup.file, "# later\n");
+      else if (change === "truncate") writeFileSync(setup.file, "");
+      else if (change === "oversize") appendFileSync(setup.file, "x".repeat(16384));
+      else if (change === "read-error") spyOn(handle, "read").mockRejectedValueOnce(new Error("Injected read failure"));
+      else {
+        writeFileSync(setup.file, `${stringifyToml(queueConfig)}\n# after!\n`);
+        utimesSync(setup.file, new Date(0), new Date(0));
+      }
+      return handle;
+    });
+    try {
+      let failure: unknown;
+      try { await loadWorkspaceConfig(setup.root); } catch (error) { failure = error; }
+      expect(failure).toBeInstanceOf(Error);
+      if (!(failure instanceof Error) || !(failure.cause instanceof Error)) throw new Error("Expected a bounded-read failure");
+      expect(failure.cause.message).toContain(change === "oversize" ? "exceeds its size limit" :
+        change === "read-error" ? "Injected read failure" : "changed during validation");
+      expect(handles).toHaveLength(1);
+      expect(handles[0]!.fd).toBe(-1);
+    } finally { open.mockRestore(); }
+  }
+});
+
+test("formal CLI rejects an unsafe workspace before network requests or local state creation", () => {
+  const setup = fixture(stringifyToml(queueConfig));
+  const target = join(setup.root, "target.toml");
+  writeFileSync(target, readFileSync(setup.file));
+  rmSync(setup.file); symlinkSync(target, setup.file);
+  const preload = join(setup.root, "deny-network.ts");
+  writeFileSync(preload, 'globalThis.fetch = async () => { console.error("UNEXPECTED_NETWORK_REQUEST"); throw new Error("Network forbidden in this test"); };\n');
+  const before = readdirSync(setup.root).sort();
+  for (const args of [["service-status"], ["init"], ["init", "--publication-protocol", "sqlite-sequential-v1"], ["publish-rss-import", "import"]]) {
+    const result = Bun.spawnSync([process.execPath, "--preload", preload, join(import.meta.dir, "index.ts"), ...args], {
+      cwd: setup.root, env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: queueConfig.account_id, CLOUDFLARE_API_TOKEN: "test-token" }, timeout: 5000,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout.toString()).toBe("");
+    expect(result.stderr.toString()).toContain("Cannot read castloop.toml");
+    expect(result.stderr.toString()).not.toContain("UNEXPECTED_NETWORK_REQUEST");
+    expect(readdirSync(setup.root).sort()).toEqual(before);
+  }
+  expect(readFileSync(target, "utf8")).toBe(stringifyToml(queueConfig));
+});
