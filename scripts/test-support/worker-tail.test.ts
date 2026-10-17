@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import { sanitizeTailInvocation, startWorkerTail } from "./worker-tail";
 import type { TailHealth, TailSession, TailSocket } from "./worker-tail";
 
@@ -22,7 +22,7 @@ function fixture(expiresAt = new Date(Date.now() + 60000).toISOString()) {
   const health: TailHealth[] = [];
   let present = true;
   const options = { create: async () => session, list: async () => present ? [session] : [],
-    socket: () => { queueMicrotask(() => socket.open()); return socket as unknown as TailSocket; },
+    socket: () => { void Promise.resolve().then(() => socket.open()); return socket as unknown as TailSocket; },
     onHealth: (record: TailHealth) => { health.push(record); }, onInvocation: () => {},
     pingIntervalMs: 10, registryIntervalMs: 10, connectTimeoutMs: 100 };
   return { socket, health, options, remove: () => { present = false; } };
@@ -61,25 +61,73 @@ describe("test-only Worker tail collector", () => {
     expect(tail.summary().complete).toBe(false);
   });
 
-  test("uses correlated ping/pong rather than treating quiet traffic as failure", async () => {
-    const setup = fixture(); const tail = await startWorkerTail(setup.options);
-    try {
-      await waitUntil(() => setup.socket.pings >= 3);
-      tail.assertHealthy();
-      expect(tail.summary().invocation_count).toBe(0);
-    } finally { tail.stop(); }
-  });
+  describe("heartbeat state machine", () => {
+    beforeEach(() => { jest.useFakeTimers(); });
+    afterEach(() => { jest.useRealTimers(); });
 
-  test("missing pong is sticky failure and blocks the next action without killing a live mutation", async () => {
-    const setup = fixture(); setup.socket.answerPings = false;
-    const tail = await startWorkerTail(setup.options);
-    try {
-      await waitUntil(() => tail.summary().state === "failed");
-      setup.socket.dispatchEvent(new MessageEvent("pong", { data: "castloop test tail ping" }));
-      expect(tail.summary().reason_code).toBe("tail_pong_timeout");
-      expect(() => tail.assertHealthy()).toThrow();
-      expect(setup.socket.closed).toBe(false);
-    } finally { tail.stop(); }
+    test("uses correlated ping/pong rather than treating quiet traffic as failure", async () => {
+      const setup = fixture(); const tail = await startWorkerTail(setup.options);
+      try {
+        jest.advanceTimersByTime(9);
+        expect(setup.socket.pings).toBe(0);
+        jest.advanceTimersByTime(1);
+        expect(setup.socket.pings).toBe(1);
+        jest.advanceTimersByTime(20);
+        expect(setup.socket.pings).toBe(3);
+        tail.assertHealthy();
+        expect(tail.summary().invocation_count).toBe(0);
+      } finally { tail.stop(); }
+    });
+
+    test("an asynchronous matching pong before the next tick permits another ping", async () => {
+      const setup = fixture(); setup.socket.answerPings = false;
+      const tail = await startWorkerTail(setup.options);
+      try {
+        jest.advanceTimersByTime(10);
+        jest.advanceTimersByTime(9);
+        tail.assertHealthy();
+        setup.socket.dispatchEvent(new MessageEvent("pong", { data: Buffer.from("castloop test tail ping") }));
+        jest.advanceTimersByTime(1);
+        expect(setup.socket.pings).toBe(2);
+        tail.assertHealthy();
+      } finally { tail.stop(); }
+    });
+
+    test("missing pong is sticky failure and blocks the next action without killing a live mutation", async () => {
+      const setup = fixture(); setup.socket.answerPings = false;
+      const tail = await startWorkerTail(setup.options);
+      try {
+        jest.advanceTimersByTime(10);
+        expect(setup.socket.pings).toBe(1);
+        setup.socket.dispatchEvent(new MessageEvent("pong", { data: "unrelated pong" }));
+        setup.socket.dispatchEvent(new MessageEvent("message", { data: JSON.stringify({ outcome: "ok" }) }));
+        jest.advanceTimersByTime(9);
+        tail.assertHealthy();
+        jest.advanceTimersByTime(1);
+        expect(tail.summary().reason_code).toBe("tail_pong_timeout");
+        setup.socket.dispatchEvent(new MessageEvent("pong", { data: "castloop test tail ping" }));
+        jest.advanceTimersByTime(100);
+        expect(tail.summary().reason_code).toBe("tail_pong_timeout");
+        expect(tail.summary().complete).toBe(false);
+        expect(() => tail.assertHealthy()).toThrow("preserve running mutations");
+        expect(setup.socket.pings).toBe(1);
+        expect(setup.socket.closed).toBe(false);
+      } finally { tail.stop(); }
+      expect(tail.summary().complete).toBe(false);
+    });
+
+    test("stopping with a pending pong cancels further heartbeat checks", async () => {
+      const setup = fixture(); setup.socket.answerPings = false;
+      const tail = await startWorkerTail(setup.options);
+      try {
+        jest.advanceTimersByTime(10);
+        tail.stop();
+        jest.advanceTimersByTime(100);
+        expect(setup.socket.pings).toBe(1);
+        expect(tail.summary().state).toBe("stopped");
+        expect(tail.summary().complete).toBe(true);
+      } finally { tail.stop(); }
+    });
   });
 
   test("expiry stops measurement even when the socket stays open", async () => {
@@ -162,16 +210,62 @@ describe("test-only Worker tail collector", () => {
     expect(setup.socket.closed).toBe(true);
   });
 
-  test("native Bun client ping receives a real server pong without new dependencies", async () => {
-    const server = Bun.serve({ port: 0, fetch(request, server) {
-      if (server.upgrade(request)) return;
-      return new Response("not upgraded", { status: 400 });
-    }, websocket: { message() {} } });
-    const session = { id: "local-tail", url: `ws://localhost:${server.port}`,
-      expires_at: new Date(Date.now() + 60000).toISOString() };
-    const tail = await startWorkerTail({ create: async () => session, list: async () => [session],
-      onHealth() {}, onInvocation() {}, pingIntervalMs: 10, registryIntervalMs: 20 });
-    try { await Bun.sleep(50); tail.assertHealthy(); }
-    finally { tail.stop(); server.stop(true); }
+  test.each([0, 25])("native Bun ping/pong control frames survive %ims loop delay", async (delayMs) => {
+    const events: Array<{ event: "socket_open" | "ping_sent" | "pong_received" | "loop_resumed" | "transport_deadline";
+      elapsed_ms: number }> = [];
+    const started = performance.now();
+    const record = (event: typeof events[number]["event"]) => events.push({ event, elapsed_ms: performance.now() - started });
+    let rejectTransport: (error: Error) => void;
+    const transportFailure = new Promise<never>((_, reject) => { rejectTransport = reject; });
+    const withDeadline = async <T,>(operation: Promise<T>): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([operation, transportFailure, new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            record("transport_deadline");
+            reject(new Error(`Native tail transport deadline: ${JSON.stringify(events)}`));
+          }, 2000);
+        })]);
+      } finally { clearTimeout(timer); }
+    };
+    let server: Bun.Server<undefined> | undefined;
+    let socket: WebSocket | undefined;
+    let acknowledgePong: (() => void) | undefined;
+    const pingPayload = "castloop test tail ping";
+    let serverPings = 0;
+    let clientPongs = 0;
+    try {
+      server = Bun.serve<undefined>({ port: 0, fetch(request, server) {
+        if (server.upgrade(request)) return;
+        return new Response("not upgraded", { status: 400 });
+      }, websocket: { message() {}, ping() { serverPings++; } } });
+      socket = new WebSocket(`ws://localhost:${server.port}`, "trace-v1");
+      const transport = socket as unknown as TailSocket;
+      transport.addEventListener("error", () => rejectTransport(new Error("Native tail socket error")));
+      transport.addEventListener("close", () => rejectTransport(new Error("Native tail socket closed")));
+      transport.addEventListener("pong", (event) => {
+        const data = (event as { data: unknown }).data;
+        if (!ArrayBuffer.isView(data) ||
+          new TextDecoder().decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)) !== pingPayload) return;
+        record("pong_received"); clientPongs++;
+        acknowledgePong?.();
+      });
+      await withDeadline(new Promise<void>((resolve) => {
+        transport.addEventListener("open", () => { record("socket_open"); resolve(); });
+      }));
+      // Collector deadlines are tested above; native I/O must not race a 10 ms timer.
+      for (let count = 1; count <= 3; count++) {
+        const pong = new Promise<void>((resolve) => { acknowledgePong = resolve; });
+        record("ping_sent"); transport.ping(pingPayload);
+        const until = performance.now() + delayMs;
+        while (performance.now() < until) {}
+        record("loop_resumed");
+        await withDeadline(pong);
+        expect(serverPings).toBe(count);
+        expect(clientPongs).toBe(count);
+      }
+    } finally {
+      socket?.close(); server?.stop(true);
+    }
   });
 });
