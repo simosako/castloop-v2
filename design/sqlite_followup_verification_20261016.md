@@ -144,6 +144,21 @@ DO/Alarm frameは0件、4 jobの開始・完了ログも欠けた。unknown log�
 
 参照：[Durable Objects known issues — code updates](https://developers.cloudflare.com/durable-objects/platform/known-issues/#code-updates)。
 
+## 欠測理由の追加調査（2026-10-17 JST）
+
+[DO・CPUログ欠測調査](sqlite_tail_missing_logs_investigation_20261017.md)で、元の時間帯にDO HTTP/RPCと4回のAlarmがsuccessとして集計されていることを確認した。
+pausedのままの追加GET観測では外側HTTP 14/14・相関付きDO HTTP 7/7を取得し、応答後のログ到着は最大57msだった。
+DOへのtail反映待ちは有力だが未確定で、長い配送遅延は再現していない。
+socket接続直後の開始と固定2秒での終了は観測側の不足だが、それだけで元の全欠測理由を確定しない。
+新しいGETのCPUや期間集計で、元のAlarm CPUの欠測を補完していない。公開・配備・activation等は再実行していない。
+
+その後、管理者によるWorkers Observability Read追加で保存ログ検索が可能になった。
+元の公開HTTP probeをUUID・Worker/version・method/status等で照合し、**19/19件の数値CPUを回収**した。
+tail欠測の4件はRange 1ms・条件付きGET 1ms・既存feed 1ms・paused feed 0ms。
+この19件のCPU最大は1msで、既取得15件の値もtailと一致した。元の外側HTTP全54件の最大2msとは対象が異なる。
+詳細とprivate証跡は[欠測調査の保存ログ照合](sqlite_tail_missing_logs_investigation_20261017.md#元の公開http-19件の保存ログ照合)を参照。
+公開HTTPの欠測は補完済みだが、job/Alarmの完全なCPU対応付けは未完了のため、元のmeasurementを一括してcompleteへ変更していない。
+
 ## 関連
 
 - [先行実機試験と欠測](sqlite_sequential_measurement_20261016.md)

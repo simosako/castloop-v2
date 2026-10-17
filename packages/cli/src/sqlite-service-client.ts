@@ -2,7 +2,8 @@ import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteHealthSchema, sqliteInspectionSchema } from "../../shared/src/sqlite-service-api";
 import type { SqliteHealth, SqliteInspection, SqliteRuntimeRequest } from "../../shared/src/sqlite-service-api";
-import { readSqliteManagementJson } from "./sqlite-publication-client";
+import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
+import type { SqliteManagementReadOptions } from "./sqlite-management-http";
 import type { R2RestTransport } from "./verified-r2-put";
 import { sqliteCatalogRequestSchema, sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../../shared/src/sqlite-catalog";
@@ -11,12 +12,15 @@ import type { SqliteUpdateActivate, SqliteUpdatePrepare, SqliteUpdateResult } fr
 
 export class SqliteServiceClient {
   readonly config: SqliteServiceConfig;
-  constructor(config: SqliteServiceConfig, private readonly key: string, private readonly transport: R2RestTransport = fetch) {
+  constructor(config: SqliteServiceConfig, private readonly key: string, private readonly transport: R2RestTransport = fetch,
+    private readonly readOptions: SqliteManagementReadOptions = {}) {
     this.config = sqliteServiceConfigSchema.parse(config);
     if (!key || /[^\x21-\x7e]/.test(key) || key.length > 1024) throw new Error("Missing SQLite administrator key");
   }
   private async call(path: string, body?: object): Promise<unknown> {
     try {
+      if (!body) return await readSqliteManagementGet(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url),
+        { "X-Castloop-Key": this.key }, { ...this.readOptions, transport: this.transport });
       const response = await this.transport(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url), {
         method: body ? "POST" : "GET", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(30000),
         headers: { "X-Castloop-Key": this.key, ...(body ? { "Content-Type": "application/json" } : {}) },

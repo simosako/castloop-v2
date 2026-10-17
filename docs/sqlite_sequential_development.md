@@ -15,7 +15,7 @@
 - Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
 - レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
 - 同じconfig/SQLite schema/namespaceのcode-only互換更新を`deploy`で扱う。明示pause/drain後に実行し、新versionのprobe後もpausedを維持する。
-- 新規環境はworkers.devのみ。**物理削除、独自ドメイン、既存移行、retry/releaseは未対応**。旧方式へfallbackしない。
+- 新規環境はworkers.devのみ。**物理削除、独自ドメイン、既存移行、公開jobのretry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
 
@@ -148,6 +148,14 @@ castloop service-status
 ```
 
 応答不明でもPUT/POSTを自動再送せず、同じupload keyや別jobへ置換しない。
+管理APIの読み取りGETは、一時的な通信・本文読取エラー、408/429/500/502/503/504だけを**初回を含め最大3試行**する。
+1試行は最大10秒、試行開始の総予算は30秒で、待機は通常250ms→500ms。`Retry-After`が長い場合は予算内だけ尊重する。
+開始済みIOと応答cleanupの終了を待ち、時間切れだけで旧IOを切り離して次を始めない。
+401/403等の恒久拒否、JSON/schema・identity不一致、不正header、サイズ超過、cleanup失敗は再試行しない。
+公開完了待機では、再試行も既存の最大300 GETに数え、5分を過ぎて新しいGETを開始しない。進行中のGETには別のtimeoutがある。
+これはstatus/health等の読み直しであり、公開・登録・pause/resume・配備のPOST、素材PUT、POST形式の一覧要求を再送する機能ではない。
+再試行診断は固定reason・HTTP status・回数・経過時間・対象URLのhashのみで、鍵・URL・本文や任意例外文は出さない。
+
 既に凍結した`publish-*`を再度呼んだ場合も、同じ要求のstatus確認だけを行う。
 `failed`は公開書込前の確定的な入力/base失敗、`blocked`は途中停止・書込不明・purge失敗等であり、後続を停止する。
 時間経過やHEAD不在で解除しない。blockedのretry/releaseは提供していない。

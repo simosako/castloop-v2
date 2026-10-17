@@ -14,6 +14,20 @@ import { join } from "node:path";
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 
+test("SQLite status retries cannot start after the publication waiting deadline", async () => {
+  const f = await fixture(); await f.stage(); await f.draft.publish();
+  const before = await f.draft.read(); let clock = 0, reads = 0;
+  f.faults.response = (response, request) => {
+    if (request.method === "GET" && new URL(request.url).pathname.includes("/jobs/")) {
+      reads++; clock = 300001; throw new Error("transient connection loss");
+    }
+    return response;
+  };
+  await expect(f.draft.wait({ now: () => clock, delay: async (ms) => { clock += ms; } })).rejects.toThrow("deadline_exceeded");
+  expect(reads).toBe(1); expect((await f.draft.read()).publication).toEqual(before.publication);
+  expect(f.management.filter((entry) => entry.startsWith("POST ")).length).toBe(1);
+});
+
 async function fixture(kind: "show" | "episode" = "episode", updating = false) {
   const root = mkdtempSync("/tmp/opencode/castloop-sqlite-cli-");
   const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service",

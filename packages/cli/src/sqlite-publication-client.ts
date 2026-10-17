@@ -2,39 +2,28 @@ import { MAX_SQLITE_PUBLICATION_BYTES, parseSqlitePublicationRequest, sqlitePubl
   sqlitePublicationStatusSchema, sqliteServiceConfigHash, sqliteServiceConfigSchema, sqliteServiceStatusSchema } from "@castloop/shared";
 import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteServiceConfig, SqliteServiceStatus } from "@castloop/shared";
 import type { R2RestTransport } from "./verified-r2-put";
+import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
+import type { SqliteManagementReadBudget, SqliteManagementReadOptions } from "./sqlite-management-http";
 
-export async function readSqliteManagementJson(response: Response, maximum = MAX_SQLITE_PUBLICATION_BYTES): Promise<unknown> {
-  if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 65536) throw new Error("Invalid SQLite response limit");
-  if (!response.body || response.headers.get("Cache-Control") !== "no-store" || response.headers.has("Content-Range") ||
-    response.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
-    await response.body?.cancel();
-    throw new Error("SQLite management response is not bounded non-cacheable JSON");
-  }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    for (;;) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      length += chunk.value.byteLength;
-      if (length > maximum) throw new Error("SQLite management response exceeds its limit");
-      chunks.push(chunk.value);
-    }
-    return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks))) as unknown;
-  } finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
-}
+export { readSqliteManagementJson } from "./sqlite-management-http";
 
 export class SqlitePublicationClient {
   readonly config: SqliteServiceConfig;
   constructor(input: SqliteServiceConfig, private readonly administratorKey: string,
-    private readonly transport: R2RestTransport = fetch, private readonly timeoutMs = 30000) {
+    private readonly transport: R2RestTransport = fetch, private readonly timeoutMs = 30000,
+    private readonly readOptions: SqliteManagementReadOptions = {}) {
     this.config = sqliteServiceConfigSchema.parse(input);
     if (!administratorKey || administratorKey.length > 1024 || /[^\x21-\x7e]/.test(administratorKey) ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid SQLite management credentials or timeout");
   }
 
-  private async call(path: string, input?: SqlitePublicationRequest): Promise<unknown | null> {
+  private async call(path: string, input?: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}): Promise<unknown | null> {
+    if (!input) {
+      return readSqliteManagementGet(new URL(`/admin/sqlite-publication/${path}`, this.config.workers_dev_base_url), {
+        "X-Castloop-Key": this.administratorKey, Accept: "application/json",
+        ...(path.startsWith("jobs/") ? { "X-Castloop-Status-Request": path.slice(5) } : {}),
+      }, { ...this.readOptions, ...budget, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: MAX_SQLITE_PUBLICATION_BYTES, allowMissing: path.startsWith("jobs/") });
+    }
     let response: Response;
     try {
       response = await this.transport(new URL(`/admin/sqlite-publication/${path}`, this.config.workers_dev_base_url), {
@@ -43,10 +32,6 @@ export class SqlitePublicationClient {
           ...(input ? { "Content-Type": "application/json" } : {}) }, ...(input ? { body: JSON.stringify(input) } : {}),
       });
     } catch { throw new Error("SQLite management response is unknown; preserve the request without automatic retry"); }
-    if (!input && path.startsWith("jobs/") && response.status === 404 && response.headers.get("Cache-Control") === "no-store") {
-      await response.body?.cancel();
-      return null;
-    }
     if (response.status !== (input ? 202 : 200)) {
       await response.body?.cancel();
       throw new Error(`SQLite management request was not verified (HTTP ${response.status}); no automatic retry`);
@@ -87,9 +72,9 @@ export class SqlitePublicationClient {
     return this.result(await this.call("jobs", request), request);
   }
 
-  async observe(input: SqlitePublicationRequest): Promise<SqlitePublicationStatus | null> {
+  async observe(input: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}): Promise<SqlitePublicationStatus | null> {
     const request = await this.requireRequest(input);
-    const value = await this.call(`jobs/${request.request_id}`);
+    const value = await this.call(`jobs/${request.request_id}`, undefined, budget);
     return value === null ? null : this.result(value, request);
   }
 }

@@ -7,6 +7,7 @@ import { readLocalMetadata } from "./local-metadata-read";
 import { openSqliteDraftJournal, requireSqliteStatus } from "./sqlite-draft-journal";
 import type { SqliteDraftJournal, SqliteDraftRecord, SqliteDraftTarget } from "./sqlite-draft-journal";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
+import type { SqliteManagementReadBudget } from "./sqlite-management-http";
 import { uploadSqliteDraftAssets } from "./sqlite-upload";
 import { assertLocalStagingSource, inspectLocalStagingSource } from "./staging-sources";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
@@ -109,15 +110,15 @@ export class SqliteDraft {
     return status;
   }
 
-  private async observeRecord(record: SqliteDraftRecord): Promise<SqlitePublicationStatus | null> {
+  private async observeRecord(record: SqliteDraftRecord, budget: SqliteManagementReadBudget = {}): Promise<SqlitePublicationStatus | null> {
     if (!record.publication) throw new Error("SQLite draft has no frozen publication request");
-    const status = await this.client.observe(record.publication.request);
+    const status = await this.client.observe(record.publication.request, budget);
     if (status === null && record.publication.status) throw new Error("Previously acknowledged SQLite publication is missing; keep its retained result");
     return status ? this.retainStatus(record, status) : null;
   }
 
-  observe(): Promise<SqlitePublicationStatus | null> {
-    return this.journal.storage.exclusively(async () => this.observeRecord(await this.journal.load()));
+  observe(budget: SqliteManagementReadBudget = {}): Promise<SqlitePublicationStatus | null> {
+    return this.journal.storage.exclusively(async () => this.observeRecord(await this.journal.load(), budget));
   }
 
   publish(): Promise<SqlitePublicationStatus | null> {
@@ -146,11 +147,16 @@ export class SqliteDraft {
 
   async wait(options: { now?: () => number; delay?: (milliseconds: number) => Promise<void> } = {}): Promise<SqlitePublicationStatus> {
     const now = options.now ?? (() => performance.now()), deadline = now() + 300000;
-    for (let attempt = 0; attempt < 300 && now() < deadline; attempt++) {
-      const status = await this.observe();
+    let requests = 0;
+    const budget = { beforeAttempt: () => {
+      if (requests >= 300 || now() >= deadline) return false;
+      requests++; return true;
+    } };
+    while (requests < 300 && now() < deadline) {
+      const status = await this.observe(budget);
       if (status?.state === "succeeded") return status;
       if (status?.state === "failed" || status?.state === "blocked") throw new Error(`SQLite publication ${status.state}: ${status.reason_code}`);
-      if (attempt < 299 && now() < deadline) await (options.delay ?? Bun.sleep)(Math.min(1000, deadline - now()));
+      if (requests < 300 && now() < deadline) await (options.delay ?? Bun.sleep)(Math.min(1000, deadline - now()));
     }
     throw new Error("SQLite publication waiting stopped; keep the frozen request and inspect status without resubmitting");
   }

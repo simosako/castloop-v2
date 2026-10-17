@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { classifySqliteInvocation, sanitizeSqliteInvocation, SqliteObservationGuard, summarizeSqliteCoverage, verifySqliteObservationCheckpoint } from "./sqlite-observability";
+import { classifySqliteInvocation, sanitizeSqliteInvocation, sqliteStatusReadRequestId, SqliteObservationGuard, summarizeSqliteCoverage, verifySqliteObservationCheckpoint } from "./sqlite-observability";
 
 const version = "11111111-1111-4111-8111-111111111111", jobId = "22222222-2222-4222-8222-222222222222";
 const requestId = "33333333-3333-4333-8333-333333333333", probeId = "44444444-4444-4444-8444-444444444444";
@@ -40,6 +40,36 @@ describe("SQLite trial trace classification", () => {
     expect(classifySqliteInvocation(frame({ outcome: "canceled", entrypoint: "SqlitePublicationService", event: { scheduledTime: 1 } }))).toBe("failed");
     const serialized = frame({ outcome: "canceled", entrypoint: "SqlitePublicationService", durableObjectId: "private", event: { scheduledTime: "2026-10-16T11:22:02.000Z" } });
     expect(serialized.kind).toBe("do-alarm"); expect(classifySqliteInvocation(serialized)).toBe("reconcile");
+  });
+  test("redacted status GET requires an exact request header and completed native reconciliation", () => {
+    const row = frame({ outcome: "canceled", event: { request: { url: "https://trial.invalid/admin/sqlite-publication/jobs/[REDACTED]?secret=private", method: "GET",
+      headers: { "X-Castloop-Status-Request": requestId, Authorization: "private" } }, response: { status: 200 } } });
+    expect(row.path).toBeUndefined(); expect(row.status_read_redacted).toBe(true); expect(row.status_request_id).toBe(requestId);
+    expect(sqliteStatusReadRequestId(row)).toBe(requestId); expect(JSON.stringify(row)).not.toContain("private");
+    expect(classifySqliteInvocation(row)).toBe("reconcile");
+    const guard = new SqliteObservationGuard(); guard.record(row); guard.assertHealthy();
+    expect(() => guard.assertCanMutate()).toThrow("reconciliation");
+    expect(() => guard.reconcile([row], runtime, health, [])).toThrow();
+    expect(() => guard.reconcile([row], runtime, health, [{ expected: { ...expected, request_id: probeId }, observed: status }])).toThrow();
+    expect(() => guard.reconcile([row], runtime, health, [{ expected, observed: { ...status, state: "running" } }])).toThrow();
+    guard.reconcile([row], runtime, health, [{ expected, observed: status }]); guard.assertCanMutate();
+  });
+  test("known canceled status reads before response headers remain blocked until reconciliation", () => {
+    const row = frame({ outcome: "canceled", event: { request: { url: `https://trial.invalid/admin/sqlite-publication/jobs/${requestId}`, method: "GET",
+      headers: { "X-Castloop-Status-Request": requestId } } } });
+    expect(row.status).toBeUndefined(); expect(classifySqliteInvocation(row)).toBe("reconcile");
+    const guard = new SqliteObservationGuard(); guard.record(row); expect(() => guard.assertCanMutate()).toThrow();
+    guard.reconcile([row], runtime, health, [{ expected, observed: status }]); guard.assertCanMutate();
+  });
+  test("redaction is not permission to adopt an unknown read, mismatched ID or canceled mutation", () => {
+    for (const [path, method, headers] of [
+      ["[REDACTED]", "GET", {}], ["[REDACTED]", "GET", { "X-Castloop-Status-Request": "private" }],
+      [requestId, "GET", { "X-Castloop-Status-Request": jobId }], ["not-a-request", "GET", { "X-Castloop-Status-Request": requestId }],
+      ["[REDACTED]", "POST", { "X-Castloop-Status-Request": requestId }],
+    ] as Array<[string, string, Record<string, string>]>) {
+      const row = frame({ outcome: "canceled", event: { request: { url: `https://trial.invalid/admin/sqlite-publication/jobs/${path}`, method, headers }, response: { status: 200 } } });
+      expect(classifySqliteInvocation(row)).toBe("failed");
+    }
   });
   test("canceled mutation/other read, truncated frame, exceptions and unrecognized logs stop safely", () => {
     const base = { outcome: "canceled" };
