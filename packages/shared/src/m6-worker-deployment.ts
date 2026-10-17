@@ -1,6 +1,6 @@
-import { migrationBootstrapRequestSchema, migrationCandidateUploadSchema, m6WorkerDeploymentEvidenceSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema, workerSettingsSnapshotSchema,
+import { m6WorkerDeploymentEvidenceSchema, serviceConfigSchema, workerDeploymentsSnapshotSchema, workerSettingsSnapshotSchema,
   workerSubdomainSnapshotSchema, workerVersionSnapshotSchema } from "./index";
-import type { MigrationCandidateUpload, M6WorkerDeploymentEvidence, ServiceConfig, WorkerSettingsSnapshot } from "./index";
+import type { M6WorkerDeploymentEvidence, ServiceConfig, WorkerSettingsSnapshot } from "./index";
 import { z } from "zod";
 
 export const M6_WORKER_COMPATIBILITY_DATE = "2026-10-01";
@@ -198,40 +198,4 @@ export async function inspectM6WorkerDeployment(input: ServiceConfig, expectedVe
     traffic_percentage: 100, default_cache_disabled: true, cached_entrypoint: "CachedPublicAssets", cached_entrypoint_enabled: true,
     cross_version_cache_disabled: true, version_metadata_binding_verified: true, service_bindings_verified: true,
     observability_enabled: true, workers_dev_previews_disabled: true });
-}
-
-export function requireMigrationBridgeSettings(input: unknown, config: ServiceConfig): WorkerSettingsSnapshot {
-  const settings = workerSettingsSnapshotSchema.parse(input);
-  verifyBindings(settings.bindings, config);
-  if (!settings.exports || Object.keys(settings.exports).length !== 1 || settings.exports.default?.cache.enabled !== false ||
-    settings.cache_options?.enabled !== true || settings.cache_options.cross_version_cache === undefined) {
-    throw new Error("Migration deploy requires explicit uncached bridge settings, not a legacy or M6 candidate Worker");
-  }
-  compatibilityDate(settings.compatibility_date ?? "", M6_WORKER_COMPATIBILITY_DATE);
-  if (!settings.compatibility_flags?.includes("enable_ctx_exports") || settings.compatibility_flags.includes("disable_ctx_exports") ||
-    settings.observability?.enabled !== true || settings.observability.logs?.enabled !== true || settings.observability.traces?.enabled !== true) {
-    throw new Error("Migration bridge compatibility/telemetry does not match this build");
-  }
-  return settings;
-}
-
-export function requireMigrationBridgeVersion(input: unknown, config: ServiceConfig, expectedVersionId: string): void {
-  const version = workerVersionSnapshotSchema.parse(input);
-  verifyBindings(version.resources.bindings, config);
-  const runtime = version.resources.script_runtime;
-  compatibilityDate(runtime.compatibility_date, M6_WORKER_COMPATIBILITY_DATE);
-  if (version.id !== expectedVersionId || Object.keys(runtime.exports).length !== 1 || runtime.exports.default?.cache.enabled !== false ||
-    !runtime.compatibility_flags.includes("enable_ctx_exports") || runtime.compatibility_flags.includes("disable_ctx_exports") ||
-    !version.resources.script.handlers.includes("fetch") || !version.resources.script.handlers.includes("queue") ||
-    version.resources.script.named_handlers.length) throw new Error("Executing bridge version does not match its expected runtime profile");
-}
-
-export function buildMigrationCandidateUpload(config: ServiceConfig, previousInput: unknown, bootstrapId: string,
-  bridgeVersionId: string): MigrationCandidateUpload {
-  migrationBootstrapRequestSchema.shape.bootstrap_id.parse(bootstrapId);
-  migrationBootstrapRequestSchema.shape.bridge_worker_version_id.parse(bridgeVersionId);
-  const previous = requireMigrationBridgeSettings(previousInput, config);
-  const metadata = buildM6WorkerUploadMetadata(config, previous, "");
-  return migrationCandidateUploadSchema.parse({ ...metadata, annotations: { "workers/tag": bootstrapId },
-    bindings: metadata.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: bridgeVersionId } : binding) });
 }

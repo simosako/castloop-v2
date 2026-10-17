@@ -59,42 +59,21 @@ export { domainConnectionReceiptSchema, m6RuntimeTargetSchema, m6RuntimeReadines
   serviceUrlChangeProgressSchema, serviceUrlChangeRequestSchema } from "./service-admission";
 export type { M6RuntimeTarget, M6RuntimeReadiness, M6ServiceReadiness, M6ServiceUpdateRequest, ServiceAdmission, ServiceInvocationKind, ServiceMigrationRequest,
   ServiceUrlChangeProgress, ServiceUrlChangeRequest } from "./service-admission";
-export { frozenMigrationPlanSchema, migrationApplyProgressSchema, migrationRuntimeProofSchema } from "./migration-plan";
-export type { FrozenMigrationPlan, MigrationApplyProgress, MigrationRuntimeProof } from "./migration-plan";
 export { serviceCapabilitiesSchema } from "./service-capabilities";
 export type { ServiceCapabilities } from "./service-capabilities";
 export { cachedDeliveryRuntimeSchema } from "./delivery-runtime";
 export type { CachedDeliveryRuntime } from "./delivery-runtime";
 export { workerSettingsSnapshotSchema, workerDeploymentsSnapshotSchema, workerVersionSnapshotSchema, workerSubdomainSnapshotSchema,
   workerScriptUploadReceiptSchema, workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema, m6WorkerDeploymentEvidenceSchema } from "./worker-deployment";
-export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence } from "./worker-deployment";
-export { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, collectM6DeploymentSnapshot,
-  m6DeploymentSnapshotSchema, m6SnapshotReads, M6_WORKER_COMPATIBILITY_DATE, M6_FRESH_WORKER_COMPATIBILITY_DATE,
-  requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
+export type { WorkerSettingsSnapshot, M6WorkerDeploymentEvidence, WorkerVersionUploadReceipt } from "./worker-deployment";
+export { buildM6WorkerUploadMetadata, inspectM6WorkerDeployment, collectM6DeploymentSnapshot,
+  m6DeploymentSnapshotSchema, m6SnapshotReads, M6_WORKER_COMPATIBILITY_DATE, M6_FRESH_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
 export type { M6DeploymentReads, M6DeploymentSnapshot, M6WorkerUploadMetadata } from "./m6-worker-deployment";
 export { m6SetupRecordKey, m6SetupRequestSchema, m6SetupRecordSchema, m6SetupQueueProbeSchema, m6SetupProbeSchema, m6SetupStatusSchema,
   m6SetupCompleteSchema, m6SetupCompletedSchema, m6SetupHealthSchema, m6UpdateBeginSchema, m6UpdateAdmittedSchema } from "./m6-setup";
 export type { M6SetupRequest, M6SetupRecord, M6SetupProbe } from "./m6-setup";
-export type { WorkerVersionUploadReceipt } from "./worker-deployment";
 export { m6ServiceAdminRequestSchema, m6ServiceAdminResponseSchema } from "./m6-service-admin";
 export type { M6ServiceAdminRequest, M6ServiceAdminResponse } from "./m6-service-admin";
-export { migrationCandidateUploadSchema } from "./worker-deployment";
-export type { MigrationCandidateUpload } from "./worker-deployment";
-export { migrationBridgeUploadSchema, migrationBridgePreparationSchema } from "./worker-deployment";
-export type { MigrationBridgeUpload, MigrationBridgePreparation } from "./worker-deployment";
-export { legacyWorkerInspectionSchema } from "./worker-deployment";
-export type { LegacyWorkerInspection } from "./worker-deployment";
-export { migrationBridgeDeploymentRequestSchema, migrationBridgeDeploymentEvidenceSchema, migrationBridgeClientStateSchema } from "./worker-deployment";
-export type { MigrationBridgeDeploymentRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeClientState } from "./worker-deployment";
-export { migrationServiceIdentitySchema, migrationOperationIdentitySchema, migrationPauseRequestSchema,
-  migrationInitializationRequestSchema, migrationInitializationResultSchema, migrationActionResponseSchema } from "./migration-admin";
-export type { MigrationInitializationResult } from "./migration-admin";
-export { migrationSetupRequestSchema, migrationSetupClientStateSchema } from "./migration-setup";
-export type { MigrationSetupRequest, MigrationSetupClientState } from "./migration-setup";
-export { migrationQuiescenceSchema, migrationBootstrapRequestSchema, migrationDeploymentSettlementSchema, migrationBootstrapSchema } from "./migration-bootstrap";
-export type { MigrationQuiescence, MigrationBootstrapRequest, MigrationBootstrap } from "./migration-bootstrap";
-export { migrationAdminStatusSchema, migrationDeploymentClientStateSchema } from "./migration-bootstrap";
-export type { MigrationAdminStatus, MigrationDeploymentClientState } from "./migration-bootstrap";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);

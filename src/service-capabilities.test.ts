@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { serviceCapabilitiesSchema } from "../packages/shared/src/index";
-import worker from "./index";
+import { fetchM6Candidate } from "./m6-routes";
 import { acquireServiceInvocation, initializeServiceAdmission, pauseServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
-import { runLifecycleMigrationStep } from "./lifecycle-migration-apply";
 import { migrationFixture } from "./test-support/migration";
 
 describe("authenticated read-only service capabilities", () => {
@@ -38,7 +37,7 @@ describe("authenticated read-only service capabilities", () => {
     const migrating = await readServiceCapabilities(setup.env, "service");
     expect(migrating.admission.migration_id).toBe(setup.migrationId);
     expect(migrating.legacy_mutations_admitted).toBe(false);
-    for (let index = 0; index < 3; index += 1) await runLifecycleMigrationStep(setup.env, "service", setup.migrationId, setup.effects);
+    await setup.initializeM6Controls();
     const value = await readServiceCapabilities(setup.env, "service");
     expect(value.admission.mode).toBe("m6");
     expect(value.m6_ready).toBe(false);
@@ -49,18 +48,22 @@ describe("authenticated read-only service capabilities", () => {
 
   test("HTTP requires authentication, is no-store and fails closed on corrupt admission", async () => {
     const setup = await migrationFixture();
-    const env = { CASTLOOP_BUCKET: setup.bucket, CASTLOOP_ADMIN_KEY: "test-secret" } as never;
+    const loopback = Object.assign(() => ({ fetch: async () => new Response() }), {
+      invalidate: async () => {}, describeRuntime: async () => ({}),
+    });
+    const env = { CASTLOOP_BUCKET: setup.bucket, CASTLOOP_ADMIN_KEY: "test-secret", CASTLOOP_DLQ_NAME: "test-dlq",
+      CASTLOOP_VERSION_METADATA: { id: setup.runtime.worker_version_id, tag: "", timestamp: "2026-10-01T12:00:00Z" } } as never;
     const request = (secret?: string) => new Request<unknown, IncomingRequestCfProperties>("https://example.workers.dev/admin/capabilities",
       { headers: secret ? { "X-Castloop-Key": secret } : {} });
     const before = new Map(setup.entries);
-    expect((await worker.fetch(request(), env)).status).toBe(401);
-    const response = await worker.fetch(request("test-secret"), env);
+    expect((await fetchM6Candidate(request(), env, loopback)).status).toBe(401);
+    const response = await fetchM6Candidate(request("test-secret"), env, loopback);
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(serviceCapabilitiesSchema.parse(await response.json()).admission.state).toBe("migrating");
     expect(setup.entries).toEqual(before);
     await setup.bucket.put(SERVICE_ADMISSION_KEY, "{}");
-    const failed = await worker.fetch(request("test-secret"), env);
+    const failed = await fetchM6Candidate(request("test-secret"), env, loopback);
     expect(failed.status).toBe(503);
     expect(await failed.text()).not.toContain("test-secret");
   });

@@ -3,7 +3,6 @@ import { parseEpisodeLifecycle, parseEpisodeRevision, parseJobStatus, serviceCap
 import { commitOwnedLifecycleOperation } from "./lifecycle-commit";
 import { claimShowOperation, readShowControl } from "./lifecycle-control";
 import { describeCachedDeliveryRuntime } from "./lifecycle-delivery-gate";
-import { runLifecycleMigrationStep } from "./lifecycle-migration-apply";
 import { fetchM6Candidate, fetchM6ManagementIntegration, queueM6Candidate } from "./m6-routes";
 import type { M6CachedLoopback, M6CandidateEnv } from "./m6-routes";
 import { pauseServiceAdmission, readServiceAdmission, resumeServiceAdmission, SERVICE_ADMISSION_KEY } from "./service-admission";
@@ -19,7 +18,7 @@ const batch = (key: string, queue = "test-queue") => ({ queue, messages: [{ id: 
 
 async function fixture() {
   const setup = await migrationFixture();
-  for (let index = 0; index < 3; index += 1) await runLifecycleMigrationStep(setup.env, "service", setup.migrationId, setup.effects);
+  await setup.initializeM6Controls();
   await resumeServiceAdmission(setup.env, "service", setup.pauseId, setup.runtime.worker_version_id);
   const events: Array<{ method: string; props?: object; request?: Request }> = [];
   let status = 200;

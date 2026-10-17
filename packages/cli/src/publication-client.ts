@@ -68,10 +68,4 @@ export class PublicationAdminClient {
     if (value.result !== "requeued") throw new Error("Invalid publication retry result");
     return value;
   }
-
-  async release(publication: PublicationRequest): Promise<Result<"released">> {
-    const value = await this.call(publication, "release");
-    if (value.result !== "released") throw new Error("Invalid publication release result");
-    return value;
-  }
 }

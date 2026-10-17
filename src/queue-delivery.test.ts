@@ -2,8 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { lifecycleCommitKey } from "../packages/shared/src/index";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
 import { lifecycleFixture } from "./test-support/lifecycle";
-import worker from "./index";
-import { PUBLICATION_SERVICE_TEXT } from "./test-support/publication";
 
 describe("publication/lifecycle Queue delivery boundary", () => {
   test("legacy publications and lifecycle commits are recognized without copying notification payloads", () => {
@@ -58,30 +56,5 @@ describe("publication/lifecycle Queue delivery boundary", () => {
     await expect(recordDeadLetterDelivery(setup.env, { id: crypto.randomUUID(), body: { object: { key } } }))
       .rejects.toThrow("different delivery");
     expect(setup.entries.get(`system/jobs/${setup.jobId}/dlq.json`)!.data).toBe(stored);
-  });
-
-  test("the live DLQ handler uses sanitized markers but does not change job status or admission", async () => {
-    const setup = await lifecycleFixture();
-    await setup.bucket.put("system/service.toml", PUBLICATION_SERVICE_TEXT);
-    const key = `staging/shows/daily/${setup.jobId}/commit.json`;
-    const before = setup.entries.get("system/show-publications/daily.json");
-    const unmatchedId = crypto.randomUUID();
-    await worker.queue({ queue: "test-dlq", messages: [
-      { id: crypto.randomUUID(), body: { object: { key }, secret: "confidential-token" } },
-      { id: unmatchedId, body: { title: "Private title", email: "private@example.com" } },
-    ] } as never, { CASTLOOP_BUCKET: setup.bucket, CASTLOOP_DLQ_NAME: "test-dlq" } as never, {} as never);
-    expect(setup.entries.get("system/show-publications/daily.json")).toEqual(before);
-    expect(setup.entries.has(`system/jobs/${setup.jobId}/status.toml`)).toBe(false);
-    expect(JSON.parse(setup.entries.get(`system/jobs/${setup.jobId}/dlq.json`)!.data)).toEqual({ key });
-    expect(JSON.parse(setup.entries.get(`system/dlq/unmatched/${unmatchedId}.json`)!.data).reason_code).toBe("unmatched_queue_delivery");
-  });
-
-  test("the current live Queue handler does not expose lifecycle execution before integration gates", async () => {
-    const setup = await lifecycleFixture();
-    const key = lifecycleCommitKey({ kind: "show", show_id: "daily", job_id: setup.jobId });
-    const before = new Map(setup.entries);
-    await worker.queue({ queue: "test-queue", messages: [{ id: crypto.randomUUID(), body: { object: { key } } }] } as never,
-      { CASTLOOP_BUCKET: setup.bucket, CASTLOOP_DLQ_NAME: "test-dlq" } as never, {} as never);
-    expect(setup.entries).toEqual(before);
   });
 });

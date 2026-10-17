@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createM6UpdateJournal, readLocalM6Update, resumeM6UpdateActivation, resumeM6UpdateCompletion, resumeM6UpdateDeploymentVerification, runM6Update } from "./m6-service-update";
 import type { M6UpdateEffects } from "./m6-service-update";
-import { migrationPayloadHash } from "./migration-deployment";
+import { workerPayloadHash as migrationPayloadHash } from "./worker-upload-hash";
 import { beginM6ServiceUpdate, completeM6ServiceUpdate } from "../../../src/m6-service-update";
 import { readServiceAdmission } from "../../../src/service-admission";
 import { m6UpdateFixture } from "../../../src/test-support/m6-update";

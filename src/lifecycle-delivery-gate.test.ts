@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { cachedDeliveryRuntimeSchema, serviceAdmissionSchema } from "../packages/shared/src/index";
 import { createM6DeliveryGate, describeCachedDeliveryRuntime } from "./lifecycle-delivery-gate";
-import { runLifecycleMigrationStep } from "./lifecycle-migration-apply";
 import { acquireServiceInvocation, initializeServiceAdmission, readServiceAdmission, releaseServiceInvocation, resumeServiceAdmission,
   SERVICE_ADMISSION_KEY } from "./service-admission";
 import { migrationFixture } from "./test-support/migration";
@@ -12,7 +11,7 @@ import { createLifecycleWorkerEffects } from "./lifecycle-worker-effects";
 
 async function fixture() {
   const setup = await migrationFixture();
-  for (let index = 0; index < 3; index += 1) await runLifecycleMigrationStep(setup.env, "service", setup.migrationId, setup.effects);
+  await setup.initializeM6Controls();
   const invocation = await acquireServiceInvocation(setup.env, "service", "m6_consumer");
   const cached = describeCachedDeliveryRuntime({ id: setup.runtime.worker_version_id }, { purge: async () => ({ success: true, errors: [] }) });
   const bindings = { versionMetadata: { id: setup.runtime.worker_version_id }, gatewayProtocol: "m6-uncached-gateway-v1" as const,

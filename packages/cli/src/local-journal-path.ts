@@ -2,7 +2,7 @@ import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openS
 import { dirname, join } from "node:path";
 
 export type JournalFamily = "staging-uploads" | "publication-jobs" | "lifecycle-jobs" | "show-registrations" | "drafts" |
-  "bridge-deployments" | "migration-setups" | "migrations" | "service-initializations" | "service-updates" | "domain-changes" | "rss-import-downloads" | "rss-imports" |
+  "service-initializations" | "service-updates" | "domain-changes" | "rss-import-downloads" | "rss-imports" |
   "sqlite-drafts" | "sqlite-uploads" | "sqlite-publications" | "sqlite-initializations" | "sqlite-registrations" | "sqlite-controls" | "sqlite-lifecycle" | "sqlite-rss-imports" | "sqlite-service-updates";
 
 export function localJournalEntryExists(path: string): boolean {
@@ -18,8 +18,8 @@ export function syncLocalJournalDirectory(path: string): void {
 }
 
 export function ensureLocalJournalParents(root: string, family: JournalFamily, serviceId: string | undefined, create = false): void {
-  const flat = ["bridge-deployments", "migration-setups", "migrations", "service-initializations", "rss-import-downloads"].includes(family);
-  if (!["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts", "bridge-deployments", "migration-setups", "migrations", "service-initializations", "service-updates", "domain-changes", "rss-import-downloads", "rss-imports",
+  const flat = ["service-initializations", "rss-import-downloads"].includes(family);
+  if (!["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts", "service-initializations", "service-updates", "domain-changes", "rss-import-downloads", "rss-imports",
     "sqlite-drafts", "sqlite-uploads", "sqlite-publications", "sqlite-initializations", "sqlite-registrations", "sqlite-controls", "sqlite-lifecycle", "sqlite-rss-imports", "sqlite-service-updates"].includes(family) ||
     flat !== (serviceId === undefined) || serviceId !== undefined &&
     (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(serviceId) || serviceId.length > 20)) throw new Error("Invalid local journal directory identity");
