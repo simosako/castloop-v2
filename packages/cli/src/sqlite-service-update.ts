@@ -4,7 +4,7 @@ import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteUpdatePrepareSchema } from "../../shared/src/sqlite-runtime-update";
 import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
 import { administratorKey } from "./administrator-key";
-import { SqliteCloudflareApi } from "./sqlite-cloudflare";
+import { SqliteCloudflareApi, sqliteScriptUploadReceiptSchema } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import type { LocalJournalStorage } from "./local-journal-storage";
@@ -13,14 +13,25 @@ import { sha256HexSync as digest } from "./sha256";
 
 const receipt = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
 const evidence = receipt.extend({ namespace_id: z.string().regex(/^[a-f0-9]{32}$/) }).strict();
-const stateSchema = z.object({ protocol: z.literal("sqlite-sequential-v1"), request: sqliteUpdatePrepareSchema, previous: evidence,
-  phase: z.enum(["prepared", "prepare_requested", "maintenance", "deploy_requested", "deployed", "verified", "activation_requested", "ready"]),
-  receipt: receipt.optional() }).strict().superRefine((value, context) => {
-  if (["deployed", "verified", "activation_requested", "ready"].includes(value.phase) !== (value.receipt !== undefined) ||
+const stateSchema = z.object({ schema_version: z.literal(2).optional(), protocol: z.literal("sqlite-sequential-v1"), request: sqliteUpdatePrepareSchema, previous: evidence,
+  phase: z.enum(["prepared", "prepare_requested", "maintenance", "deploy_requested", "deploy_acknowledged", "deployed", "verified", "activation_requested", "ready"]),
+  upload_receipt: sqliteScriptUploadReceiptSchema.optional(), receipt: receipt.optional() }).strict().superRefine((value, context) => {
+  const deployed = ["deployed", "verified", "activation_requested", "ready"].includes(value.phase);
+  const acknowledged = value.phase === "deploy_acknowledged" || deployed;
+  if (deployed !== (value.receipt !== undefined) ||
+    (value.schema_version === 2 && acknowledged) !== (value.upload_receipt !== undefined) ||
+    value.phase === "deploy_acknowledged" && value.schema_version !== 2 ||
+    value.upload_receipt && value.receipt && value.upload_receipt.script_etag !== value.receipt.script_etag ||
     value.previous.worker_version_id !== value.request.worker_version_id || value.previous.namespace_id !== value.request.namespace_id ||
-    value.receipt?.worker_version_id === value.request.worker_version_id) context.addIssue({ code: "custom", message: "SQLite update phase and runtime evidence differ" });
+    value.receipt?.worker_version_id === value.request.worker_version_id || value.receipt?.deployment_id === value.previous.deployment_id) {
+    context.addIssue({ code: "custom", message: "SQLite update phase and runtime evidence differ" });
+  }
 });
 export type SqliteServiceUpdateState = z.infer<typeof stateSchema>;
+function updateSource(source: string, operationId: string, schemaVersion: 2 | undefined): string {
+  // Bind the content ETag to this operation even when the embedded code is unchanged.
+  return schemaVersion === 2 ? `${source}\n// castloop SQLite update operation: ${operationId}\n` : source;
+}
 type UpdateWait = { attempts: number; delay: () => Promise<void> };
 const defaultWait: UpdateWait = { attempts: 120, delay: () => Bun.sleep(1000) };
 const local = (root: string, config: SqliteServiceConfig, id: string) => {
@@ -36,24 +47,26 @@ export async function updateSqliteService(root: string, config: SqliteServiceCon
   if (!source || !Number.isSafeInteger(wait.attempts) || wait.attempts < 1 || wait.attempts > 120) throw new Error("Invalid SQLite update source or observation limit");
   const key = administratorKey(root), api = new SqliteCloudflareApi(config, options), client = new SqliteServiceClient(config, key, options.transport);
   const journal = local(root, config, operationId), retained = readSqliteServiceUpdate(root, config, operationId);
+  const deploymentSource = updateSource(source, operationId, retained ? retained.schema_version : 2), sourceHash = digest(deploymentSource);
   const configHash = await sqliteServiceConfigHash(config), metadataHash = digest(JSON.stringify(buildSqliteWorkerMetadata(config, key)));
   if (retained && (retained.request.service_id !== config.service_id || retained.request.service_config_sha256 !== configHash ||
-    retained.request.worker_source_sha256 !== digest(source) || retained.request.worker_metadata_sha256 !== metadataHash)) throw new Error("SQLite update differs from its frozen source/configuration");
+    retained.request.worker_source_sha256 !== sourceHash || retained.request.worker_metadata_sha256 !== metadataHash)) throw new Error("SQLite update differs from its frozen source/configuration");
   if (!retained) {
     const health = await client.health();
     if (!health.publication_ready || health.state !== "paused" || !health.drained) throw new Error("Explicitly pause and drain the ready SQLite service before deployment");
     const previous = await api.current();
     if (previous.worker_version_id !== health.worker_version_id) throw new Error("SQLite REST and DO versions differ");
-    journal.initialize(stateSchema.parse({ protocol: "sqlite-sequential-v1", phase: "prepared", previous, request: {
+    journal.initialize(stateSchema.parse({ schema_version: 2, protocol: "sqlite-sequential-v1", phase: "prepared", previous, request: {
       service_id: config.service_id, service_config_sha256: configHash, worker_version_id: previous.worker_version_id,
-      operation_id: operationId, worker_source_sha256: digest(source), worker_metadata_sha256: metadataHash, namespace_id: previous.namespace_id } }));
+      operation_id: operationId, worker_source_sha256: sourceHash, worker_metadata_sha256: metadataHash, namespace_id: previous.namespace_id } }));
   }
   return journal.exclusively(async () => {
     let state = stateSchema.parse(journal.read());
-    if (state.request.operation_id !== operationId || state.request.service_config_sha256 !== configHash || state.request.worker_source_sha256 !== digest(source) ||
+    if (state.request.operation_id !== operationId || state.request.service_id !== config.service_id || state.request.service_config_sha256 !== configHash ||
+      state.request.worker_source_sha256 !== sourceHash || digest(updateSource(source, operationId, state.schema_version)) !== sourceHash ||
       state.request.worker_metadata_sha256 !== metadataHash) throw new Error("SQLite update journal changed concurrently");
     if (state.phase === "ready") return state;
-    if (state.phase !== "prepared") throw new Error("SQLite update already started; preserve unknown outcomes and use read-only update-service-reconcile only for completed matching setup");
+    if (state.phase !== "prepared") throw new Error("SQLite update already started; use update-service-verify only for acknowledged unactivated deployments, or read-only update-service-reconcile for completed matching setup; never replay unknown outcomes");
     if ((await api.inspect(state.previous)).namespace_id !== state.previous.namespace_id) throw new Error("SQLite previous deployment changed");
     const save = (phase: SqliteServiceUpdateState["phase"], fields: Partial<SqliteServiceUpdateState> = {}) => {
       state = stateSchema.parse({ ...state, ...fields, phase }); journal.replace(state);
@@ -63,11 +76,24 @@ export async function updateSqliteService(root: string, config: SqliteServiceCon
     if (preparation.update.state !== "prepared" || preparation.worker_version_id !== state.request.worker_version_id) throw new Error("SQLite maintenance preparation was not verified");
     save("maintenance");
     await api.inspect(state.previous);
-    save("deploy_requested"); const receipt = await api.deploy(source, key); save("deployed", { receipt });
-    if ((await api.inspect(receipt)).namespace_id !== state.request.namespace_id) throw new Error("SQLite update changed its namespace; do not activate it");
-    save("verified");
-    return activateVerifiedUpdate(journal, state, client, api, wait);
+    save("deploy_requested");
+    if (state.schema_version === 2) save("deploy_acknowledged", { upload_receipt: await api.uploadWorker(deploymentSource, key) });
+    else save("deployed", { receipt: await api.deploy(deploymentSource, key) });
+    return verifyAndActivateUpdate(journal, state, client, api, wait);
   });
+}
+
+async function verifyAndActivateUpdate(journal: LocalJournalStorage, initial: SqliteServiceUpdateState, client: SqliteServiceClient,
+  api: SqliteCloudflareApi, wait: UpdateWait): Promise<SqliteServiceUpdateState> {
+  let state = initial;
+  if (state.phase === "deploy_acknowledged" && state.upload_receipt) {
+    const receipt = await api.deploymentReceipt(state.upload_receipt);
+    state = stateSchema.parse({ ...state, phase: "deployed", receipt }); journal.replace(state);
+  }
+  if (!["deployed", "verified"].includes(state.phase) || !state.receipt) throw new Error("SQLite verification requires acknowledged deployment evidence");
+  if ((await api.inspect(state.receipt)).namespace_id !== state.request.namespace_id) throw new Error("SQLite update changed its namespace; do not activate it");
+  state = stateSchema.parse({ ...state, phase: "verified" }); journal.replace(state);
+  return activateVerifiedUpdate(journal, state, client, api, wait);
 }
 
 async function activateVerifiedUpdate(journal: LocalJournalStorage, initial: SqliteServiceUpdateState, client: SqliteServiceClient,
@@ -111,14 +137,14 @@ export async function continueSqliteServiceUpdateVerification(root: string, conf
   const journal = local(root, config, operationId), key = administratorKey(root);
   return journal.exclusively(async () => {
     const state = stateSchema.parse(journal.read());
-    if (state.phase !== "verified" || !state.receipt || state.request.operation_id !== operationId || state.request.service_id !== config.service_id ||
-      state.request.service_config_sha256 !== await sqliteServiceConfigHash(config) || state.request.worker_source_sha256 !== digest(source) ||
+    if (!["deploy_acknowledged", "deployed", "verified"].includes(state.phase) || state.request.operation_id !== operationId || state.request.service_id !== config.service_id ||
+      state.request.service_config_sha256 !== await sqliteServiceConfigHash(config) ||
+      state.request.worker_source_sha256 !== digest(updateSource(source, operationId, state.schema_version)) ||
       state.request.worker_metadata_sha256 !== digest(JSON.stringify(buildSqliteWorkerMetadata(config, key)))) {
-      throw new Error("SQLite update verification continuation requires its exact verified source/configuration and no prior activation request");
+      throw new Error("SQLite update verification continuation requires exact verified or acknowledged deployment evidence, frozen source/configuration and no prior activation request");
     }
     const api = new SqliteCloudflareApi(config, options);
-    if ((await api.inspect(state.receipt)).namespace_id !== state.request.namespace_id) throw new Error("Verified SQLite deployment namespace changed");
-    return activateVerifiedUpdate(journal, state, new SqliteServiceClient(config, key, options.transport), api, wait);
+    return verifyAndActivateUpdate(journal, state, new SqliteServiceClient(config, key, options.transport), api, wait);
   });
 }
 

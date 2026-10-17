@@ -7,6 +7,8 @@ import { putVerifiedR2Object, requireR2RestOptions } from "./verified-r2-put";
 import type { R2RestOptions } from "./verified-r2-put";
 
 const uuid = z.uuid(), hash = z.string().min(1).max(256);
+export const sqliteScriptUploadReceiptSchema = z.object({ script_etag: hash }).strict();
+export type SqliteScriptUploadReceipt = z.infer<typeof sqliteScriptUploadReceiptSchema>;
 const evidenceSchema = z.object({ worker_version_id: uuid, deployment_id: uuid, namespace_id: z.string().regex(/^[a-f0-9]{32}$/), script_etag: hash }).strict();
 export type SqliteDeploymentEvidence = z.infer<typeof evidenceSchema>;
 const record = z.record(z.string(), z.unknown());
@@ -71,12 +73,25 @@ export class SqliteCloudflareApi {
     if (worker.name !== this.config.worker_name) throw new Error("Created Worker differs");
   }
   async deploy(source: string, adminKey: string): Promise<{ script_etag: string; worker_version_id: string; deployment_id: string }> {
+    const receipt = await this.uploadWorker(source, adminKey);
+    const deployment = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`));
+    return { ...receipt, worker_version_id: deployment.versions[0].version_id, deployment_id: deployment.id };
+  }
+  async uploadWorker(source: string, adminKey: string): Promise<SqliteScriptUploadReceipt> {
     if (!source) throw new Error("SQLite Worker source is missing");
     const form = new FormData(); form.set("metadata", JSON.stringify(buildSqliteWorkerMetadata(this.config, adminKey)));
     form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
     const receipt = z.object({ etag: hash }).parse(await this.call("PUT", `${this.path()}?bindings_inherit=strict`, form));
+    return { script_etag: receipt.etag };
+  }
+  async deploymentReceipt(input: SqliteScriptUploadReceipt): Promise<{ script_etag: string; worker_version_id: string; deployment_id: string }> {
+    const receipt = sqliteScriptUploadReceiptSchema.parse(input);
     const deployment = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`));
-    return { script_etag: receipt.etag, worker_version_id: deployment.versions[0].version_id, deployment_id: deployment.id };
+    const versionId = deployment.versions[0].version_id;
+    const version = z.object({ id: uuid, resources: z.object({ script: z.object({ etag: hash }) }) }).parse(
+      await this.json("GET", `${this.path()}/versions/${encodeURIComponent(versionId)}`));
+    if (version.id !== versionId || version.resources.script.etag !== receipt.script_etag) throw new Error("SQLite deployment does not match its acknowledged script upload");
+    return { ...receipt, worker_version_id: versionId, deployment_id: deployment.id };
   }
   private singleDeployment(input: unknown, versionId?: string) {
     const deployment = deploymentSchema.parse(input).deployments[0];
