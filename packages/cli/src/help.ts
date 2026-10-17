@@ -117,7 +117,8 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "update-service-verify": {
     usage: "update-service-verify OPERATION_UUID",
     description: "Continue verification of an acknowledged deployment using its retained journal. Never re-upload an unknown deployment.\n" +
-      "SQLite: only an exact verified journal with unchanged source/configuration and no prior activation request.\n" +
+      "SQLite: deploy_acknowledged/deployed/verified only, with unchanged frozen source/configuration and no prior activation request.\n" +
+      "Rechecks the acknowledged script ETag, pinned deployment and namespace; never adopts an unacknowledged PUT.\n" +
       "Waits for the recorded native version, then requests its first activation/probe and finishes paused. Unknown activation remains blocked.",
   },
   "update-service-reconcile": {

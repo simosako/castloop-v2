@@ -133,6 +133,8 @@ castloop service-resume NEW_WINDOW_UUID
 
 An already paused service does not need a second pause request. Update verifies the exact deployed version and new Alarm/R2/cache/purge readiness and finishes paused. It does not convert schemas, change domains/configuration, force-release blocked jobs, or replay unknown deployments. See [update/recovery details](docs/sqlite_sequential_development.md#互換worker更新).
 
+**Unreleased recovery fix:** `castloop update-service-verify UPDATE_UUID` also continues REST verification from an acknowledged PUT or a pinned deployment after a GET failure, not only from `verified`. It requires the exact frozen inputs and rechecks the acknowledged ETag, deployment/version, namespace and server maintenance request before the first activation/probe. It never repeats PUT/preparation or a previously requested activation. Older receipt-free `deploy_requested` journals remain blocked; see the [recovery contract](design/sqlite_worker_update_recovery.md).
+
 ## Errors and recovery
 
 - Preserve `.castloop/`, frozen requests and uploads. Inspect the same `job-status` and `service-status`; never replace unknown jobs or remove locks because time elapsed.

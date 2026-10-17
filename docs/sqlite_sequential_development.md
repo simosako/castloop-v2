@@ -104,14 +104,22 @@ castloop update-service-reconcile UPDATE_UUID
 
 RESTの配備成功直後でも、DOがしばらく旧versionで応答する場合がある。
 CLIは一致するprepared状態の旧versionだけを有限回GETで観測し、記録済み新versionになるまでactivationしない。
-この待機だけで停止し、journalが`verified`（配備応答・REST照合済み、activation未要求）の場合に限り、次で続けられる。
+未リリースのCLI修正では、この待機や配備成功後のREST GET失敗で停止した場合、次で検証を続けられる。
 
 ```sh
 castloop update-service-verify UPDATE_UUID
 ```
 
-これは読み取り専用ではない。凍結source/config/metadataと既知receipt/namespaceを再照合し、新native versionで**初回activation/probeだけ**を行う。
-配備・準備・R2 uploadは繰り返さない。`activation_requested`や未知prepare/deployには使えず、完了後はpausedのまま。
+対象は`deploy_acknowledged`（PUT成功応答を保存済み）、`deployed`（配備ID/versionも保存済み）、`verified`（REST照合済み）のみ。
+これは読み取り専用ではない。凍結source/config/metadata、成功応答のETag、単一100%配備、version、namespace、正確なサーバー側prepared状態を再照合し、新native versionで**初回activation/probeだけ**を行う。
+配備・準備・R2 uploadは繰り返さない。検証のGETが再び失敗してもcheckpointを保持する。
+`prepare_requested`/`deploy_requested`の未知応答や`activation_requested`には使えず、完了後はpausedのまま。
+
+新規のSQLite更新journalはformat `schema_version=2`で、PUT成功を最初のGETより前に永続保存する。更新固有のコメントを送信sourceへ加え、そのsource hashと応答ETagを束縛する。
+同じ組み込みcodeの別更新でもETagを区別するためで、Workerの動作・service config・metadataの変更ではない。
+旧SQLite journalの`deployed`/`verified`は元のsource hash/receiptのまま検証できるが、receiptのない旧`deploy_requested`を推測で昇格しない。
+このjournal format、serviceのschema version 2、旧Queue更新journalのversion 2は別の概念であり、Queue/R2の旧upload-only journalを復旧する修正ではない。
+設計・互換性・検証範囲は[SQLite更新復帰の契約](../design/sqlite_worker_update_recovery.md)を参照。v0.5.1配布済みCLIの続行対象は`verified`だけ。
 
 ## ローカルRSS取り込みの公開
 

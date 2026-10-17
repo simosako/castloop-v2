@@ -12,6 +12,7 @@ import { sqlitePublicationBucket } from "../../../../src/test-support/sqlite-pub
 import { SqlitePublicationQueue } from "../../../../src/sqlite-publication-queue";
 import { selectSqliteRuntime } from "../../../../src/sqlite-runtime-update";
 import { administratorKey } from "../administrator-key";
+import { sha256HexSync } from "../sha256";
 import type { R2RestTransport } from "../verified-r2-put";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -102,8 +103,9 @@ export async function sqliteServiceFixture() {
       if (!workerCreated) throw new Error("Worker must be created first");
       const updating = metadata !== null;
       const form = await request.formData(); metadata = JSON.parse(String(form.get("metadata")));
+      etag = sha256HexSync(await (form.get("index.js") as File).text());
       if (updating) {
-        actual = { ...actual, worker_version_id: crypto.randomUUID() }; deploymentId = crypto.randomUUID(); etag = crypto.randomUUID(); runtime = boot();
+        actual = { ...actual, worker_version_id: crypto.randomUUID() }; deploymentId = crypto.randomUUID(); runtime = boot();
         faults.afterDeploy?.();
       }
       lost("deploy"); return json({ etag });

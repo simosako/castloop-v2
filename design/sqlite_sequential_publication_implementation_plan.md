@@ -309,10 +309,10 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 
 1. CLIは明示的にpaused/drained/readyであることと、現在のREST version/ETag/namespaceを照合する。source/metadata hash、旧version、operation IDをlocal journalへ凍結する。
 2. 旧DOへ更新準備を一度だけ登録する。SQLiteに要求を保存し、resume・登録・新規公開・配信を閉じる。旧queued/running/blockedがある場合は準備しない。
-3. CLIが同じWorkerへ一度だけPUT配備する。成功receipt後に単一100%配備・binding/cache/namespace・version ETagを照合する。unknown PUTは再送せず、記録を保持する。
+3. CLIが同じWorkerへ一度だけPUT配備する。成功応答のETagを最初のGETより前に保存し、単一100%配備のID/versionを特定して固定する。その後にbinding/cache/namespace・version ETagを照合する。新規更新ではoperation固有のsourceコメントと送信source hashで同一codeの別更新を区別する。unknown PUTは再送せず、記録を保持する。
 4. 新DO constructorは、同configで正確な更新準備が残る場合だけ旧runtimeをmaintenance用に開く。公開可能へ昇格しない。実際の新versionとREST証拠を照合済みの認証要求により、paused/drainedのままruntime変更と新Alarm予約をtransactionへ保存する。
 5. 新versionのAlarmでR2設定・cache owner/purgeを再検証する。成功してから更新を完了し、pausedを維持する。resumeには新しいwindow UUIDを要求する。
-6. 準備/配備/activationの応答不明は再送しない。read-only reconcileは、保存済みreceiptと同じsetupの完了を確認するだけ。未知versionの採用や旧I/Oの強制解放はしない。
+6. 準備/配備/activationの応答不明は再送しない。PUT成功応答または既知配備の証拠があり、activation未要求の場合だけ、`update-service-verify`で読取検証と初回activationを明示続行できる。read-only reconcileは、保存済みreceiptと同じsetupの完了を確認するだけ。未知versionの採用や旧I/Oの強制解放はしない。[検証続行の契約](sqlite_worker_update_recovery.md)にphaseと旧journalの制限を定める。
 
 本節はローカル実装用の契約であり、Cloudflareへの実配備・資源変更の許可ではない。
 
