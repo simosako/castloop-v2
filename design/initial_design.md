@@ -98,6 +98,14 @@ service ID・account ID・bucket名・workers.devのaccount subdomainから`cast
 
 配備したWorker version・cache設定・公開／管理API・Queue probeから稼働を検証し、**pausedで完了**する。設定値だけで完了にしない。再開には`service-status`の`admission.pause_id`を使う。開始済み・応答不明の`init`は再送せず、journalを保持する。[初期化設計](./m6_fresh_initialization.md)参照。
 
+### ローカルサービス設定の読み取り（次回更新向け・両方式共通）
+
+正式CLIの`castloop.toml`読み取りは既存の`readLocalMetadata`を再利用する。`O_NOFOLLOW`／`O_NONBLOCK`で開き、通常ファイルかつ1〜16,384 bytesに制限し、上限を超えて増大した読み取りも中断する。同じdescriptorの読み取り前後のサイズ・mtime・ctimeと実際の読取量を照合し、不一致は拒否して必ずdescriptorを閉じる。不正UTF-8を置換せず拒否してからTOML解析と既存のstrictスキーマ判定を行う。
+
+同期の無制限読み取りは廃止し、呼出元も完了をawaitする。schema version 1／2の振り分け、未知schemaの拒否、既存操作の再送禁止は変えない。設定の読み取り失敗時は管理API呼び出しやjournal・管理鍵の作成へ進まない。大きすぎるコメント付き設定や設定ファイル自体のsymlinkも非対応となるため、通常ファイルへ戻して上限内で管理する。設定内容の自動書き換えはしない。
+
+これは最終パス要素のsymlink拒否とdescriptor内の安定性検査であり、親ディレクトリ全体のsymlink排除、hard linkの拒否、検査後の変更禁止や操作全体のロックを保証するものではない。今回の開発・検証はローカルのみで、Cloudflareへの配備・実機操作を含まない。
+
 ### Show作成
 
 ```sh

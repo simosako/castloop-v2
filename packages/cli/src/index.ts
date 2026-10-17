@@ -64,8 +64,8 @@ async function workerSource(): Promise<string> {
   return result.outputs[0]!.text();
 }
 
-function loadConfig(root: string): ServiceConfig {
-  const config = loadWorkspaceConfig(root);
+async function loadConfig(root: string): Promise<ServiceConfig> {
+  const config = await loadWorkspaceConfig(root);
   if (config.schema_version !== 1) throw new Error("This command is not implemented for sqlite-sequential-v1; no legacy fallback");
   return config;
 }
@@ -97,7 +97,7 @@ async function initSqlite(target: string, flags: Record<string, string>): Promis
     writeSyncedLocalFile(file, () => stringifyToml(config));
     syncLocalJournalDirectory(root);
   } else if (Object.keys(flags).some((name) => !["operation-id", "publication-protocol"].includes(name))) throw new Error("Do not change retained initialization inputs");
-  const config = loadWorkspaceConfig(root);
+  const config = await loadWorkspaceConfig(root);
   if (config.schema_version !== 2) throw new Error("Existing service config is not converted to sqlite-sequential-v1");
   const { runSqliteCommand } = await import("./sqlite-commands");
   return runSqliteCommand(root, config, "init", flags["operation-id"] ? [flags["operation-id"]] : [], { workerSource: sqliteWorkerSource });
@@ -126,7 +126,7 @@ async function init(target: string, flags: Record<string, string>): Promise<unkn
   } else if (Object.keys(flags).some((name) => name !== "operation-id")) {
     throw new Error("Workspace configuration already exists; do not change its initialization inputs");
   }
-  const config = loadConfig(root);
+  const config = await loadConfig(root);
   if (process.env.CLOUDFLARE_ACCOUNT_ID !== config.account_id || !process.env.CLOUDFLARE_API_TOKEN) {
     throw new Error("Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for this service before provisioning");
   }
@@ -157,7 +157,7 @@ async function main(): Promise<unknown> {
     allowedFlags(flags, []);
     if (positional.length !== 1) throw new Error(commandHelp(command));
     const root = process.cwd();
-    const config = loadWorkspaceConfig(root);
+    const config = await loadWorkspaceConfig(root);
     if (config.schema_version === 2) {
       const { publishSqliteRssImport } = await import("./sqlite-rss-publication");
       return publishSqliteRssImport(root, config, positional[0]!);
@@ -168,7 +168,7 @@ async function main(): Promise<unknown> {
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
     const root = resolve(positional[0] ?? ".");
-    if (flags["publication-protocol"] || existsSync(join(root, "castloop.toml")) && loadWorkspaceConfig(root).schema_version === 2) return initSqlite(root, flags);
+    if (flags["publication-protocol"] || existsSync(join(root, "castloop.toml")) && (await loadWorkspaceConfig(root)).schema_version === 2) return initSqlite(root, flags);
     return init(positional[0] ?? ".", flags);
   }
   if (command === "domain") {
@@ -176,7 +176,7 @@ async function main(): Promise<unknown> {
     const action = positional[0];
     if (!["add", "list", "remove"].includes(action ?? "") || positional.length !== (action === "add" ? 2 : 1) ||
       action === "list" && flags["operation-id"]) throw new Error(commandHelp(command));
-    return runDomainCommand(process.cwd(), loadConfig(process.cwd()), action as "add" | "list" | "remove", positional[1], flags["operation-id"]);
+    return runDomainCommand(process.cwd(), await loadConfig(process.cwd()), action as "add" | "list" | "remove", positional[1], flags["operation-id"]);
   }
   let root = process.cwd();
   if (command === "create-show") {
@@ -198,7 +198,7 @@ async function main(): Promise<unknown> {
     root = resolve(root, "..");
   }
   if (listing && positional.length !== M6_COMMAND_ARGUMENTS[command]) throw new Error(commandHelp(command));
-  const workspace = loadWorkspaceConfig(root);
+  const workspace = await loadWorkspaceConfig(root);
   if (workspace.schema_version === 2) {
     const { runSqliteCommand } = await import("./sqlite-commands");
     const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
@@ -216,11 +216,11 @@ async function main(): Promise<unknown> {
   if (Object.hasOwn(M6_COMMAND_ARGUMENTS, command)) {
     const count = command === "publish-episode" && positional.length === 2 ? 2 : M6_COMMAND_ARGUMENTS[command];
     if (positional.length !== count) throw new Error(listing ? commandHelp(command) : "Invalid command arguments; use --help");
-    const result = await runM6Command(root, loadConfig(root), command, positional, { workerSource,
+    const result = await runM6Command(root, await loadConfig(root), command, positional, { workerSource,
       ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
     return listing && !flags.json ? formatContentList(contentListResponseSchema.parse(result)) : result;
   }
-  const config = loadConfig(root);
+  const config = await loadConfig(root);
   if (command === "local-operation-status" && positional.length === 2) return readLocalOperationStatus(root, config, positional[0]!, positional[1]!);
   throw new Error("Invalid command arguments; use --help");
 }
