@@ -20,7 +20,7 @@ export class SqliteCloudflareApi {
   private readonly base: string;
   constructor(config: SqliteServiceConfig, private readonly options: R2RestOptions) {
     this.config = sqliteServiceConfigSchema.parse(config); requireR2RestOptions(this.config.account_id, options);
-    this.base = `https://api.cloudflare.com/client/v4/accounts/${this.config.account_id}`;
+    this.base = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.config.account_id)}`;
   }
   private async call(method: string, path: string, body?: BodyInit, contentType?: string, absent = false): Promise<unknown> {
     let response: Response;
@@ -45,10 +45,10 @@ export class SqliteCloudflareApi {
   private json(method: string, path: string, value?: object): Promise<unknown> {
     return this.call(method, path, value ? JSON.stringify(value) : undefined, value ? "application/json" : undefined);
   }
-  private path(): string { return `/workers/scripts/${this.config.worker_name}`; }
+  private path(): string { return `/workers/scripts/${encodeURIComponent(this.config.worker_name)}`; }
   async preflight(): Promise<void> {
     if (this.config.public_base_url !== this.config.workers_dev_base_url) throw new Error("Fresh SQLite initialization requires its workers.dev public origin");
-    const bucket = await this.call("GET", `/r2/buckets/${this.config.bucket_name}`, undefined, undefined, true);
+    const bucket = await this.call("GET", `/r2/buckets/${encodeURIComponent(this.config.bucket_name)}`, undefined, undefined, true);
     const worker = await this.call("GET", `${this.path()}/settings`, undefined, undefined, true);
     if (bucket !== null || worker !== null) throw new Error("Fresh SQLite initialization cannot adopt an existing or unknown bucket/Worker");
     const subdomain = z.object({ subdomain: z.string() }).parse(await this.json("GET", "/workers/subdomain"));
@@ -120,7 +120,7 @@ export class SqliteCloudflareApi {
     const settingsInput = settingsSchema.parse(await this.json("GET", `${this.path()}/settings`));
     const version = z.object({ id: uuid, resources: z.object({ bindings: z.array(record), script: z.object({ etag: hash }),
       script_runtime: settingsSchema.pick({ compatibility_date: true, compatibility_flags: true }).extend({ exports: record,
-        cache_options: settingsSchema.shape.cache_options.optional() }) }) }).parse(await this.json("GET", `${this.path()}/versions/${expected.worker_version_id}`));
+        cache_options: settingsSchema.shape.cache_options.optional() }) }) }).parse(await this.json("GET", `${this.path()}/versions/${encodeURIComponent(expected.worker_version_id)}`));
     const settings = this.checkSettings(settingsInput, version.resources.script_runtime.exports);
     if (version.id !== expected.worker_version_id || version.resources.script.etag !== expected.script_etag ||
       this.checkSettings({ ...settingsInput, ...version.resources.script_runtime, bindings: version.resources.bindings }, version.resources.script_runtime.exports).namespaceId !== settings.namespaceId) throw new Error("SQLite uploaded version differs");
@@ -142,7 +142,7 @@ export class SqliteCloudflareApi {
   async current(): Promise<SqliteDeploymentEvidence> {
     const deployment = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`));
     const versionId = deployment.versions[0].version_id;
-    const version = z.object({ id: uuid, resources: z.object({ script: z.object({ etag: hash }) }) }).parse(await this.json("GET", `${this.path()}/versions/${versionId}`));
+    const version = z.object({ id: uuid, resources: z.object({ script: z.object({ etag: hash }) }) }).parse(await this.json("GET", `${this.path()}/versions/${encodeURIComponent(versionId)}`));
     if (version.id !== versionId) throw new Error("SQLite current version differs");
     return this.inspect({ worker_version_id: versionId, deployment_id: deployment.id, script_etag: version.resources.script.etag });
   }

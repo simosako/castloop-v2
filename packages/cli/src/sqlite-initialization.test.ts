@@ -24,6 +24,9 @@ test("fresh initialization provisions only R2/Worker/SQLite, verifies native run
   expect(state.phase).toBe("ready"); expect(state.namespace_id).toBe("b".repeat(32));
   expect(value.runtime.health()).toMatchObject({ publication_ready: true, state: "paused", drained: true });
   expect(value.calls.some((call) => unrelatedResourcePath.test(call.path))).toBe(false);
+  expect(value.calls).toContainEqual({ method: "GET", path: `/r2/buckets/${value.config.bucket_name}` });
+  expect(value.calls).toContainEqual({ method: "PUT", path: `/workers/scripts/${value.config.worker_name}?bindings_inherit=strict` });
+  expect(value.calls).toContainEqual({ method: "GET", path: `/workers/scripts/${value.config.worker_name}/versions/${state.receipt!.worker_version_id}` });
   const metadata = value.metadata()!;
   expect(metadata.exports).toMatchObject({ default: { cache: { enabled: false } }, SqliteCachedAssets: { cache: { enabled: true } },
     SqlitePublicationService: { type: "durable-object", storage: "sqlite" } });

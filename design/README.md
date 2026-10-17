@@ -14,6 +14,7 @@
 | [互換更新](m6_compatible_updates.md) | pause・処理終了確認・配備・検証 |
 | [完了応答喪失の照合](m6_completion_recovery.md) | 確認済み完了の復旧条件と限界 |
 | [単一PUT・U1](m6_upload_recovery_options.md) | 採用方式と未検証の仮定 |
+| [REST URLの構築](rest_url_construction.md) | パス要素のエンコード、R2 keyの区切り保持と単一PUTの不変条件 |
 | [承認済み方針](m6_review_queue.md) | 記録保持・安全条件・開発範囲 |
 | [publication停止の診断とtoken保全](publication_execution_recovery.md) | Show/Episodeの停止経路・開始/終了ログ・DLQ根拠の解放の撤回・読み取り調査 |
 | [HTTP commitのCPU削減・責務分離](http_publication_commit_optimization_plan.md) | 承認済みのQueue検証集約、受付/失敗通知の契約、残る固定負担と実装後の測定 |

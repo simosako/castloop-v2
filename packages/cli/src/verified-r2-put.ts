@@ -68,7 +68,7 @@ export async function putVerifiedR2Object(config: { account_id: string; bucket_n
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 300000);
   const transport = options.transport ?? fetch;
-  const url = `https://api.cloudflare.com/client/v4/accounts/${config.account_id}/r2/buckets/${config.bucket_name}/objects/${target.key}`;
+  const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.account_id)}/r2/buckets/${encodeURIComponent(config.bucket_name)}/objects/${target.key.split("/").map(encodeURIComponent).join("/")}`;
   let response: Response | undefined;
   let phase: "put" | "put_receipt" | "source_completed" | "readback" | "readback_verify" = "put";
   try {
