@@ -1,18 +1,18 @@
-# Queue方式サービスの操作（schema_version=1、v0.5.0）
+# Queue方式サービスの操作（schema_version=1、v0.5.1）
 
 Serverless podcast hosting on Cloudflare: one private R2 bucket and one public Worker per service, multiple Shows, managed through a standalone CLI.
 
-This guide covers the retained Queue/R2 protocol, not the new SQLite protocol. v0.5.0 keeps existing schema-version-1 routing and adds asynchronous Queue/R2 management; it does not convert or adopt v0.1.x services. For SQLite initialization and commands, use the [project README](../README.md) and [SQLite guide](sqlite_sequential_development.md). Historical v0.4.0 behavior remains documented in the [v0.4.0 release](https://github.com/simosako/castloop-v2/tree/v0.4.0).
+This guide covers the retained Queue/R2 protocol, not the SQLite protocol. v0.5.1 keeps existing schema-version-1 routing and adds no protocol change; v0.5.0 introduced asynchronous Queue/R2 management and did not convert or adopt v0.1.x services. For SQLite initialization and commands, use the [project README](../README.md) and [SQLite guide](sqlite_sequential_development.md). Historical v0.4.0 behavior remains documented in the [v0.4.0 release](https://github.com/simosako/castloop-v2/tree/v0.4.0).
 
-**Known limitation:** this protocol does not inherit the SQLite trial's CPU/performance results. Earlier Queue-path measurements included an internal audio GET above the Workers Free 10ms target. Stable Free-tier operation and permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13) are not guaranteed. No paid-plan change is automatic. See the [v0.5.0 release notes](release-v0.5.0.md).
+**Known limitation:** this protocol does not inherit the SQLite trial's CPU/performance results. Earlier Queue-path measurements included an internal audio GET above the Workers Free 10ms target. Stable Free-tier operation and permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13) are not guaranteed. No paid-plan change is automatic. See the [v0.5.1 release notes](release-v0.5.1.md) and [v0.5.0 release notes](release-v0.5.0.md).
 
-**v0.5.0 Queue management:** [option C](../design/async_management_implementation.md) submits `stage-start`, waits for an authenticated R2 grant, uploads directly to private R2, then submits `upload-complete`. Explicit publication delegates claim/commit/publication to Queue; new job polling reads authenticated R2 results. Both the new CLI and a compatibly updated, verified Worker with `runtime_readiness.management_protocol: "queue-management-v1"` are required, along with Cloudflare credentials and Queues Edit. `publication-queued` / journal `async_queued` proves enqueue only; wait for `server_status.response.state: "published"` on `job-status`. Unknown submissions are never resent or sent through an HTTP fallback; async retry/release is not provided. Registration, target inspection, service controls, listings, lifecycle and deployment retain their HTTP paths. [Isolated live measurement](../design/async_management_measurement_20261015.md) completed seven publications, but did not establish a total-wall speedup or full Free readiness. Installing this release does not change resources or token permissions.
+**Queue management (added in v0.5.0):** [option C](../design/async_management_implementation.md) submits `stage-start`, waits for an authenticated R2 grant, uploads directly to private R2, then submits `upload-complete`. Explicit publication delegates claim/commit/publication to Queue; new job polling reads authenticated R2 results. Both the current CLI and a compatibly updated, verified Worker with `runtime_readiness.management_protocol: "queue-management-v1"` are required, along with Cloudflare credentials and Queues Edit. `publication-queued` / journal `async_queued` proves enqueue only; wait for `server_status.response.state: "published"` on `job-status`. Unknown submissions are never resent or sent through an HTTP fallback; async retry/release is not provided. Registration, target inspection, service controls, listings, lifecycle and deployment retain their HTTP paths. [Isolated live measurement](../design/async_management_measurement_20261015.md) completed seven publications, but did not establish a total-wall speedup or full Free readiness. Installing this release does not change resources or token permissions.
 
 ## Build and install
 
 ### Install the release binary
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.5.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.5.0). In the download directory:
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.5.1 release](https://github.com/simosako/castloop-v2/releases/tag/v0.5.1). In the download directory:
 
 ```sh
 sha256sum --check SHA256SUMS
@@ -22,7 +22,7 @@ export PATH="$HOME/.local/bin:$PATH"
 castloop --version
 ```
 
-The version must be `0.5.0`. Keep the two license files with the binary and add `$HOME/.local/bin` to your shell's PATH for future sessions.
+The version must be `0.5.1`. Keep the two license files with the binary and add `$HOME/.local/bin` to your shell's PATH for future sessions.
 
 The target Linux x86-64 machine needs no Bun, Node.js, Wrangler, source tree, `ffprobe`, or R2 S3 credentials. Enable R2 and Queues and supply an account-scoped Cloudflare API token with Workers Scripts, Workers R2 Storage, and Queues read/write permissions. Never store it in TOML or Git. Experimental macOS/Windows cross-builds are not distributed or runtime-verified.
 
@@ -132,7 +132,7 @@ castloop service-status
 castloop service-resume NEW_PAUSE_UUID
 ```
 
-Pause blocks new mutations; paused public delivery returns HTTP 503. Paused does not necessarily mean drained, and an HTTP response alone is not proof that old operations ended. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update. Installing the executable does not update Workers. v0.5.0 Queue staging/publication requires the new CLI and its verified Queue-management Worker; old readiness is not upgraded locally. Pending/unknown journals are not converted, and downgrade after new protocols/catalogs is unsupported.
+Pause blocks new mutations; paused public delivery returns HTTP 503. Paused does not necessarily mean drained, and an HTTP response alone is not proof that old operations ended. Deployment preserves data, media URLs and secrets, verifies the new runtime, and remains paused until explicit resume. There is no legacy conversion, resource adoption, automatic rollback or zero-downtime update. Installing the executable does not update Workers. Queue staging/publication requires the current CLI and its verified Queue-management Worker; old readiness is not upgraded locally. Pending/unknown journals are not converted, and downgrade after new protocols/catalogs is unsupported.
 
 ## Custom domains
 
@@ -161,7 +161,7 @@ The single REST PUT recovery model retains [unverified assumption U1](../design/
 
 ## RSS migration and publication acceptance
 
-Use `import-rss SHOW_ID RSS_URL --dry-run`, `import-rss SHOW_ID RSS_URL --output DIRECTORY`, and `publish-rss-import DIRECTORY` for one-time RSS migration into a new Show. Review locally before sequential publication. GUIDs and dates are preserved; recurring synchronization, adoption of an existing Show and subscriber migration are not provided. v0.5.0 Queue publication requires the verified Queue management capability described above. See [RSS usage](rss_migration.md).
+Use `import-rss SHOW_ID RSS_URL --dry-run`, `import-rss SHOW_ID RSS_URL --output DIRECTORY`, and `publish-rss-import DIRECTORY` for one-time RSS migration into a new Show. Review locally before sequential publication. GUIDs and dates are preserved; recurring synchronization, adoption of an existing Show and subscriber migration are not provided. Queue publication requires the verified Queue management capability described above. See [RSS usage](rss_migration.md).
 
 Retained v0.4.0 `queue-validation-v1` jobs remain readable without promotion or resubmission. Their `publication-accepted` / HTTP `202 accepted` receipt is not validation or publication success; their terminal evidence remains `published / released`. Deterministic pre-write input failures retain the held owner and frozen draft. New Queue jobs use the async result contract above, not an HTTP commit fallback. See [HTTP acceptance history](../design/http_publication_commit_optimization_plan.md).
 
@@ -171,7 +171,7 @@ The [design document index](../design/README.md) separates current references fr
 
 Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.
 
-[M6 acceptance](../design/archive/m6_standalone_acceptance.md) and [approved scope](../design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.5.0 release notes](release-v0.5.0.md) and [v0.4.0 release notes](release-v0.4.0.md). Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
+[M6 acceptance](../design/archive/m6_standalone_acceptance.md) and [approved scope](../design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.5.1 release notes](release-v0.5.1.md), [v0.5.0 release notes](release-v0.5.0.md) and [v0.4.0 release notes](release-v0.4.0.md). Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
 
 Existing M6 workspaces without `workers_dev_base_url` retain their original workers.dev URL and configuration hash until an owned domain change saves the field. [Live Cloudflare acceptance passed](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md), including removal and restored workers.dev delivery. Earlier interrupted trial operations remain retained; their unknown requests or tokens are not released by this version.
 

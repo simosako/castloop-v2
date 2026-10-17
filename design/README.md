@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-現在の公開版はv0.5.0。まず[全体設計](initial_design.md)を読み、操作方法は[プロジェクトREADME](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS移行案内](../docs/rss_migration.md)を参照する。既存schema-version-1は[Queue方式ガイド](../docs/queue_service.md)を使い、SQLiteへ自動変換しない。通常HTTPの今回の10ms達成範囲・未対応機能・Issue #13の残る制限は[リリースノート](../docs/release-v0.5.0.md)で確認する。
+現在の公開版はv0.5.1。まず[全体設計](initial_design.md)を読み、操作方法は[プロジェクトREADME](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS移行案内](../docs/rss_migration.md)を参照する。既存schema-version-1は[Queue方式ガイド](../docs/queue_service.md)を使い、SQLiteへ自動変換しない。v0.5.1の変更点は[v0.5.1リリースノート](../docs/release-v0.5.1.md)、通常HTTPの10ms達成範囲・未対応機能・Issue #13の残る制限は[v0.5.0リリースノート](../docs/release-v0.5.0.md)で確認する。
 
 ## 開発時に参照する文書
 
@@ -30,7 +30,7 @@
 | [通常規模36件の連続公開測定](normal36_publication_measurement_20261015.md) | 29件完了、30件目R2事前照合で停止。Queue/HTTP CPUと未完了範囲 |
 | [試験通知・R2読取診断](trial_notifications_and_r2_read_diagnostics.md) | tmux独立監視と同一OpenCode sessionへの通知、一時GETの有限再試行、診断のallowlist |
 | [SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md) | 一意upload→DO SQLite FIFO→Alarm。実DO入口・fresh init/readiness・正式CLI・配信接続のローカル実装と残る実機/P6の範囲 |
-| [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | v0.5.0のschema version 2明示init、公開・pause/resume、未知IOの保全、未対応操作と実機未検証の範囲 |
+| [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | v0.5.0のschema version 2明示init、公開・pause/resume、未知IOの保全、未対応操作と実機未検証の範囲（v0.5.1の検証強化を含む） |
 | [SQLite実機受け入れ・測定](sqlite_sequential_measurement_20261016.md) | 新規隔離環境の段階試験、初回REST応答形の修正、既知の配備を再送しない検証継続と測定範囲 |
 | [SQLite追加受け入れ・観測改善](sqlite_followup_verification_20261016.md) | canceled/read timeoutと公開失敗の分離、CPU/jobログ欠測の明示、正式RSS・互換更新の確認順序 |
 | [DO・CPUログ欠測の調査](sqlite_tail_missing_logs_investigation_20261017.md) | DO実行のGraphQL照合、paused GETでのtail比較、反映待ち仮説と未確定の配送原因、観測開始・終了条件の不足 |

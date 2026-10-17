@@ -1,18 +1,19 @@
 # castloop v2 デザインドキュメント
 
-更新日: 2026-10-17。現在の公開版はv0.5.0。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
+更新日: 2026-10-17。現在の公開版はv0.5.1。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
 
-v0.5.0は新しいSQLite方式を明示指定で提供する。既存Queue方式のdefaultとworkspace routingを維持し、サービス間・schema間の変換はしない。
+v0.5.1はv0.5.0のSQLite方式・Queue方式をそのまま維持し、RSSテキスト検証、workspace設定の安全な読み取り、未到達実装の削除と共通処理の集約だけを行う。protocol・schema・公開object key・主要commandの引数は変更しない。
 
 - v0.2.0: M6の新規初期化、通常更新、Show／Episodeの非公開化・復元・削除を公開。
 - v0.2.1: Show／Episode一覧を追加。
 - v0.3.0: 1サービスにつき1つの独自ドメインを追加・照会・削除できる。
 - v0.4.0: RSSから新規Showへの一度限りの移行、Episodeカタログ、公開受付とQueue検証の分離、停止診断と限定的なWorker更新続行を追加。
 - v0.5.0: SQLite DO/FIFO/Alarmによる逐次公開、正式CLI・fresh init・一覧・非公開化/復元・RSS・code-only互換更新を追加。既存Queue方式にも直接commit送信を経た非同期管理（案C）と配信判定事前生成を統合。
+- v0.5.1: RSSへ出力するテキストのXML 1.0検証、`castloop.toml`の上限付き・symlink拒否読み取り、未到達の旧実装削除とhash/HMAC・管理応答・IO・journal検証の共通化。挙動の変更は不正入力拒否とQueue初期化の`.gitignore`保護強化。
 
 配布・実機検証の対象はLinux x86-64。v0.1.xのデータ変換・既存資源の採用は行わない。M0〜M5の経緯は後半のマイルストーンと各実装ログに残す。
 
-### RSSテキストの検証（次回更新向け）
+### RSSテキストの検証（v0.5.1）
 
 Queue／SQLite共通のShow・Episodeスキーマは、RSSへ出力する自由文、カテゴリ、サイトURLにXML 1.0で禁止された制御文字・孤立サロゲート・U+FFFE／U+FFFFを許可しない。GUIDと同じ許容範囲を共有し、文字の削除・置換による修復は行わない。検証は既存のtrim処理より前に行い、正常な日本語・絵文字・タブ・改行・復帰文字とGUIDの値を維持する。RSSレンダラーでも禁止文字を拒否する。
 
@@ -104,7 +105,7 @@ service ID・account ID・bucket名・workers.devのaccount subdomainから`cast
 
 配備したWorker version・cache設定・公開／管理API・Queue probeから稼働を検証し、**pausedで完了**する。設定値だけで完了にしない。再開には`service-status`の`admission.pause_id`を使う。開始済み・応答不明の`init`は再送せず、journalを保持する。[初期化設計](./m6_fresh_initialization.md)参照。
 
-### ローカルサービス設定の読み取り（次回更新向け・両方式共通）
+### ローカルサービス設定の読み取り（v0.5.1・両方式共通）
 
 正式CLIの`castloop.toml`読み取りは既存の`readLocalMetadata`を再利用する。`O_NOFOLLOW`／`O_NONBLOCK`で開き、通常ファイルかつ1〜16,384 bytesに制限し、上限を超えて増大した読み取りも中断する。同じdescriptorの読み取り前後のサイズ・mtime・ctimeと実際の読取量を照合し、不一致は拒否して必ずdescriptorを閉じる。不正UTF-8を置換せず拒否してからTOML解析と既存のstrictスキーマ判定を行う。
 

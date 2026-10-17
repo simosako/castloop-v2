@@ -1,8 +1,8 @@
-# RSSからのPodcast移行（v0.5.0）
+# RSSからのPodcast移行（v0.5.0以降）
 
-v0.5.0はSQLite方式（schema-version-2）と既存Queue方式（schema-version-1）の両方に対応する。
+v0.5.0はSQLite方式（schema-version-2）と既存Queue方式（schema-version-1）の両方に対応する。v0.5.1はRSSへ出力するテキストのXML 1.0検証を追加する。
 公開には選択した方式に対応するCLI・検証済みWorker・private workspaceが必要で、既存サービスを自動変換しない。
-通常HTTPの最新測定範囲と未検証事項は[リリースの制限](release-v0.5.0.md)を確認する。
+通常HTTPの最新測定範囲と未検証事項は[v0.5.0リリースの制限](release-v0.5.0.md)、v0.5.1の変更点は[v0.5.1リリースノート](release-v0.5.1.md)を確認する。
 
 ローカルdownloadは両方式で共通。公開先のprotocolによって受付・完了status・復旧条件が異なるため混用しない。
 
