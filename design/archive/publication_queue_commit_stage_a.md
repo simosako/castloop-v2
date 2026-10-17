@@ -2,7 +2,7 @@
 
 2026-10-15。v0.4.0 (`8e722ca`)を起点とする`feat/publication-queue-submit`。
 管理者が[移譲案](publication_queue_delegation_options.md)の段階Aを承認した。公開版・Cloudflare配備済みコードではない。
-段階Aの経緯を保存した文書。後続承認により、現在の開発CLIのcontent経路は[案C](async_management_implementation.md)へ進んだ。
+段階Aの経緯を保存した文書。後続承認により、現在の開発CLIのcontent経路は[案C](../async_management_implementation.md)へ進んだ。
 
 ## 経路と対象
 

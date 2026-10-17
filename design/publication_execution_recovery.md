@@ -199,7 +199,7 @@ consumer例外は未解決の別調査対象として保全し、Issue #13全体
   開始/終了phaseとjob件数を別途照合し、入れ子の時間は加算しない。
 - heartbeatの期限判定は仮想timer、native control frame疎通は実pong受信で分けて試験する。
   10ms周期と固定sleepによるnative試験の時間依存性、遅延再現と検証範囲は
-  [Issue #29の調査](worker_tail_heartbeat_tests.md)を参照。収集器の期限や欠測判定は緩和しない。
+  [Issue #29の調査](archive/worker_tail_heartbeat_tests.md)を参照。収集器の期限や欠測判定は緩和しない。
 - 長時間試験そのものもOpenCodeのLocation寿命から独立した管理プロセスで起動する。
   これはログ採取の修正とは別の対策で、未知の既存owner/tokenを解放する根拠にはしない。
 

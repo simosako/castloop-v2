@@ -2,8 +2,8 @@
 
 2026-10-15。管理者が「管理処理で検証・事前生成し、HTTPでは最新の小さな配信判定だけ読む」設計の開発を承認した。
 `feat/publication-queue-submit`の開発実装であり、main/v0.4.0 releaseは変更していない。
-開発後の別承認で隔離環境への[互換配備・実機測定](public_delivery_projection_measurement_20261015.md)を実施した。
-[feed CPU調査](feed_delivery_cpu_investigation_20261015.md)を受けた変更で、feedは改善したが内部音源GETに10ms超過が残り、全HTTPの達成は未確定。
+開発後の別承認で隔離環境への[互換配備・実機測定](archive/public_delivery_projection_measurement_20261015.md)を実施した。
+[feed CPU調査](archive/feed_delivery_cpu_investigation_20261015.md)を受けた変更で、feedは改善したが内部音源GETに10ms超過が残り、全HTTPの達成は未確定。
 
 ## 採用方式
 
@@ -100,11 +100,11 @@ service metadataの`migration`/`legacy`からだけこの経路へ入り、通�
 
 これらはローカルの自動テストであり、Cloudflare実機CPU/キャッシュ挙動の再測定とは区別する。
 残る管理HTTP、起動/GC、Queue処理のCPUやservice全体のFree適合、Issue #13の恒久解消は証明しない。
-開発後の別承認による実機結果は[測定記録](public_delivery_projection_measurement_20261015.md)を参照する。
+開発後の別承認による実機結果は[測定記録](archive/public_delivery_projection_measurement_20261015.md)を参照する。
 追加配備・他endpointの最適化・権限/課金変更には、その結果だけで進まない。
 
 ## 参照
 
 - [R2 Workers API: HEAD、customMetadata、conditional PUT](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/)
 - [R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/)
-- [新規初期化](m6_fresh_initialization.md)、[互換更新](m6_compatible_updates.md)、[案Cの実機測定](async_management_measurement_20261015.md)
+- [新規初期化](m6_fresh_initialization.md)、[互換更新](m6_compatible_updates.md)、[案Cの実機測定](archive/async_management_measurement_20261015.md)

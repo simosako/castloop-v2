@@ -5,7 +5,7 @@
 既存のR2制御方式と案Cは、別途変更が承認されるまでは現行仕様である。
 
 **後続の検討による方針修正**: 管理者との検討で、確認済み一意upload→DO SQLiteの逐次キュー→Alarm実行を基本形とした。
-実装は[SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md)に従う。
+実装は[SQLite逐次公開の実装計画](../sqlite_sequential_publication_implementation_plan.md)に従う。
 以下のDO＋Queues/outboxと全面的な公開先ポインター方式は比較履歴であり、最新の実装要件ではない。
 
 ## 結論
@@ -20,9 +20,9 @@
 
 ### 当初の選択は「非FIFOだからR2しか使えない」ではなかった
 
-[初回レビュー](archive/initial_design_review_01.md)のD-05には、ShowごとのDO、全体1並列のQueue、R2の条件付き更新の比較がある。
+[初回レビュー](initial_design_review_01.md)のD-05には、ShowごとのDO、全体1並列のQueue、R2の条件付き更新の比較がある。
 D-12ではMVPのjob statusをR2へ置き、必要になったらD1等を検討するとした。
-[第2回レビュー](archive/initial_design_review_02.md)では、追加DBを避け、同じShowの未完了操作を一つに制限する方式を採った。
+[第2回レビュー](initial_design_review_02.md)では、追加DBを避け、同じShowの未完了操作を一つに制限する方式を採った。
 
 非FIFOが要求するのは、配送順と公開順を切り離すこと。**その状態をR2へ置くことではない。**
 仮にFIFOのQueueがあっても、CLIによる並行受付、処理途中の停止、重複、R2と状態記録の非原子性は残る。

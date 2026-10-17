@@ -1,6 +1,6 @@
 # Cloudflareクリーンアップ候補（2026-10-17）
 
-管理者の依頼による読み取り調査。以下は**調査時点**の資源と廃棄候補であり、現存資源の恒久的な一覧ではない。調査後、管理者が旧環境と試験用サブドメインの廃棄を承認した。[削除の実行記録](archive/cloudflare_test_environment_cleanup_20261017.md)を別途参照する。
+管理者の依頼による読み取り調査。以下は**調査時点**の資源と廃棄候補であり、現存資源の恒久的な一覧ではない。調査後、管理者が旧環境と試験用サブドメインの廃棄を承認した。[削除の実行記録](cloudflare_test_environment_cleanup_20261017.md)を別途参照する。
 
 ## 結論
 
@@ -149,7 +149,7 @@ REST一覧をcursor終端まで取得。観測集計の完了時刻は**2026-10-
 - R2のservice admissionとShow controlは取得できたものをallowlist集計したが、全job status/progress・全local journalをschema検証して正常終了を認定した調査ではない。最初の全status読取を含む集計はローカル120秒制限で中断したため、最終集計はobject一覧・admission・Show controlに範囲を絞った。途中にもCloudflare変更はない。
 - この実行環境のprocess一覧では、過去のcastloop試験runner/upload/deploy processは見つからなかった。別ホスト・CI・Cloudflare側の全IO終了までは証明しない。
 - 非公開の今回の調査結果は`/tmp/opencode/castloop-cleanup-audit-20261017/`。inventoryはkey/size/ETag等とallowlist集計であり、完全な復旧backupではない。既存の`.local-test-data/`、過去の退避先、journal、原素材は削除していない。
-- [2026-10-11の削除記録](archive/cloudflare_test_environment_cleanup_20261011.md)の削除済み5環境は今回の現存一覧にない。保留だった7環境は現在もある。
+- [2026-10-11の削除記録](cloudflare_test_environment_cleanup_20261011.md)の削除済み5環境は今回の現存一覧にない。保留だった7環境は現在もある。
 
 ## 推奨する廃棄の単位と順序
 

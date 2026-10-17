@@ -91,7 +91,7 @@ v0.5.0 Queue管理はstage-start/grant/upload-complete/publishを使い、HTTP c
 保存ログの収集・CPU数値とapplication log・tail配送の不足は区別する。公開確認のprobe IDが一致しない記録を欠測0msとして扱わない。
 
 SQLiteでは通常Worker HTTP/cacheとDO HTTP/RPC/Alarmを区別する。通常Free HTTPは10ms、DOは既定30秒のCPU上限で評価し、ジョブ全体のCPUを合算する必要はない。
-最新試験の外側/cache HTTP最大は3/5ms、公開probeは60/60対応したが、全invocation・未試験負荷の保証ではない。[測定記録](../design/sqlite_size36_measurement_20261017.md)を参照。
+最新試験の外側/cache HTTP最大は3/5ms、公開probeは60/60対応したが、全invocation・未試験負荷の保証ではない。[測定記録](../design/archive/sqlite_size36_measurement_20261017.md)を参照。
 
 以下のphase名・カタログの説明は、既存Queue方式の診断用でありSQLiteのcontrol DBには適用しない。
 

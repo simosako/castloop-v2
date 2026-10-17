@@ -1,9 +1,9 @@
 # Queue/R2管理経路: 案Cの実装契約
 
-2026-10-15。管理者が[構成比較の案C](async_management_architecture_options.md)の実装とテストを承認。
+2026-10-15。管理者が[構成比較の案C](archive/async_management_architecture_options.md)の実装とテストを承認。
 `feat/publication-queue-submit`の開発コードであり、v0.4.0公開版ではない。
 実装依頼時にはCloudflare配備・upload・実機測定は行わなかった。
-後続の別承認による隔離環境への配備と測定は[案C実機結果](async_management_measurement_20261015.md)参照。
+後続の別承認による隔離環境への配備と測定は[案C実機結果](archive/async_management_measurement_20261015.md)参照。
 
 ## 対象と経路
 

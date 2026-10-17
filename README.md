@@ -6,7 +6,7 @@ Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one pri
 
 The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen publication request to one Durable Object per service. Its SQLite FIFO and Alarms execute one job at a time, without Cloudflare Queues or D1. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
 
-In the latest 36-Episode trial, all publications and ten metadata-only updates completed without an observed freeze. Observed outer/cache HTTP CPU maxima were **3/5ms**, below the Workers Free 10ms target, with **60/60** public probes matched to saved CPU logs. This is evidence for the tested paths/load, not a guarantee for every workload or permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13). See [v0.5.0 release notes](docs/release-v0.5.0.md) and [measurement details](design/sqlite_size36_measurement_20261017.md).
+In the latest 36-Episode trial, all publications and ten metadata-only updates completed without an observed freeze. Observed outer/cache HTTP CPU maxima were **3/5ms**, below the Workers Free 10ms target, with **60/60** public probes matched to saved CPU logs. This is evidence for the tested paths/load, not a guarantee for every workload or permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13). See [v0.5.0 release notes](docs/release-v0.5.0.md) and [measurement details](design/archive/sqlite_size36_measurement_20261017.md).
 
 ## Choose the service protocol
 

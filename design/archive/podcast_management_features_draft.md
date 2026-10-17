@@ -150,9 +150,9 @@ D〜Fやその他の候補は、具体的な運営上の困りごとが出てか
 
 ## 参照
 
-- [現在の利用・復旧手順](../README.md)
+- [現在の利用・復旧手順](../../README.md)
 - [正式CLIのコマンド一覧](../packages/cli/src/help.ts)、[コマンド接続](../packages/cli/src/m6-commands.ts)
 - [metadataと個別状態確認のschema](../packages/shared/src/index.ts)、[個別状態確認API](../src/target-inspection-admin.ts)
 - [制御記録と公開状態](../src/lifecycle-control.ts)、[ローカル下書き作成](../packages/cli/src/m6-local-drafts.ts)
 - [RSS生成](../src/feed.ts)
-- [独自ドメイン計画](./custom_domain_plan.md)、[基礎実装と残課題](archive/custom_domain_implementation_log.md)
+- [独自ドメイン計画](../custom_domain_plan.md)、[基礎実装と残課題](custom_domain_implementation_log.md)

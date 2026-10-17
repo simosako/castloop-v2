@@ -298,7 +298,7 @@ CLI・Workerとも無改変の`4781fad`。同じ36件Show、同じEpisodeの同�
 - カタログの36件/200件fixtureで、通常更新のGET/HEAD数が同じであることと、未変更Episodeを読まないことを確認した。カタログPUT応答喪失、別世代/job/hash、破損、非公開GUID競合、非配信path、削除対象分類も検証した。
 - staging finishのmetadata fixtureでは、凍結upload manifestのGETは2回、凍結control requestは3回以内。scope確立後に5回の検証をしても不変記録のGETは増えず、Show controlとEpisode lifecycleはそれぞれ5回読み直す。実機139操作/14.295秒との直接比較ではない。
 
-再測定手順は[`docs/rss_migration.md`](../docs/rss_migration.md#workerの時間ログと性能比較)。既存Showは最初のjobで初回構築し、次のjobを通常更新として比較する。カタログサイズ・RSS生成量はO(N)のままであり、Workers Freeでの実測と正式待機上限の判断は残る。
+再測定手順は[`docs/rss_migration.md`](../../docs/rss_migration.md#workerの時間ログと性能比較)。既存Showは最初のjobで初回構築し、次のjobを通常更新として比較する。カタログサイズ・RSS生成量はO(N)のままであり、Workers Freeでの実測と正式待機上限の判断は残る。
 
 実装時の検証: `bun test`は977 pass / 0 fail（111 files）、`npm run check`とLinux単一CLI buildは成功。Cloudflareでの所要時間は未測定。
 
@@ -363,4 +363,4 @@ PUTがsettleした後、未lockの元bodyをcancelしてawaitする。並列stat
 
 前回のDLQ一致を終了証明とする明示解放は安全条件を満たさないため撤回した。古い失敗履歴と現在の
 実行/IOを区別し、未知tokenを保持する。実機Episodeの取消原因は未確定で、待機延長/制限変更・
-Cloudflare操作はしていない。停止経路と証跡採取は[publication診断](./publication_execution_recovery.md)参照。
+Cloudflare操作はしていない。停止経路と証跡採取は[publication診断](../publication_execution_recovery.md)参照。

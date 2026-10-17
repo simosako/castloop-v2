@@ -3,7 +3,7 @@
 2026-10-15。管理者から、細かなCPU最適化ではなくHTTPの責務を見直し、
 「保存先を返す→CLIがR2へupload→通知でWorker処理→完了polling」などを比較するよう依頼された。
 当初は比較・推奨案。管理者は同日に**案Cの実装とテストを承認**した。
-開発ブランチの実装契約・確認結果は[案C実装](async_management_implementation.md)参照。
+開発ブランチの実装契約・確認結果は[案C実装](../async_management_implementation.md)参照。
 Cloudflare配備・実機測定・資源/権限/課金変更はこの承認に含めない。他案は比較資料のまま。
 [現行HTTP整理](http_execution_cpu_breakdown_20261015.md)、[段階A実測](publication_queue_commit_measurement_20261015.md)、
 [先行するclaim移譲案](publication_queue_delegation_options.md)を踏まえる。
@@ -151,7 +151,7 @@ CLI→R2読取はruntime RPCの能動的なreadiness検証を代替しない。c
 - current Show/Episode generationが変わったらrejectし、caller要求を自動修正しない。
 - admission前のrejected/unclaimedと、admission後のfailed/heldを区別する。ownerなしの拒否をlifecycle job statusへ無理に保存しない。
 - 入力失敗ではfrozen draft/必要なownerを保持し、unknown IO・残留execution・DLQ履歴から自動解放しない。
-- 移譲しても[単一REST PUTの未検証仮定U1](m6_upload_recovery_options.md)は解決しない。multipartやU1解消を今回の必須ゲートにしない。
+- 移譲しても[単一REST PUTの未検証仮定U1](../m6_upload_recovery_options.md)は解決しない。multipartやU1解消を今回の必須ゲートにしない。
 
 ## Public Workerとconsumerの物理分離
 

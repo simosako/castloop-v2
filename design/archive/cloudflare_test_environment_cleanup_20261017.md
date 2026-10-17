@@ -2,7 +2,7 @@
 
 ## 承認範囲
 
-管理者は[現状調査と推奨](../cloudflare_cleanup_inventory_20261017.md)を確認し、推奨に従った削除と、試験用`castloop-`サブドメインの削除を指示した。それ以外の`otftalk.com`のドメイン・サブドメインは削除禁止。
+管理者は[現状調査と推奨](cloudflare_cleanup_inventory_20261017.md)を確認し、推奨に従った削除と、試験用`castloop-`サブドメインの削除を指示した。それ以外の`otftalk.com`のドメイン・サブドメインは削除禁止。
 
 - 最新SQLite環境`sq16r-6ec01dc6`は保持する。
 - それ以外のWorker 20、bucket 18、Queue/DLQ 34、旧SQLite namespace 1、試験用Custom Domain 3を対象とする。

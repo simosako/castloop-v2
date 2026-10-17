@@ -4,11 +4,11 @@ v0.5.0で明示指定できる`sqlite-sequential-v1`方式の操作ガイド。v
 新規SQLiteサービスを対象とし、既存Queueサービスや旧journalを変換しない。
 flag省略時は既存のschema-version-1 defaultのままである。
 
-2026-10-17の[36件規模の確認](../design/sqlite_size36_measurement_20261017.md)では、Episode公開36件とmetadata-only更新10回を完了した。
+2026-10-17の[36件規模の確認](../design/archive/sqlite_size36_measurement_20261017.md)では、Episode公開36件とmetadata-only更新10回を完了した。
 status GET切断による中断後は成功済み15 jobを照合し、未開始分だけ継続した。通常HTTP CPU最大3/5ms、公開probe 60/60を保存ログへ対応付け、ready/paused/drainedで終了した。
 これは中断を挟む短尺音源試験であり、全負荷のFree適合・Issue #13恒久解消や大容量公開を保証しない。
-初回purge blocked・旧試験の欠測は[先行測定](../design/sqlite_sequential_measurement_20261016.md)、
-互換更新・正式RSSの受け入れは[追加確認](../design/sqlite_followup_verification_20261016.md)に区別して残している。
+初回purge blocked・旧試験の欠測は[先行測定](../design/archive/sqlite_sequential_measurement_20261016.md)、
+互換更新・正式RSSの受け入れは[追加確認](../design/archive/sqlite_followup_verification_20261016.md)に区別して残している。
 リリースの全範囲は[v0.5.1リリースノート](release-v0.5.1.md)と[v0.5.0リリースノート](release-v0.5.0.md)を参照。
 
 ## 対応範囲
@@ -71,7 +71,7 @@ castloop publish-episode first
 
 - `create-*`は公開しない。`update-*`は一意のR2 keyへのuploadとローカルreceipt保存だけで、サーバーのstage-start許可を待たない。
 - MP3上限は300,000,000 bytes。MP3解析・サイズ・全量readback/hash・ETag/versionを確認した素材だけを公開manifestへ登録する。
-- upload sourceは最終bytesを転送する前にEOFまで確認する。HTTP 200だけでは成功にせず、receiptと全量readback検証を維持する（[Issue #30の調査・修正](../design/cli_upload_source_completion.md)）。
+- upload sourceは最終bytesを転送する前にEOFまで確認する。HTTP 200だけでは成功にせず、receiptと全量readback検証を維持する（[Issue #30の調査・修正](../design/archive/cli_upload_source_completion.md)）。
 - 初回Episodeにはmetadataと音源が両方必要。その後はmetadata-only/audio-onlyが可能。
 - `publish-*`は要求をローカルへ凍結してDOへ送信し、完了を最大300回・新規poll開始5分まで待つ。
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
