@@ -38,6 +38,7 @@
 | [SQLite実機受け入れ・測定](sqlite_sequential_measurement_20261016.md) | 新規隔離環境の段階試験、初回REST応答形の修正、既知の配備を再送しない検証継続と測定範囲 |
 | [SQLite追加受け入れ・観測改善](sqlite_followup_verification_20261016.md) | canceled/read timeoutと公開失敗の分離、CPU/jobログ欠測の明示、正式RSS・互換更新の確認順序 |
 | [DO・CPUログ欠測の調査](sqlite_tail_missing_logs_investigation_20261017.md) | DO実行のGraphQL照合、paused GETでのtail比較、反映待ち仮説と未確定の配送原因、観測開始・終了条件の不足 |
+| [Worker tailのheartbeat試験](worker_tail_heartbeat_tests.md) | Issue #29のevent loop遅延再現、期限判定とnative ping/pong疎通の分離、欠測判定を維持する回帰試験 |
 | [36件規模の再試験・CPU測定](sqlite_size36_measurement_20261017.md) | status GET切断と有限retry修正、未開始分だけ継続して36 Episode＋更新10回完了。probe CPU 60/60、通常HTTP最大3/5ms、最終pause |
 | [制御状態の保存先・公開方式の再検討](control_plane_storage_reconsideration_20261016.md) | R2/DO/D1の比較履歴。DO＋Queuesと全面的な公開先切替を必須とした案は最新計画で修正 |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
