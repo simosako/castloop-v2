@@ -3,10 +3,9 @@ import { sqliteServiceStatusSchema } from "../packages/shared/src/sqlite-service
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import { PublicationQueueConflict, SqlitePublicationQueue } from "./sqlite-publication-queue";
+import { adminReply as reply } from "./admin-reply";
 
 const prefix = "/admin/sqlite-publication/";
-const reply = (value: object, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
-
 export function createSqlitePublicationHttp(queue: SqlitePublicationQueue, administratorKey: string,
   publicationReady: () => boolean): (request: Request) => Promise<Response> {
   return async (request) => {

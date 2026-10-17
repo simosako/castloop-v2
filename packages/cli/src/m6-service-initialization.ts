@@ -5,6 +5,8 @@ import { createLocalJournalStorage } from "./local-journal-storage";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists } from "./local-journal-path";
 import { workerPayloadHash as digest } from "./worker-upload-hash";
+import { bindLocalJournal } from "./validated-local-journal";
+import type { ValidatedLocalJournal } from "./validated-local-journal";
 import { join } from "node:path";
 
 const checksum = z.string().regex(/^[a-f0-9]{64}$/);
@@ -14,11 +16,7 @@ const stateSchema = z.object({ schema_version: z.literal(1), request: requestSch
   phase: z.enum(["prepared", "resources_requested", "resources_created", "deploy_requested", "deployed", "initialization_requested", "initialized"]),
   target: m6RuntimeTargetSchema.optional(), runtime_readiness: m6RuntimeReadinessSchema.optional() }).strict();
 export type FreshM6InitializationState = z.infer<typeof stateSchema>;
-export type FreshM6InitializationJournal = {
-  load: () => FreshM6InitializationState;
-  save: (state: FreshM6InitializationState) => void;
-  exclusively: <T>(callback: () => Promise<T>) => Promise<T>;
-};
+export type FreshM6InitializationJournal = ValidatedLocalJournal<FreshM6InitializationState>;
 export type FreshM6InitializationEffects = {
   createResources: (config: ServiceConfig) => Promise<void>;
   deploy: (config: ServiceConfig, source: string, metadata: object) => Promise<{ deployment_id: string; worker_version_id: string }>;
@@ -64,25 +62,21 @@ export async function openFreshM6InitializationJournal(root: string, config: Ser
 function initializationJournal(root: string, request: FreshM6InitializationState["request"], initialize: boolean): FreshM6InitializationJournal {
   const config = request.config;
   const storage = createLocalJournalStorage(root, "service-initializations", undefined, `${config.service_id}.json`);
-  const load = (): FreshM6InitializationState => {
-    const state = validateState(storage.read());
-    if (JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("This workspace already has a different frozen fresh M6 initialization");
-    return state;
-  };
   if (initialize) storage.initialize({ schema_version: 1, request, phase: "prepared" });
-  load();
-  return { load, exclusively: storage.exclusively, save: (input) => {
-    storage.requireLock();
-    const next = validateState(input);
-    const previous = load();
-    const phases = stateSchema.shape.phase.options;
-    const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
-    if (JSON.stringify(next.request) !== JSON.stringify(previous.request) || distance < 0 || distance > 1 ||
-      distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) || previous.target && JSON.stringify(next.target) !== JSON.stringify(previous.target)) {
-      throw new Error("Frozen fresh M6 initialization cannot change or skip phases");
-    }
-    storage.replace(next);
-  } };
+  return bindLocalJournal(storage, {
+    parse: validateState,
+    assertIdentity: (state) => {
+      if (JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("This workspace already has a different frozen fresh M6 initialization");
+    },
+    assertTransition: (previous, next) => {
+      const phases = stateSchema.shape.phase.options;
+      const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
+      if (JSON.stringify(next.request) !== JSON.stringify(previous.request) || distance < 0 || distance > 1 ||
+        distance === 0 && JSON.stringify(next) !== JSON.stringify(previous) || previous.target && JSON.stringify(next.target) !== JSON.stringify(previous.target)) {
+        throw new Error("Frozen fresh M6 initialization cannot change or skip phases");
+      }
+    },
+  });
 }
 
 async function initialize(journal: FreshM6InitializationJournal, effects: FreshM6InitializationEffects): Promise<void> {

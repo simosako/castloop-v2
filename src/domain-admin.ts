@@ -8,6 +8,7 @@ import { readServiceAdmission } from "./service-admission";
 import { beginServiceUrlChange, claimDomainConnection, completeServiceUrlChange, readServiceUrlChange,
   returnDomainConnection, stepServiceUrlChange } from "./service-url-change";
 import type { ServiceUrlChangeBindings, ServiceUrlChangeEnv } from "./service-url-change";
+import { adminReply as reply } from "./admin-reply";
 
 async function snapshot(env: ServiceUrlChangeEnv, serviceId: string, bindings: ServiceUrlChangeBindings) {
   const current = await readM6ServiceConfiguration(env);
@@ -23,7 +24,6 @@ async function snapshot(env: ServiceUrlChangeEnv, serviceId: string, bindings: S
 
 export async function handleDomainAdmin(request: Request, env: ServiceUrlChangeEnv & { CASTLOOP_ADMIN_KEY: string },
   bindings: ServiceUrlChangeBindings): Promise<Response> {
-  const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "domain_unauthorized" }, 401);
   if (request.method !== "POST") return reply({ reason_code: "domain_method_invalid" }, 405);
   let input: DomainAdminRequest;

@@ -5,6 +5,7 @@ import { readBoundedAdminJson } from "./admin-body";
 import { readEpisodeLifecycle, readShowControl } from "./lifecycle-control";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import { M6ManagementServiceMismatch, withM6ManagementRead } from "./m6-management";
+import { adminReply as reply } from "./admin-reply";
 
 type Env = { CASTLOOP_BUCKET: Pick<R2Bucket, "get" | "head" | "list">; CASTLOOP_ADMIN_KEY: string };
 
@@ -68,7 +69,6 @@ async function listContent(env: Env, bindings: M6DeliveryGateBindings, input: Co
 
 export async function handleM6ContentList(request: Request, env: Env, bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/catalog") return null;
-  const reply = (data: object, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
   if (request.method !== "POST") return reply({ error: "method not allowed" }, 405);
   let input: ContentListRequest;

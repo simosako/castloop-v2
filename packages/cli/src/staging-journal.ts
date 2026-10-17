@@ -5,7 +5,9 @@ import { stagingClientOperation, stagingClientTargets } from "./staging-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
-import { createHash } from "node:crypto";
+import { bindLocalJournal } from "./validated-local-journal";
+import type { ValidatedLocalJournal } from "./validated-local-journal";
+import { sha256HexSync } from "./sha256";
 import { join } from "node:path";
 
 const stateSchema = z.object({ schema_version: z.literal(1), identity: identitySchema, upload: stageUploadRequestSchema,
@@ -23,8 +25,7 @@ const stateSchema = z.object({ schema_version: z.literal(1), identity: identityS
 }).strict();
 
 export type StagingClientState = z.infer<typeof stateSchema>;
-export type StagingJournal = { load: () => StagingClientState; save: (state: StagingClientState) => void;
-  exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
+export type StagingJournal = ValidatedLocalJournal<StagingClientState>;
 
 export function validateStagingClientState(input: unknown): StagingClientState {
   const state = stateSchema.parse(input);
@@ -35,7 +36,7 @@ export function validateStagingClientState(input: unknown): StagingClientState {
     const start = state.async_start;
     if (phase < 1 || start.intent.command.action !== "stage-start" || start.intent.service_id !== state.identity.service_id ||
       JSON.stringify(start.intent.command.upload) !== JSON.stringify(state.upload) ||
-      start.intent_sha256 !== createHash("sha256").update(JSON.stringify(start.intent)).digest("hex") ||
+      start.intent_sha256 !== sha256HexSync(JSON.stringify(start.intent)) ||
       (phase >= 2) !== (state.grant_result !== undefined) || state.grant_result &&
       (state.grant_result.state !== "granted" || state.grant_result.request_id !== start.intent.request_id ||
         state.grant_result.intent_sha256 !== start.intent_sha256 || state.grant_result.service_id !== state.identity.service_id ||
@@ -48,7 +49,7 @@ export function validateStagingClientState(input: unknown): StagingClientState {
         JSON.stringify(complete.intent.command.upload) !== JSON.stringify(state.upload) ||
         complete.intent.command.grant_request_id !== start.intent.request_id || complete.intent.command.outcome !== state.put_outcome ||
         JSON.stringify(complete.intent.command.settlement.readback_receipts) !== JSON.stringify(state.readback_receipts) ||
-        complete.intent_sha256 !== createHash("sha256").update(JSON.stringify(complete.intent)).digest("hex") ||
+        complete.intent_sha256 !== sha256HexSync(JSON.stringify(complete.intent)) ||
         state.complete_result && (state.complete_result.state !== state.put_outcome || state.complete_result.request_id !== complete.intent.request_id ||
           state.complete_result.service_id !== state.identity.service_id || state.complete_result.intent_sha256 !== complete.intent_sha256) ||
         phase >= 8 && !state.complete_queued) throw new Error("Async upload completion differs from its frozen settlement");
@@ -94,21 +95,16 @@ export function createStagingJournal(root: string, configInput: ServiceConfig, i
   const config = serviceConfigSchema.parse(configInput);
   const prepared = validateStagingClientState({ schema_version: 1, identity: identityFromConfig(config), upload: input, phase: "prepared" });
   const storage = createLocalJournalStorage(root, "staging-uploads", config.service_id, `${prepared.upload.operation_id}.json`);
-  const load = (): StagingClientState => {
-    const state = validateStagingClientState(storage.read());
-    if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || JSON.stringify(state.upload) !== JSON.stringify(prepared.upload)) {
-      throw new Error("This operation already has a different frozen staging request");
-    }
-    return state;
-  };
   storage.initialize(prepared);
-  load();
-  return {
-    load,
-    save: (input) => {
-      storage.requireLock("Staging journal writes require its exclusive client lock");
-      const next = validateStagingClientState(input);
-      const previous = load();
+  return bindLocalJournal(storage, {
+    parse: validateStagingClientState,
+    lockMessage: "Staging journal writes require its exclusive client lock",
+    assertIdentity: (state) => {
+      if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || JSON.stringify(state.upload) !== JSON.stringify(prepared.upload)) {
+        throw new Error("This operation already has a different frozen staging request");
+      }
+    },
+    assertTransition: (previous, next) => {
       const phases = stateSchema.shape.phase.options;
       const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
       const acknowledgeQueue = next.phase === previous.phase &&
@@ -132,8 +128,6 @@ export function createStagingJournal(root: string, configInput: ServiceConfig, i
         previous.finish_receipt && next.finish_receipt !== previous.finish_receipt) {
         throw new Error("Frozen staging journal cannot change, skip phases or reopen PUT permission");
       }
-      storage.replace(next);
     },
-    exclusively: storage.exclusively,
-  };
+  });
 }

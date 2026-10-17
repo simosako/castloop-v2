@@ -4,6 +4,8 @@ import type { ServiceConfig } from "@castloop/shared";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { ensureLocalJournalParents, localJournalEntryExists as existsSync } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
+import { bindLocalJournal } from "./validated-local-journal";
+import type { ValidatedLocalJournal } from "./validated-local-journal";
 import { join } from "node:path";
 
 export const showRegistrationIdentitySchema = serviceIdentitySchema;
@@ -19,8 +21,7 @@ const stateSchema = z.object({ schema_version: z.literal(1), identity: showRegis
   phase: z.enum(["prepared", "reserve_requested", "registered"]), receipt: receiptSchema.optional() }).strict();
 
 export type ShowRegistrationClientState = z.infer<typeof stateSchema>;
-export type ShowRegistrationJournal = { load: () => ShowRegistrationClientState; save: (state: ShowRegistrationClientState) => void;
-  exclusively: <T>(callback: () => Promise<T>) => Promise<T> };
+export type ShowRegistrationJournal = ValidatedLocalJournal<ShowRegistrationClientState>;
 
 export function showRegistrationIdentity(config: ServiceConfig): z.infer<typeof showRegistrationIdentitySchema> {
   return serviceOperationIdentity(config);
@@ -53,20 +54,16 @@ export function createShowRegistrationJournal(root: string, configInput: Service
   const config = serviceConfigSchema.parse(configInput);
   const prepared = validateShowRegistrationState({ schema_version: 1, identity: showRegistrationIdentity(config), reserve: input, phase: "prepared" });
   const storage = createLocalJournalStorage(root, "show-registrations", config.service_id, `${prepared.reserve.show_id}.json`);
-  const load = (): ShowRegistrationClientState => {
-    const state = validateShowRegistrationState(storage.read());
-    if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || JSON.stringify(state.reserve) !== JSON.stringify(prepared.reserve)) {
-      throw new Error("This Show already has a different frozen registration request");
-    }
-    return state;
-  };
   storage.initialize(prepared);
-  load();
-  return { load,
-    save: (input) => {
-      storage.requireLock("Show registration journal writes require its exclusive client lock");
-      const next = validateShowRegistrationState(input);
-      const previous = load();
+  return bindLocalJournal(storage, {
+    parse: validateShowRegistrationState,
+    lockMessage: "Show registration journal writes require its exclusive client lock",
+    assertIdentity: (state) => {
+      if (JSON.stringify(state.identity) !== JSON.stringify(prepared.identity) || JSON.stringify(state.reserve) !== JSON.stringify(prepared.reserve)) {
+        throw new Error("This Show already has a different frozen registration request");
+      }
+    },
+    assertTransition: (previous, next) => {
       const phases = stateSchema.shape.phase.options;
       const distance = phases.indexOf(next.phase) - phases.indexOf(previous.phase);
       if (JSON.stringify(next.identity) !== JSON.stringify(previous.identity) || JSON.stringify(next.reserve) !== JSON.stringify(previous.reserve) ||
@@ -74,8 +71,6 @@ export function createShowRegistrationJournal(root: string, configInput: Service
         previous.receipt && JSON.stringify(next.receipt) !== JSON.stringify(previous.receipt)) {
         throw new Error("Frozen Show registration cannot change, skip phases or replay an unknown request");
       }
-      storage.replace(next);
     },
-    exclusively: storage.exclusively,
-  };
+  });
 }

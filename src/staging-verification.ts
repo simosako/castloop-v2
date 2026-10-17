@@ -1,6 +1,7 @@
 import { lifecycleFailureForPhase, lifecycleJobStatusSchema, parseEpisodeDraft, parseEpisodeRevision, parseJobStatus,
   parseShowControl, parseShowMetadata, stageControlRequest, stagePayloadKey, stageUploadProgressSchema, stageUploadRequestSchema,
   sameEpisodeIdentity, stringifyToml } from "../packages/shared/src/index";
+import { sha256Hex as hashBytes } from "../packages/shared/src/sha256";
 import type { LifecycleJobStatus, StagePayload, StageUploadProgress } from "../packages/shared/src/index";
 import { putPublicDeliveryRecord } from "./public-delivery-records";
 import { controlRequestHash, readEpisodeLifecycle, readShowControl } from "./lifecycle-control";
@@ -9,11 +10,6 @@ import { createStageVerificationEnv, readStageUploadProgress, requireStageUpload
 import type { StageOperation, StageUploadSnapshot } from "./staging-upload";
 
 export type StageVerification = StageOperation & { verificationId: string };
-
-async function hashBytes(bytes: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 
 export async function acquireStageVerification(env: LifecycleControlEnv, operation: StageOperation): Promise<StageVerification> {
   const snapshot = await requireStageUpload(env, operation);

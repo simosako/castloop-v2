@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sha256Hex } from "./sha256";
 
 export const sqlitePublicationProtocol = "sqlite-sequential-v1" as const;
 export const MAX_SQLITE_PUBLICATION_BYTES = 16384;
@@ -91,7 +92,5 @@ export function parseSqlitePublicationRequest(input: unknown): SqlitePublication
 }
 
 export async function sqlitePublicationRequestHash(input: SqlitePublicationRequest): Promise<string> {
-  const bytes = new TextEncoder().encode(JSON.stringify(parseSqlitePublicationRequest(input)));
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(JSON.stringify(parseSqlitePublicationRequest(input)));
 }

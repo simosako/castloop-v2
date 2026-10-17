@@ -1,6 +1,7 @@
 import * as TOML from "@iarna/toml";
 import { z } from "zod";
 import { sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { sha256Hex } from "./sha256";
 
 const resourceName = z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/);
 const origin = z.url().refine((value) => {
@@ -38,7 +39,5 @@ export function parseSqliteServiceConfig(source: string): SqliteServiceConfig {
 }
 
 export async function sqliteServiceConfigHash(input: SqliteServiceConfig): Promise<string> {
-  const bytes = new TextEncoder().encode(JSON.stringify(sqliteServiceConfigSchema.parse(input)));
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(JSON.stringify(sqliteServiceConfigSchema.parse(input)));
 }

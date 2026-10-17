@@ -14,7 +14,8 @@ import { parseRssImportFeed } from "./rss-import-feed";
 import { hashRssImportFile } from "./rss-import-local";
 import { prepareRssImportPublication } from "./rss-import-preflight";
 import type { PreparedRssImport } from "./rss-import-preflight";
-import { createHash, randomUUID } from "node:crypto";
+import { sha256HexSync } from "./sha256";
+import { randomUUID } from "node:crypto";
 import { constants, renameSync } from "node:fs";
 import { copyFile, open } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -110,10 +111,10 @@ export async function publishRssImport(root: string, config: ServiceConfig, outp
     const actions: Array<() => Promise<{ jobId?: string; createdShowHash?: string }>> = [];
     actions.push(async () => {
       await effects.command("create-show", [showId, prepared.show.site_url]);
-      return { createdShowHash: createHash("sha256").update(await readLocalMetadata(join(directory, "show.toml"))).digest("hex") };
+      return { createdShowHash: sha256HexSync(await readLocalMetadata(join(directory, "show.toml"))) };
     });
     actions.push(async () => {
-      const existing = createHash("sha256").update(await readLocalMetadata(join(directory, "show.toml"))).digest("hex");
+      const existing = sha256HexSync(await readLocalMetadata(join(directory, "show.toml")));
       if (existing !== state.created_show_sha256) throw new Error("Created Show draft changed before import installation");
       const destination = join(directory, prepared.show.image_path);
       await copyFile(prepared.coverPath, destination, constants.COPYFILE_EXCL);

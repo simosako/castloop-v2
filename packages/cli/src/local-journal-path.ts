@@ -1,9 +1,11 @@
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-export type JournalFamily = "staging-uploads" | "publication-jobs" | "lifecycle-jobs" | "show-registrations" | "drafts" |
-  "service-initializations" | "service-updates" | "domain-changes" | "rss-import-downloads" | "rss-imports" |
-  "sqlite-drafts" | "sqlite-uploads" | "sqlite-publications" | "sqlite-initializations" | "sqlite-registrations" | "sqlite-controls" | "sqlite-lifecycle" | "sqlite-rss-imports" | "sqlite-service-updates";
+const JOURNAL_FAMILIES = ["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts",
+  "service-initializations", "service-updates", "domain-changes", "rss-import-downloads", "rss-imports",
+  "sqlite-drafts", "sqlite-uploads", "sqlite-publications", "sqlite-initializations", "sqlite-registrations", "sqlite-controls",
+  "sqlite-lifecycle", "sqlite-rss-imports", "sqlite-service-updates"] as const;
+export type JournalFamily = typeof JOURNAL_FAMILIES[number];
 
 export function localJournalEntryExists(path: string): boolean {
   try { lstatSync(path); return true; } catch (error) {
@@ -19,8 +21,7 @@ export function syncLocalJournalDirectory(path: string): void {
 
 export function ensureLocalJournalParents(root: string, family: JournalFamily, serviceId: string | undefined, create = false): void {
   const flat = ["service-initializations", "rss-import-downloads"].includes(family);
-  if (!["staging-uploads", "publication-jobs", "lifecycle-jobs", "show-registrations", "drafts", "service-initializations", "service-updates", "domain-changes", "rss-import-downloads", "rss-imports",
-    "sqlite-drafts", "sqlite-uploads", "sqlite-publications", "sqlite-initializations", "sqlite-registrations", "sqlite-controls", "sqlite-lifecycle", "sqlite-rss-imports", "sqlite-service-updates"].includes(family) ||
+  if (!JOURNAL_FAMILIES.includes(family) ||
     flat !== (serviceId === undefined) || serviceId !== undefined &&
     (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(serviceId) || serviceId.length > 20)) throw new Error("Invalid local journal directory identity");
   const directories = [root, join(root, ".castloop"), join(root, ".castloop", family),

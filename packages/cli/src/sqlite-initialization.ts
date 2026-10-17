@@ -7,13 +7,10 @@ import { SqliteCloudflareApi } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import type { LocalJournalStorage } from "./local-journal-storage";
-import { syncLocalJournalDirectory } from "./local-journal-path";
+import { protectLocalState } from "./workspace-protection";
 import type { R2RestOptions } from "./verified-r2-put";
-import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { sha256HexSync as digest } from "./sha256";
 
-const digest = (source: string) => createHash("sha256").update(source).digest("hex");
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const receiptSchema = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
 const stateSchema = z.object({ protocol: z.literal("sqlite-sequential-v1"), operation_id: z.uuid(), service_config_sha256: hash,
@@ -28,25 +25,6 @@ const stateSchema = z.object({ protocol: z.literal("sqlite-sequential-v1"), oper
 });
 export type SqliteInitializationState = z.infer<typeof stateSchema>;
 const local = (root: string, config: SqliteServiceConfig) => createLocalJournalStorage(root, "sqlite-initializations", config.service_id, "initialize.json");
-
-function protectLocalState(root: string): void {
-  if (!lstatSync(root).isDirectory()) throw new Error("SQLite workspace must be a real directory");
-  const fd = openSync(join(root, ".gitignore"), constants.O_CREAT | constants.O_RDWR | constants.O_APPEND | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
-  try {
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.size > 1_000_000) throw new Error("Workspace gitignore must be a bounded regular file");
-    const source = readFileSync(fd, "utf8"), lines = source.split(/\r?\n/);
-    if (lines.at(-1) === "") lines.pop();
-    const rules = [".castloop/", "*.mp3"];
-    if (JSON.stringify(lines.slice(-2)) !== JSON.stringify(rules)) {
-      const addition = `${source && !source.endsWith("\n") ? "\n" : ""}${rules.join("\n")}\n`;
-      if (Buffer.byteLength(source) + Buffer.byteLength(addition) > 1_000_000) throw new Error("Workspace gitignore protection exceeds its size limit");
-      writeFileSync(fd, addition);
-    }
-    fsyncSync(fd);
-  } finally { closeSync(fd); }
-  syncLocalJournalDirectory(root);
-}
 
 export function readSqliteInitialization(root: string, config: SqliteServiceConfig): SqliteInitializationState | null {
   try { return stateSchema.parse(local(root, config).read()); }

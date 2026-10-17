@@ -3,7 +3,7 @@ import type { PublicationAdminResponse, PublicationRequest, ServiceConfig } from
 import { PublicationAdminClient, publicationClientOperation } from "./publication-client";
 import { validatePublicationClientState } from "./publication-journal";
 import type { PublicationClientState, PublicationJournal } from "./publication-journal";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 type Receipt<Result extends PublicationAdminResponse["result"]> = Extract<PublicationAdminResponse, { result: Result }>;
 export type PublicationOperationEffects = { publication: PublicationRequest; claim: () => Promise<Receipt<"claimed">>;
@@ -24,7 +24,7 @@ function receipt(state: PublicationClientState, input: unknown, expected: Public
     JSON.stringify(value.operation) !== JSON.stringify(publicationClientOperation(state.publication)) ||
     (value.result === "accepted" || value.result === "requeued") && value.key !== publicationCommitKey(state.publication.commit) || value.result === "status" &&
     (JSON.stringify(value.publication) !== JSON.stringify(state.publication) ||
-      value.request_sha256 !== createHash("sha256").update(JSON.stringify(state.publication.request)).digest("hex") ||
+      value.request_sha256 !== sha256HexSync(JSON.stringify(state.publication.request)) ||
       state.queue_submission && value.submission && (value.submission.submission_id !== state.queue_submission.intent.submission_id ||
         value.submission.intent_sha256 !== state.queue_submission.intent_sha256))) {
     throw new Error("Publication receipt differs from the journal's frozen manifest/request");

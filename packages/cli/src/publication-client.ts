@@ -3,7 +3,7 @@ import { publicationAdminRequestSchema, publicationAdminResponseSchema, publicat
 import type { PublicationAdminResponse, PublicationOperationIdentity, PublicationRequest, ServiceConfig } from "@castloop/shared";
 import { M6AdminJsonClient, M6AdminVerificationError } from "./m6-admin-json";
 import type { M6AdminTransport } from "./m6-admin-json";
-import { createHash } from "node:crypto";
+import { sha256HexSync } from "./sha256";
 
 type Result<Name extends PublicationAdminResponse["result"]> = Extract<PublicationAdminResponse, { result: Name }>;
 
@@ -35,7 +35,7 @@ export class PublicationAdminClient {
         JSON.stringify(value.operation) !== JSON.stringify(operation) ||
         (value.result === "accepted" || value.result === "requeued" || value.result === "released") && value.key !== publicationCommitKey(publication.commit) ||
         value.result === "status" && (JSON.stringify(value.publication) !== JSON.stringify(publication) ||
-          value.request_sha256 !== createHash("sha256").update(JSON.stringify(publication.request)).digest("hex"))) {
+          value.request_sha256 !== sha256HexSync(JSON.stringify(publication.request)))) {
         throw new Error("Publication response differs from its frozen manifest/control request");
       }
       return value;

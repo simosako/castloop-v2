@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { hmacSha256Hex, verifyHmacSha256Hex } from "./hmac";
+import { sha256Hex, utf8Bytes } from "./sha256";
 import { publicationRequestSchema } from "./publication-request";
 import { publicationQueueIdSchema } from "./publication-queue";
 import { serviceAdmissionSchema } from "./service-admission";
@@ -49,22 +51,22 @@ export type ManagementResultPayload = z.infer<typeof managementResultPayloadSche
 export type ManagementResult = z.infer<typeof managementResultSchema>;
 export type ManagementStatus = z.infer<typeof managementStatusSchema>;
 
-function bytes(source: string): Uint8Array<ArrayBuffer> { return new Uint8Array(new TextEncoder().encode(source)); }
-function hex(value: ArrayBuffer): string { return [...new Uint8Array(value)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
-async function key(secret: string): Promise<CryptoKey> {
+function requireKey(secret: string): string {
   if (!secret) throw new Error("Management authentication requires an administrator key");
-  return crypto.subtle.importKey("raw", bytes(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  return secret;
+}
+function signedMessage(value: object, domain: "intent" | "result"): string {
+  return `castloop/${asyncManagementProtocol}/${domain}\n${JSON.stringify(value)}`;
 }
 async function sign(value: object, secret: string, domain: "intent" | "result"): Promise<string> {
-  return hex(await crypto.subtle.sign("HMAC", await key(secret), bytes(`castloop/${asyncManagementProtocol}/${domain}\n${JSON.stringify(value)}`)));
+  return hmacSha256Hex(signedMessage(value, domain), requireKey(secret));
 }
 async function verify(value: object, mac: string, secret: string, domain: "intent" | "result"): Promise<boolean> {
-  const signature = Uint8Array.from(mac.match(/../g)!, (part) => Number.parseInt(part, 16));
-  return crypto.subtle.verify("HMAC", await key(secret), signature, bytes(`castloop/${asyncManagementProtocol}/${domain}\n${JSON.stringify(value)}`));
+  return verifyHmacSha256Hex(signedMessage(value, domain), mac, requireKey(secret));
 }
 export function parseManagementIntent(input: unknown): ManagementIntent {
   const value = managementIntentSchema.parse(input);
-  if (bytes(JSON.stringify(value)).length > MAX_MANAGEMENT_BYTES) throw new Error("Management intent exceeds its size limit");
+  if (utf8Bytes(JSON.stringify(value)).length > MAX_MANAGEMENT_BYTES) throw new Error("Management intent exceeds its size limit");
   return value;
 }
 export async function signManagementIntent(input: ManagementIntentPayload, secret: string): Promise<ManagementIntent> {
@@ -78,7 +80,7 @@ export async function verifyManagementIntent(input: unknown, secret: string): Pr
   return await verify(payload, mac, secret, "intent") ? value : null;
 }
 export async function managementIntentHash(input: ManagementIntent): Promise<string> {
-  return hex(await crypto.subtle.digest("SHA-256", bytes(JSON.stringify(parseManagementIntent(input)))));
+  return sha256Hex(JSON.stringify(parseManagementIntent(input)));
 }
 export async function signManagementResult(input: ManagementResultPayload, secret: string): Promise<ManagementResult> {
   const value = managementResultPayloadSchema.parse(input);

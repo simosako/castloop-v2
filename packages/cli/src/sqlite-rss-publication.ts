@@ -16,7 +16,7 @@ import { readSqliteDraftRecord } from "./sqlite-draft-journal";
 import { SqliteDraft } from "./sqlite-draft";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
-import { createHash } from "node:crypto";
+import { sha256HexSync as digest } from "./sha256";
 import { constants } from "node:fs";
 import { copyFile, open } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -57,7 +57,6 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       if (state[field] !== initial[field]) throw new Error("SQLite RSS import inputs changed; preserve its frozen operation");
     }
     const save = () => journal.replace(stateSchema.parse(state));
-    const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
     const actions: Array<() => Promise<void>> = [];
     actions.push(async () => {
       await effects.command("create-show", [showId, prepared.show.site_url]);

@@ -38,7 +38,7 @@ function requireSettledUploads(root: string, config: ServiceConfig, state: Local
   }
 }
 
-async function inspect(root: string, config: ServiceConfig, target: LocalDraftTarget, adminKey: string, inspector?: Inspection):
+async function inspect(root: string, config: ServiceConfig, target: LocalDraftTarget, inspector?: Inspection):
   Promise<TargetInspectionResponse> {
   const request = targetInspectionRequestSchema.parse({ schema_version: 1, service_id: config.service_id, ...target });
   const before = readLocalDraft(root, config, target);
@@ -66,7 +66,7 @@ export async function updateLocalM6Draft(root: string, configInput: ServiceConfi
   if (before.lock_present || before.client_state?.phase === "publication_prepared") throw new Error("Preserve the frozen or locked publication draft");
   if (before.client_state) requireSettledUploads(root, config, before.client_state);
   let snapshot: TargetInspectionResponse;
-  try { snapshot = await inspect(root, config, target, adminKey, options.inspector); }
+  try { snapshot = await inspect(root, config, target, options.inspector); }
   catch (error) { throw new LocalUpdateInspectionError(error); }
   const current = readLocalDraft(root, config, target).client_state;
   const baseId = snapshot.current_revision?.revision_id;
@@ -88,7 +88,7 @@ export async function publishLocalM6Draft(root: string, configInput: ServiceConf
   const previous = readLocalPublicationJob(root, config, state.draft_job_id);
   if (previous.lock_present || previous.client_state && previous.client_state.phase !== "prepared" ||
     state.phase === "publication_prepared" && !previous.client_state) throw new Error("Preserve the requested or missing publication journal without automatic replay");
-  const snapshot = await inspect(root, config, target, adminKey, options.inspector);
+  const snapshot = await inspect(root, config, target, options.inspector);
   if (snapshot.current_revision?.revision_id !== state.base_revision_id) throw new Error("Current Episode base differs from the permanent draft identity");
   const generations = expected(snapshot);
   const retained = previous.client_state?.publication.request;

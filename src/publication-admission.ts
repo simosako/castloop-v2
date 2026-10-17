@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sha256Hex as hashSource } from "../packages/shared/src/sha256";
 import { controlRequestSchema, episodeCommitSchema, episodeRevisionSchema, parseControlRequest, parseEpisodeRevision, parseJobStatus, parseLifecycleProgress,
   parseStageUploadInputs, permitsControlAction, showCommitSchema, stageUploadProgressSchema,
   publicationCommitKey, publicationManifestHash, publicationRequestSchema } from "../packages/shared/src/index";
@@ -28,11 +29,6 @@ function verifiedCommit(env: CommitPublicationEnv, jobId: string) {
     throw new InvalidFrozenPublication();
   }
   return verified;
-}
-
-async function hashSource(source: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export async function withPublicationCommitContext<T extends LifecycleControlEnv, Result>(env: T,

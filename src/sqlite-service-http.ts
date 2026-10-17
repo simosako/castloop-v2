@@ -1,11 +1,11 @@
 import { sqliteRuntimeRequestSchema, sqliteResumeRequestSchema, sqliteRegistrationSchema } from "../packages/shared/src/sqlite-service-api";
 import { sqliteCatalogRequestSchema } from "../packages/shared/src/sqlite-catalog";
 import { sqliteUpdateActivateSchema, sqliteUpdatePrepareSchema } from "../packages/shared/src/sqlite-runtime-update";
+import { adminReply as reply } from "./admin-reply";
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 
-const reply = (body: object, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 export function createSqliteServiceHttp(runtime: SqliteServiceRuntime, key: string): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url), path = url.pathname.slice("/admin/sqlite-service/".length);

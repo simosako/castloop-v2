@@ -1,3 +1,4 @@
+import { sha256Hex, toHex } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import { renderFeed } from "./feed";
 import type { LifecycleFeedEnv } from "./lifecycle-feed";
@@ -21,13 +22,12 @@ export async function readPublicationBytes(env: LifecycleFeedEnv, key: string, m
 }
 
 export async function publicationChecksum(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(bytes);
 }
 
 export function matchesPublishedAudio(object: R2Object | null, length: number, sha256: string): boolean {
   if (!object || object.size !== length || object.customMetadata?.sha256 !== sha256 || !object.checksums?.sha256) return false;
-  const checksum = [...new Uint8Array(object.checksums.sha256)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const checksum = toHex(object.checksums.sha256);
   return checksum === sha256;
 }
 

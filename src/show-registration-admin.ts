@@ -6,10 +6,7 @@ import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
 import { M6ManagementServiceMismatch, withM6ManagementInvocation, withM6ManagementRead } from "./m6-management";
 import { inspectShowRegistration, reserveM6Show } from "./show-registration";
 import type { ShowRegistrationEnv } from "./show-registration";
-
-function reply(data: object, status = 200): Response {
-  return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
-}
+import { adminReply as reply } from "./admin-reply";
 
 export async function handleM6ShowRegistrationAdmin(request: Request, env: ShowRegistrationEnv & { CASTLOOP_ADMIN_KEY: string },
   bindings: M6DeliveryGateBindings): Promise<Response | null> {

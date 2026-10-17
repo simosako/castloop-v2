@@ -1,5 +1,6 @@
 import { publicationCommitKey, publicationManifestHash, publicationRequestSchema, verifyPublicationCommitIntent, verifyManagementIntent } from "../packages/shared/src/index";
 import type { ServiceConfig } from "../packages/shared/src/index";
+import { adminReplyHeadAware as reply } from "./admin-reply";
 import { authenticated } from "./admin-auth";
 import { handleM6ContentList } from "./content-list-admin";
 import { handleDomainAdmin, serveDomainRuntimeProbe } from "./domain-admin";
@@ -43,12 +44,6 @@ export type M6CachedLoopback = CachedAssetBinding & {
   describeRuntime: () => Promise<unknown>;
 };
 
-function reply(request: Request, data: object, status: number): Response {
-  return new Response(request.method === "HEAD" ? null : JSON.stringify(data), {
-    status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
-  });
-}
-
 async function serviceConfig(env: M6CandidateEnv): Promise<ServiceConfig> {
   const { config } = await readM6ServiceConfiguration(env);
   if (config.dlq_name !== env.CASTLOOP_DLQ_NAME) throw new Error("M6 dead-letter binding does not match this service");
@@ -72,8 +67,7 @@ async function deliveryGate(env: M6CandidateEnv): Promise<{ legacy: boolean }> {
   throw new Error("Migration delivery is not enabled");
 }
 
-async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
-  options: { setupRuntime?: M6SetupRuntime }): Promise<Response | null> {
+async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
   if (pathname !== "/admin/staging" && pathname !== "/admin/publication" && pathname !== "/admin/lifecycle" && pathname !== "/admin/shows" &&
     pathname !== "/admin/target" && pathname !== "/admin/service" && pathname !== "/admin/catalog" && pathname !== "/admin/domain") return null;
@@ -130,7 +124,7 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
     if (setup) return setup;
   }
   if (managementIntegration) {
-    const management = await m6ManagementRoute(request, env, cachedAssets, options);
+    const management = await m6ManagementRoute(request, env, cachedAssets);
     if (management) return management;
   }
   if (request.method !== "GET") return reply(request, { error: "Mutation routes are not released on the M6 candidate" }, 409);

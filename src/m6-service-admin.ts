@@ -4,10 +4,7 @@ import { readBoundedAdminJson } from "./admin-body";
 import { readM6ServiceConfiguration } from "./m6-runtime-readiness";
 import type { M6RuntimeEnv } from "./m6-runtime-readiness";
 import { pauseServiceAdmission, readServiceAdmission, resumeServiceAdmission } from "./service-admission";
-
-function reply(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
-}
+import { adminReply as reply } from "./admin-reply";
 
 export async function handleM6ServiceAdmin(request: Request, env: M6RuntimeEnv & { CASTLOOP_ADMIN_KEY: string }): Promise<Response> {
   if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "service_unauthorized" }, 401);

@@ -1,5 +1,6 @@
 import { stagingAdminRequestSchema, stagingAdminResponseSchema } from "../packages/shared/src/index";
 import type { StagingAdminRequest, StagingAdminResponse, StagingOperation } from "../packages/shared/src/index";
+import { adminReply as reply } from "./admin-reply";
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import type { M6DeliveryGateBindings } from "./lifecycle-delivery-gate";
@@ -12,10 +13,6 @@ import { runStageVerification } from "./staging-verification";
 import { measureWorkerPhase } from "./worker-timing";
 
 export type StagingAdminEnv = StageEpisodeDraftEnv & { CASTLOOP_ADMIN_KEY: string };
-
-function reply(input: object, status = 200): Response {
-  return Response.json(input, { status, headers: { "Cache-Control": "no-store" } });
-}
 
 function wireOperation(operation: StageOperation): StagingOperation {
   return { show_id: operation.showId, operation_id: operation.operationId, show_generation: operation.generation };
