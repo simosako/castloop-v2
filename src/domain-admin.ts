@@ -10,8 +10,9 @@ import { beginServiceUrlChange, claimDomainConnection, completeServiceUrlChange,
 import type { ServiceUrlChangeBindings, ServiceUrlChangeEnv } from "./service-url-change";
 import { adminReply as reply } from "./admin-reply";
 
-async function snapshot(env: ServiceUrlChangeEnv, serviceId: string, bindings: ServiceUrlChangeBindings) {
+async function snapshot(env: ServiceUrlChangeEnv, bindings: ServiceUrlChangeBindings, expectedServiceId?: string) {
   const current = await readM6ServiceConfiguration(env);
+  const serviceId = expectedServiceId ?? current.config.service_id;
   const admission = await readServiceAdmission(env, serviceId);
   const ready = admission?.value.runtime_readiness ?? admission?.value.readiness;
   if (current.config.service_id !== serviceId || !admission || admission.value.mode !== "m6" || !ready ||
@@ -31,13 +32,13 @@ export async function handleDomainAdmin(request: Request, env: ServiceUrlChangeE
   catch { return reply({ reason_code: "domain_input_invalid" }, 400); }
   try {
     const serviceId = input.action === "inspect" ? input.service_id : input.request.service_id;
-    await snapshot(env, serviceId, bindings);
+    await snapshot(env, bindings, serviceId);
     if (input.action === "begin") await beginServiceUrlChange(env, input.request);
     else if (input.action === "step") await stepServiceUrlChange(env, input.request, bindings);
     else if (input.action === "complete") await completeServiceUrlChange(env, input.request, bindings);
     else if (input.action === "claim-connection") await claimDomainConnection(env, input.request, input.execution_id);
     else if (input.action === "return-connection") await returnDomainConnection(env, input.request, input.receipt);
-    const { current, admission } = await snapshot(env, serviceId, bindings);
+    const { current, admission } = await snapshot(env, bindings, serviceId);
     const progress = input.action === "inspect" ? null : (await readServiceUrlChange(env, input.request))?.value ?? null;
     const configuration = await env.CASTLOOP_BUCKET.head("system/service.toml");
     const latest = await readServiceAdmission(env, serviceId);
@@ -59,8 +60,7 @@ export async function serveDomainRuntimeProbe(request: Request, env: ServiceUrlC
   if (request.method !== "GET") return new Response(null, { status: 405, headers });
   try {
     const nonce = domainRuntimeProbeSchema.shape.nonce.parse(new URL(request.url).searchParams.get("nonce"));
-    const { config } = await readM6ServiceConfiguration(env);
-    await snapshot(env, config.service_id, bindings);
+    const { current: { config } } = await snapshot(env, bindings);
     return Response.json(domainRuntimeProbeSchema.parse({ schema_version: 1, service_id: config.service_id,
       worker_name: config.worker_name, worker_version_id: env.CASTLOOP_VERSION_METADATA.id, nonce }), { headers });
   } catch { return Response.json({ reason_code: "domain_probe_unavailable" }, { status: 503, headers }); }

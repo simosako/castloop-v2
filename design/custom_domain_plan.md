@@ -70,6 +70,12 @@ castloop domain remove
 - Cloudflare PUT/DELETEそのものの結果が不明なら、照会で想定結果が見えても将来の書き込み終了とは扱わない。connection tokenとpending記録を保持し、再送・強制解放を提供しない。これは既存MVPの未知IOをblockedに保つ範囲と同じであり、接続APIの応答喪失を万能に復旧できるとは主張しない。
 - ただし生存不明の実行・IO・lockは経過時間やHEAD不在で解放しない。同じコマンドの再実行でも、古い書き手が残る可能性があれば停止したままにする。
 
+### 公開プローブの読み取り負荷（2026-10-17）
+
+Queue方式の公開プローブは、同一request内のservice設定の二重取得を除き、正常なGETにつきR2 GETを3回から2回へ減らした。設定とservice admissionを各1回取得し、その同じ設定から応答のservice/Worker名を作る。各requestでpaused/open、M6 readiness、実行Worker versionとcache ownerを照合する。requestをまたいだ設定/readinessキャッシュは設けず、不正なmethod/nonceはR2やcache ownerへのIO前に拒否する。認証済みdomain変更処理の前後snapshotと最終ETag再照合は省略しない。CLIのnonce、応答schema、no-store、管理鍵を独自hostへ送らない契約は変更しない。SQLite方式へこのrouteを追加しない。
+
+これは読み取り回数の削減であり、無認証の大量アクセス対策の完了ではない。正しいUUIDを持つ第三者のGETも依然として2回のR2読み取りとcache owner照合を起こせる。次段階の候補は、信頼済み管理originで発行し、対象host・service・Worker version・nonce・短い有効期限に束縛した署名challengeを、独自hostでR2読み取り前に検証する方式。管理鍵そのものは送らず、旧unsigned probeへのfallbackでは防御を迂回できるため、CLI/Workerの互換性方針と再利用可能な期限内challengeの負荷制限も別途設計する。今回は署名方式、新規rate-limit資源、配備や実機測定は追加しない。
+
 ## 通常deployはドメインから独立させる
 
 `prepareCompatibleM6WorkerUpload`の「Custom Domainが1件でもあれば拒否」は未提供機能用の制限であり、今回解除済み。別のdomain専用deployは作らない。

@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
-import { domainAdminResponseSchema } from "../packages/shared/src/index";
+import { expect, spyOn, test } from "bun:test";
+import { cachedDeliveryRuntimeSchema, domainAdminResponseSchema, serviceAdmissionSchema, stringifyToml } from "../packages/shared/src/index";
 import { fetchM6Candidate, fetchM6ManagementIntegration } from "./m6-routes";
 import { resumeServiceAdmission } from "./service-admission";
 import { domainAdminFixture } from "./test-support/domain-admin";
@@ -74,4 +74,96 @@ test("unauthenticated nonce probes verify runtime without exposing or reopening 
     expect((await fetchM6ManagementIntegration(new Request(`https://podcasts.example.com${path}`), setup.env, setup.cachedAssets)).status).toBe(path.startsWith("/podcasts/") ? 503 : 404);
   }
   expect((await fetchM6ManagementIntegration(new Request(`${setup.management}/.well-known/castloop/runtime?nonce=bad`), setup.env, setup.cachedAssets)).status).toBe(503);
+});
+
+test("runtime probes read configuration and admission only once per request without writing or caching readiness", async () => {
+  const setup = await fixture();
+  const before = [...setup.entries];
+  const get = spyOn(setup.bucket, "get");
+  const head = spyOn(setup.bucket, "head");
+  const describe = spyOn(setup.cachedAssets, "describeRuntime");
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      get.mockClear();
+      const nonce = crypto.randomUUID();
+      const response = await fetchM6ManagementIntegration(new Request(`https://podcasts.example.com/.well-known/castloop/runtime?nonce=${nonce}`),
+        setup.env, setup.cachedAssets);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json<unknown>()).toEqual({ schema_version: 1, service_id: setup.config.service_id,
+        worker_name: setup.config.worker_name, worker_version_id: setup.versionId, nonce });
+      expect(get.mock.calls.map(([key]) => key)).toEqual(["system/service.toml", "system/lifecycle-service.json"]);
+    }
+    expect(head).not.toHaveBeenCalled();
+    expect(describe).toHaveBeenCalledTimes(2);
+    expect([...setup.entries]).toEqual(before);
+  } finally { get.mockRestore(); head.mockRestore(); describe.mockRestore(); }
+});
+
+test("runtime probes reject invalid methods and nonces before storage or cache-owner IO", async () => {
+  const setup = await fixture();
+  const get = spyOn(setup.bucket, "get");
+  const head = spyOn(setup.bucket, "head");
+  const describe = spyOn(setup.cachedAssets, "describeRuntime");
+  try {
+    for (const [method, query, status] of [["GET", "", 503], ["GET", "?nonce=bad", 503],
+      ["POST", `?nonce=${crypto.randomUUID()}`, 405], ["HEAD", `?nonce=${crypto.randomUUID()}`, 405]] as const) {
+      const response = await fetchM6ManagementIntegration(new Request(`https://podcasts.example.com/.well-known/castloop/runtime${query}`, { method }),
+        setup.env, setup.cachedAssets);
+      expect(response.status).toBe(status);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+    }
+    expect(get).not.toHaveBeenCalled();
+    expect(head).not.toHaveBeenCalled();
+    expect(describe).not.toHaveBeenCalled();
+  } finally { get.mockRestore(); head.mockRestore(); describe.mockRestore(); }
+});
+
+test("runtime probes observe changed configuration, admission and runtime instead of reusing previous success", async () => {
+  const setup = await fixture();
+  const probe = () => fetchM6ManagementIntegration(new Request(`https://podcasts.example.com/.well-known/castloop/runtime?nonce=${crypto.randomUUID()}`),
+    setup.env, setup.cachedAssets);
+  const before = [...setup.entries];
+  const configuration = setup.entries.get("system/service.toml")!;
+  const admission = setup.entries.get("system/lifecycle-service.json")!;
+  const value = serviceAdmissionSchema.parse(JSON.parse(new TextDecoder().decode(admission.bytes)));
+  const unavailable = async () => {
+    const response = await probe();
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json<unknown>()).toEqual({ reason_code: "domain_probe_unavailable" });
+  };
+  expect((await probe()).status).toBe(200);
+  setup.entries.delete("system/service.toml");
+  await unavailable();
+  await setup.bucket.put("system/service.toml", stringifyToml({ ...setup.config, service_id: "foreign" }));
+  await unavailable();
+  setup.entries.set("system/service.toml", configuration);
+  setup.entries.delete("system/lifecycle-service.json");
+  await unavailable();
+  await setup.bucket.put("system/lifecycle-service.json", JSON.stringify({ ...value,
+    runtime_readiness: { ...value.runtime_readiness, worker_version_id: crypto.randomUUID() } }));
+  await unavailable();
+  await setup.bucket.put("system/lifecycle-service.json", JSON.stringify({ ...value, mode: "legacy",
+    runtime_readiness: undefined, readiness: undefined }));
+  await unavailable();
+  await setup.bucket.put("system/lifecycle-service.json", JSON.stringify(serviceAdmissionSchema.parse({ ...value, state: "updating",
+    update: { request: { operation_id: crypto.randomUUID(), service_id: "service", expected_service_generation: value.generation,
+      pause_id: setup.pauseId, previous_worker_version_id: setup.versionId, service_config_sha256: setup.request.service_config_sha256,
+      worker_source_sha256: "0".repeat(64), worker_metadata_sha256: "0".repeat(64) } } })));
+  await unavailable();
+  setup.entries.set("system/lifecycle-service.json", admission);
+  setup.env.CASTLOOP_VERSION_METADATA.id = crypto.randomUUID();
+  await unavailable();
+  setup.env.CASTLOOP_VERSION_METADATA.id = setup.versionId;
+  const runtime = cachedDeliveryRuntimeSchema.parse(await setup.cachedAssets.describeRuntime());
+  const describe = spyOn(setup.cachedAssets, "describeRuntime");
+  try {
+    describe.mockResolvedValueOnce({ ...runtime, worker_version_id: crypto.randomUUID() });
+    await unavailable();
+    describe.mockRejectedValueOnce(new Error("Cache owner unavailable"));
+    await unavailable();
+    expect((await probe()).status).toBe(200);
+    expect(setup.entries).toEqual(new Map(before));
+  } finally { describe.mockRestore(); }
 });
