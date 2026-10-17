@@ -51,9 +51,11 @@ Queue statusの有限回待機はCLIの観測終了だけである。時間だ�
 
 自動テストはsimulated REST/cache/Queueである。通常candidateのready=falseとmanagement書込禁止は維持する。通常更新・六lifecycle操作・cache HITと停止/削除後のpurge・300MB受け入れ・unknown IO回復・公開CLI/案内等のM6共通gateも省略しない。
 
-## 試験バイナリと実Cloudflare受け入れ
+## 旧試験バイナリと実Cloudflare受け入れの履歴
 
-`bun scripts/build-cli.ts linux-x64 --m6-test`は、通常binaryとは別の`dist/castloop-m6-test-linux-x64`へ試験entryを埋め込む。管理者のマシンにBun/Node/Wranglerや別R2 credentialを要求せず、envのaccount/tokenとprivate local admin keyを使う。service IDは`m6-test-`、全資源名は`castloop-m6-test-`だけを許す。通常buildのCLI/Worker entryは変えない。
+以下は当時の検証記録。2026-10-17に、正式CLIへの統合と専用試験環境・実行スクリプトの廃止を確認し、`m6-test-cli.ts`、試験header用の`m6-setup-worker.ts`、`--m6-test`ビルドを削除した。今後のbuildは正式CLIと正式Workerだけを使う。応答喪失の注入ヘルパーは、現行の自動結合テストで使うため保持する。過去の受け入れ証跡やローカルデータは削除しない。
+
+当時の`bun scripts/build-cli.ts linux-x64 --m6-test`は、通常binaryとは別の`dist/castloop-m6-test-linux-x64`へ試験entryを埋め込んだ。service IDは`m6-test-`、全資源名は`castloop-m6-test-`だけを許し、envのaccount/tokenとprivate local admin keyを使った。通常buildのCLI/Worker entryは変更しなかった。
 
 試験CLIは既存のdurable登録/draft/staging/publication runnerを使用する。init完了はpausedで、明示service-resumeが必要。serviceの認証付きstatus/pause/resumeとtarget照会を接続し、pauseでは残存tokenを保持する。実行versionと空registryの再開条件は同じservice CAS snapshotで検査し、競合後にも再検査する。未知応答を自動再送せず、service操作の未知結果復旧は未完成である。
 
