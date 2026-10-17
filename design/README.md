@@ -6,6 +6,7 @@
 
 | 文書 | 用途 |
 | --- | --- |
+| [Cloudflare資源の棚卸し・削除候補](cloudflare_cleanup_inventory_20261017.md) | 2026-10-17の調査時点の一覧。[承認済み削除結果](archive/cloudflare_test_environment_cleanup_20261017.md)では最新SQLite環境だけを保持し、旧環境と試験用ドメインを廃棄済み |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [Lifecycle設計](m6_content_lifecycle_plan.md) | 非公開化・復元・削除の状態と安全条件 |
 | [新規初期化](m6_fresh_initialization.md) | 新規資源と稼働判定の責務 |
@@ -48,6 +49,6 @@
 
 通常の開発で一括して読む必要はない。判断の理由、過去の障害、検証証跡を調べるときだけ該当文書を参照する。本文の「未実装」「未公開」「資源を保持」は記録当時の状態であり、現在の仕様・残タスクやCloudflare資源の現状を示さない。
 
-試験環境の廃棄・保留の履歴は[2026-10-11の削除記録](archive/cloudflare_test_environment_cleanup_20261011.md)を参照する。
+試験環境の廃棄履歴は[2026-10-17の削除記録](archive/cloudflare_test_environment_cleanup_20261017.md)を参照する。以前の廃棄・保留は[2026-10-11の削除記録](archive/cloudflare_test_environment_cleanup_20261011.md)に残す。
 
 現在の仕様を変更したら直下の文書を更新する。完了した開発記録はarchiveへ移し、参照リンクも更新する。未解決の制約や承認済みの安全条件を、単に開発が完了したという理由でアーカイブしない。
