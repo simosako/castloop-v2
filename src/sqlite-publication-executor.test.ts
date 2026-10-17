@@ -192,6 +192,25 @@ test("real executor publishes a registered Show and Episode using no R2 lock/sta
   expect(setup.content.delivery("/staging/uploads/daily/audio.mp3").status).toBe(404);
 });
 
+test("XML-invalid Show and Episode payloads fail validation before any publication writes", async () => {
+  const setup = await fixture();
+  for (const kind of ["show", "episode"] as const) {
+    if (kind === "episode") await setup.publishShow();
+    const request = await setup.request(kind);
+    const source = kind === "show" ? { ...show, title: "private\u0000title" } : { ...metadata("first"), description: "private\u0008description" };
+    request.payloads[0] = await setup.payload(request.job_id, kind === "show" ? "show_metadata" : "episode_metadata", stringifyToml(source));
+    const before = new Map(setup.entries);
+    const purges = setup.purges.length;
+    setup.calls.length = 0;
+    expect(await setup.run(request)).toMatchObject({ state: "failed", reason_code: "validation_failed" });
+    expect(setup.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(setup.entries).toEqual(before);
+    expect(setup.purges).toHaveLength(purges);
+    expect(setup.queue.snapshot().drained).toBe(true);
+    expect(JSON.stringify(setup.queue.status(request.request_id))).not.toContain("private");
+  }
+});
+
 test("metadata-only publishes no audio and preserves immutable history, GUID, time and enclosure", async () => {
   const setup = await fixture();
   await setup.publishShow();

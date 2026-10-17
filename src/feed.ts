@@ -1,7 +1,9 @@
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
+import { isXml10Text } from "../packages/shared/src/xml";
 import { canonicalEnclosureUrl } from "./media-url";
 
 function escapeXml(value: string): string {
+  if (!isXml10Text(value)) throw new Error("RSS text contains a character forbidden by XML 1.0");
   return value.replace(/[&<>"'\r]/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;", "\r": "&#13;",
   })[character] ?? character);

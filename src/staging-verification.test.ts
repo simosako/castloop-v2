@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 
 const SHOW_TEXT = "schema_version = 1\nshow_id = 'daily'\ntitle = 'Private Show title'\ndescription = 'Private description'\nlanguage = 'en'\nauthor = 'Author'\nowner_name = 'Owner'\nowner_email = 'owner@example.com'\ncategories = ['Arts']\nexplicit = false\nsite_url = 'https://example.com'\nimage_path = 'cover.jpg'\n";
 
-async function fixture(asset: "show" | "audio" | "episode_metadata" = "show", invalid?: "image" | "metadata") {
+async function fixture(asset: "show" | "audio" | "episode_metadata" = "show", invalid?: "image" | "metadata" | "xml") {
   const kind = asset === "show" ? "show" : "episode";
   const base = await lifecycleFixture({ kind });
   await base.bucket.put("system/show-publications/daily.json", JSON.stringify({ schema_version: 2, show_id: "daily",
@@ -42,6 +42,10 @@ async function fixture(asset: "show" | "audio" | "episode_metadata" = "show", in
     { asset: "cover_jpg", bytes: Uint8Array.from(invalid === "image" ? [1, 2, 3, 4] : [255, 216, 255, 0]) },
   ] : asset === "audio" ? [{ asset: "audio", bytes: new TextEncoder().encode("ID3-test-audio") }] :
     [{ asset: "episode_metadata", bytes: new TextEncoder().encode(`schema_version = 1\nepisode_id = 'first'\nguid = '${crypto.randomUUID()}'\ntitle = 'Private Episode title'\ndescription = 'Private description'\npublished_at = '2026-10-01T12:00:00Z'\n`) }];
+  if (invalid === "xml") {
+    const source = new TextDecoder().decode(contents[0]!.bytes).replace("'Private description'", '"Private\\u0000description"');
+    contents[0]!.bytes = new TextEncoder().encode(source);
+  }
   const request = stageUploadRequestSchema.parse({ schema_version: 1, operation_id: crypto.randomUUID(), draft_job_id: crypto.randomUUID(),
     kind, show_id: "daily", expected_show_generation: 0, created_at: "2026-10-01T12:00:00Z",
     ...(kind === "episode" ? { episode_id: "first", expected_episode_generation: 0 } : {}),
@@ -61,6 +65,25 @@ async function fixture(asset: "show" | "audio" | "episode_metadata" = "show", in
 }
 
 describe("M6 staging verification and admission completion", () => {
+  test("XML-invalid Show and Episode text cannot finish staging or alter published content", async () => {
+    for (const asset of ["show", "episode_metadata"] as const) {
+      const setup = await fixture(asset, "xml");
+      await setup.settle();
+      const published = () => [...setup.entries].filter(([key]) => key.startsWith("public/") || key.startsWith("system/shows/"));
+      const before = published();
+      const payloads = new Map(setup.payloads);
+      await expect(runStageVerification(setup.env, setup.operation, "staged")).rejects.toThrow("XML");
+      expect(published()).toEqual(before);
+      expect(setup.payloads).toEqual(payloads);
+      const control = (await readShowControl(setup.env, "daily"))!.value;
+      expect(control.owner?.job_id).toBe(setup.operation.operationId);
+      expect(control.owner?.verification_id).toBeUndefined();
+      expect(control.last_finished_upload).toBeUndefined();
+      expect(JSON.parse(setup.entries.get(setup.progressKey)!.data).reason_code).toBe("validation_failed");
+      expect(setup.entries.get(setup.statusKey)!.data).not.toContain("Private");
+    }
+  });
+
   test("verification reuses only frozen records and still checks current owner, tokens, lifecycle and settlement", async () => {
     const setup = await fixture("episode_metadata");
     await setup.settle();

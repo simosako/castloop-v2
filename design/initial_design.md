@@ -12,6 +12,12 @@ v0.5.0は新しいSQLite方式を明示指定で提供する。既存Queue方式
 
 配布・実機検証の対象はLinux x86-64。v0.1.xのデータ変換・既存資源の採用は行わない。M0〜M5の経緯は後半のマイルストーンと各実装ログに残す。
 
+### RSSテキストの検証（次回更新向け）
+
+Queue／SQLite共通のShow・Episodeスキーマは、RSSへ出力する自由文、カテゴリ、サイトURLにXML 1.0で禁止された制御文字・孤立サロゲート・U+FFFE／U+FFFFを許可しない。GUIDと同じ許容範囲を共有し、文字の削除・置換による修復は行わない。検証は既存のtrim処理より前に行い、正常な日本語・絵文字・タブ・改行・復帰文字とGUIDの値を維持する。RSSレンダラーでも禁止文字を拒否する。
+
+新しい不正入力はCLI入力検証でも拒否し、サーバー側もQueueのstaging検証・SQLiteの公開検証で公開payloadの書き込み前に拒否する。既存の`validation_failed`診断とowner保全契約を維持する。保存済みの不正なスナップショットも新しい読み取り・再生成では拒否し、自動修復・履歴の書き換え・状態解放は行わない。配備だけで既存feedが再生成されることはない。既存のmetadata／feed全体のサイズ上限は維持し、今回の変更でフィールドごとの新しい文字数上限は追加しない。ローカル検証のみで、Cloudflareへの配備・実機操作は含まない。
+
 ## SQLite方式の構成（schema_version=2）
 
 - `init --publication-protocol sqlite-sequential-v1`で新規作成する。flag省略時は従来どおりQueue方式で、既存TOMLのschema/protocolを編集して変換しない。
