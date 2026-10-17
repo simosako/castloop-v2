@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { collectM6DeploymentSnapshot, m6SnapshotReads, m6WorkerDeploymentEvidenceSchema, serviceConfigSchema } from "@castloop/shared";
-import { buildM6WorkerUploadMetadata, inspectM6WorkerDeployment, M6_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
-import type { M6DeploymentReads } from "./m6-worker-deployment";
+import { buildM6WorkerUploadMetadata, collectM6DeploymentSnapshot, inspectM6WorkerDeployment, M6_WORKER_COMPATIBILITY_DATE,
+  m6SnapshotReads, m6WorkerDeploymentEvidenceSchema, serviceConfigSchema } from "@castloop/shared";
+import type { M6DeploymentReads } from "@castloop/shared";
 
 const M6_DEPLOYMENT_CONFIG = serviceConfigSchema.parse({ schema_version: 1, service_id: "probe", account_id: "a".repeat(32),
   bucket_name: "probe-bucket", worker_name: "probe-worker", queue_name: "probe-queue", dlq_name: "probe-dlq",

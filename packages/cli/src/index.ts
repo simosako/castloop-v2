@@ -3,16 +3,12 @@
 import { contentListResponseSchema, serviceConfigSchema, stringifyToml, validateId } from "@castloop/shared";
 import type { ServiceConfig } from "@castloop/shared";
 import { version } from "../../../package.json";
-import { administratorKey } from "./administrator-key";
-import { CloudflareApi } from "./cloudflare-api";
 import { formatContentList } from "./content-list";
 import { runDomainCommand } from "./domain-operation";
 import { COMMAND_HELP, commandHelp } from "./help";
 import { readLocalOperationStatus } from "./local-operation-status";
 import { M6_COMMAND_ARGUMENTS, runM6Command } from "./m6-commands";
 import { readLocalFreshM6Initialization } from "./m6-service-initialization";
-import { MigrationAdminClient } from "./migration-client";
-import { readLocalMigrationSetup } from "./migration-setup-journal";
 import { embeddedWorkerSource, embeddedSqliteWorkerSource } from "./worker-payload";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
@@ -153,7 +149,7 @@ async function main(): Promise<unknown> {
   if (["version", "--version"].includes(command) && !rest.length) return CLI_VERSION;
   if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`Unknown command: ${command}`);
   const listing = command === "list-shows" || command === "list-episodes";
-  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : command === "migration-status" ? ["local"] : command === "import-rss" ? ["dry-run"] : []);
+  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : command === "import-rss" ? ["dry-run"] : []);
   if (command === "import-rss") {
     allowedFlags(flags, ["dry-run", "output"]);
     if (positional.length !== 2 || Boolean(flags["dry-run"]) === Boolean(flags.output)) throw new Error(commandHelp(command));
@@ -198,7 +194,7 @@ async function main(): Promise<unknown> {
   } else if (listing) {
     allowedFlags(flags, ["json", "include-deleted", "cursor"]);
   } else {
-    allowedFlags(flags, command === "migration-status" ? ["local"] : []);
+    allowedFlags(flags, []);
   }
   if (["create-episode", "update-episode", "update-episode-audio", "publish-episode"].includes(command)) {
     positional.unshift(validateId(basename(root), "show"));
@@ -229,8 +225,6 @@ async function main(): Promise<unknown> {
   }
   const config = loadConfig(root);
   if (command === "local-operation-status" && positional.length === 2) return readLocalOperationStatus(root, config, positional[0]!, positional[1]!);
-  if (command === "migration-preflight" && positional.length === 1) return new CloudflareApi(config).inspectLegacyService(config, positional[0]!);
-  if (command === "migration-status" && !positional.length) return flags.local ? readLocalMigrationSetup(root, config) : new MigrationAdminClient(config, administratorKey(root)).status();
   throw new Error("Invalid command arguments; use --help");
 }
 

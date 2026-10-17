@@ -13,8 +13,8 @@ import { createLocalPublicationEffects } from "./publication-sources";
 import type { LocalPublicationInputs } from "./publication-sources";
 import { StagingAdminClient, stagingClientOperation, stagingClientTargets } from "./staging-client";
 import { createStagingJournal, validateStagingClientState } from "./staging-journal";
-import { runStagingBeginAndUpload, runStagingClaim, runStagingFinish, runStagingSettle } from "./staging-operation";
-import { createStagingRestEffects } from "./staging-rest-operation";
+import { createStagingOperationEffects, runStagingBeginAndUpload, runStagingClaim, runStagingFinish, runStagingSettle } from "./staging-operation";
+import { createStagingRestPut } from "./staging-rest";
 import type { StagingRestTransport } from "./staging-rest";
 import { freezeStagingSources } from "./staging-sources";
 import { mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
@@ -204,8 +204,9 @@ test("real local staging journal and REST/source effects feed guarded publicatio
     const object = (await setup.bucket.get(key))!;
     return new Response(object.bytes, { headers: { ETag: `"${object.etag}"` } });
   };
-  const stageEffects = createStagingRestEffects(setup.config, stageJournal.load(), "private-secret", sources,
-    { accountId: setup.config.account_id, apiToken: "private-token", transport }, client);
+  const stageEffects = { ...createStagingOperationEffects(setup.config, stageJournal.load(), "private-secret",
+    createStagingRestPut(setup.config, sources, { accountId: setup.config.account_id, apiToken: "private-token", transport }), client),
+    checkLocalInputs: () => sources.assertCurrent() };
   try {
     await runStagingClaim(stageJournal, stageEffects);
     await runStagingBeginAndUpload(stageJournal, stageEffects);

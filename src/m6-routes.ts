@@ -3,7 +3,6 @@ import type { ServiceConfig } from "../packages/shared/src/index";
 import { authenticated } from "./admin-auth";
 import { handleM6ContentList } from "./content-list-admin";
 import { handleDomainAdmin, serveDomainRuntimeProbe } from "./domain-admin";
-import legacyWorker from "./index";
 import { createCachedPublicFetch } from "./lifecycle-cache";
 import type { CachedAssetBinding, LifecyclePurgeTarget } from "./lifecycle-cache";
 import { handleM6LifecycleAdmin } from "./lifecycle-admin";
@@ -17,12 +16,9 @@ import { handleM6PublicationAdmin } from "./publication-admin";
 import { consumeOwnedPublication } from "./publication-consumer";
 import { consumePublicationCommitIntent, requirePublicationIntentRuntime } from "./publication-queue-consumer";
 import { parseQueueDelivery, recordDeadLetterDelivery } from "./queue-delivery";
-import { readServiceAdmission, requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
+import { requireM6ServiceRuntime, withServiceInvocation } from "./service-admission";
 import { readServiceCapabilities } from "./service-capabilities";
 import { handleM6StagingAdmin } from "./staging-admin";
-import { readBootstrapDeliveryWindow } from "./migration-bootstrap";
-import { handleMigrationAdmin } from "./migration-admin";
-import type { BootstrapRuntime } from "./migration-bootstrap";
 import { handleM6ShowRegistrationAdmin } from "./show-registration-admin";
 import { handleM6TargetInspection } from "./target-inspection-admin";
 import { handleM6SetupAdmin } from "./m6-setup-admin";
@@ -63,7 +59,7 @@ async function requireCandidateReadiness(env: M6CandidateEnv, config: ServiceCon
   await requireM6ServiceRuntime(env, config.service_id, env.CASTLOOP_VERSION_METADATA?.id);
 }
 
-async function deliveryGate(env: M6CandidateEnv): Promise<{ migrationId?: string; legacy: boolean }> {
+async function deliveryGate(env: M6CandidateEnv): Promise<{ legacy: boolean }> {
   const delivery = await readPublicServiceDelivery(env, env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_DLQ_NAME);
   if (delivery.mode === "m6") return { legacy: false };
   const config = await serviceConfig(env);
@@ -73,10 +69,7 @@ async function deliveryGate(env: M6CandidateEnv): Promise<{ migrationId?: string
     if (ready.value.state !== "open") throw new Error("Public delivery requires open service admission");
     return { legacy: true };
   }
-  const current = await readServiceAdmission(env, config.service_id);
-  if (!current) throw new Error("Migration delivery admission is missing");
-  return { legacy: true, migrationId: await readBootstrapDeliveryWindow(env, current.value,
-    env.CASTLOOP_VERSION_METADATA?.id, env.CASTLOOP_VERSION_METADATA?.tag) };
+  throw new Error("Migration delivery is not enabled");
 }
 
 async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAssets: M6CachedLoopback,
@@ -97,17 +90,17 @@ async function m6ManagementRoute(request: Request, env: M6CandidateEnv, cachedAs
 }
 
 export async function fetchM6Candidate(request: Request, env: M6CandidateEnv,
-  cachedAssets: M6CachedLoopback, bootstrapRuntime?: BootstrapRuntime): Promise<Response> {
-  return fetchM6Routes(request, env, cachedAssets, false, bootstrapRuntime);
+  cachedAssets: M6CachedLoopback): Promise<Response> {
+  return fetchM6Routes(request, env, cachedAssets, false);
 }
 
 export async function fetchM6ManagementIntegration(request: Request, env: M6CandidateEnv,
   cachedAssets: M6CachedLoopback, options: { setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
-  return fetchM6Routes(request, env, cachedAssets, true, undefined, options);
+  return fetchM6Routes(request, env, cachedAssets, true, options);
 }
 
 async function fetchM6Routes(request: Request, env: M6CandidateEnv,
-  cachedAssets: M6CachedLoopback, managementIntegration: boolean, bootstrapRuntime?: BootstrapRuntime,
+  cachedAssets: M6CachedLoopback, managementIntegration: boolean,
   options: { setupRuntime?: M6SetupRuntime } = {}): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   if (managementIntegration && pathname === "/.well-known/castloop/runtime") return serveDomainRuntimeProbe(request, env,
@@ -116,13 +109,12 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
   if (asset) {
     if (request.method !== "GET" && request.method !== "HEAD") return reply(request, { error: "method not allowed" }, 405);
     try {
-      const { migrationId, legacy } = await deliveryGate(env);
+      const { legacy } = await deliveryGate(env);
       const response = await serveLifecyclePublicRequest(request, env, createCachedPublicFetch(cachedAssets),
         legacy ? readPublicVisibilitySnapshot : undefined);
       if (!response) throw new Error("M6 public path was not handled by its lifecycle gateway");
       const headers = new Headers(response.headers);
       headers.set("X-Castloop-Worker-Version", env.CASTLOOP_VERSION_METADATA.id);
-      if (migrationId) headers.set("X-Castloop-Migration-ID", migrationId);
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     } catch {
       console.error(JSON.stringify({ event: "m6_candidate_public_failed", reason_code: "runtime_not_ready" }));
@@ -137,10 +129,6 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
     const setup = await handleM6SetupAdmin(request, env, options.setupRuntime);
     if (setup) return setup;
   }
-  if (bootstrapRuntime) {
-    const migration = await handleMigrationAdmin(request, env, bootstrapRuntime);
-    if (migration) return migration;
-  }
   if (managementIntegration) {
     const management = await m6ManagementRoute(request, env, cachedAssets, options);
     if (management) return management;
@@ -154,9 +142,6 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
     } catch {
       return reply(request, { error: "Service capabilities are unavailable" }, 503);
     }
-  }
-  if (pathname.startsWith("/admin/jobs/") || pathname.startsWith("/admin/episodes/") || pathname.startsWith("/admin/shows/")) {
-    return legacyWorker.fetch(request, env);
   }
   return reply(request, { error: "not found" }, 404);
 }

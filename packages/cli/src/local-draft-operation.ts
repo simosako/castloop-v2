@@ -92,7 +92,7 @@ export async function runLocalDraftStaging(root: string, configInput: ServiceCon
 
 export async function runLocalDraftPublication(root: string, configInput: ServiceConfig, target: LocalDraftTarget,
   request: PublicationHeader, options: Omit<LocalPublicationPreparation, "stagedOperationIds">, adminKey: string,
-  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "release" | "status">,
+  client?: Pick<PublicationAdminClient, "claim" | "commit" | "retry" | "status">,
   expectedDraftJobId?: string, management?: ManagementQueueTransport): Promise<PublicationClientState> {
   const config = serviceConfigSchema.parse(configInput);
   const header = publicationHeaderSchema.parse(request);

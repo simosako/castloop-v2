@@ -1,19 +1,32 @@
 import { expect, test } from "bun:test";
 import { stageUploadRequestSchema } from "@castloop/shared";
+import type { ServiceConfig } from "@castloop/shared";
 import { stagingAdminFixture } from "../../../src/test-support/staging-admin";
 import { handleM6StagingAdmin } from "../../../src/staging-admin";
 import { readShowControl } from "../../../src/lifecycle-control";
 import { fetchM6ManagementIntegration } from "../../../src/m6-routes";
 import { StagingAdminClient, stagingClientTargets } from "./staging-client";
 import { createStagingJournal } from "./staging-journal";
-import { runStagingBeginAndUpload, runStagingClaim, runStagingFinish, runStagingSettle } from "./staging-operation";
-import { createStagingRestEffects } from "./staging-rest-operation";
+import type { StagingClientState } from "./staging-journal";
+import { createStagingOperationEffects, runStagingBeginAndUpload, runStagingClaim, runStagingFinish, runStagingSettle } from "./staging-operation";
+import type { StagingOperationEffects } from "./staging-operation";
 import { createStagingRestPut } from "./staging-rest";
-import type { StagingRestTransport } from "./staging-rest";
+import type { StagingRestOptions, StagingRestTransport } from "./staging-rest";
 import { freezeStagingSources } from "./staging-sources";
+import type { FrozenStagingSources } from "./staging-sources";
 import { createHash } from "node:crypto";
 import { mkdtemp, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+
+function createStagingRestEffects(config: ServiceConfig, state: StagingClientState,
+  adminKey: string, sources: FrozenStagingSources, options?: StagingRestOptions,
+  client?: Pick<StagingAdminClient, "claim" | "begin" | "settle" | "finish" | "status">): StagingOperationEffects {
+  const effects = createStagingOperationEffects(config, state, adminKey, createStagingRestPut(config, sources, options), client);
+  if (JSON.stringify(effects.upload) !== JSON.stringify(sources.upload)) throw new Error("REST staging sources differ from the durable frozen manifest");
+  return { ...effects, checkLocalInputs: () => sources.assertCurrent(),
+    claim: async () => { await sources.assertCurrent(); return effects.claim(); },
+    begin: async () => { await sources.assertCurrent(); return effects.begin(); } };
+}
 
 async function fixture(kind: "show" | "audio" | "episode_metadata" = "audio") {
   const setup = await stagingAdminFixture(kind);

@@ -1,17 +1,12 @@
-import { collectM6DeploymentSnapshot, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, migrationBootstrapRequestSchema, migrationBridgeDeploymentRequestSchema, migrationBridgeUploadSchema, migrationCandidateUploadSchema, normalizeHostname, serviceConfigSchema, serviceManagementBaseUrl, stringifyToml, workerDeploymentsSnapshotSchema,
+import { buildM6WorkerUploadMetadata, collectM6DeploymentSnapshot, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
+  M6_WORKER_COMPATIBILITY_DATE, m6RuntimeTargetSchema, m6ServiceConfigHash, m6ServiceUpdateRequestSchema, normalizeHostname,
+  parseManagementIntent, publicationQueueIdSchema, serviceConfigSchema, serviceManagementBaseUrl, stringifyToml, workerDeploymentsSnapshotSchema,
   workerScriptUploadReceiptSchema, workerSettingsSnapshotSchema, workerSubdomainSnapshotSchema, workerVersionSnapshotSchema,
-   workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema, parsePublicationCommitIntent, publicationQueueIdSchema, parseManagementIntent } from "@castloop/shared";
-import type { LegacyWorkerInspection, MigrationBootstrapRequest, MigrationBridgeDeploymentEvidence, MigrationBridgeDeploymentRequest, MigrationBridgePreparation, MigrationBridgeUpload, MigrationCandidateUpload,
-   M6DeploymentReads, M6DeploymentSnapshot, M6RuntimeTarget, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence, ManagementIntent, PublicationCommitIntent, ServiceConfig, WorkerVersionUploadReceipt } from "@castloop/shared";
+  workerVersionUploadReceiptSchema, workerVersionsSnapshotSchema } from "@castloop/shared";
+import type { M6DeploymentReads, M6DeploymentSnapshot, M6RuntimeTarget, M6ServiceUpdateRequest, M6WorkerDeploymentEvidence,
+  M6WorkerUploadMetadata, ManagementIntent, ServiceConfig, WorkerVersionUploadReceipt } from "@castloop/shared";
 import type { M6UpdateDeployReceipts } from "./m6-service-update";
-import { buildM6WorkerUploadMetadata, buildMigrationCandidateUpload, inspectM6WorkerDeployment, M6_FRESH_WORKER_COMPATIBILITY_DATE,
-  M6_WORKER_COMPATIBILITY_DATE, requireMigrationBridgeSettings, requireMigrationBridgeVersion } from "./m6-worker-deployment";
-import { migrationPayloadHash } from "./migration-deployment";
-import type { M6WorkerUploadMetadata } from "./m6-worker-deployment";
-import { inspectLegacyServiceDeployment, inspectMigrationBridgeDeployment, prepareMigrationBridgeDeployment } from "./migration-bridge-deployment";
-import type { MigrationBridgeReads } from "./migration-bridge-deployment";
-import { createHash } from "node:crypto";
-import { createReadStream, statSync } from "node:fs";
+import { workerPayloadHash } from "./worker-upload-hash";
 
 type ApiResult<T> = { success: boolean; result: T; errors?: Array<{ code: number; message: string }> };
 type QueueRecord = { queue_id: string; queue_name: string };
@@ -116,7 +111,7 @@ export class CloudflareApi {
     const path = this.migrationWorkerPath(config);
     const metadata = buildM6WorkerUploadMetadata(config, null, adminKey, M6_FRESH_WORKER_COMPATIBILITY_DATE);
     const metadataSource = JSON.stringify(frozenMetadata);
-    if (!source || migrationPayloadHash(metadata) !== migrationPayloadHash(metadataSource)) {
+    if (!source || workerPayloadHash(metadata) !== workerPayloadHash(metadataSource)) {
       throw new Error("Fresh M6 upload differs from its frozen runtime metadata");
     }
     await this.json("POST", "/workers/workers", { name: config.worker_name });
@@ -148,7 +143,7 @@ export class CloudflareApi {
     const metadata = buildM6WorkerUploadMetadata(config, previous, "", previous.compatibility_date);
     const current = buildM6WorkerUploadMetadata(config, await this.json<unknown>("GET", `${path}/settings`), "", previous.compatibility_date);
     const deployment = await this.singleMigrationDeployment(path, previousVersionId);
-    if (migrationPayloadHash(current) !== migrationPayloadHash(metadata) || deployment.id !== evidence.deployment_id ||
+    if (workerPayloadHash(current) !== workerPayloadHash(metadata) || deployment.id !== evidence.deployment_id ||
       await this.compatibleDomainSnapshot(config) !== domains) {
       throw new Error("M6 settings or deployment changed during compatible upload preparation");
     }
@@ -163,12 +158,12 @@ export class CloudflareApi {
     const request = m6ServiceUpdateRequestSchema.parse(input);
     const metadataSource = JSON.stringify(metadata);
     if (config.service_id !== request.service_id || await m6ServiceConfigHash(config) !== request.service_config_sha256 ||
-      migrationPayloadHash(source) !== request.worker_source_sha256 || migrationPayloadHash(metadataSource) !== request.worker_metadata_sha256) {
+      workerPayloadHash(source) !== request.worker_source_sha256 || workerPayloadHash(metadataSource) !== request.worker_metadata_sha256) {
       throw new Error("Compatible upload differs from its frozen service, source or metadata");
     }
     const path = this.workerPath(config);
     const expected = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id);
-    if (migrationPayloadHash(expected) !== request.worker_metadata_sha256) throw new Error("Compatible settings changed after metadata was frozen");
+    if (workerPayloadHash(expected) !== request.worker_metadata_sha256) throw new Error("Compatible settings changed after metadata was frozen");
     const previousDeployment = await this.singleMigrationDeployment(path, request.previous_worker_version_id);
     const form = new FormData();
     form.set("metadata", JSON.stringify({ main_module: expected.main_module, compatibility_date: expected.compatibility_date,
@@ -198,7 +193,7 @@ export class CloudflareApi {
     for (let snapshot = 0; snapshot < 2; snapshot += 1) {
       await this.requireUploadedM6Version(path, versionId, uploaded.resources.script);
       const current = await this.prepareCompatibleM6WorkerUpload(config, request.previous_worker_version_id, versionId);
-      if (migrationPayloadHash(current) !== request.worker_metadata_sha256 ||
+      if (workerPayloadHash(current) !== request.worker_metadata_sha256 ||
         (await this.singleMigrationDeployment(path, request.previous_worker_version_id)).id !== previousDeploymentId) {
         throw new Error("Compatible settings or deployment changed before activation; preserve the acknowledged version");
       }
@@ -240,7 +235,7 @@ export class CloudflareApi {
     }
     const preserved = await this.prepareCompatibleM6WorkerUpload(config, versionId);
     preserved.bindings = preserved.bindings.map((binding) => binding.type === "inherit" ? { ...binding, version_id: request.previous_worker_version_id } : binding);
-    if (migrationPayloadHash(preserved) !== request.worker_metadata_sha256) throw new Error("Compatible update changed the preserved Worker settings");
+    if (workerPayloadHash(preserved) !== request.worker_metadata_sha256) throw new Error("Compatible update changed the preserved Worker settings");
     const evidence = await this.inspectM6WorkerDeployment(config, versionId, preserved.compatibility_date);
     if (evidence.deployment_id !== deployment.deployment_id) throw new Error("Compatible deployment changed after upload");
     return evidence;
@@ -370,17 +365,6 @@ export class CloudflareApi {
     return id;
   }
 
-  async publishPublicationIntent(queueId: string, input: PublicationCommitIntent): Promise<void> {
-    const id = publicationQueueIdSchema.parse(queueId);
-    const intent = parsePublicationCommitIntent(input);
-    try {
-      await this.json("POST", `/queues/${id}/messages`, { body: intent });
-    } catch (error) {
-      throw new Error("Queue submission was not acknowledged; preserve its frozen journal and held owner without replaying the POST. " +
-        "Check Cloudflare connectivity and Queues Edit permission", { cause: error });
-    }
-  }
-
   async publishManagementIntent(queueId: string, input: ManagementIntent): Promise<void> {
     const id = publicationQueueIdSchema.parse(queueId);
     const intent = parseManagementIntent(input);
@@ -401,45 +385,6 @@ export class CloudflareApi {
     const data: ApiResult<WorkerSettings> = await response.json();
     if (!data.success) throw new Error(`Cloudflare GET ${path} did not succeed`);
     return data.result;
-  }
-
-  async deployWorker(config: ServiceConfig, source: string, adminKey: string,
-    compatibilityDate: string): Promise<void> {
-    const previous = await this.existingWorker(config.worker_name);
-    if (previous?.exports?.CachedPublicAssets !== undefined ||
-      previous?.bindings?.some((binding) => binding.name === "CASTLOOP_VERSION_METADATA")) {
-      throw new Error("Legacy deploy cannot replace an M6 Worker; use a verified migration-aware deployment path");
-    }
-    const managed = new Set(["CASTLOOP_BUCKET", "CASTLOOP_QUEUE", "CASTLOOP_DLQ_NAME", "CASTLOOP_ADMIN_KEY"]);
-    const preserved = previous?.bindings?.filter((binding) => !managed.has(binding.name))
-      .map((binding) => ({ name: binding.name, type: "inherit" })) ?? [];
-    const adminSecret = previous?.bindings?.some((binding) => binding.name === "CASTLOOP_ADMIN_KEY")
-      ? { name: "CASTLOOP_ADMIN_KEY", type: "inherit" }
-      : { name: "CASTLOOP_ADMIN_KEY", type: "secret_text", text: adminKey };
-    const metadata = {
-      main_module: "index.js", compatibility_date: compatibilityDate,
-      cache_options: { enabled: true,
-        ...(previous?.cache_options?.cross_version_cache !== undefined
-          ? { cross_version_cache: previous.cache_options.cross_version_cache } : {}) },
-      observability: previous?.observability ?? { enabled: true, traces: { enabled: true } },
-      ...(previous?.compatibility_flags?.length ? { compatibility_flags: previous.compatibility_flags } : {}),
-      ...(previous?.tags?.length ? { tags: previous.tags } : {}),
-      ...(previous?.tail_consumers?.length ? { tail_consumers: previous.tail_consumers } : {}),
-      ...(previous?.placement ? { placement: previous.placement } : {}),
-      ...(previous?.logpush ? { logpush: previous.logpush } : {}),
-      bindings: [
-        { name: "CASTLOOP_BUCKET", type: "r2_bucket", bucket_name: config.bucket_name },
-        { name: "CASTLOOP_QUEUE", type: "queue", queue_name: config.queue_name },
-        { name: "CASTLOOP_DLQ_NAME", type: "plain_text", text: config.dlq_name },
-        adminSecret, ...preserved,
-      ],
-    };
-    const upload = new FormData();
-    upload.set("metadata", JSON.stringify(metadata));
-    upload.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
-    await this.jsonUpload(`/workers/scripts/${encodeURIComponent(config.worker_name)}?bindings_inherit=strict`, upload);
-    await this.json("POST", `/workers/scripts/${encodeURIComponent(config.worker_name)}/subdomain`,
-      { enabled: true, previews_enabled: false });
   }
 
   async inspectM6WorkerDeployment(config: ServiceConfig, expectedVersionId: string,
@@ -492,92 +437,12 @@ export class CloudflareApi {
   }
 
   private async singleMigrationDeployment(path: string, expectedVersionId: string) {
-    migrationBootstrapRequestSchema.shape.bridge_worker_version_id.parse(expectedVersionId);
+    m6RuntimeTargetSchema.shape.worker_version_id.parse(expectedVersionId);
     const value = workerDeploymentsSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/deployments`)).deployments[0]!;
     if (value.versions.length !== 1 || value.versions[0]!.version_id !== expectedVersionId || value.versions[0]!.percentage !== 100) {
       throw new Error("Migration requires the expected single Worker version serving 100% before any write");
     }
     return value;
-  }
-
-  private legacyDeploymentReads(config: ServiceConfig): MigrationBridgeReads {
-    const path = this.migrationWorkerPath(config);
-    return {
-      deployments: () => this.json<unknown>("GET", `${path}/deployments`),
-      settings: () => this.json<unknown>("GET", `${path}/settings`),
-      version: (id) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(id)}`),
-      subdomain: () => this.json<unknown>("GET", `${path}/subdomain`),
-      domains: () => this.workerDomains("service", config.worker_name),
-      script: () => this.request("GET", path),
-    };
-  }
-
-  async inspectLegacyService(config: ServiceConfig, legacyVersionId: string): Promise<LegacyWorkerInspection> {
-    return inspectLegacyServiceDeployment(config, legacyVersionId, this.legacyDeploymentReads(config));
-  }
-
-  async prepareMigrationBridge(config: ServiceConfig, legacyVersionId: string, bridgeId: string, source: string):
-    Promise<{ request: MigrationBridgePreparation; metadata: MigrationBridgeUpload }> {
-    return prepareMigrationBridgeDeployment(config, legacyVersionId, bridgeId, source, this.legacyDeploymentReads(config));
-  }
-
-  async uploadMigrationBridge(config: ServiceConfig, input: MigrationBridgeDeploymentRequest, source: string, metadataInput: object): Promise<void> {
-    const request = migrationBridgeDeploymentRequestSchema.parse(input);
-    const preparation = request.preparation;
-    const metadata = migrationBridgeUploadSchema.parse(metadataInput);
-    if (preparation.service_id !== config.service_id || preparation.account_id !== config.account_id || preparation.worker_name !== config.worker_name ||
-      metadata.annotations["workers/tag"] !== preparation.bridge_id || migrationPayloadHash(source) !== preparation.worker_source_sha256 ||
-      migrationPayloadHash(metadataInput) !== preparation.worker_metadata_sha256) throw new Error("Initial bridge upload differs from its frozen preparation");
-    const path = this.migrationWorkerPath(config);
-    const current = await this.prepareMigrationBridge(config, preparation.legacy_worker_version_id, preparation.bridge_id, source);
-    if (JSON.stringify(current.request) !== JSON.stringify(preparation)) throw new Error("Legacy snapshot changed after initial bridge preparation");
-    const form = new FormData();
-    form.set("metadata", JSON.stringify(metadataInput));
-    form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
-    await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
-  }
-
-  async inspectMigrationBridge(config: ServiceConfig, bridgeId: string, expectedVersionId: string): Promise<MigrationBridgeDeploymentEvidence> {
-    const path = this.migrationWorkerPath(config);
-    return inspectMigrationBridgeDeployment(config, bridgeId, expectedVersionId, {
-      deployments: () => this.json<unknown>("GET", `${path}/deployments`), settings: () => this.json<unknown>("GET", `${path}/settings`),
-      version: (id) => this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(id)}`),
-      subdomain: () => this.json<unknown>("GET", `${path}/subdomain`), domains: () => this.workerDomains("service", config.worker_name),
-    });
-  }
-
-  async migrationCandidateUploadMetadata(config: ServiceConfig, bootstrapId: string, bridgeVersionId: string): Promise<MigrationCandidateUpload> {
-    const path = this.migrationWorkerPath(config);
-    const before = await this.singleMigrationDeployment(path, bridgeVersionId);
-    const previous = requireMigrationBridgeSettings(await this.json<unknown>("GET", `${path}/settings`), config);
-    requireMigrationBridgeVersion(await this.json<unknown>("GET", `${path}/versions/${encodeURIComponent(bridgeVersionId)}`), config, bridgeVersionId);
-    const domains = await this.workerDomains("service", config.worker_name);
-    if (domains.length) throw new Error("Migration deploy cannot alter a Worker with attached Custom Domains");
-    const previews = workerSubdomainSnapshotSchema.parse(await this.json<unknown>("GET", `${path}/subdomain`));
-    if (!previews.enabled || previews.previews_enabled) throw new Error("Migration bridge requires workers.dev enabled and old previews disabled");
-    const metadata = buildMigrationCandidateUpload(config, previous, bootstrapId, bridgeVersionId);
-    const latestMetadata = buildMigrationCandidateUpload(config, await this.json<unknown>("GET", `${path}/settings`), bootstrapId, bridgeVersionId);
-    const current = await this.singleMigrationDeployment(path, bridgeVersionId);
-    if (JSON.stringify(current) !== JSON.stringify(before) || migrationPayloadHash(latestMetadata) !== migrationPayloadHash(metadata)) {
-      throw new Error("Migration bridge deployment/settings changed during metadata preparation");
-    }
-    return metadata;
-  }
-
-  async uploadMigrationCandidate(config: ServiceConfig, input: MigrationBootstrapRequest, source: string, metadataInput: object): Promise<void> {
-    const request = migrationBootstrapRequestSchema.parse(input);
-    const metadata = migrationCandidateUploadSchema.parse(metadataInput);
-    if (request.service_id !== config.service_id || metadata.annotations["workers/tag"] !== request.bootstrap_id ||
-      migrationPayloadHash(source) !== request.worker_source_sha256 || migrationPayloadHash(metadataInput) !== request.worker_metadata_sha256) {
-      throw new Error("Candidate upload differs from its frozen service/bootstrap/source/metadata request");
-    }
-    const path = this.migrationWorkerPath(config);
-    const expected = await this.migrationCandidateUploadMetadata(config, request.bootstrap_id, request.bridge_worker_version_id);
-    if (migrationPayloadHash(expected) !== request.worker_metadata_sha256) throw new Error("Migration bridge settings changed after upload metadata was frozen");
-    const form = new FormData();
-    form.set("metadata", JSON.stringify(metadataInput));
-    form.set("index.js", new Blob([source], { type: "application/javascript+module" }), "index.js");
-    await this.jsonUpload(`${path}?bindings_inherit=strict`, form);
   }
 
   async disableMigrationWorkerPreviews(config: ServiceConfig, workerVersionId: string): Promise<void> {
@@ -634,37 +499,4 @@ export class CloudflareApi {
         prefix: "staging/", suffix: "commit.json" }],
     });
   }
-
-  async putObject(bucket: string, key: string, file: string, contentType: string,
-    checksum?: string): Promise<void> {
-    const length = statSync(file).size;
-    const path = `/r2/buckets/${encodeURIComponent(bucket)}/objects/${key}`;
-    const response = await this.request("PUT", path, Bun.file(file), contentType, 300000);
-    const data: ApiResult<{ size: number | string }> = await response.json();
-    if (!data.success || Number(data.result?.size) !== length) {
-      throw new Error(`R2 upload size mismatch for ${key}`);
-    }
-    if (checksum) await this.verifyObject(bucket, key, length, checksum);
-  }
-
-  private async verifyObject(bucket: string, key: string, length: number, checksum: string): Promise<void> {
-    const path = `/r2/buckets/${encodeURIComponent(bucket)}/objects/${key}`;
-    const response = await this.request("GET", path, undefined, undefined, 300000);
-    if (!response.body) throw new Error(`R2 download for ${key} was empty`);
-    const hash = createHash("sha256");
-    let received = 0;
-    for await (const chunk of response.body) {
-      received += chunk.length;
-      hash.update(chunk);
-    }
-    if (received !== length || hash.digest("hex") !== checksum) {
-      throw new Error(`R2 upload verification failed for ${key}`);
-    }
-  }
-}
-
-export async function hashFile(file: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(file)) hash.update(chunk);
-  return hash.digest("hex");
 }

@@ -1,7 +1,7 @@
-import { episodeRevisionSchema, stringifyToml } from "../../packages/shared/src/index";
-import { claimServiceMigration, initializeServiceAdmission, pauseServiceAdmission, readServiceAdmission } from "../service-admission";
+import { episodeRevisionSchema, serviceAdmissionSchema, stringifyLifecycleToml, stringifyToml } from "../../packages/shared/src/index";
+import { preparePublicDeliveryConfiguration, preparePublicDeliveryControls, putPublicDeliveryRecord } from "../public-delivery-records";
+import { claimServiceMigration, initializeServiceAdmission, pauseServiceAdmission, readServiceAdmission, SERVICE_ADMISSION_KEY } from "../service-admission";
 import { PUBLICATION_SERVICE_TEXT, PUBLICATION_SHOW_TEXT } from "./publication";
-import type { MigrationApplyEffects } from "../lifecycle-migration-apply";
 
 export async function migrationFixture(pageSize = 1000) {
   const entries = new Map<string, { data: string; size: number; etag: string; customMetadata?: Record<string, string> }>();
@@ -38,7 +38,8 @@ export async function migrationFixture(pageSize = 1000) {
   const env = { CASTLOOP_BUCKET: bucket } as never;
   const jobId = crypto.randomUUID();
   await bucket.put("system/service.toml", PUBLICATION_SERVICE_TEXT);
-  await bucket.put("system/show-reservations/daily.json", JSON.stringify({ show_id: "daily", reservation_id: crypto.randomUUID() }));
+  const reservationId = crypto.randomUUID();
+  await bucket.put("system/show-reservations/daily.json", JSON.stringify({ show_id: "daily", reservation_id: reservationId }));
   await bucket.put("system/show-publications/daily.json", JSON.stringify({ job_id: jobId, state: "free" }));
   await bucket.put(`system/jobs/${jobId}/status.toml`, stringifyToml({ schema_version: 1, job_id: jobId,
     show_id: "daily", kind: "show", state: "published" }));
@@ -61,7 +62,27 @@ export async function migrationFixture(pageSize = 1000) {
   const runtime = { deployment_id: crypto.randomUUID(), worker_version_id: crypto.randomUUID(), default_cache_disabled: true as const,
     cached_entrypoint: "CachedPublicAssets" as const, old_cache_purged: true as const, cutover_verified: true as const,
     old_io_quiesced: true as const, publication_routes_verified: true as const };
-  const effects: MigrationApplyEffects = { checkQuiescence: async () => {}, verifyCutover: async () => runtime };
-  return { env, bucket, entries, writes, jobId, pauseId, migrationId, runtime, effects,
+  const initializeM6Controls = async () => {
+    entries.delete("system/show-publications/daily.json");
+    await putPublicDeliveryRecord(env, "system/show-publications/daily.json", JSON.stringify({
+      schema_version: 2, show_id: "daily", lifecycle: "active", generation: 0, feed_generation: 0,
+    }), { onlyIf: new Headers({ "If-None-Match": "*" }) });
+    await putPublicDeliveryRecord(env, "system/episode-lifecycle/daily/first.toml", stringifyLifecycleToml({
+      schema_version: 1, show_id: "daily", episode_id: "first", lifecycle: "active", generation: 0,
+    }), { onlyIf: new Headers({ "If-None-Match": "*" }) });
+    await preparePublicDeliveryControls(env, async () => {});
+    await preparePublicDeliveryConfiguration(env, "service");
+    const current = await readServiceAdmission(env, "service");
+    if (!current) throw new Error("Test fixture lost its service admission");
+    const { migration: _migration, ...base } = current.value;
+    const next = serviceAdmissionSchema.parse({
+      ...base, generation: current.value.generation + 1, mode: "m6", state: "paused",
+      readiness: { migration_id: migrationId, plan_sha256: "a".repeat(64), ...runtime, completed_execution_id: crypto.randomUUID() },
+    });
+    if (!await putPublicDeliveryRecord(env, SERVICE_ADMISSION_KEY, JSON.stringify(next), { onlyIf: { etagMatches: current.etag } })) {
+      throw new Error("Test fixture admission completion conflicted");
+    }
+  };
+  return { env, bucket, entries, writes, jobId, pauseId, migrationId, runtime, initializeM6Controls,
     prefix: `system/lifecycle-migrations/${migrationId}` };
 }

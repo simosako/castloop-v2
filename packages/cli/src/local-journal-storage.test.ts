@@ -32,8 +32,8 @@ test("journal storage creates private records and atomically replaces them witho
 test("journal lock scopes survive rejected nesting and release after callback failure", async () => {
   const root = mkdtempSync("/tmp/opencode/castloop-journal-storage-lock-");
   try {
-    const storage = createLocalJournalStorage(root, "migrations", undefined, "operation.json");
-    const other = createLocalJournalStorage(root, "migrations", undefined, "operation.json");
+    const storage = createLocalJournalStorage(root, "service-initializations", undefined, "operation.json");
+    const other = createLocalJournalStorage(root, "service-initializations", undefined, "operation.json");
     storage.initialize({ phase: "prepared" });
     expect(() => storage.replace({})).toThrow("exclusive client lock");
     await expect(storage.exclusively(async () => {
@@ -52,7 +52,7 @@ test("journal lock scopes survive rejected nesting and release after callback fa
 test("failed record serialization preserves the predecessor and leaves its private temporary file for inspection", async () => {
   const root = mkdtempSync("/tmp/opencode/castloop-journal-storage-failure-");
   try {
-    const storage = createLocalJournalStorage(root, "migrations", undefined, "operation.json");
+    const storage = createLocalJournalStorage(root, "service-initializations", undefined, "operation.json");
     storage.initialize({ phase: "prepared" });
     await expect(storage.exclusively(async () => storage.replace({ invalid: 1n }))).rejects.toThrow();
     expect(storage.read()).toEqual({ phase: "prepared" });
@@ -71,7 +71,7 @@ test("journal storage rejects filenames that could escape the selected journal d
   const root = mkdtempSync("/tmp/opencode/castloop-journal-storage-identity-");
   try {
     for (const name of ["../outside.json", "/outside.json", "history/entry.json", ".json", "operation.json.lock"]) {
-      expect(() => createLocalJournalStorage(root, "migrations", undefined, name)).toThrow("file identity");
+      expect(() => createLocalJournalStorage(root, "service-initializations", undefined, name)).toThrow("file identity");
     }
     expect(readdirSync(root)).toEqual([]);
   } finally { rmSync(root, { recursive: true, force: true }); }

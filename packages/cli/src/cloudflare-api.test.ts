@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { m6ServiceConfigHash, m6ServiceUpdateRequestSchema, parseServiceConfig, serviceAdmissionSchema, serviceConfigSchema,
-  stringifyToml, workerSettingsSnapshotSchema } from "@castloop/shared";
+import { buildM6WorkerUploadMetadata, M6_FRESH_WORKER_COMPATIBILITY_DATE, m6ServiceConfigHash, m6ServiceUpdateRequestSchema,
+  parseServiceConfig, serviceAdmissionSchema, serviceConfigSchema, stringifyToml } from "@castloop/shared";
 import { fetchM6ManagementIntegration } from "../../../src/m6-routes";
 import { readServiceAdmission } from "../../../src/service-admission";
 import { domainAdminFixture } from "../../../src/test-support/domain-admin";
@@ -9,10 +9,9 @@ import { DomainClient } from "./domain-client";
 import { readLocalDomainChanges } from "./domain-journal";
 import { runDomainCommand } from "./domain-operation";
 import type { DomainEffects } from "./domain-operation";
-import { buildM6WorkerUploadMetadata, M6_FRESH_WORKER_COMPATIBILITY_DATE } from "./m6-worker-deployment";
 import { createFreshM6RestEffects } from "./m6-initialization-rest";
 import { createM6UpdateRestEffects } from "./m6-update-rest";
-import { migrationPayloadHash } from "./migration-deployment";
+import { workerPayloadHash } from "./worker-upload-hash";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -265,56 +264,6 @@ test("M6 inspection does not retry or substitute a successful proof when Cloudfl
   expect(calls).toBe(1);
 });
 
-test("existing legacy deploy keeps its cache/bindings policy and does not silently opt into M6", async () => {
-  const methods: string[] = [];
-  await withCloudflare(async (request) => {
-    const url = new URL(request.url);
-    methods.push(request.method);
-    if (request.method === "GET" && url.pathname.endsWith("/settings")) return reply({
-      cache_options: { enabled: true, cross_version_cache: true },
-      bindings: [{ name: "CASTLOOP_ADMIN_KEY", type: "secret_text" }, { name: "EXTRA_SECRET", type: "secret_text" }],
-      observability: { enabled: true, traces: { enabled: true } },
-    });
-    if (request.method === "PUT") {
-      const form = await request.formData();
-      const metadata = workerSettingsSnapshotSchema.parse(JSON.parse(String(form.get("metadata"))));
-      expect(metadata.cache_options).toEqual({ enabled: true, cross_version_cache: true });
-      expect(metadata.exports).toBeUndefined();
-      expect(metadata.bindings).toContainEqual({ name: "CASTLOOP_ADMIN_KEY", type: "inherit" });
-      expect(metadata.bindings).toContainEqual({ name: "EXTRA_SECRET", type: "inherit" });
-      expect(metadata.bindings.some((binding) => binding.name === "CASTLOOP_VERSION_METADATA")).toBe(false);
-      expect(metadata.compatibility_date).toBe("2026-09-30");
-      expect(JSON.stringify(metadata)).not.toContain("replacement-secret");
-      expect(url.searchParams.get("bindings_inherit")).toBe("strict");
-      return reply({});
-    }
-    if (request.method === "POST" && url.pathname.endsWith("/subdomain")) {
-      expect(await request.json<{ enabled: boolean; previews_enabled: boolean }>()).toEqual({ enabled: true, previews_enabled: false });
-      return reply({});
-    }
-    throw new Error("Unexpected legacy deployment request");
-  }, async (api) => {
-    await api.deployWorker(config, "export default {};", "replacement-secret", "2026-09-30");
-  });
-  expect(methods).toEqual(["GET", "PUT", "POST"]);
-});
-
-test("legacy deploy refuses M6 cache exports or version metadata before any Worker write", async () => {
-  for (const marker of ["export", "binding"]) {
-    let calls = 0;
-    await withCloudflare((request) => {
-      calls += 1;
-      expect(request.method).toBe("GET");
-      expect(new URL(request.url).pathname.endsWith("/settings")).toBe(true);
-      return reply(marker === "export" ? { bindings: [], exports: { CachedPublicAssets: { type: "worker", cache: { enabled: true } } } } :
-        { bindings: [{ name: "CASTLOOP_VERSION_METADATA", type: "version_metadata" }] });
-    }, async (api) => {
-      await expect(api.deployWorker(config, "export default {};", "private-secret", "2026-09-30")).rejects.toThrow("Legacy deploy cannot replace");
-    });
-    expect(calls).toBe(1);
-  }
-});
-
 test("fresh M6 REST provisioning creates isolated resources and verifies its frozen deployment without claiming runtime readiness", async () => {
   const fresh = { ...config, public_base_url: `https://${worker}.example.workers.dev` };
   const metadata = buildM6WorkerUploadMetadata(fresh, null, "private-admin-key", M6_FRESH_WORKER_COMPATIBILITY_DATE);
@@ -478,8 +427,8 @@ test.each([null, "custom-domain", "domain-drift", "missing-receipt", "old-versio
     expect(nextMetadata.bindings).toContainEqual({ name: "EXTRA_SECRET", type: "inherit", version_id: previousVersion });
     const request = m6ServiceUpdateRequestSchema.parse({ operation_id: crypto.randomUUID(), service_id: service.service_id,
       pause_id: crypto.randomUUID(), expected_service_generation: 1, previous_worker_version_id: previousVersion,
-      service_config_sha256: await m6ServiceConfigHash(service), worker_source_sha256: migrationPayloadHash("new-worker"),
-      worker_metadata_sha256: migrationPayloadHash(nextMetadata) });
+      service_config_sha256: await m6ServiceConfigHash(service), worker_source_sha256: workerPayloadHash("new-worker"),
+      worker_metadata_sha256: workerPayloadHash(nextMetadata) });
     if (failure === null) {
       await expect(api.uploadCompatibleM6Worker(service, request, "changed-worker", nextMetadata)).rejects.toThrow("frozen");
       changed = true;
