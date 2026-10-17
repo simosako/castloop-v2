@@ -9,13 +9,21 @@ const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
 async function fixture() { const value = await sqliteServiceFixture(); values.push(value); return value; }
 const wait = { attempts: 2, delay: async () => {} };
+const unrelatedResourcePath = /\/(?:queues|event_notifications|d1)(?:\/|$)/;
+
+test("resource path checks distinguish D1 endpoints from deployment UUIDs", () => {
+  expect(unrelatedResourcePath.test("/accounts/account/workers/scripts/worker/versions/00000000-0000-4000-8000-0000000000d1")).toBe(false);
+  for (const path of ["/accounts/account/d1/database", "/accounts/account/queues/queue-id", "/accounts/account/r2/buckets/bucket/event_notifications"]) {
+    expect(unrelatedResourcePath.test(path)).toBe(true);
+  }
+});
 
 test("fresh initialization provisions only R2/Worker/SQLite, verifies native runtime probes and finishes paused", async () => {
   const value = await fixture(), id = crypto.randomUUID();
   const state = await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait);
   expect(state.phase).toBe("ready"); expect(state.namespace_id).toBe("b".repeat(32));
   expect(value.runtime.health()).toMatchObject({ publication_ready: true, state: "paused", drained: true });
-  expect(value.calls.some((call) => /queues|event_notifications|d1/.test(call.path))).toBe(false);
+  expect(value.calls.some((call) => unrelatedResourcePath.test(call.path))).toBe(false);
   const metadata = value.metadata()!;
   expect(metadata.exports).toMatchObject({ default: { cache: { enabled: false } }, SqliteCachedAssets: { cache: { enabled: true } },
     SqlitePublicationService: { type: "durable-object", storage: "sqlite" } });

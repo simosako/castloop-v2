@@ -1,9 +1,15 @@
-# SQLite逐次公開方式の開発版
+# SQLite逐次公開方式（v0.5.0）
 
-`feat/sqlite-sequential-publication`向け。**公開済みv0.4.0の機能ではない**。
-2026-10-16の最初の実機試験は15件目のpurge段階でblockedとなった。別途承認された新環境では、修正版`da7c4bd`で小容量・36件公開・metadata-only 10回・一覧を通過し、pausedで終了した。観測runnerの中断とCPU欠測は残るため、全Free適合・恒久的なIssue #13解消・release受け入れとは区別する。詳細は[測定記録](../design/sqlite_sequential_measurement_20261016.md)を参照。
-2026-10-17 JSTの[追加確認](../design/sqlite_followup_verification_20261016.md)では、同じ隔離サービスの互換更新と正式RSSの3 Episode公開も通過した。更新時のversion伝播待ちと観測schemaを修正し、完了済み配備・activationを繰り返さずpausedで終了。最終試験でもCPU/jobログの欠測は残る。
-新しい隔離環境だけを対象とし、既存サービスや旧journalを変換しない。
+v0.5.0で明示指定できる`sqlite-sequential-v1`方式の操作ガイド。v0.4.0には含まれない。
+新規SQLiteサービスを対象とし、既存Queueサービスや旧journalを変換しない。
+flag省略時は既存のschema-version-1 defaultのままである。
+
+2026-10-17の[36件規模の確認](../design/sqlite_size36_measurement_20261017.md)では、Episode公開36件とmetadata-only更新10回を完了した。
+status GET切断による中断後は成功済み15 jobを照合し、未開始分だけ継続した。通常HTTP CPU最大3/5ms、公開probe 60/60を保存ログへ対応付け、ready/paused/drainedで終了した。
+これは中断を挟む短尺音源試験であり、全負荷のFree適合・Issue #13恒久解消や大容量公開を保証しない。
+初回purge blocked・旧試験の欠測は[先行測定](../design/sqlite_sequential_measurement_20261016.md)、
+互換更新・正式RSSの受け入れは[追加確認](../design/sqlite_followup_verification_20261016.md)に区別して残している。
+リリースの全範囲は[v0.5.0リリースノート](release-v0.5.0.md)を参照。
 
 ## 対応範囲
 
@@ -182,5 +188,5 @@ resource作成・設定PUT・配備・access変更は再送しない。`setup_re
 ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを実施した。
 Worker/DO classは実platform型で型検査・browser bundle化し、Linux単体CLIには新旧両Workerを埋め込む。
 **模擬storageのtransaction/AlarmとCloudflare実機のoutput gate・再配送、模擬purgeと実Workers Cache purgeは区別する。**
-小容量・36件公開・正式RSS・互換更新の実機機能確認は通過したが、新経路の300MB実機公開、実機purge rate-limit retry、完全なDO/Alarm CPU採取は未確認。
-Issue #13恒久解消、全Free適合と実機release readinessはまだ示していない。
+小容量・36件公開・正式RSS・互換更新の実機機能確認は通過した。最新継続試験は公開probe 60/60と通常HTTP/cache/DO/Alarmの各区分の数値CPUを取得したが、platform上の全invocation回収の証明ではない。
+新経路の300MB実機公開と実機purge rate-limit retryは未確認。Issue #13恒久解消と、未試験経路・将来負荷を含む全Free適合は保証しない。

@@ -70,9 +70,11 @@ jobs:
           chmod +x castloop-linux-x64
           test "$(./castloop-linux-x64 --version)" = "$expected_version"
           ./castloop-linux-x64 --help | grep -F 'Usage: castloop'
-          for command in init create-show create-episode list-shows list-episodes domain import-rss publish-rss-import; do
+          for command in init create-show create-episode update-show publish-show update-episode update-episode-audio publish-episode job-status service-status service-pause service-resume deploy init-continue-verification update-service-verify update-service-reconcile preview-show-lifecycle preview-episode-lifecycle lifecycle-execute list-shows list-episodes domain import-rss publish-rss-import; do
             ./castloop-linux-x64 "$command" --help | grep -F "Usage: castloop $command"
           done
+          ./castloop-linux-x64 init --help | grep -F -- '--publication-protocol sqlite-sequential-v1'
+          ./castloop-linux-x64 publish-episode --help | grep -F 'SQLite workspaces (schema_version=2)'
           if ./castloop-linux-x64 list-episodes > list-episodes-error.txt 2>&1; then
             exit 1
           fi

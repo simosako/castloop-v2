@@ -1,9 +1,10 @@
-# RSSからのPodcast移行（v0.4.0）
+# RSSからのPodcast移行（v0.5.0）
 
-v0.4.0のCLIとWorkerの両方が必要。v0.3.0以前のバイナリには含まれない。
-HTTP CPUの既存観測は15〜34msでWorkers Freeの10ms目標は未達。Freeでの安定稼働とIssue #13の完全解消は保証しない。[リリースの制限](release-v0.4.0.md)を確認する。
+v0.5.0はSQLite方式（schema-version-2）と既存Queue方式（schema-version-1）の両方に対応する。
+公開には選択した方式に対応するCLI・検証済みWorker・private workspaceが必要で、既存サービスを自動変換しない。
+通常HTTPの最新測定範囲と未検証事項は[リリースの制限](release-v0.5.0.md)を確認する。
 
-**開発ブランチとの差分:** `feat/publication-queue-submit`では[段階A](../design/publication_queue_commit_stage_a.md)を実装し、commitだけをCLIから直接Queueへ送る。開発CLI／Worker両方、`publication_commit_protocol: "queue-commit-v1"`、Queues Editを含むCloudflare認証が必要。公開コマンドの応答は`publication-queued`、journalは`queued`となるが、marker作成や公開成功の証明ではない。`submit_requested`の結果不明は状態照会だけを行い、RSS公開コマンド・Queue POSTを再実行して復旧しない。下記のv0.4.0説明は公開版についてのもの。
+ローカルdownloadは両方式で共通。公開先のprotocolによって受付・完了status・復旧条件が異なるため混用しない。
 
 ## 対象
 
@@ -46,47 +47,53 @@ download中に失敗したら、同じコマンド・同じ出力先で続行す
 
 ## 2. 確認した内容を公開する
 
-サービスworkspaceで、v0.4.0のCLIを使用する。既存Workerの更新は[通常更新手順](../README.md#compatible-worker-updates)に従い、最後に明示resumeする。
+サービスworkspaceで実行する。SQLiteサービスの初期化・互換更新は[SQLiteガイド](sqlite_sequential_development.md)、既存Queueサービスは[Queue方式ガイド](queue_service.md)に従い、稼働確認後に明示resumeする。
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...
 cd /path/to/service-workspace
 castloop service-status
-# external_episode_guids: true、publication_acceptance_protocol: "queue-validation-v1"、admission.state: "open"を確認する。
+# Confirm the protocol-specific ready/open runtime before submission.
 castloop publish-rss-import /path/to/import
 ```
 
 全TOML・素材を検証した後、Show登録・Show公開・各Episodeの公開を既存runnerで順番に実行する。既存または削除済みShow IDは採用しない。操作中は取り込みファイルや対象Showを別の操作で変更しない。
 
-Episodeは古い公開日時から公開し、各jobの`published`／`released`を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
+Episodeは古い公開日時から公開し、各jobの完了を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
 
-v0.4.0ではHTTP commitを受付に限定した。`publish-show`／`publish-episode`の
-`publication-accepted`、HTTPの`202 / accepted`、local journalの`phase: "accepted"`は、
-凍結した要求とcommit markerの受付完了を示す。**staging検証済み・公開成功の応答ではない。**
-詳細なstaging証跡、payload identity、base revisionは既存Queue consumerが公開書き込み前に検証する。
-旧CLI／Workerとの混用はclaim/commitの受付プロトコル照合で拒否するため、CLIとWorkerを両方更新する。
-旧`committed` journalはそのまま読めるが、`accepted`へ自動変換せず、未知要求を再送しない。
+| 公開先 | 必要な稼働状態 | 完了証拠 |
+| --- | --- | --- |
+| SQLite | 同じconfig/runtimeの`publication_ready: true`、`state: "open"`と受付window | 凍結job IDの`status.state: "succeeded"` |
+| v0.5.0 Queue管理 | `queue-management-v1` readiness、open admission、Queues Edit付きCloudflare認証 | 認証付き結果の`server_status.response.state: "published"` |
+| 保持した旧Queue job | 元のjournal/protocolを維持 | 従来の`published / released` |
+
+SQLiteはCLIの一意uploadと検証後、DO FIFO/Alarmへ明示要求する。Queues Editは不要。
+公開前にreview済み素材とstaged receiptを照合し、元のjob IDを凍結する。既存/削除済みShowの採用、別draftへの置換、未知要求の再送はしない。
+v0.5.0 Queue管理はstage-start/grant/upload-complete/publishを使い、HTTP commitへfallbackしない。旧journalを新しい受付済み記録へ昇格しない。
+いずれもqueued/accepted/enqueue receiptだけでは公開成功ではない。
 
 完了時に新RSSの番組情報、Episode件数、GUID・公開日時・説明、音源URLを照合し、`feed_url`を返す。`subscriber_migration_completed: false`は、購読者の移行は別途必要という意味。
 
 ### 停止した場合
 
-- 読み取り中に公開記録やサービス状態が変わった場合（`publication_status_changed`）だけ、既知jobの状態を再照会する。v0.4.0は各jobで最大300回、待機開始から5分経過後は照会を追加しない。進行中のHTTP照会には別の要求timeoutがあり、CLI全体が必ず5分以内に終了するという意味ではない。`published`／`released`の検証までは次の公開へ進まない。この識別には対応CLIとWorkerの両方が必要。
-- 公開receiptを保存済みのjobで状態照会に失敗した、または公開待機が終わらない場合は、同じコマンドでそのjobの確認から続けられる。完了済みの公開を再送しない。
-- 公開前の確定的な入力不一致は`failed / validation_failed`として表示し、待機を終了する。`ownership: "held"`のShow ownerと凍結draftは保持する。I/Oが終了した通常経路ではexecution/service tokenだけを返す。重複配送で公開へ進めず、`retry-job`も拒否する。draft編集、別jobへの置換、owner強制解除は復旧方法ではなく、安全な取消し操作は未提供。
-- heldなjobにDLQ履歴がある場合は早期停止し、token残留か、実行tokenを返却済みの失敗履歴かを表示する。DLQ markerは現在の実行・I/Oの終了証明ではない。前回追加した`release-job`／`publication-release`は安全条件を満たさず無効化したため使用しない。lock/owner/registryを保持し、[停止の診断手順](../design/publication_execution_recovery.md)で調べる。
-- 更新前の対象照会では、確認できた記録変化（`target_status_changed`）だけ最大3回照会する。その他のエラーは停止し、変更処理を始めていなければ進捗を`ready`に戻す。同じ取り込みコマンドで続行できる。HTTP拒否には`http_status`を表示する。
-- 修正前の`command_requested`記録も、Episode作成直後の最初の`update-episode`に限り続行できる。保持したworkspaceで下書きjournal／lockが未作成、ローカルTOMLが取り込み内容と一致、サーバーのEpisodeが未登録、Showがactive／openで所有者なし、照会前後のローカル記録が不変であることを確認する。確認できなければ停止する。通常更新は下書きjournalを保存してから変更要求を送るため、既存journalがあればこの復旧は適用しない。
-- 照会エラーの`reason_code`は、通信失敗（`management_transport_failed`）、HTTP拒否（`management_http_rejected`）、応答形式不正（`management_response_invalid`）、公開schema／identity不一致（`management_identity_invalid`）、ローカル記録変化（`local_record_changed`）等を区別する。これらは自動再照会せず停止する。調査にはコードを保存し、秘密を含む原本や応答を公開しない。
-- 変更コマンドの応答が不明な場合は再送を拒否する。サービスの`.castloop/`にある登録・staging・publicationの既存journalを保持し、`local-operation-status`／`operation-status`で調べる。lockやownerを削除しない。上記の未開始確認は、記録を削除・復元したworkspaceには適用しない。
-- 公開進捗は`.castloop/rss-imports/<serviceId>/<importId>.json`に保存する。開始後に取り込み入力や公開URL・サービスを変更したら続行しない。
-- `.castloop/`の記録削除、新しいjobによる置換、`init`の再実行は復旧方法ではない。未知の変更要求からの万能な自動復旧は提供しない。
+- 各job最大300状態照会、5分経過後は新規照会を開始しない。進行中の要求には別timeoutがあり、CLI全体が必ず5分以内に終了するという意味ではない。
+- SQLite管理GETの通信/本文断とallowlistの一時HTTP拒否は最大3試行。retryも300 GETへ数える。schema/identity不一致や恒久拒否はretryしない。Queue方式へこのGET契約を流用しない。
+- 保存済みpending publicationがある場合、同じ取り込みはその凍結jobのstatusを確認する。完了済み公開を再送せず、別jobへ置き換えない。未知upload・登録・ローカルinstallは自動再実行しない。
+- SQLiteの`failed`は公開書込前の確定的失敗、`blocked`は未知IOや途中停止等で後続FIFOを止める。retry/releaseを提供しない。Queueの`failed/rejected/blocked`も凍結要求とowner/tokenを保持し、DLQ・経過時間・HEAD不在で解放しない。
+- `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、journal/lockを削除したりしない。
+- protocolごとに`job-status`/`service-status`で照合する。未知mutationを再送する万能復旧は提供しない。旧Queueの限定的復旧条件は[Queue方式ガイド](queue_service.md)と[v0.4.0時点の詳細](https://github.com/simosako/castloop-v2/blob/v0.4.0/docs/rss_migration.md)を参照し、SQLiteへ適用しない。
 
 新しい版は既存UUID Episodeも読めるが、任意GUIDを取り込んだ後の旧版へのdowngradeは非対応。
 
 ### Workerの時間ログと性能比較
 
-v0.4.0のWorkerは、Cloudflare Workers LogsへJSONログを出力する。Dashboardの対象WorkerのObservabilityでjob IDを検索する。
+対応WorkerのCloudflare Workers Logsを使用する。DashboardのObservabilityでjob IDとruntime/version・request/trace IDを照合する。
+保存ログの収集・CPU数値とapplication log・tail配送の不足は区別する。公開確認のprobe IDが一致しない記録を欠測0msとして扱わない。
+
+SQLiteでは通常Worker HTTP/cacheとDO HTTP/RPC/Alarmを区別する。通常Free HTTPは10ms、DOは既定30秒のCPU上限で評価し、ジョブ全体のCPUを合算する必要はない。
+最新試験の外側/cache HTTP最大は3/5ms、公開probeは60/60対応したが、全invocation・未試験負荷の保証ではない。[測定記録](../design/sqlite_size36_measurement_20261017.md)を参照。
+
+以下のphase名・カタログの説明は、既存Queue方式の診断用でありSQLiteのcontrol DBには適用しない。
 
 - `event: "worker_phase_started"`: `job_id`、固定`phase`、`timing_id`、`started_at`。処理のawait前に出す。
 - `event: "worker_timing"`: 同じ`timing_id`と`job_id`／`phase`、`outcome`、`started_at`、`finished_at`、`duration_ms`。

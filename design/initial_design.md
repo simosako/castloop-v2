@@ -1,15 +1,36 @@
 # castloop v2 デザインドキュメント
 
-更新日: 2026-10-14。現在の公開版v0.4.0の構成と仕様をまとめる。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
+更新日: 2026-10-17。現在の公開版はv0.5.0。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
 
-2026-10-15の開発差分: `feat/publication-queue-submit`でcommit全体を既存Queue invocationへ移す[段階A](publication_queue_commit_stage_a.md)を実装している。同期claim・staging・statusはHTTPに残し、claimまで移す段階Bは未実装。公開版v0.4.0には含まれず、以下の公開版仕様とは区別する。
+v0.5.0は新しいSQLite方式を明示指定で提供する。既存Queue方式のdefaultとworkspace routingを維持し、サービス間・schema間の変換はしない。
 
 - v0.2.0: M6の新規初期化、通常更新、Show／Episodeの非公開化・復元・削除を公開。
 - v0.2.1: Show／Episode一覧を追加。
 - v0.3.0: 1サービスにつき1つの独自ドメインを追加・照会・削除できる。
-- v0.4.0: RSSから新規Showへの一度限りの移行、Episodeカタログ、公開受付とQueue検証の分離、停止診断と限定的なWorker更新続行を追加。CLIから直接Queueへの送信は次期案であり未実装。
+- v0.4.0: RSSから新規Showへの一度限りの移行、Episodeカタログ、公開受付とQueue検証の分離、停止診断と限定的なWorker更新続行を追加。
+- v0.5.0: SQLite DO/FIFO/Alarmによる逐次公開、正式CLI・fresh init・一覧・非公開化/復元・RSS・code-only互換更新を追加。既存Queue方式にも直接commit送信を経た非同期管理（案C）と配信判定事前生成を統合。
 
-配布・実機検証の対象はLinux x86-64。新規M6サービスと初期化済みM6サービスの互換更新に対応し、v0.1.xのデータ変換・既存資源の採用は行わない。M0〜M5の経緯は後半のマイルストーンと各実装ログに残す。
+配布・実機検証の対象はLinux x86-64。v0.1.xのデータ変換・既存資源の採用は行わない。M0〜M5の経緯は後半のマイルストーンと各実装ログに残す。
+
+## SQLite方式の構成（schema_version=2）
+
+- `init --publication-protocol sqlite-sequential-v1`で新規作成する。flag省略時は従来どおりQueue方式で、既存TOMLのschema/protocolを編集して変換しない。
+- 1サービスにつき1 private R2 bucket・1 public Worker・1 SQLite-backed DO。Cloudflare Queues/DLQ/D1は使わない。
+- CLIは一意のR2 keyへ素材をuploadし、全量hash・size・ETag/versionを確認してから、凍結公開要求をDOへ明示送信する。uploadだけでは公開しない。
+- DOが受付window・runtime・target/baseを検証し、SQLite FIFOへ積む。Alarmが一件ずつ保存・feed生成・purgeを行い、SQLで完了する。R2はpayload/snapshot保存先で、ロックや進捗DBにはしない。
+- `queued`は受付、`succeeded`はそのjobの保存/purge/完了記録であり、global quiescenceや回復権限の証明ではない。未知IOはblockedのまま保全し、POST/PUTを再送しない。
+- 公開gatewayはDOの最新の小さい配信判定を確認し、同versionのcache ownerでfeed/mediaを配信する。immutable media/historyを維持し、GET/HEAD/Range/304とpause中503を扱う。
+- fresh initとcode-only互換更新はnative Alarm/R2/cache/purgeを確認してpausedで終える。resumeは新しいwindow UUID。同config/schema/namespace以外の更新・変換は拒否する。
+- 一覧20件pagination、Show/Episodeの非公開化・保存snapshotの復元、ローカルRSSの新Showへの逐次公開に対応する。物理削除・独自ドメイン・既存移行・retry/releaseは未対応。
+- 最新36件規模試験は公開36件＋更新10回が完了し、通常HTTP最大3/5ms、probe CPU 60/60だった。DOは通常HTTPの10msではなく既定30秒のCPU上限で評価する。未試験負荷・300MB新経路・purge rate-limit retry・Issue #13恒久解消は保証しない。
+
+操作と制限は[SQLiteガイド](../docs/sqlite_sequential_development.md)、設計契約は[実装計画](sqlite_sequential_publication_implementation_plan.md)、測定は[2026-10-17の記録](sqlite_size36_measurement_20261017.md)を参照する。
+
+## 以下の章の適用範囲
+
+以下は従来の**Queue/R2方式（schema_version=1）**の詳細・履歴であり、SQLite方式の操作契約として使わない。
+旧公開HTTP受付の説明はv0.4.0までの履歴で、v0.5.0の新しいstaging/publicationは[案C](async_management_implementation.md)のQueue管理を使う。
+現在のQueue操作と更新要件は[Queue方式ガイド](../docs/queue_service.md)を優先する。特に削除・domain・同じpause IDでのresume・owner/retry契約をSQLiteへ適用しない。
 
 ## プロジェクト概要
 
