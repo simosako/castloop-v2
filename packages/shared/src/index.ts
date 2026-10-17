@@ -6,6 +6,7 @@ import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import { episodeCommitSchema, showCommitSchema } from "./publication-request";
 import { sha256Hex } from "./sha256";
 import type { SqliteServiceConfig } from "./sqlite-service";
+import { isXml10Text } from "./xml";
 export { episodeCommitSchema, publicationCommitKey, publicationManifestHash, publicationRequestSchema, showCommitSchema } from "./publication-request";
 export type { PublicationRequest } from "./publication-request";
 export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKey, sqliteVerifiedUploadSchema,
@@ -79,6 +80,8 @@ export type { M6ServiceAdminRequest, M6ServiceAdminResponse } from "./m6-service
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);
+const xmlText = z.string().refine(isXml10Text, "Expected XML 1.0-compatible text");
+const trimmedXmlText = xmlText.trim().min(1);
 const webUrl = z.url().refine((value) => {
   const url = new URL(value);
   return (url.protocol === "https:" || url.protocol === "http:") && !!url.hostname &&
@@ -121,28 +124,23 @@ export const serviceConfigSchema = serviceConfigBaseSchema.superRefine((value, c
 export const showMetadataSchema = z.object({
   schema_version: z.literal(1),
   show_id: ID(32),
-  title: z.string().trim().min(1),
-  description: z.string().trim().min(1),
+  title: trimmedXmlText,
+  description: trimmedXmlText,
   language: z.string().regex(/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/),
-  author: z.string().trim().min(1),
-  owner_name: z.string().trim().min(1),
-  owner_email: z.email(),
-  categories: z.array(z.string().trim().min(1)).min(1),
+  author: trimmedXmlText,
+  owner_name: trimmedXmlText,
+  owner_email: xmlText.pipe(z.email()),
+  categories: z.array(trimmedXmlText).min(1),
   explicit: z.boolean(),
-  site_url: webUrl,
+  site_url: xmlText.pipe(webUrl),
   image_path: z.string().regex(/^[^/\\.][^/\\]*\.(?:jpg|jpeg|png)$/i),
-  copyright: z.string().min(1).optional(),
+  copyright: xmlText.min(1).optional(),
   show_type: z.enum(["episodic", "serial"]).optional(),
 }).strict();
 
 export const episodeGuidSchema = z.string().min(1).max(4096).refine((value) => {
   if (!value.trim() || new TextEncoder().encode(value).byteLength > 4096) return false;
-  return [...value].every((character) => {
-    const point = character.codePointAt(0)!;
-    return point === 9 || point === 10 || point === 13 ||
-      point >= 0x20 && point <= 0xd7ff || point >= 0xe000 && point <= 0xfffd ||
-      point >= 0x10000 && point <= 0x10ffff;
-  });
+  return isXml10Text(value);
 }, "Expected a nonblank XML-compatible GUID of at most 4096 UTF-8 bytes");
 
 export const episodeDraftSchema = z.object({
@@ -150,8 +148,8 @@ export const episodeDraftSchema = z.object({
   episode_id: ID(80),
   guid: episodeGuidSchema,
   guid_is_permalink: z.boolean().optional(),
-  title: z.string().trim().min(1),
-  description: z.string().trim().min(1),
+  title: trimmedXmlText,
+  description: trimmedXmlText,
   published_at: publishedAt,
   explicit: z.boolean().optional(),
   episode_type: z.enum(["full", "trailer", "bonus"]).optional(),
