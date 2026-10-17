@@ -7,6 +7,7 @@
 | 文書 | 用途 |
 | --- | --- |
 | [エージェント向け共通ルール](../AGENTS.md) | 常時必要な開発・安全ルールと作業別の参照先。検討履歴は必要なときだけ読む |
+| [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [Cloudflare資源の棚卸し・削除候補](cloudflare_cleanup_inventory_20261017.md) | 2026-10-17の調査時点の一覧。[承認済み削除結果](archive/cloudflare_test_environment_cleanup_20261017.md)では最新SQLite環境だけを保持し、旧環境と試験用ドメインを廃棄済み |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [Lifecycle設計](m6_content_lifecycle_plan.md) | 非公開化・復元・削除の状態と安全条件 |

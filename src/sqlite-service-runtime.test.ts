@@ -5,6 +5,7 @@ import type { SqliteServiceConfig } from "../packages/shared/src/sqlite-service"
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
+import { createSqlitePublicationHttp } from "./sqlite-publication-http";
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
 
@@ -95,6 +96,26 @@ test("authenticated service commands bind exact runtime and explicit resume wind
   expect((await value.call("register-show", { ...registration, reservation_id: crypto.randomUUID() })).status).toBe(409);
   expect((await value.call("pause", value.request)).status).toBe(200);
   expect(value.runtime.health()).toMatchObject({ state: "paused", drained: true });
+});
+
+test("both SQLite HTTP handlers await authentication before runtime access or body parsing", async () => {
+  const value = await fixture();
+  const forbidden = { get() { throw new Error("Authentication must precede runtime access"); } };
+  const service = createSqliteServiceHttp(new Proxy(value.runtime, forbidden), "private-key");
+  const publication = createSqlitePublicationHttp(new Proxy(value.queue, forbidden), "private-key", () => {
+    throw new Error("Authentication must precede readiness inspection");
+  });
+  for (const [path, http] of [["sqlite-service/prepare", service], ["sqlite-publication/jobs", publication]] as const) {
+    for (const key of [undefined, "wrong-key"]) {
+      const input = new Request(`https://service.example/admin/${path}`, { method: "POST", body: "{",
+        headers: { "Content-Type": "application/json", ...(key ? { "X-Castloop-Key": key } : {}) } });
+      const response = await http(input);
+      expect(response.status).toBe(401);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(input.bodyUsed).toBe(false);
+    }
+  }
+  expect(value.runtime.health()).toMatchObject({ state: "paused", setup: null });
 });
 
 test("the native Worker is a separate bundle with real DO and cached entrypoint exports", async () => {

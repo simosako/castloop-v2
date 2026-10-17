@@ -11,7 +11,7 @@ export function createSqlitePublicationHttp(queue: SqlitePublicationQueue, admin
   return async (request) => {
     const url = new URL(request.url);
     if (!url.pathname.startsWith(prefix)) return reply({ error: "not_found" }, 404);
-    if (!authenticated(request, administratorKey)) return reply({ error: "unauthorized" }, 401);
+    if (!await authenticated(request, administratorKey)) return reply({ error: "unauthorized" }, 401);
     if (url.search || url.hash) return reply({ error: "invalid_route" }, 400);
     const path = url.pathname.slice(prefix.length);
     if (path.startsWith("jobs/") && request.method === "GET") {

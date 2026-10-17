@@ -116,7 +116,7 @@ async function fetchM6Routes(request: Request, env: M6CandidateEnv,
     }
   }
   if (!pathname.startsWith("/admin/")) return reply(request, { error: "not found" }, 404);
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply(request, { error: "unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply(request, { error: "unauthorized" }, 401);
   if (managementIntegration && options.setupRuntime) {
     const update = await handleM6UpdateAdmin(request, env);
     if (update) return update;

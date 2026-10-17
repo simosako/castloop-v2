@@ -61,7 +61,7 @@ async function previewLifecycle(env: LifecycleAdminEnv, bindings: M6DeliveryGate
 
 export async function handleM6LifecycleAdmin(request: Request, env: LifecycleAdminEnv, bindings: M6DeliveryGateBindings): Promise<Response | null> {
   if (new URL(request.url).pathname !== "/admin/lifecycle") return null;
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ error: "unauthorized" }, 401);
   if (request.method !== "POST") return reply({ error: "method not allowed" }, 405);
   let input: LifecycleAdminRequest;
   try { input = lifecycleAdminRequestSchema.parse(await readBoundedAdminJson(request)); }

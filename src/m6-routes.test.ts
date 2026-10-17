@@ -10,6 +10,16 @@ import { migrationFixture } from "./test-support/migration";
 import { publicationFixture } from "./test-support/publication";
 import { episodePublicationFixture } from "./test-support/episode-publication";
 import { putPublicDeliveryRecord } from "./public-delivery-records";
+import { handleM6ContentList } from "./content-list-admin";
+import { handleDomainAdmin } from "./domain-admin";
+import { handleM6LifecycleAdmin } from "./lifecycle-admin";
+import { handleM6ServiceAdmin } from "./m6-service-admin";
+import { handleM6SetupAdmin } from "./m6-setup-admin";
+import { handleM6UpdateAdmin } from "./m6-update-admin";
+import { handleM6PublicationAdmin } from "./publication-admin";
+import { handleM6ShowRegistrationAdmin } from "./show-registration-admin";
+import { handleM6StagingAdmin } from "./staging-admin";
+import { handleM6TargetInspection } from "./target-inspection-admin";
 
 const feedPath = "/podcasts/daily/feed.xml";
 const request = (path = feedPath, method = "GET", headers: HeadersInit = {}) =>
@@ -38,6 +48,42 @@ async function fixture() {
 }
 
 describe("M6 candidate state-first gateway", () => {
+  test("every management handler awaits authentication before reading a body or invoking management effects", async () => {
+    const setup = await fixture(), before = new Map(setup.entries);
+    const env = new Proxy(setup.env, { get(target, name, receiver) {
+      if (name !== "CASTLOOP_ADMIN_KEY") throw new Error("Authentication must precede binding access");
+      return Reflect.get(target, name, receiver);
+    } });
+    const bindings = { versionMetadata: setup.env.CASTLOOP_VERSION_METADATA,
+      gatewayProtocol: "m6-uncached-gateway-v1" as const, cachedAssets: setup.loopback };
+    const setupRuntime = { defaultFetch: async () => { throw new Error("Unexpected default fetch"); },
+      cachedRuntime: async () => { throw new Error("Unexpected cache inspection"); },
+      invalidate: async () => { throw new Error("Unexpected purge"); } };
+    const handlers: Array<[string, (input: Request) => Promise<Response | null>]> = [
+      ["health", (input) => fetchM6ManagementIntegration(input, env, setup.loopback)],
+      ["service", (input) => handleM6ServiceAdmin(input, env)],
+      ["domain", (input) => handleDomainAdmin(input, env, bindings)],
+      ["staging", (input) => handleM6StagingAdmin(input, env, bindings)],
+      ["publication", (input) => handleM6PublicationAdmin(input, env, bindings)],
+      ["lifecycle", (input) => handleM6LifecycleAdmin(input, env, bindings)],
+      ["shows", (input) => handleM6ShowRegistrationAdmin(input, env, bindings)],
+      ["target", (input) => handleM6TargetInspection(input, env, bindings)],
+      ["catalog", (input) => handleM6ContentList(input, env, bindings)],
+      ["setup/prepare", (input) => handleM6SetupAdmin(input, env, setupRuntime)],
+      ["update/begin", (input) => handleM6UpdateAdmin(input, env)],
+    ];
+    for (const [path, handle] of handlers) for (const key of [undefined, "wrong-secret"]) {
+      const input = new Request(`https://current.example/admin/${path}`, { method: "POST", body: "{",
+        headers: { "Content-Type": "application/json", ...(key ? { "X-Castloop-Key": key } : {}) } });
+      const response = await handle(input);
+      expect(response?.status).toBe(401);
+      expect(response?.headers.get("Cache-Control")).toBe("no-store");
+      expect(input.bodyUsed).toBe(false);
+    }
+    expect(setup.entries).toEqual(before);
+    expect(setup.events).toEqual([]); expect(setup.sent).toEqual([]);
+  });
+
   test("public GET/HEAD/Range/validators use normalized loopback props after readiness/state checks", async () => {
     const setup = await fixture();
     const before = new Map(setup.entries);

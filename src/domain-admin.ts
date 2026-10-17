@@ -25,7 +25,7 @@ async function snapshot(env: ServiceUrlChangeEnv, bindings: ServiceUrlChangeBind
 
 export async function handleDomainAdmin(request: Request, env: ServiceUrlChangeEnv & { CASTLOOP_ADMIN_KEY: string },
   bindings: ServiceUrlChangeBindings): Promise<Response> {
-  if (!authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "domain_unauthorized" }, 401);
+  if (!await authenticated(request, env.CASTLOOP_ADMIN_KEY)) return reply({ reason_code: "domain_unauthorized" }, 401);
   if (request.method !== "POST") return reply({ reason_code: "domain_method_invalid" }, 405);
   let input: DomainAdminRequest;
   try { input = domainAdminRequestSchema.parse(await readBoundedAdminJson(request)); }
