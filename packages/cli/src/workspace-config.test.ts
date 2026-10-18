@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { stringifyToml } from "@castloop/shared";
+import { stringify as stringifyToml } from "@iarna/toml";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import * as fsPromises from "node:fs/promises";
@@ -24,8 +24,8 @@ function fixture(source: string | Buffer) {
   return { root, file };
 }
 
-test("workspace config preserves Queue and SQLite routing, strict schemas and valid UTF-8 comments", async () => {
-  for (const config of [queueConfig, sqliteConfig]) {
+test("workspace config accepts only strict SQLite settings and valid UTF-8 comments", async () => {
+  for (const config of [sqliteConfig]) {
     const source = `${stringifyToml(config)}\n# 日本語😀\n`;
     const setup = fixture(source);
     expect(await loadWorkspaceConfig(setup.root)).toEqual(config);
@@ -37,6 +37,15 @@ test("workspace config preserves Queue and SQLite routing, strict schemas and va
   await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow();
 });
 
+test("version 1 service configs are explicitly rejected without conversion", async () => {
+  for (const config of [{ schema_version: 1 }, queueConfig, { ...queueConfig, workers_dev_base_url: queueConfig.public_base_url }]) {
+    const source = stringifyToml(config), setup = fixture(source);
+    await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("use a compatible v0.5.x CLI/Worker");
+    expect(readFileSync(setup.file, "utf8")).toBe(source);
+    expect(readdirSync(setup.root)).toEqual(["castloop.toml"]);
+  }
+});
+
 test("workspace config refuses symbolic links without following or modifying their targets", async () => {
   const setup = fixture(stringifyToml(queueConfig));
   const target = join(setup.root, "target.toml");
@@ -46,6 +55,33 @@ test("workspace config refuses symbolic links without following or modifying the
   await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
   expect(readFileSync(target, "utf8")).toBe(stringifyToml(queueConfig));
 });
+
+test("formal CLI rejects old service settings before network, build or local state changes", () => {
+  for (const old of [{ schema_version: 1 }, queueConfig, { ...queueConfig, workers_dev_base_url: queueConfig.public_base_url }]) {
+    const setup = fixture(stringifyToml(old));
+    const state = join(setup.root, ".castloop"); mkdirSync(state);
+    const retained = join(state, "retained.json"); writeFileSync(retained, "private retained journal");
+    const preload = join(setup.root, "deny-io.ts");
+    writeFileSync(preload, `globalThis.fetch = async () => { console.error("UNEXPECTED_IO"); throw new Error("Forbidden network"); };
+Bun.build = async () => { console.error("UNEXPECTED_IO"); throw new Error("Forbidden build"); };`);
+    const before = readdirSync(setup.root).sort(), source = readFileSync(setup.file);
+    for (const args of [["init"], ["init", "--publication-protocol", "sqlite-sequential-v1"], ["init", "--service-id", "different"],
+      ["service-status"], ["service-pause", crypto.randomUUID()], ["service-resume", crypto.randomUUID()],
+      ["deploy"], ["create-show", "daily", "--site-url", "https://example.com"], ["update-show", "daily"], ["publish-show", "daily"],
+      ["list-shows"], ["target-show", "daily"], ["job-status", crypto.randomUUID()], ["publish-rss-import", "missing-import"]]) {
+      const result = Bun.spawnSync([process.execPath, "--preload", preload, join(import.meta.dir, "index.ts"), ...args], {
+        cwd: setup.root, env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: queueConfig.account_id, CLOUDFLARE_API_TOKEN: "test-token" }, timeout: 5000,
+      });
+      expect(result.exitCode).toBe(1); expect(result.stdout.toString()).toBe("");
+      expect(result.stderr.toString()).toContain("use a compatible v0.5.x CLI/Worker");
+      expect(result.stderr.toString()).not.toContain("UNEXPECTED_IO");
+      expect(readdirSync(setup.root).sort()).toEqual(before);
+      expect(readdirSync(state)).toEqual(["retained.json"]);
+      expect(readFileSync(retained, "utf8")).toBe("private retained journal");
+      expect(readFileSync(setup.file)).toEqual(source);
+    }
+  }
+}, 15000);
 
 test("workspace config enforces the byte budget before parsing otherwise valid TOML", async () => {
   const source = `${stringifyToml(sqliteConfig)}\n#`;

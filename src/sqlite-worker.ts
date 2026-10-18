@@ -19,6 +19,12 @@ import { createSqliteServiceHttp } from "./sqlite-service-http";
 import { serveSqliteGateway } from "./sqlite-gateway";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
 
+declare global {
+  namespace Cloudflare {
+    interface GlobalProps { mainModule: typeof import("./sqlite-worker"); }
+  }
+}
+
 export type SqliteWorkerEnv = { CASTLOOP_BUCKET: R2Bucket; CASTLOOP_ADMIN_KEY: string;
   CASTLOOP_VERSION_METADATA: WorkerVersionMetadata; CASTLOOP_SQLITE_CONFIG: string;
   CASTLOOP_SERVICE_ID: string; CASTLOOP_MANAGEMENT_ORIGIN: string;

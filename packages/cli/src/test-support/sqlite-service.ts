@@ -17,9 +17,9 @@ import type { R2RestTransport } from "../verified-r2-put";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-export async function sqliteServiceFixture() {
+export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?: string) {
   const root = mkdtempSync("/tmp/opencode/castloop-sqlite-service-");
-  const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service", account_id: "a".repeat(32),
+  const config: SqliteServiceConfig = input ?? { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service", account_id: "a".repeat(32),
     bucket_name: "private-bucket", worker_name: "test-worker", public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
   writeFileSync(join(root, "castloop.toml"), stringifyToml(config));
   const queue = sqlitePublicationFixture({ resume: false, runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
@@ -56,7 +56,7 @@ export async function sqliteServiceFixture() {
     calls.push({ method: request.method, path: `${path}${url.search}` });
     const lost = (phase: NonNullable<typeof faults.lost>) => { if (faults.lost === phase) throw new Error("private-key unconfirmed request"); };
     if (url.hostname !== "api.cloudflare.com") {
-      const key = administratorKey(root);
+      const key = administratorKey(keyRoot ?? root);
       if (path.startsWith("/admin/sqlite-service/")) {
         const response = await createSqliteServiceHttp(runtime, key)(request);
         if (path.endsWith("/prepare") && response.status === 202) {

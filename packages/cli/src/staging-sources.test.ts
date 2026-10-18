@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { freezePayloadSources } from "./staging-sources";
 import { createHash } from "node:crypto";
-import { chmod, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 for (const length of [4, 65536, 65537, 8 * 1024 * 1024]) {
@@ -81,3 +81,47 @@ for (const mode of ["truncated", "grown"] as const) {
     } finally { await sources.dispose(); await rm(root, { recursive: true }); }
   });
 }
+
+test("frozen payloads retain private snapshots and cannot be disposed or reused while IO is active", async () => {
+  const root = await mkdtemp("/tmp/opencode/castloop-source-owned-");
+  const bytes = Buffer.from("private frozen payload");
+  await writeFile(join(root, "audio.mp3"), bytes);
+  const sources = await freezePayloadSources(root, [{ asset: "audio", length_bytes: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex") }], ["audio.mp3"]);
+  const started = Promise.withResolvers<void>(), settle = Promise.withResolvers<void>();
+  try {
+    const [directory] = await readdir(join(root, ".castloop"));
+    expect((await stat(join(root, ".castloop"))).mode & 0o777).toBe(0o700);
+    expect((await stat(join(root, ".castloop", directory!, "0"))).mode & 0o777).toBe(0o400);
+    const pending = sources.withPayload(0, async (body, consumed) => {
+      expect(Buffer.from(await new Response(body).arrayBuffer())).toEqual(bytes); consumed();
+      started.resolve(); await settle.promise;
+    });
+    try {
+      await started.promise;
+      await expect(sources.dispose()).rejects.toThrow("IO is active");
+      await expect(sources.assertCurrent()).rejects.toThrow("active IO");
+      await expect(sources.withPayload(0, async () => {})).rejects.toThrow("active IO");
+    } finally { settle.resolve(); await pending; }
+    await expect(sources.withPayload(0, async () => {})).rejects.toThrow("cannot be replayed");
+    await sources.dispose(); expect(await readdir(join(root, ".castloop"))).toEqual([]);
+  } finally { settle.resolve(); await sources.dispose(); await rm(root, { recursive: true, force: true }); }
+});
+
+test("changed and symlinked original sources cannot reach a consumer after freezing", async () => {
+  for (const mode of ["changed", "symlink"] as const) {
+    const root = await mkdtemp("/tmp/opencode/castloop-source-changed-");
+    const bytes = Buffer.from("original"), path = join(root, "audio.mp3");
+    await writeFile(path, bytes);
+    const sources = await freezePayloadSources(root, [{ asset: "audio", length_bytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex") }], ["audio.mp3"]);
+    try {
+      if (mode === "changed") await writeFile(path, "modified");
+      else { await rm(path); await writeFile(join(root, "target.mp3"), bytes); await symlink(join(root, "target.mp3"), path); }
+      await expect(sources.assertCurrent()).rejects.toThrow();
+      let consumed = false;
+      await expect(sources.withPayload(0, async () => { consumed = true; })).rejects.toThrow();
+      expect(consumed).toBe(false);
+    } finally { await sources.dispose(); await rm(root, { recursive: true, force: true }); }
+  }
+});

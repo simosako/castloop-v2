@@ -1,22 +1,16 @@
 #!/usr/bin/env bun
 
-import { contentListResponseSchema, serviceConfigSchema, stringifyToml, validateId } from "@castloop/shared";
-import type { ServiceConfig } from "@castloop/shared";
+import { stringifyToml, validateId } from "@castloop/shared";
 import { version } from "../../../package.json";
-import { formatContentList } from "./content-list";
-import { runDomainCommand } from "./domain-operation";
 import { COMMAND_HELP, commandHelp } from "./help";
-import { readLocalOperationStatus } from "./local-operation-status";
-import { M6_COMMAND_ARGUMENTS, runM6Command } from "./m6-commands";
-import { readLocalFreshM6Initialization } from "./m6-service-initialization";
-import { embeddedWorkerSource, embeddedSqliteWorkerSource } from "./worker-payload";
+import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
+import { embeddedSqliteWorkerSource } from "./worker-payload";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { syncLocalJournalDirectory } from "./local-journal-path";
-import { protectLocalState } from "./workspace-protection";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -55,21 +49,6 @@ async function ask(value: string | undefined, name: string, label: string): Prom
   } finally { prompt.close(); }
 }
 
-async function workerSource(): Promise<string> {
-  if (embeddedWorkerSource) return embeddedWorkerSource;
-  if (Bun.isStandaloneExecutable) throw new Error("The executable does not contain a Worker bundle");
-  const result = await Bun.build({ entrypoints: [join(SOURCE_ROOT, "src/worker.ts")],
-    target: "browser", minify: true, external: ["cloudflare:workers"] });
-  if (!result.success || result.outputs.length !== 1) throw new Error("Worker bundle build failed");
-  return result.outputs[0]!.text();
-}
-
-async function loadConfig(root: string): Promise<ServiceConfig> {
-  const config = await loadWorkspaceConfig(root);
-  if (config.schema_version !== 1) throw new Error("This command is not implemented for sqlite-sequential-v1; no legacy fallback");
-  return config;
-}
-
 async function sqliteWorkerSource(): Promise<string> {
   if (embeddedSqliteWorkerSource) return embeddedSqliteWorkerSource;
   if (Bun.isStandaloneExecutable) throw new Error("The executable does not contain its SQLite Worker bundle");
@@ -78,7 +57,7 @@ async function sqliteWorkerSource(): Promise<string> {
   return result.outputs[0].text();
 }
 
-async function initSqlite(target: string, flags: Record<string, string>): Promise<unknown> {
+async function init(target: string, flags: Record<string, string>): Promise<unknown> {
   allowedFlags(flags, ["publication-protocol", "service-id", "account-id", "bucket-name", "workers-subdomain", "operation-id"]);
   if (flags["publication-protocol"] && flags["publication-protocol"] !== "sqlite-sequential-v1") throw new Error("Unknown publication protocol");
   const root = resolve(target); mkdirSync(root, { recursive: true });
@@ -96,46 +75,13 @@ async function initSqlite(target: string, flags: Record<string, string>): Promis
       public_base_url: origin, workers_dev_base_url: origin });
     writeSyncedLocalFile(file, () => stringifyToml(config));
     syncLocalJournalDirectory(root);
-  } else if (Object.keys(flags).some((name) => !["operation-id", "publication-protocol"].includes(name))) throw new Error("Do not change retained initialization inputs");
+  } else {
+    await loadWorkspaceConfig(root);
+    if (Object.keys(flags).some((name) => !["operation-id", "publication-protocol"].includes(name))) throw new Error("Do not change retained initialization inputs");
+  }
   const config = await loadWorkspaceConfig(root);
-  if (config.schema_version !== 2) throw new Error("Existing service config is not converted to sqlite-sequential-v1");
   const { runSqliteCommand } = await import("./sqlite-commands");
   return runSqliteCommand(root, config, "init", flags["operation-id"] ? [flags["operation-id"]] : [], { workerSource: sqliteWorkerSource });
-}
-
-async function init(target: string, flags: Record<string, string>): Promise<unknown> {
-  allowedFlags(flags, ["service-id", "account-id", "bucket-name", "workers-subdomain", "operation-id"]);
-  const root = resolve(target);
-  mkdirSync(root, { recursive: true });
-  if (!lstatSync(root).isDirectory()) throw new Error("Workspace must be a real directory");
-  if (existsSync(join(root, ".castloop", "state.json"))) throw new Error("Legacy workspaces are not converted; initialize a new M6 workspace");
-  const file = join(root, "castloop.toml");
-  if (!existsSync(file)) {
-    const serviceId = validateId(await ask(flags["service-id"], "service-id", "Service ID"), "service");
-    const suffix = randomBytes(4).toString("hex");
-    const accountId = await ask(flags["account-id"] ?? process.env.CLOUDFLARE_ACCOUNT_ID, "account-id", "Cloudflare account ID");
-    const bucketName = await ask(flags["bucket-name"], "bucket-name", "Private R2 bucket name");
-    const subdomain = await ask(flags["workers-subdomain"], "workers-subdomain", "workers.dev subdomain");
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subdomain)) throw new Error("Invalid workers.dev subdomain");
-    const workerName = `castloop-${serviceId}-${suffix}`;
-    const workersDevBaseUrl = `https://${workerName}.${subdomain}.workers.dev`;
-    const config = serviceConfigSchema.parse({ schema_version: 1, service_id: serviceId, account_id: accountId,
-      bucket_name: bucketName, worker_name: workerName, queue_name: workerName,
-      dlq_name: `castloop-${serviceId}-dlq-${suffix}`, public_base_url: workersDevBaseUrl, workers_dev_base_url: workersDevBaseUrl });
-    writeFileSync(file, stringifyToml(config), { flag: "wx" });
-  } else if (Object.keys(flags).some((name) => name !== "operation-id")) {
-    throw new Error("Workspace configuration already exists; do not change its initialization inputs");
-  }
-  const config = await loadConfig(root);
-  if (process.env.CLOUDFLARE_ACCOUNT_ID !== config.account_id || !process.env.CLOUDFLARE_API_TOKEN) {
-    throw new Error("Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for this service before provisioning");
-  }
-  const retained = readLocalFreshM6Initialization(root, config);
-  if (retained.lockPresent || retained.state && retained.state.phase !== "prepared") {
-    throw new Error("Initialization already started; inspect its journal or use init-reconcile only for an acknowledged completed initialization");
-  }
-  protectLocalState(root);
-  return runM6Command(root, config, "init", [flags["operation-id"] ?? retained.state?.request.operation_id ?? randomUUID()], { workerSource });
 }
 
 async function main(): Promise<unknown> {
@@ -158,25 +104,12 @@ async function main(): Promise<unknown> {
     if (positional.length !== 1) throw new Error(commandHelp(command));
     const root = process.cwd();
     const config = await loadWorkspaceConfig(root);
-    if (config.schema_version === 2) {
-      const { publishSqliteRssImport } = await import("./sqlite-rss-publication");
-      return publishSqliteRssImport(root, config, positional[0]!);
-    }
-    const { createRssPublicationEffects, publishRssImport } = await import("./rss-import-publication");
-    return publishRssImport(root, config, positional[0]!, createRssPublicationEffects(root, config, workerSource));
+    const { publishSqliteRssImport } = await import("./sqlite-rss-publication");
+    return publishSqliteRssImport(root, config, positional[0]!);
   }
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
-    const root = resolve(positional[0] ?? ".");
-    if (flags["publication-protocol"] || existsSync(join(root, "castloop.toml")) && (await loadWorkspaceConfig(root)).schema_version === 2) return initSqlite(root, flags);
     return init(positional[0] ?? ".", flags);
-  }
-  if (command === "domain") {
-    allowedFlags(flags, ["operation-id"]);
-    const action = positional[0];
-    if (!["add", "list", "remove"].includes(action ?? "") || positional.length !== (action === "add" ? 2 : 1) ||
-      action === "list" && flags["operation-id"]) throw new Error(commandHelp(command));
-    return runDomainCommand(process.cwd(), await loadConfig(process.cwd()), action as "add" | "list" | "remove", positional[1], flags["operation-id"]);
   }
   let root = process.cwd();
   if (command === "create-show") {
@@ -193,36 +126,25 @@ async function main(): Promise<unknown> {
   } else {
     allowedFlags(flags, []);
   }
+  const count = SQLITE_COMMAND_ARGUMENTS[command];
+  if (count === undefined || !count.includes(positional.length)) throw new Error(commandHelp(command === "update-service" ? "deploy" : command));
+  if (command === "operation-status" && positional[0] !== "lifecycle" ||
+    ["preview-show-lifecycle", "preview-episode-lifecycle"].includes(command) && !["unpublish", "restore"].includes(positional.at(-1)!) ||
+    command === "lifecycle-execute" && positional[2] !== "confirm") throw new Error(commandHelp(command));
   if (["create-episode", "update-episode", "update-episode-audio", "publish-episode"].includes(command)) {
     positional.unshift(validateId(basename(root), "show"));
     root = resolve(root, "..");
   }
-  if (listing && positional.length !== M6_COMMAND_ARGUMENTS[command]) throw new Error(commandHelp(command));
   const workspace = await loadWorkspaceConfig(root);
-  if (workspace.schema_version === 2) {
-    const { runSqliteCommand } = await import("./sqlite-commands");
-    const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
-      ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
-    if (listing && !flags.json) {
-      const { formatSqliteCatalog } = await import("./sqlite-catalog");
-      const { sqliteCatalogResponseSchema } = await import("../../shared/src/sqlite-catalog");
-      return formatSqliteCatalog(sqliteCatalogResponseSchema.parse(result));
-    }
-    return result;
+  const { runSqliteCommand } = await import("./sqlite-commands");
+  const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
+    ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
+  if (listing && !flags.json) {
+    const { formatSqliteCatalog } = await import("./sqlite-catalog");
+    const { sqliteCatalogResponseSchema } = await import("../../shared/src/sqlite-catalog");
+    return formatSqliteCatalog(sqliteCatalogResponseSchema.parse(result));
   }
-  if (command === "job-status") { command = "operation-status"; positional.unshift("publication"); }
-  if (command === "retry-job") command = "publication-retry";
-  if (command === "release-job") command = "publication-release";
-  if (Object.hasOwn(M6_COMMAND_ARGUMENTS, command)) {
-    const count = command === "publish-episode" && positional.length === 2 ? 2 : M6_COMMAND_ARGUMENTS[command];
-    if (positional.length !== count) throw new Error(listing ? commandHelp(command) : "Invalid command arguments; use --help");
-    const result = await runM6Command(root, await loadConfig(root), command, positional, { workerSource,
-      ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
-    return listing && !flags.json ? formatContentList(contentListResponseSchema.parse(result)) : result;
-  }
-  const config = await loadConfig(root);
-  if (command === "local-operation-status" && positional.length === 2) return readLocalOperationStatus(root, config, positional[0]!, positional[1]!);
-  throw new Error("Invalid command arguments; use --help");
+  return result;
 }
 
 try {

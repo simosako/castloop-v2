@@ -9,16 +9,17 @@
 ## Read documentation by task
 - Use [design/README.md](design/README.md) to locate relevant documents; do not read all design docs or historical records on every task.
 - Current architecture: [design/initial_design.md](design/initial_design.md). Usage: [README.md](README.md).
-- Determine the service protocol before changing publication or control behavior. Queue/R2 (`schema_version=1`) and SQLite (`schema_version=2`, `sqlite-sequential-v1`) have different state, admission and recovery contracts. Do not silently convert or fall back between them.
+- v0.6.0 development supports only SQLite service configs (`schema_version=2`, `sqlite-sequential-v1`); `init` uses this by default. Reject service schema version 1 before IO or local state changes. Queue/R2 remains on v0.5.x only; never add migration, resource adoption or fallback. Shared content/request schema version 1 is independent and remains supported.
+- The production Worker entrypoint is `src/sqlite-worker.ts`; embed only that Worker. Preserve existing DO/cache class names, bindings, compatibility date and persisted SQLite formats during code-only cleanup.
 
 | When working on | Read the relevant contract |
 | --- | --- |
-| Queue publication, staging or recovery | [Queue guide](docs/queue_service.md), [async management](design/async_management_implementation.md), [execution recovery](design/publication_execution_recovery.md) |
 | SQLite publication, lifecycle or updates | [SQLite guide](docs/sqlite_sequential_development.md), [implementation plan](design/sqlite_sequential_publication_implementation_plan.md) |
-| Queue initialization or compatible updates | [Fresh initialization](design/m6_fresh_initialization.md), [compatible updates](design/m6_compatible_updates.md), [completion reconciliation](design/m6_completion_recovery.md) |
+| Worker update continuation | [SQLite recovery contract](design/sqlite_worker_update_recovery.md) |
+| Removed Queue code or v0.5.x history | [Removal plan](design/schema_v1_removal_plan.md), [v0.5.x Queue guide](docs/queue_service.md), [archived architecture](design/archive/initial_design_v052.md) |
 | Upload integrity or interrupted IO | [Single PUT and unresolved assumption U1](design/m6_upload_recovery_options.md) |
-| Lifecycle, deletion or retention | [Lifecycle design](design/m6_content_lifecycle_plan.md), [approved retention and safety policy](design/m6_review_queue.md); also check protocol support |
-| Public delivery, caching or domains | [Delivery projections](design/public_delivery_projection.md), [domain design](design/custom_domain_plan.md) |
+| Lifecycle, deletion or retention | [SQLite guide](docs/sqlite_sequential_development.md), [approved retention and safety policy](design/m6_review_queue.md). Physical deletion and custom domains are not implemented; do not transplant archived Queue operations |
+| Public delivery or caching | [Current architecture](design/initial_design.md), [SQLite implementation contract](design/sqlite_sequential_publication_implementation_plan.md) |
 | RSS import or publication | [RSS migration guide](docs/rss_migration.md), [RSS design](design/m7_rss_import_plan.md) |
 | Live environments or past acceptance claims | [Cleanup outcome and retained environment](design/archive/cloudflare_test_environment_cleanup_20261017.md), then the relevant measurement record linked from the design index |
 
@@ -39,12 +40,12 @@
 
 ## Data and code conventions
 - Local TOML is the editable source; R2 holds payloads and published snapshots. Each service has one private R2 bucket; show IDs partition object keys. Keep `public_base_url` in service config, not an R2 public URL in show metadata.
-- Use strict Zod schemas, `@iarna/toml`, `parseServiceConfig`, `parseShowMetadata`, `parseEpisodeDraft` and `stringifyToml`. TOML keys are snake_case; TypeScript identifiers are camelCase.
+- Use strict Zod schemas, `@iarna/toml`, `parseSqliteServiceConfig`, `parseShowMetadata`, `parseEpisodeDraft` and `stringifyToml`. TOML keys are snake_case; TypeScript identifiers are camelCase.
 - Prefer explicit, focused code and async/await. Avoid global state except shared clients, clever abstractions and unnecessary inline comments.
 - Use ES module imports, grouped external, internal, then Node built-ins; prefer `node:` for built-ins. Avoid unused imports.
 - Use PascalCase for types/classes and UPPER_SNAKE_CASE for constants. Prefer `type` aliases, explicit exported types and Zod inference; use `unknown` with narrowing instead of `any`.
 - Match surrounding formatting: two spaces, double quotes and readable line lengths.
-- Throw clear `Error`s in helpers; CLI handlers print errors and set `process.exitCode = 1`. Do not silently swallow failures. Worker diagnostics must follow the allowlist/privacy rule; Queue handlers distinguish transient from permanent failures.
+- Throw clear `Error`s in helpers; CLI handlers print errors and set `process.exitCode = 1`. Do not silently swallow failures. Worker diagnostics must follow the allowlist/privacy rule; preserve the SQLite failed/blocked distinction and never replay uncertain side effects.
 
 ## CodeGraph in Git worktrees
 - The `.codegraph/` index is local and untracked; only `.codegraph/.gitignore` is tracked. Initialize each newly created worktree with `codegraph init -y` before agent work.

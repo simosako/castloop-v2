@@ -4,7 +4,7 @@ import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqlitePublicationStatusSchema } from "../../shared/src/sqlite-publication";
 import { prepareRssImportPublication } from "./rss-import-preflight";
-import { verifyImportedFeed, writeImportedMetadata } from "./rss-import-publication";
+import { verifyImportedFeed, writeImportedMetadata } from "./rss-publication-content";
 import { hashRssImportFile } from "./rss-import-local";
 import { receiveRssAsset } from "./rss-import-download";
 import { createLocalJournalStorage } from "./local-journal-storage";

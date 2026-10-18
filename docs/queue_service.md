@@ -1,5 +1,7 @@
 # Queue方式サービスの操作（schema_version=1、v0.5.2）
 
+> **v0.5.x専用の保存ガイド。** v0.6.0以降はQueue方式と旧専用commandを削除している。既存サービスの管理には対応するv0.5.x CLI/Workerを保持する。version 1からの移行機能は提供しない。CLI交換だけでは配備済み旧Workerや公開probeは変更されず、資源削除・強制解放の許可にもならない。[固定版の文書・コード](https://github.com/simosako/castloop-v2/tree/v0.5.2)も参照する。
+
 Serverless podcast hosting on Cloudflare: one private R2 bucket and one public Worker per service, multiple Shows, managed through a standalone CLI.
 
 This guide covers the retained Queue/R2 protocol, not the SQLite protocol. v0.5.2 keeps existing schema-version-1 routing and adds no protocol change; v0.5.0 introduced asynchronous Queue/R2 management and did not convert or adopt v0.1.x services. For SQLite initialization and commands, use the [project README](../README.md) and [SQLite guide](sqlite_sequential_development.md). Historical v0.4.0 behavior remains documented in the [v0.4.0 release](https://github.com/simosako/castloop-v2/tree/v0.4.0).
