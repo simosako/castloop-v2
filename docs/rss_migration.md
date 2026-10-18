@@ -1,7 +1,7 @@
-# RSSからのPodcast取り込み（v0.6.0向け開発仕様）
+# RSSからのPodcast取り込み（v0.6.0）
 
-v0.6.0向け開発ではSQLiteサービス（サービス設定version 2）だけに公開する。公開には対応するCLI・検証済みWorker・private workspaceが必要。旧サービス設定version 1からのマイグレーション機能やjournal変換は提供しない。
-現在の公開版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。今回の変更は未リリースで、[新規隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)にのみ配備した。
+v0.6.0ではSQLiteサービス（サービス設定version 2）だけに公開する。公開には対応するCLI・検証済みWorker・private workspaceが必要。旧サービス設定version 1からのマイグレーション機能やjournal変換は提供しない。
+旧版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。v0.6.0の検証は[新規隔離環境の回帰試験・CPU記録](../design/schema_v1_removal_live_test.md)、変更点は[リリースノート](release-v0.6.0.md)に記録した。
 
 ローカルdownloadはサービスworkspace不要。既存の取り込み素材は引き続き検証して利用できるが、旧Queue公開cursorをSQLiteの受付記録として採用しない。
 
@@ -90,7 +90,7 @@ queued/acceptedだけでは公開成功ではない。
 SQLiteでは通常Worker HTTP/cacheとDO HTTP/RPC/Alarmを区別する。通常Free HTTPは10ms、DOは既定30秒のCPU上限で評価し、ジョブ全体のCPUを合算する必要はない。
 最新試験の外側/cache HTTP最大は3/5ms、公開probeは60/60対応したが、全invocation・未試験負荷の保証ではない。[測定記録](../design/archive/sqlite_size36_measurement_20261017.md)を参照。
 
-診断ログは本文・秘密・任意例外文を含めず、SQLiteの固定eventとjob/request/versionを照合する。sampling・保持・tail配送不足とCPU 0msを混同しない。新しい整理版の実機性能は測定していない。
+診断ログは本文・秘密・任意例外文を含めず、SQLiteの固定eventとjob/request/versionを照合する。sampling・保持・tail配送不足とCPU 0msを混同しない。v0.6.0の追加確認では通常Workerの最大3/5msを保存ログで確認したが、全ログ収録や全負荷のFree適合は保証しない。
 
 実機試験には別承認が必要。`scripts/test-support/worker-tail.ts`等の採取器は正式CLIに含まれず、tail削除や未知変更の再送・強制解放を自動実行しない。旧Queueのphase・R2カタログ・診断手順は[v0.5.2時点の資料](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)に保存する。
 

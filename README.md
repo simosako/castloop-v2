@@ -2,11 +2,11 @@
 
 Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one private R2 bucket and one public Worker per service, multiple Shows.
 
-**This checkout documents v0.6.0 development: SQLite services only.** `castloop init` now creates a schema-version-2 service by default. Queue/R2 service support, its Worker bundle and commands have been removed. Content metadata and SQLite request formats are unchanged. This is not a released or deployed version; package/release versioning is a separate step.
+**v0.6.0 supports SQLite services only.** `castloop init` creates a schema-version-2 service by default. Queue/R2 service support, its Worker bundle and commands have been removed. Content metadata and SQLite request formats are unchanged. Installing this release does not deploy or change an existing Cloudflare service. See the [release notes](docs/release-v0.6.0.md).
 
 The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen publication request to one Durable Object per service. Its SQLite FIFO and Alarms execute one job at a time, without Cloudflare Queues or D1. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
 
-In the latest 36-Episode trial, all publications and ten metadata-only updates completed without an observed freeze. Observed outer/cache HTTP CPU maxima were **3/5ms**, below the Workers Free 10ms target, with **60/60** public probes matched to saved CPU logs. This is evidence for the tested paths/load, not a guarantee for every workload or permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13). See [v0.5.0 release notes](docs/release-v0.5.0.md) and [measurement details](design/archive/sqlite_size36_measurement_20261017.md).
+The v0.6.0 trial published 36 full-size Episodes (1.50GB) in **485.53 seconds**, plus three short Episodes. All 39 audio hashes and delivery checks passed, including preservation after a Worker update. Saved logs showed outer/cache HTTP CPU maxima of **3/5ms**, below the Workers Free 10ms target for the captured requests. This is not proof of complete log capture, every workload's Free compatibility, or permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13). See the [acceptance and CPU record](design/schema_v1_removal_live_test.md).
 
 ## Supported service configuration
 
@@ -16,7 +16,15 @@ Service schema version 1 is rejected before management requests, deployment or a
 
 ## Install
 
-The latest published release is [v0.5.2](https://github.com/simosako/castloop-v2/releases/tag/v0.5.2); its behavior and installation instructions are in the [tagged README](https://github.com/simosako/castloop-v2/blob/v0.5.2/README.md). **That release still defaults to Queue initialization**; use its explicit SQLite protocol flag. The default-init behavior described below requires this development checkout, built from source. Do not identify it as a released v0.6.0 binary or replace a production CLI solely by its unchanged development version string. Keep the matching CLI/source for frozen initialization/update journals.
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.6.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.6.0). Verify the checksum, make the executable runnable, and place it on your PATH:
+
+```sh
+sha256sum --check SHA256SUMS
+chmod +x castloop-linux-x64
+./castloop-linux-x64 --version
+```
+
+Keep the matching old CLI/source for frozen initialization/update journals. Existing Queue services need [v0.5.x](https://github.com/simosako/castloop-v2/blob/v0.5.2/README.md), not this release; there is no automatic migration.
 
 Keep `LICENSE` and `THIRD_PARTY_NOTICES.md` with the executable. Linux x86-64 is the distributed and runtime-verified target; macOS/Windows binaries are not distributed.
 

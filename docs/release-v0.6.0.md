@@ -1,6 +1,6 @@
-# v0.6.0向け変更点（未リリース）
+# castloop v0.6.0
 
-本書は開発中の変更案内。version更新・タグ・配布公開・Cloudflare配備は別作業であり、現在の公開版はv0.5.2。
+SQLiteサービス単独に整理したLinux x86-64向けCLIです。サービス設定schema version 1のQueue/R2方式を削除し、新規初期化はschema version 2を既定にします。インストールだけでは配備済みWorker・資源・公開状態は変更されません。Cloudflareへの配備は別の明示操作です。
 
 ## 破壊的変更
 
@@ -23,4 +23,19 @@ SQLiteも未完了のinit/updateは凍結source hashへ束縛される。適合�
 
 RSSのローカル取り込み→新規Showへの公開は維持するが、service schemaやsubscriberの移行機能ではない。旧ホスト撤去・URL切替・Cloudflare実環境変更は別の明示判断が必要。
 
-ローカル試験はnative性能、全Free適合、300MB実機公開や万能復旧を保証しない。[実装計画・検証記録](../design/schema_v1_removal_plan.md)参照。
+## 検証・性能情報
+
+- ローカル439テスト成功、TypeScript検査、Linux単体binary build・binary smokeを確認。GitHub CIでもbuild・smoke成功。
+- v0.6.0への版番号更新後も同じ検査を再実行し、組み込みWorkerのsource SHA-256が実機合格時の`4d0411acc4edea734b098321307d8813b2d73b9902ce8c0e2bdd95aac643f9c6`と完全一致することを確認しました。
+- 新規Cloudflare隔離環境で、既定init、短尺3件＋通常36件のRSS公開、非公開化・復元、Worker更新後の保持を確認。計43 job succeeded、全39音源の全量hash・HEAD/Range/304・cover・private path拒否を確認しました。
+- 通常36件・1,496,055,589 bytesは**485.53秒（約8分6秒）**、短尺3件は25.99秒。upload/readback・逐次公開・purge・最終RSS照合を含むcommand全体のwall timeであり、Worker CPU時間ではありません。
+- 保存ログ1,985 invocationを確認。通常Workerは外側HTTP最大**3ms**、cache HTTP最大**5ms**、cache RPC最大**2ms**で、取得した1,047件は10ms以内。DOはHTTP最大26ms、RPC最大2ms、Alarm最大7msで、通常Workerの10ms枠とは別の既定30秒枠です。
+- Linux binaryの整理前後は83,580,384→82,621,920 bytes（version更新前の比較）。runtime TSは17,653→4,997行。速度改善や将来負荷の性能保証ではありません。
+
+Worker更新はnative反映待機で一度停止しましたが、verified checkpointから再配備せず明示verifyで完了しました。初回の公開試験は外側240秒timeoutの設定ミスで中断したため、途中結果を再利用しない新規環境で全件を再試験しました。異常終了後の統一CLI診断・安全な回復/cleanupは[Issue #40](https://github.com/simosako/castloop-v2/issues/40)の別機能です。
+
+記録：[実装計画](../design/schema_v1_removal_plan.md)、[合格サマリー・CPU観測条件](../design/schema_v1_removal_live_test.md)。保存ログの全件回収、全Free適合、300MB実機公開、U1解決や万能復旧は保証しません。承認済み試験環境2件は[廃棄済み](../design/archive/cloudflare_issue24_cleanup_20261018.md)で、保持環境とローカル原本・journal・証跡は維持しています。
+
+## 配布
+
+GitHub Releaseの`castloop-linux-x64`、`SHA256SUMS`、`LICENSE`、`THIRD_PARTY_NOTICES.md`を取得してください。管理端末にはBun・Node.js・Wrangler・別R2 S3 credentialsは不要です。macOS/Windows向けbinaryは配布しません。
