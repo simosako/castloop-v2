@@ -1,5 +1,7 @@
 # Issue #24: SQLite単独化後の実環境回帰試験
 
+> 試験完了後、管理者承認により初回・再試験のCloudflare専用資源は[2026-10-18に廃棄](archive/cloudflare_issue24_cleanup_20261018.md)した。以下の「環境を保持」は試験終了時の状態。元データ・workspace/journal・非公開証跡は引き続き保持する。
+
 ## 合格サマリー
 
 管理者が2026-10-18に試験合格と判断した。製品commit `1171b2a`、Bun 1.4.2のLinux単体CLIを新規Cloudflare隔離環境で検証した。旧環境の途中結果は再利用していない。

@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-このcheckoutはv0.6.0向け開発版で、サービス設定version 2（SQLite）のみを扱い、`init`も既定でSQLiteを作る。現在の公開版はv0.5.2で、リリース・実機配備は別作業。まず[全体設計](initial_design.md)を読み、操作は[README](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS案内](../docs/rss_migration.md)を参照する。既存version 1サービスはv0.5.xと[Queue専用ガイド](../docs/queue_service.md)を使い、移行機能は提供しない。[開発版変更点](../docs/release-v0.6.0.md)と[公開済みv0.5.2](../docs/release-v0.5.2.md)を区別する。
+v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既定でSQLiteを作る。リリースの取得と実環境への配備は別操作。まず[全体設計](initial_design.md)を読み、操作は[README](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS案内](../docs/rss_migration.md)を参照する。既存version 1サービスはv0.5.xと[Queue専用ガイド](../docs/queue_service.md)を使い、移行機能は提供しない。[v0.6.0変更点](../docs/release-v0.6.0.md)と[旧版v0.5.2](../docs/release-v0.5.2.md)を区別する。
 
 ## 開発時に参照する文書
 
@@ -38,6 +38,8 @@ v0.6.0のQueueコード削除に伴い、次をv0.5.x以前の履歴へ分離し
 [旧AGENTS.mdの保存規約・マイルストーン](archive/agent_storage_and_milestones_20261017.md)には、常時読み込む指示から切り出した判断・進捗・実機測定の記録を保存した。内容は切り出し前のままであり、古い承認を再実行の許可にしたり、当時の未実装事項を現在の作業一覧にしたりしない。今後の進捗・測定・個別承認も対応する設計／証跡文書へ記録し、AGENTS.mdには時系列で追記しない。
 
 試験環境の廃棄履歴は[2026-10-17の削除記録](archive/cloudflare_test_environment_cleanup_20261017.md)を参照する。以前の廃棄・保留は[2026-10-11の削除記録](archive/cloudflare_test_environment_cleanup_20261011.md)に残す。削除前の資源一覧は[2026-10-17の棚卸し](archive/cloudflare_cleanup_inventory_20261017.md)に残す。
+
+Issue #24の初回・再試験環境2件は[2026-10-18の廃棄記録](archive/cloudflare_issue24_cleanup_20261018.md)を参照する。保持環境`sq16r-6ec01dc6`とローカル原本・journal・証跡は削除対象外。
 
 ### 2026-10-18にアーカイブした文書
 
