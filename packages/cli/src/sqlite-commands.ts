@@ -22,6 +22,14 @@ import { join, resolve } from "node:path";
 
 export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
   listOptions?: { includeDeleted?: boolean; cursor?: string } };
+export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
+  "create-show": [2], "create-episode": [1], "update-show": [1], "publish-show": [1],
+  "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
+  "service-status": [0], "service-pause": [1], "service-resume": [1], "target-show": [1], "target-episode": [2],
+  "list-shows": [0], "list-episodes": [1], "preview-show-lifecycle": [2], "preview-episode-lifecycle": [3],
+  "lifecycle-execute": [3], "operation-status": [2], "init-reconcile": [1], "init-continue-verification": [1],
+  "update-service": [1], "update-service-verify": [1], "update-service-reconcile": [1],
+};
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
 const controlSchema = z.object({ action: z.enum(["pause", "resume"]), request: sqliteRuntimeRequestSchema, window: z.uuid().optional(),

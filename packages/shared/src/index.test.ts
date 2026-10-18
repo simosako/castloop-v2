@@ -1,77 +1,23 @@
-import { describe, expect, test } from "bun:test";
-import { episodeCommitSchema, parseEpisodeDraft, parseServiceConfig, parseShowMetadata,
-  m6ServiceConfigHash, serviceManagementBaseUrl, serviceOperationIdentity, stringifyToml, validateId } from "./index";
+import { expect, test } from "bun:test";
+import { parseEpisodeDraft, parseShowMetadata, stringifyToml, validateId } from "./index";
 
-const show = {
-  schema_version: 1 as const, show_id: "daily-show", title: "Daily", description: "Description",
+const show = { schema_version: 1 as const, show_id: "daily-show", title: "Daily", description: "Description",
   language: "ja", author: "Author", owner_name: "Owner", owner_email: "owner@example.com",
-  categories: ["Technology"], explicit: false, site_url: "https://example.com/podcast",
-  image_path: "cover.jpg",
-};
+  categories: ["Technology"], explicit: false, site_url: "https://example.com/podcast", image_path: "cover.jpg" };
 
-describe("M1 TOML metadata", () => {
-  test("round trips draft input and rejects unknown or generated publication fields", () => {
-    expect(parseShowMetadata(stringifyToml(show))).toEqual(show);
-    expect(() => parseShowMetadata(stringifyToml(show) + "revision_id = \"old\"\n")).toThrow();
-    expect(() => parseShowMetadata(stringifyToml({ ...show, site_url: "not-a-url" }))).toThrow();
-  });
-
-  test("accepts explicit RFC3339 offsets, rejects impossible dates and TOML native datetime", () => {
-    const input = { schema_version: 1 as const, episode_id: "first", guid: crypto.randomUUID(),
-      title: "First", description: "Description", published_at: "2026-02-28T23:59:59+09:00" };
-    expect(parseEpisodeDraft(stringifyToml(input)).published_at).toBe(input.published_at);
-    expect(() => parseEpisodeDraft(stringifyToml({ ...input, published_at: "2026-02-30T12:00:00Z" }))).toThrow();
-    expect(() => parseEpisodeDraft(stringifyToml(input).replace('"2026-02-28T23:59:59+09:00"',
-      "2026-02-28T23:59:59+09:00"))).toThrow();
-  });
-
-  test("service configuration is strict and IDs have their documented boundaries", () => {
-    const config = { schema_version: 1 as const, service_id: "castloop", account_id: "a".repeat(32),
-      bucket_name: "castloop-demo-bucket", worker_name: "castloop-demo-worker",
-      queue_name: "castloop-demo-queue", dlq_name: "castloop-demo-dlq",
-      public_base_url: "https://castloop-demo-worker.example.workers.dev" };
-    expect(parseServiceConfig(stringifyToml(config))).toEqual(config);
-    expect(serviceManagementBaseUrl(config)).toBe(config.public_base_url);
-    expect(() => parseServiceConfig(stringifyToml(config) + "token = \"secret\"\n")).toThrow();
-    expect(validateId("a".repeat(32), "show")).toBe("a".repeat(32));
-    expect(() => validateId("a".repeat(33), "show")).toThrow();
-    expect(() => validateId("a--b", "show")).toThrow();
-  });
+test("version 1 content metadata still round trips and rejects generated/unknown fields", () => {
+  expect(parseShowMetadata(stringifyToml(show))).toEqual(show);
+  expect(() => parseShowMetadata(stringifyToml(show) + 'revision_id = "old"\n')).toThrow();
+  expect(() => parseShowMetadata(stringifyToml({ ...show, site_url: "not-a-url" }))).toThrow();
+  expect(validateId("a".repeat(32), "show")).toBe("a".repeat(32));
+  expect(() => validateId("a".repeat(33), "show")).toThrow();
+  expect(() => validateId("a--b", "show")).toThrow();
 });
 
-test("management origins stay on the matching workers.dev host without changing old configuration hashes", async () => {
-  const original = { schema_version: 1 as const, service_id: "castloop", account_id: "a".repeat(32),
-    bucket_name: "castloop-bucket", worker_name: "castloop-worker", queue_name: "castloop-queue", dlq_name: "castloop-dlq",
-    public_base_url: "https://castloop-worker.example.workers.dev" };
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(original)));
-  expect(await m6ServiceConfigHash(parseServiceConfig(stringifyToml(original)))).toBe(Buffer.from(digest).toString("hex"));
-  const config = { ...original, public_base_url: "https://podcasts.example.com", workers_dev_base_url: original.public_base_url };
-  expect(parseServiceConfig(stringifyToml(config))).toEqual(config);
-  expect(serviceManagementBaseUrl(config)).toBe(original.public_base_url);
-  expect(serviceOperationIdentity(config)).toEqual(serviceOperationIdentity(original));
-  expect(serviceOperationIdentity(original)).toEqual({ service_id: original.service_id, account_id: original.account_id,
-    worker_name: original.worker_name, public_base_url: original.public_base_url });
-  expect(() => serviceManagementBaseUrl({ ...original, public_base_url: config.public_base_url })).toThrow("matching workers.dev");
-  for (const workers_dev_base_url of ["https://podcasts.example.com", "https://other.example.workers.dev",
-    "https://castloop-worker.workers.dev", "https://castloop-worker.example.workers.dev.evil.example",
-    "http://castloop-worker.example.workers.dev", `${original.public_base_url}:8443`, `${original.public_base_url}/admin`,
-    `${original.public_base_url}?token=private`, `${original.public_base_url}#fragment`, "https://user@castloop-worker.example.workers.dev"]) {
-    expect(() => parseServiceConfig(stringifyToml({ ...config, workers_dev_base_url }))).toThrow();
-  }
-});
-
-test("Episode commits require both inputs initially and at least one input for revisions", () => {
-  const base = { schema_version: 1, kind: "episode", show_id: "daily-show", episode_id: "first",
-    job_id: crypto.randomUUID(), committed_at: "2026-09-24T01:05:00Z" };
-  const metadata_sha256 = "a".repeat(64);
-  const audio = { audio_sha256: "b".repeat(64), audio_length_bytes: 123, duration_seconds: 5 };
-  expect(episodeCommitSchema.safeParse({ ...base, metadata_sha256, ...audio }).success).toBe(true);
-  expect(episodeCommitSchema.safeParse({ ...base, metadata_sha256 }).success).toBe(false);
-  expect(episodeCommitSchema.safeParse({ ...base, ...audio }).success).toBe(false);
-  const base_revision_id = crypto.randomUUID();
-  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id, metadata_sha256 }).success).toBe(true);
-  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id, ...audio }).success).toBe(true);
-  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id }).success).toBe(false);
-  expect(episodeCommitSchema.safeParse({ ...base, base_revision_id, audio_sha256: "b".repeat(64) }).success)
-    .toBe(false);
+test("Episode input accepts explicit RFC3339 offsets but rejects impossible dates and TOML native datetime", () => {
+  const input = { schema_version: 1 as const, episode_id: "first", guid: crypto.randomUUID(),
+    title: "First", description: "Description", published_at: "2026-02-28T23:59:59+09:00" };
+  expect(parseEpisodeDraft(stringifyToml(input)).published_at).toBe(input.published_at);
+  expect(() => parseEpisodeDraft(stringifyToml({ ...input, published_at: "2026-02-30T12:00:00Z" }))).toThrow();
+  expect(() => parseEpisodeDraft(stringifyToml(input).replace('"2026-02-28T23:59:59+09:00"', "2026-02-28T23:59:59+09:00"))).toThrow();
 });

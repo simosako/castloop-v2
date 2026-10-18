@@ -1,34 +1,9 @@
-import { sha256Hex, toHex } from "../packages/shared/src/index";
+import { sha256Hex } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import { renderFeed } from "./feed";
-import type { LifecycleFeedEnv } from "./lifecycle-feed";
-
-export type PublicationEffects = {
-  checkDeliveryGate: (target: { showId: string; episodeId?: string }) => Promise<void>;
-  purge: (target: { showId: string; episodeId?: string }) => Promise<void>;
-};
-
-export async function readPublicationBytes(env: LifecycleFeedEnv, key: string, maximum: number): Promise<Uint8Array> {
-  const head = await env.CASTLOOP_BUCKET.head(key);
-  if (!head || head.size < 1 || head.size > maximum) throw new Error("Publication snapshot is missing or oversized");
-  const object = await env.CASTLOOP_BUCKET.get(key, { onlyIf: { etagMatches: head.etag } });
-  if (!object || !("body" in object) || !object.body || object.etag !== head.etag || object.size !== head.size) {
-    if (object && "body" in object && object.body) await object.body.cancel();
-    throw new Error("Publication snapshot changed before reading");
-  }
-  const bytes = new Uint8Array(await object.arrayBuffer());
-  if (bytes.length !== head.size) throw new Error("Publication snapshot contents have a different size");
-  return bytes;
-}
 
 export async function publicationChecksum(bytes: Uint8Array): Promise<string> {
   return sha256Hex(bytes);
-}
-
-export function matchesPublishedAudio(object: R2Object | null, length: number, sha256: string): boolean {
-  if (!object || object.size !== length || object.customMetadata?.sha256 !== sha256 || !object.checksums?.sha256) return false;
-  const checksum = toHex(object.checksums.sha256);
-  return checksum === sha256;
 }
 
 export function renderPublicationFeed(show: ShowMetadata, episodes: EpisodeRevision[], baseUrl: string, extension: "jpg" | "png"): string {

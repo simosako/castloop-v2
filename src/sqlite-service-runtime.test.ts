@@ -118,13 +118,12 @@ test("both SQLite HTTP handlers await authentication before runtime access or bo
   expect(value.runtime.health()).toMatchObject({ state: "paused", setup: null });
 });
 
-test("the native Worker is a separate bundle with real DO and cached entrypoint exports", async () => {
+test("the native Worker bundle contains real DO and cache exports without Queue handlers", async () => {
   const output = await Bun.build({ entrypoints: ["src/sqlite-worker.ts"], target: "browser", external: ["cloudflare:workers"] });
   expect(output.success).toBe(true); expect(output.outputs).toHaveLength(1);
   const source = await output.outputs[0].text();
   expect(source).toContain("SqlitePublicationService"); expect(source).toContain("SqliteCachedAssets");
   expect(source).not.toContain("queueM6Candidate");
-  const legacy = await Bun.build({ entrypoints: ["src/worker.ts"], target: "browser", external: ["cloudflare:workers"] });
-  expect(legacy.success).toBe(true);
-  expect(await legacy.outputs[0].text()).not.toContain("SqlitePublicationService");
+  expect(source).not.toContain("queue-management-v1");
+  expect(source).not.toContain("queue-commit-v1");
 });

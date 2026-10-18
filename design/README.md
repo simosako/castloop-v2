@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-現在の公開版はv0.5.2。まず[全体設計](initial_design.md)を読み、操作方法は[プロジェクトREADME](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS移行案内](../docs/rss_migration.md)を参照する。既存schema-version-1は[Queue方式ガイド](../docs/queue_service.md)を使い、SQLiteへ自動変換しない。v0.5.2の変更点は[v0.5.2リリースノート](../docs/release-v0.5.2.md)、通常HTTPの10ms達成範囲・未対応機能・Issue #13の残る制限は[v0.5.0リリースノート](../docs/release-v0.5.0.md)で確認する。
+このcheckoutはv0.6.0向け開発版で、サービス設定version 2（SQLite）のみを扱い、`init`も既定でSQLiteを作る。現在の公開版はv0.5.2で、リリース・実機配備は別作業。まず[全体設計](initial_design.md)を読み、操作は[README](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS案内](../docs/rss_migration.md)を参照する。既存version 1サービスはv0.5.xと[Queue専用ガイド](../docs/queue_service.md)を使い、移行機能は提供しない。[開発版変更点](../docs/release-v0.6.0.md)と[公開済みv0.5.2](../docs/release-v0.5.2.md)を区別する。
 
 ## 開発時に参照する文書
 
@@ -9,25 +9,26 @@
 | [エージェント向け共通ルール](../AGENTS.md) | 常時必要な開発・安全ルールと作業別の参照先。検討履歴は必要なときだけ読む |
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
-| [Lifecycle設計](m6_content_lifecycle_plan.md) | 非公開化・復元・削除の状態と安全条件 |
-| [新規初期化](m6_fresh_initialization.md) | 新規資源と稼働判定の責務 |
-| [互換更新](m6_compatible_updates.md) | pause・処理終了確認・配備・検証 |
-| [完了応答喪失の照合](m6_completion_recovery.md) | 確認済み完了の復旧条件と限界 |
+| [v0.6.0のQueue方式コード削除計画](schema_v1_removal_plan.md) | Issue #24。v0.5.xのschema version 1機能は維持し、v0.6.0以降はSQLite単独化。削除範囲・共用処理の分離・検証・既存環境の保全 |
+| [旧Lifecycle設計と共通安全条件](m6_content_lifecycle_plan.md) | Queueの履歴。保持・削除の安全条件は維持するが、現行SQLiteの操作はSQLiteガイドを使う |
 | [単一PUT・U1](m6_upload_recovery_options.md) | 採用方式と未検証の仮定 |
 | [REST URLの構築](rest_url_construction.md) | パス要素のエンコード、R2 keyの区切り保持と単一PUTの不変条件 |
 | [承認済み方針](m6_review_queue.md) | 記録保持・安全条件・開発範囲 |
-| [publication停止の診断とtoken保全](publication_execution_recovery.md) | Show/Episodeの停止経路・開始/終了ログ・DLQ根拠の解放の撤回・読み取り調査 |
-| [案C: Queue/R2管理経路](async_management_implementation.md) | 開発中のstart/complete/publish、署名済みgrant/result、async admission、journal・未知IO・回帰試験 |
-| [配信判定の事前生成](public_delivery_projection.md) | 管理側のstrict検証と原子的metadata生成、通常HTTPのHEAD-only判定、互換更新時の準備と旧移行の分離 |
 | [SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md) | 一意upload→DO SQLite FIFO→Alarm。実DO入口・fresh init/readiness・正式CLI・配信接続のローカル実装と残る実機/P6の範囲 |
-| [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | v0.5.0のschema version 2明示init、公開・pause/resume、未知IOの保全、未対応操作と実機未検証の範囲（v0.5.1の検証強化とv0.5.2の更新検証続行を含む） |
+| [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | 既定のschema version 2 init、公開・pause/resume、限定検証続行、未知IO保全と未対応機能 |
 | [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md) | Issue #11/#33の現行経路。PUT成功checkpoint、配備後GET失敗の明示続行、旧journalと未知IOの境界（v0.5.2で提供） |
-| [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
-| [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。v0.4.0の利用案内はdocs/rss_migration.md |
+| [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。現行の利用方法はRSSガイドを使う |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 
 ## アーカイブ
+
+v0.6.0のQueueコード削除に伴い、次をv0.5.x以前の履歴へ分離した。保存した契約や過去の承認は、現行SQLiteの新機能・移行・復旧・実環境操作の許可ではない。
+
+- [v0.5.2全体設計](archive/initial_design_v052.md)
+- [Queue非同期管理](archive/async_management_implementation.md)、[公開停止診断・解放撤回](archive/publication_execution_recovery.md)
+- [Queue新規初期化](archive/m6_fresh_initialization.md)、[互換更新](archive/m6_compatible_updates.md)、[完了照合](archive/m6_completion_recovery.md)
+- [R2配信判定projection](archive/public_delivery_projection.md)、[独自ドメイン](archive/custom_domain_plan.md)
 
 [archive/](archive/)には、初期レビュー、完了済みの検証計画・実装ログ・受け入れ記録、M6の部品ごとの開発記録、旧形式移行の検討を保存する。ファイル名は移動前と同じで、階層は増やさない。
 

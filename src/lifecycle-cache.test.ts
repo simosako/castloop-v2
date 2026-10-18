@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createCachedPublicFetch, purgeLifecycleCache, serveCachedLifecycleAsset } from "./lifecycle-cache";
-import { parsePublicAssetPath } from "./public-assets";
-import { serveLifecyclePublicRequest } from "./lifecycle-gateway";
-import { lifecycleFixture } from "./test-support/lifecycle";
-import { putPublicDeliveryRecord } from "./public-delivery-records";
+import { serveCachedLifecycleAsset } from "./lifecycle-cache";
 
 const AUDIO_PATH = "/podcasts/daily/episodes/first/6cefc5cc-5d0c-4cc7-8e3d-aa99711b74e2.mp3";
 const DATA = new TextEncoder().encode("0123456789abcdefghij");
@@ -26,7 +22,7 @@ function fixture(path = AUDIO_PATH) {
     new Request(`https://castloop-cache.invalid${path}`, { method, headers }) };
 }
 
-describe("M6 cached public asset handler and purge", () => {
+describe("cached public asset handler", () => {
   test("GET streams the full object with tags and validators; HEAD reads metadata only", async () => {
     const setup = fixture();
     const props = { showGeneration: 1, episodeGeneration: 2 };
@@ -136,57 +132,4 @@ describe("M6 cached public asset handler and purge", () => {
     }
   });
 
-  test("the internal transport normalizes host/query and never forwards cookies or administrator headers", async () => {
-    const requests: Request[] = [];
-    const propsValues: object[] = [];
-    const transport = createCachedPublicFetch(({ props }) => {
-      propsValues.push(props);
-      return { async fetch(request) { requests.push(request); return new Response("streamed"); } };
-    });
-    const asset = parsePublicAssetPath(AUDIO_PATH)!;
-    const props = { showGeneration: 3, episodeGeneration: 4 };
-    const request = new Request(`https://alternate.example${AUDIO_PATH}?token=private`, { headers: {
-      Cookie: "private", Authorization: "Bearer secret", "X-Castloop-Key": "secret", Range: "bytes=0-3", "If-None-Match": '"old"',
-    } });
-    await transport(request, asset, props);
-    expect(requests[0]!.url).toBe(`https://castloop-cache.invalid${AUDIO_PATH}`);
-    expect(propsValues).toEqual([props]);
-    expect([...requests[0]!.headers.keys()].sort()).toEqual(["if-none-match", "range"]);
-    await expect(transport(new Request("https://alternate.example/system/service.toml"), asset, props)).rejects.toThrow("input");
-  });
-
-  test("gateway checks state before conditional/range delivery and keeps internal cache headers private", async () => {
-    const setup = await lifecycleFixture({ kind: "episode" });
-    const media = fixture();
-    const transport = createCachedPublicFetch(({ props }) => ({ fetch: async (request) => serveCachedLifecycleAsset(request, media.env, props) }));
-    const request = new Request(`https://public.example${AUDIO_PATH}`, { headers: { Range: "bytes=0-3" } });
-    const response = await serveLifecyclePublicRequest(request, setup.env, transport);
-    expect(response!.status).toBe(206);
-    expect(await response!.text()).toBe("0123");
-    expect(response!.headers.get("Cache-Control")).toBe("public, max-age=0, must-revalidate");
-    expect(response!.headers.get("Cache-Tag")).toBeNull();
-    const control = JSON.parse(setup.entries.get("system/show-publications/daily.json")!.data);
-    await putPublicDeliveryRecord(setup.env, "system/show-publications/daily.json", JSON.stringify({ ...control, lifecycle: "unpublished" }),
-      { onlyIf: { etagMatches: setup.entries.get("system/show-publications/daily.json")!.etag } });
-    const count = media.calls.length;
-    const denied = await serveLifecyclePublicRequest(new Request(request.url, { headers: { "If-None-Match": '"revision-etag"' } }), setup.env, transport);
-    expect(denied!.status).toBe(404);
-    expect(media.calls).toHaveLength(count);
-  });
-
-  test("tag and prefix purges are awaited and scoped to the owning entrypoint with slash boundaries", async () => {
-    const calls: CachePurgeOptions[] = [];
-    const cache = { async purge(options: CachePurgeOptions) { calls.push(options); return { success: true, errors: [] }; } };
-    await purgeLifecycleCache(cache, { showId: "a-b", episodeId: "c" });
-    expect(calls).toEqual([{ tags: ["feed-a-b", "episode-a-b/c"] }, { pathPrefixes: ["/podcasts/a-b/episodes/c/"] }]);
-    calls.length = 0;
-    await purgeLifecycleCache(cache, { showId: "a" });
-    expect(calls).toEqual([{ tags: ["show-a", "feed-a", "cover-a"] }, { pathPrefixes: ["/podcasts/a/"] }]);
-    await expect(purgeLifecycleCache(undefined, { showId: "a" })).rejects.toThrow("unavailable");
-    await expect(purgeLifecycleCache(cache, { showId: "../a" })).rejects.toThrow();
-    let count = 0;
-    await expect(purgeLifecycleCache({ async purge() { return { success: ++count === 1, errors: [] }; } }, { showId: "a" }))
-      .rejects.toThrow("prefix purge failed");
-    expect(count).toBe(2);
-  });
 });

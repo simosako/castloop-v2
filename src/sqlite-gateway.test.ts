@@ -33,9 +33,10 @@ test("gateway forwards Range and conditional requests but never credentials or q
   const service = { fetch: async () => new Response(null), delivery: async () => allowed(1) };
   for (const status of [200, 206, 304, 412, 416]) {
     const request = new Request(`${management}${feed}?secret=not-forwarded`, { headers: { Authorization: "private-token", "X-Castloop-Key": "private-key",
-      Range: "bytes=0-1", "If-Range": '"etag"', "If-None-Match": '"etag"' } });
+      Cookie: "private-cookie", Range: "bytes=0-1", "If-Range": '"etag"', "If-None-Match": '"etag"' } });
     const response = await serveSqliteGateway(request, management, service, async (input) => {
       expect(new URL(input.url).search).toBe(""); expect(input.headers.has("Authorization")).toBe(false); expect(input.headers.has("X-Castloop-Key")).toBe(false);
+      expect(input.headers.has("Cookie")).toBe(false);
       expect(input.headers.get("Range")).toBe("bytes=0-1"); expect(input.headers.get("If-None-Match")).toBe('"etag"');
       return new Response(status === 304 ? null : "data", { status, headers: { "Content-Range": "bytes 0-1/4" } });
     });
@@ -54,7 +55,7 @@ test("administration is workers.dev-only and invalid paths or methods never ente
   expect((await serveSqliteGateway(new Request(`${management}/admin/sqlite-service/health`), management, service, cached)).status).toBe(200);
   expect((await serveSqliteGateway(new Request("https://public.example/admin/sqlite-service/health"), management, service, cached)).status).toBe(404);
   expect((await serveSqliteGateway(new Request(`https://public.example${feed}`), management, service, cached)).status).toBe(404);
-  for (const path of ["/system/service.toml", "/staging/uploads/private", "/podcasts/daily/not-approved"]) {
+  for (const path of ["/system/service.toml", "/staging/uploads/private", "/podcasts/daily/not-approved", "/.well-known/castloop/runtime?nonce=" + crypto.randomUUID()]) {
     expect((await serveSqliteGateway(new Request(`${management}${path}`), management, service, cached)).status).toBe(404);
   }
   expect((await serveSqliteGateway(new Request(`${management}${feed}`, { method: "POST" }), management, service, cached)).status).toBe(405);

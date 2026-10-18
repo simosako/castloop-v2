@@ -1,5 +1,5 @@
-import { stageAssetSchema, stagePayloadSchema, stageUploadRequestSchema } from "@castloop/shared";
-import type { StageAsset, StagePayload, StageUploadRequest } from "@castloop/shared";
+import { stageAssetSchema, stagePayloadSchema } from "@castloop/shared";
+import type { StageAsset, StagePayload } from "@castloop/shared";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { chmod, lstat, mkdir, mkdtemp, open, rmdir, unlink } from "node:fs/promises";
@@ -12,7 +12,6 @@ export type FrozenPayloadSources = {
   withPayload: (index: number, consume: (body: ReadableStream<Uint8Array>, requireConsumed: () => void) => Promise<void>) => Promise<void>;
   dispose: () => Promise<void>;
 };
-export type FrozenStagingSources = FrozenPayloadSources & { upload: StageUploadRequest };
 
 async function checkDirectory(path: string): Promise<void> {
   await mkdir(path, { mode: 0o700, recursive: true });
@@ -22,7 +21,7 @@ async function checkDirectory(path: string): Promise<void> {
   }
 }
 
-async function checkSource(path: string, expected: StageUploadRequest["payloads"][number], destination?: string): Promise<void> {
+async function checkSource(path: string, expected: StagePayload, destination?: string): Promise<void> {
   const source = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = await source.stat({ bigint: true });
@@ -86,14 +85,6 @@ export async function inspectLocalStagingSource(path: string, input: StageAsset)
     }
     return { payload: { ...candidate, sha256: hash.digest("hex") }, prefix };
   } finally { await source.close(); }
-}
-
-export async function freezeStagingSources(root: string, input: StageUploadRequest, paths: readonly string[]): Promise<FrozenStagingSources> {
-  const upload = stageUploadRequestSchema.parse(input);
-  for (const payload of upload.payloads) Object.freeze(payload);
-  Object.freeze(upload.payloads);
-  Object.freeze(upload);
-  return { upload, ...await freezePayloadSources(root, upload.payloads, paths) };
 }
 
 export async function freezePayloadSources(root: string, input: readonly StagePayload[], paths: readonly string[]): Promise<FrozenPayloadSources> {

@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
-import { writeFileSync } from "node:fs";
+import { loadWorkspaceConfig } from "./workspace-config";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,3 +60,44 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
   } finally { server.stop(true); setup.close(); }
 }, 30000);
+
+for (const explicit of [false, true]) {
+  test(`formal fresh init generates schema version 2 ${explicit ? "with" : "without"} the optional protocol flag`, async () => {
+    const root = mkdtempSync("/tmp/opencode/castloop-fresh-cli-"), workspace = join(root, "workspace");
+    mkdirSync(workspace);
+    let fixture: Promise<Awaited<ReturnType<typeof sqliteServiceFixture>>> | undefined;
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
+      fixture ??= loadWorkspaceConfig(workspace).then((config) => sqliteServiceFixture(config, workspace));
+      const setup = await fixture;
+      const target = request.headers.get("X-Castloop-Test-Target");
+      if (!target || !["https://api.cloudflare.com", setup.config.workers_dev_base_url].includes(new URL(target).origin)) return new Response(null, { status: 400 });
+      const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
+      return setup.transport(target, { method: request.method, headers,
+        ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+    } });
+    const preload = join(root, "preload.ts");
+    writeFileSync(preload, `import { loadWorkspaceConfig } from ${JSON.stringify(join(import.meta.dir, "workspace-config.ts"))};
+const transport = globalThis.fetch;
+globalThis.fetch = Object.assign(async (input, init) => {
+  const config = await loadWorkspaceConfig(process.cwd());
+  const request = new Request(input, init), url = new URL(request.url);
+  if (!["https://api.cloudflare.com", config.workers_dev_base_url].includes(url.origin)) throw new Error("External access forbidden");
+  const headers = new Headers(request.headers); headers.set("X-Castloop-Test-Target", request.url);
+  return transport(${JSON.stringify(`http://127.0.0.1:${server.port}`)}, { method: request.method, headers, redirect: "error", signal: request.signal,
+    ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+}, { preconnect: transport.preconnect });`);
+    try {
+      const child = Bun.spawn([process.execPath, "--preload", preload, join(import.meta.dir, "index.ts"), "init", ".",
+        "--service-id", "service", "--bucket-name", "private-bucket", "--workers-subdomain", "example",
+        ...(explicit ? ["--publication-protocol", "sqlite-sequential-v1"] : [])], { cwd: workspace,
+        env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: "a".repeat(32), CLOUDFLARE_API_TOKEN: "private-token" },
+        stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+      const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+      expect(code, stderr).toBe(0); expect(JSON.parse(stdout)).toMatchObject({ phase: "ready" });
+      expect(await loadWorkspaceConfig(workspace)).toMatchObject({ schema_version: 2, publication_protocol: "sqlite-sequential-v1" });
+      const setup = await fixture!;
+      expect(setup.runtime.health()).toMatchObject({ state: "paused", drained: true, publication_ready: true });
+      expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
+    } finally { server.stop(true); (await fixture)?.close(); rmSync(root, { recursive: true, force: true }); }
+  }, 30000);
+}

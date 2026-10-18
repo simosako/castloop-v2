@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { serviceConfigSchema, stringifyToml } from "./index";
+import { stringify as stringifyToml } from "@iarna/toml";
 import { parseSqliteServiceConfig, sqliteServiceConfigHash, sqliteServiceConfigSchema, sqliteServiceStatusSchema } from "./sqlite-service";
 
 const config = { schema_version: 2 as const, publication_protocol: "sqlite-sequential-v1" as const,
@@ -9,7 +9,6 @@ const config = { schema_version: 2 as const, publication_protocol: "sqlite-seque
 test("SQLite service config does not require or adopt Queue settings", () => {
   expect(sqliteServiceConfigSchema.parse(config)).toEqual(config);
   expect(parseSqliteServiceConfig(stringifyToml(config))).toEqual(config);
-  expect(serviceConfigSchema.safeParse(config).success).toBe(false);
   for (const change of [{ schema_version: 1 }, { publication_protocol: "queue-management-v1" },
     { queue_name: "legacy-queue" }, { dlq_name: "legacy-dlq" }, { api_token: "secret" }]) {
     expect(sqliteServiceConfigSchema.safeParse({ ...config, ...change }).success).toBe(false);

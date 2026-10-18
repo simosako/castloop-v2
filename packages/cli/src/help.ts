@@ -1,32 +1,14 @@
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
-  "publish-rss-import": {
-    usage: "publish-rss-import DIRECTORY",
-    description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
-      "Requires an open queue-management-v1-ready Worker, retained administrator key and Cloudflare credentials with Queues Edit.\n" +
-      "Validates all TOML and assets before registration; publishes the Show then Episodes sequentially.\n" +
-      "Intermediate Episodes become public as jobs finish. The operation is not an atomic batch.\n" +
-      "Re-running inspects acknowledged pending jobs and continues recorded progress without republishing completed inputs.\n" +
-      "Unknown mutation outcomes remain blocked; preserve .castloop journals and inspect the existing jobs.\n" +
-      "Completion does not authorize removal of the old host or certify subscriber migration.",
-  },
-  "import-rss": {
-    usage: "import-rss SHOW_ID FEED_URL (--dry-run | --output DIRECTORY)",
-    description: "Import one RSS 2.0 podcast to local files without Cloudflare credentials or changes.\n" +
-      "--dry-run fetches only RSS and reports counts, missing fields and unsupported extensions.\n" +
-      "--output downloads the RSS snapshot, JPEG/PNG cover, MP3s and editable TOML into an empty directory.\n" +
-      "Repeat the same command to continue this snapshot without overwriting edited TOML.\n" +
-      "Preserve downloaded files and private .castloop records; review them before publication.\n" +
-      "Audio must be MP3 and at most 300,000,000 bytes. Local import does not migrate subscribers or remove the old host.",
-  },
   init: {
     usage: "init [dir] [--publication-protocol sqlite-sequential-v1] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
-    description: "Create a service workspace and Cloudflare resources. Missing values are prompted on a terminal.\n" +
-      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Creates only new resources and completes paused.\n" +
-      "schema_version=1: use service-status, then service-resume with its pause ID. Never rerun an initialization with an unknown outcome.\n" +
-      "SQLite: --publication-protocol sqlite-sequential-v1 creates a fresh SQLite DO service without Queues.\n" +
-      "SQLite initialization verifies Alarm/R2/cache readiness and finishes paused; resume with a NEW window UUID. Existing services are not converted.",
+    description: "Create a fresh SQLite service (schema_version=2) by default; no protocol option is required.\n" +
+      "--publication-protocol sqlite-sequential-v1 remains optional for existing scripts; no other protocol is supported.\n" +
+      "Missing values are prompted on a terminal. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
+      "Creates a private R2 bucket, Worker and SQLite-backed Durable Object without Queues.\n" +
+      "Verifies Alarm/R2/cache/purge readiness and finishes paused; resume with a NEW admission-window UUID.\n" +
+      "Existing resources are never adopted. Service schema_version=1 requires v0.5.x; migration is not provided.",
   },
   "create-show": {
     usage: "create-show ID [--site-url URL]",
@@ -40,170 +22,136 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "update-show": {
     usage: "update-show ID",
-    description: "Run from the service workspace. Stage local Show metadata and cover art without publishing.\n" +
-      "Requires queue-management-v1 readiness and Cloudflare credentials with Queues Edit. Waits for an R2 grant before upload.",
+    description: "Run from the service workspace. Upload verified Show metadata and JPEG/PNG cover to unique private R2 keys.\n" +
+      "Requires Cloudflare credentials. Does not publish; use publish-show explicitly.",
   },
   "publish-show": {
     usage: "publish-show ID",
-    description: "Run from the service workspace after update-show. Submit the staged Show for publication.\n" +
-      "Requires queue-management-v1 readiness and Cloudflare Queues Edit. Queued does not prove admission, marker creation or publication.\n" +
-      "Check the returned job ID with job-status until server_status.response.state is published.",
+    description: "Run from the service workspace after update-show. Freeze and submit the current draft to the SQLite FIFO.\n" +
+      "Waits for the exact job's succeeded status after writes and cache purge. Queued is not publication success.",
   },
   "update-episode": {
     usage: "update-episode ID",
-    description: "Run from the Show directory. Stage Episode metadata without uploading audio or publishing.\n" +
-      "Requires queue-management-v1 readiness and Cloudflare credentials with Queues Edit.",
+    description: "Run from the Show directory. Upload verified Episode metadata without uploading audio or publishing.\n" +
+      "Requires Cloudflare credentials. Old or frozen inputs cannot be silently replaced.",
   },
   "update-episode-audio": {
     usage: "update-episode-audio ID MP3",
-    description: "Run from the Show directory. Validate and stage MP3 audio (at most 300,000,000 bytes).\n" +
-      "Requires queue-management-v1 readiness and Cloudflare credentials with Queues Edit.\n" +
-      "This does not publish. Initial publication also requires update-episode.",
+    description: "Run from the Show directory. Validate and upload MP3 audio (at most 300,000,000 bytes) to a unique R2 key.\n" +
+      "Requires Cloudflare credentials; verifies full readback/hash/size/object identity. Does not publish.",
   },
   "publish-episode": {
     usage: "publish-episode ID [MP3]",
-    description: "Run from the Show directory. Submit staged Episode changes for publication.\n" +
-      "Initial publication requires metadata and audio. Supply the original MP3 path whenever audio was staged.\n" +
-      "For metadata-only revisions omit MP3; unchanged published audio is reused.\n" +
-      "Requires queue-management-v1 readiness and Cloudflare Queues Edit. Unknown submissions are never automatically resent.",
+    description: "Run from the Show directory. Freeze and submit staged changes, then wait for succeeded.\n" +
+      "Initial publication requires metadata and audio. Metadata-only updates reuse immutable published audio.\n" +
+      "An MP3 argument is optional; if supplied it must match the staged source. Unknown submissions are never resent.",
   },
   "job-status": {
     usage: "job-status JOB",
-    description: "Run from the service workspace. Compare the retained publication journal with server status.\n" +
-      "New jobs read authenticated private R2 results and require Cloudflare credentials; response.state published proves this operation completed.\n" +
-      "Legacy jobs retain published/released status. Neither a result nor queued proves global service quiescence or authorizes recovery.",
-  },
-  "retry-job": {
-    usage: "retry-job JOB",
-    description: "Run from the service workspace. Explicitly retry the same acknowledged publication commit.\n" +
-      "Requires its retained journal, an existing verified marker and settled execution. Does not resend an unconfirmed Queue submission.\n" +
-      "New async management requests cannot be retried by this command. Active or unknown owners/locks are not released.",
-  },
-  "release-job": {
-    usage: "release-job JOB",
-    description: "Disabled: dead-letter history does not prove that the current execution or IO ended.\n" +
-      "Preserve journals and tokens and inspect Worker logs. No token is released or commit requeued.",
+    description: "Run from the service workspace. Read the retained publication/lifecycle job's status.\n" +
+      "status.state succeeded proves this operation completed, not global quiescence or recovery authorization.",
   },
   deploy: {
     usage: "deploy [--operation-id UUID]",
-    description: "Run from the service workspace. Update an already initialized M6 service without converting data.\n" +
+    description: "Run from the service workspace. Perform a code-only update of the same config/schema/namespace.\n" +
       "Explicitly pause and drain first. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
-      "Completes paused; resume explicitly. Does not adopt legacy services or replay unknown deployments.",
-  },
-  domain: {
-    usage: "domain add HOSTNAME [--operation-id UUID] | domain list | domain remove [--operation-id UUID]",
-    description: "Run from the service workspace. Use one Custom Domain in an active/full Cloudflare zone owned by this account.\n" +
-      "Add/remove require explicit service-pause and drained owners, and finish paused; resume explicitly.\n" +
-      "Keep workers.dev for administration. TLS probes send no administrator key or API token.\n" +
-      "Repeat the same command to continue acknowledged progress/TLS waiting. Preserve unknown REST outcomes, execution tokens and locks.\n" +
-      "List is read-only and reports connections, settings mismatches and unfinished operations. Set Cloudflare account/API token and the local administrator key.",
+      "Probes the new runtime and finishes paused. Never adopts resources, converts data or replays an unknown deployment.",
   },
   "init-reconcile": {
     usage: "init-reconcile OPERATION_UUID",
-    description: "Reconcile a retained initialization only when the server already completed it paused. Does not redeploy or replay initialization.",
+    description: "Read-only reconciliation of an exact retained initialization already completed ready/paused/drained on the server.\n" +
+      "Never redeploys, adopts an unknown deployment or replays initialization.",
   },
   "init-continue-verification": {
     usage: "init-continue-verification OPERATION_UUID",
-    description: "SQLite development only: continue verified setup after an acknowledged deployment/access configuration.\n" +
-      "Requires unchanged frozen source/configuration and a fresh paused runtime with no setup request.\n" +
-      "Never recreates resources, uploads configuration, redeploys, or resends a previously requested setup. init-reconcile remains read-only.",
-  },
-  "update-service-continue": {
-    usage: "update-service-continue OPERATION_UUID",
-    description: "Explicitly activate an acknowledged upload only with a durable not-started activation checkpoint.\n" +
-      "Rechecks the retained owner, settings, version history and script ETag; never uploads again. Completes paused.\n" +
-      "Legacy upload-only journals, unknown activation requests and residual locks remain blocked.",
+    description: "Continue verification after acknowledged deployment/access configuration, before any setup request.\n" +
+      "Requires unchanged frozen source/configuration and a fresh paused runtime.\n" +
+      "Never recreates resources, uploads configuration, redeploys, or resends setup.",
   },
   "update-service-verify": {
     usage: "update-service-verify OPERATION_UUID",
-    description: "Continue verification of an acknowledged deployment using its retained journal. Never re-upload an unknown deployment.\n" +
-      "SQLite: deploy_acknowledged/deployed/verified only, with unchanged frozen source/configuration and no prior activation request.\n" +
-      "Rechecks the acknowledged script ETag, pinned deployment and namespace; never adopts an unacknowledged PUT.\n" +
-      "Waits for the recorded native version, then requests its first activation/probe and finishes paused. Unknown activation remains blocked.",
+    description: "Continue a retained deploy_acknowledged/deployed/verified update with no prior activation request.\n" +
+      "Rechecks frozen source/configuration, acknowledged script ETag, pinned deployment, namespace and server prepared state.\n" +
+      "Waits for the recorded native version, then requests its first activation/probe and finishes paused.\n" +
+      "Never re-uploads, repeats preparation, adopts unknown PUTs or resends activation.",
   },
   "update-service-reconcile": {
     usage: "update-service-reconcile OPERATION_UUID",
-    description: "Reconcile an already completed paused update without repeating remote mutations.",
+    description: "Reconcile an exact already-completed paused update using retained evidence without remote mutations.",
   },
   "service-status": {
     usage: "service-status",
-    description: "Read service admission, pause ID, worker version and unsettled invocations. Paused does not necessarily mean drained.",
+    description: "Read service state, runtime/readiness, admission window and FIFO active/queued/drained status.\n" +
+      "Paused does not necessarily mean drained; an empty FIFO does not prove unregistered uploads settled.",
   },
   "service-pause": {
     usage: "service-pause PAUSE_UUID",
-    description: "Explicitly pause delivery and new mutations. Existing owners must finish; no elapsed-time release is performed.",
+    description: "Explicitly pause delivery and new admission. Already accepted jobs can drain; blocked jobs stay preserved.",
   },
   "service-resume": {
     usage: "service-resume UUID",
-    description: "Resume only the exact paused service after runtime verification and settlement of existing owners.\n" +
-      "schema_version=1 requires its PAUSE_UUID. sqlite-sequential-v1 requires a NEW admission-window UUID, not the pause command UUID.",
+    description: "Resume the verified paused service with a NEW admission-window UUID, not the init/pause UUID.\n" +
+      "Does not release unknown IO, blocked jobs or retained locks.",
   },
   "target-show": {
     usage: "target-show SHOW_ID",
-    description: "Read a Show's current lifecycle, generations and unfinished ownership without mutations.",
-  },
-  "list-shows": {
-    usage: "list-shows [--include-deleted] [--cursor TOKEN] [--json]",
-    description: "Run from the service workspace. List server-side Shows, states, titles and feed URLs without mutations.\n" +
-      "Returns up to 20 control records per page; repeat with the returned cursor for more. Deleted IDs are hidden unless requested.\n" +
-      "Local-only drafts are not included. Snapshot only; feed URLs do not prove delivery. Requires the administrator key, not a Cloudflare API token.",
-  },
-  "list-episodes": {
-    usage: "list-episodes SHOW_ID [--include-deleted] [--cursor TOKEN] [--json]",
-    description: "Run from the service workspace. SHOW_ID is required. List server-side Episodes, states, titles and publication dates.\n" +
-      "Returns up to 20 control records per page; repeat with the returned cursor for more. Deleted IDs are hidden unless requested.\n" +
-      "Local-only Episode TOML drafts are not included. Parent Show/service state is reported separately. Requires the administrator key.",
+    description: "Read a Show's current lifecycle and expected state version without mutations or recovery authorization.",
   },
   "target-episode": {
     usage: "target-episode SHOW_ID EPISODE_ID",
-    description: "Read an Episode's current lifecycle, revision and unfinished ownership without mutations.",
+    description: "Read the Episode's current lifecycle/base revision and expected versions without mutations.",
+  },
+  "list-shows": {
+    usage: "list-shows [--include-deleted] [--cursor TOKEN] [--json]",
+    description: "Run from the service workspace. List server-side Shows, states, titles and feed URLs.\n" +
+      "Returns up to 20 entries; follow next_cursor. Local-only drafts are excluded. Snapshot only.\n" +
+      "Requires the administrator key, not a Cloudflare API token.",
+  },
+  "list-episodes": {
+    usage: "list-episodes SHOW_ID [--include-deleted] [--cursor TOKEN] [--json]",
+    description: "Run from the service workspace. List server-side Episodes, states, titles and dates for SHOW_ID.\n" +
+      "Returns up to 20 entries; follow next_cursor. Local-only drafts are excluded. Snapshot only.\n" +
+      "Requires the administrator key, not a Cloudflare API token.",
   },
   "preview-show-lifecycle": {
-    usage: "preview-show-lifecycle SHOW_ID unpublish|restore|delete",
-    description: "Print a non-mutating lifecycle plan. Save JSON, review target/action/request hash, then use lifecycle-execute.\n" +
-      "Unpublish is reversible; deletion removes payloads permanently while retaining operational records and IDs.",
+    usage: "preview-show-lifecycle SHOW_ID unpublish|restore",
+    description: "Print a read-only lifecycle plan. Save JSON, review target/action/request_sha256, then use lifecycle-execute.\n" +
+      "Restore uses saved snapshots and preserves individually unpublished Episodes. Physical deletion is not supported.",
   },
   "preview-episode-lifecycle": {
-    usage: "preview-episode-lifecycle SHOW_ID EPISODE_ID unpublish|restore|delete",
-    description: "Print a non-mutating Episode lifecycle plan. Save JSON and review it before lifecycle-execute.\n" +
-      "Deletion is irreversible and retains operational records and IDs.",
+    usage: "preview-episode-lifecycle SHOW_ID EPISODE_ID unpublish|restore",
+    description: "Print a read-only Episode lifecycle plan. Save JSON and review it before lifecycle-execute.\n" +
+      "Restore preserves saved GUID/date/audio/revision identity, not local edits. Physical deletion is not supported.",
   },
   "lifecycle-execute": {
-    usage: "lifecycle-execute PLAN_JSON REQUEST_SHA256 confirm|confirm-delete-retain-records",
-    description: "Execute the exact reviewed plan with explicit acknowledgement. Delete requires confirm-delete-retain-records.\n" +
-      "The returned job ID is queued, not completed; inspect operation-status lifecycle JOB until settled.",
-  },
-  "lifecycle-retry": {
-    usage: "lifecycle-retry JOB_UUID REQUEST_SHA256 confirm|confirm-delete-retain-records",
-    description: "Retry the same confirmed lifecycle job only with its retained journal and settled execution. No force unlock or owner release.",
-  },
-  "local-operation-status": {
-    usage: "local-operation-status FAMILY ID",
-    description: "Run from the service workspace. Read a local M6 operation journal and observe its lock.\n" +
-      "FAMILY must be staging, publication, lifecycle or show-registration. Staging uses an upload operation ID,\n" +
-      "publication/lifecycle use a job ID, and show-registration uses a Show ID.\n" +
-      "No credentials, network access or writes are used. Missing local records do not prove remote absence or completion.\n" +
-      "This does not retry, remove locks, release tokens, authorize recovery or certify M6 readiness.",
+    usage: "lifecycle-execute PLAN_JSON REQUEST_SHA256 confirm",
+    description: "Submit the exact reviewed unpublish/restore plan with its hash and explicit confirmation.\n" +
+      "Queued is not completed; use job-status or operation-status lifecycle JOB until succeeded.",
   },
   "operation-status": {
-    usage: "operation-status FAMILY ID",
-    description: "Run from the service workspace. Compare a frozen local M6 operation with its read-only server status.\n" +
-      "FAMILY must be staging, publication, lifecycle or show-registration; IDs match local-operation-status.\n" +
-      "Requires the local administrator key. New async content jobs use private R2 and require Cloudflare account/API credentials.\n" +
-      "Legacy jobs use the M6 management status route without a Cloudflare API token.\n" +
-      "This does not send mutations, update local phases, remove locks, release tokens, authorize recovery or certify M6 readiness.\n" +
-      "Legacy Workers and migration-only candidate routes reject this inspection.",
+    usage: "operation-status lifecycle JOB",
+    description: "Read a retained SQLite lifecycle job's status. Other families are not supported.\n" +
+      "Does not retry, remove locks, release tokens or authorize recovery.",
+  },
+  "import-rss": {
+    usage: "import-rss SHOW_ID FEED_URL (--dry-run | --output DIRECTORY)",
+    description: "Import RSS 2.0 to local files without a service workspace, Cloudflare credentials or changes.\n" +
+      "--dry-run reports counts, missing fields and warnings; --output downloads the snapshot, cover, MP3s and TOML.\n" +
+      "Repeat the same command to continue this snapshot without overwriting edits. MP3s are at most 300,000,000 bytes.\n" +
+      "Review before publication. Does not migrate subscribers, service schemas or old operational journals.",
+  },
+  "publish-rss-import": {
+    usage: "publish-rss-import DIRECTORY",
+    description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
+      "Requires an open, ready SQLite service, administrator key and Cloudflare credentials; no Queues permissions.\n" +
+      "Validates inputs, preserves GUIDs/dates, then publishes the Show and Episodes sequentially. Not an atomic batch.\n" +
+      "Re-running observes acknowledged pending jobs and continues without republishing completed inputs.\n" +
+      "Unknown mutations stay blocked. Does not adopt existing Shows, convert services or remove the old host.",
   },
 };
 
 export function commandHelp(command: string): string {
   const help = Object.hasOwn(COMMAND_HELP, command) ? COMMAND_HELP[command] : undefined;
   if (!help) throw new Error(`Unknown command: ${command}`);
-  const sqlite = ["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode", "job-status", "preview-show-lifecycle", "preview-episode-lifecycle", "lifecycle-execute", "operation-status", "publish-rss-import", "deploy", "update-service-verify", "update-service-reconcile"].includes(command) ?
-    "\n\nSQLite workspaces (schema_version=2): unique R2 uploads, no Queue grants/Queues Edit, explicit DO submission and bounded completion polling.\n" +
-    "Lifecycle preview/execution supports only unpublish/restore of saved snapshots, with the reviewed hash and confirm; deletion is not implemented.\n" +
-    "publish-rss-import supports new Shows only and preserves imported GUIDs/dates. A retained pending publication is observed, never resubmitted.\n" +
-    "deploy supports paused/drained code-only updates of the same config/schema/namespace, probes the new runtime and finishes paused. Reconcile is read-only.\n" +
-    "succeeded proves this operation completed, not global quiescence. Unknown requests are never resent; retry/release, deletion and domain changes are not implemented." : "";
-  return `Usage: castloop ${help.usage}\n\n${help.description}${sqlite}\n\nOptions:\n  --help, -h  Show this help`;
+  return `Usage: castloop ${help.usage}\n\n${help.description}\n\nOptions:\n  --help, -h  Show this help`;
 }

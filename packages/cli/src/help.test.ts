@@ -1,14 +1,13 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { sqliteServiceConfigHash, stringifyToml } from "@castloop/shared";
+import { COMMAND_HELP, commandHelp } from "./help";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { COMMAND_HELP } from "./help";
-import { PUBLICATION_SERVICE_TEXT } from "../../../src/test-support/publication";
 
 const entrypoint = join(import.meta.dir, "index.ts");
 
 test("every subcommand displays help without a workspace or credentials", () => {
-  const directory = mkdtempSync(join(tmpdir(), "castloop-help-"));
+  const directory = mkdtempSync("/tmp/opencode/castloop-help-");
   try {
     for (const command of Object.keys(COMMAND_HELP)) {
       const result = Bun.spawnSync([process.execPath, entrypoint, command, "--help"], {
@@ -19,191 +18,97 @@ test("every subcommand displays help without a workspace or credentials", () => 
       expect(result.stderr.toString()).toBe("");
     }
     expect(readdirSync(directory)).toEqual([]);
-  } finally {
-    rmdirSync(directory);
-  }
+  } finally { rmSync(directory, { recursive: true }); }
 }, 15000);
 
 test("help works after positional arguments, with -h, and with help COMMAND", () => {
   for (const args of [["create-show", "daily", "--help"], ["init", "--service-id", "daily", "--help"],
     ["create-episode", "-h"], ["help", "init"], ["-h"]]) {
     const result = Bun.spawnSync([process.execPath, entrypoint, ...args]);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout.toString()).toContain("Usage: castloop");
+    expect(result.exitCode).toBe(0); expect(result.stdout.toString()).toContain("Usage: castloop");
     expect(result.stderr.toString()).toBe("");
   }
+  expect(commandHelp("init")).toContain("no protocol option is required");
+  expect(commandHelp("init")).toContain("schema_version=2");
 });
 
-test("unknown commands and missing ordinary option values still fail", () => {
-  for (const args of [["unknown", "--help"], ["help", "unknown"], ["init", "--service-id"]]) {
-    const result = Bun.spawnSync([process.execPath, entrypoint, ...args]);
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr.toString()).toContain(args.includes("unknown") ? "Unknown command" : "Invalid or missing value");
-  }
-});
+test("removed commands, unsupported families and malformed arguments fail before workspace access", () => {
+  const directory = mkdtempSync("/tmp/opencode/castloop-help-invalid-");
+  try {
+    for (const args of [["unknown", "--help"], ["help", "unknown"], ["init", "--service-id"], ["init", "--schema-version", "1"],
+      ["init", "--publication-protocol", "queue-management-v1"], ["list-episodes"], ["list-episodes", "--json"],
+      ["list-shows", "unexpected"], ["list-episodes", "daily", "extra"], ["list-shows", "--cursor"], ["list-shows", "--local", "true"],
+      ["domain", "list"], ["retry-job", "id"], ["release-job", "id"], ["publication-retry", "id"], ["publication-release", "id"],
+      ["lifecycle-retry", "id", "hash", "confirm"], ["update-service-continue", "id"], ["local-operation-status", "publication", "id"],
+      ["operation-status", "publication", "id"], ["operation-status", "staging", "id"], ["operation-status", "show-registration", "id"],
+      ["preview-show-lifecycle", "daily", "delete"], ["preview-episode-lifecycle", "daily", "first", "delete"],
+      ["lifecycle-execute", "plan.json", "hash", "confirm-delete-retain-records"], ["update-service-drop-completion", "id"],
+      ["deploy", "--force", "true"], ["service-resume"], ["publish-episode", "first", "one.mp3", "two.mp3"], ["init", "--__proto__", "value"],
+      ["import-rss"], ["import-rss", "show", "https://example.com/feed"],
+      ["import-rss", "show", "https://example.com/feed", "--dry-run", "--output", "dir"],
+      ["import-rss", "show", "file:///etc/passwd", "--dry-run"], ["publish-rss-import"], ["publish-rss-import", "dir", "--force", "true"]]) {
+      const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: directory, timeout: 5000 });
+      expect(result.exitCode, args.join(" ")).toBe(1);
+      expect(result.stdout.toString()).toBe(""); expect(result.stderr.toString()).not.toContain("ENOENT");
+    }
+    expect(readdirSync(directory)).toEqual([]);
+  } finally { rmSync(directory, { recursive: true }); }
+}, 15000);
 
-test("list commands reject missing Show IDs, excess arguments and invalid flags before workspace access", () => {
-  for (const args of [["list-episodes"], ["list-episodes", "--json"], ["list-shows", "unexpected"],
-    ["list-episodes", "daily", "extra"], ["list-shows", "--cursor"], ["list-shows", "--local", "true"]]) {
-    const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: "/tmp/opencode" });
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout.toString()).toBe("");
-    expect(result.stderr.toString()).not.toContain("ENOENT");
-    if (args[0] === "list-episodes") expect(result.stderr.toString()).toContain("Usage: castloop list-episodes SHOW_ID");
-  }
-});
-
-test("domain rejects malformed actions and options before workspace access", () => {
-  for (const args of [["domain"], ["domain", "add"], ["domain", "list", "extra"], ["domain", "remove", "hostname"],
-    ["domain", "unknown"], ["domain", "list", "--operation-id", "id"], ["domain", "remove", "--force", "true"]]) {
-    const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: "/tmp/opencode" });
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout.toString()).toBe("");
-    expect(result.stderr.toString()).not.toContain("ENOENT");
-  }
-});
-
-test("RSS import arguments fail before network or workspace access", () => {
-  for (const args of [["import-rss"], ["import-rss", "show", "https://example.com/feed"],
-    ["import-rss", "show", "https://example.com/feed", "--dry-run", "--output", "dir"],
-    ["import-rss", "show", "file:///etc/passwd", "--dry-run"], ["publish-rss-import"], ["publish-rss-import", "dir", "--force", "true"]]) {
-    const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: "/tmp/opencode" });
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout.toString()).toBe("");
-    expect(result.stderr.toString()).not.toContain("ENOENT");
-  }
-});
-
-test("formal list commands pass options, format text/JSON and leave workspace state unchanged", () => {
+test("formal list commands pass SQLite options, format text/JSON and preserve workspace state", async () => {
   const directory = mkdtempSync("/tmp/opencode/castloop-list-entrypoint-");
-  const state = join(directory, ".castloop");
-  const preload = join(directory, "mock-fetch.ts");
-  const secret = JSON.stringify({ CASTLOOP_ADMIN_KEY: "private-secret" });
-  mkdirSync(state, { mode: 0o700 });
-  writeFileSync(join(state, "secrets.json"), secret, { mode: 0o600 });
-  writeFileSync(join(directory, "castloop.toml"), PUBLICATION_SERVICE_TEXT);
+  const state = join(directory, ".castloop"), preload = join(directory, "mock-fetch.ts");
+  const config = { schema_version: 2 as const, publication_protocol: "sqlite-sequential-v1" as const,
+    service_id: "service", account_id: "a".repeat(32), bucket_name: "private-bucket", worker_name: "test-worker",
+    public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
+  const source = stringifyToml(config), secret = JSON.stringify({ CASTLOOP_ADMIN_KEY: "private-secret" });
+  mkdirSync(state, { mode: 0o700 }); writeFileSync(join(state, "secrets.json"), secret, { mode: 0o600 });
+  writeFileSync(join(directory, "castloop.toml"), source);
   writeFileSync(preload, `import assert from "node:assert/strict";
 globalThis.fetch = async (url, init) => {
-  assert.equal(String(url), "https://test-worker.example.workers.dev/admin/catalog");
+  assert.equal(String(url), "https://test-worker.example.workers.dev/admin/sqlite-service/catalog");
   assert.equal(init.method, "POST");
   assert.equal(init.headers["X-Castloop-Key"], "private-secret");
   assert.deepEqual(JSON.parse(init.body), JSON.parse(process.env.CASTLOOP_TEST_REQUEST));
   return Response.json(JSON.parse(process.env.CASTLOOP_TEST_RESPONSE), { headers: { "Cache-Control": "no-store" } });
-};
-`);
-  const common = { schema_version: 1, result: "catalog", snapshot_only: true, authorizes_operation: false,
-    admission_state: "open", next_cursor: null };
-  const show = { show_id: "daily", lifecycle: "active", unfinished_operation: false,
-    title: "Title\n\u001b[31m", feed_url: "https://current.example/podcasts/daily/feed.xml" };
-  const episode = { episode_id: "first", lifecycle: "active", title: "First Episode", published_at: "2026-10-04T12:00:00Z" };
+};`);
+  const common = { protocol: "sqlite-sequential-v1", service_id: "service", worker_version_id: crypto.randomUUID(),
+    service_config_sha256: await sqliteServiceConfigHash(config), snapshot_only: true, authorizes_recovery: false, state: "open", next_cursor: null };
+  const show = { show_id: "daily", lifecycle: "published", unfinished_operation: false,
+    title: "Title\n\u001b[31m", feed_url: `${config.public_base_url}/podcasts/daily/feed.xml` };
+  const episode = { episode_id: "first", lifecycle: "published", title: "First Episode", published_at: "2026-10-04T12:00:00Z" };
   try {
     for (const args of [["list-shows"], ["list-episodes", "daily"],
       ["list-shows", "--include-deleted", "--cursor", "next-page", "--json"], ["list-episodes", "daily", "--json"]]) {
-      const listingShows = args[0] === "list-shows";
-      const request = { schema_version: 1, service_id: "service", include_deleted: args.includes("--include-deleted"),
-        ...(args.includes("--cursor") ? { cursor: "next-page" } : {}),
-        ...(listingShows ? { kind: "show" } : { kind: "episode", show_id: "daily" }) };
-      const response = listingShows ? { ...common, request, shows: [show] } : { ...common, request,
-        show: { show_id: "daily", lifecycle: "active", unfinished_operation: false }, episodes: [episode] };
-      const result = Bun.spawnSync([process.execPath, "--preload", preload, entrypoint, ...args], {
-        cwd: directory, env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: "", CLOUDFLARE_API_TOKEN: "",
-          CASTLOOP_TEST_REQUEST: JSON.stringify(request), CASTLOOP_TEST_RESPONSE: JSON.stringify(response) },
-      });
-      expect(result.exitCode).toBe(0);
-      expect(result.stderr.toString()).toBe("");
+      const shows = args[0] === "list-shows";
+      const request = { kind: shows ? "show" : "episode", ...(shows ? {} : { show_id: "daily" }),
+        include_deleted: args.includes("--include-deleted"), ...(args.includes("--cursor") ? { cursor: "next-page" } : {}) };
+      const response = shows ? { ...common, request, shows: [show] } : { ...common, request,
+        show: { show_id: "daily", lifecycle: "published", unfinished_operation: false }, episodes: [episode] };
+      const result = Bun.spawnSync([process.execPath, "--preload", preload, entrypoint, ...args], { cwd: directory,
+        env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: "", CLOUDFLARE_API_TOKEN: "",
+          CASTLOOP_TEST_REQUEST: JSON.stringify(request), CASTLOOP_TEST_RESPONSE: JSON.stringify(response) } });
+      expect(result.exitCode, result.stderr.toString()).toBe(0); expect(result.stderr.toString()).toBe("");
       if (args.includes("--json")) expect(JSON.parse(result.stdout.toString())).toEqual(response);
       else {
-        expect(result.stdout.toString()).toContain(listingShows ? "SHOW_ID\tSTATE" : "EPISODE_ID\tSTATE");
+        expect(result.stdout.toString()).toContain(shows ? "SHOW_ID\tSTATE" : "EPISODE_ID\tSTATE");
         expect(result.stdout.toString()).not.toContain("\u001b");
-        if (listingShows) expect(result.stdout.toString()).toContain("Title\\n\\u001b[31m");
+        if (shows) expect(result.stdout.toString()).toContain("Title\\n\\u001b[31m");
       }
     }
     expect(readdirSync(state)).toEqual(["secrets.json"]);
     expect(readFileSync(join(state, "secrets.json"), "utf8")).toBe(secret);
-    expect(readFileSync(join(directory, "castloop.toml"), "utf8")).toBe(PUBLICATION_SERVICE_TEXT);
-    expect(readdirSync(directory).sort()).toEqual([".castloop", "castloop.toml", "mock-fetch.ts"]);
-  } finally {
-    unlinkSync(join(state, "secrets.json"));
-    rmdirSync(state);
-    unlinkSync(join(directory, "castloop.toml"));
-    unlinkSync(preload);
-    rmdirSync(directory);
-  }
+    expect(readFileSync(join(directory, "castloop.toml"), "utf8")).toBe(source);
+  } finally { rmSync(directory, { recursive: true }); }
 });
 
-test("formal domain list uses workers.dev administration and Cloudflare GET without changing the workspace", () => {
-  const directory = mkdtempSync("/tmp/opencode/castloop-domain-entrypoint-");
-  const state = join(directory, ".castloop");
-  const preload = join(directory, "mock-fetch.ts");
-  mkdirSync(state, { mode: 0o700 });
-  writeFileSync(join(state, "secrets.json"), JSON.stringify({ CASTLOOP_ADMIN_KEY: "private-secret" }));
-  writeFileSync(join(directory, "castloop.toml"), PUBLICATION_SERVICE_TEXT);
-  const fixture = join(import.meta.dir, "../../../src/test-support/domain-admin.ts");
-  const routes = join(import.meta.dir, "../../../src/m6-routes.ts");
-  writeFileSync(preload, `import assert from "node:assert/strict";
-import { domainAdminFixture } from ${JSON.stringify(fixture)};
-import { fetchM6ManagementIntegration } from ${JSON.stringify(routes)};
-const output = console.log;
-console.log = () => {};
-const setup = await domainAdminFixture();
-console.log = output;
-globalThis.fetch = async (input, init) => {
-  const request = new Request(input, init);
-  const url = new URL(request.url);
-  if (url.origin === "https://api.cloudflare.com") {
-    assert.equal(request.method, "GET");
-    assert.equal(url.pathname, "/client/v4/accounts/" + setup.config.account_id + "/workers/domains");
-    assert.equal(url.searchParams.get("service"), setup.config.worker_name);
-    assert.equal(request.headers.get("Authorization"), "Bearer test-token");
-    return Response.json({ success: true, result: [], result_info: { total_pages: 1 } });
-  }
-  assert.equal(url.origin, setup.management);
-  assert.deepEqual(JSON.parse(init.body), { action: "inspect", service_id: "service" });
-  return fetchM6ManagementIntegration(request, setup.env, setup.cachedAssets);
-};
-`);
-  try {
-    const result = Bun.spawnSync([process.execPath, "--preload", preload, entrypoint, "domain", "list"], {
-      cwd: directory, env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: "a".repeat(32), CLOUDFLARE_API_TOKEN: "test-token" },
-    });
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr.toString()).toBe("");
-    expect(JSON.parse(result.stdout.toString())).toMatchObject({ result: "domains", connections_match: true,
-      configuration_matches: false, domains: [], local_operations: [] });
-    expect(readFileSync(join(directory, "castloop.toml"), "utf8")).toBe(PUBLICATION_SERVICE_TEXT);
-    expect(readdirSync(state)).toEqual(["secrets.json"]);
-  } finally {
-    unlinkSync(join(state, "secrets.json")); rmdirSync(state);
-    unlinkSync(join(directory, "castloop.toml")); unlinkSync(preload); rmdirSync(directory);
-  }
-});
-
-test("formal commands reject test-only faults and malformed mutations without creating local state", () => {
-  const directory = mkdtempSync(join(tmpdir(), "castloop-entrypoint-"));
-  try {
-    for (const args of [["update-service-drop-completion", "id"], ["deploy", "--force", "true"],
-      ["lifecycle-execute", "plan.json", "hash"], ["service-resume"],
-      ["publish-episode", "first", "one.mp3", "two.mp3"], ["init", "--__proto__", "value"]]) {
-      const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: directory });
-      expect(result.exitCode).toBe(1);
-      expect(result.stdout.toString()).toBe("");
-    }
-    expect(readdirSync(directory)).toEqual([]);
-  } finally { rmdirSync(directory); }
-});
-
-test("formal initialization does not convert a legacy workspace or create administrator credentials", () => {
-  const directory = mkdtempSync(join(tmpdir(), "castloop-legacy-entrypoint-"));
-  const stateDirectory = join(directory, ".castloop");
-  const state = join(stateDirectory, "state.json");
-  mkdirSync(stateDirectory);
-  writeFileSync(state, "retained legacy state");
+test("fresh initialization never adopts retained local state or creates administrator credentials", () => {
+  const directory = mkdtempSync("/tmp/opencode/castloop-legacy-entrypoint-");
+  const state = join(directory, ".castloop"); mkdirSync(state); writeFileSync(join(state, "state.json"), "retained legacy state");
   try {
     const result = Bun.spawnSync([process.execPath, entrypoint, "init"], { cwd: directory });
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr.toString()).toContain("Legacy workspaces are not converted");
-    expect(readFileSync(state, "utf8")).toBe("retained legacy state");
-    expect(readdirSync(stateDirectory)).toEqual(["state.json"]);
-    expect(readdirSync(directory)).toEqual([".castloop"]);
-  } finally { unlinkSync(state); rmdirSync(stateDirectory); rmdirSync(directory); }
+    expect(result.exitCode).toBe(1); expect(result.stderr.toString()).toContain("cannot adopt retained local state");
+    expect(readFileSync(join(state, "state.json"), "utf8")).toBe("retained legacy state");
+    expect(readdirSync(state)).toEqual(["state.json"]); expect(readdirSync(directory)).toEqual([".castloop"]);
+  } finally { rmSync(directory, { recursive: true }); }
 });

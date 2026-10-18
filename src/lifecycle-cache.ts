@@ -1,11 +1,8 @@
-import { validateId } from "../packages/shared/src/index";
 import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
-import type { CachedPublicFetch } from "./lifecycle-gateway";
 
 export type LifecycleCacheEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "head" | "get"> };
 export type LifecyclePurgeTarget = { showId: string; episodeId?: string };
-export type CachedAssetBinding = (options: { props: PublicCacheProps }) => { fetch: (request: Request) => Promise<Response> };
 
 function rejected(request: Request, status: 404 | 405 | 412 | 416 | 503, size?: number): Response {
   return new Response(request.method === "HEAD" ? null : JSON.stringify({ error: status === 404 ? "not found" :
@@ -70,23 +67,6 @@ function requestedRange(request: Request, object: R2Object): { offset: number; l
   return { offset, length: end - offset + 1 };
 }
 
-export function createCachedPublicFetch(binding: CachedAssetBinding): CachedPublicFetch {
-  return async (request, asset, props) => {
-    const original = new URL(request.url);
-    const parsed = parsePublicAssetPath(original.pathname);
-    if (!parsed || parsed.key !== asset.key || !validProps(asset, props) || (request.method !== "GET" && request.method !== "HEAD")) {
-      throw new Error("Invalid cached public transport input");
-    }
-    const url = new URL(original.pathname, "https://castloop-cache.invalid");
-    const headers = new Headers();
-    for (const name of ["Range", "If-Range", "If-Match", "If-Unmodified-Since", "If-None-Match", "If-Modified-Since"]) {
-      const value = request.headers.get(name);
-      if (value !== null) headers.set(name, value);
-    }
-    return binding({ props }).fetch(new Request(url, { method: request.method, headers }));
-  };
-}
-
 export async function serveCachedLifecycleAsset(request: Request, env: LifecycleCacheEnv, props: PublicCacheProps): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return rejected(request, 405);
   const asset = parsePublicAssetPath(new URL(request.url).pathname);
@@ -121,16 +101,4 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
       ...(asset.kind === "audio" ? { episode_id: asset.episodeId } : {}), reason_code: "public_delivery_failed" }));
     return rejected(request, 503);
   }
-}
-
-export async function purgeLifecycleCache(cache: Pick<CacheContext, "purge"> | undefined, input: LifecyclePurgeTarget): Promise<void> {
-  const showId = validateId(input.showId, "show");
-  const episodeId = input.episodeId !== undefined ? validateId(input.episodeId, "episode") : undefined;
-  if (!cache) throw new Error("Cached entrypoint purge is unavailable");
-  const tags = episodeId ? [`feed-${showId}`, `episode-${showId}/${episodeId}`] : [`show-${showId}`, `feed-${showId}`, `cover-${showId}`];
-  const tagged = await cache.purge({ tags });
-  if (!tagged.success) throw new Error("Lifecycle cache tag purge failed");
-  const prefix = episodeId ? `/podcasts/${showId}/episodes/${episodeId}/` : `/podcasts/${showId}/`;
-  const prefixed = await cache.purge({ pathPrefixes: [prefix] });
-  if (!prefixed.success) throw new Error("Lifecycle cache prefix purge failed");
 }

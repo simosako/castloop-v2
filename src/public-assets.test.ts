@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { parsePublicAssetPath, publicAssetCacheProps, publicAssetCacheTags } from "./public-assets";
-import type { PublicVisibilitySnapshot } from "./lifecycle-control";
+import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 
 const revisionId = "01234567-89ab-4cde-8fab-0123456789ab";
 const audioPath = `/podcasts/daily/episodes/first/${revisionId}.mp3`;
-const snapshot: PublicVisibilitySnapshot = { visibility: "public", showId: "daily", showGeneration: 8, feedGeneration: 3 };
 
 describe("approved public asset paths", () => {
   test("feed, supported cover formats and immutable audio map to the existing R2 layout", () => {
@@ -34,31 +32,6 @@ describe("approved public asset paths", () => {
 });
 
 describe("server-controlled public cache identity", () => {
-  test("feed, cover and audio use their applicable visibility generations", () => {
-    const feed = parsePublicAssetPath("/podcasts/daily/feed.xml")!;
-    const cover = parsePublicAssetPath("/podcasts/daily/cover.png")!;
-    const audio = parsePublicAssetPath(audioPath)!;
-    expect(publicAssetCacheProps(feed, snapshot)).toEqual({ showGeneration: 8, feedGeneration: 3 });
-    expect(publicAssetCacheProps(cover, snapshot)).toEqual({ showGeneration: 8 });
-    expect(publicAssetCacheProps(audio, { ...snapshot, episodeId: "first", episodeGeneration: 4 }))
-      .toEqual({ showGeneration: 8, episodeGeneration: 4 });
-    expect(publicAssetCacheProps(audio, { ...snapshot, episodeId: "first", episodeGeneration: 5 }))
-      .not.toEqual(publicAssetCacheProps(audio, { ...snapshot, episodeId: "first", episodeGeneration: 4 }));
-  });
-
-  test("non-public/mismatched state and invalid generations cannot produce cache props", () => {
-    const feed = parsePublicAssetPath("/podcasts/daily/feed.xml")!;
-    const audio = parsePublicAssetPath(audioPath)!;
-    for (const state of [{ visibility: "not_found" }, { visibility: "gone" }, { ...snapshot, showId: "other" },
-      { ...snapshot, showGeneration: -1 }, { ...snapshot, feedGeneration: Number.MAX_SAFE_INTEGER + 1 },
-      { ...snapshot, episodeId: "first", episodeGeneration: 0 }] as PublicVisibilitySnapshot[]) {
-      expect(() => publicAssetCacheProps(feed, state)).toThrow();
-    }
-    expect(() => publicAssetCacheProps(audio, snapshot)).toThrow();
-    expect(() => publicAssetCacheProps(audio, { ...snapshot, episodeId: "other", episodeGeneration: 0 })).toThrow();
-    expect(() => publicAssetCacheProps(audio, { ...snapshot, episodeId: "first", episodeGeneration: NaN })).toThrow();
-  });
-
   test("hierarchical tags retain old feed/cover identities and avoid ambiguous Show/Episode slug joins", () => {
     expect(publicAssetCacheTags(parsePublicAssetPath("/podcasts/daily/feed.xml")!)).toEqual(["show-daily", "feed-daily"]);
     expect(publicAssetCacheTags(parsePublicAssetPath("/podcasts/daily/cover.png")!)).toEqual(["show-daily", "cover-daily"]);
