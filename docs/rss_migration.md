@@ -1,7 +1,7 @@
 # RSSからのPodcast取り込み（v0.6.0向け開発仕様）
 
 v0.6.0向け開発ではSQLiteサービス（サービス設定version 2）だけに公開する。公開には対応するCLI・検証済みWorker・private workspaceが必要。旧サービス設定version 1からのマイグレーション機能やjournal変換は提供しない。
-現在の公開版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。今回の変更は未リリース・未配備。
+現在の公開版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。今回の変更は未リリースで、[新規隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)にのみ配備した。
 
 ローカルdownloadはサービスworkspace不要。既存の取り込み素材は引き続き検証して利用できるが、旧Queue公開cursorをSQLiteの受付記録として採用しない。
 
@@ -73,6 +73,7 @@ queued/acceptedだけでは公開成功ではない。
 ### 停止した場合
 
 - 各job最大300状態照会、5分経過後は新規照会を開始しない。進行中の要求には別timeoutがあり、CLI全体が必ず5分以内に終了するという意味ではない。
+- 複数Episodeのupload・全量readback・公開は逐次処理のため、import全体は数分以上かかり得る。外部の実行ツールやCIから起動する場合、短いcommand全体timeoutで強制終了させない。単一jobの5分予算とbatch全体の時間を区別し、元processの終了とjournalを確認せず二重起動しない。
 - SQLite管理GETの通信/本文断とallowlistの一時HTTP拒否は最大3試行。retryも300 GETへ数える。schema/identity不一致や恒久拒否はretryしない。
 - 保存済みpending publicationがある場合、同じ取り込みはその凍結jobのstatusを確認する。完了済み公開を再送せず、別jobへ置き換えない。未知upload・登録・ローカルinstallは自動再実行しない。
 - SQLiteの`failed`は公開書込前の確定的失敗、`blocked`は未知IOや途中停止等で後続FIFOを止める。retry/releaseを提供せず、経過時間・HEAD不在で解放しない。

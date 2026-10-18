@@ -250,4 +250,4 @@ Linux／Bun 1.4.2、同じcheckout・lockfileで`npm ci`後に確認した。最
 - 相対import欠落と、production sourceの旧protocol／binding／Worker参照を検査し、該当なし。残るversion 1はcontent／SQLite要求・journal、queueはSQL FIFO、旧名称のcache/source helperは共通処理。プラットフォームの汎用Queue型は変更していない。
 - 変更・移動した文書のローカルリンクを確認した。既存のM6資料2箇所にある過去の`experiments/m6/`不在リンクは本件以前のもので、旧証跡の再作成やcleanupはしていない。
 - 模擬試験の初回追加時にテスト側のmetadata出力名、fixtureの管理鍵参照先、削除済みWorkerを要求する旧bundle期待値を補正した。製品IOの安全条件を緩和したものではない。
-- Cloudflareへの配備・公開・資源操作・未知IO再送・証跡削除は0件。commit／push／Issue更新・close／リリースも行っていない。
+- 上記ローカル検証時点ではCloudflareへの配備・公開・資源操作・未知IO再送・証跡削除は0件で、commit／push／Issue更新・close／リリースも未実施。その後の承認済み実機回帰は[試験結果・性能サマリー](schema_v1_removal_live_test.md)を参照。管理者は新規隔離環境での全36件公開・全39音源配信照合・Worker更新後の保持確認を合格と判断した。
