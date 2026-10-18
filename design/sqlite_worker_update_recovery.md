@@ -1,7 +1,7 @@
 # SQLite Worker更新の検証続行
 
 Issue [#11](https://github.com/simosako/castloop-v2/issues/11)の最新コメントと、
-[#33の棚卸し](https://github.com/simosako/castloop-v2/issues/33)で確認した現行SQLite経路を対象とする未リリースの修正。
+[#33の棚卸し](https://github.com/simosako/castloop-v2/issues/33)で確認した現行SQLite経路を対象とするv0.5.2の修正。
 元のQueue/R2障害のGET timeout原因を確定・再現したという意味ではない。
 
 ## 問題と範囲

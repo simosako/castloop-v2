@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-現在の公開版はv0.5.1。まず[全体設計](initial_design.md)を読み、操作方法は[プロジェクトREADME](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS移行案内](../docs/rss_migration.md)を参照する。既存schema-version-1は[Queue方式ガイド](../docs/queue_service.md)を使い、SQLiteへ自動変換しない。v0.5.1の変更点は[v0.5.1リリースノート](../docs/release-v0.5.1.md)、通常HTTPの10ms達成範囲・未対応機能・Issue #13の残る制限は[v0.5.0リリースノート](../docs/release-v0.5.0.md)で確認する。
+現在の公開版はv0.5.2。まず[全体設計](initial_design.md)を読み、操作方法は[プロジェクトREADME](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS移行案内](../docs/rss_migration.md)を参照する。既存schema-version-1は[Queue方式ガイド](../docs/queue_service.md)を使い、SQLiteへ自動変換しない。v0.5.2の変更点は[v0.5.2リリースノート](../docs/release-v0.5.2.md)、通常HTTPの10ms達成範囲・未対応機能・Issue #13の残る制限は[v0.5.0リリースノート](../docs/release-v0.5.0.md)で確認する。
 
 ## 開発時に参照する文書
 
@@ -20,8 +20,8 @@
 | [案C: Queue/R2管理経路](async_management_implementation.md) | 開発中のstart/complete/publish、署名済みgrant/result、async admission、journal・未知IO・回帰試験 |
 | [配信判定の事前生成](public_delivery_projection.md) | 管理側のstrict検証と原子的metadata生成、通常HTTPのHEAD-only判定、互換更新時の準備と旧移行の分離 |
 | [SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md) | 一意upload→DO SQLite FIFO→Alarm。実DO入口・fresh init/readiness・正式CLI・配信接続のローカル実装と残る実機/P6の範囲 |
-| [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | v0.5.0のschema version 2明示init、公開・pause/resume、未知IOの保全、未対応操作と実機未検証の範囲（v0.5.1の検証強化を含む） |
-| [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md) | Issue #11/#33の現行経路。PUT成功checkpoint、配備後GET失敗の明示続行、旧journalと未知IOの境界（未リリース） |
+| [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | v0.5.0のschema version 2明示init、公開・pause/resume、未知IOの保全、未対応操作と実機未検証の範囲（v0.5.1の検証強化とv0.5.2の更新検証続行を含む） |
+| [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md) | Issue #11/#33の現行経路。PUT成功checkpoint、配備後GET失敗の明示続行、旧journalと未知IOの境界（v0.5.2で提供） |
 | [独自ドメイン設計](custom_domain_plan.md) | 管理URL分離・正規URL切替・復旧 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。v0.4.0の利用案内はdocs/rss_migration.md |
 
