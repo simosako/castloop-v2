@@ -1,6 +1,6 @@
 # castloop v2 デザインドキュメント
 
-更新日: 2026-10-18。**v0.6.0仕様**。SQLite単独化と既定initを提供する。隔離環境で実機試験済みだが、配布の取得だけで既存環境へ配備されるものではない。[リリースノート](../docs/release-v0.6.0.md)参照。
+更新日: 2026-10-18。**v0.6.1仕様**。SQLite単独化と既定initに加え、新規Show/EpisodeメタデータのApple基準入力上限を提供する。保存履歴の読取・復元は無制限のまま維持する。配布の取得だけで既存環境へ配備されるものではない。[リリースノート](../docs/release-v0.6.1.md)参照。
 操作は[README](../README.md)、詳細は[SQLiteガイド](../docs/sqlite_sequential_development.md)、[文書索引](README.md)を参照する。
 
 ## リリース境界

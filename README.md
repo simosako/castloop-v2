@@ -2,7 +2,7 @@
 
 Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one private R2 bucket and one public Worker per service, multiple Shows.
 
-**v0.6.0 supports SQLite services only.** `castloop init` creates a schema-version-2 service by default. Queue/R2 service support, its Worker bundle and commands have been removed. Content metadata and SQLite request formats are unchanged. Installing this release does not deploy or change an existing Cloudflare service. See the [release notes](docs/release-v0.6.0.md).
+**v0.6.1 adds Apple-based input limits for new Show/Episode metadata.** `castloop init` creates a schema-version-2 service by default. Queue/R2 service support, its Worker bundle and commands have been removed. Content metadata and SQLite request formats are unchanged. Installing this release does not deploy or change an existing Cloudflare service. See the [release notes](docs/release-v0.6.1.md).
 
 The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen publication request to one Durable Object per service. Its SQLite FIFO and Alarms execute one job at a time, without Cloudflare Queues or D1. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
 
@@ -16,7 +16,7 @@ Service schema version 1 is rejected before management requests, deployment or a
 
 ## Install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.6.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.6.0). Verify the checksum, make the executable runnable, and place it on your PATH:
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.6.1 release](https://github.com/simosako/castloop-v2/releases/tag/v0.6.1). Verify the checksum, make the executable runnable, and place it on your PATH:
 
 ```sh
 sha256sum --check SHA256SUMS
@@ -135,6 +135,6 @@ An already paused service does not need a second pause request. Update verifies 
 - `failed` means a deterministic pre-write input/base failure; `blocked` preserves uncertain/unfinished execution and stops the FIFO. SQLite retry/release is not provided. An empty queue does not prove unregistered uploads ended.
 - `init-reconcile` and `update-service-reconcile` only reconcile exact, already-completed server evidence. Limited explicit verification continuations exist for acknowledged deployment journals; they do not repeat resource creation/deploy or adopt unknown versions.
 
-See the [SQLite operations guide](docs/sqlite_sequential_development.md), [v0.6.0 development changes](docs/release-v0.6.0.md), [v0.5.2 release notes](docs/release-v0.5.2.md), and [design index](design/README.md). Existing Queue environments must keep v0.5.x and use its [separate guide](docs/queue_service.md). No release, install or test completion automatically deploys, resumes, cleans up or deletes Cloudflare resources.
+See the [SQLite operations guide](docs/sqlite_sequential_development.md), [v0.6.1 release notes](docs/release-v0.6.1.md), [v0.6.0 changes](docs/release-v0.6.0.md), and [design index](design/README.md). Existing Queue environments must keep v0.5.x and use its [separate guide](docs/queue_service.md). No release, install or test completion automatically deploys, resumes, cleans up or deletes Cloudflare resources.
 
 The [release workflow](.github/workflows/build-binaries.yml) tests, builds and smoke-checks Linux artifacts before publishing matching `v*` tags. castloop uses the MIT License; redistribute [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with the binary.
