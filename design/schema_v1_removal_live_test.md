@@ -20,7 +20,7 @@
 | Linux binary | 83,580,384 → 82,621,920 bytes（約1.15%減） |
 | runtime TS | 17,653 → 4,997行（約71.7%減。集計範囲は[実装記録](schema_v1_removal_plan.md#基準と測定方法)） |
 
-今回のwall timeはupload・readback・逐次公開・purge・待機を含み、Worker CPU時間や純粋な転送速度ではない。CPU/tail数値は今回未採取で、過去の3/5msを本patchの測定値として流用しない。比較対照のない単発試験のため速度改善・全Free適合・300MB境界を保証しない。最初の試験は外側240秒timeoutの設定ミスで中断し、約8分必要だった再試験で是正した。異常終了後の診断・回復・cleanupは[Issue #40](https://github.com/simosako/castloop-v2/issues/40)へ分離した。
+今回のwall timeはupload・readback・逐次公開・purge・待機を含み、Worker CPU時間や純粋な転送速度ではない。合格判定時点ではCPU/tail数値は未採取だったが、下記「保存ログによるCPU追加確認」で今回のCPUを追加照会した。過去の3/5msを本patchの測定値として流用しない。比較対照のない単発試験のため速度改善・全Free適合・300MB境界を保証しない。最初の試験は外側240秒timeoutの設定ミスで中断し、約8分必要だった再試験で是正した。異常終了後の診断・回復・cleanupは[Issue #40](https://github.com/simosako/castloop-v2/issues/40)へ分離した。
 
 非公開の再試験証跡217ファイルのmanifest SHA-256は`89ac7a75b06e73ba780ba2963671eb81bdab9ac8408ae1bc901f0b6b87ff2a3e`。秘密・本文・job IDやraw journalはGitへ追加しない。
 
@@ -130,3 +130,26 @@ namespaceの初回値はinit receipt、更新後はREST settingsで照合した�
 非公開証跡217ファイルとSHA-256 manifestを再試験directoryへ保存した。公開／uploadの途中結果を旧試験から採用せず、前回の受け入れ確認用scriptのみを使って新環境へ検査を行った。元データとの不変照合では前回の入力hash manifestを参照した。既存2環境の配備・resume・公開・削除、DNS/権限/課金/CPU上限変更、journal手動昇格、unknown再送は行っていない。
 
 この結果は今回の36件・実サイズ音源・code-only更新の機能回帰を示す。300MB境界、異常終了からの回復／cleanup（Issue #40）、CPU/tail全回収・性能保証・全Free適合・U1解決は未検証である。
+
+## 保存ログによるCPU追加確認
+
+管理者の指示で、成功した再試験Worker `castloop-i24r-20261018-8f638a69`の**2026-10-18 05:13:00〜05:32:16 UTC**をWorkers Observabilityの保存ログで照会した。試験の合格判定は変更しない。配備・resume・公開・設定変更・tail作成はせず、`dry: true`の検索POSTのみを使用した。
+
+初回の検索は1分間の2000件上限に達したため集計せず、再取得では該当区間を30秒へ分割した。最終21区間はすべて上限未満、query statisticsの`abr_level`は1。application log・spanをinvocationから分離し、境界の重複をmetadata IDで除いた。CPU付き`cf-worker-event` **1,985件**、2つの試験versionのみ、取得invocation内のCPU欠測・truncatedは0、outcomeは全件okだった。数値はproviderの`$workers.cpuTimeMs`で、0msもproviderの記録値として扱う。
+
+| 区分 | 取得invocation数 | p95 CPU | 最大CPU | 10ms超 |
+| --- | ---: | ---: | ---: | ---: |
+| 外側HTTP | 910 | 1ms | **3ms** | 0 |
+| cache HTTP | 90 | 3ms | **5ms** | 0 |
+| cache RPC | 47 | 0ms | **2ms** | 0 |
+| DO HTTP | 563 | 5ms | **26ms** | 3 |
+| DO RPC | 330 | 0ms | **2ms** | 0 |
+| DO Alarm | 45 | 6ms | **7ms** | 0 |
+
+通常Worker側の計1,047 invocationは取得範囲ですべて10ms以内。DO HTTPの10ms超は**11／19／26msの3件**で、通常Workerの10ms枠とは区別する。[WorkersのFree CPU枠](https://developers.cloudflare.com/workers/platform/limits/#cpu-time)はHTTPごと10ms、[DOのCPU枠](https://developers.cloudflare.com/durable-objects/platform/limits/)は既定30秒であり、DOの26msをFree HTTP超過とは判定しない。CPU上限超過outcomeは今回取得分にない。CPUをtrace全体・job全体へ合算して10msと比較しない。
+
+通常36件の公開commandの正確な時間帯だけでは、通常Worker側374件・最大2ms、DO側376件・最大19ms。全試験区間の上表は初期化・短尺・lifecycle・配信・更新の観測も含む。p95は取得値を昇順に並べたnearest-rankで算出した。
+
+**結論：今回取得できた通常Workerの記録では10ms以内に収まる目処がある。** 保存設定はhead sampling 1・invocation logs/persist有効だったが、provider側の欠落がないことや全invocation回収は証明していない。probe IDによる全要求の照合、job単位のAlarm CPU帰属、将来の全負荷・300MB境界の保証はない。trace内のspanやCPUのないapplication logを0ms invocationとして数えていない。
+
+allowlistで本文・header・任意例外・URL詳細を除いた取得記録と集計は`.local-test-data/issue24-cpu/retrieval2/`に非公開保存した。manifest SHA-256は`79caf748d3113ae0ddac0872a0dfc4155c307c96cf938ee83abf6c39d729ce8b`。本書の集計・観測条件・証跡参照をGitで保持し、生ログ・journalは非公開領域に保持する。追加確認によるruntime・実環境設定の変更はない。
