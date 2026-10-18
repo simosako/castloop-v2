@@ -1,8 +1,8 @@
 # castloop v2 デザインドキュメント
 
-更新日: 2026-10-17。現在の公開版はv0.5.1。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
+更新日: 2026-10-18。現在の公開版はv0.5.2。具体的な操作・導入手順は[README](../README.md)、関連文書は[設計文書の案内](README.md)を参照する。
 
-v0.5.1はv0.5.0のSQLite方式・Queue方式をそのまま維持し、RSSテキスト検証、workspace設定の安全な読み取り、未到達実装の削除と共通処理の集約だけを行う。protocol・schema・公開object key・主要commandの引数は変更しない。
+v0.5.2はv0.5.1の挙動・protocol・schemaを維持し、SQLite Worker更新の検証続行、CLIアップロードのsource完了順序、REST URLエンコード、管理者キー照合の修正だけを行う。protocol・schema・公開object key・主要commandの引数は変更しない。
 
 - v0.2.0: M6の新規初期化、通常更新、Show／Episodeの非公開化・復元・削除を公開。
 - v0.2.1: Show／Episode一覧を追加。
@@ -10,6 +10,7 @@ v0.5.1はv0.5.0のSQLite方式・Queue方式をそのまま維持し、RSSテキ
 - v0.4.0: RSSから新規Showへの一度限りの移行、Episodeカタログ、公開受付とQueue検証の分離、停止診断と限定的なWorker更新続行を追加。
 - v0.5.0: SQLite DO/FIFO/Alarmによる逐次公開、正式CLI・fresh init・一覧・非公開化/復元・RSS・code-only互換更新を追加。既存Queue方式にも直接commit送信を経た非同期管理（案C）と配信判定事前生成を統合。
 - v0.5.1: RSSへ出力するテキストのXML 1.0検証、`castloop.toml`の上限付き・symlink拒否読み取り、未到達の旧実装削除とhash/HMAC・管理応答・IO・journal検証の共通化。挙動の変更は不正入力拒否とQueue初期化の`.gitignore`保護強化。
+- v0.5.2: SQLite更新journal format 2とPUT成功checkpoint、配備後GET失敗時の`update-service-verify`続行、CLIアップロードのsource完了順序、RESTパス要素のエンコード、管理者キーのネイティブ暗号照合。旧M6試験バイナリ削除とドキュメント再編を含む。
 
 配布・実機検証の対象はLinux x86-64。v0.1.xのデータ変換・既存資源の採用は行わない。M0〜M5の経緯は後半のマイルストーンと各実装ログに残す。
 
@@ -216,7 +217,7 @@ R2 Event Notificationは`staging/` prefix・`commit.json` suffixのobject-create
 
 `.castloop/`の管理鍵・凍結要求・receipt・lockとR2のownerを保持する。`local-operation-status`はローカルだけ、`operation-status`は認証付きサーバー状態も照会する。現在の対象は`target-show`／`target-episode`で確認する。読み取り時の競合は読み取りだけを再照会し、変更要求を再送しない。
 
-`init-reconcile`／`update-service-reconcile`は、保持した要求に一致するpaused完了を照合する。`update-service-verify`は確認済み配備の検証を続行するだけで、結果不明の配備を再送しない。未知IO・残存lockの強制解放や万能な外部復旧は提供しない。詳細は[READMEの復旧制限](../README.md#errors-and-recovery-limits)。
+`init-reconcile`／`update-service-reconcile`は、保持した要求に一致するpaused完了を照合する。`update-service-verify`は確認済み配備（PUT成功応答または配備ID/versionを保存済み）の検証を続行するだけで、結果不明の配備を再送しない。未知IO・残存lockの強制解放や万能な外部復旧は提供しない。詳細は[READMEの復旧制限](../README.md#errors-and-recovery-limits)。
 
 ### R2オブジェクトキー（採用済み）
 

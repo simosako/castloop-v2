@@ -1,6 +1,6 @@
 # SQLite逐次公開方式（v0.5.0以降）
 
-v0.5.0で明示指定できる`sqlite-sequential-v1`方式の操作ガイド。v0.4.0には含まれない。v0.5.1は同じprotocolのまま、RSSテキストのXML 1.0検証と`castloop.toml`の上限付き・symlink拒否読み取りを追加する。
+v0.5.0で明示指定できる`sqlite-sequential-v1`方式の操作ガイド。v0.4.0には含まれない。v0.5.1は同じprotocolのまま、RSSテキストのXML 1.0検証と`castloop.toml`の上限付き・symlink拒否読み取りを追加する。v0.5.2はprotocol・schemaを変えず、配備後GET失敗時の明示的な検証続行とCLI/REST/認証の修正だけを行う。
 新規SQLiteサービスを対象とし、既存Queueサービスや旧journalを変換しない。
 flag省略時は既存のschema-version-1 defaultのままである。
 
@@ -9,7 +9,7 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 これは中断を挟む短尺音源試験であり、全負荷のFree適合・Issue #13恒久解消や大容量公開を保証しない。
 初回purge blocked・旧試験の欠測は[先行測定](../design/archive/sqlite_sequential_measurement_20261016.md)、
 互換更新・正式RSSの受け入れは[追加確認](../design/archive/sqlite_followup_verification_20261016.md)に区別して残している。
-リリースの全範囲は[v0.5.1リリースノート](release-v0.5.1.md)と[v0.5.0リリースノート](release-v0.5.0.md)を参照。
+リリースの全範囲は[v0.5.2リリースノート](release-v0.5.2.md)、[v0.5.1リリースノート](release-v0.5.1.md)と[v0.5.0リリースノート](release-v0.5.0.md)を参照。
 
 ## 対応範囲
 
@@ -104,7 +104,7 @@ castloop update-service-reconcile UPDATE_UUID
 
 RESTの配備成功直後でも、DOがしばらく旧versionで応答する場合がある。
 CLIは一致するprepared状態の旧versionだけを有限回GETで観測し、記録済み新versionになるまでactivationしない。
-未リリースのCLI修正では、この待機や配備成功後のREST GET失敗で停止した場合、次で検証を続けられる。
+v0.5.2のCLIでは、この待機や配備成功後のREST GET失敗で停止した場合、次で検証を続けられる。
 
 ```sh
 castloop update-service-verify UPDATE_UUID
@@ -119,7 +119,7 @@ castloop update-service-verify UPDATE_UUID
 同じ組み込みcodeの別更新でもETagを区別するためで、Workerの動作・service config・metadataの変更ではない。
 旧SQLite journalの`deployed`/`verified`は元のsource hash/receiptのまま検証できるが、receiptのない旧`deploy_requested`を推測で昇格しない。
 このjournal format、serviceのschema version 2、旧Queue更新journalのversion 2は別の概念であり、Queue/R2の旧upload-only journalを復旧する修正ではない。
-設計・互換性・検証範囲は[SQLite更新復帰の契約](../design/sqlite_worker_update_recovery.md)を参照。v0.5.1配布済みCLIの続行対象は`verified`だけ。
+設計・互換性・検証範囲は[SQLite更新復帰の契約](../design/sqlite_worker_update_recovery.md)を参照。v0.5.1配布済みCLIの続行対象は`verified`だけで、v0.5.2は`deploy_acknowledged`／`deployed`／`verified`を対象に加える。
 
 ## ローカルRSS取り込みの公開
 
