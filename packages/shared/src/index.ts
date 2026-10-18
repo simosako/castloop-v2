@@ -3,6 +3,7 @@ import { z } from "zod";
 import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import type { SqliteServiceConfig } from "./sqlite-service";
 import { isXml10Text } from "./xml";
+import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits } from "./metadata-limits";
 
 export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKey, sqliteVerifiedUploadSchema,
   sqlitePublicationRuntimeSchema, sqlitePublicationRequestSchema, sqlitePublicationStatusSchema,
@@ -18,6 +19,10 @@ export { validateId } from "./ids";
 export { sha256Hex, toHex } from "./sha256";
 export { parsePublicAssetPath } from "./public-assets";
 export type { PublicAsset } from "./public-assets";
+export { SHOW_TITLE_MAX_CHARS, SHOW_DESCRIPTION_MAX_BYTES, SHOW_AUTHOR_MAX_CHARS, SHOW_OWNER_NAME_MAX_CHARS,
+  SHOW_OWNER_EMAIL_MAX_CHARS, SHOW_CATEGORY_MAX_CHARS, SHOW_COPYRIGHT_MAX_CHARS, SHOW_SITE_URL_MAX_CHARS,
+  EPISODE_TITLE_MAX_CHARS, EPISODE_DESCRIPTION_MAX_CHARS, stripHtmlTags, countCharacters, utf8ByteLength,
+  assertShowMetadataInputLimits, assertEpisodeDraftInputLimits } from "./metadata-limits";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);
@@ -78,6 +83,39 @@ export const episodeRevisionSchema = episodeDraftSchema.extend({
 export type ShowMetadata = z.infer<typeof showMetadataSchema>;
 export type EpisodeDraft = z.infer<typeof episodeDraftSchema>;
 export type EpisodeRevision = z.infer<typeof episodeRevisionSchema>;
+
+// Input schemas enforce Apple-based size limits for new drafts and imports.
+// Storage schemas above stay unbounded so saved snapshots and revisions remain
+// readable even when they predate the limits or came from larger hosts.
+const showLimitPath = (message: string): string[] => {
+  if (message.startsWith("Show title")) return ["title"];
+  if (message.startsWith("Show description")) return ["description"];
+  if (message.startsWith("Show author")) return ["author"];
+  if (message.startsWith("Show owner_name")) return ["owner_name"];
+  if (message.startsWith("Show owner_email")) return ["owner_email"];
+  if (message.startsWith("Show category")) return ["categories"];
+  if (message.startsWith("Show copyright")) return ["copyright"];
+  if (message.startsWith("Show site_url")) return ["site_url"];
+  return [];
+};
+
+export const showMetadataInputSchema = showMetadataSchema.superRefine((value, context) => {
+  try {
+    assertShowMetadataInputLimits(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Show metadata exceeds its input limit";
+    context.addIssue({ code: "custom", path: showLimitPath(message), message });
+  }
+});
+
+export const episodeDraftInputSchema = episodeDraftSchema.superRefine((value, context) => {
+  try {
+    assertEpisodeDraftInputLimits(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Episode metadata exceeds its input limit";
+    context.addIssue({ code: "custom", path: message.startsWith("Episode description") ? ["description"] : ["title"], message });
+  }
+});
 
 export function sameEpisodeIdentity(left: EpisodeDraft, right: EpisodeDraft): boolean {
   return left.episode_id === right.episode_id && left.guid === right.guid &&

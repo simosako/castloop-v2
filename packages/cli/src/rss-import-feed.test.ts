@@ -53,6 +53,15 @@ describe("RSS import conversion", () => {
     expect(result.warnings.some((warning) => warning.includes("image"))).toBe(true);
   });
 
+  test("reports Apple-based input limits as missing fields without inventing values", () => {
+    const longShow = parseRssImportFeed(feed().replace("Description", "あ".repeat(1334)),
+      "imported", "https://old.example/feed.xml");
+    expect(longShow.missing_fields.some((field) => field.startsWith("Show:"))).toBe(true);
+    const longEpisode = parseRssImportFeed(feed(item.replace("Full & detailed description", "d".repeat(10001))),
+      "imported", "https://old.example/feed.xml");
+    expect(longEpisode.missing_fields.some((field) => field.startsWith("Episode 1:"))).toBe(true);
+  });
+
   test("rejects missing or duplicate identity, invalid dates and ambiguous enclosures without silently skipping", () => {
     for (const input of [item + item, item.replace(/<guid[^>]*>.*?<\/guid>/, ""),
       item.replace("01 Apr 2020", "31 Apr 2020"), item.replace("+0900", "+2500"),

@@ -1,5 +1,6 @@
 import { SaxesParser } from "saxes";
-import { episodeDraftSchema, episodeGuidSchema, showMetadataSchema, validateId } from "@castloop/shared";
+import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, episodeDraftSchema, episodeGuidSchema,
+  showMetadataSchema, validateId } from "@castloop/shared";
 import type { EpisodeDraft, ShowMetadata } from "@castloop/shared";
 import { sha256HexSync } from "./sha256";
 
@@ -159,6 +160,13 @@ export function parseRssImportFeed(source: string, showId: string, feedUrl: stri
         season_number: number(value(item, "season", ITUNES)), episode_number: number(value(item, "episode", ITUNES)) });
       const validation = episodeDraftSchema.safeParse(metadata);
       if (!validation.success) missing.push(...validation.error.issues.map((issue) => `Episode ${index + 1}: ${issue.path.join(".")}`));
+      else {
+        try {
+          assertEpisodeDraftInputLimits(validation.data);
+        } catch (error) {
+          missing.push(`Episode ${index + 1}: ${error instanceof Error ? error.message : "Episode metadata exceeds its input limit"}`);
+        }
+      }
       const length = enclosure.attributes.length;
       const declared = length !== undefined && /^\d+$/.test(length) && Number.isSafeInteger(Number(length)) && Number(length) > 0 ? Number(length) : undefined;
       if (length !== undefined && declared === undefined) warnings.add(`Episode ${index + 1}: enclosure length is unavailable or unreliable`);
@@ -171,6 +179,13 @@ export function parseRssImportFeed(source: string, showId: string, feedUrl: stri
   }
   const showValidation = showMetadataSchema.omit({ image_path: true }).safeParse(show);
   if (!showValidation.success) missing.unshift(...showValidation.error.issues.map((issue) => `Show: ${issue.path.join(".")}`));
+  else {
+    try {
+      assertShowMetadataInputLimits({ ...showValidation.data, image_path: "cover.jpg" });
+    } catch (error) {
+      missing.unshift(`Show: ${error instanceof Error ? error.message : "Show metadata exceeds its input limit"}`);
+    }
+  }
   if (!cover) missing.push("Show: cover image");
   return { show, ...(cover ? { cover_url: url(cover, feedUrl) } : {}), episodes, warnings: [...warnings].sort(), missing_fields: missing };
 }

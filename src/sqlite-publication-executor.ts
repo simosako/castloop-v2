@@ -1,4 +1,4 @@
-import { episodeDraftFromRevision, episodeRevisionSchema, parseEpisodeDraft, parsePublicAssetPath,
+import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, episodeDraftFromRevision, episodeRevisionSchema, parseEpisodeDraft, parsePublicAssetPath,
   parseShowMetadata, sameEpisodeIdentity, stringifyToml, toHex } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import type { SqlitePublicationRequest, SqliteVerifiedUpload } from "../packages/shared/src/sqlite-publication";
@@ -151,7 +151,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         const metadataPayload = request.payloads.find((payload) => payload.asset === "show_metadata")!;
         const coverPayload = request.payloads.find((payload) => payload.asset.startsWith("cover_"))!;
         const metadataBytes = await readPayload(bucket, metadataPayload);
-        const metadata = input(() => parseShowMetadata(text(metadataBytes)));
+        const metadata = input(() => { const parsed = parseShowMetadata(text(metadataBytes)); assertShowMetadataInputLimits(parsed); return parsed; });
         const cover = await readPayload(bucket, coverPayload);
         const extension = coverPayload.asset === "cover_png" ? "png" : "jpg";
         const signature = extension === "png" ? [137, 80, 78, 71, 13, 10, 26, 10] : [255, 216, 255];
@@ -167,7 +167,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
       }
       const metadataPayload = request.payloads.find((payload) => payload.asset === "episode_metadata");
       const metadataBytes = metadataPayload ? await readPayload(bucket, metadataPayload) : null;
-      const metadata = metadataBytes ? input(() => parseEpisodeDraft(text(metadataBytes))) : episodeDraftFromRevision(target.base!);
+      const metadata = metadataBytes ? input(() => { const parsed = parseEpisodeDraft(text(metadataBytes)); assertEpisodeDraftInputLimits(parsed); return parsed; }) : episodeDraftFromRevision(target.base!);
       if (metadata.episode_id !== request.episode_id || target.base && !sameEpisodeIdentity(metadata, target.base)) {
         throw new SqlitePublicationInputError("validation_failed");
       }
