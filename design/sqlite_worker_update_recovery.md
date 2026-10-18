@@ -80,4 +80,9 @@ activation開始後は、応答がなくても旧deploymentが見えても`verif
 
 既存の互換更新・初期化・コンテンツ保持・readinessテストも維持する。
 fixtureのETagは送信sourceのhashとして模擬する。実Cloudflareの応答形、ETag処理、native rollout/Alarm/output gateをこの試験だけで実証したとは扱わない。
-実環境の配備・resume・公開・資源変更、旧環境の再構築や元journalの復旧は行っていない。
+修正作成時の上記ローカル検証では、実環境の配備・resume・公開・資源変更、旧環境の再構築や元journalの復旧は行っていない。
+
+その後、管理者の別承認により新規隔離環境で[限定実機検証](archive/sqlite_update_recovery_verification_20261018.md)を実施した。
+2箇所のGET故障注入から再配備せず続行し、同一code更新2回のETag分離とnative readinessを確認した。
+両更新ともnative versionの有限待機で一度停止し、GET-only照合後に未開始のactivationを明示続行している。
+最終ready/paused/drained、公開0件。元のtimeout原因確定・旧upload-only journal復旧・性能測定の実証には広げない。

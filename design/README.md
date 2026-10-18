@@ -65,6 +65,7 @@ SQLite実機受け入れ・測定・調査：
 - [SQLite追加受け入れ・観測改善](archive/sqlite_followup_verification_20261016.md) — canceled/read timeoutと公開失敗の分離、CPU/jobログ欠測の明示、正式RSS・互換更新の確認順序
 - [DO・CPUログ欠測の調査](archive/sqlite_tail_missing_logs_investigation_20261017.md) — DO実行のGraphQL照合、paused GETでのtail比較、反映待ち仮説と未確定の配送原因、観測開始・終了条件の不足
 - [36件規模の再試験・CPU測定](archive/sqlite_size36_measurement_20261017.md) — status GET切断と有限retry修正、未開始分だけ継続して36 Episode＋更新10回完了。probe CPU 60/60、通常HTTP最大3/5ms、最終pause
+- [SQLite更新復帰の実機検証](archive/sqlite_update_recovery_verification_20261018.md) — Issue #11/PR #37。新規隔離環境で2箇所のGET故障注入、native反映待機後の明示続行、同一code更新2回のETag分離と再配備なしの完了。公開0件、最終ready/paused/drained
 
 supersededの比較案・草案と完了済みIssue対応：
 
