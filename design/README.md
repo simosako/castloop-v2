@@ -11,6 +11,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [v0.6.0のQueue方式コード削除計画](schema_v1_removal_plan.md) | Issue #24。v0.5.xのschema version 1機能は維持し、v0.6.0以降はSQLite単独化。削除範囲・共用処理の分離・検証・既存環境の保全 |
 | [SQLite単独化の実環境回帰試験](schema_v1_removal_live_test.md) | Issue #24。既存MP3を用いる隔離環境での段階試験と結果 |
+| [SQLite単独化後のテスト責務監査](sqlite_test_responsibility_audit.md) | Issue #34。残存テストの責務対応、統合範囲と保持する安全回帰、ローカル試験時間の比較 |
 | [旧Lifecycle設計と共通安全条件](m6_content_lifecycle_plan.md) | Queueの履歴。保持・削除の安全条件は維持するが、現行SQLiteの操作はSQLiteガイドを使う |
 | [単一PUT・U1](m6_upload_recovery_options.md) | 採用方式と未検証の仮定 |
 | [REST URLの構築](rest_url_construction.md) | パス要素のエンコード、R2 keyの区切り保持と単一PUTの不変条件 |

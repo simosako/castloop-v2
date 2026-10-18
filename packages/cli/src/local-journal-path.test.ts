@@ -1,11 +1,38 @@
 import { expect, test } from "bun:test";
 import { ensureLocalJournalParents } from "./local-journal-path";
+import type { JournalFamily } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-for (const family of ["sqlite-drafts", "sqlite-uploads", "sqlite-publications", "sqlite-initializations", "sqlite-registrations",
-  "sqlite-controls", "sqlite-lifecycle", "sqlite-rss-imports", "sqlite-service-updates", "rss-import-downloads"] as const) {
+const familyServices = {
+  "sqlite-drafts": "service", "sqlite-uploads": "service", "sqlite-publications": "service",
+  "sqlite-initializations": "service", "sqlite-registrations": "service", "sqlite-controls": "service",
+  "sqlite-lifecycle": "service", "sqlite-rss-imports": "service", "sqlite-service-updates": "service",
+  "rss-import-downloads": undefined,
+} satisfies Record<JournalFamily, string | undefined>;
+
+test("all journal families use their exact service-scoped or flat directory and reject the opposite scope", async () => {
+  for (const family of Object.keys(familyServices) as JournalFamily[]) {
+    const root = mkdtempSync("/tmp/opencode/castloop-journal-family-");
+    try {
+      const service = familyServices[family];
+      expect(() => ensureLocalJournalParents(root, family, service === undefined ? "service" : undefined, true)).toThrow("identity");
+      expect(readdirSync(root)).toEqual([]);
+      const journal = createLocalJournalStorage(root, family, service, "operation.json");
+      expect(journal.path).toBe(join(root, ".castloop", family, ...(service === undefined ? [] : [service]), "operation.json"));
+      journal.initialize({ family, phase: "prepared" });
+      expect(journal.read()).toEqual({ family, phase: "prepared" });
+      await journal.exclusively(async () => journal.replace({ family, phase: "updated" }));
+      expect(journal.read()).toEqual({ family, phase: "updated" });
+      expect(readdirSync(join(root, ".castloop"))).toEqual([family]);
+      expect(readdirSync(join(root, ".castloop", family))).toEqual(service === undefined ? ["operation.json"] : [service]);
+      expect(readdirSync(dirname(journal.path))).toEqual(["operation.json"]);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+for (const family of ["sqlite-uploads", "rss-import-downloads"] as const) {
   const service = family === "rss-import-downloads" ? undefined : "service";
   const storage = (root: string) => createLocalJournalStorage(root, family, service, "operation.json");
   test(`${family} rejects symlink parents without reads or writes outside the workspace`, () => {
@@ -65,6 +92,7 @@ test("read-only checks do not create parents and invalid directory identities ca
     expect(existsSync(missing)).toBe(false);
     expect(() => ensureLocalJournalParents(missing, "sqlite-uploads", "service", true)).toThrow("already exist");
     expect(() => ensureLocalJournalParents(root, "sqlite-uploads", "../outside", true)).toThrow("identity");
+    expect(() => ensureLocalJournalParents(root, "unknown-family" as JournalFamily, "service", true)).toThrow("identity");
     expect(readdirSync(root)).toEqual([]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

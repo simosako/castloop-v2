@@ -17,6 +17,28 @@ const health = { ...runtime, protocol: "sqlite-sequential-v1", invocation_id: wi
 const json = (value: unknown, code = 200) => Response.json(value, { status: code, headers: { "Cache-Control": "no-store" } });
 const quiet = { delay: async () => {}, onDiagnostic: () => {} };
 
+for (const [fault, response] of [
+  ["malformed JSON", () => new Response("private-admin invalid JSON", { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })],
+  ["oversized body", () => new Response("x".repeat(16385), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })],
+  ["cacheable response", () => Response.json({ secret: "private-admin" })],
+  ["partial response", () => new Response("{}", { status: 206, headers: { "Content-Range": "bytes 0-1/2" } })],
+] as const) {
+  test(`publication capability rejects ${fault} without echoing secrets or retrying`, async () => {
+    const calls: Request[] = [];
+    const client = new SqlitePublicationClient(config, "private-admin", async (input, init) => {
+      calls.push(new Request(input, init)); return response();
+    }, 30000, quiet);
+    let error: unknown;
+    try { await client.describe(); } catch (caught) { error = caught; }
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toContain("private-admin");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.method).toBe("GET");
+    expect(calls[0]!.url).toBe(`${config.workers_dev_base_url}/admin/sqlite-publication/status`);
+    expect(calls[0]!.headers.get("X-Castloop-Key")).toBe("private-admin");
+  });
+}
+
 test("publication status GET retries and binds redacted cancellation to the unchanged frozen request", async () => {
   const calls: Request[] = [], guard = new SqliteObservationGuard();
   const client = new SqlitePublicationClient(config, "private-admin", async (input, init) => {
