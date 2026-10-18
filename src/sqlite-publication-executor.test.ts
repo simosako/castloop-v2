@@ -211,6 +211,21 @@ test("XML-invalid Show and Episode payloads fail validation before any publicati
   }
 });
 
+test("Apple-based input limits fail validation before any publication writes", async () => {
+  const setup = await fixture();
+  for (const kind of ["show", "episode"] as const) {
+    if (kind === "episode") await setup.publishShow();
+    const request = await setup.request(kind);
+    const source = kind === "show" ? { ...show, description: "あ".repeat(1334) } : { ...metadata("first"), description: "d".repeat(10001) };
+    request.payloads[0] = await setup.payload(request.job_id, kind === "show" ? "show_metadata" : "episode_metadata", stringifyToml(source));
+    const before = new Map(setup.entries);
+    setup.calls.length = 0;
+    expect(await setup.run(request)).toMatchObject({ state: "failed", reason_code: "validation_failed" });
+    expect(setup.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(setup.entries).toEqual(before);
+  }
+});
+
 test("metadata-only publishes no audio and preserves immutable history, GUID, time and enclosure", async () => {
   const setup = await fixture();
   await setup.publishShow();

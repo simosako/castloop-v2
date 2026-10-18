@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseEpisodeDraft, parseShowMetadata, parseSqlitePublicationRequest, sqlitePublicationRequestHash,
+import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, parseEpisodeDraft, parseShowMetadata, parseSqlitePublicationRequest, sqlitePublicationRequestHash,
   sqliteServiceConfigSchema } from "@castloop/shared";
 import type { SqlitePublicationStatus, SqliteServiceConfig, StagePayload } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
@@ -47,8 +47,14 @@ export class SqliteDraft {
     const bytes = await readLocalMetadata(this.metadataPath(record));
     const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
     if (record.target.kind === "show") {
-      if (parseShowMetadata(source).show_id !== record.target.show_id) throw new Error("SQLite metadata targets another Show");
-    } else if (parseEpisodeDraft(source).episode_id !== record.target.episode_id) throw new Error("SQLite metadata targets another Episode");
+      const show = parseShowMetadata(source);
+      if (show.show_id !== record.target.show_id) throw new Error("SQLite metadata targets another Show");
+      assertShowMetadataInputLimits(show);
+    } else {
+      const episode = parseEpisodeDraft(source);
+      if (episode.episode_id !== record.target.episode_id) throw new Error("SQLite metadata targets another Episode");
+      assertEpisodeDraftInputLimits(episode);
+    }
     return bytes;
   }
 

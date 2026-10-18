@@ -21,6 +21,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md) | Issue #11/#33の現行経路。PUT成功checkpoint、配備後GET失敗の明示続行、旧journalと未知IOの境界（v0.5.2で提供） |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。現行の利用方法はRSSガイドを使う |
 | [RSS lookupのBun互換性調査](rss_lookup_bun_compatibility.md) | Issue #32。Bun 1.4.2のIPv4/IPv6・HTTP/HTTPSとcompile fixtureでは現行経路の形式不一致を再現せず。正式配布CLIの受け入れ試験とは区別する |
+| [Show/Episodeの項目別入力上限](show_episode_input_limits.md) | Issue #31。Apple基準・大きめ解釈の新規入力上限、保存履歴の無制限読取維持、検証範囲 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 
