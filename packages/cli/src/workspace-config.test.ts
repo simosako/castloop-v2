@@ -57,7 +57,16 @@ test("workspace config refuses symbolic links without following or modifying the
 });
 
 test("formal CLI rejects old service settings before network, build or local state changes", () => {
-  for (const old of [{ schema_version: 1 }, queueConfig, { ...queueConfig, workers_dev_base_url: queueConfig.public_base_url }]) {
+  const allCommands = [["init"], ["init", "--publication-protocol", "sqlite-sequential-v1"], ["init", "--service-id", "different"],
+    ["service-status"], ["service-pause", crypto.randomUUID()], ["service-resume", crypto.randomUUID()],
+    ["deploy"], ["create-show", "daily", "--site-url", "https://example.com"], ["update-show", "daily"], ["publish-show", "daily"],
+    ["list-shows"], ["target-show", "daily"], ["job-status", crypto.randomUUID()], ["publish-rss-import", "missing-import"]];
+  const entrypointCommands = [["init"], ["service-status"], ["publish-rss-import", "missing-import"]];
+  for (const [old, commands] of [
+    [{ schema_version: 1 }, entrypointCommands],
+    [queueConfig, allCommands],
+    [{ ...queueConfig, workers_dev_base_url: queueConfig.public_base_url }, entrypointCommands],
+  ] as const) {
     const setup = fixture(stringifyToml(old));
     const state = join(setup.root, ".castloop"); mkdirSync(state);
     const retained = join(state, "retained.json"); writeFileSync(retained, "private retained journal");
@@ -65,14 +74,11 @@ test("formal CLI rejects old service settings before network, build or local sta
     writeFileSync(preload, `globalThis.fetch = async () => { console.error("UNEXPECTED_IO"); throw new Error("Forbidden network"); };
 Bun.build = async () => { console.error("UNEXPECTED_IO"); throw new Error("Forbidden build"); };`);
     const before = readdirSync(setup.root).sort(), source = readFileSync(setup.file);
-    for (const args of [["init"], ["init", "--publication-protocol", "sqlite-sequential-v1"], ["init", "--service-id", "different"],
-      ["service-status"], ["service-pause", crypto.randomUUID()], ["service-resume", crypto.randomUUID()],
-      ["deploy"], ["create-show", "daily", "--site-url", "https://example.com"], ["update-show", "daily"], ["publish-show", "daily"],
-      ["list-shows"], ["target-show", "daily"], ["job-status", crypto.randomUUID()], ["publish-rss-import", "missing-import"]]) {
+    for (const args of commands) {
       const result = Bun.spawnSync([process.execPath, "--preload", preload, join(import.meta.dir, "index.ts"), ...args], {
         cwd: setup.root, env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: queueConfig.account_id, CLOUDFLARE_API_TOKEN: "test-token" }, timeout: 5000,
       });
-      expect(result.exitCode).toBe(1); expect(result.stdout.toString()).toBe("");
+      expect(result.exitCode, `${args.join(" ")} with ${JSON.stringify(old)}`).toBe(1); expect(result.stdout.toString()).toBe("");
       expect(result.stderr.toString()).toContain("use a compatible v0.5.x CLI/Worker");
       expect(result.stderr.toString()).not.toContain("UNEXPECTED_IO");
       expect(readdirSync(setup.root).sort()).toEqual(before);

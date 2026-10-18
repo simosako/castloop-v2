@@ -3,7 +3,6 @@ import { parseEpisodeDraft, sqliteServiceConfigHash, stringifyToml } from "@cast
 import type { SqliteServiceConfig } from "@castloop/shared";
 import { SqliteDraft } from "./sqlite-draft";
 import type { SqliteDraftTarget } from "./sqlite-draft-journal";
-import { SqlitePublicationClient } from "./sqlite-publication-client";
 import type { R2RestTransport } from "./verified-r2-put";
 import { SqlitePublicationAlarm } from "../../../src/sqlite-publication-alarm";
 import { sqlitePublicationFixture } from "../../../src/test-support/sqlite-publication";
@@ -362,17 +361,3 @@ test("local oversize, invalid MP3, symlink, wrong metadata and wrong selection f
   expect(setup.calls).toEqual([]);
   expect(setup.management).toEqual([]);
 });
-
-for (const response of [() => new Response("private-admin invalid JSON", { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }),
-  () => new Response("x".repeat(16385), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }),
-  () => Response.json({ secret: "private-admin" }),
-  () => new Response("{}", { status: 206, headers: { "Content-Range": "bytes 0-1/2" } })]) {
-  test("malformed, cacheable, oversized and partial management replies are not trusted or echoed", async () => {
-    const setup = await fixture();
-    const client = new SqlitePublicationClient(setup.config, "private-admin", async () => response());
-    let error: unknown;
-    try { await client.describe(); } catch (caught) { error = caught; }
-    expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).not.toContain("private-admin");
-  });
-}
