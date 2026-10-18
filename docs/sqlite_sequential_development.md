@@ -2,14 +2,14 @@
 
 `sqlite-sequential-v1`方式の操作ガイド。v0.6.0ではサービス設定version 2のみを扱い、`init`のflag省略時もSQLiteになる。`--publication-protocol sqlite-sequential-v1`は省略可能な既存指定として維持する。新たなschema選択オプションは設けない。
 既存Queueサービスや旧journalを変換するマイグレーション機能は提供しない。version 1設定は副作用前に拒否し、利用者は対応するv0.5.xのCLI/Workerを保持する。
-旧版v0.5.2は方式の明示指定が必要である。[同版ガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/sqlite_sequential_development.md)を参照する。v0.6.0の変更と検証は[リリースノート](release-v0.6.0.md)と[隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)を参照する。
+旧版v0.5.2は方式の明示指定が必要である。[同版ガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/sqlite_sequential_development.md)を参照する。v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.0の変更と検証は[リリースノート](release-v0.6.0.md)と[隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)を参照する。
 
 2026-10-17の[36件規模の確認](../design/archive/sqlite_size36_measurement_20261017.md)では、Episode公開36件とmetadata-only更新10回を完了した。
 status GET切断による中断後は成功済み15 jobを照合し、未開始分だけ継続した。通常HTTP CPU最大3/5ms、公開probe 60/60を保存ログへ対応付け、ready/paused/drainedで終了した。
 これは中断を挟む短尺音源試験であり、全負荷のFree適合・Issue #13恒久解消や大容量公開を保証しない。
 初回purge blocked・旧試験の欠測は[先行測定](../design/archive/sqlite_sequential_measurement_20261016.md)、
 互換更新・正式RSSの受け入れは[追加確認](../design/archive/sqlite_followup_verification_20261016.md)に区別して残している。
-現行リリースは[v0.6.0リリースノート](release-v0.6.0.md)、過去の変更は[v0.5.2](release-v0.5.2.md)、[v0.5.1](release-v0.5.1.md)、[v0.5.0](release-v0.5.0.md)を参照。
+現行リリースは[v0.6.1リリースノート](release-v0.6.1.md)、過去の変更は[v0.6.0](release-v0.6.0.md)、[v0.5.2](release-v0.5.2.md)、[v0.5.1](release-v0.5.1.md)、[v0.5.0](release-v0.5.0.md)を参照。
 
 ## 対応範囲
 
