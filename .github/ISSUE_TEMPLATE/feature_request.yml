@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose an improvement or a new capability for castloop.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are welcome, but castloop intentionally excludes some capabilities (schema-version-1 migration, physical deletion, custom domains on SQLite services, recurring RSS sync). If your request touches one of those, say why the current trade-off no longer works for you.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to achieve, and what blocks you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should the CLI/Worker do? Include proposed command syntax if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: What do you do instead today? Existing tools that almost solve it?
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I read the README's "Supported service configuration" section
+        - label: My report contains no credentials, administrator keys, journal contents, unpublished audio or private URLs

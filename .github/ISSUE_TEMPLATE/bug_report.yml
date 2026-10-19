@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a problem with the castloop CLI or Worker. Never include tokens, keys, journals or unpublished audio.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before you start:** redact everything private. Do not paste `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` values, the service administrator key, any `.castloop/` journal content, unpublished audio, or private staging URLs. Security vulnerabilities must go to [private vulnerability reporting](https://github.com/simosako/castloop-v2/security/advisories/new) instead.
+  - type: dropdown
+    id: service-schema
+    attributes:
+      label: Service type
+      description: Which service configuration is affected?
+      options:
+        - Schema version 2 (SQLite) with the current CLI
+        - Schema version 1 (Queue/R2) with the separate v0.5.x CLI
+        - Not deployed yet / local-only
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: castloop version
+      description: Output of `castloop --version` (CLI or source mode).
+      placeholder: "castloop 0.6.2"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the problem, including the exact command sequence.
+      placeholder: |
+        castloop publish-episode first
+        → job ends with state "failed", code ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: |
+        Paste the command output with private values redacted. Prefer the allowlisted diagnostic codes/messages over raw dumps.
+      render: text
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues (open and closed) for a duplicate
+        - label: My report contains no credentials, administrator keys, journal contents, unpublished audio or private URLs
+        - label: I understand this project provides no schema-version-1 migration and no physical deletion feature
