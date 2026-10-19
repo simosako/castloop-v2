@@ -75,10 +75,10 @@ queued/acceptedだけでは公開成功ではない。
 - 各job最大300状態照会、5分経過後は新規照会を開始しない。進行中の要求には別timeoutがあり、CLI全体が必ず5分以内に終了するという意味ではない。
 - 複数Episodeのupload・全量readback・公開は逐次処理のため、import全体は数分以上かかり得る。外部の実行ツールやCIから起動する場合、短いcommand全体timeoutで強制終了させない。単一jobの5分予算とbatch全体の時間を区別し、元processの終了とjournalを確認せず二重起動しない。
 - SQLite管理GETの通信/本文断とallowlistの一時HTTP拒否は最大3試行。retryも300 GETへ数える。schema/identity不一致や恒久拒否はretryしない。
-- 保存済みpending publicationがある場合、同じ取り込みはその凍結jobのstatusを確認する。完了済み公開を再送せず、別jobへ置き換えない。未知upload・登録・ローカルinstallは自動再実行しない。
+- 保存済みpending publicationがある場合、同じ取り込みはその凍結jobのstatusを確認する。完了済み公開を再送せず、別jobへ置き換えない。開発版の新形式では、成功応答があるuploadの検証・下書き登録、完了確認済みのローカル配置からも続行できる。未知upload・登録・ローカルinstallは自動再実行しない。
 - SQLiteの`failed`は公開書込前の確定的失敗、`blocked`は未知IOや途中停止等で後続FIFOを止める。retry/releaseを提供せず、経過時間・HEAD不在で解放しない。
 - `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、journal/lockを削除したりしない。
-- `job-status`/`service-status`で照合する。未知mutationを再送する万能復旧は提供しない。
+- 開発版は`operation-status rss-import IMPORT_UUID --remote`と`operation-list --parent IMPORT_UUID`で、取り込み全体と各処理を照合できる。操作は[中断後の手順](sqlite_operation_recovery.md)を参照する。配布済み版では`job-status`/`service-status`を使う。
 
 新しい版は既存UUID Episodeも読めるが、任意GUIDを取り込んだ後の旧版へのdowngradeは非対応。
 

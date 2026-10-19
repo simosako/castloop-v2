@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseEpisodeDraft, parseShowMetadata } from "@castloop/shared";
-import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqlitePublicationStatusSchema } from "../../shared/src/sqlite-publication";
 import { prepareRssImportPublication } from "./rss-import-preflight";
@@ -17,20 +17,28 @@ import { SqliteDraft } from "./sqlite-draft";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { sha256HexSync as digest } from "./sha256";
+import { operationCommandSchema } from "../../shared/src/sqlite-operations";
+import type { OperationCommand } from "../../shared/src/sqlite-operations";
+import { SqliteOperationClient } from "./sqlite-operation-client";
+import { readSqliteUploadRecord } from "./sqlite-upload";
 import { constants } from "node:fs";
 import { copyFile, open } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
-const stateSchema = z.object({ protocol: z.literal("sqlite-sequential-v1"), service_id: z.string(), service_config_sha256: hash,
+export const sqliteRssStateSchema = z.object({ schema_version: z.literal(2).optional(), protocol: z.literal("sqlite-sequential-v1"), service_id: z.string(), service_config_sha256: hash,
   import_id: z.uuid(), source_directory: z.string().max(4096), input_sha256: hash, step: z.number().int().nonnegative(),
-  phase: z.enum(["ready", "command_requested", "completed"]), created_show_sha256: hash.optional(), publication_job_id: z.uuid().optional() }).strict();
-export type SqliteRssEffects = { command: (name: string, args: string[]) => Promise<unknown>; readFeed: (url: string) => Promise<string> };
+  phase: z.enum(["ready", "command_requested", "completed"]), created_show_sha256: hash.optional(), publication_job_id: z.uuid().optional(),
+  registration: operationCommandSchema.optional(), root_registered: z.boolean().optional(), pending: operationCommandSchema.optional(),
+  step_registration: operationCommandSchema.optional(), upload_operation_id: z.uuid().optional() }).strict();
+const stateSchema = sqliteRssStateSchema;
+type RssCommandContext = Pick<SqliteCommandOptions, "parentOperationId" | "importId" | "onUploadPrepared">;
+export type SqliteRssEffects = { command: (name: string, args: string[], context?: RssCommandContext) => Promise<unknown>; readFeed: (url: string) => Promise<string> };
 export type SqliteRssResult = { result: "rss-import-published"; protocol: "sqlite-sequential-v1"; import_id: string;
   show_id: string; episode_count: number; feed_url: string; subscriber_migration_completed: false };
 
 export function createSqliteRssEffects(root: string, config: SqliteServiceConfig, options: SqliteCommandOptions = {}): SqliteRssEffects {
-  return { command: (name, args) => runSqliteCommand(root, config, name, args, options), async readFeed(url) {
+  return { command: (name, args, context) => runSqliteCommand(root, config, name, args, { ...options, ...context }), async readFeed(url) {
     const chunks: Buffer[] = [];
     await receiveRssAsset(url, 32_000_000, async (bytes) => { chunks.push(Buffer.from(bytes)); });
     return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks));
@@ -39,15 +47,28 @@ export function createSqliteRssEffects(root: string, config: SqliteServiceConfig
 
 export async function publishSqliteRssImport(root: string, config: SqliteServiceConfig, output: string,
   options: SqliteCommandOptions = {}, effects = createSqliteRssEffects(root, config, options)): Promise<SqliteRssResult> {
+  config = sqliteServiceConfigSchema.parse(config);
   const prepared = await prepareRssImportPublication(resolve(root, output)), key = administratorKey(root);
   const client = new SqliteServiceClient(config, key, options.transport), health = await client.health();
   if (!health.publication_ready || health.state !== "open") throw new Error("SQLite RSS publication requires a ready, open service");
   const showId = prepared.show.show_id, directory = join(root, showId);
-  const initial = stateSchema.parse({ protocol: "sqlite-sequential-v1", service_id: config.service_id,
+  const registration = operationCommandSchema.parse({ schema_version: 1, service_id: config.service_id,
+    worker_version_id: health.worker_version_id, service_config_sha256: health.service_config_sha256,
+    operation_id: prepared.importId, request_id: crypto.randomUUID(), expected_version: 0, action: "register",
+    estimated_operations: (prepared.episodes.length + 1) * 5,
+    estimated_content_bytes: Buffer.byteLength(JSON.stringify({ show: prepared.show, episodes: prepared.episodes.map((episode) => episode.metadata) })) * 2,
+    operation: { operation_id: prepared.importId,
+      import_id: prepared.importId, kind: "rss_import", target_kind: "show", show_id: showId,
+      worker_version_id: health.worker_version_id, service_config_sha256: health.service_config_sha256,
+      admission_window_id: health.admission_window_id, input_sha256: prepared.inputSha256 } });
+  const initial = stateSchema.parse({ schema_version: 2, protocol: "sqlite-sequential-v1", service_id: config.service_id, registration,
     service_config_sha256: await sqliteServiceConfigHash(config), import_id: prepared.importId, source_directory: prepared.root,
     input_sha256: prepared.inputSha256, step: 0, phase: "ready" });
   const journal = createLocalJournalStorage(root, "sqlite-rss-imports", config.service_id, `${prepared.importId}.json`);
   if (!present(journal.path)) {
+    const capacity = (await new SqliteOperationClient(config, key, options.transport).list()).capacity;
+    if (capacity.warning === "critical" && (capacity.database_bytes ?? 0) + registration.estimated_operations! * 20000 +
+      registration.estimated_content_bytes! + 10_000_000 > capacity.planning_limit_bytes) throw new Error("Insufficient operation record capacity for this import");
     if (present(directory) || (await client.inspect(showId)).show_lifecycle !== "missing") throw new Error("SQLite RSS import requires a new Show; never adopt existing local, published or deleted identities");
     journal.initialize(initial);
   }
@@ -57,9 +78,36 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       if (state[field] !== initial[field]) throw new Error("SQLite RSS import inputs changed; preserve its frozen operation");
     }
     const save = () => journal.replace(stateSchema.parse(state));
+    const operations = new SqliteOperationClient(config, key, options.transport), tracked = state.schema_version === 2;
+    const send = async (command: OperationCommand) => {
+      state = { ...state, pending: command }; save();
+      const result = await operations.send(root, command);
+      state = { ...state, pending: undefined }; save(); return result;
+    };
+    if (tracked && state.pending) {
+      const result = await operations.observeRequest(root, state.pending);
+      if (!result || result.request.outcome !== "applied") throw new Error("RSS operation instruction is unknown; preserve its request without replaying it");
+      state = { ...state, ...(state.pending.action === "register" && state.pending.operation_id === prepared.importId ? { root_registered: true } : {}), pending: undefined }; save();
+    }
+    if (tracked && !state.root_registered) {
+      if (!state.registration || state.registration.operation_id !== prepared.importId || state.registration.operation?.input_sha256 !== prepared.inputSha256) throw new Error("RSS operation registration differs");
+      await send(state.registration); state = { ...state, root_registered: true }; save();
+    }
+    const change = async (id: string, phase: "command_requested" | "step_completed" | "completed") => {
+      if (!tracked) return;
+      const detail = await operations.detail(id);
+      if (detail?.operation.state === "succeeded" && phase === "completed") return;
+      if (!detail || detail.operation.state === "cancelled" || detail.operation.worker_version_id !== health.worker_version_id ||
+        detail.operation.admission_window_id && detail.operation.admission_window_id !== health.admission_window_id) throw new Error("RSS operation runtime, admission or state changed");
+      await send(operationCommandSchema.parse({ schema_version: 1, service_id: config.service_id,
+        worker_version_id: health.worker_version_id, service_config_sha256: health.service_config_sha256,
+        operation_id: id, request_id: crypto.randomUUID(), expected_version: detail.operation.version, action: "resume", phase }));
+    };
+    const context: RssCommandContext = tracked ? { parentOperationId: prepared.importId, importId: prepared.importId,
+      onUploadPrepared: (id) => { state = { ...state, upload_operation_id: id }; save(); } } : {};
     const actions: Array<() => Promise<void>> = [];
     actions.push(async () => {
-      await effects.command("create-show", [showId, prepared.show.site_url]);
+      await effects.command("create-show", [showId, prepared.show.site_url], context);
       state = { ...state, created_show_sha256: digest(await readLocalMetadata(join(directory, "show.toml"))) };
     });
     actions.push(async () => {
@@ -73,7 +121,7 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       await writeImportedMetadata(join(prepared.root, "show.toml"), join(directory, "show.toml"), prepared.show);
     });
     const command = (name: string, args: string[]) => async () => {
-      const result = await effects.command(name, args);
+      const result = await effects.command(name, args, context);
       if (name.startsWith("publish-")) {
         const status = sqlitePublicationStatusSchema.parse(result);
         if (status.state !== "succeeded" || status.job_id !== state.publication_job_id) throw new Error("SQLite RSS publication did not confirm the frozen job");
@@ -85,7 +133,7 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       actions.push(async () => {
         const audio = await hashRssImportFile(episode.audioPath, 300_000_000);
         if (audio.sha256 !== episode.sha256 || audio.length !== episode.length) throw new Error("Import audio changed before publication");
-        await effects.command("create-episode", [showId, id]);
+        await effects.command("create-episode", [showId, id], context);
         await writeImportedMetadata(join(prepared.root, `episode-${id}.toml`), join(directory, `episode-${id}.toml`), episode.metadata);
       });
       actions.push(command("update-episode", [showId, id]), command("update-episode-audio", [showId, id, episode.audioPath]),
@@ -100,13 +148,39 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
     if ((state.phase === "command_requested" && publicationTarget(state.step) !== null) !== (state.publication_job_id !== undefined)) throw new Error("SQLite RSS publication identity is inconsistent");
     if (state.phase === "command_requested") {
       const target = publicationTarget(state.step);
-      if (!target) throw new Error("SQLite RSS command outcome is unknown; preserve upload/registration journals without replaying it");
-      const record = await readSqliteDraftRecord(root, config, target);
-      if (!record?.publication || record.target.job_id !== state.publication_job_id) throw new Error("SQLite RSS submission is unconfirmed or changed; never replay an unknown command");
-      const draft = await SqliteDraft.open(root, config, record.target, { administratorKey: key, managementTransport: options.transport, r2: options.cloudflare });
-      if (!await draft.observe()) throw new Error("SQLite RSS submission is unknown; preserve its frozen request without resending");
-      await draft.wait();
-      state = { ...state, step: state.step + 1, phase: "ready", publication_job_id: undefined }; save();
+      if (!target && tracked && state.upload_operation_id) {
+        const upload = await readSqliteUploadRecord(root, config, state.upload_operation_id);
+        if (upload.registration.operation?.parent_operation_id !== prepared.importId) throw new Error("RSS upload belongs to another operation");
+        const draft = await SqliteDraft.open(root, config, upload.target, { administratorKey: key, managementTransport: options.transport, r2: options.cloudflare });
+        await draft.resumeUpload(state.upload_operation_id);
+      } else if (!target && tracked && state.step_registration) {
+        const child = await operations.detail(state.step_registration.operation_id);
+        if (child?.operation.state !== "succeeded" || child.operation.parent_operation_id !== prepared.importId ||
+          child.operation.input_sha256 !== digest(`${prepared.inputSha256}:${state.step}`)) {
+          throw new Error("SQLite RSS command outcome is unknown; preserve local installation without replaying it");
+        }
+        if (state.step === 0) {
+          if (!state.created_show_sha256 || digest(await readLocalMetadata(join(directory, "show.toml"))) !== state.created_show_sha256) {
+            throw new Error("Completed Show registration differs from its local installation");
+          }
+        } else if (state.step === 1) {
+          if (JSON.stringify(parseShowMetadata((await readLocalMetadata(join(directory, "show.toml"))).toString("utf8"))) !== JSON.stringify(prepared.show) ||
+            (await hashRssImportFile(join(directory, prepared.show.image_path), 5_000_000)).sha256 !== prepared.coverSha256) throw new Error("Completed Show installation differs from its reviewed import");
+        } else {
+          const episode = prepared.episodes[(state.step - 4) / 4];
+          if (!episode || JSON.stringify(parseEpisodeDraft((await readLocalMetadata(join(directory, `episode-${episode.metadata.episode_id}.toml`))).toString("utf8"))) !==
+            JSON.stringify(episode.metadata)) throw new Error("Completed Episode installation differs from its reviewed import");
+        }
+      } else if (!target) throw new Error("SQLite RSS command outcome is unknown; preserve upload/registration journals without replaying it");
+      if (target) {
+        const record = await readSqliteDraftRecord(root, config, target);
+        if (!record?.publication || record.target.job_id !== state.publication_job_id) throw new Error("SQLite RSS submission is unconfirmed or changed; never replay an unknown command");
+        const draft = await SqliteDraft.open(root, config, record.target, { administratorKey: key, managementTransport: options.transport, r2: options.cloudflare });
+        if (!await draft.observe()) throw new Error("SQLite RSS submission is unknown; preserve its frozen request without resending");
+        await draft.wait();
+      }
+      state = { ...state, step: state.step + 1, phase: "ready", publication_job_id: undefined, upload_operation_id: undefined, step_registration: undefined }; save();
+      await change(prepared.importId, "step_completed");
     }
     while (state.step < actions.length) {
       const target = publicationTarget(state.step), record = target ? await readSqliteDraftRecord(root, config, target) : null;
@@ -122,13 +196,30 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
         }
       }
       state = { ...state, phase: "command_requested", ...(record ? { publication_job_id: record.target.job_id } : {}) }; save();
+      await change(prepared.importId, "command_requested");
+      if (tracked && (state.step === 0 || state.step === 1 || state.step >= 4 && state.step % 4 === 0)) {
+        const childId = crypto.randomUUID(), episode = state.step >= 4 ? prepared.episodes[(state.step - 4) / 4] : undefined;
+        const child = operationCommandSchema.parse({ schema_version: 1, service_id: config.service_id,
+          worker_version_id: health.worker_version_id, service_config_sha256: health.service_config_sha256,
+          operation_id: childId, request_id: crypto.randomUUID(), expected_version: 0, action: "register", operation: {
+            operation_id: childId, parent_operation_id: prepared.importId, import_id: prepared.importId,
+            kind: state.step === 0 ? "show_registration" : "local_install", target_kind: episode ? "episode" : "show",
+            show_id: showId, episode_id: episode?.metadata.episode_id, worker_version_id: health.worker_version_id,
+            service_config_sha256: health.service_config_sha256, admission_window_id: health.admission_window_id,
+            input_sha256: digest(`${prepared.inputSha256}:${state.step}`) } });
+        state = { ...state, step_registration: child }; save();
+        await send(child); await change(childId, "command_requested");
+      }
       console.error(JSON.stringify({ event: "sqlite_rss_publication", import_id: prepared.importId, step: state.step, phase: "started" }));
       await actions[state.step]();
-      state = { ...state, step: state.step + 1, phase: "ready", publication_job_id: undefined }; save();
+      if (state.step_registration) await change(state.step_registration.operation_id, "completed");
+      state = { ...state, step: state.step + 1, phase: "ready", publication_job_id: undefined, upload_operation_id: undefined, step_registration: undefined }; save();
+      await change(prepared.importId, "step_completed");
       console.error(JSON.stringify({ event: "sqlite_rss_publication", import_id: prepared.importId, step: state.step, phase: "completed" }));
     }
     const feedUrl = `${config.public_base_url}/podcasts/${showId}/feed.xml`;
     verifyImportedFeed(prepared, feedUrl, await effects.readFeed(feedUrl));
+    await change(prepared.importId, "completed");
     state = { ...state, phase: "completed" }; save();
     return { result: "rss-import-published", protocol: "sqlite-sequential-v1", import_id: prepared.importId, show_id: showId,
       episode_count: prepared.episodes.length, feed_url: feedUrl, subscriber_migration_completed: false };

@@ -6,13 +6,17 @@ import type { PublicationQueueStorage } from "../sqlite-publication-queue";
 
 export function sqlitePublicationFixture(options: { path?: string; runtime?: SqlitePublicationRuntime; resume?: boolean } = {}) {
   const database = new Database(options.path ?? ":memory:", { strict: true });
+  database.exec("PRAGMA foreign_keys = ON");
   const runtime = options.runtime ?? { service_id: "test-service", worker_version_id: crypto.randomUUID(), service_config_sha256: "a".repeat(64) };
   let alarm: number | null = null;
   let alarmFailures = 0;
   let syncFailures = 0;
   let tail = Promise.resolve();
   const storage: PublicationQueueStorage = {
-    sql: { exec<Row extends Record<string, string | number | null>>(query: string, ...bindings: Array<string | number | null>) {
+    sql: { get databaseSize() {
+      return Number(database.query<{ page_count: number }, []>("PRAGMA page_count").get()!.page_count) *
+        Number(database.query<{ page_size: number }, []>("PRAGMA page_size").get()!.page_size);
+    }, exec<Row extends Record<string, string | number | null>>(query: string, ...bindings: Array<string | number | null>) {
       const rows = database.query<Row, Array<string | number | null>>(query).all(...bindings);
       return { toArray: () => rows };
     } },

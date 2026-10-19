@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { loadWorkspaceConfig } from "./workspace-config";
+import { operationCleanupPlanSchema, operationListSchema, operationResultSchema } from "../../shared/src/sqlite-operations";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,13 +54,25 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
       expect(await command(["lifecycle-execute", file, plan.request_sha256, "confirm"])).toMatchObject({ state: "queued" });
       expect(await command(["job-status", plan.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
     }
+    const staged = await command(["update-show", "daily"]);
+    const operations = operationListSchema.parse(await command(["operation-list", "--remote"]));
+    const upload = operations.operations.find((operation) => operation.kind === "upload" && operation.job_id === staged.job_id)!;
+    expect(upload).toBeDefined();
+    expect(await command(["operation-status", "upload", upload.operation_id, "--local"])).toMatchObject({ source: "local" });
+    expect(await command(["operation-status", "upload", upload.operation_id, "--remote"])).toMatchObject({ operation: { state: "succeeded" } });
+    await command(["operation-cancel", "upload", upload.operation_id]);
+    const cleanup = operationCleanupPlanSchema.parse(await command(["operation-cleanup-preview", "upload", upload.operation_id]));
+    const cleaned = operationResultSchema.parse(await command(["operation-cleanup", "upload", upload.operation_id, cleanup.plan_sha256, "confirm"]));
+    expect(cleaned.operation.state).toBe("succeeded");
+    expect(await command(["operation-status", "cleanup", cleaned.operation.operation_id])).toMatchObject({ operation: { state: "succeeded" } });
     await command(["service-pause", crypto.randomUUID()]);
     expect(await command(["service-status"])).toMatchObject({ state: "paused", drained: true });
     expect(await command(["deploy", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
     expect(await command(["service-status"])).toMatchObject({ publication_ready: true, state: "paused", runtime_update: { state: "completed" } });
+    expect(await command(["operation-status", "publication", String(publication.job_id), "--remote"])).toMatchObject({ operation: { state: "succeeded" } });
     expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
   } finally { server.stop(true); setup.close(); }
-}, 30000);
+}, 45000);
 
 for (const explicit of [false, true]) {
   test(`formal fresh init generates schema version 2 ${explicit ? "with" : "without"} the optional protocol flag`, async () => {

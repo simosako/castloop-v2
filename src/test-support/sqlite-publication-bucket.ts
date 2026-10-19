@@ -8,7 +8,8 @@ export function sqlitePublicationBucket() {
   const entries = new Map<string, Entry>(), calls: Array<{ method: string; key: string }> = [];
   const hooks: { beforePut?: (key: string) => Promise<void>; afterPut?: (key: string) => Promise<void>;
     beforeGet?: (key: string) => Promise<void> } = {};
-  const bucket: SqlitePublicationBucket = {
+  const bucket: SqlitePublicationBucket & { delete: (key: string) => Promise<void> } = {
+    async delete(key) { calls.push({ method: "DELETE", key }); entries.delete(key); },
     async head(key) { calls.push({ method: "HEAD", key }); return entries.get(key) ?? null; },
     async get(key, options) {
       calls.push({ method: "GET", key });

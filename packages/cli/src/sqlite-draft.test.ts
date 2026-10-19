@@ -6,6 +6,11 @@ import type { SqliteDraftTarget } from "./sqlite-draft-journal";
 import type { R2RestTransport } from "./verified-r2-put";
 import { SqlitePublicationAlarm } from "../../../src/sqlite-publication-alarm";
 import { sqlitePublicationFixture } from "../../../src/test-support/sqlite-publication";
+import { SqliteOperationRecords } from "../../../src/sqlite-operation-records";
+import { createSqliteOperationHttp, operationClient } from "../../../src/sqlite-operation-http";
+import { SqliteOperationClient } from "./sqlite-operation-client";
+import { runSqliteOperationCommand } from "./sqlite-operation-commands";
+import { operationCommandSchema } from "../../shared/src/sqlite-operations";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -51,11 +56,16 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
     ...(kind === "episode" ? { episode_id: "first" } : {}),
     ...(kind === "episode" && updating ? { base_revision_id: crypto.randomUUID(),
       base_metadata_sha256: createHash("sha256").update(JSON.stringify(parseEpisodeDraft(readFileSync(episodePath, "utf8")))).digest("hex") } : {}) };
+  const records = new SqliteOperationRecords(setup.storage, () => setup.queue.identity());
+  setup.queue.operationRecords = records;
+  const operationHttp = createSqliteOperationHttp(records, "private-admin", () => true, {
+    head: async () => null, delete: async () => { throw new Error("No cleanup in draft fixture"); } });
   const objects = new Map<string, { bytes: Uint8Array; etag: string; version: string }>();
   const calls: Array<{ method: string; key: string }> = [], management: string[] = [];
   const faults: { r2?: "lost" | "bad_hash" | "etag" | "partial" | "receipt" | "early" | "http";
     submit?: "lost_before" | "lost_after" | "http"; response?: (response: Response, request: Request) => Response | Promise<Response>;
-    put?: () => Promise<void>; beforeSubmit?: () => Promise<void> } = {};
+    put?: () => Promise<void>; beforeSubmit?: () => Promise<void>;
+    operation?: (response: Response, request: Request) => Response | Promise<Response> } = {};
   const r2: R2RestTransport = async (input, init) => {
     const request = new Request(input, init), key = new URL(request.url).pathname.split("/objects/")[1]!;
     calls.push({ method: request.method, key });
@@ -83,12 +93,24 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
   const json = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
   const transport: R2RestTransport = async (input, init) => {
     const request = new Request(input, init), path = new URL(request.url).pathname;
-    management.push(`${request.method} ${path}`);
+    if (path.startsWith("/admin/sqlite-publication/")) management.push(`${request.method} ${path}`);
     expect(new URL(request.url).origin).toBe(config.workers_dev_base_url);
     expect(request.headers.get("X-Castloop-Key")).toBe("private-admin");
     expect(request.headers.has("Authorization")).toBe(false);
     expect(init?.redirect).toBe("error");
     let response: Response;
+    if (path.startsWith("/admin/sqlite-operations/")) {
+      const copy = request.clone(), result = await operationHttp(request);
+      return faults.operation ? faults.operation(result, copy) : result;
+    }
+    if (path.startsWith("/admin/sqlite-service/targets/")) {
+      return json({ ...setup.runtime, protocol: "sqlite-sequential-v1", publication_ready: true,
+        state: "open", admission_window_id: setup.windowId, show_id: target.show_id, show_lifecycle: kind === "show" ? "draft" : "published",
+        reservation_id: crypto.randomUUID(), expected_show_state_version: target.expected_show_state_version,
+        ...(kind === "episode" ? { episode_id: target.episode_id, episode_lifecycle: updating ? "published" : "missing",
+          expected_episode_lifecycle_version: target.expected_episode_lifecycle_version ?? 0 } : {}),
+        ...(updating ? { base_revision_id: target.base_revision_id, base_metadata_sha256: target.base_metadata_sha256 } : {}) });
+    }
     if (path.endsWith("/status")) {
       const snapshot = setup.queue.snapshot();
       response = json({ ...setup.runtime, protocol: "sqlite-sequential-v1", state: snapshot.state,
@@ -97,7 +119,7 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
       await faults.beforeSubmit?.();
       if (faults.submit === "lost_before") throw new Error("private-admin lost response");
       if (faults.submit === "http") return json({ error: "private-admin" }, 503);
-      const result = await setup.queue.enqueue(await request.json());
+      const result = await setup.queue.enqueue(await request.json(), operationClient(request));
       if (faults.submit === "lost_after") throw new Error("private-admin lost response");
       response = json(result, 202);
     } else {
@@ -114,7 +136,7 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
     try { return readdirSync(folder).filter((name) => name.endsWith(".json")).map((name) => JSON.parse(readFileSync(join(folder, name), "utf8"))); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
   };
-  return { ...setup, root, config, target, draft, options, calls, management, faults, objects, attemptRecords,
+  return { ...setup, root, config, target, draft, options, calls, management, faults, objects, attemptRecords, records,
     episodePath, showPath, coverPath, audioPath,
     stage: async () => {
       if (kind === "show") await draft.stage({ asset: "show" });
@@ -123,6 +145,57 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
     alarm: () => new SqlitePublicationAlarm(setup.queue, { validate: async (request) => request, publish: async () => {} }, () => {}),
   };
 }
+
+test("a lost successful upload report is reconciled by its frozen request and resumes without another PUT", async () => {
+  const f = await fixture(); let lose = true;
+  f.faults.operation = async (response, request) => {
+    if (request.method === "POST" && operationCommandSchema.parse(await request.json()).action === "report_upload" && lose) {
+      lose = false; throw new Error("lost acknowledged report");
+    }
+    return response;
+  };
+  await expect(f.draft.stage({ asset: "episode_metadata" })).rejects.toThrow();
+  const record = f.attemptRecords()[0];
+  expect(record.intents[0]).toMatchObject({ state: "put_acknowledged" });
+  expect(record.pending.action).toBe("report_upload");
+  expect(f.records.request(record.pending.request_id)!.request.outcome).toBe("applied");
+  await f.draft.resumeUpload(record.operation_id);
+  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+  expect(f.records.get(record.operation_id)!.state).toBe("succeeded");
+});
+
+test("a lost attachment response resumes the existing manifest without replacing or uploading assets", async () => {
+  const f = await fixture(); let lose = true;
+  f.faults.operation = async (response, request) => {
+    if (request.method === "POST" && operationCommandSchema.parse(await request.json()).action === "attach_asset" && lose) { lose = false; throw new Error("lost attachment"); }
+    return response;
+  };
+  await expect(f.draft.stage({ asset: "episode_metadata" })).rejects.toThrow();
+  const before = await f.draft.read(), record = f.attemptRecords()[0];
+  expect(before.assets).toHaveLength(1);
+  await f.draft.resumeUpload(record.operation_id);
+  expect((await f.draft.read()).assets).toEqual(before.assets);
+  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+});
+
+test("local and remote operation diagnosis do not initialize identities, rewrite records or acquire locks", async () => {
+  const f = await fixture(), folder = join(f.root, ".castloop");
+  const names = () => readdirSync(folder, { recursive: true }).sort();
+  const beforeEmpty = names();
+  expect(await runSqliteOperationCommand(f.root, f.config, "operation-list", [], { local: true })).toMatchObject({ source: "local" });
+  expect(names()).toEqual(beforeEmpty);
+  f.faults.r2 = "partial";
+  await expect(f.draft.stage({ asset: "episode_metadata" })).rejects.toThrow();
+  const id = f.attemptRecords()[0].operation_id, before = names(), changes = f.database.query("SELECT total_changes() n").get();
+  const local = await runSqliteOperationCommand(f.root, f.config, "operation-status", ["upload", id], { local: true });
+  const client = new SqliteOperationClient(f.config, "private-admin", f.options.managementTransport);
+  expect((await client.detail(id))!.assets[0]!.upload_state).toBe("put_acknowledged");
+  await client.list({ incomplete: true });
+  expect(local).toMatchObject({ source: "local" }); expect(names()).toEqual(before);
+  expect(f.database.query("SELECT total_changes() n").get()).toEqual(changes);
+  const remote = JSON.stringify(f.records.detail(id));
+  for (const secret of ["Private title", "Private description", "private@example.com", "private-token", "private-admin", f.root]) expect(remote).not.toContain(secret);
+});
 
 for (const kind of ["show", "episode"] as const) {
   test(`SQLite ${kind} uploads only unique payload objects and requires explicit publish`, async () => {
@@ -191,14 +264,18 @@ for (const fault of ["lost", "bad_hash", "etag", "partial", "receipt", "early", 
     await expect(setup.draft.stage({ asset: "episode_metadata" })).rejects.toThrow();
     expect((await setup.draft.read()).assets).toEqual([]);
     expect(setup.attemptRecords()).toHaveLength(1);
-    expect(setup.attemptRecords()[0].state).toBe("put_requested");
+    expect(setup.attemptRecords()[0].intents[0].state).toBe(["bad_hash", "etag", "partial"].includes(fault) ? "put_acknowledged" : "put_requested");
     expect(setup.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
     expect(setup.management).toEqual([]);
     expect(setup.queue.snapshot().drained).toBe(true);
-    const key = setup.calls[0].key;
     setup.faults.r2 = undefined;
-    await setup.draft.stage({ asset: "episode_metadata" });
-    expect(setup.calls.filter((call) => call.method === "PUT")[1].key).not.toBe(key);
+    await expect(setup.draft.stage({ asset: "episode_metadata" })).rejects.toThrow("unfinished upload");
+    expect(setup.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+    if (["bad_hash", "etag", "partial"].includes(fault)) {
+      await setup.draft.resumeUpload(setup.attemptRecords()[0].operation_id);
+      expect(setup.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+      expect((await setup.draft.read()).assets).toHaveLength(1);
+    }
     expect((await setup.draft.read()).target.job_id).toBe(setup.target.job_id);
   });
 }
@@ -213,11 +290,11 @@ test("uploads remain owned and unreferenced until the PUT and full readback sett
   await entered;
   try {
     expect((await setup.draft.read()).assets).toEqual([]);
-    expect(setup.attemptRecords()[0].state).toBe("put_requested");
+    expect(["put_requested", "put_acknowledged"]).toContain(setup.attemptRecords()[0].intents[0].state);
     await expect(setup.draft.publish()).rejects.toThrow();
     expect(setup.queue.snapshot().drained).toBe(true);
   } finally { release(); await staging; }
-  expect(setup.attemptRecords()[0].state).toBe("verified");
+  expect(setup.attemptRecords()[0].intents[0].state).toBe("attached");
   expect((await setup.draft.read()).assets).toHaveLength(1);
 });
 
@@ -243,7 +320,7 @@ test("a partially uploaded Show pair is retained as an attempt but never becomes
   await expect(setup.draft.stage({ asset: "show" })).rejects.toThrow();
   expect(setup.objects.size).toBe(2);
   expect((await setup.draft.read()).assets).toEqual([]);
-  expect(setup.attemptRecords()[0].state).toBe("put_requested");
+  expect(setup.attemptRecords()[0].intents.map((intent: { state: string }) => intent.state)).toEqual(["verified", "put_requested"]);
   expect(setup.management).toEqual([]);
 });
 

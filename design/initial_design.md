@@ -72,6 +72,14 @@ Gateway: DOの最新の小さい配信判定 → 同versionのcache owner → R2
 - 一覧はSQL indexから20件pagination。非公開化／復元はpreview→hash確認→executeで同じFIFOへ送る。復元は保存済みsnapshotを使い、子の個別停止を勝手に復活させない。
 - RSSはdownload→ローカルreview→新規Showへの逐次公開。GUID・日時を維持するが、subscriber／旧ホスト移行やservice schema変換は行わない。
 
+## 開発版の操作記録（Issue #40）
+
+開発版は既存DOに操作・要求・素材・履歴と形式管理の5表を追加する。CLIはupload前に操作を登録し、PUT開始、成功応答、検証、下書き登録を記録する。公開の受付・実行・完了履歴は既存キューのトランザクションへ接続する。公開要求の本文・ハッシュ、既存content/queueの保存形式は維持する。
+
+一覧・詳細・容量表示は読取専用。成功応答があるuploadと完了済み公開は結果を照合して続行する。取消後の未使用staging素材は、利用禁止を原子的に確定してから、プレビューと確認hashに従って削除する。必要な記録は保持し、容量を50/70/85%で警告する。
+
+詳しくは[操作記録の設計](sqlite_operation_records_schema.md)と[利用方法](../docs/sqlite_operation_recovery.md)を参照する。配布済みv0.6.1や、以下の過去の実機測定とは区別する。
+
 ## 未提供機能と検証の限界
 
 物理delete、独自domain、既存サービス移行、blocked retry/release、未登録uploadの一般cleanup、予約配信、音源変換、統計は提供しない。旧Queueのdomain／deleteを代替として呼び出さない。

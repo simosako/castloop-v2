@@ -1,6 +1,7 @@
 import { ensureLocalJournalParents, localJournalEntryExists, releaseLocalJournalLock, syncLocalJournalDirectory } from "./local-journal-path";
 import type { JournalFamily } from "./local-journal-path";
 import { readBoundedLocalJournal } from "./local-journal-read";
+import { withProcessJournalLock } from "./process-journal-lock";
 import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -57,6 +58,16 @@ export function createLocalJournalStorage(root: string, family: JournalFamily, s
     },
     exclusively: async (callback) => {
       checkParents();
+      const record = readBoundedLocalJournal(file);
+      if (record && typeof record === "object" && "schema_version" in record && record.schema_version === 2 &&
+        ["sqlite-drafts", "sqlite-uploads", "sqlite-rss-imports", "sqlite-operation-requests"].includes(family)) {
+        if (localJournalEntryExists(lock)) throw new Error("Preserve the retained legacy client lock");
+        return withProcessJournalLock(`${file}.lock.sqlite`, async () => {
+          if (localJournalEntryExists(lock)) throw new Error("Preserve the concurrent legacy client lock");
+          locked = true;
+          try { return await callback(); } finally { locked = false; }
+        });
+      }
       const fd = openSync(lock, "wx", 0o600);
       locked = true;
       try { fsyncSync(fd); syncLocalJournalDirectory(dirname(file)); return await callback(); }

@@ -10,6 +10,7 @@ const familyServices = {
   "sqlite-initializations": "service", "sqlite-registrations": "service", "sqlite-controls": "service",
   "sqlite-lifecycle": "service", "sqlite-rss-imports": "service", "sqlite-service-updates": "service",
   "rss-import-downloads": undefined,
+  "sqlite-client": "service", "sqlite-operation-requests": "service",
 } satisfies Record<JournalFamily, string | undefined>;
 
 test("all journal families use their exact service-scoped or flat directory and reject the opposite scope", async () => {

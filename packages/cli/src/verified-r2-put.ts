@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 export type R2RestTransport = (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => Promise<Response>;
 export type R2RestOptions = { accountId: string; apiToken: string; transport?: R2RestTransport; timeoutMs?: number };
 export type VerifiedR2Target = { key: string; length: number; sha256: string; contentType: string };
-type ObjectReceipt = Pick<StageReadbackReceipt, "etag" | "version">;
+export type ObjectReceipt = Pick<StageReadbackReceipt, "etag" | "version">;
 
 async function readReceipt(response: Response, target: VerifiedR2Target): Promise<ObjectReceipt> {
   if (!response.body) throw new Error("Staging PUT receipt is missing");
@@ -63,7 +63,8 @@ export function requireR2RestOptions(accountId: string, options: R2RestOptions):
 }
 
 export async function putVerifiedR2Object(config: { account_id: string; bucket_name: string }, target: VerifiedR2Target,
-  body: ReadableStream<Uint8Array>, requireConsumed: () => void, options: R2RestOptions): Promise<ObjectReceipt> {
+  body: ReadableStream<Uint8Array>, requireConsumed: () => void, options: R2RestOptions,
+  onAcknowledged?: (receipt: ObjectReceipt) => Promise<void>): Promise<ObjectReceipt> {
   requireR2RestOptions(config.account_id, options);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 300000);
@@ -79,6 +80,7 @@ export async function putVerifiedR2Object(config: { account_id: string; bucket_n
     const receipt = await readReceipt(response, target);
     phase = "source_completed";
     requireConsumed();
+    await onAcknowledged?.(receipt);
     phase = "readback";
     response = undefined;
     response = await transport(url, { method: "GET", redirect: "error", cache: "no-store", signal: controller.signal,
@@ -96,5 +98,21 @@ export async function putVerifiedR2Object(config: { account_id: string; bucket_n
     if (response?.body && !response.body.locked) {
       try { await response.body.cancel(); } catch { throw new Error("Staging REST response cancellation failed; no automatic retry"); }
     }
+  }
+}
+
+export async function verifyAcknowledgedR2Object(config: { account_id: string; bucket_name: string }, target: VerifiedR2Target,
+  receipt: ObjectReceipt, options: R2RestOptions): Promise<void> {
+  requireR2RestOptions(config.account_id, options);
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 300000);
+  let response: Response | undefined;
+  try {
+    const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.account_id)}/r2/buckets/${encodeURIComponent(config.bucket_name)}/objects/${target.key.split("/").map(encodeURIComponent).join("/")}`;
+    response = await (options.transport ?? fetch)(url, { method: "GET", redirect: "error", cache: "no-store", signal: controller.signal,
+      headers: { Authorization: `Bearer ${options.apiToken}`, "Accept-Encoding": "identity" } });
+    await verifyResponse(response, target, receipt.etag);
+  } finally {
+    controller.abort(); clearTimeout(timer);
+    if (response?.body && !response.body.locked) await response.body.cancel();
   }
 }

@@ -4,6 +4,7 @@ import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import { PublicationQueueConflict, SqlitePublicationQueue } from "./sqlite-publication-queue";
 import { adminReply as reply } from "./admin-reply";
+import { operationClient } from "./sqlite-operation-http";
 
 const prefix = "/admin/sqlite-publication/";
 export function createSqlitePublicationHttp(queue: SqlitePublicationQueue, administratorKey: string,
@@ -41,9 +42,10 @@ export function createSqlitePublicationHttp(queue: SqlitePublicationQueue, admin
       catch { return reply({ error: "input_unavailable" }, 503); }
       return reply({ error: "invalid_publication" }, 400);
     }
-    try { return reply(await queue.enqueue(input), 202); }
+    const invocation = crypto.randomUUID();
+    try { return reply(await queue.enqueue(input, request.headers.has("X-Castloop-Client-Id") ? operationClient(request) : undefined, invocation), 202); }
     catch (error) {
-      console.error(JSON.stringify({ event: "sqlite_publication_http", request_id: input.request_id, job_id: input.job_id,
+      console.error(JSON.stringify({ event: "sqlite_publication_http", request_id: input.request_id, job_id: input.job_id, invocation_id: invocation,
         reason_code: error instanceof PublicationQueueConflict ? "request_conflict" : "submission_unverified" }));
       return reply({ error: error instanceof PublicationQueueConflict ? "request_conflict" : "submission_unverified" },
         error instanceof PublicationQueueConflict ? 409 : 503);

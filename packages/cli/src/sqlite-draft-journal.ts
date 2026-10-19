@@ -21,7 +21,7 @@ export const sqliteDraftAssetSchema = z.object({ upload: sqliteVerifiedUploadSch
   source_path: z.string().min(1).max(2048) }).strict();
 const publicationSchema = z.object({ request: sqlitePublicationRequestSchema, request_sha256: fields.service_config_sha256,
   status: sqlitePublicationStatusSchema.optional() }).strict();
-const recordSchema = z.object({ schema_version: z.literal(1), protocol: z.literal(sqlitePublicationProtocol),
+const recordSchema = z.object({ schema_version: z.union([z.literal(1), z.literal(2)]), protocol: z.literal(sqlitePublicationProtocol),
   service_id: fields.service_id, service_config_sha256: fields.service_config_sha256, target: sqliteDraftTargetSchema,
   assets: z.array(sqliteDraftAssetSchema).max(2), publication: publicationSchema.optional(),
 }).strict().superRefine((value, context) => {
@@ -94,7 +94,7 @@ export async function openSqliteDraftJournal(root: string, input: SqliteServiceC
   const config = sqliteServiceConfigSchema.parse(input), target = sqliteDraftTargetSchema.parse(targetInput);
   const hash = await sqliteServiceConfigHash(config);
   const storage = createLocalJournalStorage(root, "sqlite-drafts", config.service_id, sqliteDraftFileName(target));
-  const initial = checkedRecord({ schema_version: 1, protocol: sqlitePublicationProtocol, service_id: config.service_id,
+  const initial = checkedRecord({ schema_version: 2, protocol: sqlitePublicationProtocol, service_id: config.service_id,
     service_config_sha256: hash, target, assets: [] });
   storage.initialize(initial);
   const loadAny = async () => {
