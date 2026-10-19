@@ -12,9 +12,27 @@
     "cli": "bun packages/cli/src/index.ts",
     "build:cli": "bun scripts/build-cli.ts"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "podcast",
+    "podcasting",
+    "cloudflare",
+    "cloudflare-workers",
+    "r2",
+    "durable-objects",
+    "serverless",
+    "cli",
+    "rss"
+  ],
+  "author": "Akira Shimosako",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simosako/castloop-v2.git"
+  },
+  "bugs": {
+    "url": "https://github.com/simosako/castloop-v2/issues"
+  },
+  "homepage": "https://github.com/simosako/castloop-v2#readme",
   "devDependencies": {
     "@types/bun": "^1.4.2",
     "@types/node": "^22.20.2",

@@ -1,12 +1,26 @@
 # castloop
 
+[![Latest release](https://img.shields.io/github/v/release/simosako/castloop-v2)](https://github.com/simosako/castloop-v2/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Build and release Linux CLI](https://github.com/simosako/castloop-v2/actions/workflows/build-binaries.yml/badge.svg)](https://github.com/simosako/castloop-v2/actions/workflows/build-binaries.yml)
+
 Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one private R2 bucket and one public Worker per service, multiple Shows.
+
+**Status: early beta (v0.6.x).** Commands, flags and service behavior may still change between releases. See the [changelog](CHANGELOG.md) for what each release changed.
 
 **v0.6.2 adds server-side operation records, upload checkpoint recovery, cancellation and reviewed cleanup of unused staging objects.** `castloop init` creates a schema-version-2 service by default. Queue/R2 service support, its Worker bundle and commands have been removed. Content metadata and SQLite request formats are unchanged. Installing this release does not deploy or change an existing Cloudflare service. See the [release notes](docs/release-v0.6.2.md).
 
 The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen publication request to one Durable Object per service. Its SQLite FIFO and Alarms execute one job at a time, without Cloudflare Queues or D1. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
 
 The v0.6.0 trial published 36 full-size Episodes (1.50GB) in **485.53 seconds**, plus three short Episodes. All 39 audio hashes and delivery checks passed, including preservation after a Worker update. Saved logs showed outer/cache HTTP CPU maxima of **3/5ms**, below the Workers Free 10ms target for the captured requests. This is not proof of complete log capture, every workload's Free compatibility, or permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13). See the [acceptance and CPU record](design/schema_v1_removal_live_test.md).
+
+## Disclaimer
+
+- castloop is in an **early beta stage**. Behavior may change incompatibly between releases, and several operations are intentionally not provided (see [Supported service configuration](#supported-service-configuration)). Do not rely on it for content you cannot afford to lose.
+- castloop creates and deploys resources **in your own Cloudflare account**. You are responsible for all resulting usage, costs and compliance, and for the availability of your published content. The CLI never expands token permissions or changes billing/CPU limits by itself.
+- Always back up your `.castloop/` state (it contains the administrator key and journals), your `castloop.toml`/Show/Episode TOML files and your audio originals. TOML alone is not a complete workspace; losing `.castloop/` can leave a deployed service unmanageable.
+- castloop is an independent project and is **not affiliated with, or endorsed by, Cloudflare, Inc.**
+- The software is provided "AS IS", without warranty of any kind, express or implied. See [LICENSE](LICENSE) for the full license text and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled third-party licenses.
 
 ## Supported service configuration
 
@@ -137,6 +151,8 @@ Use `castloop operation-list --incomplete` and `castloop operation-status upload
 - `failed` means a deterministic pre-write input/base failure; `blocked` preserves uncertain/unfinished execution and stops the FIFO. SQLite retry/release is not provided. An empty queue does not prove unregistered uploads ended.
 - `init-reconcile` and `update-service-reconcile` only reconcile exact, already-completed server evidence. Limited explicit verification continuations exist for acknowledged deployment journals; they do not repeat resource creation/deploy or adopt unknown versions.
 
-See the [SQLite operations guide](docs/sqlite_sequential_development.md), [v0.6.2 release notes](docs/release-v0.6.2.md), [v0.6.1 changes](docs/release-v0.6.1.md), [v0.6.0 changes](docs/release-v0.6.0.md), and [design index](design/README.md). Existing Queue environments must keep v0.5.x and use its [separate guide](docs/queue_service.md). No release, install or test completion automatically deploys, resumes, cleans up or deletes Cloudflare resources.
+See the [changelog](CHANGELOG.md), the [SQLite operations guide](docs/sqlite_sequential_development.md), the [release notes](docs/release-v0.6.2.md), and the [design index](design/README.md). Existing Queue environments must keep v0.5.x and use its [separate guide](docs/queue_service.md). No release, install or test completion automatically deploys, resumes, cleans up or deletes Cloudflare resources. The deep-dive design and operations documents are currently written in Japanese.
+
+To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md) for the local build/test workflow and the safety rules, [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately, and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 The [release workflow](.github/workflows/build-binaries.yml) tests, builds and smoke-checks Linux artifacts before publishing matching `v*` tags. castloop uses the MIT License; redistribute [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with the binary.
