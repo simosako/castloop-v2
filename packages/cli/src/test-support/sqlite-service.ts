@@ -11,6 +11,8 @@ import { sqlitePublicationFixture } from "../../../../src/test-support/sqlite-pu
 import { sqlitePublicationBucket } from "../../../../src/test-support/sqlite-publication-bucket";
 import { SqlitePublicationQueue } from "../../../../src/sqlite-publication-queue";
 import { selectSqliteRuntime } from "../../../../src/sqlite-runtime-update";
+import { createSqliteOperationRecords } from "../../../../src/sqlite-operation-runtime";
+import { createSqliteOperationHttp } from "../../../../src/sqlite-operation-http";
 import { administratorKey } from "../administrator-key";
 import { sha256HexSync } from "../sha256";
 import type { R2RestTransport } from "../verified-r2-put";
@@ -25,10 +27,13 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
   const queue = sqlitePublicationFixture({ resume: false, runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
   const objects = sqlitePublicationBucket(), content = new SqlitePublicationContent(queue.storage), purges: string[] = [];
   let actual = queue.runtime, nativeQueue = queue.queue;
+  let records!: ReturnType<typeof createSqliteOperationRecords>;
   const boot = () => {
     nativeQueue = new SqlitePublicationQueue(queue.storage, selectSqliteRuntime(queue.storage, actual));
-    return new SqliteServiceRuntime(queue.storage, nativeQueue, content, objects.bucket, config, {
+    const runtime = new SqliteServiceRuntime(queue.storage, nativeQueue, content, objects.bucket, config, {
       describe: async () => ({ ...actual, cache_enabled: true }), purge: async (id) => { purges.push(id); } }, actual);
+    records = createSqliteOperationRecords(queue.storage, nativeQueue, content, () => runtime.ready());
+    return runtime;
   };
   let runtime = boot();
   const runner = () => new SqlitePublicationAlarm(nativeQueue, createSqlitePublicationExecutor(content, objects.bucket, config, { purge: async ({ showId }) => { purges.push(showId); } }), () => {});
@@ -57,6 +62,8 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
     const lost = (phase: NonNullable<typeof faults.lost>) => { if (faults.lost === phase) throw new Error("private-key unconfirmed request"); };
     if (url.hostname !== "api.cloudflare.com") {
       const key = administratorKey(keyRoot ?? root);
+      nativeQueue.operationRecords = records;
+      if (path.startsWith("/admin/sqlite-operations/")) return createSqliteOperationHttp(records, key, () => runtime.ready(), objects.bucket)(request);
       if (path.startsWith("/admin/sqlite-service/")) {
         const response = await createSqliteServiceHttp(runtime, key)(request);
         if (path.endsWith("/prepare") && response.status === 202) {

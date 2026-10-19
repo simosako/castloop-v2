@@ -39,6 +39,8 @@ describe("SQLite publication Alarm execution", () => {
     value.clearAlarm();
     expect(await runner.alarm()).toMatchObject({ state: "succeeded", job_id: second.job_id });
     expect(events.map((event) => event.phase)).toEqual(["started", "succeeded", "started", "succeeded"]);
+    expect(events[0]!.invocation_id).toBe(events[1]!.invocation_id);
+    expect(events[0]!.invocation_id).not.toBe(events[2]!.invocation_id);
     expect(value.alarm()).toBeNull();
     expect(await runner.alarm()).toEqual({ state: "idle" });
   });

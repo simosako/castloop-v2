@@ -130,6 +130,8 @@ An already paused service does not need a second pause request. Update verifies 
 
 ## Errors and recovery
 
+Development builds add server-side operation records, upload checkpoint recovery, cancellation and reviewed cleanup of unused staging objects. Use `castloop operation-list --incomplete` and `castloop operation-status upload OPERATION_UUID --remote`; see the [operation recovery guide](docs/sqlite_operation_recovery.md). These additions require the matching Worker and are not in the published v0.6.1 binary. Published Show/Episode deletion remains unsupported.
+
 - Preserve `.castloop/`, frozen requests and uploads. Inspect the same `job-status` and `service-status`; never replace unknown jobs or remove locks because time elapsed.
 - SQLite management GETs retry transient transport/body failures and selected transient HTTP statuses up to three attempts. Publication polling counts actual GETs toward 300 and starts none after five minutes. POST/PUT mutations are **never automatically retried**.
 - `failed` means a deterministic pre-write input/base failure; `blocked` preserves uncertain/unfinished execution and stops the FIFO. SQLite retry/release is not provided. An empty queue does not prove unregistered uploads ended.

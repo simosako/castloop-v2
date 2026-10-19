@@ -18,6 +18,8 @@ import type { SqliteCacheRuntime } from "./sqlite-service-runtime";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
 import { serveSqliteGateway } from "./sqlite-gateway";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
+import { createSqliteOperationRecords } from "./sqlite-operation-runtime";
+import { createSqliteOperationHttp } from "./sqlite-operation-http";
 
 declare global {
   namespace Cloudflare {
@@ -47,6 +49,7 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
   private alarmRuntime!: () => SqliteServiceRuntime;
   private publicationHttp!: (request: Request) => Promise<Response>;
   private serviceHttp!: (request: Request) => Promise<Response>;
+  private operationHttp!: (request: Request) => Promise<Response>;
   constructor(ctx: DurableObjectState, env: SqliteWorkerEnv) {
     super(ctx, env);
     this.initialized = this.ctx.blockConcurrencyWhile(async () => {
@@ -60,6 +63,8 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
         purge: (showId: string) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId }) };
       this.alarmRuntime = () => new SqliteServiceRuntime(this.ctx.storage, queue, content, this.env.CASTLOOP_BUCKET, config, cache, identity);
       this.runtime = this.alarmRuntime();
+      const records = createSqliteOperationRecords(this.ctx.storage, queue, content, () => this.runtime.ready());
+      this.operationHttp = createSqliteOperationHttp(records, this.env.CASTLOOP_ADMIN_KEY, () => this.runtime.ready(), this.env.CASTLOOP_BUCKET);
       this.executor = createSqlitePublicationExecutor(content, this.env.CASTLOOP_BUCKET, config,
         { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) });
       this.publicationHttp = createSqlitePublicationHttp(queue, this.env.CASTLOOP_ADMIN_KEY, () => this.runtime.ready());
@@ -68,6 +73,7 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
   }
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
+    if (new URL(request.url).pathname.startsWith("/admin/sqlite-operations/")) return this.operationHttp(request);
     return new URL(request.url).pathname.startsWith("/admin/sqlite-service/") ? this.serviceHttp(request) : this.publicationHttp(request);
   }
   async delivery(path: string): Promise<SqliteDeliveryDecision> {

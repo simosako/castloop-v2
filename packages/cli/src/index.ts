@@ -92,7 +92,8 @@ async function main(): Promise<unknown> {
   if (["version", "--version"].includes(command) && !rest.length) return CLI_VERSION;
   if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`Unknown command: ${command}`);
   const listing = command === "list-shows" || command === "list-episodes";
-  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : command === "import-rss" ? ["dry-run"] : []);
+  const operationRead = command === "operation-list" || command === "operation-status";
+  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : operationRead ? ["local", "remote", "incomplete", "json"] : command === "import-rss" ? ["dry-run"] : []);
   if (command === "import-rss") {
     allowedFlags(flags, ["dry-run", "output"]);
     if (positional.length !== 2 || Boolean(flags["dry-run"]) === Boolean(flags.output)) throw new Error(commandHelp(command));
@@ -123,13 +124,15 @@ async function main(): Promise<unknown> {
     positional.push(flags["operation-id"] ?? randomUUID());
   } else if (listing) {
     allowedFlags(flags, ["json", "include-deleted", "cursor"]);
+  } else if (operationRead) {
+    allowedFlags(flags, command === "operation-list" ? ["local", "remote", "incomplete", "cursor", "parent", "json"] : ["local", "remote", "after-version", "request-cursor", "json"]);
+    if (flags.local && flags.remote) throw new Error("Choose --local or --remote");
   } else {
     allowedFlags(flags, []);
   }
   const count = SQLITE_COMMAND_ARGUMENTS[command];
   if (count === undefined || !count.includes(positional.length)) throw new Error(commandHelp(command === "update-service" ? "deploy" : command));
-  if (command === "operation-status" && positional[0] !== "lifecycle" ||
-    ["preview-show-lifecycle", "preview-episode-lifecycle"].includes(command) && !["unpublish", "restore"].includes(positional.at(-1)!) ||
+  if (["preview-show-lifecycle", "preview-episode-lifecycle"].includes(command) && !["unpublish", "restore"].includes(positional.at(-1)!) ||
     command === "lifecycle-execute" && positional[2] !== "confirm") throw new Error(commandHelp(command));
   if (["create-episode", "update-episode", "update-episode-audio", "publish-episode"].includes(command)) {
     positional.unshift(validateId(basename(root), "show"));
@@ -138,6 +141,8 @@ async function main(): Promise<unknown> {
   const workspace = await loadWorkspaceConfig(root);
   const { runSqliteCommand } = await import("./sqlite-commands");
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
+    ...(operationRead ? { operationOptions: { local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
+      afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
   if (listing && !flags.json) {
     const { formatSqliteCatalog } = await import("./sqlite-catalog");

@@ -21,6 +21,7 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 - Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
 - レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
 - 同じconfig/SQLite schema/namespaceのcode-only互換更新を`deploy`で扱う。明示pause/drain後に実行し、新versionのprobe後もpausedを維持する。
+- 開発版では[操作記録・再開・取消](sqlite_operation_recovery.md)を追加した。対応WorkerのDO SQLiteに記録し、条件を満たす未公開staging素材だけを明示的に削除できる。配布済みv0.6.1の機能とは区別する。
 - 新規環境はworkers.devのみ。**物理削除、独自ドメイン、既存移行、公開jobのretry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
@@ -69,7 +70,7 @@ castloop update-episode-audio first audio.mp3
 castloop publish-episode first
 ```
 
-- `create-*`は公開しない。`update-*`は一意のR2 keyへのuploadとローカルreceipt保存だけで、サーバーのstage-start許可を待たない。
+- `create-*`は公開しない。`update-*`は一意のR2 keyへのuploadとreceipt保存を行い、公開はしない。開発版では送信前にサーバーへ操作と素材を登録し、素材ごとの開始許可・成功応答・検証・下書き登録を記録する。
 - MP3上限は300,000,000 bytes。MP3解析・サイズ・全量readback/hash・ETag/versionを確認した素材だけを公開manifestへ登録する。
 - 新規metadata入力にはApple基準の項目別上限を適用する（Show説明4000 UTF-8 bytes、Episode説明10000文字、title/author等255文字、site_urlは2048文字）。HTML tagは除外して測り、文字はUnicode code pointで数える。超過分は切り詰めず、項目名付きで拒否する。保存済みsnapshot/revisionの読取・復元は上限なしで維持する（[入力上限の仕様](../design/show_episode_input_limits.md)）。
 - upload sourceは最終bytesを転送する前にEOFまで確認する。HTTP 200だけでは成功にせず、receiptと全量readback検証を維持する（[Issue #30の調査・修正](../design/archive/cli_upload_source_completion.md)）。
@@ -135,7 +136,7 @@ castloop publish-rss-import ./reviewed-import
 subscriber移行や旧ホスト撤去の完了を意味しない。
 
 再実行は完了済みの公開を繰り返さない。保存済みpublication jobがある公開途中停止は、**そのjob IDのstatusを読むだけ**で照合・待機する。
-未確認のupload/登録/ローカルinstallは自動再実行しない。取り込み元の編集、別draftへの置換、不明な要求の再送で先へ進めない。
+開発版の新形式では、PUT成功を保存済みのuploadは検証・下書き登録から続行できる。登録・ローカル配置も完了記録と保存内容が一致すれば結果を再利用する。未確認のupload/登録/ローカルinstallは自動再実行しない。[中断後の手順](sqlite_operation_recovery.md)を参照する。
 公開前にstaged receiptをレビュー済みmetadata/cover/audioと照合し、事前検証後の素材差し替えも拒否する。
 
 ## 非公開化・復元
@@ -191,7 +192,7 @@ castloop init-continue-verification INIT_UUID
 対象は元journalの`access_enabled`/`verified`だけ。凍結source/config/metadata hashが一致し、native setupが存在せずpaused/drainedの場合に限定する。
 resource作成・設定PUT・配備・access変更は再送しない。`setup_requested`やblockedのprobeを再試行するコマンドでもない。
 
-物理deleteと未登録uploadのsettlement契約は未実装。現行staging keyだけでは未登録音源をEpisodeへ確実に対応付けられない。空のキューを根拠にbucketやprefixを削除しない。
+公開済みShow/Episodeの物理削除と、未登録uploadの一般的な整理は未実装。開発版の削除機能は、サーバーに登録した一意のstaging keyでPUT成功と未使用を確認できる素材に限定する。空のキューを根拠にbucketやprefixを削除しない。
 
 ## 検証の限界
 

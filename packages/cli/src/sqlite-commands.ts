@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { episodeDraftSchema, parseShowMetadata, showMetadataSchema, stringifyToml, validateId } from "@castloop/shared";
-import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteRuntimeRequestSchema, sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
 import { administratorKey } from "./administrator-key";
@@ -17,11 +17,14 @@ import { executeSqliteLifecycle, previewSqliteLifecycle, readSqliteLifecycleStat
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { continueSqliteServiceUpdateVerification, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
+import { runSqliteOperationCommand } from "./sqlite-operation-commands";
+import type { OperationReadOptions } from "./sqlite-operation-commands";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
-  listOptions?: { includeDeleted?: boolean; cursor?: string } };
+  listOptions?: { includeDeleted?: boolean; cursor?: string }; operationOptions?: OperationReadOptions;
+  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "create-show": [2], "create-episode": [1], "update-show": [1], "publish-show": [1],
   "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
@@ -29,6 +32,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "list-shows": [0], "list-episodes": [1], "preview-show-lifecycle": [2], "preview-episode-lifecycle": [3],
   "lifecycle-execute": [3], "operation-status": [2], "init-reconcile": [1], "init-continue-verification": [1],
   "update-service": [1], "update-service-verify": [1], "update-service-reconcile": [1],
+  "operation-list": [0], "operation-resume": [2], "operation-cancel": [2], "operation-cleanup-preview": [2], "operation-cleanup": [4],
 };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
@@ -72,14 +76,19 @@ async function registeredShow(root: string, config: SqliteServiceConfig, showId:
 
 export async function runSqliteCommand(root: string, config: SqliteServiceConfig, command: string, args: string[],
   options: SqliteCommandOptions = {}): Promise<unknown> {
+  config = sqliteServiceConfigSchema.parse(config);
   const cf = options.cloudflare ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" };
+  if (command.startsWith("operation-") && !(command === "operation-status" && args[0] === "lifecycle" && !options.operationOptions?.local)) {
+    return runSqliteOperationCommand(root, config, command, args, options.operationOptions, options.transport, cf);
+  }
   if (command === "init") {
     if (args.length > 1 || !options.workerSource) throw new Error("Invalid SQLite initialization arguments");
     return initializeSqliteService(root, config, args[0] ?? readSqliteInitialization(root, config)?.operation_id ?? crypto.randomUUID(),
       await options.workerSource(), cf);
   }
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);
-  const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf };
+  const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf,
+    parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared };
   if (command === "init-reconcile" && args.length === 1) return reconcileSqliteInitialization(root, config, args[0], cf);
   if (command === "init-continue-verification" && args.length === 1 && options.workerSource) return continueSqliteInitialization(root, config, args[0], await options.workerSource(), cf);
   if (command === "update-service" && args.length === 1 && options.workerSource) return updateSqliteService(root, config, args[0], await options.workerSource(), cf);

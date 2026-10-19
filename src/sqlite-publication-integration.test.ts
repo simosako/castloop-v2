@@ -11,6 +11,10 @@ import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import { createSqlitePublicationHttp } from "./sqlite-publication-http";
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
+import { createSqliteOperationRecords } from "./sqlite-operation-runtime";
+import { createSqliteOperationHttp } from "./sqlite-operation-http";
+import { SqliteServiceRuntime } from "./sqlite-service-runtime";
+import { createSqliteServiceHttp } from "./sqlite-service-http";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -30,11 +34,20 @@ async function fixture() {
   content.registerShow("daily", crypto.randomUUID());
   let ready = true;
   const http = createSqlitePublicationHttp(queue.queue, "private-admin", () => ready);
+  const records = createSqliteOperationRecords(queue.storage, queue.queue, content, () => ready);
+  const operations = createSqliteOperationHttp(records, "private-admin", () => ready, objects.bucket);
+  const runtime = new SqliteServiceRuntime(queue.storage, queue.queue, content, objects.bucket, config,
+    { describe: async () => ({ ...queue.runtime, cache_enabled: true }), purge: async () => {} });
+  runtime.ready = () => ready;
+  const service = createSqliteServiceHttp(runtime, "private-admin");
   const requests: Request[] = [];
   const transport: R2RestTransport = async (input, init) => {
     const request = new Request(input, init);
     requests.push(request.clone());
-    if (new URL(request.url).hostname !== "api.cloudflare.com") return http(request);
+    if (new URL(request.url).hostname !== "api.cloudflare.com") {
+      const path = new URL(request.url).pathname;
+      return path.startsWith("/admin/sqlite-operations/") ? operations(request) : path.startsWith("/admin/sqlite-service/") ? service(request) : http(request);
+    }
     expect(request.headers.get("Authorization")).toBe("Bearer private-token");
     const key = new URL(request.url).pathname.split("/objects/")[1]!;
     if (request.method === "PUT") {
@@ -100,7 +113,7 @@ test("CLI upload → authenticated submit → FIFO Alarm → real publication �
     title: "Updated first", guid: base.guid, published_at: base.published_at, enclosure_url: base.enclosure_url });
   expect(setup.calls.some((call) => call.method === "PUT" && call.key.endsWith(".mp3"))).toBe(false);
   expect(setup.calls.some((call) => /^system\/(?:jobs|show-publications|management-requests|lifecycle-service)/.test(call.key))).toBe(false);
-  expect(setup.requests.filter((request) => request.method === "POST")).toHaveLength(4);
+  expect(setup.requests.filter((request) => request.method === "POST" && new URL(request.url).pathname === "/admin/sqlite-publication/jobs")).toHaveLength(4);
   expect(setup.requests.some((request) => new URL(request.url).pathname.includes("queues"))).toBe(false);
   expect(setup.text("public/podcasts/daily/feed.xml")).toContain("Updated first");
   expect(setup.purges).toHaveLength(4);

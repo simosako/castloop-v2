@@ -17,7 +17,7 @@ export type SqlitePublicationExecutor<Prepared> = {
   commit?: (prepared: Prepared) => undefined;
 };
 export type SqlitePublicationEvent = { event: "sqlite_publication"; phase: "started" | "succeeded" | "failed" | "blocked";
-  job_id: string; request_id: string; sequence: number; reason_code?: SqlitePublicationStatus["reason_code"] };
+  job_id: string; request_id: string; sequence: number; invocation_id: string; reason_code?: SqlitePublicationStatus["reason_code"] };
 export type SqliteAlarmResult = { state: "idle" | "busy" } | SqlitePublicationStatus;
 
 export class SqlitePublicationAlarm<Prepared> {
@@ -28,46 +28,47 @@ export class SqlitePublicationAlarm<Prepared> {
       else console.log(JSON.stringify(event));
     }) {}
 
-  private emit(job: SqlitePublicationStatus, phase: SqlitePublicationEvent["phase"]): void {
+  private emit(job: SqlitePublicationStatus, phase: SqlitePublicationEvent["phase"], invocation: string): void {
     this.onEvent({ event: "sqlite_publication", phase, job_id: job.job_id, request_id: job.request_id,
-      sequence: job.sequence, ...(job.reason_code ? { reason_code: job.reason_code } : {}) });
+      sequence: job.sequence, invocation_id: invocation, ...(job.reason_code ? { reason_code: job.reason_code } : {}) });
   }
 
   async alarm(): Promise<SqliteAlarmResult> {
     if (this.executing) return { state: "busy" };
     this.executing = true;
+    const invocation = crypto.randomUUID();
     try {
-      const claim = this.queue.claim();
+      const claim = this.queue.claim(invocation);
       if (claim.state === "idle") return { state: "idle" };
-      if (claim.state === "blocked") { this.emit(claim.job, "blocked"); return claim.job; }
+      if (claim.state === "blocked") { this.emit(claim.job, "blocked", invocation); return claim.job; }
       if (claim.state === "interrupted") {
-        const job = await this.queue.block(claim.job.job_id, "execution_interrupted");
-        this.emit(job, "blocked");
+        const job = await this.queue.block(claim.job.job_id, "execution_interrupted", invocation);
+        this.emit(job, "blocked", invocation);
         return job;
       }
       await this.queue.confirm();
       if (await sqlitePublicationRequestHash(claim.request) !== claim.job.request_sha256) {
-        const job = await this.queue.block(claim.job.job_id, "stored_request_invalid");
-        this.emit(job, "blocked");
+        const job = await this.queue.block(claim.job.job_id, "stored_request_invalid", invocation);
+        this.emit(job, "blocked", invocation);
         return job;
       }
-      this.emit(claim.job, "started");
+      this.emit(claim.job, "started", invocation);
       let prepared: Prepared;
       try { prepared = await this.executor.validate(claim.request); }
       catch (error) {
-        const job = error instanceof SqlitePublicationInputError ? await this.queue.finish(claim.job.job_id, error.reason) :
-          await this.queue.block(claim.job.job_id, "validation_unavailable");
-        this.emit(job, job.state === "failed" ? "failed" : "blocked");
+        const job = error instanceof SqlitePublicationInputError ? await this.queue.finish(claim.job.job_id, error.reason, undefined, invocation) :
+          await this.queue.block(claim.job.job_id, "validation_unavailable", invocation);
+        this.emit(job, job.state === "failed" ? "failed" : "blocked", invocation);
         return job;
       }
       try { await this.executor.publish(prepared); }
       catch {
-        const job = await this.queue.block(claim.job.job_id, "execution_failed");
-        this.emit(job, "blocked");
+        const job = await this.queue.block(claim.job.job_id, "execution_failed", invocation);
+        this.emit(job, "blocked", invocation);
         return job;
       }
-      const job = await this.queue.finish(claim.job.job_id, undefined, () => this.executor.commit?.(prepared));
-      this.emit(job, "succeeded");
+      const job = await this.queue.finish(claim.job.job_id, undefined, () => this.executor.commit?.(prepared), invocation);
+      this.emit(job, "succeeded", invocation);
       return job;
     } finally { this.executing = false; }
   }

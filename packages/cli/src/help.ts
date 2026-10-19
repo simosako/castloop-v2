@@ -129,9 +129,28 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Queued is not completed; use job-status or operation-status lifecycle JOB until succeeded.",
   },
   "operation-status": {
-    usage: "operation-status lifecycle JOB",
-    description: "Read a retained SQLite lifecycle job's status. Other families are not supported.\n" +
-      "Does not retry, remove locks, release tokens or authorize recovery.",
+    usage: "operation-status upload|rss-import|publication|draft|show-registration|lifecycle|cleanup ID [--local|--remote] [--after-version N] [--request-cursor UUID]",
+    description: "Read operation, client, request and checkpoint records without changing journals or locks. Remote is the default.",
+  },
+  "operation-list": {
+    usage: "operation-list [--incomplete] [--local|--remote] [--cursor UUID] [--parent UUID]",
+    description: "List operations and server SQLite capacity. Remote pages contain up to 20 entries; follow next_cursor.",
+  },
+  "operation-resume": {
+    usage: "operation-resume upload ID",
+    description: "Resume an unchanged upload from a durable successful PUT receipt, verification or draft attachment. Unknown PUTs are retained.",
+  },
+  "operation-cancel": {
+    usage: "operation-cancel upload|rss-import ID",
+    description: "Cancel a settled, unused operation. Files remain stored; preview cleanup separately.",
+  },
+  "operation-cleanup-preview": {
+    usage: "operation-cleanup-preview upload ID",
+    description: "Preview eligible staging files from a cancelled operation and their confirmation hash. Read-only.",
+  },
+  "operation-cleanup": {
+    usage: "operation-cleanup upload ID PLAN_SHA256 confirm",
+    description: "Delete only the reviewed, settled, unused staging objects. Retain receipts and uncertain deletion results for inspection.",
   },
   "import-rss": {
     usage: "import-rss SHOW_ID FEED_URL (--dry-run | --output DIRECTORY)",

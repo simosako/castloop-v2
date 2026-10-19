@@ -19,6 +19,11 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md) | 一意upload→DO SQLite FIFO→Alarm。実DO入口・fresh init/readiness・正式CLI・配信接続のローカル実装と残る実機/P6の範囲 |
 | [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | 既定のschema version 2 init、公開・pause/resume、限定検証続行、未知IO保全と未対応機能 |
 | [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md) | Issue #11/#33の現行経路。PUT成功checkpoint、配備後GET失敗の明示続行、旧journalと未知IOの境界（v0.5.2で提供） |
+| [中断した操作の確認・再開・取消](sqlite_operation_recovery_options.md) | Issue #40。方式の比較、採用したDO SQLite案、再開・取消・未公開素材削除の設計。利用は[操作ガイド](../docs/sqlite_operation_recovery.md)を参照 |
+| [サーバー側の操作記録の保存先比較](sqlite_operation_record_storage_options.md) | Issue #40。保存先の比較、DO SQLiteの無料枠と容量試算、記録の保持・整理・警告方針 |
+| [操作記録のIDとテーブル設計](sqlite_operation_records_schema.md) | Issue #40。作業と要求の区別、セッションを省く理由、要求元と時刻の記録、DO SQLiteのDDLと検索例 |
+| [操作記録と再開機能の確認結果](sqlite_operation_records_verification.md) | Issue #40。CLI/SQL/模擬R2の回帰、強制終了時のプロセス排他、記録量の小規模確認と実機確認の範囲 |
+| [操作記録の小規模実機確認](sqlite_operation_records_live_verification_20261019.md) | Issue #40。正常公開、成功応答の保存前後でのSIGKILL、再開と再送拒否、配信ハッシュと最終paused状態 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。現行の利用方法はRSSガイドを使う |
 | [RSS lookupのBun互換性調査](rss_lookup_bun_compatibility.md) | Issue #32。Bun 1.4.2のIPv4/IPv6・HTTP/HTTPSとcompile fixtureでは現行経路の形式不一致を再現せず。正式配布CLIの受け入れ試験とは区別する |
 | [Show/Episodeの項目別入力上限](show_episode_input_limits.md) | Issue #31。Apple基準・大きめ解釈の新規入力上限、保存履歴の無制限読取維持、検証範囲 |

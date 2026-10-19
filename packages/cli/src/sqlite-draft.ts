@@ -1,14 +1,16 @@
 import { z } from "zod";
 import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, parseEpisodeDraft, parseShowMetadata, parseSqlitePublicationRequest, sqlitePublicationRequestHash,
-  sqliteServiceConfigSchema } from "@castloop/shared";
+  sqliteServiceConfigSchema, sqliteVerifiedUploadSchema } from "@castloop/shared";
 import type { SqlitePublicationStatus, SqliteServiceConfig, StagePayload } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
 import { readLocalMetadata } from "./local-metadata-read";
-import { openSqliteDraftJournal, requireSqliteStatus } from "./sqlite-draft-journal";
+import { openSqliteDraftJournal, requireSqliteStatus, sqliteDraftAssetSchema } from "./sqlite-draft-journal";
 import type { SqliteDraftJournal, SqliteDraftRecord, SqliteDraftTarget } from "./sqlite-draft-journal";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
 import type { SqliteManagementReadBudget } from "./sqlite-management-http";
-import { uploadSqliteDraftAssets } from "./sqlite-upload";
+import { attachSqliteUpload, readSqliteUploadRecord, requireNoPendingSqliteUpload, resumeSqliteUpload, uploadSqliteDraftAssets } from "./sqlite-upload";
+import { SqliteOperationClient, sqliteClientIdentity } from "./sqlite-operation-client";
+import { SqliteServiceClient } from "./sqlite-service-client";
 import { assertLocalStagingSource, inspectLocalStagingSource } from "./staging-sources";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { sha256HexSync as sha256 } from "./sha256";
@@ -19,19 +21,24 @@ const selectionSchema = z.discriminatedUnion("asset", [z.object({ asset: z.liter
   z.object({ asset: z.literal("episode_metadata") }).strict(),
   z.object({ asset: z.literal("audio"), audio_path: z.string().min(1).max(2048) }).strict()]);
 export type SqliteDraftSelection = z.infer<typeof selectionSchema>;
-export type SqliteDraftOptions = { administratorKey: string; managementTransport?: R2RestTransport; r2?: R2RestOptions };
+export type SqliteDraftOptions = { administratorKey: string; managementTransport?: R2RestTransport; r2?: R2RestOptions;
+  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void };
 
 export class SqliteDraft {
   private constructor(private readonly root: string, private readonly config: SqliteServiceConfig,
     private readonly journal: SqliteDraftJournal, private readonly client: SqlitePublicationClient,
-    private readonly r2: R2RestOptions) {}
+    private readonly r2: R2RestOptions, private readonly operations: SqliteOperationClient,
+    private readonly service: SqliteServiceClient, private readonly context: Pick<SqliteDraftOptions, "parentOperationId" | "importId" | "onUploadPrepared">) {}
 
   static async open(root: string, input: SqliteServiceConfig, target: SqliteDraftTarget,
     options: SqliteDraftOptions): Promise<SqliteDraft> {
     const config = sqliteServiceConfigSchema.parse(input);
     const client = new SqlitePublicationClient(config, options.administratorKey, options.managementTransport);
     return new SqliteDraft(resolve(root), config, await openSqliteDraftJournal(root, config, target), client, options.r2 ?? {
-      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" });
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" },
+    new SqliteOperationClient(config, options.administratorKey, options.managementTransport),
+    new SqliteServiceClient(config, options.administratorKey, options.managementTransport),
+    { parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared });
   }
 
   read(): Promise<SqliteDraftRecord> { return this.journal.load(); }
@@ -98,12 +105,42 @@ export class SqliteDraft {
         payloads.push(audio.payload);
         paths.push(path);
       }
-      const uploaded = await uploadSqliteDraftAssets(this.root, this.config, record.target, payloads, paths, duration, this.r2);
+      await requireNoPendingSqliteUpload(this.root, this.config, record.target, this.operations);
+      const uploaded = await uploadSqliteDraftAssets(this.root, this.config, record.target, payloads, paths, duration, this.r2,
+        { client: this.operations, service: this.service, metadataSha256: sha256(metadata), baseAssets: record.assets, ...this.context });
       if (!metadata.equals(await this.metadata(record))) throw new Error("Local metadata changed while its upload was in progress");
-      const assets = record.assets.filter((entry) => !uploaded.some((next) => next.upload.asset === entry.upload.asset ||
+      const assets = record.assets.filter((entry) => !uploaded.assets.some((next) => next.upload.asset === entry.upload.asset ||
         next.upload.asset.startsWith("cover_") && entry.upload.asset.startsWith("cover_")));
-      const next = { ...record, assets: [...assets, ...uploaded] };
+      const next = { ...record, assets: [...assets, ...uploaded.assets] };
       this.journal.replace(next);
+      await attachSqliteUpload(this.root, this.config, uploaded.operationId, this.operations);
+      return this.journal.load();
+    });
+  }
+
+  async resumeUpload(id: string): Promise<SqliteDraftRecord> {
+    return this.journal.storage.exclusively(async () => {
+      const record = await this.journal.load(), upload = await readSqliteUploadRecord(this.root, this.config, id);
+      if (record.schema_version !== 2 || record.publication || JSON.stringify(record.target) !== JSON.stringify(upload.target) ||
+        sha256(await this.metadata(record)) !== upload.metadata_sha256) throw new Error("Upload resume requires its unchanged, unfrozen draft and metadata");
+      const previouslyUploaded = upload.intents.every((intent) => intent.receipt) ? upload.intents.map(({ source_path, state, receipt, ...intent }) =>
+        sqliteDraftAssetSchema.parse({ source_path, upload: sqliteVerifiedUploadSchema.parse({ ...intent, ...receipt, verified: true }) })) : null;
+      const kept = upload.base_assets.filter((entry) => !upload.intents.some((intent) => intent.asset === entry.upload.asset ||
+        intent.asset.startsWith("cover_") && entry.upload.asset.startsWith("cover_")));
+      if (JSON.stringify(record.assets) !== JSON.stringify(upload.base_assets) &&
+        (!previouslyUploaded || JSON.stringify(record.assets) !== JSON.stringify([...kept, ...previouslyUploaded]))) {
+        throw new Error("Another operation changed this draft; do not resume its upload");
+      }
+      const result = await resumeSqliteUpload(this.root, this.config, id, this.r2, this.operations);
+      if (sha256(await this.metadata(record)) !== upload.metadata_sha256) throw new Error("Metadata changed during upload verification");
+      const assets = upload.base_assets.filter((entry) => !result.assets.some((next) => next.upload.asset === entry.upload.asset ||
+        next.upload.asset.startsWith("cover_") && entry.upload.asset.startsWith("cover_")));
+      const merged = [...assets, ...result.assets.map((entry) => sqliteDraftAssetSchema.parse(entry))];
+      if (JSON.stringify(record.assets) !== JSON.stringify(upload.base_assets) && JSON.stringify(record.assets) !== JSON.stringify(merged)) {
+        throw new Error("A different upload changed this draft; do not overwrite its references");
+      }
+      this.journal.replace({ ...record, assets: merged });
+      await attachSqliteUpload(this.root, this.config, id, this.operations);
       return this.journal.load();
     });
   }
@@ -146,7 +183,7 @@ export class SqliteDraft {
       const frozen = { ...record, publication: { request, request_sha256: await sqlitePublicationRequestHash(request) } };
       if (!metadata.equals(await this.metadata(record))) throw new Error("Local metadata changed before publication was frozen");
       this.journal.replace(frozen);
-      return this.retainStatus(frozen, await this.client.submit(request));
+      return this.retainStatus(frozen, await this.client.submit(request, sqliteClientIdentity(this.root, this.config, true)!));
     });
   }
 

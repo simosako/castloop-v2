@@ -3,9 +3,12 @@ import { parseSqlitePublicationRequest, sqlitePublicationBlockSchema, sqlitePubl
   sqlitePublicationStatusSchema } from "../packages/shared/src/sqlite-publication";
 import type { SqlitePublicationBlock, SqlitePublicationFailure, SqlitePublicationRequest,
   SqlitePublicationRuntime, SqlitePublicationStatus } from "../packages/shared/src/sqlite-publication";
+import type { OperationClient } from "../packages/shared/src/sqlite-operations";
+import type { SqliteOperationRecords } from "./sqlite-operation-records";
 
 type Binding = string | number | null;
 export type PublicationSql = {
+  readonly databaseSize?: number;
   exec: <Row extends Record<string, Binding>>(query: string, ...bindings: Binding[]) => { toArray: () => Row[] };
 };
 export type PublicationQueueStorage = {
@@ -30,6 +33,7 @@ export class PublicationQueueConflict extends Error {
 }
 
 export class SqlitePublicationQueue {
+  operationRecords?: SqliteOperationRecords;
   constructor(private readonly storage: PublicationQueueStorage, private runtime: SqlitePublicationRuntime,
     private readonly now: () => number = Date.now) {
     this.runtime = sqlitePublicationRuntimeSchema.parse(runtime);
@@ -93,7 +97,7 @@ export class SqlitePublicationQueue {
     if (alarm === null) await this.storage.setAlarm(this.now());
   }
 
-  async enqueue(input: SqlitePublicationRequest): Promise<SqlitePublicationStatus> {
+  async enqueue(input: SqlitePublicationRequest, client?: OperationClient, invocation = crypto.randomUUID()): Promise<SqlitePublicationStatus> {
     const request = parseSqlitePublicationRequest(input);
     const source = JSON.stringify(request);
     const hash = await sqlitePublicationRequestHash(request);
@@ -105,6 +109,7 @@ export class SqlitePublicationQueue {
       if (existing.length) {
         if (existing.length !== 1 || existing[0].request_id !== request.request_id || existing[0].job_id !== request.job_id ||
           existing[0].request_sha256 !== hash || existing[0].request_json !== source) throw new PublicationQueueConflict();
+        if (client) this.operationRecords?.requirePublicationClient(request, hash, client);
         await this.schedule();
         return this.statusRow(existing[0]);
       }
@@ -112,6 +117,8 @@ export class SqlitePublicationQueue {
       if (request.worker_version_id !== service.worker_version_id || request.service_config_sha256 !== service.service_config_sha256 ||
         request.admission_window_id !== service.admission_window_id) throw new Error("Publication runtime or resume window is stale");
       if (this.active()?.state === "blocked") throw new Error("SQLite publication queue is blocked; inspect the retained job");
+      this.operationRecords?.validatePublicationAssets(request);
+      if (client) this.operationRecords?.publicationAccepted(request, hash, client, invocation);
       this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, state)
         VALUES (?, ?, ?, ?, ?, 'queued')`, request.request_id, request.job_id, request.show_id, hash, source);
       await this.schedule();
@@ -161,7 +168,7 @@ export class SqlitePublicationQueue {
     });
   }
 
-  claim(): PublicationClaim {
+  claim(invocation = crypto.randomUUID()): PublicationClaim {
     return this.storage.transactionSync(() => {
       const service = this.requireRuntime();
       const active = this.active();
@@ -176,14 +183,16 @@ export class SqlitePublicationQueue {
           request.admission_window_id !== service.admission_window_id || JSON.stringify(request) !== row.request_json) throw new Error("Stored request differs");
       } catch {
         this.storage.sql.exec("UPDATE publication_jobs SET state = 'blocked', reason_code = 'stored_request_invalid' WHERE job_id = ?", row.job_id);
+        this.operationRecords?.publicationChanged(row.job_id, "blocked", "stored_request_invalid", invocation);
         return { state: "blocked", job: this.statusRow(this.byJob(row.job_id)) };
       }
       this.storage.sql.exec("UPDATE publication_jobs SET state = 'running' WHERE job_id = ? AND state = 'queued'", row.job_id);
+      this.operationRecords?.publicationChanged(row.job_id, "running", undefined, invocation);
       return { state: "claimed", job: this.statusRow(this.byJob(row.job_id)), request };
     });
   }
 
-  async finish(jobId: string, failure?: SqlitePublicationFailure, apply?: () => undefined): Promise<SqlitePublicationStatus> {
+  async finish(jobId: string, failure?: SqlitePublicationFailure, apply?: () => undefined, invocation = crypto.randomUUID()): Promise<SqlitePublicationStatus> {
     if (failure !== undefined) sqlitePublicationFailureSchema.parse(failure);
     if (failure !== undefined && apply) throw new Error("Failed input cannot commit publication content");
     return this.storage.transaction(async () => {
@@ -193,12 +202,13 @@ export class SqlitePublicationQueue {
       if (apply && apply() !== undefined) throw new Error("Publication content commit must be synchronous");
       this.storage.sql.exec("UPDATE publication_jobs SET state = ?, reason_code = ? WHERE job_id = ?",
         failure === undefined ? "succeeded" : "failed", failure ?? null, jobId);
+      this.operationRecords?.publicationChanged(jobId, failure === undefined ? "succeeded" : "failed", failure, invocation);
       await this.schedule();
       return this.statusRow(this.byJob(jobId));
     });
   }
 
-  async block(jobId: string, reason: SqlitePublicationBlock): Promise<SqlitePublicationStatus> {
+  async block(jobId: string, reason: SqlitePublicationBlock, invocation = crypto.randomUUID()): Promise<SqlitePublicationStatus> {
     sqlitePublicationBlockSchema.parse(reason);
     const status = this.storage.transactionSync(() => {
       this.requireRuntime();
@@ -206,6 +216,7 @@ export class SqlitePublicationQueue {
       if (current.state === "blocked") return this.statusRow(current);
       if (current.state !== "running") throw new Error("Only a running publication can be blocked");
       this.storage.sql.exec("UPDATE publication_jobs SET state = 'blocked', reason_code = ? WHERE job_id = ?", reason, jobId);
+      this.operationRecords?.publicationChanged(jobId, "blocked", reason, invocation);
       return this.statusRow(this.byJob(jobId));
     });
     await this.storage.sync();

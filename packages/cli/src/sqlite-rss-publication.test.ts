@@ -1,6 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import { importRssLocally } from "./rss-import-local";
 import { createSqliteRssEffects, publishSqliteRssImport } from "./sqlite-rss-publication";
+import type { SqliteRssEffects } from "./sqlite-rss-publication";
+import { SqliteOperationClient } from "./sqlite-operation-client";
+import { administratorKey } from "./administrator-key";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
@@ -22,7 +25,8 @@ async function fixture(count = 2) {
   await importRssLocally("imported", "https://source.example/feed", output, rssImportTransport(false, source).effects);
   const report = JSON.parse(readFileSync(join(output, "import.json"), "utf8")) as { import_id: string; episodes: Array<{ metadata: { episode_id: string; guid: string; guid_is_permalink: boolean; published_at: string } }> };
   const commands: string[] = [], native = createSqliteRssEffects(value.root, value.config, options);
-  const effects = { ...native, async command(name: string, args: string[]) { commands.push(name); return native.command(name, args); },
+  const effects = { ...native, async command(name: string, args: string[], context?: Parameters<SqliteRssEffects["command"]>[2]) {
+    commands.push(name); return native.command(name, args, context); },
     async readFeed() { return value.text("public/podcasts/imported/feed.xml"); } };
   const execute = (custom = effects, customOptions = options) => publishSqliteRssImport(value.root, value.config, output, customOptions, custom);
   const cursor = join(value.root, ".castloop", "sqlite-rss-imports", value.config.service_id, `${report.import_id}.json`);
@@ -58,6 +62,33 @@ test("a completed publication with a lost import checkpoint is observed without 
   expect(await value.execute(effects)).toMatchObject({ episode_count: 2 });
   expect(value.commands.filter((name) => name === "publish-show")).toHaveLength(1);
   expect(value.commands.filter((name) => name === "update-show")).toHaveLength(1);
+});
+
+test("RSS resumes acknowledged audio verification and links all new uploads and publications to its import", async () => {
+  const value = await fixture(2); let failReadback = true;
+  const options = { ...value.options, cloudflare: { ...value.options.cloudflare, transport: async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const request = new Request(input, init), response = await value.transport(input, init);
+    if (failReadback && request.method === "GET" && new URL(request.url).pathname.endsWith("/audio.mp3")) {
+      failReadback = false; await response.body?.cancel(); throw new Error("readback connection interrupted");
+    }
+    return response;
+  } } };
+  const native = createSqliteRssEffects(value.root, value.config, options), effects = { ...native, readFeed: value.effects.readFeed };
+  await expect(publishSqliteRssImport(value.root, value.config, value.output, options, effects)).rejects.toThrow();
+  const stopped = JSON.parse(readFileSync(value.cursor, "utf8")); expect(stopped.upload_operation_id).toBeString();
+  const firstPuts = value.calls.filter((call) => call.method === "PUT" && call.path.endsWith("/audio.mp3")); expect(firstPuts).toHaveLength(1);
+  expect(await publishSqliteRssImport(value.root, value.config, value.output, options, effects)).toMatchObject({ episode_count: 2 });
+  expect(value.calls.filter((call) => call.method === "PUT" && call.path.endsWith("/audio.mp3"))).toHaveLength(2);
+  const client = new SqliteOperationClient(value.config, administratorKey(value.root), value.transport);
+  const children = (await client.list({ parent: value.report.import_id })).operations;
+  expect(children.filter((operation) => operation.kind === "publication")).toHaveLength(3);
+  expect(children.filter((operation) => operation.kind === "upload")).toHaveLength(5);
+  expect(children.every((operation) => operation.import_id === value.report.import_id && operation.state === "succeeded")).toBe(true);
+  expect((await client.detail(value.report.import_id))!.operation.state).toBe("succeeded");
+  expect(await runSqliteCommand(value.root, value.config, "operation-status", ["rss-import", value.report.import_id], value.options)).toMatchObject({
+    progress: { published_episode_count: 2, unstarted_episode_count: null },
+    related_summary: expect.arrayContaining([expect.objectContaining({ kind: "publication", target_kind: "episode", state: "succeeded", count: 2 })]),
+  });
 });
 
 test("an unknown upload is never repeated and changed imports cannot replace the frozen operation", async () => {
@@ -107,5 +138,6 @@ test("a failed final feed check is read-only and never repeats completed publica
   await expect(value.execute({ ...value.effects, async readFeed() { throw new Error("read-only feed unavailable"); } })).rejects.toThrow("feed unavailable");
   const count = value.commands.length; value.calls.length = 0;
   expect(await value.execute()).toMatchObject({ result: "rss-import-published" });
-  expect(value.commands).toHaveLength(count); expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+  expect(value.commands).toHaveLength(count);
+  expect(value.calls.filter((call) => call.method !== "GET").every((call) => call.path === "/admin/sqlite-operations/commands")).toBe(true);
 });

@@ -4,6 +4,7 @@ import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteServiceCo
 import type { R2RestTransport } from "./verified-r2-put";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadBudget, SqliteManagementReadOptions } from "./sqlite-management-http";
+import type { OperationClient } from "../../shared/src/sqlite-operations";
 
 export { readSqliteManagementJson } from "./sqlite-management-http";
 
@@ -17,7 +18,7 @@ export class SqlitePublicationClient {
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid SQLite management credentials or timeout");
   }
 
-  private async call(path: string, input?: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}): Promise<unknown | null> {
+  private async call(path: string, input?: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}, trace?: OperationClient): Promise<unknown | null> {
     if (!input) {
       return readSqliteManagementGet(new URL(`/admin/sqlite-publication/${path}`, this.config.workers_dev_base_url), {
         "X-Castloop-Key": this.administratorKey, Accept: "application/json",
@@ -29,7 +30,8 @@ export class SqlitePublicationClient {
       response = await this.transport(new URL(`/admin/sqlite-publication/${path}`, this.config.workers_dev_base_url), {
         method: input ? "POST" : "GET", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(this.timeoutMs),
         headers: { "X-Castloop-Key": this.administratorKey, "Accept": "application/json",
-          ...(input ? { "Content-Type": "application/json" } : {}) }, ...(input ? { body: JSON.stringify(input) } : {}),
+          ...(input ? { "Content-Type": "application/json" } : {}),
+          ...(trace ? { "X-Castloop-Client-Id": trace.client_id, "X-Castloop-Cli-Version": trace.cli_version } : {}) }, ...(input ? { body: JSON.stringify(input) } : {}),
       });
     } catch { throw new Error("SQLite management response is unknown; preserve the request without automatic retry"); }
     if (response.status !== (input ? 202 : 200)) {
@@ -67,9 +69,9 @@ export class SqlitePublicationClient {
     return status;
   }
 
-  async submit(input: SqlitePublicationRequest): Promise<SqlitePublicationStatus> {
+  async submit(input: SqlitePublicationRequest, trace?: OperationClient): Promise<SqlitePublicationStatus> {
     const request = await this.requireRequest(input);
-    return this.result(await this.call("jobs", request), request);
+    return this.result(await this.call("jobs", request, {}, trace), request);
   }
 
   async observe(input: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}): Promise<SqlitePublicationStatus | null> {
