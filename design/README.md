@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既定でSQLiteを作る。リリースの取得と実環境への配備は別操作。まず[全体設計](initial_design.md)を読み、操作は[README](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS案内](../docs/rss_migration.md)を参照する。既存version 1サービスはv0.5.xと[Queue専用ガイド](../docs/queue_service.md)を使い、移行機能は提供しない。[v0.6.1変更点](../docs/release-v0.6.1.md)、[v0.6.0変更点](../docs/release-v0.6.0.md)、[旧版v0.5.2](../docs/release-v0.5.2.md)を区別する。
+v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既定でSQLiteを作る。リリースの取得と実環境への配備は別操作。まず[全体設計](initial_design.md)を読み、操作は[README](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS案内](../docs/rss_migration.md)を参照する。既存version 1サービスはv0.5.xと[Queue専用ガイド](../docs/queue_service.md)を使い、移行機能は提供しない。[v0.6.2変更点](../docs/release-v0.6.2.md)、[v0.6.1変更点](../docs/release-v0.6.1.md)、[v0.6.0変更点](../docs/release-v0.6.0.md)、[旧版v0.5.2](../docs/release-v0.5.2.md)を区別する。
 
 ## 開発時に参照する文書
 
