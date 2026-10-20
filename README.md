@@ -10,7 +10,9 @@ Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one pri
 
 **v0.6.2 adds server-side operation records, upload checkpoint recovery, cancellation and reviewed cleanup of unused staging objects.** `castloop init` creates a schema-version-2 service by default. Queue/R2 service support, its Worker bundle and commands have been removed. Content metadata and SQLite request formats are unchanged. Installing this release does not deploy or change an existing Cloudflare service. See the [release notes](docs/release-v0.6.2.md).
 
-The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen publication request to one Durable Object per service. Its SQLite FIFO and Alarms execute one job at a time, without Cloudflare Queues or D1. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
+**Development tree (Issue #48, not released):** the usage below targets fresh `storage_layout = "show-v1"` services. Released v0.6.2 uses the previous service-wide layout; see its [tagged README](https://github.com/simosako/castloop-v2/blob/v0.6.2/README.md). Legacy layouts cannot be updated or migrated with this development CLI. Do not add the layout field to an old workspace to bypass this boundary.
+
+The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen request to the target Show's Durable Object. Each Show has its own SQLite FIFO, Alarm and Pause/Resume window; different Shows can progress independently. A small control DO stores membership and shared Worker-update progress. No Cloudflare Queues or D1 are used. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
 
 The v0.6.0 trial published 36 full-size Episodes (1.50GB) in **485.53 seconds**, plus three short Episodes. All 39 audio hashes and delivery checks passed, including preservation after a Worker update. Saved logs showed outer/cache HTTP CPU maxima of **3/5ms**, below the Workers Free 10ms target for the captured requests. This is not proof of complete log capture, every workload's Free compatibility, or permanent resolution of [Issue #13](https://github.com/simosako/castloop-v2/issues/13). See the [acceptance and CPU record](design/schema_v1_removal_live_test.md).
 
@@ -24,7 +26,7 @@ The v0.6.0 trial published 36 full-size Episodes (1.50GB) in **485.53 seconds**,
 
 ## Supported service configuration
 
-Only `schema_version = 2` with `publication_protocol = "sqlite-sequential-v1"` is supported. Publication, listings, RSS import, unpublish/restore and same-config/schema/namespace code-only updates are available. Physical deletion, custom domains and blocked-job retry/release are not supported.
+Development supports only fresh `schema_version = 2`, `publication_protocol = "sqlite-sequential-v1"`, `storage_layout = "show-v1"` services. Missing/other layouts are rejected before management IO or local state changes. Publication, listings, RSS import, unpublish/restore and same-config/schema/namespace code-only updates are available. Physical deletion, custom domains and blocked-job retry/release are not supported.
 
 Service schema version 1 is rejected before management requests, deployment or administrator-key/journal creation. There is **no schema-version-1 migration feature**: do not edit schema/protocol fields, adopt old resources or convert retained journals. Existing Queue services require a compatible **v0.5.x CLI and Worker**, maintained separately; see the [v0.5.x-only Queue guide](docs/queue_service.md). Installing this CLI does not change, pause, delete or harden an existing deployed Worker. Shared Show/Episode metadata still uses its independent `schema_version = 1`.
 
@@ -68,10 +70,9 @@ castloop init /path/to/workspace \
   --workers-subdomain my-account-subdomain --operation-id INIT_UUID
 cd /path/to/workspace
 castloop service-status
-castloop service-resume NEW_WINDOW_UUID
 ```
 
-Initialization defaults to schema version 2; the existing `--publication-protocol sqlite-sequential-v1` flag remains optional. It verifies the actual Worker/version/namespace and an Alarm/R2/cache/purge probe, then finishes **paused**. It never adopts existing resources. Resume requires a **new admission-window UUID**, not the init/pause UUID.
+Initialization creates schema version 2 with `storage_layout = "show-v1"`; the protocol flag remains optional. It verifies the actual Worker/version/namespace and control-DO Alarm/R2/cache/purge readiness. Each newly registered Show starts **paused** and requires its own explicit Resume with a new window UUID. There is no service-wide Pause/Resume. Existing resources are never adopted.
 
 Keep `castloop.toml` and private, git-ignored `.castloop/` state together and backed up. The latter contains the administrator key and journals: TOML alone is not a complete workspace. Never commit credentials, journals or unpublished audio. Since v0.5.1 `castloop.toml` must be a regular file of 1–16,384 bytes; a symlinked, FIFO, oversized or non-UTF-8 configuration is rejected before any management request or local state is created.
 
@@ -79,6 +80,8 @@ Keep `castloop.toml` and private, git-ignored `.castloop/` state together and ba
 
 ```sh
 castloop create-show my-show --site-url https://your-real-site.example/podcast
+castloop show-status my-show
+castloop show-resume my-show NEW_WINDOW_UUID
 # Edit my-show/show.toml and provide the JPEG/PNG named in image_path.
 castloop update-show my-show
 castloop publish-show my-show
@@ -127,28 +130,29 @@ Run publication from the service root. Imports create a new Show, preserve GUIDs
 
 ## Update an existing SQLite Worker
 
-Back up the retained workspace. Replace the executable, then explicitly pause and drain before a same-config/schema/namespace code-only update:
+This applies only within the new layout, not to an upgrade from a legacy service. Back up the workspace and explicitly pause and drain **every Show** before a same-config/schema/namespace code-only update:
 
 ```sh
-castloop service-pause PAUSE_OPERATION_UUID
+castloop show-pause my-show PAUSE_OPERATION_UUID
+# Repeat for every other Show with a fresh UUID.
 castloop service-status
-# Continue only when publication_ready, paused and drained are confirmed.
+# Confirm all Shows are paused, drained and ready.
 castloop deploy --operation-id UPDATE_UUID
 castloop service-status
-castloop service-resume NEW_WINDOW_UUID
+castloop show-resume my-show NEW_WINDOW_UUID
 ```
 
-An already paused service does not need a second pause request. Update verifies the exact deployed version and new Alarm/R2/cache/purge readiness and finishes paused. It does not convert schemas, change domains/configuration, force-release blocked jobs, or replay unknown deployments. See [update/recovery details](docs/sqlite_sequential_development.md#互換worker更新).
+An already paused Show does not need another pause request. Update pins membership, atomically prepares and locks each Show, then verifies all targets' exact runtime and Alarm/R2/cache/purge readiness before releasing maintenance. Every Show remains paused and can be resumed separately. Partial/unknown preparation, activation or release is retained without replay or automatic rollback. See [update/recovery details](docs/sqlite_sequential_development.md#互換worker更新).
 
 **Recovery continuation (since v0.5.2):** `castloop update-service-verify UPDATE_UUID` also continues REST verification from an acknowledged PUT or a pinned deployment after a GET failure, not only from `verified`. It requires the exact frozen inputs and rechecks the acknowledged ETag, deployment/version, namespace and server maintenance request before the first activation/probe. It never repeats PUT/preparation or a previously requested activation. Older receipt-free `deploy_requested` journals remain blocked; see the [recovery contract](design/sqlite_worker_update_recovery.md).
 
 ## Errors and recovery
 
-Use `castloop operation-list --incomplete` and `castloop operation-status upload OPERATION_UUID --remote` to inspect server-side operation records, resume from a durable successful PUT receipt, cancel settled operations and preview reviewed cleanup of unused staging objects; see the [operation recovery guide](docs/sqlite_operation_recovery.md). These additions require the matching v0.6.2 Worker. Published Show/Episode deletion remains unsupported.
+Use `castloop operation-list --show my-show --incomplete` and `castloop operation-status upload OPERATION_UUID --show my-show --remote` to inspect server-side operation records. Remote operation commands require `--show`; local-only diagnosis does not. See the [operation recovery guide](docs/sqlite_operation_recovery.md) for receipt-based continuation, cancellation and reviewed staging cleanup. Published Show/Episode deletion remains unsupported.
 
 - Preserve `.castloop/`, frozen requests and uploads. Inspect the same `job-status` and `service-status`; never replace unknown jobs or remove locks because time elapsed.
 - SQLite management GETs retry transient transport/body failures and selected transient HTTP statuses up to three attempts. Publication polling counts actual GETs toward 300 and starts none after five minutes. POST/PUT mutations are **never automatically retried**.
-- `failed` means a deterministic pre-write input/base failure; `blocked` preserves uncertain/unfinished execution and stops the FIFO. SQLite retry/release is not provided. An empty queue does not prove unregistered uploads ended.
+- `failed` means a deterministic pre-write input/base failure; `blocked` preserves uncertain execution and stops only that Show's FIFO/delivery. Other Shows can operate, Pause/Resume and register independently. A blocked Show still prevents shared Worker updates. An empty queue does not prove unregistered uploads ended.
 - `init-reconcile` and `update-service-reconcile` only reconcile exact, already-completed server evidence. Limited explicit verification continuations exist for acknowledged deployment journals; they do not repeat resource creation/deploy or adopt unknown versions.
 
 See the [changelog](CHANGELOG.md), the [SQLite operations guide](docs/sqlite_sequential_development.md), the [release notes](docs/release-v0.6.2.md), and the [design index](design/README.md). Existing Queue environments must keep v0.5.x and use its [separate guide](docs/queue_service.md). No release, install or test completion automatically deploys, resumes, cleans up or deletes Cloudflare resources. The deep-dive design and operations documents are currently written in Japanese.

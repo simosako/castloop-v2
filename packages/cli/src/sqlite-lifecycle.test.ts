@@ -15,7 +15,7 @@ async function fixture() {
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, { attempts: 2, delay: async () => {} });
   const command = (name: string, args: string[] = [], transport = value.transport) => runSqliteCommand(value.root, value.config, name, args,
     { transport, cloudflare: value.options });
-  await command("service-resume", [crypto.randomUUID()]); await command("create-show", ["daily", "https://example.com/podcast"]);
+  await command("create-show", ["daily", "https://example.com/podcast"]); await command("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(value.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
   await command("update-show", ["daily"]); await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);
@@ -25,7 +25,7 @@ async function fixture() {
   const preview = async (action: string, episode = true) => sqliteLifecyclePlanSchema.parse(await command(episode ? "preview-episode-lifecycle" : "preview-show-lifecycle",
     episode ? ["daily", "first", action] : ["daily", action]));
   const file = join(value.root, "reviewed-plan.json");
-  return { ...value, command, preview, file };
+  return Object.assign(value, { command, preview, file });
 }
 
 test("formal lifecycle previews are read-only and execution restores only the saved snapshot", async () => {
@@ -67,7 +67,7 @@ test("lifecycle refuses changed hashes, deletion, unconfirmed requests and stale
   await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm-delete-retain-records"])).rejects.toThrow("confirm");
   await expect(value.preview("delete")).rejects.toThrow("unregistered upload");
   expect(value.calls).toEqual([]);
-  await value.command("service-pause", [crypto.randomUUID()]); await value.command("service-resume", [crypto.randomUUID()]);
+  await value.command("show-pause", ["daily", crypto.randomUUID()]); await value.command("show-resume", ["daily", crypto.randomUUID()]);
   await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).rejects.toThrow("HTTP 503");
   value.calls.length = 0;
   expect(await value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).toBe(null);
@@ -78,9 +78,10 @@ test("catalog client accepts bounded pages of escaped Unicode titles above the p
   const value = await fixture();
   for (let index = 0; index < 20; index++) {
     const id = `unicode-${index}`;
-    value.content.registerShow(id, crypto.randomUUID());
-    value.storage.sql.exec("UPDATE publication_shows SET lifecycle = 'published' WHERE show_id = ?", id);
-    value.storage.sql.exec("INSERT INTO publication_show_content VALUES (?, ?, 'jpg')", id, JSON.stringify({ title: "\u0001あ".repeat(100) }));
+    await value.command("create-show", [id, "https://example.com"]);
+    const storage = value.nodes.get(id)!.fixture.storage;
+    storage.sql.exec("UPDATE publication_shows SET lifecycle = 'published' WHERE show_id = ?", id);
+    storage.sql.exec("INSERT INTO publication_show_content VALUES (?, ?, 'jpg')", id, JSON.stringify({ title: "\u0001あ".repeat(100) }));
   }
   const client = new SqliteServiceClient(value.config, administratorKey(value.root), value.transport);
   const page = await client.catalog({ kind: "show", include_deleted: false });

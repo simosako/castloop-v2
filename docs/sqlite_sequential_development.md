@@ -1,4 +1,6 @@
-# SQLite逐次公開方式（v0.6.0）
+# SQLiteのShow単位公開方式（開発版）
+
+2026-10-20、Issue #48の新layout専用ガイド。**配布済みv0.6.2とは非互換・未リリース**であり、以下の操作には本開発版から構築したCLI/Workerが必要。サービス設定に`storage_layout = "show-v1"`を必須とし、旧設定は副作用前に拒否する。既存設定への追記、旧DO/DB/journalの変換・移行・資源採用は行わない。[採用設計](../design/do_show_separation_options.md)参照。
 
 `sqlite-sequential-v1`方式の操作ガイド。v0.6.0ではサービス設定version 2のみを扱い、`init`のflag省略時もSQLiteになる。`--publication-protocol sqlite-sequential-v1`は省略可能な既存指定として維持する。新たなschema選択オプションは設けない。
 既存Queueサービスや旧journalを変換するマイグレーション機能は提供しない。version 1設定は副作用前に拒否し、利用者は対応するv0.5.xのCLI/Workerを保持する。
@@ -13,14 +15,14 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 
 ## 対応範囲
 
-- 1サービスにつき1つのSQLite-backed DO。明示公開をFIFOで一件ずつAlarm実行する。
+- 1サービスにつき所属・共有更新の制御DO、Showごとに独立したSQLite-backed DO。明示公開をShow内FIFOで一件ずつAlarm実行する。異なるShowのIO待機は並行できる。
 - Show登録、Show/Episodeのローカル作成、素材upload、公開、status、pause/resume、fresh init。
 - metadata-onlyは既存音源を再利用。audio-onlyはmetadataのbaseも照合する。
 - GET/HEAD/Range/条件付き応答は既存配信部品を利用し、外側gatewayが毎回DOの最新配信判定を見る。
 - `list-shows`/`list-episodes`はSQLiteの20件ずつの一覧。`--json`、`--include-deleted`、`--cursor`に対応し、R2のmetadata列挙はしない。cursorはruntimeと検索条件へ束縛する。ローカルだけのdraftは含めない。
 - Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
 - レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
-- 同じconfig/SQLite schema/namespaceのcode-only互換更新を`deploy`で扱う。明示pause/drain後に実行し、新versionのprobe後もpausedを維持する。
+- 同じconfig/SQLite schema/namespaceのcode-only更新を`deploy`で扱う。全Showを個別に明示Pause/drainし、固定した対象集合へのprepare/activation/probe後も各Showはpausedを維持する。
 - v0.6.2では[操作記録・再開・取消](sqlite_operation_recovery.md)を提供する。対応WorkerのDO SQLiteに記録し、条件を満たす未公開staging素材だけを明示的に削除できる。旧版v0.6.1以前の機能とは区別する。
 - 新規環境はworkers.devのみ。**物理削除、独自ドメイン、既存移行、公開jobのretry/releaseは未対応**。旧方式へfallbackしない。
 
@@ -48,16 +50,16 @@ REST設定を読んだだけではreadyにしない。完了時はpausedのま�
 ```sh
 cd new-service
 castloop service-status
-castloop service-resume NEW_WINDOW_UUID
 ```
 
-SQLite方式のresume UUIDは**新しい受付window**であり、init UUIDやpauseコマンドのUUIDとは別にする。
-`service-status`のdrainedは受け付けた公開jobについてのsnapshotであり、未登録uploadの不存在や回復権限を示さない。
+全体Pause/Resumeコマンドはない。`service-status`のstate/drainedはShow照会の集約snapshotであり、全体windowはnull。更新ロックや未登録uploadの不存在・回復権限を示さない。ShowごとのResume UUIDは**新しい受付window**であり、init UUIDやPause UUIDとは別にする。
 
 ## Show/Episodeの公開
 
 ```sh
 castloop create-show my-show --site-url https://YOUR_REAL_WEBSITE/
+castloop show-status my-show
+castloop show-resume my-show NEW_WINDOW_UUID
 # Edit my-show/show.toml and place its JPEG/PNG cover file.
 castloop update-show my-show
 castloop publish-show my-show
@@ -71,6 +73,7 @@ castloop publish-episode first
 ```
 
 - `create-*`は公開しない。`update-*`は一意のR2 keyへのuploadとreceipt保存を行い、公開はしない。開発版では送信前にサーバーへ操作と素材を登録し、素材ごとの開始許可・成功応答・検証・下書き登録を記録する。
+- 新Showは独立DOのSQL/Alarm/R2/cache probeをpausedで完了する。`show-pause SHOW PAUSE_UUID`は同Showの新規受付・配信を閉じ、既受付jobは取り消さずdrainする。別Showのblocked/pausedでも健全なShowは個別にResumeでき、新Showも登録できる。
 - MP3上限は300,000,000 bytes。MP3解析・サイズ・全量readback/hash・ETag/versionを確認した素材だけを公開manifestへ登録する。
 - 新規metadata入力にはApple基準の項目別上限を適用する（Show説明4000 UTF-8 bytes、Episode説明10000文字、title/author等255文字、site_urlは2048文字）。HTML tagは除外して測り、文字はUnicode code pointで数える。超過分は切り詰めず、項目名付きで拒否する。保存済みsnapshot/revisionの読取・復元は上限なしで維持する（[入力上限の仕様](../design/show_episode_input_limits.md)）。
 - upload sourceは最終bytesを転送する前にEOFまで確認する。HTTP 200だけでは成功にせず、receiptと全量readback検証を維持する（[Issue #30の調査・修正](../design/archive/cli_upload_source_completion.md)）。
@@ -83,16 +86,17 @@ castloop publish-episode first
 ## 互換Worker更新
 
 ```sh
-castloop service-pause PAUSE_OPERATION_UUID
+castloop show-pause my-show PAUSE_OPERATION_UUID
+# Repeat show-pause for every other Show, each with a fresh UUID.
 castloop service-status
-# Wait until paused, drained and publication_ready are all true.
+# Confirm every Show is paused, drained and ready.
 castloop deploy --operation-id UPDATE_UUID
 castloop service-status
-castloop service-resume NEW_WINDOW_UUID
+castloop show-resume my-show NEW_WINDOW_UUID
 ```
 
 未完了job、blocked、未確認runtime、設定変更、別namespace、古いcontent schemaがある場合は配備へ進まない。
-更新準備をDOへ保存した後は、更新完了までresume・登録・公開・配信を閉じる。新versionでAlarm/R2/cache owner/purgeを再検証し、成功してからreadyにする。
+更新専用手順が制御DOで所属集合を固定し、各Showでpaused/drained確認とResume禁止の保守拘束を原子的に保存する。全Showの準備を確認するまで配備しない。各Showと制御DOで新versionのAlarm/R2/cache owner/purgeを再検証し、全件成功後に保守拘束を解く。各Showはpausedのままで、再開は個別に明示する。部分prepare/activation/probe/解除や応答不明は完了扱いせず、該当要求を再送しない。準備途中の失敗で既に拘束されたShowが残る場合も、自動解放・rollbackはしない。
 R2 payloadの書換えやresource作成は行わない。キューがdrainedでも未登録uploadがないとは判断せず、物理削除の許可に使わない。
 
 unknownな準備/配備/activationを再送しない。配備receiptと正確なsetup完了を読取確認できる場合だけ、次を使える。
@@ -131,7 +135,7 @@ castloop update-service-verify UPDATE_UUID
 castloop publish-rss-import ./reviewed-import
 ```
 
-既存/削除済みShowを採用せず、新しいShowとして順次公開する。元のGUID・permalink属性・公開日時を保持し、音源は新しいサービスへ保存する。
+既存/削除済みShowを採用せず、新しいShowを作成し、そのShowだけを明示的にResumeして順次公開する。`publish-rss-import`はこの新Showの作成・再開・公開を含む操作であり、他Showを再開しない。初期化・再開の開始をjournalへ保存し、未知応答なら再実行せず停止する。元のGUID・permalink属性・公開日時を保持し、音源は新しいサービスへ保存する。
 途中のEpisodeも完了ごとに公開され、全件一括の原子公開ではない。最後にpublic feedのmetadata・件数・identity・内部音源URLを照合する。
 subscriber移行や旧ホスト撤去の完了を意味しない。
 
@@ -174,7 +178,7 @@ castloop service-status
 再試行診断は固定reason・HTTP status・回数・経過時間・対象URLのhashのみで、鍵・URL・本文や任意例外文は出さない。
 
 既に凍結した`publish-*`を再度呼んだ場合も、同じ要求のstatus確認だけを行う。
-`failed`は公開書込前の確定的な入力/base失敗、`blocked`は途中停止・書込不明・purge失敗等であり、後続を停止する。
+`failed`は公開書込前の確定的な入力/base失敗、`blocked`は途中停止・書込不明・purge失敗等であり、同Showの後続と配信を停止する。別Showの通常操作・再開・登録は妨げないが、共有Worker更新はdrainできないため拒否する。
 時間経過やHEAD不在で解除しない。blockedのretry/releaseは提供していない。
 
 初期化では、R2/Worker作成・PUT・配備・公開設定の各要求前にjournalを保存する。
@@ -196,7 +200,7 @@ resource作成・設定PUT・配備・access変更は再送しない。`setup_re
 
 ## 検証の限界
 
-ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを実施した。
+ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の実機配備・性能測定は未実施。以下の過去の実機結果を新layoutの証拠へ流用しない。
 Worker/DO classは実platform型で型検査・browser bundle化し、Linux単体CLIにはSQLite Workerだけを埋め込む。v0.6.0整理後は[新規隔離環境](../design/schema_v1_removal_live_test.md)で短尺3件＋通常音源36件の公開・全音源hash/Range/304・lifecycle・Worker更新後の保持を確認した。保存ログの追加照会では通常Workerの外側/cache HTTP最大3/5msを確認したが、全invocation回収や将来負荷を保証しない。
 **模擬storageのtransaction/AlarmとCloudflare実機のoutput gate・再配送、模擬purgeと実Workers Cache purgeは区別する。**
 小容量・36件公開・正式RSS・互換更新の実機機能確認は通過した。最新継続試験は公開probe 60/60と通常HTTP/cache/DO/Alarmの各区分の数値CPUを取得したが、platform上の全invocation回収の証明ではない。

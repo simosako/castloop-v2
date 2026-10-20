@@ -21,6 +21,7 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
   const environment = { ...process.env, CASTLOOP_TEST_LOOPBACK_ORIGIN: `http://127.0.0.1:${server.port}`,
     CLOUDFLARE_ACCOUNT_ID: setup.config.account_id, CLOUDFLARE_API_TOKEN: "private-token" };
   async function command(args: string[], cwd = setup.root) {
+    if (args[0]?.startsWith("operation-") && !args.includes("--local")) args = [...args, "--show", "daily"];
     const child = Bun.spawn([process.execPath, "--preload", preload, cli, ...args], { cwd, env: environment,
       stdin: "ignore", stdout: "pipe", stderr: "pipe" });
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
@@ -30,11 +31,11 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
   try {
     expect(await command(["init", ".", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
     expect(setup.runtime.health().state).toBe("paused");
-    await command(["service-resume", crypto.randomUUID()]);
     const show = Bun.spawn([process.execPath, "--preload", preload, cli, "create-show", "daily", "--site-url", "https://example.com/podcast"], {
       cwd: setup.root, env: environment, stdout: "pipe", stderr: "pipe" });
     const [showOutput, showError, showCode] = await Promise.all([new Response(show.stdout).text(), new Response(show.stderr).text(), show.exited]);
     expect(showCode, showError).toBe(0); expect(showOutput).toContain("show.toml");
+    await command(["show-resume", "daily", crypto.randomUUID()]);
     const directory = join(setup.root, "daily");
     writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
     await command(["update-show", "daily"]); expect(await command(["publish-show", "daily"])).toMatchObject({ state: "succeeded" });
@@ -65,7 +66,7 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     const cleaned = operationResultSchema.parse(await command(["operation-cleanup", "upload", upload.operation_id, cleanup.plan_sha256, "confirm"]));
     expect(cleaned.operation.state).toBe("succeeded");
     expect(await command(["operation-status", "cleanup", cleaned.operation.operation_id])).toMatchObject({ operation: { state: "succeeded" } });
-    await command(["service-pause", crypto.randomUUID()]);
+    await command(["show-pause", "daily", crypto.randomUUID()]);
     expect(await command(["service-status"])).toMatchObject({ state: "paused", drained: true });
     expect(await command(["deploy", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
     expect(await command(["service-status"])).toMatchObject({ publication_ready: true, state: "paused", runtime_update: { state: "completed" } });

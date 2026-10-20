@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { stringify as stringifyToml } from "@iarna/toml";
 import { parseSqliteServiceConfig, sqliteServiceConfigHash, sqliteServiceConfigSchema, sqliteServiceStatusSchema } from "./sqlite-service";
 
-const config = { schema_version: 2 as const, publication_protocol: "sqlite-sequential-v1" as const,
+const config = { schema_version: 2 as const, storage_layout: "show-v1" as const, publication_protocol: "sqlite-sequential-v1" as const,
   service_id: "service", account_id: "a".repeat(32), bucket_name: "private-bucket", worker_name: "castloop-service",
   public_base_url: "https://podcasts.example.com", workers_dev_base_url: "https://castloop-service.example.workers.dev" };
 

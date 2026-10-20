@@ -28,7 +28,7 @@ export type SqliteCommandOptions = { workerSource?: () => Promise<string>; trans
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "create-show": [2], "create-episode": [1], "update-show": [1], "publish-show": [1],
   "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
-  "service-status": [0], "service-pause": [1], "service-resume": [1], "target-show": [1], "target-episode": [2],
+  "service-status": [0], "show-status": [1], "show-pause": [2], "show-resume": [2], "target-show": [1], "target-episode": [2],
   "list-shows": [0], "list-episodes": [1], "preview-show-lifecycle": [2], "preview-episode-lifecycle": [3],
   "lifecycle-execute": [3], "operation-status": [2], "init-reconcile": [1], "init-continue-verification": [1],
   "update-service": [1], "update-service-verify": [1], "update-service-reconcile": [1],
@@ -36,7 +36,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
 };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
-const controlSchema = z.object({ action: z.enum(["pause", "resume"]), request: sqliteRuntimeRequestSchema, window: z.uuid().optional(),
+const controlSchema = z.object({ action: z.enum(["pause", "resume"]), show_id: z.string(), request: sqliteRuntimeRequestSchema, window: z.uuid().optional(),
   phase: z.enum(["prepared", "requested", "confirmed"]), result: sqliteHealthSchema.optional() }).strict().superRefine((value, context) => {
   if ((value.action === "resume") !== (value.window !== undefined) || (value.phase === "confirmed") !== (value.result !== undefined)) {
     context.addIssue({ code: "custom", message: "Service control phase and evidence differ" });
@@ -52,16 +52,20 @@ async function registeredShow(root: string, config: SqliteServiceConfig, showId:
   try { existing = registrationSchema.parse(journal.read()); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   const configHash = await sqliteServiceConfigHash(config);
   if (existing && (existing.service_config_sha256 !== configHash || existing.show_id !== showId)) throw new Error("Retained Show registration differs");
-  const health = await client.health();
-  if (!health.publication_ready || health.state !== "open" || !health.admission_window_id) throw new Error("Show registration requires ready, open admission");
+  const health = await client.registrationHealth();
+  if (health.scope !== "service" || !health.publication_ready) throw new Error("Show registration requires a ready service outside shared maintenance");
   const reservationId = existing?.reservation_id ?? crypto.randomUUID();
   journal.initialize({ service_config_sha256: configHash, show_id: showId, reservation_id: reservationId, phase: "prepared" });
   return journal.exclusively(async () => {
     const state = registrationSchema.parse(journal.read());
     if (state.reservation_id !== reservationId || state.show_id !== showId || state.service_config_sha256 !== configHash) throw new Error("Show registration changed concurrently");
+    if (state.phase !== "prepared") {
+      const registered = await client.registration(showId);
+      if (registered.state !== "registered" || registered.reservation_id !== reservationId) throw new Error("Show registration remains uncertain; preserve its reservation without replay");
+    }
     if (state.phase === "prepared") journal.replace({ ...state, phase: "requested" });
     const target = state.phase !== "prepared" ? await client.inspect(showId) : await client.register({ service_id: config.service_id, service_config_sha256: configHash,
-      worker_version_id: health.worker_version_id, operation_id: crypto.randomUUID() }, health.admission_window_id!, showId, reservationId);
+      worker_version_id: health.worker_version_id, operation_id: crypto.randomUUID() }, showId, reservationId);
     if (state.reservation_id !== target.reservation_id || target.show_lifecycle !== "draft" || target.expected_show_state_version !== 0) {
       throw new Error("Registration is unknown or the Show has advanced/deleted; never recreate it or resend its request");
     }
@@ -95,30 +99,31 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (command === "update-service-verify" && args.length === 1 && options.workerSource) return continueSqliteServiceUpdateVerification(root, config, args[0], await options.workerSource(), cf);
   if (command === "update-service-reconcile" && args.length === 1) return reconcileSqliteServiceUpdate(root, config, args[0], cf);
   if (command === "service-status" && !args.length) return client.health();
+  if (command === "show-status" && args.length === 1) return client.health(validateId(args[0], "show"));
   if (command === "list-shows" && !args.length || command === "list-episodes" && args.length === 1) {
     return client.catalog({ kind: command === "list-shows" ? "show" : "episode", ...(command === "list-episodes" ? { show_id: validateId(args[0], "show") } : {}),
       include_deleted: options.listOptions?.includeDeleted ?? false, ...(options.listOptions?.cursor ? { cursor: options.listOptions.cursor } : {}) });
   }
-  if (["service-pause", "service-resume"].includes(command) && args.length === 1) {
-    const id = z.uuid().parse(args[0]), action = command === "service-pause" ? "pause" : "resume";
+  if (["show-pause", "show-resume"].includes(command) && args.length === 2) {
+    const showId = validateId(args[0], "show"), id = z.uuid().parse(args[1]), action = command === "show-pause" ? "pause" : "resume";
     const journal = createLocalJournalStorage(root, "sqlite-controls", config.service_id, `${id}.json`);
     let prior: z.infer<typeof controlSchema> | null = null;
     try { prior = controlSchema.parse(journal.read()); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
     if (prior) {
-      if (prior.action !== action || prior.request.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error("Retained service control differs");
+      if (prior.action !== action || prior.show_id !== showId || prior.request.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error("Retained Show control differs");
       if (prior.phase === "requested") throw new Error("Service control outcome is unknown; inspect service-status without replaying it");
-      if (prior.phase === "confirmed") return client.health();
+      if (prior.phase === "confirmed") return client.health(showId);
     }
-    const health = await client.health();
+    const health = await client.health(showId);
     const request = sqliteRuntimeRequestSchema.parse({ service_id: config.service_id, service_config_sha256: health.service_config_sha256,
       worker_version_id: health.worker_version_id, operation_id: id });
-    journal.initialize({ action, request, ...(action === "resume" ? { window: id } : {}), phase: "prepared" });
+    journal.initialize({ action, show_id: showId, request, ...(action === "resume" ? { window: id } : {}), phase: "prepared" });
     return journal.exclusively(async () => {
       const state = controlSchema.parse(journal.read());
-      if (state.phase === "confirmed") return client.health();
+      if (state.phase === "confirmed") return client.health(showId);
       if (state.phase !== "prepared" || state.action !== action || JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("Service control is uncertain or changed; do not replay it");
       journal.replace({ ...state, phase: "requested" });
-      const result = await client.control(action, request, state.window); journal.replace({ ...state, phase: "confirmed", result }); return result;
+      const result = await client.control(action, request, state.window, showId); journal.replace({ ...state, phase: "confirmed", result }); return result;
     });
   }
   if (command === "create-show" && args.length === 2) return registeredShow(root, config, validateId(args[0], "show"), args[1], client);

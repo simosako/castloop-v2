@@ -12,7 +12,7 @@ import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucke
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 async function fixture() {
-  const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service", account_id: "a".repeat(32),
+  const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service", account_id: "a".repeat(32),
     bucket_name: "test-bucket", worker_name: "test-worker", public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
   const value = sqlitePublicationFixture({ resume: false, runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
   cleanups.push(value.close);
@@ -90,7 +90,7 @@ test("authenticated service commands bind exact runtime and explicit resume wind
   expect((await value.call("resume", { ...value.request, worker_version_id: crypto.randomUUID(), admission_window_id: crypto.randomUUID() })).status).toBe(409);
   const window = crypto.randomUUID();
   expect((await value.call("resume", { ...value.request, admission_window_id: window })).status).toBe(200);
-  const registration = { ...value.request, admission_window_id: window, show_id: "daily", reservation_id: crypto.randomUUID() };
+  const registration = { ...value.request, show_id: "daily", reservation_id: crypto.randomUUID() };
   expect((await value.call("register-show", registration)).status).toBe(200);
   expect(await value.runtime.inspect("daily")).toMatchObject({ show_lifecycle: "draft", expected_show_state_version: 0, reservation_id: registration.reservation_id });
   expect((await value.call("register-show", { ...registration, reservation_id: crypto.randomUUID() })).status).toBe(409);

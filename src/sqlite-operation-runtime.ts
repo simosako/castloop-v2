@@ -3,9 +3,9 @@ import type { PublicationQueueStorage, SqlitePublicationQueue } from "./sqlite-p
 import type { SqlitePublicationContent } from "./sqlite-publication-content";
 
 export function createSqliteOperationRecords(storage: PublicationQueueStorage, queue: SqlitePublicationQueue,
-  content: SqlitePublicationContent, ready: () => boolean) {
+  content: SqlitePublicationContent, ready: () => boolean, showId?: string) {
   const records = new SqliteOperationRecords(storage, () => queue.identity(), (operation) => {
-    if (!ready()) return false;
+    if (!ready() || showId !== undefined && operation.show_id !== showId) return false;
     const service = queue.snapshot();
     if (service.state !== "open" || operation.admission_window_id && operation.admission_window_id !== service.admission_window_id) return false;
     const target = content.inspect(operation.show_id, operation.episode_id ?? undefined);

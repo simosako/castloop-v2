@@ -23,7 +23,7 @@ const metadata = (episodeId: string) => ({ schema_version: 1 as const, episode_i
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 async function fixture() {
-  const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service",
+  const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
     account_id: "a".repeat(32), bucket_name: "test-bucket", worker_name: "test-worker", public_base_url: "https://public.example.com",
     workers_dev_base_url: "https://test-worker.example.workers.dev" };
   const setup = sqlitePublicationFixture({ runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(),

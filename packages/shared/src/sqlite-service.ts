@@ -11,6 +11,7 @@ const origin = z.url().refine((value) => {
 }, "Expected an HTTPS origin without credentials, path, query or port").transform((value) => new URL(value).origin);
 
 export const sqliteServiceConfigSchema = z.object({ schema_version: z.literal(2),
+  storage_layout: z.literal("show-v1"),
   publication_protocol: z.literal(sqlitePublicationProtocol), service_id: sqlitePublicationRuntimeSchema.shape.service_id,
   account_id: z.string().regex(/^[a-f0-9]{32}$/i), bucket_name: resourceName, worker_name: resourceName,
   public_base_url: origin, workers_dev_base_url: origin,
@@ -23,6 +24,7 @@ export const sqliteServiceConfigSchema = z.object({ schema_version: z.literal(2)
 });
 
 export const sqliteServiceStatusSchema = sqlitePublicationRuntimeSchema.extend({
+  show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   protocol: z.literal(sqlitePublicationProtocol), state: z.enum(["open", "paused"]),
   admission_window_id: z.uuid().nullable(), publication_ready: z.literal(true),
 }).strict().superRefine((value, context) => {

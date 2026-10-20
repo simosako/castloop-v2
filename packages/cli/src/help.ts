@@ -7,13 +7,13 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "--publication-protocol sqlite-sequential-v1 remains optional for existing scripts; no other protocol is supported.\n" +
       "Missing values are prompted on a terminal. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
       "Creates a private R2 bucket, Worker and SQLite-backed Durable Object without Queues.\n" +
-      "Verifies Alarm/R2/cache/purge readiness and finishes paused; resume with a NEW admission-window UUID.\n" +
+      "Verifies Alarm/R2/cache/purge readiness. New Shows start paused; use show-resume SHOW NEW_WINDOW_UUID.\n" +
       "Existing resources are never adopted. Service schema_version=1 requires v0.5.x; migration is not provided.",
   },
   "create-show": {
     usage: "create-show ID [--site-url URL]",
     description: "Run from the service workspace. Reserve a Show ID and create its local show.toml.\n" +
-      "A real website URL is required (prompted if omitted). This does not publish the Show.",
+      "A real website URL is required (prompted if omitted). Creates a paused Show DO; explicitly show-resume before uploads. Does not publish.",
   },
   "create-episode": {
     usage: "create-episode ID",
@@ -54,7 +54,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   deploy: {
     usage: "deploy [--operation-id UUID]",
     description: "Run from the service workspace. Perform a code-only update of the same config/schema/namespace.\n" +
-      "Explicitly pause and drain first. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
+      "Explicitly pause and drain every Show first. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
       "Probes the new runtime and finishes paused. Never adopts resources, converts data or replays an unknown deployment.",
   },
   "init-reconcile": {
@@ -81,17 +81,21 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "service-status": {
     usage: "service-status",
-    description: "Read service state, runtime/readiness, admission window and FIFO active/queued/drained status.\n" +
-      "Paused does not necessarily mean drained; an empty FIFO does not prove unregistered uploads settled.",
+    description: "Read service runtime and aggregated Show readiness/paused/queued/drained status. No service-wide Pause or admission window exists.\n" +
+      "The aggregate is not an atomic snapshot or an update lock; an empty FIFO does not prove unregistered uploads settled.",
   },
-  "service-pause": {
-    usage: "service-pause PAUSE_UUID",
-    description: "Explicitly pause delivery and new admission. Already accepted jobs can drain; blocked jobs stay preserved.",
+  "show-status": {
+    usage: "show-status SHOW_ID",
+    description: "Read this Show's runtime, Pause state, admission window and FIFO without consulting other Shows.",
   },
-  "service-resume": {
-    usage: "service-resume UUID",
-    description: "Resume the verified paused service with a NEW admission-window UUID, not the init/pause UUID.\n" +
-      "Does not release unknown IO, blocked jobs or retained locks.",
+  "show-pause": {
+    usage: "show-pause SHOW_ID PAUSE_UUID",
+    description: "Pause this Show's delivery and new admission. Already accepted jobs drain; other Shows are unaffected.",
+  },
+  "show-resume": {
+    usage: "show-resume SHOW_ID NEW_WINDOW_UUID",
+    description: "Resume this verified, drained Show with a NEW admission window outside shared maintenance.\n" +
+      "Other Shows' blocked jobs do not prevent this. Never releases unknown IO or blocked jobs.",
   },
   "target-show": {
     usage: "target-show SHOW_ID",
@@ -129,27 +133,27 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Queued is not completed; use job-status or operation-status lifecycle JOB until succeeded.",
   },
   "operation-status": {
-    usage: "operation-status upload|rss-import|publication|draft|show-registration|lifecycle|cleanup ID [--local|--remote] [--after-version N] [--request-cursor UUID]",
+    usage: "operation-status upload|rss-import|publication|draft|show-registration|lifecycle|cleanup ID [--show SHOW_ID] [--local|--remote] [--after-version N] [--request-cursor UUID]",
     description: "Read operation, client, request and checkpoint records without changing journals or locks. Remote is the default.",
   },
   "operation-list": {
-    usage: "operation-list [--incomplete] [--local|--remote] [--cursor UUID] [--parent UUID]",
+    usage: "operation-list [--show SHOW_ID] [--incomplete] [--local|--remote] [--cursor UUID] [--parent UUID]",
     description: "List operations and server SQLite capacity. Remote pages contain up to 20 entries; follow next_cursor.",
   },
   "operation-resume": {
-    usage: "operation-resume upload ID",
+    usage: "operation-resume upload ID --show SHOW_ID",
     description: "Resume an unchanged upload from a durable successful PUT receipt, verification or draft attachment. Unknown PUTs are retained.",
   },
   "operation-cancel": {
-    usage: "operation-cancel upload|rss-import ID",
+    usage: "operation-cancel upload|rss-import ID --show SHOW_ID",
     description: "Cancel a settled, unused operation. Files remain stored; preview cleanup separately.",
   },
   "operation-cleanup-preview": {
-    usage: "operation-cleanup-preview upload ID",
+    usage: "operation-cleanup-preview upload ID --show SHOW_ID",
     description: "Preview eligible staging files from a cancelled operation and their confirmation hash. Read-only.",
   },
   "operation-cleanup": {
-    usage: "operation-cleanup upload ID PLAN_SHA256 confirm",
+    usage: "operation-cleanup upload ID PLAN_SHA256 confirm --show SHOW_ID",
     description: "Delete only the reviewed, settled, unused staging objects. Retain receipts and uncertain deletion results for inspection.",
   },
   "import-rss": {
@@ -162,7 +166,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "publish-rss-import": {
     usage: "publish-rss-import DIRECTORY",
     description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
-      "Requires an open, ready SQLite service, administrator key and Cloudflare credentials; no Queues permissions.\n" +
+      "Requires a ready SQLite service, administrator key and Cloudflare credentials; creates and explicitly opens only the new Show.\n" +
       "Validates inputs, preserves GUIDs/dates, then publishes the Show and Episodes sequentially. Not an atomic batch.\n" +
       "Re-running observes acknowledged pending jobs and continues without republishing completed inputs.\n" +
       "Unknown mutations stay blocked. Does not adopt existing Shows, convert services or remove the old host.",

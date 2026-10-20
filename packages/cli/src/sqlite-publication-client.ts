@@ -18,10 +18,12 @@ export class SqlitePublicationClient {
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid SQLite management credentials or timeout");
   }
 
-  private async call(path: string, input?: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}, trace?: OperationClient): Promise<unknown | null> {
+  private async call(path: string, input?: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}, trace?: OperationClient, showId = input?.show_id): Promise<unknown | null> {
+    const scope: Record<string, string> = showId ? { "X-Castloop-Show-Id": showId } : {};
     if (!input) {
       return readSqliteManagementGet(new URL(`/admin/sqlite-publication/${path}`, this.config.workers_dev_base_url), {
         "X-Castloop-Key": this.administratorKey, Accept: "application/json",
+        ...scope,
         ...(path.startsWith("jobs/") ? { "X-Castloop-Status-Request": path.slice(5) } : {}),
       }, { ...this.readOptions, ...budget, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: MAX_SQLITE_PUBLICATION_BYTES, allowMissing: path.startsWith("jobs/") });
     }
@@ -30,6 +32,7 @@ export class SqlitePublicationClient {
       response = await this.transport(new URL(`/admin/sqlite-publication/${path}`, this.config.workers_dev_base_url), {
         method: input ? "POST" : "GET", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(this.timeoutMs),
         headers: { "X-Castloop-Key": this.administratorKey, "Accept": "application/json",
+          ...scope,
           ...(input ? { "Content-Type": "application/json" } : {}),
           ...(trace ? { "X-Castloop-Client-Id": trace.client_id, "X-Castloop-Cli-Version": trace.cli_version } : {}) }, ...(input ? { body: JSON.stringify(input) } : {}),
       });
@@ -42,10 +45,11 @@ export class SqlitePublicationClient {
     catch { throw new Error("SQLite management response body was not verified; preserve the request without automatic retry"); }
   }
 
-  async describe(): Promise<SqliteServiceStatus> {
-    const parsed = sqliteServiceStatusSchema.safeParse(await this.call("status"));
+  async describe(showId?: string): Promise<SqliteServiceStatus> {
+    const parsed = sqliteServiceStatusSchema.safeParse(await this.call("status", undefined, {}, undefined, showId));
     if (!parsed.success) throw new Error("SQLite management capability was not verified");
     const status = parsed.data;
+    if (showId && status.show_id !== showId) throw new Error("Publication capability target differs");
     if (status.service_id !== this.config.service_id || status.service_config_sha256 !== await sqliteServiceConfigHash(this.config)) {
       throw new Error("SQLite management runtime belongs to another service configuration");
     }
@@ -76,7 +80,7 @@ export class SqlitePublicationClient {
 
   async observe(input: SqlitePublicationRequest, budget: SqliteManagementReadBudget = {}): Promise<SqlitePublicationStatus | null> {
     const request = await this.requireRequest(input);
-    const value = await this.call(`jobs/${request.request_id}`, undefined, budget);
+    const value = await this.call(`jobs/${request.request_id}`, undefined, budget, undefined, request.show_id);
     return value === null ? null : this.result(value, request);
   }
 }

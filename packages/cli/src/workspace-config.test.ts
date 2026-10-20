@@ -11,7 +11,7 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 const queueConfig = { schema_version: 1 as const, service_id: "service", account_id: "a".repeat(32),
   bucket_name: "private-bucket", worker_name: "test-worker", queue_name: "test-queue", dlq_name: "test-dlq",
   public_base_url: "https://test-worker.example.workers.dev" };
-const sqliteConfig = { schema_version: 2 as const, publication_protocol: "sqlite-sequential-v1" as const,
+const sqliteConfig = { schema_version: 2 as const, storage_layout: "show-v1" as const, publication_protocol: "sqlite-sequential-v1" as const,
   service_id: queueConfig.service_id, account_id: queueConfig.account_id, bucket_name: queueConfig.bucket_name,
   worker_name: queueConfig.worker_name, public_base_url: queueConfig.public_base_url,
   workers_dev_base_url: queueConfig.public_base_url };
@@ -58,7 +58,7 @@ test("workspace config refuses symbolic links without following or modifying the
 
 test("formal CLI rejects old service settings before network, build or local state changes", () => {
   const allCommands = [["init"], ["init", "--publication-protocol", "sqlite-sequential-v1"], ["init", "--service-id", "different"],
-    ["service-status"], ["service-pause", crypto.randomUUID()], ["service-resume", crypto.randomUUID()],
+    ["service-status"], ["show-pause", "daily", crypto.randomUUID()], ["show-resume", "daily", crypto.randomUUID()],
     ["deploy"], ["create-show", "daily", "--site-url", "https://example.com"], ["update-show", "daily"], ["publish-show", "daily"],
     ["list-shows"], ["target-show", "daily"], ["job-status", crypto.randomUUID()], ["publish-rss-import", "missing-import"]];
   const entrypointCommands = [["init"], ["service-status"], ["publish-rss-import", "missing-import"]];
@@ -97,6 +97,23 @@ test("workspace config enforces the byte budget before parsing otherwise valid T
     writeFileSync(setup.file, bytes);
     await expect(loadWorkspaceConfig(setup.root)).rejects.toThrow("Cannot read castloop.toml");
     expect(readFileSync(setup.file)).toEqual(bytes);
+  }
+});
+
+test("legacy SQLite layouts fail before network, bundle building or local journal creation", () => {
+  const { storage_layout, ...legacy } = sqliteConfig;
+  const setup = fixture(stringifyToml(legacy));
+  const preload = join(setup.root, "deny-layout-io.ts");
+  writeFileSync(preload, `globalThis.fetch = async () => { throw new Error("UNEXPECTED_IO"); };
+Bun.build = async () => { throw new Error("UNEXPECTED_BUILD"); };`);
+  const before = readdirSync(setup.root).sort(), source = readFileSync(setup.file);
+  for (const args of [["init"], ["service-status"], ["show-pause", "daily", crypto.randomUUID()], ["deploy"]]) {
+    const result = Bun.spawnSync([process.execPath, "--preload", preload, join(import.meta.dir, "index.ts"), ...args], { cwd: setup.root, timeout: 5000 });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain("Legacy service layouts cannot be updated or migrated");
+    expect(result.stderr.toString()).not.toContain("UNEXPECTED_");
+    expect(readdirSync(setup.root).sort()).toEqual(before);
+    expect(readFileSync(setup.file)).toEqual(source);
   }
 });
 

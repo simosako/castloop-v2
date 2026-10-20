@@ -1,5 +1,9 @@
 # SQLite Worker更新の検証続行
 
+> 2026-10-20: Issue #48の新layoutでは[Show分離契約](do_show_separation_options.md)の共有更新手順を適用する。全体Pauseはなく、各ShowのPause/drain・原子的なprepare/Resume拘束と所属集合固定を行う。全Showと制御DOのprobe成功・保守拘束解除を確認するまで全体完了を返さない。Show別prepare/activation/解除の送信開始と結果を制御DOへ永続記録し、未知応答を再送しない。旧layoutやそのjournalへの互換導入・変換は対象外。以下のPUT checkpoint・正確なruntime照合・非再送の安全条件を新layoutでも維持する。
+
+新layoutの配備後GETは制御DOだけでなく、固定した全Showのnative version/prepared/保守拘束も照合する。`targets_native_ready=false`なら、制御DOが新versionでもactivationを始めない。有限観測で停止後は、同じ既知配備のverifyで読取から続行し、全対象を確認した後だけ初回activationを行う。
+
 Issue [#11](https://github.com/simosako/castloop-v2/issues/11)の最新コメントと、
 [#33の棚卸し](https://github.com/simosako/castloop-v2/issues/33)で確認した現行SQLite経路を対象とするv0.5.2の修正。
 元のQueue/R2障害のGET timeout原因を確定・再現したという意味ではない。

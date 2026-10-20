@@ -34,7 +34,7 @@ test("SQLite status retries cannot start after the publication waiting deadline"
 
 async function fixture(kind: "show" | "episode" = "episode", updating = false) {
   const root = mkdtempSync("/tmp/opencode/castloop-sqlite-cli-");
-  const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service",
+  const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
     account_id: "a".repeat(32), bucket_name: "private-bucket", worker_name: "castloop-service",
     public_base_url: "https://podcasts.example.com", workers_dev_base_url: "https://castloop-service.example.workers.dev" };
   const setup = sqlitePublicationFixture({ runtime: { service_id: config.service_id,
@@ -113,7 +113,7 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
     }
     if (path.endsWith("/status")) {
       const snapshot = setup.queue.snapshot();
-      response = json({ ...setup.runtime, protocol: "sqlite-sequential-v1", state: snapshot.state,
+      response = json({ ...setup.runtime, protocol: "sqlite-sequential-v1", show_id: target.show_id, state: snapshot.state,
         admission_window_id: snapshot.admission_window_id, publication_ready: true });
     } else if (request.method === "POST") {
       await faults.beforeSubmit?.();

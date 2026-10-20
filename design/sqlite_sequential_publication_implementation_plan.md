@@ -1,5 +1,7 @@
 # DO SQLite逐次キューによる公開処理の実装計画
 
+> 2026-10-20追補: Issue #48の開発版では[Show分離の採用契約](do_show_separation_options.md)を優先する。1サービス1 DO/全体FIFO/全体Pauseは廃止し、ShowごとのDO/FIFO/Pause/windowと、所属・共有更新の制御DOへ分ける。以下の一件ずつ実行・未知IO保全・purge-before-completion・原子的な受付/完了の安全条件はShow内で維持する。旧layoutは維持・移行せず、必須`storage_layout="show-v1"`で配備前に拒否する。
+
 > 適用版: 本書の基礎契約は現行SQLiteでも維持する。実装順序・進捗欄はv0.5.0導入時の履歴であり、旧方式併存・明示flag必須・二Worker同梱の記述は当時のもの。v0.6.0向け開発ではSQLite既定・単独Workerとし、旧サービス設定version 1からの移行機能は提供しない。[現行設計](initial_design.md)と[削除計画](schema_v1_removal_plan.md)を優先する。
 
 2026-10-16。管理者と合意した簡素化案を実装の基準とする。

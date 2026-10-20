@@ -35,7 +35,7 @@ export class PublicationQueueConflict extends Error {
 export class SqlitePublicationQueue {
   operationRecords?: SqliteOperationRecords;
   constructor(private readonly storage: PublicationQueueStorage, private runtime: SqlitePublicationRuntime,
-    private readonly now: () => number = Date.now) {
+    private readonly now: () => number = Date.now, private readonly scope?: { showId: string; ready: () => boolean }) {
     this.runtime = sqlitePublicationRuntimeSchema.parse(runtime);
     storage.transactionSync(() => {
       storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_queue_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");
@@ -103,6 +103,7 @@ export class SqlitePublicationQueue {
     const hash = await sqlitePublicationRequestHash(request);
     return this.storage.transaction(async () => {
       const service = this.requireRuntime();
+      if (this.scope && (request.show_id !== this.scope.showId || !this.scope.ready())) throw new Error("Show publication scope is unavailable");
       if (request.service_id !== service.service_id) throw new Error("Publication belongs to another service");
       const existing = this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE request_id = ? OR job_id = ?",
         request.request_id, request.job_id).toArray();
@@ -158,6 +159,7 @@ export class SqlitePublicationQueue {
   resume(windowId: string): PublicationQueueSnapshot {
     sqlitePublicationRequestSchema.shape.admission_window_id.parse(windowId);
     return this.storage.transactionSync(() => {
+      if (this.scope && !this.scope.ready()) throw new Error("Show resume requires its verified runtime outside maintenance");
       const current = this.snapshot();
       if (current.state === "open" && current.admission_window_id === windowId) return current;
       if (current.state !== "paused" || !current.drained || current.admission_window_id === windowId) {

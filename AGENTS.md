@@ -9,12 +9,13 @@
 ## Read documentation by task
 - Use [design/README.md](design/README.md) to locate relevant documents; do not read all design docs or historical records on every task.
 - Current architecture: [design/initial_design.md](design/initial_design.md). Usage: [README.md](README.md).
-- v0.6.0 development supports only SQLite service configs (`schema_version=2`, `sqlite-sequential-v1`); `init` uses this by default. Reject service schema version 1 before IO or local state changes. Queue/R2 remains on v0.5.x only; never add migration, resource adoption or fallback. Shared content/request schema version 1 is independent and remains supported.
+- Development supports only fresh SQLite service configs (`schema_version=2`, `sqlite-sequential-v1`, required `storage_layout="show-v1"`); `init` uses this by default. Reject service schema version 1 and legacy layouts before IO or local state changes. Never add migration, legacy layout support, resource adoption or fallback. Shared content/request schema version 1 is independent and remains supported.
 - The production Worker entrypoint is `src/sqlite-worker.ts`; embed only that Worker. Preserve existing DO/cache class names, bindings, compatibility date and persisted SQLite formats during code-only cleanup.
 
 | When working on | Read the relevant contract |
 | --- | --- |
 | SQLite publication, lifecycle or updates | [SQLite guide](docs/sqlite_sequential_development.md), [implementation plan](design/sqlite_sequential_publication_implementation_plan.md) |
+| Show isolation, Pause/Resume or shared Worker maintenance | [Show separation contract](design/do_show_separation_options.md). Keep ordinary admission and delivery local to a Show; shared update membership and partial outcomes belong to the control DO |
 | Worker update continuation | [SQLite recovery contract](design/sqlite_worker_update_recovery.md) |
 | Removed Queue code or v0.5.x history | [Removal plan](design/schema_v1_removal_plan.md), [v0.5.x Queue guide](docs/queue_service.md), [archived architecture](design/archive/initial_design_v052.md) |
 | Upload integrity or interrupted IO | [Single PUT and unresolved assumption U1](design/m6_upload_recovery_options.md) |

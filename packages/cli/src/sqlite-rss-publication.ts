@@ -30,7 +30,8 @@ export const sqliteRssStateSchema = z.object({ schema_version: z.literal(2).opti
   import_id: z.uuid(), source_directory: z.string().max(4096), input_sha256: hash, step: z.number().int().nonnegative(),
   phase: z.enum(["ready", "command_requested", "completed"]), created_show_sha256: hash.optional(), publication_job_id: z.uuid().optional(),
   registration: operationCommandSchema.optional(), root_registered: z.boolean().optional(), pending: operationCommandSchema.optional(),
-  step_registration: operationCommandSchema.optional(), upload_operation_id: z.uuid().optional() }).strict();
+  step_registration: operationCommandSchema.optional(), upload_operation_id: z.uuid().optional(),
+  bootstrap_state: z.enum(["prepared", "create_requested", "created", "resume_requested", "opened"]).optional(), bootstrap_window: z.uuid().optional() }).strict();
 const stateSchema = sqliteRssStateSchema;
 type RssCommandContext = Pick<SqliteCommandOptions, "parentOperationId" | "importId" | "onUploadPrepared">;
 export type SqliteRssEffects = { command: (name: string, args: string[], context?: RssCommandContext) => Promise<unknown>; readFeed: (url: string) => Promise<string> };
@@ -49,8 +50,9 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
   options: SqliteCommandOptions = {}, effects = createSqliteRssEffects(root, config, options)): Promise<SqliteRssResult> {
   config = sqliteServiceConfigSchema.parse(config);
   const prepared = await prepareRssImportPublication(resolve(root, output)), key = administratorKey(root);
-  const client = new SqliteServiceClient(config, key, options.transport), health = await client.health();
-  if (!health.publication_ready || health.state !== "open") throw new Error("SQLite RSS publication requires a ready, open service");
+  const client = new SqliteServiceClient(config, key, options.transport);
+  let health = await client.registrationHealth();
+  if (!health.publication_ready) throw new Error("SQLite RSS publication requires a ready service outside shared maintenance");
   const showId = prepared.show.show_id, directory = join(root, showId);
   const registration = operationCommandSchema.parse({ schema_version: 1, service_id: config.service_id,
     worker_version_id: health.worker_version_id, service_config_sha256: health.service_config_sha256,
@@ -60,16 +62,13 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
     operation: { operation_id: prepared.importId,
       import_id: prepared.importId, kind: "rss_import", target_kind: "show", show_id: showId,
       worker_version_id: health.worker_version_id, service_config_sha256: health.service_config_sha256,
-      admission_window_id: health.admission_window_id, input_sha256: prepared.inputSha256 } });
+      input_sha256: prepared.inputSha256 } });
   const initial = stateSchema.parse({ schema_version: 2, protocol: "sqlite-sequential-v1", service_id: config.service_id, registration,
     service_config_sha256: await sqliteServiceConfigHash(config), import_id: prepared.importId, source_directory: prepared.root,
-    input_sha256: prepared.inputSha256, step: 0, phase: "ready" });
+    input_sha256: prepared.inputSha256, step: 0, phase: "ready", bootstrap_state: "prepared", bootstrap_window: crypto.randomUUID() });
   const journal = createLocalJournalStorage(root, "sqlite-rss-imports", config.service_id, `${prepared.importId}.json`);
   if (!present(journal.path)) {
-    const capacity = (await new SqliteOperationClient(config, key, options.transport).list()).capacity;
-    if (capacity.warning === "critical" && (capacity.database_bytes ?? 0) + registration.estimated_operations! * 20000 +
-      registration.estimated_content_bytes! + 10_000_000 > capacity.planning_limit_bytes) throw new Error("Insufficient operation record capacity for this import");
-    if (present(directory) || (await client.inspect(showId)).show_lifecycle !== "missing") throw new Error("SQLite RSS import requires a new Show; never adopt existing local, published or deleted identities");
+    if (present(directory) || (await client.registration(showId)).state !== "missing") throw new Error("SQLite RSS import requires a new Show; never adopt existing local, published or deleted identities");
     journal.initialize(initial);
   }
   return journal.exclusively(async () => {
@@ -78,7 +77,30 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       if (state[field] !== initial[field]) throw new Error("SQLite RSS import inputs changed; preserve its frozen operation");
     }
     const save = () => journal.replace(stateSchema.parse(state));
-    const operations = new SqliteOperationClient(config, key, options.transport), tracked = state.schema_version === 2;
+    if (state.bootstrap_state === "create_requested" || state.bootstrap_state === "resume_requested") throw new Error("RSS Show initialization outcome is unknown; inspect without replaying it");
+    if (state.bootstrap_state === "prepared") {
+      state = { ...state, bootstrap_state: "create_requested" }; save();
+      await effects.command("create-show", [showId, prepared.show.site_url]);
+      state = { ...state, bootstrap_state: "created", created_show_sha256: digest(await readLocalMetadata(join(directory, "show.toml"))) }; save();
+    }
+    if (state.bootstrap_state === "created") {
+      state = { ...state, bootstrap_state: "resume_requested" }; save();
+      await effects.command("show-resume", [showId, state.bootstrap_window!]);
+      state = { ...state, bootstrap_state: "opened" }; save();
+    }
+    health = await client.health(showId);
+    if (!health.publication_ready || health.state !== "open" || !health.admission_window_id) throw new Error("RSS target Show is not ready and open");
+    if (!state.root_registered && !state.pending && state.registration) {
+      if (state.registration.worker_version_id !== health.worker_version_id) throw new Error("RSS prepared runtime changed");
+      state = { ...state, registration: operationCommandSchema.parse({ ...state.registration,
+        operation: { ...state.registration.operation!, admission_window_id: health.admission_window_id } }) }; save();
+    }
+    const operations = new SqliteOperationClient(config, key, options.transport, showId), tracked = state.schema_version === 2;
+    if (!state.root_registered) {
+      const capacity = (await operations.list()).capacity;
+      if (capacity.warning === "critical" && (capacity.database_bytes ?? 0) + registration.estimated_operations! * 20000 +
+        registration.estimated_content_bytes! + 10_000_000 > capacity.planning_limit_bytes) throw new Error("Insufficient operation record capacity for this import");
+    }
     const send = async (command: OperationCommand) => {
       state = { ...state, pending: command }; save();
       const result = await operations.send(root, command);
@@ -107,8 +129,7 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       onUploadPrepared: (id) => { state = { ...state, upload_operation_id: id }; save(); } } : {};
     const actions: Array<() => Promise<void>> = [];
     actions.push(async () => {
-      await effects.command("create-show", [showId, prepared.show.site_url], context);
-      state = { ...state, created_show_sha256: digest(await readLocalMetadata(join(directory, "show.toml"))) };
+      if (!state.created_show_sha256 || digest(await readLocalMetadata(join(directory, "show.toml"))) !== state.created_show_sha256) throw new Error("Created Show draft differs");
     });
     actions.push(async () => {
       if (digest(await readLocalMetadata(join(directory, "show.toml"))) !== state.created_show_sha256) throw new Error("Created Show draft changed before RSS installation");

@@ -69,7 +69,7 @@ async function init(target: string, flags: Record<string, string>): Promise<unkn
     const worker = `castloop-${id}-${randomBytes(4).toString("hex")}`;
     const subdomain = await ask(flags["workers-subdomain"], "workers-subdomain", "workers.dev subdomain");
     const origin = `https://${worker}.${subdomain}.workers.dev`;
-    const config = sqliteServiceConfigSchema.parse({ schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: id,
+    const config = sqliteServiceConfigSchema.parse({ schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: id,
       account_id: await ask(flags["account-id"] ?? process.env.CLOUDFLARE_ACCOUNT_ID, "account-id", "Cloudflare account ID"),
       bucket_name: await ask(flags["bucket-name"], "bucket-name", "Private R2 bucket name"), worker_name: worker,
       public_base_url: origin, workers_dev_base_url: origin });
@@ -125,8 +125,10 @@ async function main(): Promise<unknown> {
   } else if (listing) {
     allowedFlags(flags, ["json", "include-deleted", "cursor"]);
   } else if (operationRead) {
-    allowedFlags(flags, command === "operation-list" ? ["local", "remote", "incomplete", "cursor", "parent", "json"] : ["local", "remote", "after-version", "request-cursor", "json"]);
+    allowedFlags(flags, command === "operation-list" ? ["show", "local", "remote", "incomplete", "cursor", "parent", "json"] : ["show", "local", "remote", "after-version", "request-cursor", "json"]);
     if (flags.local && flags.remote) throw new Error("Choose --local or --remote");
+  } else if (command.startsWith("operation-")) {
+    allowedFlags(flags, ["show"]);
   } else {
     allowedFlags(flags, []);
   }
@@ -141,7 +143,7 @@ async function main(): Promise<unknown> {
   const workspace = await loadWorkspaceConfig(root);
   const { runSqliteCommand } = await import("./sqlite-commands");
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
-    ...(operationRead ? { operationOptions: { local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
+    ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
   if (listing && !flags.json) {

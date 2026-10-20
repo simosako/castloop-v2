@@ -17,7 +17,6 @@ async function fixture(count = 2) {
   const value = await sqliteServiceFixture(); values.push(value);
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, { attempts: 2, delay: async () => {} });
   const options = { transport: value.transport, cloudflare: value.options };
-  await runSqliteCommand(value.root, value.config, "service-resume", [crypto.randomUUID()], options);
   const item = RSS_IMPORT_SOURCE.match(/<item>[\s\S]*?<\/item>/)![0];
   const items = Array.from({ length: count }, (_, index) => item.replace("old:123", index === 1 ? "https://old.example/second" : `old:${index}`)
     .replace('isPermaLink="false"', `isPermaLink="${index === 1}"`).replace("First", `Episode ${index}`));
@@ -30,7 +29,7 @@ async function fixture(count = 2) {
     async readFeed() { return value.text("public/podcasts/imported/feed.xml"); } };
   const execute = (custom = effects, customOptions = options) => publishSqliteRssImport(value.root, value.config, output, customOptions, custom);
   const cursor = join(value.root, ".castloop", "sqlite-rss-imports", value.config.service_id, `${report.import_id}.json`);
-  return { ...value, output, report, commands, effects, execute, cursor, options };
+  return Object.assign(value, { output, report, commands, effects, execute, cursor, options });
 }
 
 test("SQLite RSS import publishes 36 Episodes sequentially and preserves external GUID/permalink/date identities", async () => {
@@ -79,13 +78,13 @@ test("RSS resumes acknowledged audio verification and links all new uploads and 
   const firstPuts = value.calls.filter((call) => call.method === "PUT" && call.path.endsWith("/audio.mp3")); expect(firstPuts).toHaveLength(1);
   expect(await publishSqliteRssImport(value.root, value.config, value.output, options, effects)).toMatchObject({ episode_count: 2 });
   expect(value.calls.filter((call) => call.method === "PUT" && call.path.endsWith("/audio.mp3"))).toHaveLength(2);
-  const client = new SqliteOperationClient(value.config, administratorKey(value.root), value.transport);
+  const client = new SqliteOperationClient(value.config, administratorKey(value.root), value.transport, "imported");
   const children = (await client.list({ parent: value.report.import_id })).operations;
   expect(children.filter((operation) => operation.kind === "publication")).toHaveLength(3);
   expect(children.filter((operation) => operation.kind === "upload")).toHaveLength(5);
   expect(children.every((operation) => operation.import_id === value.report.import_id && operation.state === "succeeded")).toBe(true);
   expect((await client.detail(value.report.import_id))!.operation.state).toBe("succeeded");
-  expect(await runSqliteCommand(value.root, value.config, "operation-status", ["rss-import", value.report.import_id], value.options)).toMatchObject({
+  expect(await runSqliteCommand(value.root, value.config, "operation-status", ["rss-import", value.report.import_id], { ...value.options, operationOptions: { showId: "imported" } })).toMatchObject({
     progress: { published_episode_count: 2, unstarted_episode_count: null },
     related_summary: expect.arrayContaining([expect.objectContaining({ kind: "publication", target_kind: "episode", state: "succeeded", count: 2 })]),
   });
@@ -117,7 +116,8 @@ test("a different current publication cannot be adopted for a retained import su
 });
 
 test("an existing remote Show is never adopted when the local import directory is new", async () => {
-  const value = await fixture(); value.content.registerShow("imported", crypto.randomUUID());
+  const value = await fixture();
+  await runSqliteCommand(value.root, value.config, "create-show", ["imported", "https://example.com"], value.options);
   await expect(value.execute()).rejects.toThrow("never adopt"); expect(value.commands).toEqual([]);
 });
 

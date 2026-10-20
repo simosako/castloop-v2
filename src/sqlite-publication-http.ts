@@ -8,7 +8,7 @@ import { operationClient } from "./sqlite-operation-http";
 
 const prefix = "/admin/sqlite-publication/";
 export function createSqlitePublicationHttp(queue: SqlitePublicationQueue, administratorKey: string,
-  publicationReady: () => boolean): (request: Request) => Promise<Response> {
+  publicationReady: () => boolean, showId?: string): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url);
     if (!url.pathname.startsWith(prefix)) return reply({ error: "not_found" }, 404);
@@ -28,6 +28,7 @@ export function createSqlitePublicationHttp(queue: SqlitePublicationQueue, admin
       try {
         const snapshot = queue.snapshot();
         return reply(sqliteServiceStatusSchema.parse({ ...queue.identity(), protocol: "sqlite-sequential-v1",
+          ...(showId ? { show_id: showId } : {}),
           state: snapshot.state, admission_window_id: snapshot.admission_window_id, publication_ready: true }));
       } catch { return reply({ error: "runtime_unavailable" }, 503); }
     }

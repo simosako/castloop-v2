@@ -13,14 +13,14 @@ async function fixture() {
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, { attempts: 2, delay: async () => {} });
   const command = (name: string, args: string[] = []) => runSqliteCommand(value.root, value.config, name, args,
     { transport: value.transport, cloudflare: value.options });
-  return { ...value, command };
+  return Object.assign(value, { command });
 }
 
 test("formal SQLite command runners resume, register, stage, publish and inspect without legacy paths", async () => {
   const value = await fixture();
-  await value.command("service-resume", [crypto.randomUUID()]);
   const site = "https://example.com/my-podcast";
   await value.command("create-show", ["daily", site]);
+  await value.command("show-resume", ["daily", crypto.randomUUID()]);
   const directory = join(value.root, "daily"), showPath = join(directory, "show.toml");
   expect(parseShowMetadata(readFileSync(showPath, "utf8")).site_url).toBe(site);
   writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
@@ -46,12 +46,12 @@ test("formal SQLite command runners resume, register, stage, publish and inspect
   expect(value.content.episodes("daily")[0]).toMatchObject({ title: "Updated first", guid: base.guid, enclosure_url: base.enclosure_url });
   expect(value.calls.some((call) => call.method === "PUT" && call.path.endsWith("audio.mp3"))).toBe(false);
   expect(value.calls.some((call) => /queues|event_notifications|show-publications|system\/jobs/.test(call.path))).toBe(false);
-  await value.command("service-pause", [crypto.randomUUID()]);
+  await value.command("show-pause", ["daily", crypto.randomUUID()]);
   expect(value.runtime.health()).toMatchObject({ state: "paused", drained: true });
 });
 
 test("a lost registration response is inspected without resending and advanced Shows are never recreated", async () => {
-  const value = await fixture(); await value.command("service-resume", [crypto.randomUUID()]);
+  const value = await fixture();
   value.faults.lost = "register";
   await expect(value.command("create-show", ["daily", "https://example.com"])).rejects.toThrow();
   value.faults.lost = undefined;
@@ -62,12 +62,14 @@ test("a lost registration response is inspected without resending and advanced S
 });
 
 test("unknown pause/resume outcomes are never resent or treated as recovery authority", async () => {
-  const value = await fixture(), window = crypto.randomUUID(); value.faults.lost = "control";
-  await expect(value.command("service-resume", [window])).rejects.toThrow();
+  const value = await fixture(), window = crypto.randomUUID();
+  await value.command("create-show", ["daily", "https://example.com"]);
+  value.faults.lost = "control";
+  await expect(value.command("show-resume", ["daily", window])).rejects.toThrow();
   value.faults.lost = undefined; value.calls.length = 0;
-  await expect(value.command("service-resume", [window])).rejects.toThrow("unknown");
+  await expect(value.command("show-resume", ["daily", window])).rejects.toThrow("unknown");
   expect(value.calls).toEqual([]);
-  expect(await value.command("service-status")).toMatchObject({ state: "open", admission_window_id: window });
+  expect(await value.command("show-status", ["daily"])).toMatchObject({ state: "open", admission_window_id: window });
 });
 
 test("unsupported SQLite commands fail explicitly without legacy fallback or remote mutations", async () => {
