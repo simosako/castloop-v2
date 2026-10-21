@@ -7,10 +7,14 @@ import type { SqliteServiceConfig } from "../packages/shared/src/sqlite-service"
 import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
 import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
+import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import type { SqlitePublicationEffectFailure } from "./sqlite-publication-executor";
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
+import { sqliteFeedSnapshotKey } from "./sqlite-feed";
+import { serveCachedLifecycleAsset } from "./lifecycle-cache";
+import { serveSqliteGateway } from "./sqlite-gateway";
 import { createHash } from "node:crypto";
 
 const cleanups: Array<() => void> = [];
@@ -21,6 +25,12 @@ const show = { schema_version: 1 as const, show_id: "daily", title: "Private Sho
 const metadata = (episodeId: string) => ({ schema_version: 1 as const, episode_id: episodeId, guid: `stable-${episodeId}`,
   title: `Private ${episodeId}`, description: "Private description", published_at: "2026-10-16T12:00:00+09:00" });
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+
+async function readPublic(setup: Awaited<ReturnType<typeof fixture>>, path = "/podcasts/daily/feed.xml", headers: HeadersInit = {}) {
+  return serveSqliteGateway(new Request(`${setup.config.workers_dev_base_url}${path}`, { headers }), setup.config.workers_dev_base_url,
+    { fetch: async () => new Response(null), delivery: async (value) => setup.content.delivery(value) },
+    (request, props) => serveCachedLifecycleAsset(request, { CASTLOOP_BUCKET: setup.bucket } as never, props));
+}
 
 async function fixture() {
   const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
@@ -74,7 +84,8 @@ async function fixture() {
       kind: episodeId === undefined ? "show" : "episode", show_id: "daily", expected_show_state_version: target.show!.state_version,
       ...(episodeId === undefined ? {} : { episode_id: episodeId, base_revision_id: target.base!.revision_id, expected_episode_lifecycle_version: target.episode!.lifecycle_version }), payloads: [] });
   };
-  return { ...setup, ...objects, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, lifecycle };
+  const feed = () => objects.text(sqliteFeedSnapshotKey("daily", content.inspect("daily").show!.feed_generation));
+  return { ...setup, ...objects, feed, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, lifecycle };
 }
 
 test("Episode lifecycle removes all revision delivery and restores the same snapshot without audio or metadata writes", async () => {
@@ -87,16 +98,16 @@ test("Episode lifecycle removes all revision delivery and restores the same snap
   value.calls.length = 0;
   const stop = value.lifecycle("unpublish", "first"); expect((await value.run(stop)).state).toBe("succeeded");
   for (const path of paths) expect(value.content.delivery(path).status).toBe(404);
-  expect(value.text("public/podcasts/daily/feed.xml")).not.toContain("Private first");
-  expect(value.text("public/podcasts/daily/feed.xml")).toContain("Private second");
+  expect(value.feed()).not.toContain("Private first");
+  expect(value.feed()).toContain("Private second");
   expect(value.purges.at(-1)).toEqual({ showId: "daily", cover: false, episodeId: "first" });
   expect((await value.run(value.lifecycle("restore", "first"))).state).toBe("succeeded");
   expect(value.content.inspect("daily", "first").base).toEqual(base);
-  expect(value.text("public/podcasts/daily/feed.xml")).toContain("Private first");
+  expect(value.feed()).toContain("Private first");
   for (const path of paths) expect(value.content.delivery(path).status).toBe(200);
   expect(value.content.delivery(paths[0])).not.toEqual(previous);
   for (const [key, etag] of preserved) expect(value.entries.get(key)!.etag).toBe(etag);
-  expect(value.calls.filter((call) => call.method === "PUT").every((call) => call.key.endsWith("feed.xml"))).toBe(true);
+  expect(value.calls.filter((call) => call.method === "PUT").every((call) => /\/feeds\/\d+\.xml$/.test(call.key))).toBe(true);
   const puts = value.calls.filter((call) => call.method === "PUT").length;
   expect((await value.queue.enqueue(stop)).state).toBe("succeeded"); value.clearAlarm(); await value.runner.alarm();
   expect(value.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
@@ -113,7 +124,7 @@ test("Show restore never revives individually unpublished Episodes, including ch
   expect(value.calls.some((call) => call.method === "PUT")).toBe(false);
   expect(await value.run(value.lifecycle("restore", "first"))).toMatchObject({ state: "failed", reason_code: "target_unavailable" });
   expect((await value.run(value.lifecycle("restore"))).state).toBe("succeeded");
-  const feed = value.text("public/podcasts/daily/feed.xml");
+  const feed = value.feed();
   expect(feed).toContain("Private third"); expect(feed).not.toContain("Private first"); expect(feed).not.toContain("Private second");
   for (const request of [first, second]) expect(value.content.delivery(`/podcasts/daily/episodes/${request.episode_id}/${request.job_id}.mp3`).status).toBe(404);
 });
@@ -181,8 +192,8 @@ test("real executor publishes a registered Show and Episode using no R2 lock/sta
   expect(current.revision_id).toBe(episode.job_id);
   expect(current.enclosure_url).toBe(`${setup.config.public_base_url}/podcasts/daily/episodes/first/${episode.job_id}.mp3`);
   expect(setup.content.episodes("daily")).toEqual([current]);
-  expect(setup.text("public/podcasts/daily/feed.xml")).toContain('<guid isPermaLink="false">stable-first</guid>');
-  expect(setup.text("public/podcasts/daily/feed.xml")).toContain("Fri, 16 Oct 2026 03:00:00 GMT");
+  expect(setup.feed()).toContain('<guid isPermaLink="false">stable-first</guid>');
+  expect(setup.feed()).toContain("Fri, 16 Oct 2026 03:00:00 GMT");
   expect(setup.purges).toEqual([{ showId: "daily", cover: true }, { showId: "daily", cover: false, episodeId: "first" }]);
   expect(setup.calls.some((call) => /^system\/(?:jobs|show-publications|lifecycle-service|episode-lifecycle|management-requests)/.test(call.key))).toBe(false);
   expect([...setup.entries.keys()].some((key) => key.endsWith("commit.json"))).toBe(false);
@@ -325,7 +336,7 @@ test("purge failure blocks later jobs and closes delivery even after the fixed f
   expect(JSON.stringify(setup.effectFailures)).not.toMatch(/Private title|private@example|secret/);
 });
 
-test("purge rejection waiting retains the running job and closed delivery without replaying R2 output", async () => {
+test("purge rejection waiting retains the running job and old Feed without replaying R2 output", async () => {
   const setup = await fixture(); await setup.publishShow();
   const episode = await setup.request("episode");
   let calls = 0, enter!: () => void, release!: () => void;
@@ -339,14 +350,14 @@ test("purge rejection waiting retains the running job and closed delivery withou
   try {
     expect(setup.queue.status(episode.request_id)?.state).toBe("running");
     expect(setup.queue.snapshot().drained).toBe(false);
-    expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+    expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(200);
     expect(setup.content.episodes("daily")).toEqual([]);
     expect(await setup.runner.alarm()).toEqual({ state: "busy" });
   } finally { release(); }
   expect((await running).state).toBe("succeeded");
   expect(setup.calls.filter((call) => call.method === "PUT").map((call) => call.key)).toEqual([
     `public/podcasts/daily/episodes/first/${episode.job_id}.mp3`,
-    `public/episodes/daily/first/revisions/${episode.job_id}.toml`, "public/episodes/daily/first/metadata.toml", "public/podcasts/daily/feed.xml",
+    `public/episodes/daily/first/revisions/${episode.job_id}.toml`, "public/episodes/daily/first/metadata.toml", sqliteFeedSnapshotKey("daily", 2),
   ]);
   expect(calls).toBe(2);
   expect(setup.effectFailures).toEqual([]);
@@ -398,7 +409,7 @@ test("completion and the content index roll back together when scheduling the ne
   expect(setup.queue.status(next.request_id)?.state).toBe("queued");
 });
 
-test("running media IO and purge keep delivery closed and completion pending while accepted jobs can drain paused", async () => {
+test("running additions preserve delivery until explicitly paused and accepted jobs can drain paused", async () => {
   const setup = await fixture(); await setup.publishShow();
   const first = await setup.request("episode", "first"), second = await setup.request("episode", "second");
   let enter!: () => void, release!: () => void, enterPurge!: () => void, releasePurge!: () => void;
@@ -413,7 +424,7 @@ test("running media IO and purge keep delivery closed and completion pending whi
     await setup.queue.enqueue(second);
     expect(setup.queue.status(first.request_id)?.state).toBe("running");
     expect(setup.queue.status(second.request_id)?.state).toBe("queued");
-    expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+    expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(200);
     expect(setup.content.episodes("daily")).toEqual([]);
     expect(await setup.runner.alarm()).toEqual({ state: "busy" });
     setup.queue.pause();
@@ -441,7 +452,7 @@ test("the binding verifies streamed audio checksums without buffering MP3 in the
   expect(setup.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
   expect(setup.entries.has(`public/podcasts/daily/episodes/first/${episode.job_id}.mp3`)).toBe(false);
   expect(setup.content.episodes("daily")).toEqual([]);
-  expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+  expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(200);
 });
 
 test("invalid content schema and corrupt frozen requests never reset content or execute an effect", async () => {
@@ -466,6 +477,7 @@ test("a valid-shaped but hash-mismatched stored request blocks before validation
   setup.calls.length = 0;
   expect(await setup.runner.alarm()).toMatchObject({ state: "blocked", reason_code: "stored_request_invalid" });
   expect(setup.calls).toEqual([]);
+  expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
 });
 
 test("Show updates advance only the Show state, regenerate its feed, and deny the old cover extension", async () => {
@@ -477,8 +489,8 @@ test("Show updates advance only the Show state, regenerate its feed, and deny th
   setup.calls.length = 0;
   expect((await setup.run(update)).state).toBe("succeeded");
   expect(parseShowMetadata(setup.text("system/shows/daily/show.toml")).title).toBe("Updated Show");
-  expect(setup.text("public/podcasts/daily/feed.xml")).toContain("Updated Show");
-  expect(setup.text("public/podcasts/daily/feed.xml")).toContain("stable-first");
+  expect(setup.feed()).toContain("Updated Show");
+  expect(setup.feed()).toContain("stable-first");
   expect(setup.content.delivery("/podcasts/daily/cover.jpg").status).toBe(404);
   expect(setup.content.delivery("/podcasts/daily/cover.png").status).toBe(200);
   expect(setup.calls.some((call) => call.key.endsWith(".mp3"))).toBe(false);
@@ -499,4 +511,143 @@ test("permanent identities cannot be claimed again, and tombstones/paused admiss
   expect(setup.content.registerShow("daily", setup.reservationId).lifecycle).toBe("deleted");
   setup.queue.pause();
   expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+});
+
+for (const phase of ["validation", "audio", "snapshot", "purge"] as const) {
+  test(`new additions serve the committed Feed during ${phase}, then switch atomically`, async () => {
+    const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
+    const old = await readPublic(setup), etag = old.headers.get("ETag")!, body = await old.text();
+    const oldDecision = setup.content.delivery("/podcasts/daily/feed.xml");
+    if (oldDecision.status !== 200) throw new Error("Expected committed Feed");
+    const next = await setup.request("episode", "second"), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    const hold = async () => { entered.resolve(); await release.promise; };
+    if (phase === "validation") setup.bucketHooks.beforeGet = async (key) => { if (key === next.payloads[0].key) await hold(); };
+    if (phase === "audio") setup.bucketHooks.beforePut = async (key) => { if (key.endsWith(`${next.job_id}.mp3`)) await hold(); };
+    if (phase === "snapshot") setup.bucketHooks.afterPut = async (key) => { if (key.includes("/feeds/")) await hold(); };
+    if (phase === "purge") setup.hooks.purge = hold;
+    const running = setup.run(next);
+    try {
+      await entered.promise;
+      expect(await (await readPublic(setup)).text()).toBe(body);
+      expect((await readPublic(setup, undefined, { "If-None-Match": etag })).status).toBe(304);
+      expect((await readPublic(setup, `/podcasts/daily/episodes/first/${first.job_id}.mp3`)).status).toBe(200);
+      expect((await readPublic(setup, "/podcasts/daily/cover.jpg")).status).toBe(200);
+      expect((await readPublic(setup, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(404);
+      expect(setup.queue.status(next.request_id)?.state).toBe("running");
+    } finally { release.resolve(); await running; }
+    const current = await readPublic(setup, undefined, { "If-None-Match": etag });
+    expect(current.status).toBe(200); expect(await current.text()).toContain("Private second");
+    expect((await readPublic(setup, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(200);
+    const late = await serveCachedLifecycleAsset(new Request("https://cache.invalid/podcasts/daily/feed.xml"),
+      { CASTLOOP_BUCKET: setup.bucket } as never, oldDecision.cache_props);
+    expect(await late.text()).toBe(body);
+    expect(setup.entries.has("public/podcasts/daily/feed.xml")).toBe(false);
+  });
+}
+
+for (const phase of ["validation", "audio", "snapshot", "purge", "commit"] as const) {
+  test(`isolated ${phase} failure preserves old delivery but never releases the blocked FIFO`, async () => {
+    const setup = await fixture(); await setup.publishShow(); await setup.publishEpisode();
+    const old = await (await readPublic(setup)).text(), next = await setup.request("episode", "second");
+    const later = await setup.request("episode", "third");
+    await setup.queue.enqueue(next); await setup.queue.enqueue(later); setup.clearAlarm();
+    if (phase === "validation") setup.bucketHooks.beforeGet = async (key) => {
+      if (key === next.payloads[0].key) throw new Error("Validation unavailable");
+    };
+    if (phase === "audio" || phase === "snapshot") setup.bucketHooks.afterPut = async (key) => {
+      if (phase === "audio" ? key.endsWith(".mp3") : key.includes("/feeds/")) throw new Error("Unknown output result");
+    };
+    if (phase === "purge") setup.hooks.purge = async () => { throw new Error("Unknown purge result"); };
+    if (phase === "commit") {
+      setup.failAlarm(); await expect(setup.runner.alarm()).rejects.toThrow();
+      expect(setup.queue.status(next.request_id)?.state).toBe("running");
+    }
+    const recoveredQueue = new SqlitePublicationQueue(setup.storage, setup.runtime);
+    const recoveredContent = new SqlitePublicationContent(setup.storage);
+    const restarted = new SqlitePublicationAlarm(recoveredQueue,
+      createSqlitePublicationExecutor(recoveredContent, setup.bucket, setup.config, { purge: async () => { await setup.hooks.purge?.(); } }), () => {});
+    expect((await restarted.alarm()).state).toBe("blocked");
+    expect(recoveredContent.delivery("/podcasts/daily/feed.xml").status).toBe(200);
+    expect(await (await readPublic(setup)).text()).toBe(old);
+    expect((await readPublic(setup, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(404);
+    const count = setup.calls.length; await restarted.alarm(); expect(setup.calls).toHaveLength(count);
+    expect(setup.queue.status(later.request_id)?.state).toBe("queued");
+    expect(setup.queue.snapshot().drained).toBe(false);
+    setup.queue.pause(); expect((await readPublic(setup)).status).toBe(503);
+    expect(() => setup.queue.resume(crypto.randomUUID())).toThrow("drained");
+    expect(() => setup.queue.resume(setup.windowId!)).toThrow();
+  });
+}
+
+test("read guards fail closed on corruption, changed committed state and missing snapshots", async () => {
+  for (const column of ["delivery_policy", "read_request_sha256", "read_show_version", "read_feed_generation", "read_episode_id"] as const) {
+    const setup = await fixture(); await setup.publishShow(); const next = await setup.request("episode");
+    await setup.queue.enqueue(next); const claim = setup.queue.claim(); expect(claim.state).toBe("claimed");
+    expect((await readPublic(setup)).status).toBe(200);
+    setup.storage.sql.exec(`UPDATE publication_jobs SET ${column} = ? WHERE job_id = ?`,
+      column === "delivery_policy" ? "exclusive" : column.endsWith("version") || column.endsWith("generation") ? 999 : null, next.job_id);
+    expect((await readPublic(setup)).status).toBe(503);
+  }
+  for (const column of ["state_version", "feed_generation", "lifecycle"] as const) {
+    const setup = await fixture(); await setup.publishShow(); const next = await setup.request("episode");
+    await setup.queue.enqueue(next); setup.queue.claim();
+    setup.storage.sql.exec(`UPDATE publication_shows SET ${column} = ? WHERE show_id = 'daily'`, column === "lifecycle" ? "unpublished" : 999);
+    expect((await readPublic(setup)).status).toBe(503);
+  }
+  const setup = await fixture(); await setup.publishShow(); const next = await setup.request("episode");
+  await setup.queue.enqueue(next); setup.queue.claim();
+  setup.entries.delete(sqliteFeedSnapshotKey("daily", 1));
+  const missing = await readPublic(setup); expect(missing.status).toBe(503); expect(missing.headers.get("Cache-Control")).toBe("no-store");
+  for (const path of ["/podcasts/daily/feeds/1.xml", "/system/service.toml", "/staging/uploads/secret"]) {
+    expect((await readPublic(setup, path)).status).toBe(404);
+  }
+});
+
+test("invalid frozen policies block before writes and cannot grant committed reads", async () => {
+  const setup = await fixture(); await setup.publishShow(); const next = await setup.request("episode");
+  await setup.queue.enqueue(next);
+  setup.storage.sql.exec("UPDATE publication_jobs SET delivery_policy = 'exclusive' WHERE job_id = ?", next.job_id);
+  const before = setup.calls.length;
+  expect(await setup.runner.alarm()).toMatchObject({ state: "blocked", reason_code: "stored_request_invalid" });
+  expect(setup.calls).toHaveLength(before); expect((await readPublic(setup)).status).toBe(503);
+});
+
+test("lifecycle operations without Feed output retain the actual snapshot generation", async () => {
+  const setup = await fixture(); await setup.publishShow(); await setup.publishEpisode();
+  const generation = setup.content.inspect("daily").show!.feed_generation;
+  await setup.run(setup.lifecycle("unpublish"));
+  await setup.run(setup.lifecycle("unpublish", "first"));
+  expect(setup.content.inspect("daily").show!.feed_generation).toBe(generation);
+  await setup.run(setup.lifecycle("restore"));
+  expect(setup.content.inspect("daily").show!.feed_generation).toBeGreaterThan(generation);
+  expect(await (await readPublic(setup)).text()).not.toContain("Private first");
+});
+
+test("old persisted queue and content schemas are rejected without conversion", async () => {
+  const setup = await fixture(); await setup.publishShow();
+  const before = new Map(setup.entries);
+  setup.storage.sql.exec("UPDATE publication_content_schema SET version = 3 WHERE id = 1");
+  expect(() => new SqlitePublicationContent(setup.storage)).toThrow("Unsupported");
+  expect(setup.storage.sql.exec("SELECT version FROM publication_content_schema").toArray()).toEqual([{ version: 3 }]);
+  setup.storage.sql.exec("UPDATE publication_queue_schema SET version = 2 WHERE id = 1");
+  expect(() => new SqlitePublicationQueue(setup.storage, setup.runtime)).toThrow("Unsupported");
+  expect(setup.storage.sql.exec("SELECT version FROM publication_queue_schema").toArray()).toEqual([{ version: 2 }]);
+  expect(setup.entries).toEqual(before);
+});
+
+test("existing candidate snapshots are never adopted or overwritten", async () => {
+  const setup = await fixture(); await setup.publishShow();
+  const next = await setup.request("episode"), key = sqliteFeedSnapshotKey("daily", 2);
+  await setup.bucket.put(key, "unapproved candidate");
+  const etag = setup.entries.get(key)!.etag, old = setup.feed();
+  expect(await setup.run(next)).toMatchObject({ state: "blocked", reason_code: "execution_failed" });
+  expect(setup.entries.get(key)!.etag).toBe(etag);
+  expect(await (await readPublic(setup)).text()).toBe(old);
+});
+
+test("corrupt committed content never receives the verified blocked-read permission", async () => {
+  const setup = await fixture(); await setup.publishShow(); const next = await setup.request("episode");
+  setup.storage.sql.exec("UPDATE publication_show_content SET metadata_json = '{invalid' WHERE show_id = 'daily'");
+  expect(await setup.run(next)).toMatchObject({ state: "blocked", reason_code: "validation_unavailable" });
+  expect((await readPublic(setup)).status).toBe(503);
 });

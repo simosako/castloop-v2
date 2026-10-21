@@ -1,5 +1,6 @@
 import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
+import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 
 export type LifecycleCacheEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "head" | "get"> };
 export type LifecyclePurgeTarget = { showId: string; episodeId?: string };
@@ -20,7 +21,7 @@ function validProps(asset: PublicAsset, props: PublicCacheProps): boolean {
   if (present.length !== keys.length || present.some((key) => !keys.includes(key))) return false;
   return keys.every((key) => {
     const value = props[key as keyof PublicCacheProps];
-    return value !== undefined && Number.isSafeInteger(value) && value >= 0;
+    return value !== undefined && Number.isSafeInteger(value) && value >= (key === "feedGeneration" ? 1 : 0);
   });
 }
 
@@ -73,9 +74,10 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
   if (!asset) return rejected(request, 404);
   if (!validProps(asset, props)) return rejected(request, 503);
   try {
-    const object = await env.CASTLOOP_BUCKET.head(asset.key);
-    if (!object) return rejected(request, 404);
-    if (!Number.isSafeInteger(object.size) || object.size < 0 || !Number.isFinite(object.uploaded.getTime())) {
+    const key = asset.kind === "feed" ? sqliteFeedSnapshotKey(asset.showId, props.feedGeneration!) : asset.key;
+    const object = await env.CASTLOOP_BUCKET.head(key);
+    if (!object) return rejected(request, asset.kind === "feed" ? 503 : 404);
+    if (object.key !== key || !Number.isSafeInteger(object.size) || object.size < 0 || !Number.isFinite(object.uploaded.getTime())) {
       throw new Error("Invalid public object metadata");
     }
     const headers = new Headers({ "Content-Type": asset.contentType, "ETag": object.httpEtag,
@@ -90,8 +92,8 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
     if (range === "unsatisfiable") return rejected(request, 416, object.size);
     headers.set("Content-Length", String(range ? range.length : object.size));
     if (request.method === "HEAD") return new Response(null, { headers });
-    const data = await env.CASTLOOP_BUCKET.get(asset.key, { onlyIf: { etagMatches: object.etag }, ...(range ? { range } : {}) });
-    if (!data || !("body" in data) || !data.body || data.etag !== object.etag || data.size !== object.size) {
+    const data = await env.CASTLOOP_BUCKET.get(key, { onlyIf: { etagMatches: object.etag }, ...(range ? { range } : {}) });
+    if (!data || !("body" in data) || !data.body || data.key !== key || data.etag !== object.etag || data.size !== object.size) {
       throw new Error("Public object changed during delivery");
     }
     if (range) headers.set("Content-Range", `bytes ${range.offset}-${range.offset + range.length - 1}/${object.size}`);

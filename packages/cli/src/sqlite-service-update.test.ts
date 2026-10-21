@@ -45,6 +45,26 @@ test("compatible REST updates preserve the namespace/content, finish paused afte
   expect(journal).not.toContain("new source"); expect(journal).not.toContain("private-token"); expect(journal).not.toContain("CASTLOOP_ADMIN_KEY");
 });
 
+for (const format of [undefined, "fixed-key-v1"]) {
+  test(`incompatible Feed storage ${format ?? "missing"} is refused before update preparation or deployment`, async () => {
+    const { value } = await fixture(); value.calls.length = 0;
+    await expect(updateSqliteService(value.root, value.config, crypto.randomUUID(), "new source", {
+      ...value.options, transport: async (input, init) => {
+        const response = await value.transport(input, init);
+        if (new URL(String(input)).pathname.endsWith("/health")) {
+          const body = await response.json() as Record<string, unknown>;
+          delete body.feed_storage;
+          if (format !== undefined) body.feed_storage = format;
+          return Response.json(body);
+        }
+        return response;
+      },
+    }, wait)).rejects.toThrow();
+    expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+    expect(value.showCalls).toEqual([]);
+  });
+}
+
 for (const lost of ["update-prepare", "deploy"] as const) {
   test(`unknown ${lost} outcome is never resent or adopted from REST`, async () => {
     const { value, id, update } = await fixture(); value.faults.lost = lost;

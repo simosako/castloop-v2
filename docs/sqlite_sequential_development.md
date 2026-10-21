@@ -1,5 +1,7 @@
 # SQLiteのShow単位公開方式（開発版）
 
+2026-10-21、Issue #50追補: 本開発版は世代別Feed保存（healthの`feed_storage="immutable-generation-v1"`、内部queue/content schema 3/4）を必要とする。固定Feed上書き方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別のない旧Workerへの更新をprepare/配備前に拒否する。[設計と境界](../design/episode_add_feed_availability_plan.md)参照。
+
 2026-10-20、Issue #48の新layout専用ガイド。**配布済みv0.6.2とは非互換・未リリース**であり、以下の操作には本開発版から構築したCLI/Workerが必要。サービス設定に`storage_layout = "show-v1"`を必須とし、旧設定は副作用前に拒否する。既存設定への追記、旧DO/DB/journalの変換・移行・資源採用は行わない。[採用設計](../design/do_show_separation_options.md)参照。
 
 `sqlite-sequential-v1`方式の操作ガイド。v0.6.0ではサービス設定version 2のみを扱い、`init`のflag省略時もSQLiteになる。`--publication-protocol sqlite-sequential-v1`は省略可能な既存指定として維持する。新たなschema選択オプションは設けない。
@@ -80,6 +82,8 @@ castloop publish-episode first
 - 初回Episodeにはmetadataと音源が両方必要。その後はmetadata-only/audio-onlyが可能。
 - `publish-*`は要求をローカルへ凍結してDOへ送信し、完了を最大300回・新規poll開始5分まで待つ。
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
+- 公開済みShowへの新規Episode追加中は、確定済みの旧Feedと承認済みcover/audioを読み取れる。新Feedは別のprivate R2 objectへ保存し、必要なpurgeとSQL完了後に切り替える。公開URLは変わらず、未完了の新音源は直リンクでも配信しない。世代別Feedは蓄積し、自動削除しない。
+- Show初回公開には旧Feedがない。Show更新・既存Episode更新の実行中の継続配信は後続開発であり、今回は503を維持する。Pause/readiness不一致/保守拘束も503のまま。
 - SQLite cache ownerはtag/prefixを1回のpurgeへまとめる。明確なrate-limit拒否だけは同じrunning実行内で12秒間隔・最大6 attemptsを行い、保存をやり直さない。未知応答・恒久拒否は停止する。この有限待機はblocked jobのretry/release機能ではない。
 - 凍結後は素材を変更しない。次の編集では、既知の完了/確定入力失敗を確認・archiveして別draft IDに進む。
 
@@ -188,7 +192,7 @@ cache purgeの未確認結果は再送せず、診断の`failure_kind`でAPI例�
 任意例外文・stack・応答本文・秘密値をログへ追加しない。保存ログの欠測や分類`other`なら原因未確定として扱う。この追加診断は、変更を含むCLI/Workerを次に配備してから有効になる。
 
 既に凍結した`publish-*`を再度呼んだ場合も、同じ要求のstatus確認だけを行う。
-`failed`は公開書込前の確定的な入力/base失敗、`blocked`は途中停止・書込不明・purge失敗等であり、同Showの後続と配信を停止する。別Showの通常操作・再開・登録は妨げないが、共有Worker更新はdrainできないため拒否する。
+`failed`は公開書込前の確定的な入力/base失敗、`blocked`は途中停止・書込不明・purge失敗等であり、同Showの後続を停止する。新規Episode追加で開始時に保存した確定世代・要求hash・対象未登録の保護根拠が成立する場合だけ、blocked後も旧Feedと承認済みcover/audioの読取を継続する。要求破損・根拠不一致・その他のblockedは503。Feedが読めてもjobの成功・復旧・drainedを意味しないので、管理statusで異常を確認する。別Showの通常操作・再開・登録は妨げないが、共有Worker更新はdrainできないため拒否する。
 時間経過やHEAD不在で解除しない。blockedのretry/releaseは提供していない。
 
 初期化では、R2/Worker作成・PUT・配備・公開設定の各要求前にjournalを保存する。

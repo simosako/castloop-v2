@@ -26,7 +26,7 @@ async function fixture(count = 2) {
   const commands: string[] = [], native = createSqliteRssEffects(value.root, value.config, options);
   const effects = { ...native, async command(name: string, args: string[], context?: Parameters<SqliteRssEffects["command"]>[2]) {
     commands.push(name); return native.command(name, args, context); },
-    async readFeed() { return value.text("public/podcasts/imported/feed.xml"); } };
+    async readFeed() { return value.text(`public/podcasts/imported/feeds/${value.content.inspect("imported").show!.feed_generation}.xml`); } };
   const execute = (custom = effects, customOptions = options) => publishSqliteRssImport(value.root, value.config, output, customOptions, custom);
   const cursor = join(value.root, ".castloop", "sqlite-rss-imports", value.config.service_id, `${report.import_id}.json`);
   return Object.assign(value, { output, report, commands, effects, execute, cursor, options });

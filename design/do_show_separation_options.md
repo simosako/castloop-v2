@@ -115,7 +115,7 @@ registryが予約・所属の正本、Show DOが公開状態の正本であれ�
 
 gatewayはpublic pathから対象Showを決め、要求ごとにそのShow DOの最新判定だけを確認する。制御DOへの毎回の配信照会や、状態のTTL cacheは設けない。Show DOがpaused、未ready、共有更新の保守拘束中なら503とする。Pauseは従来の安全側の意味をShow単位へ移し、新規受付と配信を閉じる。既受付jobは取り消さずdrainを続ける。
 
-対象Showがrunning/blockedなら503、別Show固有のblockedだけでは配信拒否しない。R2 streamingと承認済みpublic path、世代別cache props、必要なpurge成功後の公開完了は維持する。音源本体をDO経由で中継しない。
+Issue #50では[Feed継続配信契約](episode_add_feed_availability_plan.md)に従い、新規Episode追加のrunning/blockedだけ、開始時に保存した確定Feed/Show世代・要求hash・対象Episode未登録の根拠が成立すれば旧Feedと承認済みcover/audioを配信する。それ以外のrunning/blockedは503、別Show固有のblockedだけでは配信拒否しない。全Feedは世代別の不変R2 snapshotへ保存し、読取先もcache propsと同世代に固定する。R2 streamingと承認済みpublic path、必要なpurge成功後の公開完了は維持する。音源本体をDO経由で中継しない。
 
 通常配信の判定は1 Show DOへの要求であり、制御DOの障害を毎回の配信依存にしない。共有Worker/R2/cache/アカウント上限の共通障害範囲は残る。
 
@@ -125,7 +125,7 @@ gatewayはpublic pathから対象Showを決め、要求ごとにそのShow DOの
 
 | 操作・状態 | 採用仕様 |
 | --- | --- |
-| Aだけblocked/paused | Aの後続公開・配信を止める。Bの通常操作・配信・独立Resume、新Show登録は継続できる |
+| Aだけblocked/paused | Aの後続公開を止める。pausedなら配信も停止。blockedの配信は§6.3の保護条件に従う。Bの通常操作・配信・独立Resume、新Show登録は継続できる |
 | AとBを個別Pause | 両Showの新規受付・配信が止まる。新Show登録まで止める意味ではなく、永続的な全体Pause状態も作らない |
 | BだけResume | Bがpaused/drained/readyで保守拘束がなく、新しいwindowなら可能。Aのblockedは参照しない |
 | 共有Worker更新 | 専用の更新手順で所属集合を固定し、各Showをpaused/drainedで保守拘束する。blockedや登録途中があれば配備しない |

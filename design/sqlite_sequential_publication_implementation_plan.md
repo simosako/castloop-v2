@@ -1,5 +1,7 @@
 # DO SQLite逐次キューによる公開処理の実装計画
 
+> 2026-10-21追補: Issue #50の[Feed継続配信契約](episode_add_feed_availability_plan.md)を優先する。固定Feed上書きと一律running/blocked配信503を改め、全Feed writerを世代別の不変R2 snapshotへ統一した。purge後のcontent/media/Feed世代/job/操作記録/次回Alarm予約の原子完了は維持する。新規Episode追加のみ、開始時に保存した保護根拠が成立するrunning/blockedで旧公開内容を配信する。その他の更新・lifecycleや要求破損は従来どおり停止する。内部queue/content schemaは3/4、新規環境専用・変換なし。下記の固定key・旧schema・一律503の記述は導入時の履歴である。
+
 > 2026-10-20追補: Issue #48の開発版では[Show分離の採用契約](do_show_separation_options.md)を優先する。1サービス1 DO/全体FIFO/全体Pauseは廃止し、ShowごとのDO/FIFO/Pause/windowと、所属・共有更新の制御DOへ分ける。以下の一件ずつ実行・未知IO保全・purge-before-completion・原子的な受付/完了の安全条件はShow内で維持する。旧layoutは維持・移行せず、必須`storage_layout="show-v1"`で配備前に拒否する。
 
 > 適用版: 本書の基礎契約は現行SQLiteでも維持する。実装順序・進捗欄はv0.5.0導入時の履歴であり、旧方式併存・明示flag必須・二Worker同梱の記述は当時のもの。v0.6.0向け開発ではSQLite既定・単独Workerとし、旧サービス設定version 1からの移行機能は提供しない。[現行設計](initial_design.md)と[削除計画](schema_v1_removal_plan.md)を優先する。

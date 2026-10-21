@@ -6,7 +6,7 @@ const DATA = new TextEncoder().encode("0123456789abcdefghij");
 
 function fixture(path = AUDIO_PATH) {
   const calls: Array<{ method: string; key: string; options?: object }> = [];
-  const metadata = { key: `public${path}`, size: DATA.length, etag: "revision-etag", httpEtag: '"revision-etag"',
+  const metadata = { key: path.endsWith("feed.xml") ? "public/podcasts/daily/feeds/1.xml" : `public${path}`, size: DATA.length, etag: "revision-etag", httpEtag: '"revision-etag"',
     uploaded: new Date("2026-10-01T12:00:00.123Z") };
   const bucket = {
     async head(key: string) { calls.push({ method: "head", key }); return metadata; },
@@ -23,6 +23,19 @@ function fixture(path = AUDIO_PATH) {
 }
 
 describe("cached public asset handler", () => {
+  test("Feed HEAD, Range and validators read only the committed snapshot; invalid generations never reach R2", async () => {
+    const setup = fixture("/podcasts/daily/feed.xml"), props = { showGeneration: 1, feedGeneration: 1 };
+    expect((await serveCachedLifecycleAsset(setup.request({}, "HEAD"), setup.env, props)).status).toBe(200);
+    expect((await serveCachedLifecycleAsset(setup.request({ "If-None-Match": '"revision-etag"' }), setup.env, props)).status).toBe(304);
+    const range = await serveCachedLifecycleAsset(setup.request({ Range: "bytes=0-3" }), setup.env, props);
+    expect(range.status).toBe(206); expect(await range.text()).toBe("0123");
+    expect(setup.calls.every((call) => call.key === "public/podcasts/daily/feeds/1.xml")).toBe(true);
+    const count = setup.calls.length;
+    for (const generation of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect((await serveCachedLifecycleAsset(setup.request(), setup.env, { ...props, feedGeneration: generation })).status).toBe(503);
+    }
+    expect(setup.calls).toHaveLength(count);
+  });
   test("GET streams the full object with tags and validators; HEAD reads metadata only", async () => {
     const setup = fixture();
     const props = { showGeneration: 1, episodeGeneration: 2 };

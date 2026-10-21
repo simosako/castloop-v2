@@ -115,7 +115,7 @@ test("CLI upload → authenticated submit → FIFO Alarm → real publication �
   expect(setup.calls.some((call) => /^system\/(?:jobs|show-publications|management-requests|lifecycle-service)/.test(call.key))).toBe(false);
   expect(setup.requests.filter((request) => request.method === "POST" && new URL(request.url).pathname === "/admin/sqlite-publication/jobs")).toHaveLength(4);
   expect(setup.requests.some((request) => new URL(request.url).pathname.includes("queues"))).toBe(false);
-  expect(setup.text("public/podcasts/daily/feed.xml")).toContain("Updated first");
+  expect(setup.text(`public/podcasts/daily/feeds/${setup.content.inspect("daily").show!.feed_generation}.xml`)).toContain("Updated first");
   expect(setup.purges).toHaveLength(4);
 });
 

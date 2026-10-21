@@ -2,6 +2,7 @@ import type { SqlitePublicationBucket } from "../sqlite-publication-executor";
 import { createHash } from "node:crypto";
 
 type Entry = { key: string; bytes: Uint8Array; size: number; etag: string; version: string;
+  httpEtag: string; uploaded: Date;
   checksums: { sha256?: ArrayBuffer }; customMetadata?: Record<string, string>; httpMetadata?: R2HTTPMetadata };
 
 export function sqlitePublicationBucket() {
@@ -29,6 +30,7 @@ export function sqlitePublicationBucket() {
       const digest = createHash("sha256").update(bytes).digest("hex");
       if (options?.sha256 !== undefined && options.sha256 !== digest) throw new Error("Binding rejected checksum mismatch");
       const object: Entry = { key, bytes, size: bytes.length, etag: crypto.randomUUID(), version: crypto.randomUUID(),
+        httpEtag: `"${digest}"`, uploaded: new Date(),
         checksums: options?.sha256 ? { sha256: Uint8Array.from(createHash("sha256").update(bytes).digest()).buffer } : {},
         ...(options?.customMetadata ? { customMetadata: options.customMetadata } : {}),
         ...(options?.httpMetadata && !(options.httpMetadata instanceof Headers) ? { httpMetadata: options.httpMetadata } : {}) };

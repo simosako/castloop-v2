@@ -34,6 +34,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [Show分離の実機確認](do_show_separation_live_verification_20261020.md) | Issue #48。新規隔離サービスの初期化でcache purge成功を確認できずblocked。2 Show・各3 Episodeの計画は未実施。停止証跡と資源を保持 |
 | [purge障害の切り分けとShow分離の再試験](do_show_separation_live_retest_20261021.md) | Issue #48。新規サービスで2 Show・6 Episode公開、個別Pause/Resume・配信確認が成功。診断の失敗段階・型分類を追加後は461テスト成功。初回障害の根本原因は未確定 |
 | [Show分離後のWorker更新の実機確認](do_show_separation_worker_update_live_20261021.md) | Issue #48。既存2 Show・6 Episodeを保持するcode-only更新が成功。native反映待ちの停止後、再配備せず明示verifyで全DOのprobe・保守解除を完了。個別Resume・公開2件を確認し最終paused |
+| [Episode追加中のFeed継続配信](episode_add_feed_availability_plan.md) | Issue #50。第1段階をローカル実装。世代別Feedと原子的な切替、新規追加のrunning/隔離を確認できるblockedで旧内容を配信。将来の更新対応、保持方針、非互換形式と検証範囲 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 

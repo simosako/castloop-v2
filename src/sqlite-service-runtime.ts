@@ -46,6 +46,7 @@ export class SqliteServiceRuntime {
   health(): SqliteHealth {
     const snapshot = this.queue.snapshot(), setup = this.setup();
     return sqliteHealthSchema.parse({ ...this.actual, protocol: "sqlite-sequential-v1", invocation_id: crypto.randomUUID(),
+      feed_storage: "immutable-generation-v1",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
       setup: setup ? { operation_id: setup.operation_id, state: setup.state } : null, runtime_update: this.updates.summary() });

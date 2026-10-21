@@ -5,6 +5,7 @@ import type { SqlitePublicationBlock, SqlitePublicationFailure, SqlitePublicatio
   SqlitePublicationRuntime, SqlitePublicationStatus } from "../packages/shared/src/sqlite-publication";
 import type { OperationClient } from "../packages/shared/src/sqlite-operations";
 import type { SqliteOperationRecords } from "./sqlite-operation-records";
+import { sqliteDeliveryPolicy } from "./sqlite-feed";
 
 type Binding = string | number | null;
 export type PublicationSql = {
@@ -21,7 +22,7 @@ export type PublicationQueueStorage = {
 };
 type ServiceRow = SqlitePublicationRuntime & { state: "open" | "paused"; admission_window_id: string | null };
 type JobRow = { sequence: number; request_id: string; job_id: string; show_id: string; request_sha256: string; request_json: string;
-  state: SqlitePublicationStatus["state"]; reason_code: string | null };
+  state: SqlitePublicationStatus["state"]; reason_code: string | null; delivery_policy: string };
 export type PublicationQueueSnapshot = { state: "open" | "paused"; admission_window_id: string | null;
   queued: number; active: SqlitePublicationStatus | null; drained: boolean };
 export type PublicationClaim = { state: "idle" } | { state: "blocked"; job: SqlitePublicationStatus } |
@@ -40,15 +41,18 @@ export class SqlitePublicationQueue {
     storage.transactionSync(() => {
       storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_queue_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");
       const schema = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
-      if (schema && schema.version !== 2) throw new Error("Unsupported SQLite publication schema; do not reset stored state");
-      storage.sql.exec("INSERT OR IGNORE INTO publication_queue_schema (id, version) VALUES (1, 2)");
+      if (schema && schema.version !== 3) throw new Error("Unsupported SQLite publication schema; do not reset stored state");
+      storage.sql.exec("INSERT OR IGNORE INTO publication_queue_schema (id, version) VALUES (1, 3)");
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_service (
         id INTEGER PRIMARY KEY CHECK(id = 1), service_id TEXT NOT NULL, worker_version_id TEXT NOT NULL,
         service_config_sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('open', 'paused')), admission_window_id TEXT)`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_jobs (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
         show_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL,
-        state TEXT NOT NULL CHECK(state IN ('queued', 'running', 'succeeded', 'failed', 'blocked')), reason_code TEXT)`);
+        state TEXT NOT NULL CHECK(state IN ('queued', 'running', 'succeeded', 'failed', 'blocked')), reason_code TEXT,
+        delivery_policy TEXT NOT NULL CHECK(delivery_policy IN ('exclusive', 'preserve_committed')),
+        read_feed_generation INTEGER, read_show_version INTEGER, read_episode_id TEXT, read_request_sha256 TEXT,
+        read_verified INTEGER NOT NULL DEFAULT 0 CHECK(read_verified IN (0, 1)))`);
       storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_jobs_pending ON publication_jobs (state, sequence)");
       storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_jobs_show_state ON publication_jobs (show_id, state)");
       storage.sql.exec("CREATE UNIQUE INDEX IF NOT EXISTS publication_one_active ON publication_jobs ((1)) WHERE state IN ('running', 'blocked')");
@@ -120,8 +124,8 @@ export class SqlitePublicationQueue {
       if (this.active()?.state === "blocked") throw new Error("SQLite publication queue is blocked; inspect the retained job");
       this.operationRecords?.validatePublicationAssets(request);
       if (client) this.operationRecords?.publicationAccepted(request, hash, client, invocation);
-      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, state)
-        VALUES (?, ?, ?, ?, ?, 'queued')`, request.request_id, request.job_id, request.show_id, hash, source);
+      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, state, delivery_policy)
+        VALUES (?, ?, ?, ?, ?, 'queued', ?)`, request.request_id, request.job_id, request.show_id, hash, source, sqliteDeliveryPolicy(request));
       await this.schedule();
       return this.statusRow(this.byJob(request.job_id));
     });
@@ -182,11 +186,21 @@ export class SqlitePublicationQueue {
         request = parseSqlitePublicationRequest(JSON.parse(row.request_json));
         if (request.service_id !== this.runtime.service_id || request.worker_version_id !== this.runtime.worker_version_id ||
           request.service_config_sha256 !== this.runtime.service_config_sha256 || request.request_id !== row.request_id || request.job_id !== row.job_id || request.show_id !== row.show_id ||
-          request.admission_window_id !== service.admission_window_id || JSON.stringify(request) !== row.request_json) throw new Error("Stored request differs");
+          request.admission_window_id !== service.admission_window_id || JSON.stringify(request) !== row.request_json ||
+          row.delivery_policy !== sqliteDeliveryPolicy(request)) throw new Error("Stored request differs");
       } catch {
         this.storage.sql.exec("UPDATE publication_jobs SET state = 'blocked', reason_code = 'stored_request_invalid' WHERE job_id = ?", row.job_id);
         this.operationRecords?.publicationChanged(row.job_id, "blocked", "stored_request_invalid", invocation);
         return { state: "blocked", job: this.statusRow(this.byJob(row.job_id)) };
+      }
+      if (row.delivery_policy === "preserve_committed" && this.storage.sql.exec(
+        "SELECT name FROM sqlite_master WHERE name = 'publication_shows'").toArray().length) {
+        this.storage.sql.exec(`UPDATE publication_jobs SET read_feed_generation =
+          (SELECT feed_generation FROM publication_shows WHERE show_id = ? AND lifecycle = 'published'
+            AND state_version = ? AND feed_generation > 0), read_show_version = ?, read_episode_id = ?, read_request_sha256 = ?
+          WHERE job_id = ? AND NOT EXISTS (SELECT 1 FROM publication_episodes WHERE show_id = ? AND episode_id = ?)`,
+        request.show_id, request.expected_show_state_version, request.expected_show_state_version, request.episode_id!,
+        row.request_sha256, row.job_id, request.show_id, request.episode_id!);
       }
       this.storage.sql.exec("UPDATE publication_jobs SET state = 'running' WHERE job_id = ? AND state = 'queued'", row.job_id);
       this.operationRecords?.publicationChanged(row.job_id, "running", undefined, invocation);
