@@ -2,6 +2,8 @@
 
 これは初回の停止記録。[承認後の診断改善・新規環境再試験](do_show_separation_live_retest_20261021.md)では2 Show・6 Episodeの機能確認に成功したが、初回環境のblockedを解放したものではない。
 
+その後、ユーザーの別指示で[2026-10-21に試験環境を廃棄](archive/cloudflare_issue48_cleanup_20261021.md)した。以下は削除前の記録であり、現在も資源が存在するという意味ではない。初回停止の一次証拠は非公開で保持している。
+
 ## 承認と対象
 
 ユーザーの実機テスト依頼に基づき、保持環境ではなく、新規の`storage_layout="show-v1"`サービスを1つ作成する。開発ブランチ`feat/show-do-separation`のcommit `4b58bb4`からLinux単体CLIを再構築し、そのCLIに埋め込まれたWorkerを配備する。

@@ -1,5 +1,7 @@
 # Issue #48: Show分離後のWorker更新の小規模実機確認
 
+本書は試験終了時点の記録。その後、ユーザーの別指示で[対象環境を廃棄](archive/cloudflare_issue48_cleanup_20261021.md)した。ローカル原本・journal・私有証跡は保持している。
+
 ## 承認と対象
 
 ユーザーは負荷試験を不要とし、リリース前の小規模なWorker更新試験を承認した。対象は[2 Show・6 Episodeの試験済みサービス](do_show_separation_live_retest_20261021.md) `i48-0147da37`だけ。commit `67293e1`から再構築したLinux単体CLIで、同じ設定・SQLite layout・DO namespaceのcode-only更新を1回行う。
