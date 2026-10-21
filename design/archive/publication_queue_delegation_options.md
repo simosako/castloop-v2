@@ -6,7 +6,7 @@
 
 2026-10-15追記: 管理者が段階Aの開発を承認し、v0.4.0を起点に`feat/publication-queue-submit`を作成した。[段階Aの実装契約](publication_queue_commit_stage_a.md)参照。以下は当初の比較・提案。
 後続の承認による段階A配備/測定は[実機結果](publication_queue_commit_measurement_20261015.md)、
-さらにclaim/staging/statusも移す現在の案C開発は[実装契約](../async_management_implementation.md)参照。
+さらにclaim/staging/statusも移す現在の案C開発は[実装契約](async_management_implementation.md)参照。
 案Cは実装・ローカルテストのみで、未配備・未実機測定。別Worker分離・権限変更は行っていない。
 
 ## 結論

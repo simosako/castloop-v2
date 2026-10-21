@@ -341,7 +341,7 @@ Cloudflare REST APIによる資源管理・deploy・R2転送とBunによるWorke
 
 **承認済みMVP範囲を実装・検証し、v0.2.0で公開済み。** 新規初期化・互換更新、六lifecycle操作、状態を検査するgateway、原子的受付・所有者検証、cache purge、300 MB音源、正式Linuxバイナリを受け入れた。必要な運用記録は自動期限を付けず保持し、未知IOの万能な復旧や旧形式変換を公開条件にはしなかった。
 
-[設計](../m6_content_lifecycle_plan.md)・[実装ログ](m6_implementation_log.md)・[実機受け入れ](m6_standalone_acceptance.md)・[v0.2.0 Release notes](../../docs/release-v0.2.0.md)を参照。
+[設計](m6_content_lifecycle_plan.md)・[実装ログ](m6_implementation_log.md)・[実機受け入れ](m6_standalone_acceptance.md)・[v0.2.0 Release notes](../../docs/release-v0.2.0.md)を参照。
 
 ### 一覧・独自ドメイン
 
@@ -372,5 +372,5 @@ M7として[外部RSSからの移行](../m7_rss_import_plan.md)を開発中。�
 TOMLは`@iarna/toml`でparse／serializeし、Zodのstrict schemaで検証する。keyはsnake_case。実装上の定義は[`packages/shared/src/index.ts`のv0.5.2版](https://github.com/simosako/castloop-v2/blob/v0.5.2/packages/shared/src/index.ts)と同ディレクトリのlifecycle・service admission等のschemaに置く。
 
 - 入力例: [Show](../show-template.toml)／[Episode](../episode-template.toml)
-- lifecycle・制御record: [M6設計](../m6_content_lifecycle_plan.md)
+- lifecycle・制御record: [M6設計](m6_content_lifecycle_plan.md)
 - 新規初期化／互換更新: [初期化設計](./m6_fresh_initialization.md)／[更新設計](./m6_compatible_updates.md)

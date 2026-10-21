@@ -5,7 +5,7 @@
 以下の旧baseline分析を根拠に受付・consumer・CLIを実装した。P0の事前測定とP1の追加guard整理は行っていない。
 実装は`818c642`としてcommit/Push済み。残る固定負担の具体案は
 [次のHTTP受付改善計画](http_acceptance_fixed_cost_optimization_plan.md)を参照する。
-既存の安全条件は[publication停止の診断](../publication_execution_recovery.md)と
+既存の安全条件は[publication停止の診断](publication_execution_recovery.md)と
 [承認済み方針](../m6_review_queue.md)を維持する。
 
 ## 結論

@@ -3,7 +3,7 @@
 2026-10-15。管理者から、細かなCPU最適化ではなくHTTPの責務を見直し、
 「保存先を返す→CLIがR2へupload→通知でWorker処理→完了polling」などを比較するよう依頼された。
 当初は比較・推奨案。管理者は同日に**案Cの実装とテストを承認**した。
-開発ブランチの実装契約・確認結果は[案C実装](../async_management_implementation.md)参照。
+開発ブランチの実装契約・確認結果は[案C実装](async_management_implementation.md)参照。
 Cloudflare配備・実機測定・資源/権限/課金変更はこの承認に含めない。他案は比較資料のまま。
 [現行HTTP整理](http_execution_cpu_breakdown_20261015.md)、[段階A実測](publication_queue_commit_measurement_20261015.md)、
 [先行するclaim移譲案](publication_queue_delegation_options.md)を踏まえる。

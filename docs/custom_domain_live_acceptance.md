@@ -348,4 +348,4 @@ Issue #7のrun3は、削除時の生HTTP status／bodyと完了receiptが残っ�
 - 第5〜8節の各確認項目の合格／不合格／未実施と、対応する保存ファイル名。
 - 最後の停止状態、保持したリソース、未解決事項。エラーのstderrと、JSONに`reason_code`があればその値を保存し、秘密やmetadata本文を報告へ転載しないこと。
 
-参照: [利用・復旧手順](custom_domains.md)、[実装計画](../design/custom_domain_plan.md)。
+参照: [利用・復旧手順](custom_domains.md)、[実装計画](../design/archive/custom_domain_plan.md)。

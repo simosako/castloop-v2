@@ -3,7 +3,7 @@
 v0.7.0は`storage_layout="show-v1"`の新規サービス専用。`publish-rss-import`は新Showの作成・初期probe・そのShowだけのResumeも含む。全体Pause/Resumeはなく、remote操作記録は`--show SHOW_ID`で対象を指定する。以下の過去の実機結果は新layoutの検証ではない。
 
 v0.6.0ではSQLiteサービス（サービス設定version 2）だけに公開する。公開には対応するCLI・検証済みWorker・private workspaceが必要。旧サービス設定version 1からのマイグレーション機能やjournal変換は提供しない。
-旧版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。v0.6.0の検証は[新規隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)、v0.7.0の変更は[リリースノート](release-v0.7.0.md)に記録した。超過した取込は切り詰めず、TOML編集後に再審査する。
+旧版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。v0.6.0の検証は[新規隔離環境の回帰試験](../design/archive/schema_v1_removal_live_test.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)、v0.7.0の変更は[リリースノート](release-v0.7.0.md)に記録した。超過した取込は切り詰めず、TOML編集後に再審査する。
 
 ローカルdownloadはサービスworkspace不要。既存の取り込み素材は引き続き検証して利用できるが、旧Queue公開cursorをSQLiteの受付記録として採用しない。
 

@@ -273,7 +273,7 @@ blockedで許可するreasonは既存の`execution_failed`、`execution_interrup
 
 実機確認は別承認後、新規隔離環境・1 Show・少数の短尺Episodeから始める。更新前後でactive状態を読み、両方runningだった取得組を更新中の証拠として数える。旧Feed bytes/ETag、旧MP3のRange/hash、候補MP3の404、完了後の新Feed・音源hash、最終Pauseを記録する。blocked故障注入・native再配送・実cacheのhit/miss・purge・CPU/負荷は、実際に確認した範囲を分けて報告する。
 
-第1段階の[追加中の実機確認](episode_add_feed_live_verification_20261021.md)は、本段階の更新中動作の実証には使わない。ローカル成功だけでnative output gate、完全な無停止、全Free適合、Issue #13恒久解消を主張しない。
+第1段階の[追加中の実機確認](archive/episode_add_feed_live_verification_20261021.md)は、本段階の更新中動作の実証には使わない。ローカル成功だけでnative output gate、完全な無停止、全Free適合、Issue #13恒久解消を主張しない。
 
 ## 12. 承認済みのレビュー結果
 
@@ -292,11 +292,11 @@ blockedで許可するreasonは既存の`execution_failed`、`execution_interrup
 
 模擬cacheの試験はnativeの完全なhit/missやpurgeの実証ではない。実機結果は別記録に分ける。
 
-その後、承認された[小規模実機確認](episode_update_feed_live_verification_20261021.md)にも成功した。1 Show・2 Episodeで3種類の更新を行い、前後ともrunningの16取得組で旧Feed200/304・新候補音源404を確認した。更新後のFeed切替・旧新音源のhash一致・最終ready/paused/drainedを確認し、資源と証跡を保持した。nativeのblocked故障注入やCPU/負荷試験は行っていない。
+その後、承認された[小規模実機確認](archive/episode_update_feed_live_verification_20261021.md)にも成功した。1 Show・2 Episodeで3種類の更新を行い、前後ともrunningの16取得組で旧Feed200/304・新候補音源404を確認した。更新後のFeed切替・旧新音源のhash一致・最終ready/paused/drainedを確認し、資源と証跡を保持した。nativeのblocked故障注入やCPU/負荷試験は行っていない。
 
 ## 参照
 
-- [第1段階のFeed継続配信設計](episode_add_feed_availability_plan.md)、[小規模実機確認](episode_add_feed_live_verification_20261021.md)
+- [第1段階のFeed継続配信設計](episode_add_feed_availability_plan.md)、[小規模実機確認](archive/episode_add_feed_live_verification_20261021.md)
 - [全体設計](initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)
 - [SQLite操作ガイド](../docs/sqlite_sequential_development.md)、[Worker更新の復旧契約](sqlite_worker_update_recovery.md)
 - [Cloudflare DO SQLite storage](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/): 同期SQL transactionと外部IOの分離。旧内容配信のために長い外部IO待ちを全要求の排他にしない。

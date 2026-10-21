@@ -4,7 +4,7 @@
 
 新layoutの配備後GETは制御DOだけでなく、固定した全Showのnative version/prepared/保守拘束も照合する。`targets_native_ready=false`なら、制御DOが新versionでもactivationを始めない。有限観測で停止後は、同じ既知配備のverifyで読取から続行し、全対象を確認した後だけ初回activationを行う。
 
-2026-10-21の[Show分離後の小規模実機確認](do_show_separation_worker_update_live_20261021.md)では、2 Show・6 Episodeを保持してcode-only更新した。native反映待ちで有限観測が停止した後、全対象の新version/preparedを読取確認し、再配備せず正式verifyからactivation/probeを完了。保守拘束解除、個別Resume、既存配信保持とmetadata-only公開2件を確認し、最終paused/ready/drainedとした。故障注入・負荷測定や旧layout移行の証拠ではない。
+2026-10-21の[Show分離後の小規模実機確認](archive/do_show_separation_worker_update_live_20261021.md)では、2 Show・6 Episodeを保持してcode-only更新した。native反映待ちで有限観測が停止した後、全対象の新version/preparedを読取確認し、再配備せず正式verifyからactivation/probeを完了。保守拘束解除、個別Resume、既存配信保持とmetadata-only公開2件を確認し、最終paused/ready/drainedとした。故障注入・負荷測定や旧layout移行の証拠ではない。
 
 Issue [#11](https://github.com/simosako/castloop-v2/issues/11)の最新コメントと、
 [#33の棚卸し](https://github.com/simosako/castloop-v2/issues/33)で確認した現行SQLite経路を対象とするv0.5.2の修正。

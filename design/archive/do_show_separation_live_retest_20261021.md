@@ -2,7 +2,7 @@
 
 後続の別承認による[Worker更新試験](do_show_separation_worker_update_live_20261021.md)では、本書の最終検証サービスをcode-only更新し、追加診断も配備した。以下の初回再試験のartifact・結果と、後から追加した未配備時点の補強記録は区別して保持する。
 
-さらにユーザーの別指示で[試験環境を廃棄](archive/cloudflare_issue48_cleanup_20261021.md)した。以下の「保持」は各試験終了時の記録である。資源削除後もローカル原本・journal・私有証跡は保持している。
+さらにユーザーの別指示で[試験環境を廃棄](cloudflare_issue48_cleanup_20261021.md)した。以下の「保持」は各試験終了時の記録である。資源削除後もローカル原本・journal・私有証跡は保持している。
 
 ## 承認と境界
 
@@ -34,7 +34,7 @@
 
 - 不正なpurge応答の`result_kind` / `success_kind`に型だけを記録する。返却値や任意fieldは保存しない。
 - 初期化/更新probe失敗に`probe_stage`を記録し、設定読取・設定照合・cache owner照会・owner照合・purge・完了保存等のどこで止まったかを区別する。service ID、実行Worker version、config hash、操作IDも記録する。
-- 秘密値・任意例外文を出さないこと、失敗後の再起動Alarmでもpurgeを再送しないこと、readinessの安全条件を保持することをローカルで確認した。再発時の保全・ログ照合手順は[操作ガイド](../docs/sqlite_sequential_development.md#異常時)を参照する。
+- 秘密値・任意例外文を出さないこと、失敗後の再起動Alarmでもpurgeを再送しないこと、readinessの安全条件を保持することをローカルで確認した。再発時の保全・ログ照合手順は[操作ガイド](../../docs/sqlite_sequential_development.md#異常時)を参照する。
 - 最終`bun test`: **461 pass / 0 fail**、62 files、58.76秒。`npm run check`とLinux単体CLI buildも成功。
 - この追加補強の再配備・再発確認・実機再試験は行っていない。次に変更を含むWorkerを配備してから追加fieldが有効になる。
 

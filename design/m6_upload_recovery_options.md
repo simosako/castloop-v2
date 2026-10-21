@@ -4,7 +4,7 @@
 
 現在の状態（2026-10-11）: この方式はv0.2.0以降の正式CLI／Workerへ接続済み。U1は引き続き未検証の仮定であり、取得応答喪失・強制終了・残存lockの万能な復旧は提供しない。末尾の未公開・release gateの記述は2026-10-04までの開発経緯で、現在の完成条件ではない。
 
-状態: **現行のCloudflare REST単一PUTを維持する方針を決定（2026-10-01）。切断後の遅延書込は未解決の懸念として保持する。** [M6設計](./m6_content_lifecycle_plan.md)と[実測ログ](archive/m6_implementation_log.md)の補足。
+状態: **現行のCloudflare REST単一PUTを維持する方針を決定（2026-10-01）。切断後の遅延書込は未解決の懸念として保持する。** [M6設計](archive/m6_content_lifecycle_plan.md)と[実測ログ](archive/m6_implementation_log.md)の補足。
 
 ## M6の決定事項
 

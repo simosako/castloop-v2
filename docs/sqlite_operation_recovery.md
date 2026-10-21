@@ -103,8 +103,8 @@ RSS全体は、実行中・保留中の子操作がない場合に`operation-can
 
 85%以上では、大量取り込みの開始前に「予定操作数×20KB＋コンテンツ増分の概算＋10MBの余裕」を確認し、1GBを超える見込みなら開始しない。進行中の操作の結果保存には、この事前制限を適用しない。
 
-操作・要求・成功応答・必要な履歴は保持する。自動期限削除や記録表全体の整理は行わない。通常運用の見積もりと、将来整理できる情報の考え方は[保存先と費用の設計](../design/sqlite_operation_record_storage_options.md)を参照する。
+操作・要求・成功応答・必要な履歴は保持する。自動期限削除や記録表全体の整理は行わない。通常運用の見積もりと、将来整理できる情報の考え方は[保存先と費用の設計](../design/archive/sqlite_operation_record_storage_options.md)を参照する。
 
 ## 確認済みの範囲
 
-ローカルSQL、模擬R2/REST、CLI entrypoint、Linuxプロセスの強制終了を確認した。加えて、[小規模なCloudflare実機試験](../design/sqlite_operation_records_live_verification_20261019.md)で、正常公開、PUT成功保存後のSIGKILLからの検証再開、成功応答保存前のSIGKILLでの再送拒否を確認した。実機性能・日次課金行数・大容量処理の保証とは区別する。実環境への配備・公開・削除は対象を明示して承認を受けてから行う。
+ローカルSQL、模擬R2/REST、CLI entrypoint、Linuxプロセスの強制終了を確認した。加えて、[小規模なCloudflare実機試験](../design/archive/sqlite_operation_records_live_verification_20261019.md)で、正常公開、PUT成功保存後のSIGKILLからの検証再開、成功応答保存前のSIGKILLでの再送拒否を確認した。実機性能・日次課金行数・大容量処理の保証とは区別する。実環境への配備・公開・削除は対象を明示して承認を受けてから行う。

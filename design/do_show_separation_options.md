@@ -2,7 +2,7 @@
 
 更新日: 2026-10-20。Issue #48への採用設計。**Show単位DO、Show単位Pause/Resume、全体Pauseの廃止、旧版互換・移行不要、および実装・ローカル検証は管理者承認済み。Cloudflareへの配備・資源変更・既存環境の削除は対象外。** v0.6.2の旧構成とは区別する。
 
-実装・ローカル検証は完了。結果と未確認範囲は[検証記録](do_show_separation_verification.md)を参照する。[初回の実機試行](do_show_separation_live_verification_20261020.md)は初期化probeで停止したが、診断改善後の[新規環境再試験](do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、配信確認に成功した。[2026-10-21の共有Worker更新](do_show_separation_worker_update_live_20261021.md)も、native反映待ちの明示verifyを経て全DOのprobe・解除・データ保持・更新後公開を確認した。初回purge障害の根本原因とnative同時IO性能は未確認。
+実装・ローカル検証は完了。結果と未確認範囲は[検証記録](archive/do_show_separation_verification.md)を参照する。[初回の実機試行](archive/do_show_separation_live_verification_20261020.md)は初期化probeで停止したが、診断改善後の[新規環境再試験](archive/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、配信確認に成功した。[2026-10-21の共有Worker更新](archive/do_show_separation_worker_update_live_20261021.md)も、native反映待ちの明示verifyを経て全DOのprobe・解除・データ保持・更新後公開を確認した。初回purge障害の根本原因とnative同時IO性能は未確認。
 
 ## 1. 結論
 
@@ -166,7 +166,7 @@ DO数そのものはFreeでも無制限だが、要求10万回/日、duration 13
 
 ローカル試験はCloudflare nativeのoutput gate・Alarm再配送・性能の実証とは区別する。実機測定は対象・範囲の別承認後とする。
 
-実装のローカル検証構成・故障注入ケースと限界は[検証記録](do_show_separation_verification.md)にまとめる。
+実装のローカル検証構成・故障注入ケースと限界は[検証記録](archive/do_show_separation_verification.md)にまとめる。
 
 ## 7. 不採用の案Bについての比較メモ
 
@@ -206,6 +206,6 @@ Issue #48は、**Showを業務上の自然な境界として採用し、通常�
 
 ## 参照
 
-- 設計: [全体設計](initial_design.md)、[SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧契約](sqlite_worker_update_recovery.md)、[操作記録の設計](sqlite_operation_records_schema.md)、[テスト責務監査](sqlite_test_responsibility_audit.md)、[v0.6.0 Queue削除計画](schema_v1_removal_plan.md)
+- 設計: [全体設計](initial_design.md)、[SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧契約](sqlite_worker_update_recovery.md)、[操作記録の設計](sqlite_operation_records_schema.md)、[テスト責務監査](archive/sqlite_test_responsibility_audit.md)、[v0.6.0 Queue削除計画](schema_v1_removal_plan.md)
 - 測定: [SQLite実機受け入れ・測定](archive/sqlite_sequential_measurement_20261016.md)、[36件規模の再試験・CPU測定](archive/sqlite_size36_measurement_20261017.md)
 - 公式: [DOの上限](https://developers.cloudflare.com/durable-objects/platform/limits/)、[DOの料金](https://developers.cloudflare.com/durable-objects/platform/pricing/)、[DO SQLite storage](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/)

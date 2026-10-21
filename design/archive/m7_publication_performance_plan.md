@@ -363,4 +363,4 @@ PUTがsettleした後、未lockの元bodyをcancelしてawaitする。並列stat
 
 前回のDLQ一致を終了証明とする明示解放は安全条件を満たさないため撤回した。古い失敗履歴と現在の
 実行/IOを区別し、未知tokenを保持する。実機Episodeの取消原因は未確定で、待機延長/制限変更・
-Cloudflare操作はしていない。停止経路と証跡採取は[publication診断](../publication_execution_recovery.md)参照。
+Cloudflare操作はしていない。停止経路と証跡採取は[publication診断](publication_execution_recovery.md)参照。

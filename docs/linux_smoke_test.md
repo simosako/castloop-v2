@@ -8,7 +8,7 @@
 
 下の実施記録は過去に同じLinux環境の新規workspaceで行った旧実装の結果です。別マシンでの検証済み結果ではありません。
 
-**次の開発予定:** [M6: Episode・Showの公開停止と削除](../design/m6_content_lifecycle_plan.md)を独自ドメイン対応より先に実装する予定です。v0.1.2には停止・削除・再開はありません。M6の受け入れ手順は対応版の完成後に追加します。ローカルTOMLやworkspaceの削除、`cleanup-job`では公開を停止できません。以下の独自ドメイン試験はM6とは別の後続試験として保持します。
+**次の開発予定:** [M6: Episode・Showの公開停止と削除](../design/archive/m6_content_lifecycle_plan.md)を独自ドメイン対応より先に実装する予定です。v0.1.2には停止・削除・再開はありません。M6の受け入れ手順は対応版の完成後に追加します。ローカルTOMLやworkspaceの削除、`cleanup-job`では公開を停止できません。以下の独自ドメイン試験はM6とは別の後続試験として保持します。
 
 対象はLinux x86-64（`uname -s`が`Linux`、`uname -m`が`x86_64`）です。macOS・Windows用バイナリの起動確認とCloudflare上の管理操作の検証は別に扱います。検証先にNode.js/npm、Wrangler、Bun、ソースコード、`ffprobe`は不要です。
 
@@ -156,7 +156,7 @@ feedにShow/Episodeのタイトル、`itunes:duration`、`workers.dev`上の`ato
 
 ## 第2段階: 独自ドメインへ移行して戻す（機能公開後のみ）
 
-**ここから先はv0.1.2でも実行できません。** `domain add/list/remove`と安全な復帰が実装・検証されたLinux x86-64配布版の公開後、その版のRelease notesと`castloop --help`を確認してから実施します。手順は承認済みの[独自ドメイン計画](../design/custom_domain_plan.md)に基づく**予定の受け入れ手順**です。コマンドや必要権限が公開版で変わった場合は、この文書を先に更新してください。
+**ここから先はv0.1.2でも実行できません。** `domain add/list/remove`と安全な復帰が実装・検証されたLinux x86-64配布版の公開後、その版のRelease notesと`castloop --help`を確認してから実施します。手順は承認済みの[独自ドメイン計画](../design/archive/custom_domain_plan.md)に基づく**予定の受け入れ手順**です。コマンドや必要権限が公開版で変わった場合は、この文書を先に更新してください。
 
 ### 7. ドメインと新しいバイナリを準備する
 

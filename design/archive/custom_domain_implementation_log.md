@@ -100,7 +100,7 @@ Show登録・local draft・staging・publication・lifecycleのidentity生成を
 
 ## 2026-10-04: v0.2.1に合わせた計画の縮小・更新
 
-[`custom_domain_plan.md`](../custom_domain_plan.md)をM6完成後の共通処理へ合わせて改訂した。今回は文書のみを変更し、以下は実装済み機能と追加予定の区別である。以下の2026-09-30以前の記述は履歴として保持する。
+[`custom_domain_plan.md`](custom_domain_plan.md)をM6完成後の共通処理へ合わせて改訂した。今回は文書のみを変更し、以下は実装済み機能と追加予定の区別である。以下の2026-09-30以前の記述は履歴として保持する。
 
 - `ensureWorkerDomain`は既存の別hostname/別Workerを拒否し、1サービス1ドメインをすでに制限している。domain listはこの0/1件の状態確認であり、複数ドメイン実装は不要。
 - 通常の配信・公開・削除・restoreはドメインに依存させない。別の停止・CAS・lock・cache・consumerを作るのではなく、M6の共通層を利用する。
@@ -114,13 +114,13 @@ Show登録・local draft・staging・publication・lifecycleのidentity生成を
 
 ## 2026-09-30: M6を先行する開発順へ変更
 
-公開済みv0.1.2の次マイルストーンを[Episode・Showの公開停止と削除（M6）](../m6_content_lifecycle_plan.md)とした。独自ドメインの承認済み方針とD0/D1基礎コードは維持し、完成・CLI公開・実機受け入れはM6の後続へ回す。domainコマンドは引き続き未公開。
+公開済みv0.1.2の次マイルストーンを[Episode・Showの公開停止と削除（M6）](m6_content_lifecycle_plan.md)とした。独自ドメインの承認済み方針とD0/D1基礎コードは維持し、完成・CLI公開・実機受け入れはM6の後続へ回す。domainコマンドは引き続き未公開。
 
 M6で導入する状態モデル・Showの受付排他・cache entrypointに合わせ、domain移行はactiveコンテンツだけを扱う必要がある。全Showの原子的移行停止やprimary設定の同期は未解決のままで、M6がそれを解決したとは扱わない。以下の過去ログは当時の調査・実装範囲として保持する。
 
 ## 2026-09-26: D0/D1の着手
 
-承認済みの計画は[`custom_domain_plan.md`](../custom_domain_plan.md)。既存サービスの変更や実機のCustom Domain作成はまだ行っていない。`domain add/list/remove`は公開CLIへ接続しておらず、v0.1.1の利用者に未完成の移行操作は見せない。
+承認済みの計画は[`custom_domain_plan.md`](custom_domain_plan.md)。既存サービスの変更や実機のCustom Domain作成はまだ行っていない。`domain add/list/remove`は公開CLIへ接続しておらず、v0.1.1の利用者に未完成の移行操作は見せない。
 
 ### 文書上確認したAPI契約
 

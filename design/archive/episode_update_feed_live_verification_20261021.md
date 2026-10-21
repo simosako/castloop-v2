@@ -4,7 +4,7 @@
 
 **新規隔離環境の正常系試験は成功した。** 1 Show・2短尺Episodeを公開した後、同じEpisodeへmetadata-only、audio-only、metadata/audio同時更新を順に実行した。3種類すべてで更新中の旧Feed配信を観測し、完了後の新Feed切替・音源検証・最終Pauseを確認した。
 
-[承認済み設計](episode_update_feed_availability_plan.md)の実装・ローカル試験成功後に、小規模実機確認を行うユーザーの承認に基づく。既存保持サービス、DNS・証明書・権限・課金・CPU上限は変更せず、削除・移行・fault injectionも行っていない。
+[承認済み設計](../episode_update_feed_availability_plan.md)の実装・ローカル試験成功後に、小規模実機確認を行うユーザーの承認に基づく。既存保持サービス、DNS・証明書・権限・課金・CPU上限は変更せず、削除・移行・fault injectionも行っていない。
 
 ## 実行物とローカル検証
 

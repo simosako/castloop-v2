@@ -1,6 +1,6 @@
 # Issue #48: Show分離後のWorker更新の小規模実機確認
 
-本書は試験終了時点の記録。その後、ユーザーの別指示で[対象環境を廃棄](archive/cloudflare_issue48_cleanup_20261021.md)した。ローカル原本・journal・私有証跡は保持している。
+本書は試験終了時点の記録。その後、ユーザーの別指示で[対象環境を廃棄](cloudflare_issue48_cleanup_20261021.md)した。ローカル原本・journal・私有証跡は保持している。
 
 ## 承認と対象
 

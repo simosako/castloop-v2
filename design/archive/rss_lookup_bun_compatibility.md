@@ -14,7 +14,7 @@ family省略または0で`autoSelectFamily: true`を指定した比較条件で�
 
 - checkout: `a500ba5f9c1d04896fadb22ea5eb35a1a0636514`。`packages/cli/src/rss-import-download.ts`はIssueの一次調査時点（`862c8ddf845914b32057d3b55d9b55614c33e38a`）と同一。
 - Bun: `1.4.2`、revision `744846f844374847c902b5e7fd59b4342a51ef99`。Linux x86-64。ビルドCIの固定版と一致する。
-- fixture: [`scripts/test-support/rss-lookup-probe.ts`](../scripts/test-support/rss-lookup-probe.ts)。Bunソース実行と`bun-linux-x64` compile実行を比較。compileは正式ビルドと同じ`env: "disable"`、`autoloadDotenv: false`、`autoloadBunfig: false`を指定。
+- fixture: [`scripts/test-support/rss-lookup-probe.ts`](../../scripts/test-support/rss-lookup-probe.ts)。Bunソース実行と`bun-linux-x64` compile実行を比較。compileは正式ビルドと同じ`env: "disable"`、`autoloadDotenv: false`、`autoloadBunfig: false`を指定。
 - HTTP/HTTPSサーバーは`127.0.0.1`と`::1`の一時portだけにbind。`.invalid`のhostnameを指定IPへ固定する。外部のfeed、DNSサーバー、Cloudflareサービスは使わない。
 - 観測用requestは本番のmethod、agent、family、lookupの単一IP返却、headers、signal、timeout、maxHeaderSizeを再現し、lookup引数の`hostname`/`family`/`all`/`hints`を記録する。比較条件だけfamily、autoSelectFamily、callback形式を変える。mockではなくnative HTTP/HTTPSを通す。
 - **本番transport自体のlookup引数に計測hookを追加したわけではない**。別途、importした実際の`defaultRssAssetTransport.request`でも4組み合わせの接続・本文を検証する。

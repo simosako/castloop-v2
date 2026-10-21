@@ -111,4 +111,4 @@ GraphQLは補助証跡。feed補完窓では小容量32 groups/32 requests、CPU
 - 配備前の停止/診断: `.local-test-data/results/20261015/delivery-50a5ba29/`。
 - raw tail、CLI stdout/stderr、frozen binary/driver、response hashes、health、GraphQL、hash manifestはGit管理外。
   API token・管理鍵・元metadata/媒体をGit/GitHubに追加しない。
-- [配信判定の事前生成](../public_delivery_projection.md)、[案C測定](async_management_measurement_20261015.md)。
+- [配信判定の事前生成](public_delivery_projection.md)、[案C測定](async_management_measurement_20261015.md)。

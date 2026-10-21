@@ -54,7 +54,7 @@ terminal resultはそのoperationの完了を示すだけで、global token空�
 Git管理外の`.local-test-data/results/20261015/management-95caf675/`。
 元metadata・音源・local secrets/journal・raw evidenceをGit/GitHubへ送らない。
 比較は[段階Aの実機結果](publication_queue_commit_measurement_20261015.md)と行うが、ペア化された同時条件の測定とは扱わない。
-実装契約は[案C実装](../async_management_implementation.md)。Issue #13の恒久解消は、この試験だけでは確定しない。
+実装契約は[案C実装](async_management_implementation.md)。Issue #13の恒久解消は、この試験だけでは確定しない。
 
 ## 実測結果
 

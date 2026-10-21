@@ -34,7 +34,7 @@ RSSのローカル取り込み→新規Showへの公開は維持するが、serv
 
 Worker更新はnative反映待機で一度停止しましたが、verified checkpointから再配備せず明示verifyで完了しました。初回の公開試験は外側240秒timeoutの設定ミスで中断したため、途中結果を再利用しない新規環境で全件を再試験しました。異常終了後の統一CLI診断・安全な回復/cleanupは[Issue #40](https://github.com/simosako/castloop-v2/issues/40)の別機能です。
 
-記録：[実装計画](../design/schema_v1_removal_plan.md)、[合格サマリー・CPU観測条件](../design/schema_v1_removal_live_test.md)。保存ログの全件回収、全Free適合、300MB実機公開、U1解決や万能復旧は保証しません。承認済み試験環境2件は[廃棄済み](../design/archive/cloudflare_issue24_cleanup_20261018.md)で、保持環境とローカル原本・journal・証跡は維持しています。
+記録：[実装計画](../design/schema_v1_removal_plan.md)、[合格サマリー・CPU観測条件](../design/archive/schema_v1_removal_live_test.md)。保存ログの全件回収、全Free適合、300MB実機公開、U1解決や万能復旧は保証しません。承認済み試験環境2件は[廃棄済み](../design/archive/cloudflare_issue24_cleanup_20261018.md)で、保持環境とローカル原本・journal・証跡は維持しています。
 
 ## 配布
 

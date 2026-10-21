@@ -88,5 +88,5 @@ run2の旧WorkerにはIssue #6が残っているため、pausedでも公開GET�
 ## 参照
 
 - [run2結果](https://github.com/simosako/castloop-v2/blob/a584a3bd2ec02752cf6997c299695648b71eb928/design/acceptance/custom-domains/20261011/run2/result.md)／[run4結果](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)
-- [M6新規初期化の記録](../m6_fresh_initialization.md)／[通常更新の記録](../m6_compatible_updates.md)／[M6受け入れ結果](m6_standalone_acceptance.md)
+- [M6新規初期化の記録](m6_fresh_initialization.md)／[通常更新の記録](m6_compatible_updates.md)／[M6受け入れ結果](m6_standalone_acceptance.md)
 - [Cloudflare: R2 bucketの削除](https://developers.cloudflare.com/r2/buckets/delete-buckets/)／[R2通知](https://developers.cloudflare.com/r2/buckets/event-notifications/)／[Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)

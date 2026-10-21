@@ -6,7 +6,7 @@
 
 `sqlite-sequential-v1`方式の操作ガイド。v0.6.0ではサービス設定version 2のみを扱い、`init`のflag省略時もSQLiteになる。`--publication-protocol sqlite-sequential-v1`は省略可能な既存指定として維持する。新たなschema選択オプションは設けない。
 既存Queueサービスや旧journalを変換するマイグレーション機能は提供しない。version 1設定は副作用前に拒否し、利用者は対応するv0.5.xのCLI/Workerを保持する。
-旧版v0.5.2は方式の明示指定が必要である。[同版ガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/sqlite_sequential_development.md)を参照する。v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.0の変更と検証は[リリースノート](release-v0.6.0.md)と[隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)を参照する。
+旧版v0.5.2は方式の明示指定が必要である。[同版ガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/sqlite_sequential_development.md)を参照する。v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.0の変更と検証は[リリースノート](release-v0.6.0.md)と[隔離環境の回帰試験](../design/archive/schema_v1_removal_live_test.md)を参照する。
 
 2026-10-17の[36件規模の確認](../design/archive/sqlite_size36_measurement_20261017.md)では、Episode公開36件とmetadata-only更新10回を完了した。
 status GET切断による中断後は成功済み15 jobを照合し、未開始分だけ継続した。通常HTTP CPU最大3/5ms、公開probe 60/60を保存ログへ対応付け、ready/paused/drainedで終了した。
@@ -219,12 +219,12 @@ resource作成・設定PUT・配備・access変更は再送しない。`setup_re
 
 ## 検証の限界
 
-Episode更新の[2026-10-21小規模実機確認](../design/episode_update_feed_live_verification_20261021.md)では、新規隔離環境の1 Show・2短尺Episodeでmetadata-only/audio-only/同時更新に成功した。前後ともrunningの16取得組で旧Feed200/304・候補音源404、完了後の切替・旧新音源hashと最終Pauseを確認した。nativeのblocked故障注入・再配送・CPU/負荷は未試験。旧形式の保持環境は変更していない。
+Episode更新の[2026-10-21小規模実機確認](../design/archive/episode_update_feed_live_verification_20261021.md)では、新規隔離環境の1 Show・2短尺Episodeでmetadata-only/audio-only/同時更新に成功した。前後ともrunningの16取得組で旧Feed200/304・候補音源404、完了後の切替・旧新音源hashと最終Pauseを確認した。nativeのblocked故障注入・再配送・CPU/負荷は未試験。旧形式の保持環境は変更していない。
 
-Issue #50の[2026-10-21小規模実機確認](../design/episode_add_feed_live_verification_20261021.md)では、世代別Feed方式の新規隔離環境で1 Show・2短尺Episodeの正常公開、追加中の旧Feed200/304・未公開音源404（前後ともrunningの16取得組）、成功後の新Feed切替、世代別snapshot保持、音源hash/HEAD/Range/304、最終Pauseを確認した。環境はready/paused/drainedで保持している。blocked時の継続配信は故障注入しておらず、ローカル回帰と区別する。負荷・CPUや完全なcache hit/missの実証ではない。
+Issue #50の[2026-10-21小規模実機確認](../design/archive/episode_add_feed_live_verification_20261021.md)では、世代別Feed方式の新規隔離環境で1 Show・2短尺Episodeの正常公開、追加中の旧Feed200/304・未公開音源404（前後ともrunningの16取得組）、成功後の新Feed切替、世代別snapshot保持、音源hash/HEAD/Range/304、最終Pauseを確認した。環境はready/paused/drainedで保持している。blocked時の継続配信は故障注入しておらず、ローカル回帰と区別する。負荷・CPUや完全なcache hit/missの実証ではない。
 
-ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の[初回実機試行](../design/do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなったが、[新規環境再試験](../design/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、feed/cover/audio配信とSHA-256・HEAD・Range・304を確認した。[2026-10-21のcode-only更新](../design/do_show_separation_worker_update_live_20261021.md)もnative反映待ちから正式verifyで再配備せず続行し、全DOのprobe・保守解除・既存データ保持・個別Resume・更新後公開を確認した。最後は両Showをpaused/ready/drainedにした。初回purge障害の根本原因、native同時IO性能・300MBは未確認。以下の過去の実機結果を新layoutの証拠へ流用しない。
-Worker/DO classは実platform型で型検査・browser bundle化し、Linux単体CLIにはSQLite Workerだけを埋め込む。v0.6.0整理後は[新規隔離環境](../design/schema_v1_removal_live_test.md)で短尺3件＋通常音源36件の公開・全音源hash/Range/304・lifecycle・Worker更新後の保持を確認した。保存ログの追加照会では通常Workerの外側/cache HTTP最大3/5msを確認したが、全invocation回収や将来負荷を保証しない。
+ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の[初回実機試行](../design/archive/do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなったが、[新規環境再試験](../design/archive/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、feed/cover/audio配信とSHA-256・HEAD・Range・304を確認した。[2026-10-21のcode-only更新](../design/archive/do_show_separation_worker_update_live_20261021.md)もnative反映待ちから正式verifyで再配備せず続行し、全DOのprobe・保守解除・既存データ保持・個別Resume・更新後公開を確認した。最後は両Showをpaused/ready/drainedにした。初回purge障害の根本原因、native同時IO性能・300MBは未確認。以下の過去の実機結果を新layoutの証拠へ流用しない。
+Worker/DO classは実platform型で型検査・browser bundle化し、Linux単体CLIにはSQLite Workerだけを埋め込む。v0.6.0整理後は[新規隔離環境](../design/archive/schema_v1_removal_live_test.md)で短尺3件＋通常音源36件の公開・全音源hash/Range/304・lifecycle・Worker更新後の保持を確認した。保存ログの追加照会では通常Workerの外側/cache HTTP最大3/5msを確認したが、全invocation回収や将来負荷を保証しない。
 **模擬storageのtransaction/AlarmとCloudflare実機のoutput gate・再配送、模擬purgeと実Workers Cache purgeは区別する。**
 小容量・36件公開・正式RSS・互換更新の実機機能確認は通過した。最新継続試験は公開probe 60/60と通常HTTP/cache/DO/Alarmの各区分の数値CPUを取得したが、platform上の全invocation回収の証明ではない。
 新経路の300MB実機公開と実機purge rate-limit retryは未確認。Issue #13恒久解消と、未試験経路・将来負荷を含む全Free適合は保証しない。

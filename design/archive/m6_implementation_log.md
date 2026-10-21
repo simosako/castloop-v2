@@ -608,7 +608,7 @@
 
 ## 2026-09-30: 次マイルストーンの設定と設計案
 
-管理者の依頼により、Episode/Showの公開停止・削除を次のマイルストーンM6とした。[設計案](../m6_content_lifecycle_plan.md)を作成し、全体設計・README・Agent Guideと独自ドメイン計画に開発順を反映した。
+管理者の依頼により、Episode/Showの公開停止・削除を次のマイルストーンM6とした。[設計案](m6_content_lifecycle_plan.md)を作成し、全体設計・README・Agent Guideと独自ドメイン計画に開発順を反映した。
 
 ### 設計案作成時の状態
 

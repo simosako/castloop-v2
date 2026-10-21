@@ -1,6 +1,6 @@
 # Issue #40: 操作記録と再開機能のローカル確認
 
-確認日: 2026-10-19。Linux x86-64、Bun 1.4.2。案Bの操作記録を通常のCLI・Worker経路へ接続し、ローカルSQLと模擬R2/RESTで確認した。利用方法は[操作ガイド](../docs/sqlite_operation_recovery.md)、表の定義は[DDL](sqlite_operation_records_schema.md)を参照する。
+確認日: 2026-10-19。Linux x86-64、Bun 1.4.2。案Bの操作記録を通常のCLI・Worker経路へ接続し、ローカルSQLと模擬R2/RESTで確認した。利用方法は[操作ガイド](../../docs/sqlite_operation_recovery.md)、表の定義は[DDL](../sqlite_operation_records_schema.md)を参照する。
 
 ## 自動テストとビルド
 

@@ -12,34 +12,19 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [v0.6.0のQueue方式コード削除計画](schema_v1_removal_plan.md) | Issue #24。v0.5.xのschema version 1機能は維持し、v0.6.0以降はSQLite単独化。削除範囲・共用処理の分離・検証・既存環境の保全 |
-| [SQLite単独化の実環境回帰試験](schema_v1_removal_live_test.md) | Issue #24。既存MP3を用いる隔離環境での段階試験と結果 |
-| [SQLite単独化後のテスト責務監査](sqlite_test_responsibility_audit.md) | Issue #34。残存テストの責務対応、統合範囲と保持する安全回帰、ローカル試験時間の比較 |
-| [旧Lifecycle設計と共通安全条件](m6_content_lifecycle_plan.md) | Queueの履歴。保持・削除の安全条件は維持するが、現行SQLiteの操作はSQLiteガイドを使う |
 | [単一PUT・U1](m6_upload_recovery_options.md) | 採用方式と未検証の仮定 |
 | [REST URLの構築](rest_url_construction.md) | パス要素のエンコード、R2 keyの区切り保持と単一PUTの不変条件 |
 | [承認済み方針](m6_review_queue.md) | 記録保持・安全条件・開発範囲 |
 | [SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md) | 一意upload→DO SQLite FIFO→Alarm。実DO入口・fresh init/readiness・正式CLI・配信接続のローカル実装と残る実機/P6の範囲 |
 | [SQLite方式の操作・制限](../docs/sqlite_sequential_development.md) | 既定のschema version 2 init、公開・pause/resume、限定検証続行、未知IO保全と未対応機能 |
 | [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md) | Issue #11/#33の現行経路。PUT成功checkpoint、配備後GET失敗の明示続行、旧journalと未知IOの境界（v0.5.2で提供） |
-| [中断した操作の確認・再開・取消](sqlite_operation_recovery_options.md) | Issue #40。方式の比較、採用したDO SQLite案、再開・取消・未公開素材削除の設計。利用は[操作ガイド](../docs/sqlite_operation_recovery.md)を参照 |
-| [サーバー側の操作記録の保存先比較](sqlite_operation_record_storage_options.md) | Issue #40。保存先の比較、DO SQLiteの無料枠と容量試算、記録の保持・整理・警告方針 |
-| [操作記録のIDとテーブル設計](sqlite_operation_records_schema.md) | Issue #40。作業と要求の区別、セッションを省く理由、要求元と時刻の記録、DO SQLiteのDDLと検索例 |
-| [操作記録と再開機能の確認結果](sqlite_operation_records_verification.md) | Issue #40。CLI/SQL/模擬R2の回帰、強制終了時のプロセス排他、記録量の小規模確認と実機確認の範囲 |
-| [操作記録の小規模実機確認](sqlite_operation_records_live_verification_20261019.md) | Issue #40。正常公開、成功応答の保存前後でのSIGKILL、再開と再送拒否、配信ハッシュと最終paused状態 |
+| [操作記録のIDとテーブル設計](sqlite_operation_records_schema.md) | Issue #40。作業と要求の区別、要求元と時刻の記録、Show DO SQLiteの現行DDLと検索例 |
 | [M7: RSS取り込み案](m7_rss_import_plan.md) | Issue #1への承認済み開発方針と実装経緯。現行の利用方法はRSSガイドを使う |
-| [RSS lookupのBun互換性調査](rss_lookup_bun_compatibility.md) | Issue #32。Bun 1.4.2のIPv4/IPv6・HTTP/HTTPSとcompile fixtureでは現行経路の形式不一致を再現せず。正式配布CLIの受け入れ試験とは区別する |
 | [Show/Episodeの項目別入力上限](show_episode_input_limits.md) | Issue #31。Apple基準・大きめ解釈の新規入力上限、保存履歴の無制限読取維持、検証範囲 |
-| [Show単位のDO分離](do_show_separation_options.md) | Issue #48。Show単位DO/Pause/Resume、全体Pause廃止、所属・共有更新の制御DOを採用。旧版互換・移行不要。ローカル回帰と2 Show・6 Episodeの実機機能確認が成功 |
-| [Show分離のローカル検証](do_show_separation_verification.md) | Issue #48。初期458テスト成功、型検査・Linux CLI build成功。独立SQLite/Alarm、blocked・個別Resume・共有更新の部分成功/応答喪失・native版反映待ち、正式CLI walkthrough。後続の実機結果は別記録 |
-| [Show分離の実機確認](do_show_separation_live_verification_20261020.md) | Issue #48。新規隔離サービスの初期化でcache purge成功を確認できずblocked。2 Show・各3 Episodeの計画は未実施。停止証跡と資源を保持 |
-| [purge障害の切り分けとShow分離の再試験](do_show_separation_live_retest_20261021.md) | Issue #48。新規サービスで2 Show・6 Episode公開、個別Pause/Resume・配信確認が成功。診断の失敗段階・型分類を追加後は461テスト成功。初回障害の根本原因は未確定 |
-| [Show分離後のWorker更新の実機確認](do_show_separation_worker_update_live_20261021.md) | Issue #48。既存2 Show・6 Episodeを保持するcode-only更新が成功。native反映待ちの停止後、再配備せず明示verifyで全DOのprobe・保守解除を完了。個別Resume・公開2件を確認し最終paused |
-| [Episode追加中のFeed継続配信](episode_add_feed_availability_plan.md) | Issue #50。第1段階をローカル実装。世代別Feedと原子的な切替、新規追加のrunning/隔離を確認できるblockedで旧内容を配信。将来の更新対応、保持方針、非互換形式と検証範囲 |
-| [Feed継続配信の小規模実機確認](episode_add_feed_live_verification_20261021.md) | Issue #50。新規隔離環境・1 Show・2短尺Episodeで成功。前後ともrunningの16取得組で旧Feed200/304・未公開音源404を確認。新世代切替・snapshot保持・最終Pauseを確認し資源を保持。blocked故障注入は未実施 |
-| [Episode更新中のFeed継続配信](episode_update_feed_availability_plan.md) | 承認済み・ローカル実装。metadata-only/audio-only/同時更新へ拡張し、旧Feed・旧MP3を継続配信。base revision/lifecycle guard、原子切替、blockedの隔離条件と新規環境専用のschema 4/5・health形式境界 |
-| [Episode更新の小規模実機確認](episode_update_feed_live_verification_20261021.md) | 1 Show・2短尺Episodeで3種類の更新に成功。実行中16取得組の旧Feed200/304・候補音源404、新Feed切替・旧新音源hash、最終Pauseを確認。試験スクリプトの出力parse停止後は成功操作を再送せず明示続行。資源・証跡を保持 |
-| [Show更新中のFeed継続配信（第3段階）](show_update_feed_availability_plan.md) | 全レビュー項目承認・ローカル実装済み。coverも世代別の不変objectへ保存し、公開URLを維持してFeed/画像を原子切替。Show/Episode共通guard、旧cover検証・復元参照、blocked条件、新規環境専用schema 5/6と別HTTP間の整合性の境界 |
-| [Show更新の小規模実機確認](show_update_feed_live_verification_20261021.md) | 新規1 Show・短尺Episode 1件で3種類のShow編集と追加metadata観測が成功。前後runningの計8取得組で旧Feed200/304、画像の旧hashまたはHEAD/ETagを確認。Episode更新・Show非公開化/復元、13 snapshot保持、最終Pause。資源・証跡を保持しnative故障注入は未実施 |
+| [Show単位のDO分離](do_show_separation_options.md) | Issue #48。Show単位DO/Pause/Resume、全体Pause廃止、所属・共有更新の制御DOを採用。旧版互換・移行不要 |
+| [Episode追加中のFeed継続配信](episode_add_feed_availability_plan.md) | Issue #50第1段階の設計。世代別Feedと原子的な切替、blockedで旧内容を配信、世代蓄積の保持方針。schema 3/4・固定coverは第1段階時点の記録 |
+| [Episode更新中のFeed継続配信](episode_update_feed_availability_plan.md) | metadata-only/audio-only/同時更新で旧Feed・旧MP3を継続配信。base revision/lifecycle guard、blockedの隔離条件。schema 4/5は第2段階時点の記録 |
+| [Show更新中のFeed継続配信（第3段階）](show_update_feed_availability_plan.md) | 現行のschema 5/6・必須health識別。coverも世代別の不変objectへ保存し、公開URLを維持してFeed/画像を原子切替。Show/Episode共通guard、旧cover検証・復元参照とblocked条件 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 
@@ -103,5 +88,32 @@ supersededの比較案・草案と完了済みIssue対応：
 - [M7: 公開所要時間の改善案](archive/m7_publication_performance_plan.md) — Issue #10の120秒待機上限と重複I/Oの分析・レビュー用計画
 - [CLI source完了順序](archive/cli_upload_source_completion.md) — Issue #30のローカル再現、Content-LengthとEOFの競合修正・回帰試験
 - [Worker tailのheartbeat試験](archive/worker_tail_heartbeat_tests.md) — Issue #29のevent loop遅延再現、期限判定とnative ping/pong疎通の分離、欠測判定を維持する回帰試験
+
+### 2026-10-21にアーカイブした文書（v0.7.0リリース後の整理）
+
+v0.7.0のリリースに伴い、完了済みIssueの検証・実機確認記録と比較検討をarchiveへ移した。現行の契約・操作は上表の設計書と各ガイドが担う。過去の障害理由、観測条件、測定値を調べるときだけ参照する。
+
+検証・実機確認の記録：
+
+- [SQLite単独化の実環境回帰試験](archive/schema_v1_removal_live_test.md) — Issue #24。短尺3件＋通常音源36件の公開、全音源照合、Worker更新後の保持、保存ログのCPU観測条件
+- [SQLite単独化後のテスト責務監査](archive/sqlite_test_responsibility_audit.md) — Issue #34。v0.6.0基準commitでの残存テストの責務対応、統合範囲と保持した安全回帰
+- [操作記録と再開機能のローカル確認](archive/sqlite_operation_records_verification.md) — Issue #40。CLI/SQL/模擬R2の回帰、強制終了時のプロセス排他、記録量の小規模確認
+- [操作記録の小規模実機確認](archive/sqlite_operation_records_live_verification_20261019.md) — Issue #40。正常公開、成功応答の保存前後でのSIGKILL、再開と再送拒否、配信ハッシュと最終paused状態
+- [Show分離のローカル検証](archive/do_show_separation_verification.md) — Issue #48。独立SQLite/Alarm、blocked・個別Resume・共有更新の故障注入、正式CLI walkthrough
+- [Show分離の実機確認（初回）](archive/do_show_separation_live_verification_20261020.md) — Issue #48。初期化のcache purge確認でblockedとなった初回停止と停止証跡の記録
+- [purge障害の切り分けとShow分離の再試験](archive/do_show_separation_live_retest_20261021.md) — Issue #48。2 Show・6 Episode公開、個別Pause/Resume・配信確認が成功。初回purge障害の根本原因は未確定
+- [Show分離後のWorker更新の実機確認](archive/do_show_separation_worker_update_live_20261021.md) — Issue #48。既存データを保持するcode-only更新が成功。native反映待ち後、再配備せず明示verifyで全DOのprobe・保守解除を完了
+- [Episode追加中のFeed継続配信の実機確認](archive/episode_add_feed_live_verification_20261021.md) — Issue #50。前後ともrunningの16取得組で旧Feed 200/304・未公開音源404、新世代切替・snapshot保持・最終Pause
+- [Episode更新中のFeed継続配信の実機確認](archive/episode_update_feed_live_verification_20261021.md) — 3種類の更新で更新中の旧Feed配信、完了後の切替・旧新音源hash・最終Pauseを確認
+- [Show更新中のFeed継続配信の実機確認](archive/show_update_feed_live_verification_20261021.md) — 3種類のShow編集と追加metadata観測が成功。旧Feed 200/304、画像の旧hashまたはHEAD/ETag、13 snapshot保持、最終Pause
+
+比較・検討と旧設計：
+
+- [中断した操作の確認・再開・取消](archive/sqlite_operation_recovery_options.md) — Issue #40。方式比較と採用したDO SQLite案の設計。利用は[操作ガイド](../docs/sqlite_operation_recovery.md)、表構成は[現行DDL](sqlite_operation_records_schema.md)を参照
+- [サーバー側の操作記録の保存先比較](archive/sqlite_operation_record_storage_options.md) — Issue #40。保存先の比較、DO SQLiteの無料枠と容量試算、記録の保持・整理・警告方針
+- [RSS lookupのBun互換性調査](archive/rss_lookup_bun_compatibility.md) — Issue #32。Bun 1.4.2のIPv4/IPv6・HTTP/HTTPSとcompile fixtureでは現行経路の形式不一致を再現せず。正式配布CLIの受け入れ試験とは区別する
+- [旧M6 Lifecycle設計](archive/m6_content_lifecycle_plan.md) — Queue時代の停止・削除設計。共通の保持・不可逆削除の安全条件は[承認済み方針](m6_review_queue.md)とSQLiteガイドが現行
+
+あわせて、本文をv0.6.0整備時にarchiveへ移していた7件の案内スタブ（async_management_implementation、custom_domain_plan、m6_compatible_updates、m6_completion_recovery、m6_fresh_initialization、public_delivery_projection、publication_execution_recovery）をdesign/直下から削除し、参照リンクをarchiveへ付け替えた。
 
 現在の仕様を変更したら直下の文書を更新する。完了した開発記録はarchiveへ移し、参照リンクも更新する。未解決の制約や承認済みの安全条件を、単に開発が完了したという理由でアーカイブしない。

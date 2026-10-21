@@ -112,6 +112,6 @@ add/removeの完了は接続/TLS、全対象feed・purge、R2/ローカル設定
 ## 参照
 
 - [実装ログ](custom_domain_implementation_log.md) — M6先行前の履歴と今回の確認。
-- [M6通常更新](m6_compatible_updates.md) / [M6公開状態](../m6_content_lifecycle_plan.md) — 既存の停止・所有者・配信条件。
+- [M6通常更新](m6_compatible_updates.md) / [M6公開状態](m6_content_lifecycle_plan.md) — 既存の停止・所有者・配信条件。
 - [Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) / [Workers Domains API](https://developers.cloudflare.com/api/resources/workers/subresources/domains/) — 接続・DNS/TLS・証明書。
 - [Cloudflare DNS full setup](https://developers.cloudflare.com/dns/zone-setups/full-setup/) / [partial setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/) — 権威DNSの前提。
