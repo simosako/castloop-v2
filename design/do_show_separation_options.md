@@ -2,7 +2,7 @@
 
 更新日: 2026-10-20。Issue #48への採用設計。**Show単位DO、Show単位Pause/Resume、全体Pauseの廃止、旧版互換・移行不要、および実装・ローカル検証は管理者承認済み。Cloudflareへの配備・資源変更・既存環境の削除は対象外。** v0.6.2の旧構成とは区別する。
 
-実装・ローカル検証は完了。結果と未確認範囲は[検証記録](do_show_separation_verification.md)を参照する。実機配備・性能測定は未実施。
+実装・ローカル検証は完了。結果と未確認範囲は[検証記録](do_show_separation_verification.md)を参照する。[初回の実機試行](do_show_separation_live_verification_20261020.md)は初期化probeで停止したが、診断改善後の[2026-10-21の新規環境再試験](do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、配信確認に成功した。初回障害の根本原因とnative同時IO性能・共有更新は未確認。
 
 ## 1. 結論
 

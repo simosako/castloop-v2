@@ -177,6 +177,16 @@ castloop service-status
 これはstatus/health等の読み直しであり、公開・登録・pause/resume・配備のPOST、素材PUT、POST形式の一覧要求を再送する機能ではない。
 再試行診断は固定reason・HTTP status・回数・経過時間・対象URLのhashのみで、鍵・URL・本文や任意例外文は出さない。
 
+cache purgeの未確認結果は再送せず、診断の`failure_kind`でAPI例外（`call_threw`）と不正な成功応答（`invalid_acknowledgement`）を区別する。例外文は記録せず、`exception_kind`の固定分類だけを残す。不正応答は`result_kind`と`success_kind`に型だけを記録し、本文・任意のfieldは記録しない。分類が`internal_error`でも、purge未実行や再送の安全性を意味しない。
+
+初期化/更新probeの失敗ログ`sqlite_runtime_setup / runtime_probe_failed`には、`probe_stage`（`target`、`admission`、`config_read`、`config_validate`、`cache_describe`、`cache_validate`、`cache_purge`、`commit`）とservice ID・実行Worker version・config hash・操作IDを記録する。再発時は秘密鍵を共有せず、次を読み取りで保全する。
+
+1. 同じ操作のローカルjournal、`service-status`と対象Showの`show-status`。blockedや未確認要求は再送しない。
+2. 発生区間・対象Worker/versionに絞った保存ログ。`sqlite_runtime_setup`の操作IDと`probe_stage`を確認する。
+3. `cache_purge`段階なら近接する`sqlite_cache_purge`の対象Show・reason・attempt・will_retry・failure/exception/型分類を確認する。probe用Show IDは`probe-`＋操作IDの先頭8文字。platformのDO ID・trace/span・時刻も併せて照合し、先頭8文字だけで要求を同一視しない。
+
+任意例外文・stack・応答本文・秘密値をログへ追加しない。保存ログの欠測や分類`other`なら原因未確定として扱う。この追加診断は、変更を含むCLI/Workerを次に配備してから有効になる。
+
 既に凍結した`publish-*`を再度呼んだ場合も、同じ要求のstatus確認だけを行う。
 `failed`は公開書込前の確定的な入力/base失敗、`blocked`は途中停止・書込不明・purge失敗等であり、同Showの後続と配信を停止する。別Showの通常操作・再開・登録は妨げないが、共有Worker更新はdrainできないため拒否する。
 時間経過やHEAD不在で解除しない。blockedのretry/releaseは提供していない。
@@ -200,7 +210,7 @@ resource作成・設定PUT・配備・access変更は再送しない。`setup_re
 
 ## 検証の限界
 
-ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の実機配備・性能測定は未実施。以下の過去の実機結果を新layoutの証拠へ流用しない。
+ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の[初回実機試行](../design/do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなったが、[2026-10-21の新規環境再試験](../design/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、feed/cover/audio配信とSHA-256・HEAD・Range・304を確認し、最後は両Showをpaused/ready/drainedにした。初回purge障害の根本原因、native同時IO性能・共有更新・300MBは未確認。以下の過去の実機結果を新layoutの証拠へ流用しない。
 Worker/DO classは実platform型で型検査・browser bundle化し、Linux単体CLIにはSQLite Workerだけを埋め込む。v0.6.0整理後は[新規隔離環境](../design/schema_v1_removal_live_test.md)で短尺3件＋通常音源36件の公開・全音源hash/Range/304・lifecycle・Worker更新後の保持を確認した。保存ログの追加照会では通常Workerの外側/cache HTTP最大3/5msを確認したが、全invocation回収や将来負荷を保証しない。
 **模擬storageのtransaction/AlarmとCloudflare実機のoutput gate・再配送、模擬purgeと実Workers Cache purgeは区別する。**
 小容量・36件公開・正式RSS・互換更新の実機機能確認は通過した。最新継続試験は公開probe 60/60と通常HTTP/cache/DO/Alarmの各区分の数値CPUを取得したが、platform上の全invocation回収の証明ではない。

@@ -64,7 +64,41 @@ test("a thrown or malformed purge result is unknown and is never resent", async 
     } }, { showId: "daily" }, { delay: async () => { waits++; }, onEvent: (event) => events.push(event) })).rejects.toThrow("unconfirmed");
     expect(calls).toBe(1);
     expect(waits).toBe(0);
-    expect(events).toEqual([{ event: "sqlite_cache_purge", show_id: "daily", reason_code: "purge_unconfirmed", attempt: 1, will_retry: false }]);
+    expect(events).toEqual([{ event: "sqlite_cache_purge", show_id: "daily", reason_code: "purge_unconfirmed", attempt: 1, will_retry: false,
+      ...(malformed ? { failure_kind: "invalid_acknowledgement", result_kind: "undefined", success_kind: "undefined" } :
+        { failure_kind: "call_threw", exception_kind: "other" }) }]);
+    expect(JSON.stringify(events)).not.toMatch(/Private|private@|secret/);
+  }
+});
+
+test("malformed acknowledgement diagnostics retain only value types, never response contents", async () => {
+  for (const [result, resultKind, successKind] of [[null, "null", "undefined"], [42, "number", "undefined"],
+    [{ success: "private@example.com secret", errors: ["Private title"] }, "object", "string"],
+    [{ success: null }, "object", "null"], [{}, "object", "undefined"]] as const) {
+    let calls = 0;
+    const events: SqliteCachePurgeEvent[] = [];
+    await expect(purgeSqliteCache({ async purge() { calls++; return result as never; } }, { showId: "daily" }, {
+      delay: async () => { throw new Error("Malformed acknowledgements must not be retried"); }, onEvent: (event) => events.push(event),
+    })).rejects.toThrow("unconfirmed");
+    expect(calls).toBe(1);
+    expect(events).toEqual([{ event: "sqlite_cache_purge", show_id: "daily", reason_code: "purge_unconfirmed", attempt: 1,
+      will_retry: false, failure_kind: "invalid_acknowledgement", result_kind: resultKind, success_kind: successKind }]);
+    expect(JSON.stringify(events)).not.toMatch(/Private|private@|secret/);
+  }
+});
+
+test("purge exceptions expose only allowlisted categories without enabling retries", async () => {
+  for (const [error, kind] of [[new TypeError("Private secret"), "type_error"],
+    [new Error("Internal error; private@example.com secret"), "internal_error"],
+    [new Error("Private internal error secret"), "other"], ["Internal error; secret", "other"]] as const) {
+    let calls = 0;
+    const events: SqliteCachePurgeEvent[] = [];
+    await expect(purgeSqliteCache({ async purge() { calls++; throw error; } }, { showId: "daily" }, {
+      delay: async () => { throw new Error("Unknown purges must not be retried"); }, onEvent: (event) => events.push(event),
+    })).rejects.toThrow("unconfirmed");
+    expect(calls).toBe(1);
+    expect(events[0]).toMatchObject({ failure_kind: "call_threw", exception_kind: kind, will_retry: false });
+    expect(JSON.stringify(events)).not.toMatch(/Private|private@|secret/);
   }
 });
 

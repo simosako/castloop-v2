@@ -14,6 +14,7 @@ import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-pub
 import { pendingSqliteUpdate, SqliteRuntimeUpdates } from "./sqlite-runtime-update";
 
 type SetupRow = { operation_id: string; state: "scheduled" | "running" | "ready" | "blocked"; request_json: string };
+type ProbeStage = "target" | "admission" | "config_read" | "config_validate" | "cache_describe" | "cache_validate" | "cache_purge" | "commit";
 export type SqliteCacheRuntime = { worker_version_id: string; service_config_sha256: string; cache_enabled: boolean };
 export type SqliteRuntimeCache = { describe: () => Promise<SqliteCacheRuntime>; purge: (showId: string) => Promise<void> };
 
@@ -79,10 +80,13 @@ export class SqliteServiceRuntime {
     try {
       this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'running' WHERE id = 1");
       await this.storage.sync();
+      let stage: ProbeStage = "target";
       try {
         this.requireTarget(JSON.parse(setup.request_json));
+        stage = "admission";
         const snapshot = this.queue.snapshot();
         if (snapshot.state !== "paused" || !snapshot.drained) throw new Error("Runtime probe admission changed");
+        stage = "config_read";
         const object = await this.bucket.get("system/service.toml");
         if (!object?.body || object.size < 1 || object.size > 16384) {
           await object?.body?.cancel(); throw new Error("Runtime config binding probe failed");
@@ -95,13 +99,18 @@ export class SqliteServiceRuntime {
         } finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
         const bytes = new Uint8Array(length); let offset = 0;
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+        stage = "config_validate";
         if (length !== object.size || await sqliteServiceConfigHash(parseSqliteServiceConfig(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes))) !==
           await sqliteServiceConfigHash(this.config)) throw new Error("Runtime bucket config differs");
+        stage = "cache_describe";
         const cached = await this.cache.describe(), identity = this.queue.identity();
+        stage = "cache_validate";
         if (cached.worker_version_id !== identity.worker_version_id || cached.service_config_sha256 !== identity.service_config_sha256 || !cached.cache_enabled) {
           throw new Error("Runtime cache owner differs");
         }
+        stage = "cache_purge";
         await this.cache.purge(`probe-${setup.operation_id.slice(0, 8).toLowerCase()}`);
+        stage = "commit";
         this.storage.transactionSync(() => {
           this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'ready' WHERE id = 1");
           this.storage.sql.exec(`UPDATE publication_runtime_updates SET state = 'completed' WHERE operation_id = ? AND state = 'activated'
@@ -111,7 +120,8 @@ export class SqliteServiceRuntime {
       } catch {
         this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'blocked' WHERE id = 1");
         await this.storage.sync();
-        console.error(JSON.stringify({ event: "sqlite_runtime_setup", operation_id: setup.operation_id, reason_code: "runtime_probe_failed" }));
+        console.error(JSON.stringify({ event: "sqlite_runtime_setup", ...this.actual, operation_id: setup.operation_id,
+          reason_code: "runtime_probe_failed", probe_stage: stage }));
       }
       return true;
     } finally { this.probing = false; }
