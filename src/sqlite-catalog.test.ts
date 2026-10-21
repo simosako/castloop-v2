@@ -12,7 +12,7 @@ function fixture() {
   const show = (id: string, lifecycle = "published", title = id) => {
     content.registerShow(id, crypto.randomUUID());
     value.storage.sql.exec("UPDATE publication_shows SET lifecycle = ? WHERE show_id = ?", lifecycle, id);
-    value.storage.sql.exec("INSERT INTO publication_show_content VALUES (?, ?, 'jpg')", id, JSON.stringify({ title }));
+    value.storage.sql.exec("INSERT INTO publication_show_content VALUES (?, ?, 'jpg', 1, ?, 4)", id, JSON.stringify({ title }), "a".repeat(64));
   };
   const catalog = (input: unknown) => readSqliteCatalog(value.storage, sqliteCatalogRequestSchema.parse(input), value.runtime, "https://public.example.com");
   return { ...value, content, show, catalog };

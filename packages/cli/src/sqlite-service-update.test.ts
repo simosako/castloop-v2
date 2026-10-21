@@ -9,6 +9,27 @@ import { join } from "node:path";
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
 const wait = { attempts: 2, delay: async () => {} };
+
+test("Show/Episode read-boundary and cover storage formats are required before preparing or deploying an update", async () => {
+  for (const [field, marker] of [["publication_read_boundary", undefined], ["publication_read_boundary", "episode-revision-v1"],
+    ["publication_read_boundary", "unknown"], ["cover_storage", undefined], ["cover_storage", "fixed-key-v1"]] as const) {
+    const { value, id } = await fixture();
+    value.calls.length = 0;
+    const transport: typeof value.transport = async (input, init) => {
+      const response = await value.transport(input, init);
+      if (new URL(input instanceof Request ? input.url : input).pathname.endsWith("/health")) {
+        const body = await response.json() as Record<string, unknown>;
+        if (marker === undefined) delete body[field];
+        else body[field] = marker;
+        return new Response(JSON.stringify(body), { headers: response.headers });
+      }
+      return response;
+    };
+    await expect(updateSqliteService(value.root, value.config, id, "new source", { ...value.options, transport }, wait)).rejects.toThrow();
+    expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+    expect(readSqliteServiceUpdate(value.root, value.config, id)).toBeNull();
+  }
+});
 async function fixture() {
   const value = await sqliteServiceFixture(); values.push(value);
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "initial source", value.options, wait);
@@ -44,6 +65,26 @@ test("compatible REST updates preserve the namespace/content, finish paused afte
   const journal = readFileSync(join(value.root, ".castloop", "sqlite-service-updates", value.config.service_id, `${id}.json`), "utf8");
   expect(journal).not.toContain("new source"); expect(journal).not.toContain("private-token"); expect(journal).not.toContain("CASTLOOP_ADMIN_KEY");
 });
+
+for (const format of [undefined, "fixed-key-v1"]) {
+  test(`incompatible Feed storage ${format ?? "missing"} is refused before update preparation or deployment`, async () => {
+    const { value } = await fixture(); value.calls.length = 0;
+    await expect(updateSqliteService(value.root, value.config, crypto.randomUUID(), "new source", {
+      ...value.options, transport: async (input, init) => {
+        const response = await value.transport(input, init);
+        if (new URL(String(input)).pathname.endsWith("/health")) {
+          const body = await response.json() as Record<string, unknown>;
+          delete body.feed_storage;
+          if (format !== undefined) body.feed_storage = format;
+          return Response.json(body);
+        }
+        return response;
+      },
+    }, wait)).rejects.toThrow();
+    expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+    expect(value.showCalls).toEqual([]);
+  });
+}
 
 for (const lost of ["update-prepare", "deploy"] as const) {
   test(`unknown ${lost} outcome is never resent or adopted from REST`, async () => {

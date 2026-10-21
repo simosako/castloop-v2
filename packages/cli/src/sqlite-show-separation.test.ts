@@ -30,7 +30,7 @@ async function fixture() {
 
 test("a blocked Show does not stop another Show's publication, independent Resume, delivery or new registration", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
-  f.hooks.afterPut = async (key) => { if (key === "public/podcasts/a/feed.xml") throw new Error("Unknown publication write response"); };
+  f.hooks.afterPut = async (key) => { if (key.startsWith("public/podcasts/a/feeds/")) throw new Error("Unknown publication write response"); };
   await expect(f.run("publish-show", ["a"])).rejects.toThrow("blocked");
   f.hooks.afterPut = undefined;
   expect(await f.run("publish-show", ["b"])).toMatchObject({ state: "succeeded" });
@@ -59,7 +59,7 @@ test("separate Alarms progress concurrently while one Show awaits external IO an
   const f = await fixture(); await f.create("a"); await f.create("b");
   const entered = Promise.withResolvers<void>(), settle = Promise.withResolvers<void>();
   f.hooks.beforePut = async (key) => {
-    if (key === "public/podcasts/a/feed.xml") { entered.resolve(); await settle.promise; }
+    if (key.startsWith("public/podcasts/a/feeds/")) { entered.resolve(); await settle.promise; }
   };
   const pending = f.run("publish-show", ["a"]);
   try {

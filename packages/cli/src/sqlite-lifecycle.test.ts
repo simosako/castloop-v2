@@ -81,7 +81,7 @@ test("catalog client accepts bounded pages of escaped Unicode titles above the p
     await value.command("create-show", [id, "https://example.com"]);
     const storage = value.nodes.get(id)!.fixture.storage;
     storage.sql.exec("UPDATE publication_shows SET lifecycle = 'published' WHERE show_id = ?", id);
-    storage.sql.exec("INSERT INTO publication_show_content VALUES (?, ?, 'jpg')", id, JSON.stringify({ title: "\u0001あ".repeat(100) }));
+    storage.sql.exec("INSERT INTO publication_show_content VALUES (?, ?, 'jpg', 1, ?, 4)", id, JSON.stringify({ title: "\u0001あ".repeat(100) }), "a".repeat(64));
   }
   const client = new SqliteServiceClient(value.config, administratorKey(value.root), value.transport);
   const page = await client.catalog({ kind: "show", include_deleted: false });

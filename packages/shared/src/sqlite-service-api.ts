@@ -9,6 +9,9 @@ export const sqliteRegistrationSchema = sqliteRuntimeRequestSchema.extend({ show
 export const sqliteRegistryStatusSchema = z.object({ show_id: sqliteRegistrationSchema.shape.show_id,
   reservation_id: z.uuid().nullable(), state: z.enum(["missing", "requested", "registered"]) }).strict();
 export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protocol: z.literal(sqlitePublicationProtocol),
+  feed_storage: z.literal("immutable-generation-v1"),
+  cover_storage: z.literal("immutable-generation-v1"),
+  publication_read_boundary: z.literal("show-episode-v1"),
   scope: z.enum(["service", "show"]).optional(), show_id: sqliteRegistrationSchema.shape.show_id.optional(),
   show_count: z.number().int().nonnegative().optional(), paused_shows: z.number().int().nonnegative().optional(),
   maintenance_operation_id: z.uuid().nullable().optional(),

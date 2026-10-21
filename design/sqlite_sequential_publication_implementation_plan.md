@@ -1,5 +1,9 @@
 # DO SQLite逐次キューによる公開処理の実装計画
 
+> 2026-10-21第3段階追補: [Show更新中の継続配信契約](show_update_feed_availability_plan.md)を実装した。公開済みShow更新も旧Feed/cover/audioを継続配信し、coverを不変snapshotへ保存してmetadata/cover identity/Feedをpurge後に原子切替する。Feed/Show/coverと対象種別のguard、Show更新の旧画像HEAD検証、復元の保存済みcover再利用を必須とする。公開cover URLは維持し、別HTTP要求間の世代一致までは保証しない。内部queue/content schema **5/6**、必須`cover_storage="immutable-generation-v1"`と`publication_read_boundary="show-episode-v1"`へ更新。以下の第1・第2段階の範囲・形式は導入履歴で、現行は本追補を優先する。初回Show/lifecycle/明示停止のgate、blocked FIFO停止、未知IO保全、移行なしは維持する。
+
+> 2026-10-21追補: Issue #50の[Feed継続配信契約](episode_add_feed_availability_plan.md)を優先する。固定Feed上書きと一律running/blocked配信503を改め、全Feed writerを世代別の不変R2 snapshotへ統一した。purge後のcontent/media/Feed世代/job/操作記録/次回Alarm予約の原子完了は維持する。新規Episode追加のみ、開始時に保存した保護根拠が成立するrunning/blockedで旧公開内容を配信する。その他の更新・lifecycleや要求破損は従来どおり停止する。内部queue/content schemaは3/4、新規環境専用・変換なし。下記の固定key・旧schema・一律503の記述は導入時の履歴である。
+
 > 2026-10-20追補: Issue #48の開発版では[Show分離の採用契約](do_show_separation_options.md)を優先する。1サービス1 DO/全体FIFO/全体Pauseは廃止し、ShowごとのDO/FIFO/Pause/windowと、所属・共有更新の制御DOへ分ける。以下の一件ずつ実行・未知IO保全・purge-before-completion・原子的な受付/完了の安全条件はShow内で維持する。旧layoutは維持・移行せず、必須`storage_layout="show-v1"`で配備前に拒否する。
 
 > 適用版: 本書の基礎契約は現行SQLiteでも維持する。実装順序・進捗欄はv0.5.0導入時の履歴であり、旧方式併存・明示flag必須・二Worker同梱の記述は当時のもの。v0.6.0向け開発ではSQLite既定・単独Workerとし、旧サービス設定version 1からの移行機能は提供しない。[現行設計](initial_design.md)と[削除計画](schema_v1_removal_plan.md)を優先する。
@@ -8,6 +12,8 @@
 計画保存と、それに基づく開発・ローカルテストの指示を受けた。その後、適切な区切りでcommitしながら実装を続ける指示を受けた。push、Cloudflare資源作成・配備、実機測定、既存データ移行は別承認とする。
 
 ## 1. 採用する基本形
+
+2026-10-21追加追補: [Episode更新中のFeed継続配信契約](episode_update_feed_availability_plan.md)を実装し、追加に加えて既存Episode更新も開始時のrevision/lifecycle guardで旧内容を配信する。内部queue/content schemaは4/5、必須health識別`publication_read_boundary="episode-revision-v1"`を追加。冒頭の第1段階の範囲・形式を本追補で拡張する。旧形式の互換配備・変換は提供しない。
 
 ```text
 CLI: 一意のR2 keyへ素材をPUT
