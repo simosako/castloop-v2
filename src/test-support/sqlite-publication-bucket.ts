@@ -8,10 +8,10 @@ type Entry = { key: string; bytes: Uint8Array; size: number; etag: string; versi
 export function sqlitePublicationBucket() {
   const entries = new Map<string, Entry>(), calls: Array<{ method: string; key: string }> = [];
   const hooks: { beforePut?: (key: string) => Promise<void>; afterPut?: (key: string) => Promise<void>;
-    beforeGet?: (key: string) => Promise<void> } = {};
+    beforeGet?: (key: string) => Promise<void>; beforeHead?: (key: string) => Promise<void> } = {};
   const bucket: SqlitePublicationBucket & { delete: (key: string) => Promise<void> } = {
     async delete(key) { calls.push({ method: "DELETE", key }); entries.delete(key); },
-    async head(key) { calls.push({ method: "HEAD", key }); return entries.get(key) ?? null; },
+    async head(key) { calls.push({ method: "HEAD", key }); await hooks.beforeHead?.(key); return entries.get(key) ?? null; },
     async get(key, options) {
       calls.push({ method: "GET", key });
       await hooks.beforeGet?.(key);

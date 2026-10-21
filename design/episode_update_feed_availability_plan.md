@@ -2,6 +2,8 @@
 
 2026-10-21。**§12の全項目を承認済み・ローカル実装済み。** [Issue #50の第1段階](episode_add_feed_availability_plan.md)に続き、既存Episode更新の継続配信を実装した。検証結果と実機確認の範囲は別途記録する。保持環境の更新・移行は行わない。
 
+後続の[Show更新の第3段階](show_update_feed_availability_plan.md)も実装した。本書の「Show更新は未対応」・schema 4/5・health `episode-revision-v1`は第2段階の記録。現行は不変cover・Show/Episode共通guard・schema 5/6・必須`cover_storage`と`show-episode-v1`を持つ新規環境専用であり、旧環境の変換・互換配備は提供しない。
+
 ## 1. 目的と提案の要約
 
 **公開済みEpisodeの更新中も、更新前の確定済みFeedと、それが参照する旧MP3を読み取れるようにする。** 新しい内容は別objectへ準備し、保存検証・必要なcache purgeが成功してから、SQLの完了transactionで新Feedと公開承認を切り替える。

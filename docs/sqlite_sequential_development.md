@@ -1,6 +1,6 @@
 # SQLiteのShow単位公開方式（開発版）
 
-2026-10-21、Issue #50とEpisode更新の追補: 本開発版は世代別Feed保存（healthの`feed_storage="immutable-generation-v1"`）に加え、`publication_read_boundary="episode-revision-v1"`と内部queue/content schema **4/5**を必要とする。追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・未知値をprepare/配備前に拒否する。[更新設計と境界](../design/episode_update_feed_availability_plan.md)参照。
+2026-10-21、Show更新の追補: 本開発版は世代別Feed/cover保存（healthの`feed_storage`と`cover_storage`が共に`immutable-generation-v1`）、`publication_read_boundary="show-episode-v1"`と内部queue/content schema **5/6**を必要とする。Episode更新の4/5、追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・旧値・未知値をprepare/配備前に拒否する。[Show更新設計と境界](../design/show_update_feed_availability_plan.md)参照。
 
 2026-10-20、Issue #48の新layout専用ガイド。**配布済みv0.6.2とは非互換・未リリース**であり、以下の操作には本開発版から構築したCLI/Workerが必要。サービス設定に`storage_layout = "show-v1"`を必須とし、旧設定は副作用前に拒否する。既存設定への追記、旧DO/DB/journalの変換・移行・資源採用は行わない。[採用設計](../design/do_show_separation_options.md)参照。
 
@@ -84,7 +84,9 @@ castloop publish-episode first
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
 - 公開済みShowへの新規Episode追加中は、確定済みの旧Feedと承認済みcover/audioを読み取れる。新Feedは別のprivate R2 objectへ保存し、必要なpurgeとSQL完了後に切り替える。公開URLは変わらず、未完了の新音源は直リンクでも配信しない。世代別Feedは蓄積し、自動削除しない。
 - 既存Episodeのmetadata-only/audio-only/同時更新中も旧Feedと承認済み旧音源を読み取れる。開始時のbase revision・lifecycle世代を照合し、新音源承認とFeedの切替は必要なpurge後の同一transactionで確定する。通常更新後も旧MP3を保持する。metadata-onlyは同じ音源URLを利用する。
-- Show初回公開には旧Feedがない。Show更新の継続配信は後続開発であり、実行中503を維持する。非公開化・復元の実行中、Pause/readiness不一致/保守拘束も503のまま。
+- 公開済みShowのmetadata/cover/同時更新中も旧Feed・旧画像・承認済み音源を読み取れる。`update-show`はmetadataと画像を組でstageするだけで、`publish-show`後の保存検証・purge成功まで公開内容は変わらない。coverもprivateな世代別objectへ保存し、Feed・metadata・画像参照を同時に切り替える。画像が同じでも新snapshotを保存し、旧画像は自動削除しない。公開済み画像の拡張子変更は拒否する。
+- 公開cover URLは変わらない。切替をまたぐ別HTTP要求では、旧Feedの画像URLが新画像を返す場合がある。画像だけの編集ではFeed bytes/ETagは同じまま304になり得る。Show復元は保存済み画像世代を検証して再利用する。
+- Show初回公開には旧Feedがない。非公開化・復元の実行中、Pause/readiness不一致/保守拘束は503のまま。隔離を確認できるblockedで旧内容を配信しても、後続FIFO停止・Resume/共有配備禁止・未知IO保全は変わらない。
 - SQLite cache ownerはtag/prefixを1回のpurgeへまとめる。明確なrate-limit拒否だけは同じrunning実行内で12秒間隔・最大6 attemptsを行い、保存をやり直さない。未知応答・恒久拒否は停止する。この有限待機はblocked jobのretry/release機能ではない。
 - 凍結後は素材を変更しない。次の編集では、既知の完了/確定入力失敗を確認・archiveして別draft IDに進む。
 

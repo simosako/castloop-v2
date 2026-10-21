@@ -113,6 +113,8 @@ registryが予約・所属の正本、Show DOが公開状態の正本であれ�
 
 ### 6.3 配信とキャッシュ
 
+2026-10-21第3段階追補: [Show更新の継続配信契約](show_update_feed_availability_plan.md)も実装した。以下のEpisode専用の例外を公開済みShowのmetadata/cover更新へ広げ、Feed/Show/coverと対象種別のguardを照合する。Show更新は旧coverのR2 identity検証後にverifiedを保存する。不変coverを別keyへ準備し、metadata/cover/Feedはpurge後の同一transactionで確定する。公開cover URLは固定し、遅い単一要求は許可世代へ固定するが、別要求間のsnapshot一致は保証しない。queue/content schema **5/6**、`cover_storage="immutable-generation-v1"`と`publication_read_boundary="show-episode-v1"`を必須とする。旧形式の移行・互換配備はなく、Show停止・保守拘束・後続FIFO停止とShow間分離は維持する。
+
 2026-10-21追加追補: [Episode更新の継続配信契約](episode_update_feed_availability_plan.md)を実装し、以下の追加専用条件を既存Episodeのmetadata/audio更新にも広げる。更新では公開中の対象revisionとlifecycle世代が開始時のguardに一致することを必須とする。新音源の承認とFeed切替はpurge後の同じtransactionで確定し、旧音源は保持する。新規環境専用のqueue/content schema 4/5と必須health識別を使い、旧形式を変換しない。
 
 gatewayはpublic pathから対象Showを決め、要求ごとにそのShow DOの最新判定だけを確認する。制御DOへの毎回の配信照会や、状態のTTL cacheは設けない。Show DOがpaused、未ready、共有更新の保守拘束中なら503とする。Pauseは従来の安全側の意味をShow単位へ移し、新規受付と配信を閉じる。既受付jobは取り消さずdrainを続ける。

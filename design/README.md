@@ -38,6 +38,8 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [Feed継続配信の小規模実機確認](episode_add_feed_live_verification_20261021.md) | Issue #50。新規隔離環境・1 Show・2短尺Episodeで成功。前後ともrunningの16取得組で旧Feed200/304・未公開音源404を確認。新世代切替・snapshot保持・最終Pauseを確認し資源を保持。blocked故障注入は未実施 |
 | [Episode更新中のFeed継続配信](episode_update_feed_availability_plan.md) | 承認済み・ローカル実装。metadata-only/audio-only/同時更新へ拡張し、旧Feed・旧MP3を継続配信。base revision/lifecycle guard、原子切替、blockedの隔離条件と新規環境専用のschema 4/5・health形式境界 |
 | [Episode更新の小規模実機確認](episode_update_feed_live_verification_20261021.md) | 1 Show・2短尺Episodeで3種類の更新に成功。実行中16取得組の旧Feed200/304・候補音源404、新Feed切替・旧新音源hash、最終Pauseを確認。試験スクリプトの出力parse停止後は成功操作を再送せず明示続行。資源・証跡を保持 |
+| [Show更新中のFeed継続配信（第3段階）](show_update_feed_availability_plan.md) | 全レビュー項目承認・ローカル実装済み。coverも世代別の不変objectへ保存し、公開URLを維持してFeed/画像を原子切替。Show/Episode共通guard、旧cover検証・復元参照、blocked条件、新規環境専用schema 5/6と別HTTP間の整合性の境界 |
+| [Show更新の小規模実機確認](show_update_feed_live_verification_20261021.md) | 新規1 Show・短尺Episode 1件で3種類のShow編集と追加metadata観測が成功。前後runningの計8取得組で旧Feed200/304、画像の旧hashまたはHEAD/ETagを確認。Episode更新・Show非公開化/復元、13 snapshot保持、最終Pause。資源・証跡を保持しnative故障注入は未実施 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 

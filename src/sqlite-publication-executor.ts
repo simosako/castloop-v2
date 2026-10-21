@@ -9,6 +9,8 @@ import type { SqlitePublicationExecutor } from "./sqlite-publication-alarm";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { publicationChecksum, renderPublicationFeed } from "./publication-inputs";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
+import { sqliteCoverSnapshotKey } from "./sqlite-cover";
+import type { SqliteCoverIdentity } from "./sqlite-cover";
 
 type ObjectHead = Pick<R2Object, "key" | "size" | "etag" | "version" | "customMetadata"> & { checksums: Pick<R2Checksums, "sha256"> };
 type ObjectBody = ObjectHead & { body?: ReadableStream<Uint8Array> };
@@ -19,7 +21,7 @@ export type SqlitePublicationBucket = {
   list: (options: { prefix: string; limit: number }) => Promise<{ objects: Array<{ key: string }>; truncated: boolean }>;
 };
 type PreparedShow = { kind: "show"; request: SqlitePublicationRequest; metadata: ShowMetadata;
-  cover: Uint8Array; extension: "jpg" | "png"; feed: string };
+  cover: Uint8Array; coverIdentity: SqliteCoverIdentity; extension: "jpg" | "png"; feed: string };
 type PreparedEpisode = { kind: "episode"; request: SqlitePublicationRequest; revision: EpisodeRevision;
   audio?: SqliteVerifiedUpload; audioRevisionId: string; feed: string };
 type PreparedLifecycle = { kind: "lifecycle"; request: SqlitePublicationRequest; feed?: string };
@@ -102,6 +104,22 @@ async function persistFeed(store: SqlitePublicationContent, bucket: SqlitePublic
     toHex(object.checksums.sha256) !== hash) throw new Error("Immutable Feed write was not verified");
 }
 
+async function verifyCover(bucket: SqlitePublicationBucket, showId: string, extension: "jpg" | "png", cover: SqliteCoverIdentity): Promise<void> {
+  const key = sqliteCoverSnapshotKey(showId, cover.generation, extension);
+  const object = await bucket.head(key);
+  if (!object || object.key !== key || object.size !== cover.lengthBytes || !object.checksums.sha256 ||
+    toHex(object.checksums.sha256) !== cover.sha256) throw new Error("Committed cover identity was not verified");
+}
+
+async function persistCover(bucket: SqlitePublicationBucket, prepared: PreparedShow): Promise<void> {
+  const cover = prepared.coverIdentity;
+  const key = sqliteCoverSnapshotKey(prepared.request.show_id, cover.generation, prepared.extension);
+  const object = await bucket.put(key, prepared.cover, { onlyIf: new Headers({ "If-None-Match": "*" }), sha256: cover.sha256,
+    httpMetadata: { contentType: prepared.extension === "jpg" ? "image/jpeg" : "image/png" } });
+  if (!object || object.key !== key || object.size !== cover.lengthBytes || !object.checksums.sha256 ||
+    toHex(object.checksums.sha256) !== cover.sha256) throw new Error("Immutable cover write was not verified");
+}
+
 async function persistAudio(bucket: SqlitePublicationBucket, prepared: PreparedEpisode): Promise<void> {
   const payload = prepared.audio;
   if (!payload) return;
@@ -146,6 +164,9 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         const media = audioKey(target.base, request.show_id);
         store.requireMedia(request.show_id, target.base, media.revisionId);
       }
+      if (request.action === "publish" && request.kind === "show" && target.show.lifecycle === "published") {
+        await verifyCover(bucket, request.show_id, target.coverExtension!, target.cover!);
+      }
       store.confirmCommittedReadBoundary(request);
       if (request.action !== "publish") {
         const restored = request.kind === "episode" && request.action === "restore" ? [target.base!] : [];
@@ -159,7 +180,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
             const hash = checksum ? toHex(checksum) : null;
             if (!object || object.size !== revision.length_bytes || hash !== revision.sha256 || object.customMetadata?.sha256 !== revision.sha256) throw new SqlitePublicationInputError("validation_failed");
           }
-          if (request.kind === "show" && !await bucket.head(`public/podcasts/${request.show_id}/cover.${target.coverExtension!}`)) throw new SqlitePublicationInputError("validation_failed");
+          if (request.kind === "show") await verifyCover(bucket, request.show_id, target.coverExtension!, target.cover!);
         }
         const writeFeed = request.kind === "show" ? request.action === "restore" : target.show.lifecycle === "published";
         return { kind: "lifecycle", request, feedGeneration, ...(writeFeed ? { feed: input(() => renderPublicationFeed(target.metadata!, visible, config.public_base_url, target.coverExtension!)) } : {}) };
@@ -172,7 +193,8 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         const cover = await readPayload(bucket, coverPayload);
         const extension = coverPayload.asset === "cover_png" ? "png" : "jpg";
         const signature = extension === "png" ? [137, 80, 78, 71, 13, 10, 26, 10] : [255, 216, 255];
-        if (metadata.show_id !== request.show_id || (metadata.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg") !== extension ||
+        if (metadata.show_id !== request.show_id || target.coverExtension !== null && target.coverExtension !== extension ||
+          (metadata.image_path.toLowerCase().endsWith(".png") ? "png" : "jpg") !== extension ||
           !signature.every((byte, index) => cover[index] === byte)) throw new SqlitePublicationInputError("validation_failed");
         if (target.show.lifecycle === "draft") {
           await requireEmpty(bucket, `system/shows/${request.show_id}/`);
@@ -180,7 +202,8 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
           await requireEmpty(bucket, `public/episodes/${request.show_id}/`);
         }
         const feed = input(() => renderPublicationFeed(metadata, episodes, config.public_base_url, extension));
-        return { kind: "show", request, feedGeneration, metadata, cover, extension, feed };
+        const coverIdentity = { generation: feedGeneration, sha256: coverPayload.sha256, lengthBytes: cover.byteLength };
+        return { kind: "show", request, feedGeneration, metadata, cover, coverIdentity, extension, feed };
       }
       const metadataPayload = request.payloads.find((payload) => payload.asset === "episode_metadata");
       const metadataBytes = metadataPayload ? await readPayload(bucket, metadataPayload) : null;
@@ -218,6 +241,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
     },
     async publish(prepared) {
       if (prepared.feedGeneration !== store.feedGeneration(prepared.request)) throw new Error("Prepared Feed generation differs");
+      if (prepared.kind === "show" && prepared.coverIdentity.generation !== prepared.feedGeneration) throw new Error("Prepared cover generation differs");
       const showId = prepared.request.show_id;
       const run = (phase: SqlitePublicationEffectFailure["phase"], operation: () => Promise<void>) => perform(prepared.request, phase, operation);
       if (prepared.kind === "lifecycle") {
@@ -227,8 +251,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
       }
       if (prepared.kind === "show") {
         await run("show_metadata", () => put(bucket, `system/shows/${showId}/show.toml`, stringifyToml(prepared.metadata), "application/toml"));
-        await run("cover", () => put(bucket, `public/podcasts/${showId}/cover.${prepared.extension}`, prepared.cover,
-          prepared.extension === "jpg" ? "image/jpeg" : "image/png"));
+        await run("cover", () => persistCover(bucket, prepared));
       } else {
         await run("audio", () => persistAudio(bucket, prepared));
         await run("revision", () => put(bucket, `public/episodes/${showId}/${prepared.revision.episode_id}/revisions/${prepared.revision.revision_id}.toml`,
@@ -242,7 +265,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
     commit(prepared) {
       if (prepared.feedGeneration !== store.feedGeneration(prepared.request)) throw new Error("Prepared Feed generation differs");
       if (prepared.kind === "lifecycle") store.commitLifecycle(prepared.request);
-      else if (prepared.kind === "show") store.commitShow(prepared.request, prepared.metadata, prepared.extension);
+      else if (prepared.kind === "show") store.commitShow(prepared.request, prepared.metadata, prepared.extension, prepared.coverIdentity);
       else store.commitEpisode(prepared.request, prepared.revision, prepared.audioRevisionId, prepared.audio !== undefined);
     },
   };

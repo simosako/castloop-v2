@@ -1,5 +1,7 @@
 # DO SQLite逐次キューによる公開処理の実装計画
 
+> 2026-10-21第3段階追補: [Show更新中の継続配信契約](show_update_feed_availability_plan.md)を実装した。公開済みShow更新も旧Feed/cover/audioを継続配信し、coverを不変snapshotへ保存してmetadata/cover identity/Feedをpurge後に原子切替する。Feed/Show/coverと対象種別のguard、Show更新の旧画像HEAD検証、復元の保存済みcover再利用を必須とする。公開cover URLは維持し、別HTTP要求間の世代一致までは保証しない。内部queue/content schema **5/6**、必須`cover_storage="immutable-generation-v1"`と`publication_read_boundary="show-episode-v1"`へ更新。以下の第1・第2段階の範囲・形式は導入履歴で、現行は本追補を優先する。初回Show/lifecycle/明示停止のgate、blocked FIFO停止、未知IO保全、移行なしは維持する。
+
 > 2026-10-21追補: Issue #50の[Feed継続配信契約](episode_add_feed_availability_plan.md)を優先する。固定Feed上書きと一律running/blocked配信503を改め、全Feed writerを世代別の不変R2 snapshotへ統一した。purge後のcontent/media/Feed世代/job/操作記録/次回Alarm予約の原子完了は維持する。新規Episode追加のみ、開始時に保存した保護根拠が成立するrunning/blockedで旧公開内容を配信する。その他の更新・lifecycleや要求破損は従来どおり停止する。内部queue/content schemaは3/4、新規環境専用・変換なし。下記の固定key・旧schema・一律503の記述は導入時の履歴である。
 
 > 2026-10-20追補: Issue #48の開発版では[Show分離の採用契約](do_show_separation_options.md)を優先する。1サービス1 DO/全体FIFO/全体Pauseは廃止し、ShowごとのDO/FIFO/Pause/windowと、所属・共有更新の制御DOへ分ける。以下の一件ずつ実行・未知IO保全・purge-before-completion・原子的な受付/完了の安全条件はShow内で維持する。旧layoutは維持・移行せず、必須`storage_layout="show-v1"`で配備前に拒否する。

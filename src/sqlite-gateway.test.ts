@@ -7,6 +7,26 @@ const feed = "/podcasts/daily/feed.xml";
 const allowed = (generation: number): SqliteDeliveryDecision => ({ status: 200, key: `public${feed}`,
   content_type: "application/rss+xml; charset=utf-8", cache_props: { showGeneration: 1, feedGeneration: generation } });
 
+test("cover warm hits, purge misses and late fills cannot cross committed generations or bypass stopping gates", async () => {
+  const path = "/podcasts/daily/cover.jpg";
+  let decision: SqliteDeliveryDecision = { status: 200, key: `public${path}`, content_type: "image/jpeg",
+    cache_props: { showGeneration: 1, coverGeneration: 1 } };
+  const service = { fetch: async () => new Response(null), delivery: async () => decision };
+  const cache = new Map<number, string>(); let reads = 0;
+  const cached = async (_: Request, props: { coverGeneration?: number }) => {
+    const generation = props.coverGeneration!; reads++;
+    if (!cache.has(generation)) cache.set(generation, `cover-${generation}`);
+    return new Response(cache.get(generation));
+  };
+  const read = () => serveSqliteGateway(new Request(`${management}${path}`), management, service, cached);
+  expect(await (await read()).text()).toBe("cover-1"); expect(await (await read()).text()).toBe("cover-1");
+  cache.clear(); expect(await (await read()).text()).toBe("cover-1");
+  decision = { status: 200, key: `public${path}`, content_type: "image/jpeg", cache_props: { showGeneration: 2, coverGeneration: 3 } };
+  cache.set(1, "late-old-cover-fill"); expect(await (await read()).text()).toBe("cover-3");
+  decision = { status: 503 }; const stopped = await read(); expect(stopped.status).toBe(503);
+  expect(stopped.headers.get("Cache-Control")).toBe("no-store"); expect(reads).toBe(4);
+});
+
 test("gateway rechecks current DO visibility even on cache hits and partitions late fills by committed feed generation", async () => {
   let decision = allowed(1), reads = 0, cacheReads = 0;
   const cache = new Map<string, string>();

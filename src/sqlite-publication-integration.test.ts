@@ -138,3 +138,24 @@ test("HTTP authentication, protocol, bounded body, readiness and method gates ca
   expect(setup.calls).toEqual([]);
   expect(setup.queue.snapshot().drained).toBe(true);
 });
+
+test("CLI stages metadata/cover/both Show edits without publication and commits independent cover snapshots", async () => {
+  const setup = await fixture(), initial = await setup.open(setup.target("show"));
+  await initial.stage({ asset: "show" }); await initial.publish(); await setup.run(); await initial.wait();
+  let generation = 1;
+  for (const selection of ["metadata", "cover", "both"] as const) {
+    const path = join(setup.directory, "show.toml"), before = setup.content.delivery("/podcasts/daily/cover.jpg");
+    if (selection !== "cover") writeFileSync(path, readFileSync(path, "utf8").replace(/title = ".*"/, `title = "${selection} update"`));
+    if (selection !== "metadata") writeFileSync(join(setup.directory, "cover.jpg"), Uint8Array.of(255, 216, 255, generation));
+    const draft = await setup.open({ ...setup.target("show"), expected_show_state_version: setup.content.inspect("daily").show!.state_version });
+    await draft.stage({ asset: "show" });
+    expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toEqual(before);
+    expect(setup.queue.snapshot().drained).toBe(true);
+    expect((await draft.publish())?.state).toBe("queued");
+    expect((await setup.run()).state).toBe("succeeded"); await draft.wait(); generation++;
+    expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toMatchObject({ cache_props: { coverGeneration: generation } });
+    expect(setup.entries.has(`public/podcasts/daily/covers/${generation}.jpg`)).toBe(true);
+    expect(setup.entries.has(`public/podcasts/daily/covers/${generation - 1}.jpg`)).toBe(true);
+    expect(setup.entries.has("public/podcasts/daily/cover.jpg")).toBe(false);
+  }
+});

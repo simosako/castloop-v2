@@ -13,6 +13,7 @@ import type { SqlitePublicationEffectFailure } from "./sqlite-publication-execut
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
+import { sqliteCoverSnapshotKey } from "./sqlite-cover";
 import { serveCachedLifecycleAsset } from "./lifecycle-cache";
 import { serveSqliteGateway } from "./sqlite-gateway";
 import { createHash } from "node:crypto";
@@ -77,6 +78,14 @@ async function fixture() {
   };
   const publishShow = async () => { const value = await request("show"); expect((await run(value)).state).toBe("succeeded"); return value; };
   const publishEpisode = async (episodeId = "first") => { const value = await request("episode", episodeId); expect((await run(value)).state).toBe("succeeded"); return value; };
+  const showUpdate = async (selection: "metadata" | "cover" | "both" = "both") => {
+    const value = await request("show");
+    value.expected_show_state_version = content.inspect("daily").show!.state_version;
+    value.payloads = [await payload(value.job_id, "show_metadata", stringifyToml({ ...show,
+      ...(selection === "cover" ? {} : { title: "Updated Show" }) })),
+      await payload(value.job_id, "cover_jpg", Uint8Array.from([255, 216, 255, selection === "metadata" ? 2 : 3]))];
+    return value;
+  };
   const lifecycle = (action: "unpublish" | "restore", episodeId?: string) => {
     const target = content.inspect("daily", episodeId);
     return parseSqlitePublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", ...setup.runtime,
@@ -85,7 +94,7 @@ async function fixture() {
       ...(episodeId === undefined ? {} : { episode_id: episodeId, base_revision_id: target.base!.revision_id, expected_episode_lifecycle_version: target.episode!.lifecycle_version }), payloads: [] });
   };
   const feed = () => objects.text(sqliteFeedSnapshotKey("daily", content.inspect("daily").show!.feed_generation));
-  return { ...setup, ...objects, feed, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, lifecycle };
+  return { ...setup, ...objects, feed, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, showUpdate, lifecycle };
 }
 
 test("Episode lifecycle removes all revision delivery and restores the same snapshot without audio or metadata writes", async () => {
@@ -480,19 +489,16 @@ test("a valid-shaped but hash-mismatched stored request blocks before validation
   expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
 });
 
-test("Show updates advance only the Show state, regenerate its feed, and deny the old cover extension", async () => {
+test("Show updates advance only the Show state, regenerate its feed, and preserve the cover extension", async () => {
   const setup = await fixture(); await setup.publishShow(); await setup.publishEpisode();
-  const update = await setup.request("show");
-  update.expected_show_state_version = 1;
-  update.payloads = [await setup.payload(update.job_id, "show_metadata", stringifyToml({ ...show, title: "Updated Show", image_path: "cover.png" })),
-    await setup.payload(update.job_id, "cover_png", Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1]))];
+  const update = await setup.showUpdate();
   setup.calls.length = 0;
   expect((await setup.run(update)).state).toBe("succeeded");
   expect(parseShowMetadata(setup.text("system/shows/daily/show.toml")).title).toBe("Updated Show");
   expect(setup.feed()).toContain("Updated Show");
   expect(setup.feed()).toContain("stable-first");
-  expect(setup.content.delivery("/podcasts/daily/cover.jpg").status).toBe(404);
-  expect(setup.content.delivery("/podcasts/daily/cover.png").status).toBe(200);
+  expect(setup.content.delivery("/podcasts/daily/cover.jpg").status).toBe(200);
+  expect(setup.content.delivery("/podcasts/daily/cover.png").status).toBe(404);
   expect(setup.calls.some((call) => call.key.endsWith(".mp3"))).toBe(false);
   expect(setup.content.registerShow("daily", setup.reservationId).state_version).toBe(2);
 });
@@ -605,6 +611,7 @@ test("read guards fail closed on corruption, changed committed state and missing
     const setup = await fixture(); await setup.publishShow(); const next = await setup.request("episode");
     await setup.queue.enqueue(next); const claim = setup.queue.claim(); expect(claim.state).toBe("claimed");
     expect((await readPublic(setup)).status).toBe(200);
+    setup.storage.sql.exec("PRAGMA ignore_check_constraints = ON");
     setup.storage.sql.exec(`UPDATE publication_jobs SET ${column} = ? WHERE job_id = ?`,
       column === "delivery_policy" ? "exclusive" : column.endsWith("version") || column.endsWith("generation") ? 999 : null, next.job_id);
     expect((await readPublic(setup)).status).toBe(503);
@@ -647,12 +654,12 @@ test("lifecycle operations without Feed output retain the actual snapshot genera
 test("old persisted queue and content schemas are rejected without conversion", async () => {
   const setup = await fixture(); await setup.publishShow();
   const before = new Map(setup.entries);
-  setup.storage.sql.exec("UPDATE publication_content_schema SET version = 4 WHERE id = 1");
+  setup.storage.sql.exec("UPDATE publication_content_schema SET version = 5 WHERE id = 1");
   expect(() => new SqlitePublicationContent(setup.storage)).toThrow("Unsupported");
-  expect(setup.storage.sql.exec("SELECT version FROM publication_content_schema").toArray()).toEqual([{ version: 4 }]);
-  setup.storage.sql.exec("UPDATE publication_queue_schema SET version = 3 WHERE id = 1");
+  expect(setup.storage.sql.exec("SELECT version FROM publication_content_schema").toArray()).toEqual([{ version: 5 }]);
+  setup.storage.sql.exec("UPDATE publication_queue_schema SET version = 4 WHERE id = 1");
   expect(() => new SqlitePublicationQueue(setup.storage, setup.runtime)).toThrow("Unsupported");
-  expect(setup.storage.sql.exec("SELECT version FROM publication_queue_schema").toArray()).toEqual([{ version: 3 }]);
+  expect(setup.storage.sql.exec("SELECT version FROM publication_queue_schema").toArray()).toEqual([{ version: 4 }]);
   expect(setup.entries).toEqual(before);
 });
 
@@ -705,6 +712,8 @@ test("update guards reject changed revisions, lifecycle ABA and malformed eviden
     if (fault === "guard-lifecycle") setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_lifecycle_version = -1 WHERE job_id = ?", next.job_id);
     if (fault === "guard-state") {
       expect(() => setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_state = NULL WHERE job_id = ?", next.job_id)).toThrow();
+      expect(() => setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_state = NULL, read_episode_revision_id = NULL, read_episode_lifecycle_version = NULL WHERE job_id = ?", next.job_id)).toThrow();
+      setup.storage.sql.exec("PRAGMA ignore_check_constraints = ON");
       setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_state = NULL, read_episode_revision_id = NULL, read_episode_lifecycle_version = NULL WHERE job_id = ?", next.job_id);
     }
     expect((await readPublic(setup)).status).toBe(503);
@@ -723,5 +732,195 @@ test("corrupt old media and interruption before verification cannot authorize bl
       expect((await setup.runner.alarm()).state).toBe("blocked");
     }
     expect((await readPublic(setup)).status).toBe(503);
+  }
+});
+
+for (const selection of ["metadata", "cover", "both"] as const) {
+for (const phase of ["old-cover", "validation", "metadata", "cover-writing", "cover-stored", "snapshot", "purge"] as const) {
+  test(`Show ${selection} update preserves committed Feed, cover and audio during ${phase}`, async () => {
+    const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
+    const oldFeed = await readPublic(setup), feedEtag = oldFeed.headers.get("ETag")!, body = await oldFeed.text();
+    const oldCover = await readPublic(setup, "/podcasts/daily/cover.jpg"), coverEtag = oldCover.headers.get("ETag")!;
+    const coverBytes = new Uint8Array(await oldCover.arrayBuffer()), episodes = setup.content.episodes("daily");
+    const feedDecision = setup.content.delivery("/podcasts/daily/feed.xml"), coverDecision = setup.content.delivery("/podcasts/daily/cover.jpg");
+    if (feedDecision.status !== 200 || coverDecision.status !== 200) throw new Error("Expected committed assets");
+    const next = await setup.showUpdate(selection);
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    const hold = async () => { entered.resolve(); await release.promise; };
+    let held = false;
+    if (phase === "old-cover") setup.bucketHooks.beforeHead = async (key) => {
+      if (!held && key === sqliteCoverSnapshotKey("daily", 1, "jpg")) { held = true; await hold(); }
+    };
+    if (phase === "validation") setup.bucketHooks.beforeGet = async (key) => { if (key === next.payloads[0].key) await hold(); };
+    if (phase === "cover-writing") setup.bucketHooks.beforePut = async (key) => { if (key.includes("/covers/")) await hold(); };
+    if (["metadata", "cover-stored", "snapshot"].includes(phase)) setup.bucketHooks.afterPut = async (key) => {
+      if (phase === "metadata" ? key === "system/shows/daily/show.toml" : key.includes(phase === "snapshot" ? "/feeds/" : "/covers/")) await hold();
+    };
+    if (phase === "purge") setup.hooks.purge = hold;
+    setup.calls.length = 0;
+    const running = setup.run(next);
+    try {
+      await entered.promise;
+      expect(setup.queue.status(next.request_id)?.state).toBe("running");
+      expect(await (await readPublic(setup)).text()).toBe(body);
+      expect((await readPublic(setup, undefined, { "If-None-Match": feedEtag })).status).toBe(304);
+      expect(new Uint8Array(await (await readPublic(setup, "/podcasts/daily/cover.jpg")).arrayBuffer())).toEqual(coverBytes);
+      expect((await readPublic(setup, "/podcasts/daily/cover.jpg", { "If-None-Match": coverEtag })).status).toBe(304);
+      expect((await readPublic(setup, `/podcasts/daily/episodes/first/${first.job_id}.mp3`)).status).toBe(200);
+      expect((await readPublic(setup, "/podcasts/daily/covers/3.jpg")).status).toBe(404);
+      expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toEqual(coverDecision);
+      expect(setup.content.inspect("daily").show).toMatchObject({ state_version: 1, feed_generation: 2 });
+    } finally { release.resolve(); await running; }
+    expect(setup.queue.status(next.request_id)?.state).toBe("succeeded");
+    expect(setup.content.inspect("daily").show).toMatchObject({ state_version: 2, feed_generation: 3 });
+    expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toMatchObject({ cache_props: { coverGeneration: 3, showGeneration: 2 } });
+    expect(setup.content.episodes("daily")).toEqual(episodes);
+    const currentFeed = await readPublic(setup, undefined, { "If-None-Match": feedEtag });
+    expect(currentFeed.status).toBe(selection === "cover" ? 304 : 200);
+    const currentCover = await readPublic(setup, "/podcasts/daily/cover.jpg", { "If-None-Match": coverEtag });
+    expect(currentCover.status).toBe(selection === "metadata" ? 304 : 200);
+    if (currentCover.status === 200) expect(hash(new Uint8Array(await currentCover.arrayBuffer()))).not.toBe(hash(coverBytes));
+    for (const [path, props, expected] of [["feed.xml", feedDecision.cache_props, hash(body)], ["cover.jpg", coverDecision.cache_props, hash(coverBytes)]] as const) {
+      const late = await serveCachedLifecycleAsset(new Request(`https://cache.invalid/podcasts/daily/${path}`), { CASTLOOP_BUCKET: setup.bucket } as never, props);
+      expect(hash(new Uint8Array(await late.arrayBuffer()))).toBe(expected);
+    }
+    expect(setup.entries.has("public/podcasts/daily/cover.jpg")).toBe(false);
+    expect(setup.calls.some((call) => call.method === "PUT" && (call.key.endsWith(".mp3") || call.key.includes("/revisions/")))).toBe(false);
+    expect(setup.entries.has(sqliteCoverSnapshotKey("daily", 1, "jpg"))).toBe(true);
+    expect(setup.entries.has(sqliteCoverSnapshotKey("daily", 3, "jpg"))).toBe(true);
+  });
+}
+}
+
+for (const phase of ["validation", "metadata", "cover", "snapshot", "purge", "commit"] as const) {
+  test(`Show ${phase} failure retains committed content and blocks FIFO without replay after restart`, async () => {
+    const setup = await fixture(); await setup.publishShow(); await setup.publishEpisode();
+    const next = await setup.showUpdate(), later = await setup.request("episode", "second");
+    const body = setup.feed(), oldContent = setup.storage.sql.exec("SELECT * FROM publication_show_content").toArray();
+    const cover = new Uint8Array(await (await readPublic(setup, "/podcasts/daily/cover.jpg")).arrayBuffer());
+    await setup.queue.enqueue(next); await setup.queue.enqueue(later); setup.clearAlarm();
+    if (phase === "validation") setup.bucketHooks.beforeGet = async (key) => { if (key === next.payloads[0].key) throw new Error("Unavailable input"); };
+    if (["metadata", "cover", "snapshot"].includes(phase)) setup.bucketHooks.afterPut = async (key) => {
+      if (phase === "metadata" ? key.endsWith("/show.toml") : key.includes(phase === "cover" ? "/covers/" : "/feeds/")) throw new Error("Unknown write outcome");
+    };
+    if (phase === "purge") setup.hooks.purge = async () => { throw new Error("Unknown purge outcome"); };
+    if (phase === "commit") { setup.failAlarm(); await expect(setup.runner.alarm()).rejects.toThrow(); }
+    else expect((await setup.runner.alarm()).state).toBe("blocked");
+    const queue = new SqlitePublicationQueue(setup.storage, setup.runtime), content = new SqlitePublicationContent(setup.storage);
+    const restarted = new SqlitePublicationAlarm(queue, createSqlitePublicationExecutor(content, setup.bucket, setup.config, { purge: async () => {} }), () => {});
+    expect((await restarted.alarm()).state).toBe("blocked");
+    expect(content.delivery("/podcasts/daily/feed.xml").status).toBe(200);
+    expect(await (await readPublic(setup)).text()).toBe(body);
+    expect(new Uint8Array(await (await readPublic(setup, "/podcasts/daily/cover.jpg")).arrayBuffer())).toEqual(cover);
+    expect(setup.storage.sql.exec("SELECT * FROM publication_show_content").toArray()).toEqual(oldContent);
+    expect(setup.content.inspect("daily").show).toMatchObject({ state_version: 1, feed_generation: 2 });
+    const calls = setup.calls.length; await restarted.alarm(); expect(setup.calls).toHaveLength(calls);
+    expect(queue.status(later.request_id)?.state).toBe("queued");
+    queue.pause(); expect((await readPublic(setup)).status).toBe(503); expect(() => queue.resume(crypto.randomUUID())).toThrow();
+  });
+}
+
+test("Show initial publication has no committed guard; a published empty Show can update continuously", async () => {
+  const setup = await fixture(), first = await setup.request("show");
+  expect((await readPublic(setup)).status).toBe(404);
+  await setup.queue.enqueue(first); const claim = setup.queue.claim();
+  if (claim.state !== "claimed") throw new Error("Expected claim");
+  expect((await readPublic(setup)).status).toBe(503);
+  const prepared = await setup.executor.validate(claim.request); await setup.executor.publish(prepared);
+  await setup.queue.finish(first.job_id, undefined, () => setup.executor.commit!(prepared));
+  setup.hooks.purge = async () => { expect((await readPublic(setup)).status).toBe(200); };
+  expect((await setup.run(await setup.showUpdate())).state).toBe("succeeded");
+  expect(setup.content.episodes("daily")).toEqual([]);
+});
+
+test("Show updates reject stale targets, extension changes and changed frozen inputs before public writes", async () => {
+  for (const fault of ["stale", "extension", "frozen"] as const) {
+    const setup = await fixture(); await setup.publishShow(); const next = await setup.showUpdate();
+    if (fault === "stale") next.expected_show_state_version = 0;
+    if (fault === "extension") next.payloads = [await setup.payload(next.job_id, "show_metadata", stringifyToml({ ...show, image_path: "cover.png" })),
+      await setup.payload(next.job_id, "cover_png", Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]))];
+    if (fault === "frozen") await setup.bucket.put(next.payloads[0].key, "changed");
+    setup.calls.length = 0;
+    expect((await setup.run(next)).state).toBe("failed");
+    expect(setup.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect((await readPublic(setup)).status).toBe(200);
+  }
+});
+
+test("unverified or corrupt committed cover cannot grant blocked Show reads and missing cover never falls back", async () => {
+  for (const fault of ["missing", "key", "size", "hash", "unavailable", "interrupted"] as const) {
+    const setup = await fixture(); await setup.publishShow(); const next = await setup.showUpdate();
+    const key = sqliteCoverSnapshotKey("daily", 1, "jpg"), object = setup.entries.get(key)!;
+    if (fault === "missing") setup.entries.delete(key);
+    if (fault === "key") object.key = "wrong";
+    if (fault === "size") object.size++;
+    if (fault === "hash") object.checksums.sha256 = new Uint8Array(32).buffer;
+    if (fault === "unavailable") setup.bucketHooks.beforeHead = async () => { throw new Error("Unavailable"); };
+    if (fault === "interrupted") { await setup.queue.enqueue(next); setup.queue.claim(); expect((await readPublic(setup)).status).toBe(200); }
+    expect((await (fault === "interrupted" ? setup.runner.alarm() : setup.run(next))).state).toBe("blocked");
+    expect((await readPublic(setup)).status).toBe(503);
+    expect(setup.storage.sql.exec("SELECT read_verified FROM publication_jobs WHERE job_id = ?", next.job_id).toArray()).toEqual([{ read_verified: 0 }]);
+  }
+  const setup = await fixture(); await setup.publishShow(); setup.entries.delete(sqliteCoverSnapshotKey("daily", 1, "jpg"));
+  await setup.bucket.put("public/podcasts/daily/cover.jpg", "must not be served");
+  const response = await readPublic(setup, "/podcasts/daily/cover.jpg");
+  expect(response.status).toBe(503); expect(response.headers.get("Cache-Control")).toBe("no-store");
+});
+
+test("Show guards reject malformed target kinds, partial guards and mismatched cover generations", async () => {
+  for (const [column, value] of [["read_target_kind", null], ["read_target_kind", "unknown"], ["read_target_kind", "episode"],
+    ["read_cover_generation", null], ["read_cover_generation", 999], ["read_episode_id", "first"], ["read_episode_state", "absent"]] as const) {
+    const setup = await fixture(); await setup.publishShow(); const next = await setup.showUpdate();
+    await setup.queue.enqueue(next); setup.queue.claim();
+    if (column !== "read_cover_generation" || value === null) expect(() => setup.storage.sql.exec(`UPDATE publication_jobs SET ${column} = ? WHERE job_id = ?`, value, next.job_id)).toThrow();
+    setup.storage.sql.exec("PRAGMA ignore_check_constraints = ON");
+    setup.storage.sql.exec(`UPDATE publication_jobs SET ${column} = ? WHERE job_id = ?`, value, next.job_id);
+    expect((await readPublic(setup)).status).toBe(503);
+  }
+});
+
+test("Show restore reuses the committed cover, and subsequent Episode and Show publications keep independent generations", async () => {
+  const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
+  expect((await setup.run(await setup.showUpdate())).state).toBe("succeeded");
+  const cover = setup.content.delivery("/podcasts/daily/cover.jpg");
+  expect(cover).toMatchObject({ cache_props: { coverGeneration: 3 } });
+  expect((await setup.run(setup.lifecycle("unpublish"))).state).toBe("succeeded");
+  setup.calls.length = 0;
+  expect((await setup.run(setup.lifecycle("restore"))).state).toBe("succeeded");
+  expect(setup.calls.some((call) => call.method === "PUT" && call.key.includes("/covers/"))).toBe(false);
+  expect(setup.calls.some((call) => call.method === "HEAD" && call.key === sqliteCoverSnapshotKey("daily", 3, "jpg"))).toBe(true);
+  const next = await setup.request("episode", "first", first.job_id, "metadata");
+  next.expected_show_state_version = setup.content.inspect("daily").show!.state_version;
+  expect((await setup.run(next)).state).toBe("succeeded");
+  expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toMatchObject({ cache_props: { coverGeneration: 3 } });
+  expect((await setup.run(await setup.showUpdate("metadata"))).state).toBe("succeeded");
+  expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toMatchObject({ cache_props: { coverGeneration: 7 } });
+  expect(setup.content.inspect("daily", "first").base).toMatchObject({ guid: "stable-first", enclosure_url: `${setup.config.public_base_url}/podcasts/daily/episodes/first/${first.job_id}.mp3` });
+});
+
+test("preexisting cover candidates are never overwritten or adopted", async () => {
+  const setup = await fixture(); await setup.publishShow(); const next = await setup.showUpdate();
+  const key = sqliteCoverSnapshotKey("daily", 2, "jpg"); await setup.bucket.put(key, "unknown candidate");
+  expect((await setup.run(next)).state).toBe("blocked");
+  expect(setup.text(key)).toBe("unknown candidate");
+  expect((await readPublic(setup)).status).toBe(200);
+  expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toMatchObject({ cache_props: { coverGeneration: 1 } });
+});
+
+test("cover PUT must confirm the exact immutable key, length and SHA-256 before publication", async () => {
+  for (const fault of ["null", "key", "size", "checksum"] as const) {
+    const setup = await fixture(); await setup.publishShow(); const next = await setup.showUpdate();
+    const executor = createSqlitePublicationExecutor(setup.content, { ...setup.bucket, async put(key, body, options) {
+      const result = await setup.bucket.put(key, body, options);
+      if (!key.includes("/covers/") || !result) return result;
+      expect(options?.onlyIf instanceof Headers && options.onlyIf.get("If-None-Match")).toBe("*");
+      expect(options?.sha256).toBe(next.payloads[1].sha256);
+      return fault === "null" ? null : { ...result, ...(fault === "key" ? { key: "wrong" } : fault === "size" ? { size: result.size + 1 } : { checksums: {} }) };
+    } }, setup.config, { purge: async () => { throw new Error("Must not purge unverified cover"); }, onFailure: () => {} });
+    await setup.queue.enqueue(next);
+    expect((await new SqlitePublicationAlarm(setup.queue, executor, () => {}).alarm()).state).toBe("blocked");
+    expect((await readPublic(setup)).status).toBe(200);
+    expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toMatchObject({ cache_props: { coverGeneration: 1 } });
+    expect(setup.entries.has(sqliteFeedSnapshotKey("daily", 2))).toBe(false);
   }
 });

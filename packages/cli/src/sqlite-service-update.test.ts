@@ -10,16 +10,17 @@ const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
 const wait = { attempts: 2, delay: async () => {} };
 
-test("Episode read-boundary format is required before preparing or deploying an update", async () => {
-  for (const marker of [undefined, "unknown"]) {
+test("Show/Episode read-boundary and cover storage formats are required before preparing or deploying an update", async () => {
+  for (const [field, marker] of [["publication_read_boundary", undefined], ["publication_read_boundary", "episode-revision-v1"],
+    ["publication_read_boundary", "unknown"], ["cover_storage", undefined], ["cover_storage", "fixed-key-v1"]] as const) {
     const { value, id } = await fixture();
     value.calls.length = 0;
     const transport: typeof value.transport = async (input, init) => {
       const response = await value.transport(input, init);
       if (new URL(input instanceof Request ? input.url : input).pathname.endsWith("/health")) {
         const body = await response.json() as Record<string, unknown>;
-        if (marker === undefined) delete body.publication_read_boundary;
-        else body.publication_read_boundary = marker;
+        if (marker === undefined) delete body[field];
+        else body[field] = marker;
         return new Response(JSON.stringify(body), { headers: response.headers });
       }
       return response;

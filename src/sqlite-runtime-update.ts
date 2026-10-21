@@ -17,9 +17,9 @@ export function pendingSqliteUpdate(storage: PublicationQueueStorage): boolean {
 }
 export function selectSqliteRuntime(storage: PublicationQueueStorage, actual: SqlitePublicationRuntime): SqlitePublicationRuntime {
   if (storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_queue_schema'").toArray().length &&
-    storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0]?.version !== 4) throw new Error("SQLite runtime update cannot convert an older queue schema");
+    storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0]?.version !== 5) throw new Error("SQLite runtime update cannot convert an older queue schema");
   if (storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_content_schema'").toArray().length &&
-    storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0]?.version !== 5) throw new Error("SQLite runtime update cannot convert an older content schema");
+    storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0]?.version !== 6) throw new Error("SQLite runtime update cannot convert an older content schema");
   initializeSqliteUpdates(storage);
   if (!storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_service'").toArray().length) return actual;
   const saved = sqlitePublicationRuntimeSchema.parse(storage.sql.exec("SELECT service_id, worker_version_id, service_config_sha256 FROM publication_service WHERE id = 1").toArray()[0]);

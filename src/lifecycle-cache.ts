@@ -1,6 +1,7 @@
 import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
+import { sqliteCoverSnapshotKey } from "./sqlite-cover";
 
 export type LifecycleCacheEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "head" | "get"> };
 export type LifecyclePurgeTarget = { showId: string; episodeId?: string };
@@ -16,12 +17,12 @@ function rejected(request: Request, status: 404 | 405 | 412 | 416 | 503, size?: 
 function validProps(asset: PublicAsset, props: PublicCacheProps): boolean {
   if (!props || typeof props !== "object") return false;
   const keys = asset.kind === "feed" ? ["showGeneration", "feedGeneration"] :
-    asset.kind === "audio" ? ["showGeneration", "episodeGeneration"] : ["showGeneration"];
+    asset.kind === "audio" ? ["showGeneration", "episodeGeneration"] : ["showGeneration", "coverGeneration"];
   const present = Object.keys(props);
   if (present.length !== keys.length || present.some((key) => !keys.includes(key))) return false;
   return keys.every((key) => {
     const value = props[key as keyof PublicCacheProps];
-    return value !== undefined && Number.isSafeInteger(value) && value >= (key === "feedGeneration" ? 1 : 0);
+    return value !== undefined && Number.isSafeInteger(value) && value >= (["feedGeneration", "coverGeneration"].includes(key) ? 1 : 0);
   });
 }
 
@@ -74,9 +75,10 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
   if (!asset) return rejected(request, 404);
   if (!validProps(asset, props)) return rejected(request, 503);
   try {
-    const key = asset.kind === "feed" ? sqliteFeedSnapshotKey(asset.showId, props.feedGeneration!) : asset.key;
+    const key = asset.kind === "feed" ? sqliteFeedSnapshotKey(asset.showId, props.feedGeneration!) :
+      asset.kind === "cover" ? sqliteCoverSnapshotKey(asset.showId, props.coverGeneration!, asset.key.endsWith(".png") ? "png" : "jpg") : asset.key;
     const object = await env.CASTLOOP_BUCKET.head(key);
-    if (!object) return rejected(request, asset.kind === "feed" ? 503 : 404);
+    if (!object) return rejected(request, asset.kind === "audio" ? 404 : 503);
     if (object.key !== key || !Number.isSafeInteger(object.size) || object.size < 0 || !Number.isFinite(object.uploaded.getTime())) {
       throw new Error("Invalid public object metadata");
     }
