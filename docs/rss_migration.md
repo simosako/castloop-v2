@@ -1,9 +1,9 @@
 # RSSからのPodcast取り込み（v0.6.0）
 
-Issue #48の開発版は`storage_layout="show-v1"`の新規サービス専用。`publish-rss-import`は新Showの作成・初期probe・そのShowだけのResumeも含む。全体Pause/Resumeはなく、remote操作記録は`--show SHOW_ID`で対象を指定する。以下の過去の実機結果は新layoutの検証ではない。
+v0.7.0は`storage_layout="show-v1"`の新規サービス専用。`publish-rss-import`は新Showの作成・初期probe・そのShowだけのResumeも含む。全体Pause/Resumeはなく、remote操作記録は`--show SHOW_ID`で対象を指定する。以下の過去の実機結果は新layoutの検証ではない。
 
 v0.6.0ではSQLiteサービス（サービス設定version 2）だけに公開する。公開には対応するCLI・検証済みWorker・private workspaceが必要。旧サービス設定version 1からのマイグレーション機能やjournal変換は提供しない。
-旧版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。v0.6.0の検証は[新規隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)に記録した。超過した取込は切り詰めず、TOML編集後に再審査する。
+旧版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。v0.6.0の検証は[新規隔離環境の回帰試験](../design/schema_v1_removal_live_test.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)、v0.7.0の変更は[リリースノート](release-v0.7.0.md)に記録した。超過した取込は切り詰めず、TOML編集後に再審査する。
 
 ローカルdownloadはサービスworkspace不要。既存の取り込み素材は引き続き検証して利用できるが、旧Queue公開cursorをSQLiteの受付記録として採用しない。
 
@@ -77,10 +77,10 @@ queued/acceptedだけでは公開成功ではない。
 - 各job最大300状態照会、5分経過後は新規照会を開始しない。進行中の要求には別timeoutがあり、CLI全体が必ず5分以内に終了するという意味ではない。
 - 複数Episodeのupload・全量readback・公開は逐次処理のため、import全体は数分以上かかり得る。外部の実行ツールやCIから起動する場合、短いcommand全体timeoutで強制終了させない。単一jobの5分予算とbatch全体の時間を区別し、元processの終了とjournalを確認せず二重起動しない。
 - SQLite管理GETの通信/本文断とallowlistの一時HTTP拒否は最大3試行。retryも300 GETへ数える。schema/identity不一致や恒久拒否はretryしない。
-- 保存済みpending publicationがある場合、同じ取り込みはその凍結jobのstatusを確認する。完了済み公開を再送せず、別jobへ置き換えない。開発版の新形式では、成功応答があるuploadの検証・下書き登録、完了確認済みのローカル配置からも続行できる。未知upload・登録・ローカルinstallは自動再実行しない。
+- 保存済みpending publicationがある場合、同じ取り込みはその凍結jobのstatusを確認する。完了済み公開を再送せず、別jobへ置き換えない。v0.7.0の新形式では、成功応答があるuploadの検証・下書き登録、完了確認済みのローカル配置からも続行できる。未知upload・登録・ローカルinstallは自動再実行しない。
 - SQLiteの`failed`は公開書込前の確定的失敗、`blocked`は未知IOや途中停止等で後続FIFOを止める。retry/releaseを提供せず、経過時間・HEAD不在で解放しない。
 - `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、journal/lockを削除したりしない。
-- 開発版は`operation-status rss-import IMPORT_UUID --show my-show --remote`と`operation-list --show my-show --parent IMPORT_UUID`で、取り込み全体と各処理を照合できる。操作は[中断後の手順](sqlite_operation_recovery.md)を参照する。配布済み版では`job-status`/`service-status`を使う。
+- v0.7.0は`operation-status rss-import IMPORT_UUID --show my-show --remote`と`operation-list --show my-show --parent IMPORT_UUID`で、取り込み全体と各処理を照合できる。操作は[中断後の手順](sqlite_operation_recovery.md)を参照する。配布済み版では`job-status`/`service-status`を使う。
 
 新しい版は既存UUID Episodeも読めるが、任意GUIDを取り込んだ後の旧版へのdowngradeは非対応。
 

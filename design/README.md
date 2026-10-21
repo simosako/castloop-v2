@@ -1,8 +1,8 @@
 # 設計文書の案内
 
-開発版はIssue #48のShow分離layoutを採用し、サービス設定version 2に`storage_layout="show-v1"`を必須とする。旧layoutは維持・移行せず、新規環境だけを扱う。Pause/ResumeはShow単位。[採用設計](do_show_separation_options.md)と[現行構成](initial_design.md)を優先する。以下のリリース案内は配布済み版の履歴であり、新layoutの実機検証ではない。
+v0.7.0はIssue #48のShow分離layoutを採用し、サービス設定version 2に`storage_layout="show-v1"`を必須とする。旧layoutは維持・移行せず、新規環境だけを扱う。Pause/ResumeはShow単位。[採用設計](do_show_separation_options.md)と[現行構成](initial_design.md)を優先する。v0.6.2以前のリリース案内は配布済み版の履歴であり、新layoutの実機検証ではない。
 
-v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既定でSQLiteを作る。リリースの取得と実環境への配備は別操作。まず[全体設計](initial_design.md)を読み、操作は[README](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS案内](../docs/rss_migration.md)を参照する。既存version 1サービスはv0.5.xと[Queue専用ガイド](../docs/queue_service.md)を使い、移行機能は提供しない。[v0.6.2変更点](../docs/release-v0.6.2.md)、[v0.6.1変更点](../docs/release-v0.6.1.md)、[v0.6.0変更点](../docs/release-v0.6.0.md)、[旧版v0.5.2](../docs/release-v0.5.2.md)を区別する。
+v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既定でSQLiteを作る。リリースの取得と実環境への配備は別操作。まず[全体設計](initial_design.md)を読み、操作は[README](../README.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[RSS案内](../docs/rss_migration.md)を参照する。既存version 1サービスはv0.5.xと[Queue専用ガイド](../docs/queue_service.md)を使い、移行機能は提供しない。[v0.7.0変更点](../docs/release-v0.7.0.md)、[v0.6.2変更点](../docs/release-v0.6.2.md)、[v0.6.1変更点](../docs/release-v0.6.1.md)、[v0.6.0変更点](../docs/release-v0.6.0.md)、[旧版v0.5.2](../docs/release-v0.5.2.md)を区別する。
 
 ## 開発時に参照する文書
 

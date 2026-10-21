@@ -2,13 +2,13 @@
 
 2026-10-21追補: [Show更新中のFeed継続配信設計](show_update_feed_availability_plan.md)を実装した。Episode追加・更新に加え、公開済みShowのmetadata/cover/同時更新でも旧Feed・画像・承認済み音源を配信する。Feed/Show/cover世代と対象種別のguardを保存・照合し、不変cover snapshotと新metadata/Feedをpurge後に原子的に切り替える。内部queue/content schema **5/6**、healthの必須`feed_storage`/`cover_storage`は`immutable-generation-v1`、`publication_read_boundary="show-episode-v1"`を使う新規環境専用。第1・第2段階を含む旧環境の移行・互換配備は提供しない。
 
-更新日: 2026-10-20。**Issue #48の開発版仕様（未リリース）**。v0.6.2の公開・操作記録機能をShow単位DOへ分離し、Pause/ResumeをShow単位に変更する。配布済みv0.6.2の旧layoutとは非互換で、移行・旧版サポートは提供しない。設計と検証範囲は[採用設計](do_show_separation_options.md)、過去のリリースは[v0.6.2](../docs/release-v0.6.2.md)を参照。
+更新日: 2026-10-21。**v0.7.0の仕様**。v0.6.2の公開・操作記録機能をShow単位DOへ分離し、Pause/ResumeをShow単位に変更する。配布済みv0.6.2の旧layoutとは非互換で、移行・旧版サポートは提供しない。設計と検証範囲は[採用設計](do_show_separation_options.md)、過去のリリースは[v0.6.2](../docs/release-v0.6.2.md)を参照。
 操作は[README](../README.md)、詳細は[SQLiteガイド](../docs/sqlite_sequential_development.md)、[文書索引](README.md)を参照する。
 
 ## リリース境界
 
 - v0.6.0以降はサービス設定`schema_version = 2`、`publication_protocol = "sqlite-sequential-v1"`のみを扱う。
-- 本開発版はさらに`storage_layout = "show-v1"`を必須とする。省略した旧設定は管理要求・配備・鍵/journal作成前に拒否する。既存設定へ追記して移行する手順ではなく、新規環境専用である。
+- 本リリースはさらに`storage_layout = "show-v1"`を必須とする。省略した旧設定は管理要求・配備・鍵/journal作成前に拒否する。既存設定へ追記して移行する手順ではなく、新規環境専用である。
 - `castloop init`の既定はSQLite。従来の`--publication-protocol sqlite-sequential-v1`も省略可能な指定として受け付ける。
 - v0.5.xでは従来のQueue/R2方式を維持するが、v0.6.0向けコードと配布物から旧専用CLI／Worker／schema／テストを削除した。
 - 旧version 1設定は管理操作・配備・鍵作成前に拒否する。専用移行機能、旧journal変換、既存資源採用、fallbackを提供しない。
