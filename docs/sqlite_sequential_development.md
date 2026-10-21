@@ -210,7 +210,7 @@ resource作成・設定PUT・配備・access変更は再送しない。`setup_re
 
 ## 検証の限界
 
-ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の[初回実機試行](../design/do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなったが、[2026-10-21の新規環境再試験](../design/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、feed/cover/audio配信とSHA-256・HEAD・Range・304を確認し、最後は両Showをpaused/ready/drainedにした。初回purge障害の根本原因、native同時IO性能・共有更新・300MBは未確認。以下の過去の実機結果を新layoutの証拠へ流用しない。
+ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の[初回実機試行](../design/do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなったが、[新規環境再試験](../design/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、feed/cover/audio配信とSHA-256・HEAD・Range・304を確認した。[2026-10-21のcode-only更新](../design/do_show_separation_worker_update_live_20261021.md)もnative反映待ちから正式verifyで再配備せず続行し、全DOのprobe・保守解除・既存データ保持・個別Resume・更新後公開を確認した。最後は両Showをpaused/ready/drainedにした。初回purge障害の根本原因、native同時IO性能・300MBは未確認。以下の過去の実機結果を新layoutの証拠へ流用しない。
 Worker/DO classは実platform型で型検査・browser bundle化し、Linux単体CLIにはSQLite Workerだけを埋め込む。v0.6.0整理後は[新規隔離環境](../design/schema_v1_removal_live_test.md)で短尺3件＋通常音源36件の公開・全音源hash/Range/304・lifecycle・Worker更新後の保持を確認した。保存ログの追加照会では通常Workerの外側/cache HTTP最大3/5msを確認したが、全invocation回収や将来負荷を保証しない。
 **模擬storageのtransaction/AlarmとCloudflare実機のoutput gate・再配送、模擬purgeと実Workers Cache purgeは区別する。**
 小容量・36件公開・正式RSS・互換更新の実機機能確認は通過した。最新継続試験は公開probe 60/60と通常HTTP/cache/DO/Alarmの各区分の数値CPUを取得したが、platform上の全invocation回収の証明ではない。

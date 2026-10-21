@@ -30,9 +30,10 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [RSS lookupのBun互換性調査](rss_lookup_bun_compatibility.md) | Issue #32。Bun 1.4.2のIPv4/IPv6・HTTP/HTTPSとcompile fixtureでは現行経路の形式不一致を再現せず。正式配布CLIの受け入れ試験とは区別する |
 | [Show/Episodeの項目別入力上限](show_episode_input_limits.md) | Issue #31。Apple基準・大きめ解釈の新規入力上限、保存履歴の無制限読取維持、検証範囲 |
 | [Show単位のDO分離](do_show_separation_options.md) | Issue #48。Show単位DO/Pause/Resume、全体Pause廃止、所属・共有更新の制御DOを採用。旧版互換・移行不要。ローカル回帰と2 Show・6 Episodeの実機機能確認が成功 |
-| [Show分離のローカル検証](do_show_separation_verification.md) | Issue #48。458テスト成功、型検査・Linux CLI build成功。独立SQLite/Alarm、blocked・個別Resume・共有更新の部分成功/応答喪失・native版反映待ち、正式CLI walkthrough。実機未確認 |
+| [Show分離のローカル検証](do_show_separation_verification.md) | Issue #48。初期458テスト成功、型検査・Linux CLI build成功。独立SQLite/Alarm、blocked・個別Resume・共有更新の部分成功/応答喪失・native版反映待ち、正式CLI walkthrough。後続の実機結果は別記録 |
 | [Show分離の実機確認](do_show_separation_live_verification_20261020.md) | Issue #48。新規隔離サービスの初期化でcache purge成功を確認できずblocked。2 Show・各3 Episodeの計画は未実施。停止証跡と資源を保持 |
-| [purge障害の切り分けとShow分離の再試験](do_show_separation_live_retest_20261021.md) | Issue #48。新規サービスで2 Show・6 Episode公開、個別Pause/Resume・配信確認が成功。診断の失敗段階・型分類を追加後は461テスト成功。初回障害の根本原因は未確定、追加補強は未配備 |
+| [purge障害の切り分けとShow分離の再試験](do_show_separation_live_retest_20261021.md) | Issue #48。新規サービスで2 Show・6 Episode公開、個別Pause/Resume・配信確認が成功。診断の失敗段階・型分類を追加後は461テスト成功。初回障害の根本原因は未確定 |
+| [Show分離後のWorker更新の実機確認](do_show_separation_worker_update_live_20261021.md) | Issue #48。既存2 Show・6 Episodeを保持するcode-only更新が成功。native反映待ちの停止後、再配備せず明示verifyで全DOのprobe・保守解除を完了。個別Resume・公開2件を確認し最終paused |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 

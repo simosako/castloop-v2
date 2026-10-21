@@ -2,7 +2,7 @@
 
 2026-10-20。[採用設計](do_show_separation_options.md)のShow単位DO/Pause/Resume、所属・共有更新の制御DOを対象とする。Cloudflareへの配備・資源変更・公開・既存環境や私有証跡の変更は行わない。
 
-本書は初期実装のローカル試験の記録。後続の[初回実機試行](do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなった。[診断改善と再試験](do_show_separation_live_retest_20261021.md)では459テストと、2 Show・6 Episodeの実機機能確認が成功した。実機後の失敗段階・型分類の追加補強では461テスト成功。追加補強は未配備、初回障害の根本原因は未確定。
+本書は初期実装のローカル試験の記録。後続の[初回実機試行](do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなった。[診断改善と再試験](do_show_separation_live_retest_20261021.md)では459テストと、2 Show・6 Episodeの実機機能確認が成功した。失敗段階・型分類の追加補強では461テスト成功。その後の[共有Worker更新](do_show_separation_worker_update_live_20261021.md)で補強を配備し、native反映待ちからの明示verify、全DOのprobe・解除・既存データ保持と更新後公開を確認した。初回purge障害の根本原因は未確定。
 
 ## 結果
 

@@ -1,5 +1,7 @@
 # Issue #48: purge障害の切り分けと実機再試験（2026-10-21）
 
+後続の別承認による[Worker更新試験](do_show_separation_worker_update_live_20261021.md)では、本書の最終検証サービスをcode-only更新し、追加診断も配備した。以下の初回再試験のartifact・結果と、後から追加した未配備時点の補強記録は区別して保持する。
+
 ## 承認と境界
 
 ユーザーは[初回停止の報告](do_show_separation_live_verification_20261020.md)を受け、障害分析、修正、新規隔離環境での再試験を承認した。初回の`i48-dc48db43`はblockedのまま保持し、初期化・probe・配備を再送しない。保持サービス、DNS、権限、課金・CPU設定、証明書、既存素材・journalを変更・削除しない。
