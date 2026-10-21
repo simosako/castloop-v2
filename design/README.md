@@ -35,6 +35,9 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [purge障害の切り分けとShow分離の再試験](do_show_separation_live_retest_20261021.md) | Issue #48。新規サービスで2 Show・6 Episode公開、個別Pause/Resume・配信確認が成功。診断の失敗段階・型分類を追加後は461テスト成功。初回障害の根本原因は未確定 |
 | [Show分離後のWorker更新の実機確認](do_show_separation_worker_update_live_20261021.md) | Issue #48。既存2 Show・6 Episodeを保持するcode-only更新が成功。native反映待ちの停止後、再配備せず明示verifyで全DOのprobe・保守解除を完了。個別Resume・公開2件を確認し最終paused |
 | [Episode追加中のFeed継続配信](episode_add_feed_availability_plan.md) | Issue #50。第1段階をローカル実装。世代別Feedと原子的な切替、新規追加のrunning/隔離を確認できるblockedで旧内容を配信。将来の更新対応、保持方針、非互換形式と検証範囲 |
+| [Feed継続配信の小規模実機確認](episode_add_feed_live_verification_20261021.md) | Issue #50。新規隔離環境・1 Show・2短尺Episodeで成功。前後ともrunningの16取得組で旧Feed200/304・未公開音源404を確認。新世代切替・snapshot保持・最終Pauseを確認し資源を保持。blocked故障注入は未実施 |
+| [Episode更新中のFeed継続配信](episode_update_feed_availability_plan.md) | 承認済み・ローカル実装。metadata-only/audio-only/同時更新へ拡張し、旧Feed・旧MP3を継続配信。base revision/lifecycle guard、原子切替、blockedの隔離条件と新規環境専用のschema 4/5・health形式境界 |
+| [Episode更新の小規模実機確認](episode_update_feed_live_verification_20261021.md) | 1 Show・2短尺Episodeで3種類の更新に成功。実行中16取得組の旧Feed200/304・候補音源404、新Feed切替・旧新音源hash、最終Pauseを確認。試験スクリプトの出力parse停止後は成功操作を再送せず明示続行。資源・証跡を保持 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 

@@ -11,6 +11,8 @@
 
 ## 1. 採用する基本形
 
+2026-10-21追加追補: [Episode更新中のFeed継続配信契約](episode_update_feed_availability_plan.md)を実装し、追加に加えて既存Episode更新も開始時のrevision/lifecycle guardで旧内容を配信する。内部queue/content schemaは4/5、必須health識別`publication_read_boundary="episode-revision-v1"`を追加。冒頭の第1段階の範囲・形式を本追補で拡張する。旧形式の互換配備・変換は提供しない。
+
 ```text
 CLI: 一意のR2 keyへ素材をPUT
   → PUT成功・保存内容を確認

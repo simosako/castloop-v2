@@ -1,8 +1,10 @@
 # Episode追加中のFeed継続配信設計（Issue #50）
 
-2026-10-21。対象: [Issue #50](https://github.com/simosako/castloop-v2/issues/50)。**承認済み・第1段階をローカル実装。実環境への配備は未実施。** 世代別Feed、新規Episode追加からの段階開発、世代の蓄積、必要な内部形式変更と移行不要、および§8.1の案Bが承認済み。Show更新・既存Episode更新の無停止化は後続開発とする。
+2026-10-21。対象: [Issue #50](https://github.com/simosako/castloop-v2/issues/50)。**承認済み・第1段階を実装し、新規隔離環境で小規模正常系試験に成功。** 世代別Feed、新規Episode追加からの段階開発、世代の蓄積、必要な内部形式変更と移行不要、および§8.1の案Bが承認済み。Show更新・既存Episode更新の無停止化は後続開発とする。[実機記録](episode_add_feed_live_verification_20261021.md)とローカル故障試験の範囲を区別する。
 
 ## 1. 目的と提案の要約
+
+後続段階の[Episode更新中のFeed継続配信](episode_update_feed_availability_plan.md)を実装した。本書の追加専用の範囲・schema 3/4は第1段階の記録として残す。現行開発版は更新元revision/lifecycle guardを持つschema 4/5・必須health識別を使う新規環境専用。Show更新の無停止化は引き続き未対応。
 
 **最終目標は、Showの明示停止・非公開化等を除き、追加・更新処理そのものを理由に確定済みFeedの読取を止めないこと。** 新しい内容は別のR2 objectへ準備し、公開条件が成立した後に配信先を切り替える。キャッシュが空でも同じ動作にする。
 
@@ -321,6 +323,8 @@ Cloudflare実機でのDO output gate・Alarm再配送・実Workers Caching/purge
 実executor、Bun SQLite、模擬R2、gateway/cache handlerを接続し、素材検証・音源保存・snapshot保存後・purge待機で旧Feedが読めること、成功後の新Feed切替、旧世代の遅い読取、304/HEAD/Range、未公開音源の404を回帰試験した。validation/音源/snapshot/purge/SQL完了の失敗、再生成後のblocked、保護根拠・要求破損、確定snapshot欠落、既存候補の採用拒否、旧形式への配備前拒否も対象とした。
 
 検証結果: `bun test`は**479 pass / 0 fail（62 files、54.56秒）**。`npm run check`、`npm run build:cli -- linux-x64`、`git diff --check`も成功した。nativeのDO output gate、実Workers Cachingのwarm hit・purge・再配送・性能は模擬試験と区別し、実環境への配備・公開は行っていない。
+
+その後の別承認による[小規模実機確認](episode_add_feed_live_verification_20261021.md)では、commit `62cd198`の単体CLIから新規隔離環境を配備し、1 Show・2 Episodeの正常追加と最終Pauseを確認した。前後ともrunningだった16取得組で旧Feedの200/304と新音源404を確認したが、blocked故障注入・native再配送・性能の実証ではない。保持サービスへの配備・移行はしていない。
 
 ## 参照
 

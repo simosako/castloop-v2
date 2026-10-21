@@ -9,6 +9,26 @@ import { join } from "node:path";
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
 const wait = { attempts: 2, delay: async () => {} };
+
+test("Episode read-boundary format is required before preparing or deploying an update", async () => {
+  for (const marker of [undefined, "unknown"]) {
+    const { value, id } = await fixture();
+    value.calls.length = 0;
+    const transport: typeof value.transport = async (input, init) => {
+      const response = await value.transport(input, init);
+      if (new URL(input instanceof Request ? input.url : input).pathname.endsWith("/health")) {
+        const body = await response.json() as Record<string, unknown>;
+        if (marker === undefined) delete body.publication_read_boundary;
+        else body.publication_read_boundary = marker;
+        return new Response(JSON.stringify(body), { headers: response.headers });
+      }
+      return response;
+    };
+    await expect(updateSqliteService(value.root, value.config, id, "new source", { ...value.options, transport }, wait)).rejects.toThrow();
+    expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+    expect(readSqliteServiceUpdate(value.root, value.config, id)).toBeNull();
+  }
+});
 async function fixture() {
   const value = await sqliteServiceFixture(); values.push(value);
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "initial source", value.options, wait);

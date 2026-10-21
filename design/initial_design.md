@@ -1,6 +1,6 @@
 # castloop v2 デザインドキュメント
 
-2026-10-21追補: Issue #50の[Feed継続配信設計](episode_add_feed_availability_plan.md)第1段階を実装した。Feedは世代別の不変R2 objectへ保存し、purge後のSQL完了で配信先を切り替える。内部queue/content schemaは3/4で、新規環境専用。従来の固定key版からの移行・互換配備は提供しない。
+2026-10-21追補: [Episode更新中のFeed継続配信設計](episode_update_feed_availability_plan.md)を実装した。Issue #50の新規追加に加え、metadata-only/audio-only/同時更新でも旧Feed・承認済み旧音源を配信する。更新元revision/lifecycleのguardを保存・照合し、新音源承認とFeed世代をpurge後のSQL完了で原子的に切り替える。内部queue/content schemaは4/5、healthに必須`publication_read_boundary="episode-revision-v1"`を持つ新規環境専用。第1段階を含む旧環境の移行・互換配備は提供しない。以下の追加専用の範囲記述は本追補で拡張する。
 
 更新日: 2026-10-20。**Issue #48の開発版仕様（未リリース）**。v0.6.2の公開・操作記録機能をShow単位DOへ分離し、Pause/ResumeをShow単位に変更する。配布済みv0.6.2の旧layoutとは非互換で、移行・旧版サポートは提供しない。設計と検証範囲は[採用設計](do_show_separation_options.md)、過去のリリースは[v0.6.2](../docs/release-v0.6.2.md)を参照。
 操作は[README](../README.md)、詳細は[SQLiteガイド](../docs/sqlite_sequential_development.md)、[文書索引](README.md)を参照する。
@@ -52,7 +52,7 @@ Gateway: 対象Show DOの最新の小さい配信判定 → 同versionのcache o
 - SQLiteのsequenceで順序を決める。受付とAlarm予約、成功とcontent更新・次回起動をそれぞれ短いstorage transactionで保存し、外部IOをtransactionに入れない。
 - runtime/config/window、Show/Episodeの世代・baseを正確に照合する。stale入力、同IDで異なる要求、古い受付windowを拒否する。
 - `queued`は受付のみ、`succeeded`はそのjobの全保存・purge・SQL完了。global quiescenceや回復権限の証明ではない。
-- `failed`は副作用前の確定入力/base失敗。`blocked`は途中停止・不明IO等であり対象Showの後続FIFOを止める。新規Episode追加で確定世代・要求hash・対象未登録の保存根拠を照合できる場合だけ旧公開内容の読取を継続し、それ以外は配信503。他Showの通常操作・Pause/Resume・新Show登録を止めない。
+- `failed`は副作用前の確定入力/base失敗。`blocked`は途中停止・不明IO等であり対象Showの後続FIFOを止める。Episode追加・更新で確定世代・要求hash・対象未登録または更新元revision/lifecycleの保存根拠が一致し、検証済みflagと許可reasonが成立する場合だけ旧公開内容の読取を継続する。それ以外は配信503。他Showの通常操作・Pause/Resume・新Show登録を止めない。
 - 再起動／Alarm再配送で残ったrunningを再実行せずblockedとして保全する。経過時間・HEAD不在・空queueで解放せず、未知PUT/POSTを再送しない。blockedのretry/releaseは未提供。
 - 管理GETだけは有限の一時エラーretryを行う。status待機は最大300 GET・5分経過後に新規GETを始めない。開始済みIOとcleanupのsettlementを待つ。
 - 診断は固定のallowlistコード・許可した識別子だけを保存し、本文・メール・秘密・任意例外文を運用記録へ入れない。
@@ -62,11 +62,11 @@ Gateway: 対象Show DOの最新の小さい配信判定 → 同versionのcache o
 公開URLは`/podcasts/<showId>/feed.xml`、`cover.jpg|png`、`episodes/<episodeId>/<revisionId>.mp3`のみ。system／staging／metadata／indexを配信しない。
 
 - gatewayはpublic pathから対象Show DOへ直接到達し、毎回その最新scalar判定でready・Pause・保守拘束・Show/Episode状態・承認音源を確認する。制御DOへの毎回の照会や判定のTTL cacheは行わない。
-- paused/readiness不一致・保守拘束は503、unpublishedは404。新規Episode追加のrunning/blockedだけ、保存した保護根拠が成立すれば旧Feed・承認済みcover/audioを配信する。その他の実行中／blocked、要求破損や保護根拠不一致は503。SQLiteの削除状態に対するgateはあるが物理削除操作は未提供。
+- paused/readiness不一致・保守拘束は503、unpublishedは404。Episode追加・更新のrunning/条件を満たすblockedでは、保存した保護根拠が成立すれば旧Feed・承認済みcover/audioを配信する。その他の実行中／blocked、要求破損や保護根拠不一致は503。SQLiteの削除状態に対するgateはあるが物理削除操作は未提供。
 - 許可した要求のみ同version cache ownerへ送り、認証header／cookie／queryを転送しない。
 - GET／HEAD／単一Range／ETag・日付条件付き応答を維持する。外向け成功応答は再検証必須、非公開／停止／エラーはno-store。内部cache tagを外へ出さない。
 - cache propsのgenerationを分離し、遅い旧cache fillを新feedへ使わない。必要なpurgeが成功するまで公開完了にしない。
-- FeedのR2読取先は`public/podcasts/<showId>/feeds/<feed_generation>.xml`で、HEAD/GETとも同世代に固定する。世代を指定する公開URLは設けず、旧snapshotを自動削除しない。公開済みShowの確定snapshot欠落は503。Show更新・既存Episode更新の継続配信は後続開発とする。
+- FeedのR2読取先は`public/podcasts/<showId>/feeds/<feed_generation>.xml`で、HEAD/GETとも同世代に固定する。世代を指定する公開URLは設けず、旧snapshotを自動削除しない。公開済みShowの確定snapshot欠落は503。Show更新の継続配信は後続開発とする。
 
 ## 管理と運用
 

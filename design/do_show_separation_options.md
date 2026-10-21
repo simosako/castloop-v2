@@ -113,6 +113,8 @@ registryが予約・所属の正本、Show DOが公開状態の正本であれ�
 
 ### 6.3 配信とキャッシュ
 
+2026-10-21追加追補: [Episode更新の継続配信契約](episode_update_feed_availability_plan.md)を実装し、以下の追加専用条件を既存Episodeのmetadata/audio更新にも広げる。更新では公開中の対象revisionとlifecycle世代が開始時のguardに一致することを必須とする。新音源の承認とFeed切替はpurge後の同じtransactionで確定し、旧音源は保持する。新規環境専用のqueue/content schema 4/5と必須health識別を使い、旧形式を変換しない。
+
 gatewayはpublic pathから対象Showを決め、要求ごとにそのShow DOの最新判定だけを確認する。制御DOへの毎回の配信照会や、状態のTTL cacheは設けない。Show DOがpaused、未ready、共有更新の保守拘束中なら503とする。Pauseは従来の安全側の意味をShow単位へ移し、新規受付と配信を閉じる。既受付jobは取り消さずdrainを続ける。
 
 Issue #50では[Feed継続配信契約](episode_add_feed_availability_plan.md)に従い、新規Episode追加のrunning/blockedだけ、開始時に保存した確定Feed/Show世代・要求hash・対象Episode未登録の根拠が成立すれば旧Feedと承認済みcover/audioを配信する。それ以外のrunning/blockedは503、別Show固有のblockedだけでは配信拒否しない。全Feedは世代別の不変R2 snapshotへ保存し、読取先もcache propsと同世代に固定する。R2 streamingと承認済みpublic path、必要なpurge成功後の公開完了は維持する。音源本体をDO経由で中継しない。

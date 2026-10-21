@@ -142,6 +142,10 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
       }
       const target = store.target(request);
       const episodes = store.episodes(request.show_id);
+      if (request.action === "publish" && request.kind === "episode" && target.base) {
+        const media = audioKey(target.base, request.show_id);
+        store.requireMedia(request.show_id, target.base, media.revisionId);
+      }
       store.confirmCommittedReadBoundary(request);
       if (request.action !== "publish") {
         const restored = request.kind === "episode" && request.action === "restore" ? [target.base!] : [];

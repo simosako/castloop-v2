@@ -1,6 +1,6 @@
 # SQLiteのShow単位公開方式（開発版）
 
-2026-10-21、Issue #50追補: 本開発版は世代別Feed保存（healthの`feed_storage="immutable-generation-v1"`、内部queue/content schema 3/4）を必要とする。固定Feed上書き方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別のない旧Workerへの更新をprepare/配備前に拒否する。[設計と境界](../design/episode_add_feed_availability_plan.md)参照。
+2026-10-21、Issue #50とEpisode更新の追補: 本開発版は世代別Feed保存（healthの`feed_storage="immutable-generation-v1"`）に加え、`publication_read_boundary="episode-revision-v1"`と内部queue/content schema **4/5**を必要とする。追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・未知値をprepare/配備前に拒否する。[更新設計と境界](../design/episode_update_feed_availability_plan.md)参照。
 
 2026-10-20、Issue #48の新layout専用ガイド。**配布済みv0.6.2とは非互換・未リリース**であり、以下の操作には本開発版から構築したCLI/Workerが必要。サービス設定に`storage_layout = "show-v1"`を必須とし、旧設定は副作用前に拒否する。既存設定への追記、旧DO/DB/journalの変換・移行・資源採用は行わない。[採用設計](../design/do_show_separation_options.md)参照。
 
@@ -83,7 +83,8 @@ castloop publish-episode first
 - `publish-*`は要求をローカルへ凍結してDOへ送信し、完了を最大300回・新規poll開始5分まで待つ。
 - `accepted/queued`は公開成功ではない。`succeeded`は保存・purge・SQL完了記録が成功した**その操作**の結果。
 - 公開済みShowへの新規Episode追加中は、確定済みの旧Feedと承認済みcover/audioを読み取れる。新Feedは別のprivate R2 objectへ保存し、必要なpurgeとSQL完了後に切り替える。公開URLは変わらず、未完了の新音源は直リンクでも配信しない。世代別Feedは蓄積し、自動削除しない。
-- Show初回公開には旧Feedがない。Show更新・既存Episode更新の実行中の継続配信は後続開発であり、今回は503を維持する。Pause/readiness不一致/保守拘束も503のまま。
+- 既存Episodeのmetadata-only/audio-only/同時更新中も旧Feedと承認済み旧音源を読み取れる。開始時のbase revision・lifecycle世代を照合し、新音源承認とFeedの切替は必要なpurge後の同一transactionで確定する。通常更新後も旧MP3を保持する。metadata-onlyは同じ音源URLを利用する。
+- Show初回公開には旧Feedがない。Show更新の継続配信は後続開発であり、実行中503を維持する。非公開化・復元の実行中、Pause/readiness不一致/保守拘束も503のまま。
 - SQLite cache ownerはtag/prefixを1回のpurgeへまとめる。明確なrate-limit拒否だけは同じrunning実行内で12秒間隔・最大6 attemptsを行い、保存をやり直さない。未知応答・恒久拒否は停止する。この有限待機はblocked jobのretry/release機能ではない。
 - 凍結後は素材を変更しない。次の編集では、既知の完了/確定入力失敗を確認・archiveして別draft IDに進む。
 
@@ -167,6 +168,8 @@ Episodeの停止/復元世代を照合するため、一度停止・復元を挟
 
 ## 異常時
 
+既存Episode更新のblockedも、開始時の確定Feed/Show世代・要求hash・公開中の対象revision/lifecycle世代が一致し、旧content/mediaの検証済みflagと許可reasonが成立する場合だけ旧内容を配信する。以下の「新規追加のみ」の制限をこの条件で拡張する。job・後続FIFO停止、Resume/共有更新拒否、未知IO保全は変えない。
+
 ```sh
 castloop job-status JOB_UUID
 castloop service-status
@@ -213,6 +216,10 @@ resource作成・設定PUT・配備・access変更は再送しない。`setup_re
 公開済みShow/Episodeの物理削除と、未登録uploadの一般的な整理は未実装。開発版の削除機能は、サーバーに登録した一意のstaging keyでPUT成功と未使用を確認できる素材に限定する。空のキューを根拠にbucketやprefixを削除しない。
 
 ## 検証の限界
+
+Episode更新の[2026-10-21小規模実機確認](../design/episode_update_feed_live_verification_20261021.md)では、新規隔離環境の1 Show・2短尺Episodeでmetadata-only/audio-only/同時更新に成功した。前後ともrunningの16取得組で旧Feed200/304・候補音源404、完了後の切替・旧新音源hashと最終Pauseを確認した。nativeのblocked故障注入・再配送・CPU/負荷は未試験。旧形式の保持環境は変更していない。
+
+Issue #50の[2026-10-21小規模実機確認](../design/episode_add_feed_live_verification_20261021.md)では、世代別Feed方式の新規隔離環境で1 Show・2短尺Episodeの正常公開、追加中の旧Feed200/304・未公開音源404（前後ともrunningの16取得組）、成功後の新Feed切替、世代別snapshot保持、音源hash/HEAD/Range/304、最終Pauseを確認した。環境はready/paused/drainedで保持している。blocked時の継続配信は故障注入しておらず、ローカル回帰と区別する。負荷・CPUや完全なcache hit/missの実証ではない。
 
 ローカルではBun SQLite、模擬R2/Cache/Cloudflare REST、実CLI entrypointの独立processによるwalkthroughを用いる。Show分割版の[初回実機試行](../design/do_show_separation_live_verification_20261020.md)は初期化のcache purge確認でblockedとなったが、[新規環境再試験](../design/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、feed/cover/audio配信とSHA-256・HEAD・Range・304を確認した。[2026-10-21のcode-only更新](../design/do_show_separation_worker_update_live_20261021.md)もnative反映待ちから正式verifyで再配備せず続行し、全DOのprobe・保守解除・既存データ保持・個別Resume・更新後公開を確認した。最後は両Showをpaused/ready/drainedにした。初回purge障害の根本原因、native同時IO性能・300MBは未確認。以下の過去の実機結果を新layoutの証拠へ流用しない。
 Worker/DO classは実platform型で型検査・browser bundle化し、Linux単体CLIにはSQLite Workerだけを埋め込む。v0.6.0整理後は[新規隔離環境](../design/schema_v1_removal_live_test.md)で短尺3件＋通常音源36件の公開・全音源hash/Range/304・lifecycle・Worker更新後の保持を確認した。保存ログの追加照会では通常Workerの外側/cache HTTP最大3/5msを確認したが、全invocation回収や将来負荷を保証しない。

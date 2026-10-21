@@ -317,15 +317,15 @@ test("duplicate GUID, orphan outputs and replaced staging objects are rejected b
   expect(await setup.run(replacement)).toMatchObject({ state: "failed", reason_code: "validation_failed" });
 });
 
-test("purge failure blocks later jobs and closes delivery even after the fixed feed was written", async () => {
+test("purge failure blocks later jobs but preserves committed delivery after a candidate Feed was written", async () => {
   const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
   const update = await setup.request("episode", "first", first.job_id, "metadata"), next = await setup.request("episode", "second");
   await setup.queue.enqueue(update); await setup.queue.enqueue(next);
   setup.hooks.purge = async () => { throw new Error("Private title private@example.com secret"); };
   setup.clearAlarm(); expect(await setup.runner.alarm()).toMatchObject({ state: "blocked", reason_code: "execution_failed" });
   expect(setup.content.episodes("daily")[0].revision_id).toBe(first.job_id);
-  expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
-  expect(setup.content.delivery(`/podcasts/daily/episodes/first/${first.job_id}.mp3`).status).toBe(503);
+  expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(200);
+  expect(setup.content.delivery(`/podcasts/daily/episodes/first/${first.job_id}.mp3`).status).toBe(200);
   setup.calls.length = 0;
   expect((await setup.runner.alarm()).state).toBe("blocked");
   expect(setup.calls).toEqual([]);
@@ -404,7 +404,7 @@ test("completion and the content index roll back together when scheduling the ne
   await expect(setup.runner.alarm()).rejects.toThrow("scheduling failure");
   expect(setup.queue.status(update.request_id)?.state).toBe("running");
   expect(setup.content.episodes("daily")[0].revision_id).toBe(first.job_id);
-  expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+  expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(200);
   expect(await setup.runner.alarm()).toMatchObject({ state: "blocked", reason_code: "execution_interrupted" });
   expect(setup.queue.status(next.request_id)?.state).toBe("queued");
 });
@@ -513,17 +513,27 @@ test("permanent identities cannot be claimed again, and tombstones/paused admiss
   expect(setup.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
 });
 
-for (const phase of ["validation", "audio", "snapshot", "purge"] as const) {
-  test(`new additions serve the committed Feed during ${phase}, then switch atomically`, async () => {
+for (const selection of ["addition", "metadata", "audio", "both"] as const) {
+for (const phase of ["validation", "audio", "revision", "metadata", "snapshot", "purge"] as const) {
+  if (selection === "metadata" && phase === "audio") continue;
+  test(`${selection} serves the committed Feed during ${phase}, then switches atomically`, async () => {
     const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
     const old = await readPublic(setup), etag = old.headers.get("ETag")!, body = await old.text();
     const oldDecision = setup.content.delivery("/podcasts/daily/feed.xml");
     if (oldDecision.status !== 200) throw new Error("Expected committed Feed");
-    const next = await setup.request("episode", "second"), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    const next = selection === "addition" ? await setup.request("episode", "second") :
+      await setup.request("episode", "first", first.job_id, selection);
+    const episodeId = next.episode_id!;
+    if (selection === "metadata") next.payloads = [await setup.payload(next.job_id, "episode_metadata",
+      stringifyToml({ ...metadata(episodeId), description: "Updated description" }))];
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
     const hold = async () => { entered.resolve(); await release.promise; };
     if (phase === "validation") setup.bucketHooks.beforeGet = async (key) => { if (key === next.payloads[0].key) await hold(); };
     if (phase === "audio") setup.bucketHooks.beforePut = async (key) => { if (key.endsWith(`${next.job_id}.mp3`)) await hold(); };
     if (phase === "snapshot") setup.bucketHooks.afterPut = async (key) => { if (key.includes("/feeds/")) await hold(); };
+    if (phase === "revision" || phase === "metadata") setup.bucketHooks.afterPut = async (key) => {
+      if (phase === "revision" ? key.endsWith(`/revisions/${next.job_id}.toml`) : key.endsWith("/metadata.toml")) await hold();
+    };
     if (phase === "purge") setup.hooks.purge = hold;
     const running = setup.run(next);
     try {
@@ -534,21 +544,26 @@ for (const phase of ["validation", "audio", "snapshot", "purge"] as const) {
       expect((await readPublic(setup, "/podcasts/daily/cover.jpg")).status).toBe(200);
       expect((await readPublic(setup, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(404);
       expect(setup.queue.status(next.request_id)?.state).toBe("running");
+      expect(setup.content.inspect("daily", "first").base!.revision_id).toBe(first.job_id);
+      expect((await readPublic(setup, `/podcasts/daily/episodes/${episodeId}/${next.job_id}.mp3`)).status).toBe(404);
     } finally { release.resolve(); await running; }
     const current = await readPublic(setup, undefined, { "If-None-Match": etag });
-    expect(current.status).toBe(200); expect(await current.text()).toContain("Private second");
-    expect((await readPublic(setup, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(200);
+    expect(current.status).toBe(200); expect(await current.text()).toContain(`Private ${episodeId}`);
+    expect((await readPublic(setup, `/podcasts/daily/episodes/${episodeId}/${next.job_id}.mp3`)).status).toBe(selection === "metadata" ? 404 : 200);
+    expect((await readPublic(setup, `/podcasts/daily/episodes/first/${first.job_id}.mp3`)).status).toBe(200);
     const late = await serveCachedLifecycleAsset(new Request("https://cache.invalid/podcasts/daily/feed.xml"),
       { CASTLOOP_BUCKET: setup.bucket } as never, oldDecision.cache_props);
     expect(await late.text()).toBe(body);
     expect(setup.entries.has("public/podcasts/daily/feed.xml")).toBe(false);
   });
 }
+}
 
-for (const phase of ["validation", "audio", "snapshot", "purge", "commit"] as const) {
-  test(`isolated ${phase} failure preserves old delivery but never releases the blocked FIFO`, async () => {
-    const setup = await fixture(); await setup.publishShow(); await setup.publishEpisode();
-    const old = await (await readPublic(setup)).text(), next = await setup.request("episode", "second");
+for (const update of [false, true]) {
+for (const phase of ["validation", "audio", "revision", "metadata", "snapshot", "purge", "commit"] as const) {
+  test(`isolated ${update ? "update" : "addition"} ${phase} failure preserves old delivery but never releases the blocked FIFO`, async () => {
+    const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
+    const old = await (await readPublic(setup)).text(), next = await setup.request("episode", update ? "first" : "second", update ? first.job_id : undefined);
     const later = await setup.request("episode", "third");
     await setup.queue.enqueue(next); await setup.queue.enqueue(later); setup.clearAlarm();
     if (phase === "validation") setup.bucketHooks.beforeGet = async (key) => {
@@ -556,6 +571,9 @@ for (const phase of ["validation", "audio", "snapshot", "purge", "commit"] as co
     };
     if (phase === "audio" || phase === "snapshot") setup.bucketHooks.afterPut = async (key) => {
       if (phase === "audio" ? key.endsWith(".mp3") : key.includes("/feeds/")) throw new Error("Unknown output result");
+    };
+    if (phase === "revision" || phase === "metadata") setup.bucketHooks.afterPut = async (key) => {
+      if (phase === "revision" ? key.endsWith(`/revisions/${next.job_id}.toml`) : key.endsWith("/metadata.toml")) throw new Error("Unknown private metadata write");
     };
     if (phase === "purge") setup.hooks.purge = async () => { throw new Error("Unknown purge result"); };
     if (phase === "commit") {
@@ -569,6 +587,8 @@ for (const phase of ["validation", "audio", "snapshot", "purge", "commit"] as co
     expect((await restarted.alarm()).state).toBe("blocked");
     expect(recoveredContent.delivery("/podcasts/daily/feed.xml").status).toBe(200);
     expect(await (await readPublic(setup)).text()).toBe(old);
+    expect(setup.content.inspect("daily", "first").base!.revision_id).toBe(first.job_id);
+    expect((await readPublic(setup, `/podcasts/daily/episodes/${next.episode_id}/${next.job_id}.mp3`)).status).toBe(404);
     expect((await readPublic(setup, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(404);
     const count = setup.calls.length; await restarted.alarm(); expect(setup.calls).toHaveLength(count);
     expect(setup.queue.status(later.request_id)?.state).toBe("queued");
@@ -577,6 +597,7 @@ for (const phase of ["validation", "audio", "snapshot", "purge", "commit"] as co
     expect(() => setup.queue.resume(crypto.randomUUID())).toThrow("drained");
     expect(() => setup.queue.resume(setup.windowId!)).toThrow();
   });
+}
 }
 
 test("read guards fail closed on corruption, changed committed state and missing snapshots", async () => {
@@ -626,12 +647,12 @@ test("lifecycle operations without Feed output retain the actual snapshot genera
 test("old persisted queue and content schemas are rejected without conversion", async () => {
   const setup = await fixture(); await setup.publishShow();
   const before = new Map(setup.entries);
-  setup.storage.sql.exec("UPDATE publication_content_schema SET version = 3 WHERE id = 1");
+  setup.storage.sql.exec("UPDATE publication_content_schema SET version = 4 WHERE id = 1");
   expect(() => new SqlitePublicationContent(setup.storage)).toThrow("Unsupported");
-  expect(setup.storage.sql.exec("SELECT version FROM publication_content_schema").toArray()).toEqual([{ version: 3 }]);
-  setup.storage.sql.exec("UPDATE publication_queue_schema SET version = 2 WHERE id = 1");
+  expect(setup.storage.sql.exec("SELECT version FROM publication_content_schema").toArray()).toEqual([{ version: 4 }]);
+  setup.storage.sql.exec("UPDATE publication_queue_schema SET version = 3 WHERE id = 1");
   expect(() => new SqlitePublicationQueue(setup.storage, setup.runtime)).toThrow("Unsupported");
-  expect(setup.storage.sql.exec("SELECT version FROM publication_queue_schema").toArray()).toEqual([{ version: 2 }]);
+  expect(setup.storage.sql.exec("SELECT version FROM publication_queue_schema").toArray()).toEqual([{ version: 3 }]);
   expect(setup.entries).toEqual(before);
 });
 
@@ -650,4 +671,57 @@ test("corrupt committed content never receives the verified blocked-read permiss
   setup.storage.sql.exec("UPDATE publication_show_content SET metadata_json = '{invalid' WHERE show_id = 'daily'");
   expect(await setup.run(next)).toMatchObject({ state: "blocked", reason_code: "validation_unavailable" });
   expect((await readPublic(setup)).status).toBe(503);
+});
+
+test("updates preserve distinct metadata and audio revisions across sequential updates", async () => {
+  const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
+  let base = first.job_id;
+  for (const selection of ["metadata", "audio", "both", "metadata"] as const) {
+    const next = await setup.request("episode", "first", base, selection);
+    const old = setup.content.inspect("daily", "first").base!, body = setup.feed();
+    setup.hooks.purge = async () => {
+      expect(setup.feed()).toBe(body);
+      expect((await readPublic(setup)).status).toBe(200);
+      expect((await readPublic(setup, new URL(old.enclosure_url).pathname, { Range: "bytes=0-2" })).status).toBe(206);
+      expect(setup.content.inspect("daily", "first").base!.revision_id).toBe(base);
+    };
+    expect((await setup.run(next)).state).toBe("succeeded");
+    expect(setup.content.inspect("daily", "first").base!.enclosure_url).toBe(selection === "metadata" ? old.enclosure_url :
+      `${setup.config.public_base_url}/podcasts/daily/episodes/first/${next.job_id}.mp3`);
+    base = next.job_id;
+  }
+});
+
+test("update guards reject changed revisions, lifecycle ABA and malformed evidence", async () => {
+  for (const fault of ["revision", "lifecycle", "missing", "guard-revision", "guard-lifecycle", "guard-state"] as const) {
+    const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
+    const next = await setup.request("episode", "first", first.job_id);
+    await setup.queue.enqueue(next); setup.queue.claim();
+    expect((await readPublic(setup)).status).toBe(200);
+    if (fault === "revision") setup.storage.sql.exec("UPDATE publication_episodes SET revision_id = ?", crypto.randomUUID());
+    if (fault === "lifecycle") setup.storage.sql.exec("UPDATE publication_episodes SET lifecycle_version = lifecycle_version + 2");
+    if (fault === "missing") setup.storage.sql.exec("DELETE FROM publication_episodes");
+    if (fault === "guard-revision") setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_revision_id = 'invalid' WHERE job_id = ?", next.job_id);
+    if (fault === "guard-lifecycle") setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_lifecycle_version = -1 WHERE job_id = ?", next.job_id);
+    if (fault === "guard-state") {
+      expect(() => setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_state = NULL WHERE job_id = ?", next.job_id)).toThrow();
+      setup.storage.sql.exec("UPDATE publication_jobs SET read_episode_state = NULL, read_episode_revision_id = NULL, read_episode_lifecycle_version = NULL WHERE job_id = ?", next.job_id);
+    }
+    expect((await readPublic(setup)).status).toBe(503);
+  }
+});
+
+test("corrupt old media and interruption before verification cannot authorize blocked update reads", async () => {
+  for (const corruptMedia of [false, true]) {
+    const setup = await fixture(); await setup.publishShow(); const first = await setup.publishEpisode();
+    const next = await setup.request("episode", "first", first.job_id, "audio");
+    if (corruptMedia) {
+      setup.storage.sql.exec("UPDATE publication_media SET sha256 = ?", "f".repeat(64));
+      expect(await setup.run(next)).toMatchObject({ state: "blocked", reason_code: "validation_unavailable" });
+    } else {
+      await setup.queue.enqueue(next); setup.queue.claim();
+      expect((await setup.runner.alarm()).state).toBe("blocked");
+    }
+    expect((await readPublic(setup)).status).toBe(503);
+  }
 });
