@@ -13,12 +13,12 @@ afterEach(() => { for (const value of values.splice(0)) value.close(); });
 async function fixture() {
   const f = await sqliteServiceFixture(); values.push(f);
   await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "source", f.options, { attempts: 2, delay: async () => {} });
-  const options = { transport: f.transport, cloudflare: f.options };
+  const options = { transport: f.transport, cloudflare: f.options, operationOptions: { showId: "daily" } };
   const run = (command: string, args: string[] = []) => runSqliteCommand(f.root, f.config, command, args, options);
-  await run("service-resume", [crypto.randomUUID()]); await run("create-show", ["daily", "https://example.com/show"]);
+  await run("create-show", ["daily", "https://example.com/show"]); await run("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(f.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
-  const client = new SqliteOperationClient(f.config, administratorKey(f.root), f.transport);
-  return { ...f, options, run, client };
+  const client = new SqliteOperationClient(f.config, administratorKey(f.root), f.transport, "daily");
+  return Object.assign(f, { options, run, client });
 }
 
 test("CLI cancellation, reviewed cleanup and a fresh update retain local originals and immutable operation receipts", async () => {

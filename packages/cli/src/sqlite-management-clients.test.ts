@@ -6,7 +6,7 @@ import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { classifySqliteInvocation, sanitizeSqliteInvocation, SqliteObservationGuard } from "../../../scripts/test-support/sqlite-observability";
 
-const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "trial", account_id: "a".repeat(32),
+const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "trial", account_id: "a".repeat(32),
   bucket_name: "private-bucket", worker_name: "test-worker", public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
 const version = "11111111-1111-4111-8111-111111111111", window = "22222222-2222-4222-8222-222222222222";
 const runtime = { service_id: config.service_id, service_config_sha256: await sqliteServiceConfigHash(config), worker_version_id: version };

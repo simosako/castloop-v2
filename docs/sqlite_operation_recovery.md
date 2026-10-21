@@ -2,15 +2,17 @@
 
 Issue #40に対応したv0.6.2の利用方法。サーバーへの記録、アップロードの再開、取消、未公開素材の削除には、対応するCLIとWorkerを使う。旧版v0.6.1以前の配布済みバイナリには含まれない。
 
+Issue #48の開発版では操作記録をShow DOへ分け、remoteコマンドに`--show SHOW_ID`を必須とする。以下は新layout向けの操作例で、配布済みv0.6.2とは引数が異なる。`--local`と保存済みlifecycle jobの照会にはShow指定は不要。旧layoutへの互換配備・移行は提供しない。
+
 ## 状態を確認する
 
 サービスの作業ディレクトリで実行する。
 
 ```sh
-castloop operation-list --incomplete
-castloop operation-status upload UPLOAD_OPERATION_UUID --remote
-castloop operation-status rss-import IMPORT_UUID --remote
-castloop operation-list --parent IMPORT_UUID
+castloop operation-list --show my-show --incomplete
+castloop operation-status upload UPLOAD_OPERATION_UUID --show my-show --remote
+castloop operation-status rss-import IMPORT_UUID --show my-show --remote
+castloop operation-list --show my-show --parent IMPORT_UUID
 ```
 
 結果はJSONで表示する。`operation`に対象・現在状態・処理段階、`assets`に素材ごとの保存・検証結果、`requests`に要求元クライアントと受信時刻、`events`に状態の履歴が入る。
@@ -43,7 +45,7 @@ castloop operation-list --local --incomplete
 ## アップロードを再開する
 
 ```sh
-castloop operation-resume upload UPLOAD_OPERATION_UUID
+castloop operation-resume upload UPLOAD_OPERATION_UUID --show my-show
 ```
 
 元の作業ディレクトリ、サービス設定、Worker、受付window、下書きの対象・公開済み版、入力ファイルを照合して続行する。Cloudflareの認証情報も必要になる。
@@ -60,8 +62,8 @@ castloop operation-resume upload UPLOAD_OPERATION_UUID
 ## RSS取り込みを続ける
 
 ```sh
-castloop operation-status rss-import IMPORT_UUID --remote
-castloop operation-list --parent IMPORT_UUID
+castloop operation-status rss-import IMPORT_UUID --show my-show --remote
+castloop operation-list --show my-show --parent IMPORT_UUID
 castloop publish-rss-import /path/to/reviewed-import
 ```
 
@@ -74,26 +76,26 @@ castloop publish-rss-import /path/to/reviewed-import
 まず操作を取り消す。取消自体はファイルを削除しない。
 
 ```sh
-castloop operation-cancel upload UPLOAD_OPERATION_UUID
-castloop operation-cleanup-preview upload UPLOAD_OPERATION_UUID
+castloop operation-cancel upload UPLOAD_OPERATION_UUID --show my-show
+castloop operation-cleanup-preview upload UPLOAD_OPERATION_UUID --show my-show
 ```
 
 プレビューの対象キー、サイズ、ETag、versionと`plan_sha256`を確認してから実行する。
 
 ```sh
-castloop operation-cleanup upload UPLOAD_OPERATION_UUID PLAN_SHA256 confirm
-castloop operation-status cleanup CLEANUP_OPERATION_UUID
+castloop operation-cleanup upload UPLOAD_OPERATION_UUID PLAN_SHA256 confirm --show my-show
+castloop operation-status cleanup CLEANUP_OPERATION_UUID --show my-show
 ```
 
 削除できるのは、登録された一意のstaging keyのうち、PUT成功が分かり、その下書きIDで公開要求を受け付けていない素材である。サーバーが対象の確定と利用禁止を同じSQLiteトランザクションで保存し、R2の識別情報を再照合して削除する。プレビュー後に条件が変わった場合は実行しない。
 
 削除結果はファイルごとに`deleted`または`unknown`として残る。完了を確認できない場合は後続の削除を停止し、同じ削除要求を再送しない。操作IDと要求IDは送信前にも表示する。
 
-RSS全体は、実行中・保留中の子操作がない場合に`operation-cancel rss-import IMPORT_UUID`で取り消せる。公開済みのエピソード、改訂履歴、元のTOML・カバー・MP3は残る。公開済みShow/Episodeの物理削除とは別の機能である。
+RSS全体は、実行中・保留中の子操作がない場合に`operation-cancel rss-import IMPORT_UUID --show my-show`で取り消せる。公開済みのエピソード、改訂履歴、元のTOML・カバー・MP3は残る。公開済みShow/Episodeの物理削除とは別の機能である。
 
 ## 容量を確認する
 
-`operation-list`と詳細の`capacity`には、DO内のDB全体の使用量を表示する。
+`operation-list`と詳細の`capacity`には、対象Show DO内のDB全体の使用量を表示する。他Show・制御DO・アカウント合計の使用量ではない。
 
 - `database_bytes`：Cloudflareの`databaseSize`。操作記録以外のSQLデータも含む。
 - `warning`：1GBを計画上限として、50%で`half`、70%で`high`、85%で`critical`。

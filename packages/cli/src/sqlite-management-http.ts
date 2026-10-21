@@ -50,7 +50,8 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
 }
 
 function readPath(path: string): boolean {
-  if (["/admin/sqlite-service/health", "/admin/sqlite-publication/status"].includes(path)) return true;
+  if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-publication/status"].includes(path)) return true;
+  if (/^\/admin\/sqlite-service\/registrations\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) && path.slice("/admin/sqlite-service/registrations/".length).length <= 32) return true;
   const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   if (path === "/admin/sqlite-operations/list" || new RegExp(`^/admin/sqlite-operations/(?:(?:cleanup|requests)/)?${uuid}$`, "i").test(path)) return true;
   if (new RegExp(`^/admin/(?:sqlite-publication/jobs|sqlite-service/update-status)/${uuid}$`, "i").test(path)) return true;

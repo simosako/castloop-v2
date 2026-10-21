@@ -4,9 +4,15 @@ import { sqliteUpdateSummarySchema } from "./sqlite-runtime-update";
 
 export const sqliteRuntimeRequestSchema = sqlitePublicationRuntimeSchema.extend({ operation_id: z.uuid() }).strict();
 export const sqliteResumeRequestSchema = sqliteRuntimeRequestSchema.extend({ admission_window_id: z.uuid() }).strict();
-export const sqliteRegistrationSchema = sqliteResumeRequestSchema.extend({ show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+export const sqliteRegistrationSchema = sqliteRuntimeRequestSchema.extend({ show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   reservation_id: z.uuid() }).strict();
+export const sqliteRegistryStatusSchema = z.object({ show_id: sqliteRegistrationSchema.shape.show_id,
+  reservation_id: z.uuid().nullable(), state: z.enum(["missing", "requested", "registered"]) }).strict();
 export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protocol: z.literal(sqlitePublicationProtocol),
+  scope: z.enum(["service", "show"]).optional(), show_id: sqliteRegistrationSchema.shape.show_id.optional(),
+  show_count: z.number().int().nonnegative().optional(), paused_shows: z.number().int().nonnegative().optional(),
+  maintenance_operation_id: z.uuid().nullable().optional(),
+  maintenance: z.object({ operation_id: z.uuid(), phase: z.enum(["preparing", "prepared", "activating", "probing", "releasing"]) }).strict().nullable().optional(),
   invocation_id: z.uuid(), publication_ready: z.boolean(), state: z.enum(["open", "paused"]), admission_window_id: z.uuid().nullable(),
   queued: z.number().int().nonnegative(), active: z.enum(["running", "blocked"]).nullable(), drained: z.boolean(),
   setup: z.object({ operation_id: z.uuid(), state: z.enum(["scheduled", "running", "ready", "blocked"]) }).strict().nullable(),

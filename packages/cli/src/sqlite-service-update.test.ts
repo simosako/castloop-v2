@@ -20,14 +20,14 @@ async function fixture() {
 test("compatible REST updates preserve the namespace/content, finish paused after a new probe and require explicit resume", async () => {
   const { value, id, update } = await fixture(), oldVersion = value.runtime.health().worker_version_id;
   const command = (name: string, args: string[] = []) => runSqliteCommand(value.root, value.config, name, args, { transport: value.transport, cloudflare: value.options });
-  await command("service-resume", [crypto.randomUUID()]); await command("create-show", ["daily", "https://example.com/podcast"]);
+  await command("create-show", ["daily", "https://example.com/podcast"]); await command("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(value.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
   await command("update-show", ["daily"]); await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);
   writeFileSync(join(value.root, "daily", "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
   await command("update-episode", ["daily", "first"]); await command("update-episode-audio", ["daily", "first", "audio.mp3"]); await command("publish-episode", ["daily", "first"]);
   const preserved = new Map([...value.entries].map(([key, object]) => [key, object.etag]));
-  await command("service-pause", [crypto.randomUUID()]); value.calls.length = 0;
+  await command("show-pause", ["daily", crypto.randomUUID()]); value.calls.length = 0;
   const result = await update(); expect(result.phase).toBe("ready"); expect(result.receipt!.worker_version_id).not.toBe(oldVersion);
   expect(value.runtime.health()).toMatchObject({ publication_ready: true, state: "paused", drained: true,
     runtime_update: { operation_id: id, state: "completed" } });
@@ -37,7 +37,7 @@ test("compatible REST updates preserve the namespace/content, finish paused afte
   expect(mutations).toHaveLength(3); expect(mutations.filter((call) => call.method === "PUT")).toHaveLength(1);
   expect(mutations.some((call) => /r2|subdomain|queues|namespaces/.test(call.path))).toBe(false);
   expect(value.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
-  await command("service-resume", [crypto.randomUUID()]);
+  await command("show-resume", ["daily", crypto.randomUUID()]);
   const file = join(value.root, "daily", "episode-first.toml"); writeFileSync(file, readFileSync(file, "utf8").replace('title = "first"', 'title = "After compatible update"'));
   await command("update-episode", ["daily", "first"]); expect(await command("publish-episode", ["daily", "first"])).toMatchObject({ state: "succeeded" });
   expect(value.content.episodes("daily")[0].title).toBe("After compatible update");
@@ -69,7 +69,7 @@ test("pending updated probes can only reconcile already-completed matching setup
   await expect(update()).rejects.toThrow("remains unconfirmed");
   expect(readSqliteServiceUpdate(value.root, value.config, id)!.phase).toBe("activation_requested");
   await expect(reconcileSqliteServiceUpdate(value.root, value.config, id, value.options)).rejects.toThrow("not verified");
-  value.clearAlarm(); await value.runtime.alarm(); value.calls.length = 0;
+  value.clearAlarm(); await value.runtime.alarm(); await value.control.progress(); value.calls.length = 0;
   expect((await reconcileSqliteServiceUpdate(value.root, value.config, id, value.options)).phase).toBe("ready");
   expect(value.calls.every((call) => call.method === "GET")).toBe(true);
 });
@@ -85,8 +85,10 @@ test("blocked probes and changed namespaces cannot be promoted to ready", async 
   expect(drift.value.runtime.ready()).toBe(false);
 });
 
-test("open services refuse deployment, and successive completed code updates retain independent evidence", async () => {
-  const { value, update } = await fixture(); value.queue.resume(crypto.randomUUID()); value.calls.length = 0;
+test("open Shows refuse deployment, and successive completed code updates retain independent evidence", async () => {
+  const { value, update } = await fixture();
+  await runSqliteCommand(value.root, value.config, "create-show", ["daily", "https://example.com"], { transport: value.transport, cloudflare: value.options });
+  value.queue.resume(crypto.randomUUID()); value.calls.length = 0;
   await expect(update()).rejects.toThrow("pause and drain"); expect(value.calls.every((call) => call.method === "GET")).toBe(true);
   value.queue.pause(); const first = await update();
   const second = await update("next compatible source", crypto.randomUUID());

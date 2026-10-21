@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { stringifyToml } from "../packages/shared/src/index";
 import { sqliteServiceConfigHash } from "../packages/shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../packages/shared/src/sqlite-service";
@@ -12,16 +12,16 @@ import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucke
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 async function fixture() {
-  const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service", account_id: "a".repeat(32),
+  const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service", account_id: "a".repeat(32),
     bucket_name: "test-bucket", worker_name: "test-worker", public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
   const value = sqlitePublicationFixture({ resume: false, runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
   cleanups.push(value.close);
   const objects = sqlitePublicationBucket(); await objects.bucket.put("system/service.toml", stringifyToml(config));
   const content = new SqlitePublicationContent(value.storage), purges: string[] = [];
   const cached = { worker_version_id: value.runtime.worker_version_id, service_config_sha256: value.runtime.service_config_sha256, cache_enabled: true };
-  const hooks: { purge?: () => Promise<void> } = {};
+  const hooks: { describe?: () => Promise<void>; purge?: () => Promise<void> } = {};
   const create = () => new SqliteServiceRuntime(value.storage, value.queue, content, objects.bucket, config,
-    { describe: async () => cached, purge: async (showId) => { purges.push(showId); await hooks.purge?.(); } });
+    { describe: async () => { await hooks.describe?.(); return cached; }, purge: async (showId) => { purges.push(showId); await hooks.purge?.(); } });
   const runtime = create(), http = createSqliteServiceHttp(runtime, "private-key");
   const request = { ...value.runtime, operation_id: crypto.randomUUID() };
   const call = (route: string, body?: object) => http(new Request(`https://test-worker.example.workers.dev/admin/sqlite-service/${route}`, {
@@ -58,16 +58,24 @@ test("duplicate setup does not reschedule or replace running or blocked work", a
   value.calls.length = 0; await value.runtime.alarm(); expect(value.calls).toEqual([]);
 });
 
-for (const fault of ["version", "config", "cache", "bucket", "purge"] as const) {
+for (const fault of ["version", "config", "cache", "bucket", "describe", "purge"] as const) {
   test(`runtime ${fault} failure stays blocked and cannot resume or register`, async () => {
     const value = await fixture(); await value.runtime.prepare(value.request);
     if (fault === "version") value.cached.worker_version_id = crypto.randomUUID();
     if (fault === "config") value.cached.service_config_sha256 = "f".repeat(64);
     if (fault === "cache") value.cached.cache_enabled = false;
     if (fault === "bucket") await value.bucket.put("system/service.toml", stringifyToml({ ...value.config, bucket_name: "other-bucket" }));
+    if (fault === "describe") value.hooks.describe = async () => { throw new Error("private-key private text"); };
     if (fault === "purge") value.hooks.purge = async () => { throw new Error("private-key private text"); };
-    await value.runtime.alarm();
+    const logs: unknown[] = [], logger = spyOn(console, "error").mockImplementation((message: unknown) => { logs.push(message); });
+    try { await value.runtime.alarm(); } finally { logger.mockRestore(); }
+    const stage = fault === "bucket" ? "config_validate" : fault === "describe" ? "cache_describe" : fault === "purge" ? "cache_purge" : "cache_validate";
+    expect(logs).toEqual([JSON.stringify({ event: "sqlite_runtime_setup", ...value.queue.identity(),
+      operation_id: value.request.operation_id, reason_code: "runtime_probe_failed", probe_stage: stage })]);
+    expect(JSON.stringify(logs)).not.toMatch(/private-key|private text/);
     expect(value.runtime.health()).toMatchObject({ publication_ready: false, state: "paused", setup: { state: "blocked" } });
+    const purgeCount = value.purges.length;
+    await value.create().alarm(); expect(value.purges).toHaveLength(purgeCount);
     expect((await value.call("resume", { ...value.request, admission_window_id: crypto.randomUUID() })).status).toBe(503);
   });
 }
@@ -90,7 +98,7 @@ test("authenticated service commands bind exact runtime and explicit resume wind
   expect((await value.call("resume", { ...value.request, worker_version_id: crypto.randomUUID(), admission_window_id: crypto.randomUUID() })).status).toBe(409);
   const window = crypto.randomUUID();
   expect((await value.call("resume", { ...value.request, admission_window_id: window })).status).toBe(200);
-  const registration = { ...value.request, admission_window_id: window, show_id: "daily", reservation_id: crypto.randomUUID() };
+  const registration = { ...value.request, show_id: "daily", reservation_id: crypto.randomUUID() };
   expect((await value.call("register-show", registration)).status).toBe(200);
   expect(await value.runtime.inspect("daily")).toMatchObject({ show_lifecycle: "draft", expected_show_state_version: 0, reservation_id: registration.reservation_id });
   expect((await value.call("register-show", { ...registration, reservation_id: crypto.randomUUID() })).status).toBe(409);

@@ -3,6 +3,8 @@
 更新日: 2026-10-19。案Bを具体化するための比較資料。
 料金と上限は、同日時点のCloudflare公式資料に基づく。
 
+2026-10-20追補: Issue #48では[Show単位DO](do_show_separation_options.md)を採用した。本書の「公開状態と同じDO SQLiteに操作記録を置く」方針をShow内で維持し、容量表示もShow DB単位とする。アカウント共通の容量・日次枠は増えない。以下の比較・旧見積もりは新layoutの実機計測ではない。
+
 保存先は既存DO内のSQLiteで検討を進める。作業と要求の区別、要求元クライアントの記録方法、具体的なDDLは、[操作記録のIDとテーブル設計](sqlite_operation_records_schema.md)を参照する。
 
 ## 1. 推奨する構成

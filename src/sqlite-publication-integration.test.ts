@@ -24,7 +24,7 @@ afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 
 async function fixture() {
   const root = mkdtempSync("/tmp/opencode/castloop-sqlite-integration-");
-  const config: SqliteServiceConfig = { schema_version: 2, publication_protocol: "sqlite-sequential-v1", service_id: "service",
+  const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
     account_id: "a".repeat(32), bucket_name: "private-bucket", worker_name: "test-worker", public_base_url: "https://public.example.com",
     workers_dev_base_url: "https://test-worker.example.workers.dev" };
   const queue = sqlitePublicationFixture({ runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(),
@@ -33,7 +33,7 @@ async function fixture() {
   const objects = sqlitePublicationBucket(), content = new SqlitePublicationContent(queue.storage);
   content.registerShow("daily", crypto.randomUUID());
   let ready = true;
-  const http = createSqlitePublicationHttp(queue.queue, "private-admin", () => ready);
+  const http = createSqlitePublicationHttp(queue.queue, "private-admin", () => ready, "daily");
   const records = createSqliteOperationRecords(queue.storage, queue.queue, content, () => ready);
   const operations = createSqliteOperationHttp(records, "private-admin", () => ready, objects.bucket);
   const runtime = new SqliteServiceRuntime(queue.storage, queue.queue, content, objects.bucket, config,

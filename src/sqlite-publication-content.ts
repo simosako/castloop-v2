@@ -37,7 +37,7 @@ export class SqlitePublicationContent {
     });
   }
 
-  registerShow(showId: string, reservationId: string): ShowRow {
+  registerShow(showId: string, reservationId: string, initializing = false): ShowRow {
     sqlitePublicationRequestSchema.shape.show_id.parse(showId);
     sqlitePublicationRequestSchema.shape.job_id.parse(reservationId);
     return this.storage.transactionSync(() => {
@@ -48,7 +48,7 @@ export class SqlitePublicationContent {
       }
       const service = this.storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
       const pending = this.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM publication_jobs WHERE state IN ('queued', 'running', 'blocked')").toArray()[0]!.count;
-      if (service?.state !== "open" || pending) throw new Error("Show registration requires open, drained publication admission");
+      if (service?.state !== (initializing ? "paused" : "open") || pending) throw new Error("Show registration requires drained publication admission");
       this.storage.sql.exec("INSERT INTO publication_shows (show_id, reservation_id, state_version, feed_generation, lifecycle) VALUES (?, ?, 0, 0, 'draft')", showId, reservationId);
       return this.show(showId)!;
     });
@@ -182,10 +182,10 @@ export class SqlitePublicationContent {
       const service = this.storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
       if (service?.state !== "open") return { status: 503 };
       const show = this.show(asset.showId);
-      if (!show || show.lifecycle === "draft" || show.lifecycle === "unpublished") return { status: 404 };
+      if (!show) return { status: 404 };
+      if (this.storage.sql.exec("SELECT job_id FROM publication_jobs WHERE show_id = ? AND state IN ('running', 'blocked') LIMIT 1", asset.showId).toArray().length) return { status: 503 };
+      if (show.lifecycle === "draft" || show.lifecycle === "unpublished") return { status: 404 };
       if (show.lifecycle === "deleted") return { status: 410 };
-      const active = this.storage.sql.exec<{ show_id: string }>("SELECT show_id FROM publication_jobs WHERE state IN ('running', 'blocked')").toArray()[0];
-      if (active?.show_id === asset.showId) return { status: 503 };
       if (asset.kind === "cover") {
         const cover = this.storage.sql.exec<{ cover_extension: string }>("SELECT cover_extension FROM publication_show_content WHERE show_id = ?", asset.showId).toArray()[0];
         if (!cover || !asset.key.endsWith(`cover.${cover.cover_extension}`)) return { status: 404 };

@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 const families = { upload: "sqlite-uploads", draft: "sqlite-drafts", publication: "sqlite-publications",
   "rss-import": "sqlite-rss-imports", "show-registration": "sqlite-registrations", lifecycle: "sqlite-lifecycle", cleanup: "sqlite-operation-requests" } as const;
-export type OperationReadOptions = { local?: boolean; incomplete?: boolean; cursor?: string; parent?: string;
+export type OperationReadOptions = { showId?: string; local?: boolean; incomplete?: boolean; cursor?: string; parent?: string;
   afterVersion?: number; requestCursor?: string };
 const briefSchema = z.object({ schema_version: z.number().optional(), operation_id: z.uuid().optional(), import_id: z.uuid().optional(),
   job_id: z.uuid().optional(), phase: z.string().optional(), state: z.string().optional(), step: z.number().optional(),
@@ -59,7 +59,8 @@ export async function runSqliteOperationCommand(root: string, input: SqliteServi
     if (!Object.hasOwn(families, args[0]!)) throw new Error("Unknown operation family");
     return { source: "local", operations: records.filter((record) => record.family === args[0] && record.id === args[1]) };
   }
-  const key = administratorKey(root), client = new SqliteOperationClient(config, key, transport);
+  if (!options.showId) throw new Error("Remote operation commands require --show SHOW_ID");
+  const key = administratorKey(root), client = new SqliteOperationClient(config, key, transport, options.showId);
   if (command === "operation-list") return client.list(options);
   const id = z.uuid().parse(args[1]);
   if (!Object.hasOwn(families, args[0]!)) throw new Error("Unknown operation family");
@@ -83,6 +84,7 @@ export async function runSqliteOperationCommand(root: string, input: SqliteServi
   }
   if (command === "operation-resume" && args[0] === "upload") {
     const upload = await readSqliteUploadRecord(root, config, id);
+    if (upload.target.show_id !== options.showId) throw new Error("Upload resume Show differs from --show");
     const draft = await SqliteDraft.open(root, config, upload.target, { administratorKey: key, managementTransport: transport, r2 });
     return draft.resumeUpload(id);
   }

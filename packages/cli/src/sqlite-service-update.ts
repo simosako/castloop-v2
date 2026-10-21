@@ -53,7 +53,7 @@ export async function updateSqliteService(root: string, config: SqliteServiceCon
     retained.request.worker_source_sha256 !== sourceHash || retained.request.worker_metadata_sha256 !== metadataHash)) throw new Error("SQLite update differs from its frozen source/configuration");
   if (!retained) {
     const health = await client.health();
-    if (!health.publication_ready || health.state !== "paused" || !health.drained) throw new Error("Explicitly pause and drain the ready SQLite service before deployment");
+    if (!health.publication_ready || health.state !== "paused" || !health.drained) throw new Error("Explicitly pause and drain every Show in the ready SQLite service before deployment");
     const previous = await api.current();
     if (previous.worker_version_id !== health.worker_version_id) throw new Error("SQLite REST and DO versions differ");
     journal.initialize(stateSchema.parse({ schema_version: 2, protocol: "sqlite-sequential-v1", phase: "prepared", previous, request: {
@@ -106,7 +106,7 @@ async function activateVerifiedUpdate(journal: LocalJournalStorage, initial: Sql
     const pending = await client.update("status", state.request);
     if (pending.update.state !== "prepared" || pending.update.new_worker_version_id !== null ||
       ![state.request.worker_version_id, receipt.worker_version_id].includes(pending.worker_version_id)) throw new Error("New SQLite runtime did not retain the exact maintenance request");
-    if (pending.worker_version_id === receipt.worker_version_id) { nativeVersionVerified = true; break; }
+    if (pending.worker_version_id === receipt.worker_version_id && pending.targets_native_ready !== false) { nativeVersionVerified = true; break; }
     console.error(JSON.stringify({ event: "sqlite_service_update", operation_id: state.request.operation_id,
       reason_code: "native_version_pending", attempt: index + 1, maximum_attempts: wait.attempts }));
     if (index + 1 < wait.attempts) await wait.delay();

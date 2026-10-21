@@ -36,9 +36,9 @@ export function createSqliteServiceHttp(runtime: SqliteServiceRuntime, key: stri
       const parsed = path === "resume" ? sqliteResumeRequestSchema.parse(body) : sqliteRegistrationSchema.parse(body);
       runtime.requireTarget({ service_id: parsed.service_id, worker_version_id: parsed.worker_version_id,
         service_config_sha256: parsed.service_config_sha256, operation_id: parsed.operation_id });
-      if (path === "resume") { runtime.queue.resume(parsed.admission_window_id); return reply(runtime.health()); }
+      if (path === "resume") { runtime.queue.resume(sqliteResumeRequestSchema.parse(parsed).admission_window_id); return reply(runtime.health()); }
       const registration = sqliteRegistrationSchema.parse(parsed), snapshot = runtime.queue.snapshot();
-      if (snapshot.state !== "open" || snapshot.admission_window_id !== registration.admission_window_id) return reply({ error: "stale_window" }, 409);
+      if (snapshot.state !== "open") return reply({ error: "stale_window" }, 409);
       runtime.content.registerShow(registration.show_id, registration.reservation_id);
       return reply(await runtime.inspect(registration.show_id));
     } catch {

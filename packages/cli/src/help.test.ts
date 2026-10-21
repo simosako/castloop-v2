@@ -58,7 +58,7 @@ test("removed commands, unsupported families and malformed arguments fail before
 test("formal list commands pass SQLite options, format text/JSON and preserve workspace state", async () => {
   const directory = mkdtempSync("/tmp/opencode/castloop-list-entrypoint-");
   const state = join(directory, ".castloop"), preload = join(directory, "mock-fetch.ts");
-  const config = { schema_version: 2 as const, publication_protocol: "sqlite-sequential-v1" as const,
+  const config = { schema_version: 2 as const, storage_layout: "show-v1" as const, publication_protocol: "sqlite-sequential-v1" as const,
     service_id: "service", account_id: "a".repeat(32), bucket_name: "private-bucket", worker_name: "test-worker",
     public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
   const source = stringifyToml(config), secret = JSON.stringify({ CASTLOOP_ADMIN_KEY: "private-secret" });

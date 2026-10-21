@@ -1,6 +1,6 @@
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
-import { sqliteHealthSchema, sqliteInspectionSchema } from "../../shared/src/sqlite-service-api";
+import { sqliteHealthSchema, sqliteInspectionSchema, sqliteRegistryStatusSchema } from "../../shared/src/sqlite-service-api";
 import type { SqliteHealth, SqliteInspection, SqliteRuntimeRequest } from "../../shared/src/sqlite-service-api";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadOptions } from "./sqlite-management-http";
@@ -17,13 +17,14 @@ export class SqliteServiceClient {
     this.config = sqliteServiceConfigSchema.parse(config);
     if (!key || /[^\x21-\x7e]/.test(key) || key.length > 1024) throw new Error("Missing SQLite administrator key");
   }
-  private async call(path: string, body?: object): Promise<unknown> {
+  private async call(path: string, body?: object, showId?: string): Promise<unknown> {
+    const scope: Record<string, string> = showId ? { "X-Castloop-Show-Id": sqliteInspectionSchema.shape.show_id.parse(showId) } : {};
     try {
       if (!body) return await readSqliteManagementGet(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url),
-        { "X-Castloop-Key": this.key }, { ...this.readOptions, transport: this.transport });
+        { "X-Castloop-Key": this.key, ...scope }, { ...this.readOptions, transport: this.transport });
       const response = await this.transport(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url), {
         method: body ? "POST" : "GET", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(30000),
-        headers: { "X-Castloop-Key": this.key, ...(body ? { "Content-Type": "application/json" } : {}) },
+        headers: { "X-Castloop-Key": this.key, ...scope, ...(body ? { "Content-Type": "application/json" } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}) });
       if (response.status !== (path === "prepare" ? 202 : 200)) {
         await response.body?.cancel(); throw new Error("Unverified service response");
@@ -34,8 +35,21 @@ export class SqliteServiceClient {
   private async identity(value: { service_id: string; service_config_sha256: string }): Promise<void> {
     if (value.service_id !== this.config.service_id || value.service_config_sha256 !== await sqliteServiceConfigHash(this.config)) throw new Error("SQLite service response belongs to another configuration");
   }
-  async health(): Promise<SqliteHealth> {
-    const value = sqliteHealthSchema.parse(await this.call("health")); await this.identity(value); return value;
+  async health(showId?: string): Promise<SqliteHealth> {
+    const value = sqliteHealthSchema.parse(await this.call("health", undefined, showId)); await this.identity(value);
+    if (showId && value.show_id !== showId) throw new Error("Show health response target differs");
+    return value;
+  }
+  async registration(showId: string) {
+    sqliteInspectionSchema.shape.show_id.parse(showId);
+    const result = sqliteRegistryStatusSchema.parse(await this.call(`registrations/${showId}`));
+    if (result.show_id !== showId) throw new Error("Registry response target differs");
+    return result;
+  }
+  async registrationHealth(): Promise<SqliteHealth> {
+    const value = sqliteHealthSchema.parse(await this.call("registration-health")); await this.identity(value);
+    if (value.scope !== "service") throw new Error("Registration runtime scope differs");
+    return value;
   }
   async update(action: "prepare" | "activate" | "status", input: SqliteUpdatePrepare | SqliteUpdateActivate): Promise<SqliteUpdateResult> {
     const request = action === "activate" ? sqliteUpdateActivateSchema.parse(input) : sqliteUpdatePrepareSchema.parse(input);
@@ -50,7 +64,7 @@ export class SqliteServiceClient {
     return value;
   }
   async catalog(input: SqliteCatalogRequest): Promise<SqliteCatalogResponse> {
-    const request = sqliteCatalogRequestSchema.parse(input), value = sqliteCatalogResponseSchema.parse(await this.call("catalog", request));
+    const request = sqliteCatalogRequestSchema.parse(input), value = sqliteCatalogResponseSchema.parse(await this.call("catalog", request, request.show_id));
     await this.identity(value);
     if (JSON.stringify(value.request) !== JSON.stringify(request)) throw new Error("SQLite catalog response differs from its exact request");
     return value;
@@ -63,20 +77,30 @@ export class SqliteServiceClient {
   async inspect(showId: string, episodeId?: string): Promise<SqliteInspection> {
     sqliteInspectionSchema.shape.show_id.parse(showId);
     if (episodeId !== undefined) sqliteInspectionSchema.shape.episode_id.unwrap().parse(episodeId);
-    const value = sqliteInspectionSchema.parse(await this.call(`targets/${showId}${episodeId === undefined ? "" : `/${episodeId}`}`));
+    const value = sqliteInspectionSchema.parse(await this.call(`targets/${showId}${episodeId === undefined ? "" : `/${episodeId}`}`, undefined, showId));
     await this.identity(value);
     if (value.show_id !== showId || value.episode_id !== episodeId) throw new Error("SQLite target response differs"); return value;
   }
-  async control(action: "pause" | "resume", request: SqliteRuntimeRequest, window?: string): Promise<SqliteHealth> {
-    const value = sqliteHealthSchema.parse(await this.call(action, { ...request, ...(window ? { admission_window_id: window } : {}) }));
+  async control(action: "pause" | "resume", request: SqliteRuntimeRequest, window?: string, showId?: string): Promise<SqliteHealth> {
+    const value = sqliteHealthSchema.parse(await this.call(action, { ...request, ...(window ? { admission_window_id: window } : {}) }, showId));
     await this.identity(value);
-    if (value.worker_version_id !== request.worker_version_id || value.state !== (action === "pause" ? "paused" : "open") ||
+    if (showId && value.show_id !== showId || value.worker_version_id !== request.worker_version_id || value.state !== (action === "pause" ? "paused" : "open") ||
       action === "resume" && value.admission_window_id !== window) throw new Error("SQLite service control result differs");
     return value;
   }
-  async register(request: SqliteRuntimeRequest, window: string, showId: string, reservationId: string): Promise<SqliteInspection> {
-    const value = sqliteInspectionSchema.parse(await this.call("register-show", { ...request, admission_window_id: window,
-      show_id: showId, reservation_id: reservationId })); await this.identity(value);
+  async register(request: SqliteRuntimeRequest, showId: string, reservationId: string): Promise<SqliteInspection> {
+    const initial = sqliteHealthSchema.parse(await this.call("register-show", { ...request, show_id: showId, reservation_id: reservationId }));
+    await this.identity(initial);
+    if (initial.show_id !== showId || initial.worker_version_id !== request.worker_version_id || initial.setup?.operation_id !== request.operation_id) throw new Error("Show registration evidence differs");
+    let ready = initial.publication_ready;
+    for (let attempt = 0; !ready && attempt < 120; attempt++) {
+      await Bun.sleep(250);
+      const health = await this.health(showId);
+      if (health.worker_version_id !== request.worker_version_id || health.setup?.operation_id !== request.operation_id || health.setup.state === "blocked") throw new Error("Show initialization is unverified; never replay registration");
+      ready = health.publication_ready;
+    }
+    if (!ready) throw new Error("Show initialization remains pending; inspect without replay");
+    const value = await this.inspect(showId);
     if (value.worker_version_id !== request.worker_version_id || value.show_id !== showId || value.episode_id !== undefined || value.reservation_id !== reservationId) throw new Error("SQLite registration result differs");
     return value;
   }

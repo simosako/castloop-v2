@@ -1,11 +1,17 @@
 import { validateId } from "../packages/shared/src/index";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 
+type ValueKind = "undefined" | "null" | "boolean" | "string" | "number" | "object" | "function" | "symbol" | "bigint";
 export type SqliteCachePurgeEvent = { event: "sqlite_cache_purge"; show_id: string; episode_id?: string;
-  reason_code: "purge_rate_limited" | "purge_rejected" | "purge_unconfirmed"; attempt: number; will_retry: boolean };
+  reason_code: "purge_rate_limited" | "purge_rejected" | "purge_unconfirmed"; attempt: number; will_retry: boolean;
+  failure_kind?: "call_threw" | "invalid_acknowledgement";
+  exception_kind?: "type_error" | "internal_error" | "other";
+  result_kind?: ValueKind; success_kind?: ValueKind };
 type PurgeOptions = { delay?: (milliseconds: number) => Promise<void>; onEvent?: (event: SqliteCachePurgeEvent) => void };
 const MAX_ATTEMPTS = 6;
 const RETRY_WAIT_MS = 12000;
+
+function valueKind(value: unknown): ValueKind { return value === null ? "null" : typeof value; }
 
 export async function purgeSqliteCache(cache: Pick<CacheContext, "purge"> | undefined, input: LifecyclePurgeTarget,
   options: PurgeOptions = {}): Promise<void> {
@@ -16,9 +22,10 @@ export async function purgeSqliteCache(cache: Pick<CacheContext, "purge"> | unde
     tags: episodeId ? [`feed-${showId}`, `episode-${showId}/${episodeId}`] : [`show-${showId}`, `feed-${showId}`, `cover-${showId}`],
     pathPrefixes: [episodeId ? `/podcasts/${showId}/episodes/${episodeId}/` : `/podcasts/${showId}/`],
   };
-  const emit = (reasonCode: SqliteCachePurgeEvent["reason_code"], attempt: number, willRetry: boolean) => {
+  const emit = (reasonCode: SqliteCachePurgeEvent["reason_code"], attempt: number, willRetry: boolean,
+    diagnostic: Pick<SqliteCachePurgeEvent, "failure_kind" | "exception_kind" | "result_kind" | "success_kind"> = {}) => {
     const event: SqliteCachePurgeEvent = { event: "sqlite_cache_purge", show_id: showId,
-      ...(episodeId === undefined ? {} : { episode_id: episodeId }), reason_code: reasonCode, attempt, will_retry: willRetry };
+      ...(episodeId === undefined ? {} : { episode_id: episodeId }), reason_code: reasonCode, attempt, will_retry: willRetry, ...diagnostic };
     if (options.onEvent) options.onEvent(event);
     else console.error(JSON.stringify(event));
   };
@@ -26,13 +33,16 @@ export async function purgeSqliteCache(cache: Pick<CacheContext, "purge"> | unde
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let result: CachePurgeResult;
     try { result = await cache.purge(target); }
-    catch {
-      emit("purge_unconfirmed", attempt, false);
+    catch (error) {
+      const exceptionKind = error instanceof TypeError ? "type_error" : error instanceof Error &&
+        /^internal error(?:[.;:]|$)/i.test(error.message) ? "internal_error" : "other";
+      emit("purge_unconfirmed", attempt, false, { failure_kind: "call_threw", exception_kind: exceptionKind });
       throw new Error("SQLite cache purge outcome is unconfirmed; do not replay publication");
     }
     if (result?.success === true) return;
     if (result?.success !== false) {
-      emit("purge_unconfirmed", attempt, false);
+      emit("purge_unconfirmed", attempt, false, { failure_kind: "invalid_acknowledgement",
+        result_kind: valueKind(result), success_kind: valueKind(result?.success) });
       throw new Error("SQLite cache purge acknowledgement is unconfirmed");
     }
     const rateLimited = Array.isArray(result.errors) && result.errors.length > 0 && result.errors.length <= 10 &&

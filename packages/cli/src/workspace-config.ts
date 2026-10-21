@@ -16,5 +16,9 @@ export async function loadWorkspaceConfig(root: string): Promise<SqliteServiceCo
   if (value && typeof value === "object" && "schema_version" in value && value.schema_version === 1) {
     throw new Error("Service schema_version = 1 is not supported in v0.6.0 or later; use a compatible v0.5.x CLI/Worker. Migration is not provided; preserve the workspace and journals");
   }
+  if (value && typeof value === "object" && "schema_version" in value && value.schema_version === 2 &&
+    (!("storage_layout" in value) || value.storage_layout !== "show-v1")) {
+    throw new Error("Service storage_layout = show-v1 is required. Legacy service layouts cannot be updated or migrated; preserve the workspace and use a separate fresh service");
+  }
   return sqliteServiceConfigSchema.parse(value);
 }

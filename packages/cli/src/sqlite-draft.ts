@@ -36,7 +36,7 @@ export class SqliteDraft {
     const client = new SqlitePublicationClient(config, options.administratorKey, options.managementTransport);
     return new SqliteDraft(resolve(root), config, await openSqliteDraftJournal(root, config, target), client, options.r2 ?? {
       accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" },
-    new SqliteOperationClient(config, options.administratorKey, options.managementTransport),
+    new SqliteOperationClient(config, options.administratorKey, options.managementTransport, target.show_id),
     new SqliteServiceClient(config, options.administratorKey, options.managementTransport),
     { parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared });
   }
@@ -167,7 +167,7 @@ export class SqliteDraft {
     return this.journal.storage.exclusively(async () => {
       const record = await this.journal.load();
       if (record.publication) return this.observeRecord(record);
-      const service = await this.client.describe();
+      const service = await this.client.describe(record.target.show_id);
       if (service.state !== "open") throw new Error("SQLite publication admission is paused");
       const metadata = await this.metadata(record);
       this.requireUnchangedMetadata(record, metadata);
