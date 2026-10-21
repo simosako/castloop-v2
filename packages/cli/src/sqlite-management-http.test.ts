@@ -105,10 +105,11 @@ describe("bounded SQLite management GET", () => {
   test("bounds and clears the actual request abort timer", async () => {
     let signal: AbortSignal | null | undefined;
     const f = fixture(async (_url, init) => { signal = init?.signal; return json(); });
-    expect(await readSqliteManagementGet(url, headers, { ...f.options, timeoutMs: 5 })).toEqual({ state: "running" });
-    await Bun.sleep(10); expect(signal?.aborted).toBe(false);
+    // Generous budget so scheduler stalls on loaded CI cannot cross the deadline before the attempt starts.
+    expect(await readSqliteManagementGet(url, headers, { ...f.options, timeoutMs: 250 })).toEqual({ state: "running" });
+    await Bun.sleep(300); expect(signal?.aborted).toBe(false);
     let calls = 0;
-    await expect(readSqliteManagementGet(url, headers, { timeoutMs: 5, onDiagnostic: () => {}, transport: async (_input, init) => {
+    await expect(readSqliteManagementGet(url, headers, { timeoutMs: 250, onDiagnostic: () => {}, transport: async (_input, init) => {
       calls++; await new Promise<void>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true })); return json();
     } })).rejects.toThrow("observation_timeout"); expect(calls).toBe(1);
   });

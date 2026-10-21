@@ -1,8 +1,8 @@
-# SQLiteのShow単位公開方式（開発版）
+# SQLiteのShow単位公開方式
 
-2026-10-21、Show更新の追補: 本開発版は世代別Feed/cover保存（healthの`feed_storage`と`cover_storage`が共に`immutable-generation-v1`）、`publication_read_boundary="show-episode-v1"`と内部queue/content schema **5/6**を必要とする。Episode更新の4/5、追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・旧値・未知値をprepare/配備前に拒否する。[Show更新設計と境界](../design/show_update_feed_availability_plan.md)参照。
+2026-10-21、Show更新の追補: v0.7.0は世代別Feed/cover保存（healthの`feed_storage`と`cover_storage`が共に`immutable-generation-v1`）、`publication_read_boundary="show-episode-v1"`と内部queue/content schema **5/6**を必要とする。Episode更新の4/5、追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・旧値・未知値をprepare/配備前に拒否する。[Show更新設計と境界](../design/show_update_feed_availability_plan.md)参照。
 
-2026-10-20、Issue #48の新layout専用ガイド。**配布済みv0.6.2とは非互換・未リリース**であり、以下の操作には本開発版から構築したCLI/Workerが必要。サービス設定に`storage_layout = "show-v1"`を必須とし、旧設定は副作用前に拒否する。既存設定への追記、旧DO/DB/journalの変換・移行・資源採用は行わない。[採用設計](../design/do_show_separation_options.md)参照。
+2026-10-20、Issue #48の新layout専用ガイド。**v0.7.0リリース。配布済みv0.6.2とは非互換**であり、以下の操作にはv0.7.0のCLI/Workerが必要。サービス設定に`storage_layout = "show-v1"`を必須とし、旧設定は副作用前に拒否する。既存設定への追記、旧DO/DB/journalの変換・移行・資源採用は行わない。[採用設計](../design/do_show_separation_options.md)参照。
 
 `sqlite-sequential-v1`方式の操作ガイド。v0.6.0ではサービス設定version 2のみを扱い、`init`のflag省略時もSQLiteになる。`--publication-protocol sqlite-sequential-v1`は省略可能な既存指定として維持する。新たなschema選択オプションは設けない。
 既存Queueサービスや旧journalを変換するマイグレーション機能は提供しない。version 1設定は副作用前に拒否し、利用者は対応するv0.5.xのCLI/Workerを保持する。
@@ -13,7 +13,7 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 これは中断を挟む短尺音源試験であり、全負荷のFree適合・Issue #13恒久解消や大容量公開を保証しない。
 初回purge blocked・旧試験の欠測は[先行測定](../design/archive/sqlite_sequential_measurement_20261016.md)、
 互換更新・正式RSSの受け入れは[追加確認](../design/archive/sqlite_followup_verification_20261016.md)に区別して残している。
-現行リリースは[v0.6.2リリースノート](release-v0.6.2.md)、過去の変更は[v0.6.1](release-v0.6.1.md)、[v0.6.0](release-v0.6.0.md)、[v0.5.2](release-v0.5.2.md)、[v0.5.1](release-v0.5.1.md)、[v0.5.0](release-v0.5.0.md)を参照。
+現行リリースは[v0.7.0リリースノート](release-v0.7.0.md)、過去の変更は[v0.6.2](release-v0.6.2.md)、[v0.6.1](release-v0.6.1.md)、[v0.6.0](release-v0.6.0.md)、[v0.5.2](release-v0.5.2.md)、[v0.5.1](release-v0.5.1.md)、[v0.5.0](release-v0.5.0.md)を参照。
 
 ## 対応範囲
 
@@ -25,7 +25,7 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 - Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
 - レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
 - 同じconfig/SQLite schema/namespaceのcode-only更新を`deploy`で扱う。全Showを個別に明示Pause/drainし、固定した対象集合へのprepare/activation/probe後も各Showはpausedを維持する。
-- v0.6.2では[操作記録・再開・取消](sqlite_operation_recovery.md)を提供する。対応WorkerのDO SQLiteに記録し、条件を満たす未公開staging素材だけを明示的に削除できる。旧版v0.6.1以前の機能とは区別する。
+- v0.6.2から[操作記録・再開・取消](sqlite_operation_recovery.md)を提供する。対応WorkerのDO SQLiteに記録し、条件を満たす未公開staging素材だけを明示的に削除できる。v0.7.0ではremote照会に`--show`が必要である。旧版v0.6.1以前の機能とは区別する。
 - 新規環境はworkers.devのみ。**物理削除、独自ドメイン、既存移行、公開jobのretry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
@@ -74,7 +74,7 @@ castloop update-episode-audio first audio.mp3
 castloop publish-episode first
 ```
 
-- `create-*`は公開しない。`update-*`は一意のR2 keyへのuploadとreceipt保存を行い、公開はしない。開発版では送信前にサーバーへ操作と素材を登録し、素材ごとの開始許可・成功応答・検証・下書き登録を記録する。
+- `create-*`は公開しない。`update-*`は一意のR2 keyへのuploadとreceipt保存を行い、公開はしない。v0.7.0では送信前にサーバーへ操作と素材を登録し、素材ごとの開始許可・成功応答・検証・下書き登録を記録する。
 - 新Showは独立DOのSQL/Alarm/R2/cache probeをpausedで完了する。`show-pause SHOW PAUSE_UUID`は同Showの新規受付・配信を閉じ、既受付jobは取り消さずdrainする。別Showのblocked/pausedでも健全なShowは個別にResumeでき、新Showも登録できる。
 - MP3上限は300,000,000 bytes。MP3解析・サイズ・全量readback/hash・ETag/versionを確認した素材だけを公開manifestへ登録する。
 - 新規metadata入力にはApple基準の項目別上限を適用する（Show説明4000 UTF-8 bytes、Episode説明10000文字、title/author等255文字、site_urlは2048文字）。HTML tagは除外して測り、文字はUnicode code pointで数える。超過分は切り詰めず、項目名付きで拒否する。保存済みsnapshot/revisionの読取・復元は上限なしで維持する（[入力上限の仕様](../design/show_episode_input_limits.md)）。
@@ -147,7 +147,7 @@ castloop publish-rss-import ./reviewed-import
 subscriber移行や旧ホスト撤去の完了を意味しない。
 
 再実行は完了済みの公開を繰り返さない。保存済みpublication jobがある公開途中停止は、**そのjob IDのstatusを読むだけ**で照合・待機する。
-開発版の新形式では、PUT成功を保存済みのuploadは検証・下書き登録から続行できる。登録・ローカル配置も完了記録と保存内容が一致すれば結果を再利用する。未確認のupload/登録/ローカルinstallは自動再実行しない。[中断後の手順](sqlite_operation_recovery.md)を参照する。
+v0.7.0の新形式では、PUT成功を保存済みのuploadは検証・下書き登録から続行できる。登録・ローカル配置も完了記録と保存内容が一致すれば結果を再利用する。未確認のupload/登録/ローカルinstallは自動再実行しない。[中断後の手順](sqlite_operation_recovery.md)を参照する。
 公開前にstaged receiptをレビュー済みmetadata/cover/audioと照合し、事前検証後の素材差し替えも拒否する。
 
 ## 非公開化・復元
@@ -215,7 +215,7 @@ castloop init-continue-verification INIT_UUID
 対象は元journalの`access_enabled`/`verified`だけ。凍結source/config/metadata hashが一致し、native setupが存在せずpaused/drainedの場合に限定する。
 resource作成・設定PUT・配備・access変更は再送しない。`setup_requested`やblockedのprobeを再試行するコマンドでもない。
 
-公開済みShow/Episodeの物理削除と、未登録uploadの一般的な整理は未実装。開発版の削除機能は、サーバーに登録した一意のstaging keyでPUT成功と未使用を確認できる素材に限定する。空のキューを根拠にbucketやprefixを削除しない。
+公開済みShow/Episodeの物理削除と、未登録uploadの一般的な整理は未実装。v0.7.0の削除機能は、サーバーに登録した一意のstaging keyでPUT成功と未使用を確認できる素材に限定する。空のキューを根拠にbucketやprefixを削除しない。
 
 ## 検証の限界
 

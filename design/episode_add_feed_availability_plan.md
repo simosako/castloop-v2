@@ -4,7 +4,7 @@
 
 ## 1. 目的と提案の要約
 
-後続の[Episode更新](episode_update_feed_availability_plan.md)と[Show更新](show_update_feed_availability_plan.md)も実装した。本書の追加専用の範囲・schema 3/4・固定coverは第1段階の記録として残す。現行開発版はFeed/Show/cover世代・対象種別・Episode revision/lifecycle guardと不変coverを持つschema 5/6・必須health識別を使う新規環境専用。旧方式の変換・移行は行わない。
+後続の[Episode更新](episode_update_feed_availability_plan.md)と[Show更新](show_update_feed_availability_plan.md)も実装した。本書の追加専用の範囲・schema 3/4・固定coverは第1段階の記録として残す。現行リリースv0.7.0はFeed/Show/cover世代・対象種別・Episode revision/lifecycle guardと不変coverを持つschema 5/6・必須health識別を使う新規環境専用。旧方式の変換・移行は行わない。
 
 **最終目標は、Showの明示停止・非公開化等を除き、追加・更新処理そのものを理由に確定済みFeedの読取を止めないこと。** 新しい内容は別のR2 objectへ準備し、公開条件が成立した後に配信先を切り替える。キャッシュが空でも同じ動作にする。
 

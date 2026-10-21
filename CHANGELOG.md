@@ -8,6 +8,12 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 
 - Nothing yet.
 
+## v0.7.0 — [release note](docs/release-v0.7.0.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.0)
+
+- Show-level isolation: each Show gets its own Durable Object with an independent SQLite FIFO, Alarm and Pause/Resume window; a small control DO stores membership and shared Worker-update progress. Service-wide Pause/Resume was removed. Requires fresh `storage_layout = "show-v1"` services; there is no update or migration path from released v0.6.2 layouts.
+- Feed read continuity: Episode additions/updates and published Show metadata/cover updates keep the committed Feed, cover and approved audio readable through immutable private R2 generation snapshots and atomic switches after verified writes and required cache purges. Requires internal queue/content schemas 5/6 and the matching health identifiers.
+- Remote operation-record commands now require `--show SHOW_ID`; probe and cache-purge diagnostics gained failure-stage and typed classifications. README/community/changelog documentation reworked.
+
 ## v0.6.2 — [release note](docs/release-v0.6.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.6.2)
 
 - Server-side operation records in the service DO's SQLite, durable upload checkpoint recovery (resume from an acknowledged PUT), operation cancellation, and previewed cleanup of unused staging objects.
