@@ -8,7 +8,7 @@ import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { RSS_IMPORT_AUDIO, RSS_IMPORT_SOURCE, rssImportTransport } from "./test-support/rss-import";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
@@ -140,4 +140,17 @@ test("a failed final feed check is read-only and never repeats completed publica
   expect(await value.execute()).toMatchObject({ result: "rss-import-published" });
   expect(value.commands).toHaveLength(count);
   expect(value.calls.filter((call) => call.method !== "GET").every((call) => call.path === "/admin/sqlite-operations/commands")).toBe(true);
+});
+
+for (const kind of ["show", "episode"] as const) test(`edited RSS ${kind} input limits reject before audio validation, remote IO or publication journals`, async () => {
+  const value = await fixture(1), id = value.report.episodes[0]!.metadata.episode_id;
+  const file = join(value.output, kind === "show" ? "show.toml" : `episode-${id}.toml`);
+  writeFileSync(file, readFileSync(file, "utf8").replace(/^title = .*$/m, `title = "${"a".repeat(256)}"`));
+  writeFileSync(join(value.output, `${id}.mp3`), "must not be read before title validation");
+  value.calls.length = 0;
+  await expect(value.execute()).rejects.toThrow("title");
+  expect(value.calls).toHaveLength(0);
+  expect(value.commands).toHaveLength(0);
+  expect(existsSync(value.cursor)).toBe(false);
+  expect(value.content.inspect("imported").show).toBeNull();
 });
