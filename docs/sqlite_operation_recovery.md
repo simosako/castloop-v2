@@ -8,6 +8,8 @@ v0.7.0では操作記録を各ShowのDOに保存し、remoteコマンドに`--sh
 
 ## 状態を確認する
 
+`operation-status FAMILY UUID --local`は対象familyだけを読む。upload・publication・rss-import・lifecycleはUUIDのファイルを直接読み、無関係な記録の破損・件数に依存しない。draft・show-registration・cleanupはファイル名が照会IDではないため、そのfamily内を予算付きで走査する。対象の破損は引き続きエラーとし、診断のために記録を書き換えない。`operation-list --local`は従来どおり全familyを一覧する。
+
 サービスの作業ディレクトリで実行する。
 
 ```sh

@@ -3,6 +3,7 @@ import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
 import { SqliteOperationClient } from "./sqlite-operation-client";
 import { administratorKey } from "./administrator-key";
+import { createLocalJournalStorage } from "./local-journal-storage";
 import { readSqliteUploadRecord, requireNoPendingSqliteUpload } from "./sqlite-upload";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -74,4 +75,27 @@ test("upload admission counts journals separately from retained process locks an
   await expect(requireNoPendingSqliteUpload(f.root, f.config, record.target, f.client)).rejects.toThrow("unfinished upload");
   expect(readFileSync(file, "utf8")).toBe(JSON.stringify(pending));
   expect(readdirSync(directory).filter((name) => name.endsWith(".lock.sqlite"))).toHaveLength(5001);
+});
+
+test("single local status reads only the ID-addressed journal and preserves unrelated corrupt records", async () => {
+  const f = await fixture(); await f.run("update-show", ["daily"]);
+  const broken = createLocalJournalStorage(f.root, "sqlite-drafts", f.config.service_id, "unrelated.json");
+  broken.initialize({ target: { job_id: "broken", show_id: "daily", kind: "show" } });
+  const brokenBytes = readFileSync(broken.path, "utf8");
+  for (const [family, directory] of [["upload", "sqlite-uploads"], ["publication", "sqlite-publications"],
+    ["rss-import", "sqlite-rss-imports"], ["lifecycle", "sqlite-lifecycle"]] as const) {
+    const id = crypto.randomUUID(), other = createLocalJournalStorage(f.root, directory, f.config.service_id, `${crypto.randomUUID()}.json`);
+    other.initialize({ target: { job_id: "also-broken" } });
+    const record = createLocalJournalStorage(f.root, directory, f.config.service_id, `${id}.json`);
+    record.initialize({ schema_version: 2, operation_id: id, state: "succeeded" });
+    const before = readFileSync(record.path, "utf8"); f.calls.length = 0;
+    expect(await runSqliteCommand(f.root, f.config, "operation-status", [family, id], { operationOptions: { local: true } }))
+      .toMatchObject({ source: "local", operations: [{ family, id, state: "succeeded" }] });
+    expect(await runSqliteCommand(f.root, f.config, "operation-status", [family, crypto.randomUUID()], { operationOptions: { local: true } }))
+      .toEqual({ source: "local", operations: [] });
+    expect(f.calls).toHaveLength(0); expect(readFileSync(record.path, "utf8")).toBe(before);
+    writeFileSync(record.path, "broken requested record");
+    await expect(runSqliteCommand(f.root, f.config, "operation-status", [family, id], { operationOptions: { local: true } })).rejects.toThrow();
+  }
+  expect(readFileSync(broken.path, "utf8")).toBe(brokenBytes);
 });
