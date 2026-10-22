@@ -8,6 +8,13 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 
 - Nothing yet.
 
+## v0.7.1 — [release note](docs/release-v0.7.1.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.1)
+
+- Validate post-publication inventory/feed budgets and edited RSS metadata before publication side effects.
+- Correct local journal counting and scoped lookup, remove fabricated service catalog admission states, share bounded reads and bound read-only Show RPC concurrency.
+- Harden observation guards and security instructions; pin release Actions to full commit SHAs. Small native functional verification succeeded, but observation coverage remains incomplete.
+- Same v0.7.0 persisted formats and compatibility boundary; no migration or automatic deployment.
+
 ## v0.7.0 — [release note](docs/release-v0.7.0.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.0)
 
 - Show-level isolation: each Show gets its own Durable Object with an independent SQLite FIFO, Alarm and Pause/Resume window; a small control DO stores membership and shared Worker-update progress. Service-wide Pause/Resume was removed. Requires fresh `storage_layout = "show-v1"` services; there is no update or migration path from released v0.6.2 layouts.
