@@ -164,6 +164,19 @@ test("a lost successful upload report is reconciled by its frozen request and re
   expect(f.records.get(record.operation_id)!.state).toBe("succeeded");
 });
 
+test("Show draft cover replacement treats JPEG and PNG as the same asset slot without erasing receipts", async () => {
+  const f = await fixture("show"); await f.stage();
+  const first = (await f.draft.read()).assets;
+  writeFileSync(f.showPath, readFileSync(f.showPath, "utf8").replace("cover.jpg", "cover.png"));
+  writeFileSync(join(f.root, "daily", "cover.png"), Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  await f.stage();
+  expect((await f.draft.read()).assets.map((entry) => entry.upload.asset)).toEqual(["show_metadata", "cover_png"]);
+  for (const entry of first) expect(f.objects.has(entry.upload.key)).toBe(true);
+  writeFileSync(f.showPath, readFileSync(f.showPath, "utf8").replace("cover.png", "cover.jpg"));
+  await f.stage();
+  expect((await f.draft.read()).assets.map((entry) => entry.upload.asset)).toEqual(["show_metadata", "cover_jpg"]);
+});
+
 test("a lost attachment response resumes the existing manifest without replacing or uploading assets", async () => {
   const f = await fixture(); let lose = true;
   f.faults.operation = async (response, request) => {

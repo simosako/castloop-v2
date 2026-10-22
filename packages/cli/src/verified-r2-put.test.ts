@@ -30,6 +30,23 @@ for (const phase of ["put", "put_receipt", "source_completed", "readback", "read
 
 const config = { account_id: "a".repeat(32), bucket_name: "private-bucket" };
 
+test("oversized PUT receipt awaits cleanup, releases the reader and never starts readback or another PUT", async () => {
+  for (const cleanupFails of [false, true]) {
+    const release = Promise.withResolvers<void>(), entered = Promise.withResolvers<void>();
+    let calls = 0, finished = false;
+    const receipt = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array(65537)); },
+      async cancel() { entered.resolve(); await release.promise; if (cleanupFails) throw new Error("private cleanup"); } });
+    const result = putVerifiedR2Object(config, { key: "staging/test", length: 1, sha256: "a".repeat(64), contentType: "audio/mpeg" },
+      new Blob([new Uint8Array([1])]).stream(), () => {}, { accountId: config.account_id, apiToken: "private",
+        transport: async () => { calls++; return new Response(receipt); } }).then(() => "unexpected success", (error: Error) => error.message)
+      .finally(() => { finished = true; });
+    await entered.promise;
+    try { expect(finished).toBe(false); expect(calls).toBe(1); } finally { release.resolve(); }
+    expect(await result).toBe("Staging REST PUT/verification failed; no automatic retry or remote termination proof");
+    expect(calls).toBe(1); expect(receipt.locked).toBe(false);
+  }
+});
+
 for (const [key, encoded] of [
   ["system/service.toml", "system/service.toml"],
   ["staging/show/episode/audio.mp3", "staging/show/episode/audio.mp3"],

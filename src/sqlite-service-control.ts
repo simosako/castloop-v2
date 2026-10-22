@@ -20,6 +20,18 @@ type RegistryRow = { show_id: string; reservation_id: string; request_json: stri
 type MaintenanceRow = { operation_id: string; request_json: string; phase: "preparing" | "prepared" | "activating" | "probing" | "releasing" | "completed" };
 type TargetRow = { show_id: string; prepare_state: string; activate_state: string; release_state: string };
 
+async function readShowSnapshots<T, R>(rows: T[], read: (row: T) => Promise<R>): Promise<R[]> {
+  const result: R[] = [];
+  for (let offset = 0; offset < rows.length; offset += 4) {
+    const batch = await Promise.allSettled(rows.slice(offset, offset + 4).map(async (row) => read(row)));
+    for (const item of batch) {
+      if (item.status === "rejected") throw item.reason;
+      result.push(item.value);
+    }
+  }
+  return result;
+}
+
 export class SqliteServiceControl {
   constructor(private readonly storage: PublicationQueueStorage, readonly runtime: SqliteServiceRuntime,
     private readonly peer: (showId: string) => SqliteShowPeer) {
@@ -57,10 +69,10 @@ export class SqliteServiceControl {
   registrationHealth(): SqliteHealth {
     return { ...this.runtime.health(), scope: "service", maintenance: this.maintenance(), publication_ready: this.runtime.ready() && !this.pending() };
   }
-  private verifyHealth(input: SqliteHealth, showId: string, version = this.runtime.health().worker_version_id): SqliteHealth {
-    const health = sqliteHealthSchema.parse(input), identity = this.runtime.health();
+  private verifyHealth(input: SqliteHealth, showId: string, version?: string, identity = this.runtime.health()): SqliteHealth {
+    const health = sqliteHealthSchema.parse(input);
     if (health.show_id !== showId || health.scope !== "show" || health.service_id !== identity.service_id ||
-      health.service_config_sha256 !== identity.service_config_sha256 || health.worker_version_id !== version) throw new Error("Show runtime evidence differs");
+      health.service_config_sha256 !== identity.service_config_sha256 || health.worker_version_id !== (version ?? identity.worker_version_id)) throw new Error("Show runtime evidence differs");
     return health;
   }
   async register(input: ShowRegistration): Promise<SqliteHealth> {
@@ -83,8 +95,8 @@ export class SqliteServiceControl {
   async health(): Promise<SqliteHealth> {
     const own = this.runtime.health(), rows = this.registry();
     if (rows.length > 10000) throw new Error("Service status exceeds its Show budget");
-    const health: SqliteHealth[] = [];
-    for (const row of rows) health.push(this.verifyHealth(await this.peer(row.show_id).health(), row.show_id));
+    const health = await readShowSnapshots(rows, async (row) =>
+      this.verifyHealth(await this.peer(row.show_id).health(), row.show_id, undefined, own));
     return { ...own, scope: "service", maintenance: this.maintenance(), state: health.some((item) => item.state === "open") ? "open" : "paused",
       admission_window_id: null, show_count: rows.length, paused_shows: health.filter((item) => item.state === "paused").length,
       publication_ready: own.publication_ready && !this.pending() && rows.every((row) => row.state === "registered") && health.every((item) => item.publication_ready),
@@ -107,13 +119,16 @@ export class SqliteServiceControl {
     for (;;) {
       const rows = this.registry(last, SQLITE_CATALOG_PAGE_SIZE + 1);
       if (!rows.length) break;
-      for (const row of rows) {
+      const pages = await readShowSnapshots(rows, async (row) => {
         if (row.state !== "registered") throw new Error("Show registration remains unconfirmed");
         const result = sqliteCatalogResponseSchema.parse(await this.peer(row.show_id).catalog({ kind: "show", include_deleted: request.include_deleted }));
         if (result.service_id !== identity.service_id || result.worker_version_id !== identity.worker_version_id ||
           result.service_config_sha256 !== identity.service_config_sha256 || result.shows?.length !== 1 && (request.include_deleted || result.shows?.length !== 0) ||
           result.shows?.some((show) => show.show_id !== row.show_id)) throw new Error("Show catalog evidence differs");
-        if (result.shows?.[0]) shows.push(result.shows[0]);
+        return result.shows?.[0];
+      });
+      for (const [index, row] of rows.entries()) {
+        if (pages[index]) shows.push(pages[index]!);
         last = row.show_id;
         if (shows.length > SQLITE_CATALOG_PAGE_SIZE) break;
       }

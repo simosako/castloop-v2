@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { runSqliteCommand } from "./sqlite-commands";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { continueSqliteServiceUpdateVerification, readSqliteServiceUpdate, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
@@ -8,6 +8,7 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { administratorKey } from "./administrator-key";
 import { formatSqliteCatalog } from "./sqlite-catalog";
 import { sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
+import { SqliteServiceControl } from "../../../src/sqlite-service-control";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -72,6 +73,42 @@ test("the service Show catalog never claims an aggregated pause state for open, 
   expect(episodes.state).toBe("paused"); expect(formatSqliteCatalog(episodes)).toContain("Show admission: paused");
   expect(sqliteCatalogResponseSchema.safeParse({ ...episodes, state: null }).success).toBe(false);
 });
+
+for (const kind of ["health", "catalog"] as const) for (const failure of [false, true])
+  test(`service ${kind} bounds read concurrency and settles its batch before ${failure ? "failure" : "success"}`, async () => {
+    const f = await fixture();
+    const ids = ["a", "b", "c", "d", "e", "f"];
+    for (const id of ids) await f.run("create-show", [id, "https://example.com"]);
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>(), aFailed = Promise.withResolvers<void>();
+    const started: string[] = []; let active = 0, maximum = 0, finished = false;
+    const read = async (id: string) => {
+      started.push(id); active++; maximum = Math.max(maximum, active);
+      if (started.length === 4) entered.resolve();
+      try {
+        if (failure && id === "a") { await entered.promise; aFailed.resolve(); throw new Error("Show read unverified"); }
+        await release.promise;
+      } finally { active--; }
+    };
+    const unexpected = async (): Promise<never> => { throw new Error("Read must not mutate Shows"); };
+    const control = new SqliteServiceControl(f.controlStorage, f.runtime, (id) => ({
+      initialize: unexpected, prepare: unexpected, activate: unexpected, release: unexpected,
+      async health() { await read(id); return f.nodes.get(id)!.service.maintenanceHealth(); },
+      async catalog(request) { await read(id); return f.nodes.get(id)!.service.runtime.catalog(request); },
+    }));
+    const ownHealth = spyOn(f.runtime, "health");
+    const pending = (kind === "health" ? control.health() : control.catalog({ kind: "show", include_deleted: false }))
+      .then((value) => ({ ok: true as const, value }), () => ({ ok: false as const })).finally(() => { finished = true; });
+    try {
+      await entered.promise;
+      if (failure) await aFailed.promise;
+      expect(started).toEqual(ids.slice(0, 4)); expect(finished).toBe(false); expect(maximum).toBe(4);
+      release.resolve(); const result = await pending;
+      expect(result.ok).toBe(!failure); expect(active).toBe(0); expect(maximum).toBe(4);
+      expect(started).toEqual(failure ? ids.slice(0, 4) : ids);
+      if (kind === "health") expect(ownHealth).toHaveBeenCalledTimes(1);
+      if (!failure && kind === "catalog" && result.ok) expect(sqliteCatalogResponseSchema.parse(result.value).shows?.map((show) => show.show_id)).toEqual(ids);
+    } finally { release.resolve(); await pending; ownHealth.mockRestore(); }
+  });
 
 test("separate Alarms progress concurrently while one Show awaits external IO and keep delivery gates independent", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
