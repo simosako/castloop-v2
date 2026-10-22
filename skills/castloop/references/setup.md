@@ -1,0 +1,13 @@
+# 新規サービスとShow
+
+`describe init`で必要値と副作用を確認する。管理者からservice ID、Cloudflare account、未使用bucket名、workers.dev subdomain、作成・配備範囲を確認する。tokenは環境変数で設定し、チャットへ貼らせない。
+
+`init ABSOLUTE_PATH --service-id ID --account-id ID --bucket-name NAME --workers-subdomain NAME --non-interactive --json`は資源作成・配備・probeを行う。既存資源の採用・移行は禁止。必要値は変更開始前に揃える。
+
+Showはタイトル、説明、言語、著者、所有者名・メール、カテゴリ、explicit、実在のsite URL、JPEG/PNG画像を確認する。`template show`はオフラインの例示であり回答の代わりではない。
+
+登録承認後、`create-show ID --site-url URL --workspace PATH --non-interactive --json`で予約・リモート登録とローカル作成を行う。新Showはpaused。生成された`SHOW/show.toml`を確認済み情報で編集し、画像を配置する。
+
+`validate show ABSOLUTE_TOML --assets --json`で検証する。Resumeは別の明示操作。`show-resume`には管理者が用意・保持した新しいwindow UUIDを使い、応答不明で新IDを発行し直さない。登録・uploadだけでは公開しない。
+
+`update-show ID --workspace PATH --json`、公開内容のpreviewと承認、`publish-show ID --workspace PATH --expect-preview HASH --json`の順。同じjobの`succeeded`を確認してFeed URLを報告する。公開は[手順](publish.md)、中断は[復旧](recovery.md)を参照。

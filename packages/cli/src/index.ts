@@ -117,6 +117,12 @@ async function main(context: Invocation): Promise<unknown> {
     const { validateLocalInput } = await import("./local-input");
     return validateLocalInput(positional[0]!, resolve(positional[1]!), { assets: !!flags.assets, audio: flags.audio });
   }
+  if (command === "skill") {
+    if (positional.join(" ") !== "export castloop" || !flags.output) throw new AgentError("invalid_arguments", "Expected skill export castloop --output DIRECTORY.");
+    const { exportAdminSkill } = await import("./admin-skill");
+    context.mutationStarted = true;
+    return exportAdminSkill(flags.output);
+  }
   delete flags.json;
   delete flags["non-interactive"];
   const explicitRoot = flags.workspace === undefined ? undefined : resolve(flags.workspace);
