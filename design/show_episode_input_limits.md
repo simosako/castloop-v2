@@ -22,7 +22,7 @@ Apple Podcasts RSSを規範とし、新規入力だけに適用する。保存�
 
 ## 適用範囲
 
-- 適用: `update-show`/`update-episode`のstage時（`SqliteDraft.metadata`）、Worker公開実行のstaging読取（`sqlite-publication-executor`、超過は`validation_failed`）、RSS取込の検証報告（`parseRssImportFeed`の`missing_fields`、TOMLは無加工で保存し編集を促す）。
+- 適用: `update-show`/`update-episode`のstage時（`SqliteDraft.metadata`）、Worker公開実行のstaging読取（`sqlite-publication-executor`、超過は`validation_failed`）、RSS取込の検証報告（`parseRssImportFeed`の`missing_fields`、TOMLは無加工で保存し編集を促す）。`publish-rss-import`の事前検証でも編集後TOMLを検査し、Showは素材走査前、各Episodeはその音源走査前に拒否する。拒否時はremote IO・Show作成・公開journalの凍結を開始しない。
 - 非適用: 保存済みsnapshot/revision/snapshot復元・lifecycle復元の読取（`showMetadataSchema`/`episodeDraftSchema`/`episodeRevisionSchema`は無制限のまま）。一覧表示は従来通りDB側`substr(...,1,200)`で200文字表示に切る。
 - 既存の全体上限（ローカルTOML 1M、RSS XML 8M、取込準備8M/rendering換算32M、公開要求/draft journal 16K）は変えない。
 - 全体上限は項目別上限とは独立する。公開後のrevision JSON合計2,000,000 code points・最大10,000件と保守的rendering予算を、外部書込前に検査する。RSS事前検証は同じshared予算定義とrevision付加fieldの保守的見積りを使う。保存済み履歴を切り詰めたり、未知IOのblockedをfailedに変更するものではない。

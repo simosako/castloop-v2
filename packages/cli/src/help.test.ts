@@ -32,6 +32,16 @@ test("help works after positional arguments, with -h, and with help COMMAND", ()
   expect(commandHelp("init")).toContain("schema_version=2");
 });
 
+test("security containment instructions name supported current commands and explicit Show pause arguments", () => {
+  const policy = readFileSync(join(import.meta.dir, "../../..", "SECURITY.md"), "utf8");
+  const commands = [...policy.matchAll(/`castloop ([a-z][a-z-]*)([^`]*)`/g)];
+  expect(commands.length).toBeGreaterThan(0);
+  for (const [, name] of commands) expect(Object.hasOwn(COMMAND_HELP, name)).toBe(true);
+  expect(policy).toContain("`castloop show-pause SHOW_ID PAUSE_UUID`");
+  expect(commandHelp("show-pause")).toContain("PAUSE_UUID");
+  expect(policy).not.toContain("castloop service-pause");
+});
+
 test("removed commands, unsupported families and malformed arguments fail before workspace access", () => {
   const directory = mkdtempSync("/tmp/opencode/castloop-help-invalid-");
   try {

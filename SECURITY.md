@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the **latest published release** receives security fixes. There are no long-term support branches. If you run an older release, upgrade to the latest one; note that schema-version-1 (Queue) services require the separate v0.5.x CLI and Worker, which are maintained on their own branch and only receive fixes at the maintainer's discretion.
+Only the **latest published release** receives security fixes. There are no long-term support branches. Check the release compatibility requirements before updating: the current CLI and Worker require a fresh schema-version-2 service with `storage_layout="show-v1"` and matching persisted formats. Migration, resource adoption and adding layout fields to an old configuration are not supported. Older services must retain their matching CLI and Worker; security fixes for those versions are at the maintainer's discretion. Do not deploy the current Worker into an incompatible service as an emergency workaround.
 
 ## Reporting a vulnerability
 
@@ -35,4 +35,6 @@ Out of scope:
 
 - The maintainer responds on a best-effort basis; there is no guaranteed response time.
 - Confirmed issues are fixed in the next release, and the reporter is credited in the release notes unless they prefer otherwise.
-- Until a fix is published, the usual mitigations apply: keep `CLOUDFLARE_API_TOKEN` scoped to the permissions the README documents, keep `.castloop/` private, and pause the service (`castloop service-pause`) if you suspect active abuse.
+- Until a fix is published, keep `CLOUDFLARE_API_TOKEN` scoped to the permissions the README documents and keep `.castloop/` private.
+- For a current compatible service, inspect `castloop list-shows` and `castloop show-status SHOW_ID` to identify affected Shows. If you suspect active abuse, explicitly pause each affected Show with `castloop show-pause SHOW_ID PAUSE_UUID`, using a fresh UUID for each operation, then confirm its status. There is no service-wide pause command. Pausing closes that Show's admission and public delivery; already accepted jobs may still drain.
+- A pause does not revoke compromised credentials or prove unknown IO has settled. Handle credential revocation separately through the relevant account controls, preserve journals and private evidence, and do not replay unknown requests, force-release blocked jobs or delete retained state. Older incompatible services require their matching version's documented containment procedure.

@@ -197,6 +197,8 @@ cache purgeの未確認結果は再送せず、診断の`failure_kind`でAPI例�
 
 任意例外文・stack・応答本文・秘密値をログへ追加しない。保存ログの欠測や分類`other`なら原因未確定として扱う。この追加診断は、変更を含むCLI/Workerを次に配備してから有効になる。
 
+ローカル実機試験用の観測guardは、runtime outcomeが`ok`でもHTTP 4xx/5xx、現行管理APIの固定エラーevent、failed/blocked操作、未認識ログを失敗として後続mutationを止める。任意ログ原文は保持しない。期待する404等の負の試験をguardの正常系へ混ぜない。これは将来の試験の停止基準であり、過去の実機記録を再分類した結果ではない。
+
 既に凍結した`publish-*`を再度呼んだ場合も、同じ要求のstatus確認だけを行う。
 `failed`は公開書込前の確定的な入力/base失敗、`blocked`は途中停止・書込不明・purge失敗等であり、同Showの後続を停止する。新規Episode追加で開始時に保存した確定世代・要求hash・対象未登録の保護根拠が成立する場合だけ、blocked後も旧Feedと承認済みcover/audioの読取を継続する。要求破損・根拠不一致・その他のblockedは503。Feedが読めてもjobの成功・復旧・drainedを意味しないので、管理statusで異常を確認する。別Showの通常操作・再開・登録は妨げないが、共有Worker更新はdrainできないため拒否する。
 時間経過やHEAD不在で解除しない。blockedのretry/releaseは提供していない。

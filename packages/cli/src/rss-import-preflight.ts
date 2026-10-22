@@ -1,4 +1,4 @@
-import { assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength,
+import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength,
   parseEpisodeDraft, parseShowMetadata, sameEpisodeIdentity, validateId } from "@castloop/shared";
 import type { EpisodeDraft, ShowMetadata } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
@@ -31,6 +31,7 @@ export async function prepareRssImportPublication(output: string, publicBaseUrl 
   const text = (bytes: Buffer) => new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   const showBytes = await readLocalMetadata(join(root, "show.toml"));
   const show = parseShowMetadata(text(showBytes));
+  assertShowMetadataInputLimits(show);
   if (show.show_id !== state.show_id) throw new Error("Import Show ID changed");
   const coverPath = join(root, show.image_path);
   const cover = await hashRssImportFile(coverPath, 5_000_000);
@@ -45,6 +46,7 @@ export async function prepareRssImportPublication(output: string, publicBaseUrl 
     const id = episode.metadata.episode_id;
     const bytes = await readLocalMetadata(join(root, `episode-${id}.toml`));
     const metadata = parseEpisodeDraft(text(bytes));
+    assertEpisodeDraftInputLimits(metadata);
     if (!sameEpisodeIdentity(metadata, { ...metadata, episode_id: id, guid: episode.metadata.guid,
       guid_is_permalink: episode.metadata.guid_is_permalink, published_at: episode.metadata.published_at })) {
       throw new Error("Import Episode GUID, date or permalink meaning changed from the original RSS");

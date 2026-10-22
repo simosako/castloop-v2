@@ -89,6 +89,30 @@ describe("SQLite trial trace classification", () => {
       expect(classifySqliteInvocation(frame({ logs: [{ message: [JSON.stringify(diagnostic)] }] }))).toBe("failed");
     }
   });
+  test("current HTTP diagnostics and error statuses stop mutation even when the platform outcome is ok", () => {
+    const diagnostics = [{ event: "sqlite_service_control", reason_code: "service_request_unverified" },
+      { event: "sqlite_operation_http", invocation_id: probeId, reason_code: "operation_unverified" }];
+    for (const diagnostic of diagnostics) for (const status of [200, 409, 503]) {
+      const row = frame({ event: { request: { url: "https://trial.invalid/admin/sqlite-service/health", method: "GET" }, response: { status } },
+        logs: [{ message: [{ ...diagnostic, secret: "private" }] }] });
+      expect(row.unrecognized_logs).toBe(0); expect(JSON.stringify(row)).not.toContain("private");
+      expect(classifySqliteInvocation(row)).toBe("failed");
+      const guard = new SqliteObservationGuard(); guard.record(row); expect(() => guard.assertCanMutate()).toThrow("failed");
+    }
+    for (const status of [401, 404, 409, 503]) expect(classifySqliteInvocation(frame({
+      event: { request: { url: "https://trial.invalid/unknown", method: "GET" }, response: { status } } }))).toBe("failed");
+    expect(classifySqliteInvocation(frame({ logs: [{ message: [{ event: "unknown", secret: "private" }] }] }))).toBe("failed");
+  });
+  test("normal current operation logs remain recognized and only failed or blocked states stop the trial", () => {
+    const operation = { event: "sqlite_operation", operation_id: jobId, request_id: requestId, upload_id: null,
+      invocation_id: probeId, worker_version_id: version, phase: "completed" };
+    for (const state of ["prepared", "in_progress", "succeeded", "cancelled", "failed", "blocked"]) {
+      const row = frame({ logs: [{ message: [{ ...operation, state, secret: "private" }] }] });
+      expect(row.unrecognized_logs).toBe(0); expect(JSON.stringify(row)).not.toContain("private");
+      expect(classifySqliteInvocation(row)).toBe(["failed", "blocked"].includes(state) ? "failed" : "ok");
+    }
+    expect(classifySqliteInvocation(frame({ logs: [log("started"), log()] }))).toBe("ok");
+  });
   test("checkpoint rejects blocked, active, unready, update and nonmatching job states", () => {
     for (const invalid of [{ ...health, queued: 1 }, { ...health, active: "blocked", drained: false }, { ...health, publication_ready: false },
       { ...health, service_config_sha256: "f".repeat(64) }]) expect(() => verifySqliteObservationCheckpoint(runtime, invalid, [])).toThrow();
