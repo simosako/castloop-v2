@@ -19,13 +19,15 @@ import { continueSqliteServiceUpdateVerification, reconcileSqliteServiceUpdate, 
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { runSqliteOperationCommand } from "./sqlite-operation-commands";
 import type { OperationReadOptions } from "./sqlite-operation-commands";
+import { draftPreview } from "./draft-preview";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
   listOptions?: { includeDeleted?: boolean; cursor?: string }; operationOptions?: OperationReadOptions;
-  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void };
+  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
+  "preview-show": [1], "preview-episode": [1],
   "create-show": [2], "create-episode": [1], "update-show": [1], "publish-show": [1],
   "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
   "service-status": [0], "show-status": [1], "show-pause": [2], "show-resume": [2], "target-show": [1], "target-episode": [2],
@@ -81,6 +83,12 @@ async function registeredShow(root: string, config: SqliteServiceConfig, showId:
 export async function runSqliteCommand(root: string, config: SqliteServiceConfig, command: string, args: string[],
   options: SqliteCommandOptions = {}): Promise<unknown> {
   config = sqliteServiceConfigSchema.parse(config);
+  if (command === "preview-show" || command === "preview-episode") {
+    const episode = command === "preview-episode";
+    if (args.length !== (episode ? 2 : 1)) throw new Error("Invalid preview arguments");
+    return draftPreview(root, config, { kind: episode ? "episode" : "show", show_id: validateId(args[0], "show"),
+      ...(episode ? { episode_id: validateId(args[1], "episode") } : {}) });
+  }
   const cf = options.cloudflare ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" };
   if (command.startsWith("operation-") && !(command === "operation-status" && args[0] === "lifecycle" && !options.operationOptions?.local)) {
     return runSqliteOperationCommand(root, config, command, args, options.operationOptions, options.transport, cf);
@@ -207,7 +215,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
       const audio = (await draft.read()).assets.find((entry) => entry.upload.asset === "audio");
       if (!audio || audio.source_path !== resolve(root, targetId.show_id, args[2])) throw new Error("MP3 argument differs from its staged source");
     }
-    await draft.publish(); return draft.wait();
+    await draft.publish(options.expectedPreview); return draft.wait();
   }
   const staged = await draft.stage(showCommand ? { asset: "show" } : command === "update-episode-audio" ? { asset: "audio", audio_path: args[2] } : { asset: "episode_metadata" });
   return { job_id: staged.target.job_id, state: "staged", assets: staged.assets.map((entry) => entry.upload.asset) };

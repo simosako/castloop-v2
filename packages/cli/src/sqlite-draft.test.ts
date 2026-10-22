@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { parseEpisodeDraft, sqliteServiceConfigHash, stringifyToml } from "@castloop/shared";
 import type { SqliteServiceConfig } from "@castloop/shared";
 import { SqliteDraft } from "./sqlite-draft";
+import { draftPreview } from "./draft-preview";
 import type { SqliteDraftTarget } from "./sqlite-draft-journal";
 import type { R2RestTransport } from "./verified-r2-put";
 import { SqlitePublicationAlarm } from "../../../src/sqlite-publication-alarm";
@@ -17,6 +18,24 @@ import { join } from "node:path";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
+
+test("preview is read-only and publication rejects changes after approval", async () => {
+  const f = await fixture(); await f.stage();
+  const before = f.management.length;
+  const preview = await draftPreview(f.root, f.config, f.target);
+  expect(preview.inputs_match_staged).toBe(true);
+  expect(preview.published.status).toBe("not_checked");
+  expect(f.management.length).toBe(before);
+  const file = join(f.root, "daily", "episode-first.toml");
+  const original = readFileSync(file, "utf8");
+  writeFileSync(file, original.replace("Private title", "Changed title"));
+  await expect(f.draft.publish(preview.input_fingerprint)).rejects.toThrow("Reviewed inputs differ");
+  expect(f.management.length).toBe(before);
+  expect((await f.draft.read()).publication).toBeUndefined();
+  writeFileSync(file, original);
+  await f.draft.publish(preview.input_fingerprint);
+  expect((await f.draft.read()).publication).toBeDefined();
+});
 
 test("SQLite status retries cannot start after the publication waiting deadline", async () => {
   const f = await fixture(); await f.stage(); await f.draft.publish();

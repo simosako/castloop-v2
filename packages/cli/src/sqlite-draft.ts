@@ -14,6 +14,8 @@ import { assertLocalStagingSource, inspectLocalStagingSource } from "./staging-s
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { sha256HexSync as sha256 } from "./sha256";
 import { loadLocalInput, inspectCover } from "./local-input";
+import { draftPreview } from "./draft-preview";
+import { AgentError } from "./agent-output";
 import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -160,10 +162,18 @@ export class SqliteDraft {
     return this.journal.storage.exclusively(async () => this.observeRecord(await this.journal.load(), budget));
   }
 
-  publish(): Promise<SqlitePublicationStatus | null> {
+  publish(expectedPreview?: string): Promise<SqlitePublicationStatus | null> {
     return this.journal.storage.exclusively(async () => {
       const record = await this.journal.load();
       if (record.publication) return this.observeRecord(record);
+      const checkPreview = async () => {
+        if (!expectedPreview) return;
+        const preview = await draftPreview(this.root, this.config, record.target, record);
+        if (preview.input_fingerprint !== expectedPreview || !preview.inputs_match_staged) {
+          throw new AgentError("preview_changed", "Reviewed inputs differ; preview and obtain approval again before publication.");
+        }
+      };
+      await checkPreview();
       const service = await this.client.describe(record.target.show_id);
       if (service.state !== "open") throw new Error("SQLite publication admission is paused");
       const metadata = await this.metadata(record);
@@ -179,6 +189,7 @@ export class SqliteDraft {
         admission_window_id: service.admission_window_id, payloads: record.assets.map((entry) => entry.upload) });
       const frozen = { ...record, publication: { request, request_sha256: await sqlitePublicationRequestHash(request) } };
       if (!metadata.equals(await this.metadata(record))) throw new Error("Local metadata changed before publication was frozen");
+      await checkPreview();
       this.journal.replace(frozen);
       return this.retainStatus(frozen, await this.client.submit(request, sqliteClientIdentity(this.root, this.config, true)!));
     });

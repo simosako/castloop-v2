@@ -128,13 +128,16 @@ async function main(context: Invocation): Promise<unknown> {
   const explicitRoot = flags.workspace === undefined ? undefined : resolve(flags.workspace);
   const explicitShow = flags.show;
   delete flags.workspace;
-  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode"].includes(command);
+  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode"].includes(command);
   if (episodeCommand && explicitRoot && !explicitShow) throw new AgentError("missing_show", "Explicit --workspace requires --show for Episode commands.");
   if (explicitShow) {
     validateId(explicitShow, "show");
     if (!episodeCommand && !command.startsWith("operation-")) throw new AgentError("invalid_options", "This command does not accept --show; use its Show positional argument.");
   }
   if (episodeCommand) delete flags.show;
+  const expectedPreview = flags["expect-preview"];
+  delete flags["expect-preview"];
+  if (expectedPreview && !/^[a-f0-9]{64}$/.test(expectedPreview)) throw new AgentError("invalid_fingerprint", "Expected a SHA-256 preview fingerprint.");
   context.target = { ...(explicitRoot ? { workspace: explicitRoot } : {}), ...(explicitShow ? { show_id: explicitShow } : {}) };
   if (command === "import-rss") {
     allowedFlags(flags, ["dry-run", "output"]);
@@ -195,7 +198,7 @@ async function main(context: Invocation): Promise<unknown> {
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
     ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
-    ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
+    ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview });
   if (listing && !process.argv.includes("--json")) {
     const { formatSqliteCatalog } = await import("./sqlite-catalog");
     const { sqliteCatalogResponseSchema } = await import("../../shared/src/sqlite-catalog");

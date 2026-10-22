@@ -47,7 +47,9 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
     await command(["update-episode", "first", "--workspace", setup.root, "--show", "daily", "--non-interactive", "--json"], "/tmp/opencode");
     await command(["update-episode-audio", "first", "audio.mp3", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode");
-    const publication = await command(["publish-episode", "first", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode"); expect(publication).toMatchObject({ state: "succeeded" });
+    const preview = await command(["preview-episode", "first", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode");
+    expect(preview.inputs_match_staged).toBe(true);
+    const publication = await command(["publish-episode", "first", "--workspace", setup.root, "--show", "daily", "--expect-preview", String(preview.input_fingerprint), "--json"], "/tmp/opencode"); expect(publication).toMatchObject({ state: "succeeded" });
     expect(await command(["job-status", String(publication.job_id)])).toMatchObject({ status: { state: "succeeded" } });
     expect(await command(["list-shows", "--json"])).toMatchObject({ shows: [{ show_id: "daily", lifecycle: "published" }] });
     expect(await command(["list-episodes", "daily", "--json"])).toMatchObject({ episodes: [{ episode_id: "first", lifecycle: "published" }] });
