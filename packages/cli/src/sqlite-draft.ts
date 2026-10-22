@@ -24,6 +24,10 @@ export type SqliteDraftSelection = z.infer<typeof selectionSchema>;
 export type SqliteDraftOptions = { administratorKey: string; managementTransport?: R2RestTransport; r2?: R2RestOptions;
   parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void };
 
+function sameAssetSlot(left: StagePayload["asset"], right: StagePayload["asset"]): boolean {
+  return left === right || left.startsWith("cover_") && right.startsWith("cover_");
+}
+
 export class SqliteDraft {
   private constructor(private readonly root: string, private readonly config: SqliteServiceConfig,
     private readonly journal: SqliteDraftJournal, private readonly client: SqlitePublicationClient,
@@ -109,8 +113,7 @@ export class SqliteDraft {
       const uploaded = await uploadSqliteDraftAssets(this.root, this.config, record.target, payloads, paths, duration, this.r2,
         { client: this.operations, service: this.service, metadataSha256: sha256(metadata), baseAssets: record.assets, ...this.context });
       if (!metadata.equals(await this.metadata(record))) throw new Error("Local metadata changed while its upload was in progress");
-      const assets = record.assets.filter((entry) => !uploaded.assets.some((next) => next.upload.asset === entry.upload.asset ||
-        next.upload.asset.startsWith("cover_") && entry.upload.asset.startsWith("cover_")));
+      const assets = record.assets.filter((entry) => !uploaded.assets.some((next) => sameAssetSlot(next.upload.asset, entry.upload.asset)));
       const next = { ...record, assets: [...assets, ...uploaded.assets] };
       this.journal.replace(next);
       await attachSqliteUpload(this.root, this.config, uploaded.operationId, this.operations);
@@ -125,16 +128,14 @@ export class SqliteDraft {
         sha256(await this.metadata(record)) !== upload.metadata_sha256) throw new Error("Upload resume requires its unchanged, unfrozen draft and metadata");
       const previouslyUploaded = upload.intents.every((intent) => intent.receipt) ? upload.intents.map(({ source_path, state, receipt, ...intent }) =>
         sqliteDraftAssetSchema.parse({ source_path, upload: sqliteVerifiedUploadSchema.parse({ ...intent, ...receipt, verified: true }) })) : null;
-      const kept = upload.base_assets.filter((entry) => !upload.intents.some((intent) => intent.asset === entry.upload.asset ||
-        intent.asset.startsWith("cover_") && entry.upload.asset.startsWith("cover_")));
+      const kept = upload.base_assets.filter((entry) => !upload.intents.some((intent) => sameAssetSlot(intent.asset, entry.upload.asset)));
       if (JSON.stringify(record.assets) !== JSON.stringify(upload.base_assets) &&
         (!previouslyUploaded || JSON.stringify(record.assets) !== JSON.stringify([...kept, ...previouslyUploaded]))) {
         throw new Error("Another operation changed this draft; do not resume its upload");
       }
       const result = await resumeSqliteUpload(this.root, this.config, id, this.r2, this.operations);
       if (sha256(await this.metadata(record)) !== upload.metadata_sha256) throw new Error("Metadata changed during upload verification");
-      const assets = upload.base_assets.filter((entry) => !result.assets.some((next) => next.upload.asset === entry.upload.asset ||
-        next.upload.asset.startsWith("cover_") && entry.upload.asset.startsWith("cover_")));
+      const assets = upload.base_assets.filter((entry) => !result.assets.some((next) => sameAssetSlot(next.upload.asset, entry.upload.asset)));
       const merged = [...assets, ...result.assets.map((entry) => sqliteDraftAssetSchema.parse(entry))];
       if (JSON.stringify(record.assets) !== JSON.stringify(upload.base_assets) && JSON.stringify(record.assets) !== JSON.stringify(merged)) {
         throw new Error("A different upload changed this draft; do not overwrite its references");

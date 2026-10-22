@@ -5,6 +5,7 @@ import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata, SQLITE_WORKER_COMPATIBILITY_DATE } from "../../shared/src/sqlite-worker-deployment";
 import { putVerifiedR2Object, requireR2RestOptions } from "./verified-r2-put";
 import type { R2RestOptions } from "./verified-r2-put";
+import { collectStreamBytes } from "./bounded-http-read";
 
 const uuid = z.uuid(), hash = z.string().min(1).max(256);
 export const sqliteScriptUploadReceiptSchema = z.object({ script_etag: hash }).strict();
@@ -34,15 +35,12 @@ export class SqliteCloudflareApi {
     if (![200, 201].includes(response.status) || !response.body || response.headers.has("Content-Range")) {
       await response.body?.cancel(); throw new Error(`Cloudflare request was not verified (HTTP ${response.status})`);
     }
-    const reader = response.body.getReader(), chunks: Uint8Array[] = []; let length = 0;
     try {
-      for (;;) { const chunk = await reader.read(); if (chunk.done) break; length += chunk.value.length;
-        if (length > 1_000_000) throw new Error("Cloudflare response exceeds its limit"); chunks.push(chunk.value); }
-      const parsed = z.object({ success: z.literal(true), result: z.unknown() }).parse(JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks))));
+      const bytes = await collectStreamBytes(response.body, 1_000_000, true);
+      const parsed = z.object({ success: z.literal(true), result: z.unknown() }).parse(JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)));
       if (absent && parsed.result === null) throw new Error("Only an explicit 404 proves resource absence");
       return parsed.result;
     } catch { throw new Error("Cloudflare response was not verified; do not replay a mutation"); }
-    finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
   }
   private json(method: string, path: string, value?: object): Promise<unknown> {
     return this.call(method, path, value ? JSON.stringify(value) : undefined, value ? "application/json" : undefined);

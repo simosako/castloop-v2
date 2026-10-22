@@ -1,5 +1,6 @@
 import { stageReadbackReceiptSchema } from "@castloop/shared";
 import type { StageReadbackReceipt } from "@castloop/shared";
+import { BoundedReadError, collectStreamBytes } from "./bounded-http-read";
 import { createHash } from "node:crypto";
 
 export type R2RestTransport = (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => Promise<Response>;
@@ -9,31 +10,25 @@ export type ObjectReceipt = Pick<StageReadbackReceipt, "etag" | "version">;
 
 async function readReceipt(response: Response, target: VerifiedR2Target): Promise<ObjectReceipt> {
   if (!response.body) throw new Error("Staging PUT receipt is missing");
-  const reader = response.body.getReader();
-  try {
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    for (;;) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      size += chunk.value.byteLength;
-      if (size > 65536) throw new Error("Staging PUT receipt exceeds its limit");
-      chunks.push(chunk.value);
-    }
-    const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks)));
-    if (!value || typeof value !== "object" || !("success" in value) || value.success !== true || !("result" in value) ||
-      !value.result || typeof value.result !== "object" || !("size" in value.result)) {
-      throw new Error("Staging PUT receipt size/success was not verified");
-    }
-    const sizeValue = value.result.size;
-    const received = typeof sizeValue === "string" && /^\d+$/.test(sizeValue) ? Number(sizeValue) : sizeValue;
-    if (typeof received !== "number" || !Number.isSafeInteger(received) || received !== target.length ||
-      !("key" in value.result) || value.result.key !== target.key || !("etag" in value.result) || !("version" in value.result)) {
-      throw new Error("Staging PUT receipt size/success was not verified");
-    }
-    return { etag: stageReadbackReceiptSchema.shape.etag.parse(value.result.etag),
-      version: stageReadbackReceiptSchema.shape.version.parse(value.result.version) };
-  } finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
+  let bytes: Uint8Array;
+  try { bytes = await collectStreamBytes(response.body, 65536, true); }
+  catch (error) {
+    if (error instanceof BoundedReadError && error.code === "size_limit") throw new Error("Staging PUT receipt exceeds its limit");
+    throw new Error("Staging PUT receipt read or cleanup was not verified");
+  }
+  const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes));
+  if (!value || typeof value !== "object" || !("success" in value) || value.success !== true || !("result" in value) ||
+    !value.result || typeof value.result !== "object" || !("size" in value.result)) {
+    throw new Error("Staging PUT receipt size/success was not verified");
+  }
+  const sizeValue = value.result.size;
+  const received = typeof sizeValue === "string" && /^\d+$/.test(sizeValue) ? Number(sizeValue) : sizeValue;
+  if (typeof received !== "number" || !Number.isSafeInteger(received) || received !== target.length ||
+    !("key" in value.result) || value.result.key !== target.key || !("etag" in value.result) || !("version" in value.result)) {
+    throw new Error("Staging PUT receipt size/success was not verified");
+  }
+  return { etag: stageReadbackReceiptSchema.shape.etag.parse(value.result.etag),
+    version: stageReadbackReceiptSchema.shape.version.parse(value.result.version) };
 }
 
 async function verifyResponse(response: Response, target: VerifiedR2Target, etag: string): Promise<void> {
