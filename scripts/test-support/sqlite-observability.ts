@@ -1,12 +1,21 @@
 import { z } from "zod";
 import { sqliteHealthSchema } from "../../packages/shared/src/sqlite-service-api";
 import { sqlitePublicationStatusSchema } from "../../packages/shared/src/sqlite-publication";
+import { operationPhaseSchema, operationReasonSchema, operationStateSchema } from "../../packages/shared/src/sqlite-operations";
 
 const diagnosticSchema = z.union([
   z.object({ event: z.literal("sqlite_publication"), phase: z.enum(["started", "succeeded", "failed", "blocked"]), job_id: z.uuid(),
     request_id: z.uuid(), sequence: z.number().int().positive(), reason_code: z.enum(["validation_failed", "base_conflict", "target_unavailable", "stale_window", "runtime_mismatch", "execution_interrupted", "validation_unavailable", "execution_failed", "stored_request_invalid"]).optional() }),
   z.object({ event: z.literal("sqlite_runtime_setup"), operation_id: z.uuid(), reason_code: z.enum(["execution_interrupted", "runtime_probe_failed"]) }),
   z.object({ event: z.literal("sqlite_service_http"), reason_code: z.literal("service_request_unverified") }),
+  z.object({ event: z.literal("sqlite_service_control"), reason_code: z.literal("service_request_unverified") }),
+  z.object({ event: z.literal("sqlite_operation_http"), invocation_id: z.uuid(), reason_code: z.literal("operation_unverified") }),
+  z.object({ event: z.literal("sqlite_publication_http"), request_id: z.uuid(), job_id: z.uuid(), invocation_id: z.uuid(),
+    reason_code: z.enum(["request_conflict", "submission_unverified"]) }),
+  z.object({ event: z.literal("sqlite_gateway"), reason_code: z.literal("request_unavailable") }),
+  z.object({ event: z.literal("sqlite_operation"), operation_id: z.uuid(), request_id: z.uuid().nullable(), upload_id: z.uuid().nullable(),
+    invocation_id: z.uuid(), worker_version_id: z.uuid(), state: operationStateSchema, phase: operationPhaseSchema,
+    reason_code: operationReasonSchema.optional() }),
   z.object({ event: z.literal("sqlite_cache_purge"), show_id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(32),
     episode_id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(80).optional(),
     reason_code: z.enum(["purge_rate_limited", "purge_rejected", "purge_unconfirmed"]), attempt: z.number().int().min(1).max(6), will_retry: z.boolean() }),
@@ -96,8 +105,11 @@ export function sqliteStatusReadRequestId(row: SqliteInvocation): string | undef
 }
 
 export function classifySqliteInvocation(row: SqliteInvocation): "ok" | "reconcile" | "failed" {
-  if (row.truncated || row.exception_count || row.logs.some((log) => log.event === "sqlite_runtime_setup" ||
-    log.event === "sqlite_service_http" || log.event === "sqlite_publication_effect_failed" ||
+  if (row.truncated || row.exception_count || row.unrecognized_logs || (row.status !== undefined && row.status >= 400) ||
+    row.logs.some((log) => log.event === "sqlite_runtime_setup" ||
+    log.event === "sqlite_service_http" || log.event === "sqlite_service_control" || log.event === "sqlite_operation_http" ||
+    log.event === "sqlite_publication_http" || log.event === "sqlite_gateway" || log.event === "sqlite_publication_effect_failed" ||
+    log.event === "sqlite_operation" && ["failed", "blocked"].includes(log.state) ||
     log.event === "sqlite_cache_purge" && !log.will_retry || log.event === "sqlite_publication" && ["failed", "blocked"].includes(log.phase))) return "failed";
   if (row.outcome === "ok") return "ok";
   if (row.outcome === "canceled" && !row.logs.length && !row.unrecognized_logs &&
