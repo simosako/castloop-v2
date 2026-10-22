@@ -1,5 +1,5 @@
 [tools]
-bun = "1.4.2"
+bun = "1.4.4"
 node = "24"
 "npm:@colbymchenry/codegraph" = "prefix:1.6"
 "npm:wrangler" = "4.131.2"
