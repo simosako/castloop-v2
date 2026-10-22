@@ -12,6 +12,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |
+| [レビュー修正とPR（2026-10-22）](code_review_fixes_20261022.md) | R1〜R10の対応範囲・commit/PR依存順・全体検証・残る走査コストと実機未確認範囲 |
 | [リリースCIのAction固定](../docs/ci_security.md) | 不変SHA・upstream確認・権限維持・手動更新の方針 |
 | [v0.6.0のQueue方式コード削除計画](schema_v1_removal_plan.md) | Issue #24。v0.5.xのschema version 1機能は維持し、v0.6.0以降はSQLite単独化。削除範囲・共用処理の分離・検証・既存環境の保全 |
 | [単一PUT・U1](m6_upload_recovery_options.md) | 採用方式と未検証の仮定 |
