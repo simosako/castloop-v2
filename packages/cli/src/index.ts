@@ -2,7 +2,9 @@
 
 import { stringifyToml, validateId } from "@castloop/shared";
 import { version } from "../../../package.json";
-import { COMMAND_HELP, commandHelp } from "./help";
+import { COMMAND_HELP, commandHelp, commandOptions, describeCommand } from "./help";
+import { CONTRACT_VERSION, INPUT_SCHEMAS, inputSchema } from "./agent-schema";
+import { agentEnvelope } from "./agent-output";
 import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
 import { embeddedSqliteWorkerSource } from "./worker-payload";
 import { loadWorkspaceConfig } from "./workspace-config";
@@ -93,7 +95,20 @@ async function main(): Promise<unknown> {
   if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`Unknown command: ${command}`);
   const listing = command === "list-shows" || command === "list-episodes";
   const operationRead = command === "operation-list" || command === "operation-status";
-  const { positional, flags } = argsOf(rest, listing ? ["json", "include-deleted"] : operationRead ? ["local", "remote", "incomplete", "json"] : command === "import-rss" ? ["dry-run"] : []);
+  const options = commandOptions(command);
+  const { positional, flags } = argsOf(rest, Object.keys(options).filter((name) => options[name] === "boolean"));
+  allowedFlags(flags, Object.keys(options));
+  if (command === "describe") {
+    if (positional.length > 1) throw new Error(commandHelp(command));
+    return { contract_version: CONTRACT_VERSION, cli_version: CLI_VERSION, protocol: "sqlite-sequential-v1", storage_layout: "show-v1", schemas: [...Object.keys(INPUT_SCHEMAS), "result"],
+      commands: positional.length ? [describeCommand(positional[0]!)] : Object.keys(COMMAND_HELP).map(describeCommand) };
+  }
+  if (command === "schema") {
+    if (positional.length !== 1 || flags.format && flags.format !== "json-schema") throw new Error(commandHelp(command));
+    return inputSchema(positional[0]!);
+  }
+  delete flags.json;
+  delete flags["non-interactive"];
   if (command === "import-rss") {
     allowedFlags(flags, ["dry-run", "output"]);
     if (positional.length !== 2 || Boolean(flags["dry-run"]) === Boolean(flags.output)) throw new Error(commandHelp(command));
@@ -146,7 +161,7 @@ async function main(): Promise<unknown> {
     ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}) });
-  if (listing && !flags.json) {
+  if (listing && !process.argv.includes("--json")) {
     const { formatSqliteCatalog } = await import("./sqlite-catalog");
     const { sqliteCatalogResponseSchema } = await import("../../shared/src/sqlite-catalog");
     return formatSqliteCatalog(sqliteCatalogResponseSchema.parse(result));
@@ -156,8 +171,11 @@ async function main(): Promise<unknown> {
 
 try {
   const result = await main();
-  console.log(typeof result === "string" ? result : JSON.stringify(result, null, 2));
+  const command = process.argv[2] ?? "help";
+  const output = process.argv.includes("--json") && !["schema", "describe"].includes(command) ? agentEnvelope(command, {}, result) : result;
+  console.log(typeof output === "string" ? output : JSON.stringify(output, null, 2));
 } catch (error) {
-  console.error(error instanceof Error ? error.message : "Command failed");
+  if (process.argv.includes("--json")) console.log(JSON.stringify(agentEnvelope(process.argv[2] ?? "help", {}, null, error, true), null, 2));
+  else console.error(error instanceof Error ? error.message : "Command failed");
   process.exitCode = 1;
 }

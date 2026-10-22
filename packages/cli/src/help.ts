@@ -1,6 +1,8 @@
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
+  describe: { usage: "describe [COMMAND] [--json]", description: "Read offline command specifications, effects and recovery rules. No credentials or workspace required." },
+  schema: { usage: "schema service-config|show-input|episode-input|result [--format json-schema]", description: "Print the embedded JSON Schema. Additional measured constraints require castloop validate; TOML dates must be quoted strings." },
   init: {
     usage: "init [dir] [--publication-protocol sqlite-sequential-v1] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
     description: "Create a fresh SQLite service (schema_version=2) by default; no protocol option is required.\n" +
@@ -176,5 +178,34 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
 export function commandHelp(command: string): string {
   const help = Object.hasOwn(COMMAND_HELP, command) ? COMMAND_HELP[command] : undefined;
   if (!help) throw new Error(`Unknown command: ${command}`);
-  return `Usage: castloop ${help.usage}\n\n${help.description}\n\nOptions:\n  --help, -h  Show this help`;
+  return `Usage: castloop ${help.usage}\n\n${help.description}\n\nOptions:\n  --help, -h  Show this help\n${Object.entries(commandOptions(command)).map(([name, type]) => `  --${name}${type === "string" ? " VALUE" : ""}`).join("\n")}\n\nExplicit --workspace selects only that service root. Episode commands also require --show.\nAudio paths use the Show directory; lifecycle plans use the workspace. New validate paths use caller cwd.\n--non-interactive disables CLI prompts, not administrator approval.`;
+}
+
+export function commandOptions(command: string): Record<string, "string" | "boolean"> {
+  const options: Record<string, "string" | "boolean"> = { json: "boolean", "non-interactive": "boolean" };
+  if (!["describe", "schema", "import-rss", "validate", "template", "skill"].includes(command)) options.workspace = "string";
+  const byCommand: Record<string, Record<string, "string" | "boolean">> = {
+    init: { "publication-protocol": "string", "service-id": "string", "account-id": "string", "bucket-name": "string", "workers-subdomain": "string", "operation-id": "string" },
+    "create-show": { "site-url": "string" }, deploy: { "operation-id": "string" }, schema: { format: "string" },
+    "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
+    "operation-list": { show: "string", local: "boolean", remote: "boolean", incomplete: "boolean", cursor: "string", parent: "string" },
+    "operation-status": { show: "string", local: "boolean", remote: "boolean", "after-version": "string", "request-cursor": "string" },
+    "import-rss": { "dry-run": "boolean", output: "string" },
+    validate: { assets: "boolean", audio: "string" }, doctor: { local: "boolean" }, skill: { output: "string" },
+  };
+  if (["create-episode", "update-episode", "update-episode-audio", "publish-episode"].includes(command) || command.startsWith("operation-")) options.show = "string";
+  return { ...options, ...byCommand[command] };
+}
+
+export function describeCommand(command: string) {
+  const help = COMMAND_HELP[command];
+  if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
+  const offline = ["describe", "schema", "validate", "template", "skill", "doctor"].includes(command);
+  const read = offline || ["service-status", "show-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
+  return { command, ...help, options: commandOptions(command),
+    authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
+    effects: { local: offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read ? "read_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" },
+    output_schema: "result", input_schemas: ["service-config", "show-input", "episode-input"],
+    recovery: read ? "Bounded observation only; snapshots do not authorize mutations." : "Preserve exact workspace, Show, input and records. Unknown PUT/POST outcomes must not be replayed. Observe the recorded job/operation; upload continuation requires the retained receipt and unchanged input.",
+    paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };
 }
