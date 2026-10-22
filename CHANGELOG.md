@@ -6,6 +6,10 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 
 ## Unreleased
 
+- Nothing yet.
+
+## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
+
 - Agent CLI/Skill support: embedded schemas and command specifications, offline validation/templates/doctor, explicit targets, non-interactive JSON results, Skill export and reviewed-input publication fingerprints. Existing `--json` command payloads move under `result`. See the [usage and limitations](docs/agent_usage.md). No Worker or persisted-format changes.
 
 ## v0.7.1 — [release note](docs/release-v0.7.1.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.1)

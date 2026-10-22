@@ -1,6 +1,6 @@
 # エージェントによるPodcast管理
 
-Issue #5の未リリースCLI機能。管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。既存のCloudflare環境・永続形式・公開プロトコルは変更しない。
+v0.7.2で追加したIssue #5のCLI機能。管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。既存のCloudflare環境・永続形式・公開プロトコルは変更しない。[リリースノート](release-v0.7.2.md)を参照する。
 
 ## Skillの導入
 
@@ -18,7 +18,11 @@ Node.js/npmを既に使う場合の任意の導入方法:
 npx skills add simosako/castloop-v2 --skill castloop
 ```
 
-既定ブランチのSkillである。再現性が必要な場合はリリース後に同じtagの`https://github.com/simosako/castloop-v2/tree/TAG/skills/castloop`を指定する。配置するエージェントとproject/global範囲を選び、開発用Skillをまとめて導入しない。
+既定ブランチのSkillである。v0.7.2に固定する場合は次を使う。配置するエージェントとproject/global範囲を選び、開発用Skillをまとめて導入しない。
+
+```sh
+npx skills add https://github.com/simosako/castloop-v2/tree/v0.7.2/skills/castloop --skill castloop
+```
 
 ## 利用仕様と入力
 
