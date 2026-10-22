@@ -8,6 +8,8 @@
 
 一方、tail欠測、安全化後path欠落による保守的停止、管理エラーeventの一部未回収があった。保存ログではtail未捕捉の`canceled` Alarmも1件見つかった。これらを後の成功で解消済みとせず、全invocation正常・欠測なし・未知IOのsettlement完了とは主張しない。製品コードの追加修正・再配備はしていない。
 
+同日の[追加調査](review_observation_investigation_20261022.md)で、path照合とCloudflareのUUID秘匿化の不適合を特定した。tail欠測の元の404/409は保存ログで回収し、canceledは同じDO・予定時刻の成功Alarmの291ms後で、成功後の重複配送取り消しが有力となった。`sqlite_service_control`診断欠落とtail配送原因は未確定。以下は初回報告時点の判断を保持する。
+
 ## 承認と対象
 
 管理者は、新規隔離環境の作成・配備・2 Showと短尺音源の公開・更新・非公開化・復元・配信・観測・最終Pauseを承認した。資源削除、既存環境の変更、DNS・権限・課金・CPU上限変更、未知結果の再送は含まない。
