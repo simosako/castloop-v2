@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { loadWorkspaceConfig } from "./workspace-config";
+import { resultEnvelopeSchema } from "./agent-schema";
 import { operationCleanupPlanSchema, operationListSchema, operationResultSchema } from "../../shared/src/sqlite-operations";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -27,7 +28,7 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     if (code !== 0) throw new Error(`Local CLI ${args[0]} failed: ${stderr}`);
     const output = JSON.parse(stdout) as Record<string, unknown>;
-    return args.includes("--json") ? output.result as Record<string, unknown> : output;
+    return args.includes("--json") ? resultEnvelopeSchema.parse(output).result as Record<string, unknown> : output;
   }
   try {
     expect(await command(["init", ".", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });

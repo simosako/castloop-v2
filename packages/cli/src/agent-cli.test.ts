@@ -25,7 +25,25 @@ test("offline discovery and validation never create state or expose input errors
     expect(existsSync(join(root, ".castloop"))).toBe(false);
     const init = await run(["init", "new", "--non-interactive", "--json"], root);
     expect(init.code).toBe(1); expect(existsSync(join(root, "new"))).toBe(false);
+    const badId = await run(["init", "bad-id", "--operation-id", "not-a-uuid", "--non-interactive", "--json"], root);
+    expect(badId.code).toBe(1); expect(existsSync(join(root, "bad-id"))).toBe(false);
+    const mismatch = await run(["init", "new", "--workspace", join(root, "other"), "--json"], root);
+    expect(JSON.parse(mismatch.stdout).error.code).toBe("target_mismatch");
     const missing = await run(["update-episode", "first", "--workspace", root, "--json"], root);
     expect(JSON.parse(missing.stdout).error.code).toBe("missing_show");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("offline validation uses input limits and reports safe field paths", async () => {
+  const root = mkdtempSync("/tmp/opencode/castloop-agent-limits-");
+  try {
+    const base = 'schema_version = 1\nepisode_id = "first"\nguid = "saved-guid"\ntitle = "Title"\npublished_at = "2026-10-22T10:00:00Z"\n';
+    writeFileSync(join(root, "episode.toml"), base + `description = "${"😀".repeat(10000)}"\n`);
+    expect((await run(["validate", "episode", "episode.toml", "--json"], root)).code).toBe(0);
+    writeFileSync(join(root, "episode.toml"), base + `description = "${"😀".repeat(10001)}"\n`);
+    const result = await run(["validate", "episode", "episode.toml", "--json"], root);
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout).error.fields).toContainEqual({ path: ["description"], code: "custom" });
+    expect(readdirSync(root)).toEqual(["episode.toml"]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

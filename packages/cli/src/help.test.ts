@@ -59,7 +59,11 @@ test("removed commands, unsupported families and malformed arguments fail before
       ["import-rss", "show", "file:///etc/passwd", "--dry-run"], ["publish-rss-import"], ["publish-rss-import", "dir", "--force", "true"]]) {
       const result = Bun.spawnSync([process.execPath, entrypoint, ...args], { cwd: directory, timeout: 5000 });
       expect(result.exitCode, args.join(" ")).toBe(1);
-      expect(result.stdout.toString()).toBe(""); expect(result.stderr.toString()).not.toContain("ENOENT");
+      if (args.includes("--json")) {
+        expect(JSON.parse(result.stdout.toString())).toMatchObject({ ok: false, error: { outcome: "not_started" } });
+        expect(result.stderr.toString()).toBe("");
+      } else expect(result.stdout.toString()).toBe("");
+      expect(result.stderr.toString()).not.toContain("ENOENT");
     }
     expect(readdirSync(directory)).toEqual([]);
   } finally { rmSync(directory, { recursive: true }); }
@@ -99,7 +103,11 @@ globalThis.fetch = async (url, init) => {
         env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: "", CLOUDFLARE_API_TOKEN: "",
           CASTLOOP_TEST_REQUEST: JSON.stringify(request), CASTLOOP_TEST_RESPONSE: JSON.stringify(response) } });
       expect(result.exitCode, result.stderr.toString()).toBe(0); expect(result.stderr.toString()).toBe("");
-      if (args.includes("--json")) expect(JSON.parse(result.stdout.toString())).toEqual(response);
+      if (args.includes("--json")) {
+        const output = JSON.parse(result.stdout.toString());
+        expect(output).toMatchObject({ contract_version: 1, ok: true, operation: null });
+        expect(output.result).toEqual(response);
+      }
       else {
         expect(result.stdout.toString()).toContain(shows ? "SHOW_ID\tSTATE" : "EPISODE_ID\tSTATE");
         expect(result.stdout.toString()).not.toContain("\u001b");

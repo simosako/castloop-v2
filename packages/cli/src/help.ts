@@ -1,6 +1,10 @@
+import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
+
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
+  doctor: { usage: "doctor [--local] [--workspace PATH] [--json]", description: "Compact offline checks with no writes, key generation, networking or repairs. Warnings alone exit 0; failed checks exit 1. Credential presence is not validity." },
+  template: { usage: "template service-config|show|episode", description: "Print an embedded example TOML without IO or registration. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
   "preview-show": { usage: "preview-show ID", description: "Read-only local metadata, staged asset hashes and base identity. Does not fetch published full content or check remote readiness. Review input_fingerprint and use publish-show --expect-preview HASH." },
   "preview-episode": { usage: "preview-episode ID", description: "Read-only local metadata, staged asset hashes and base identity. Requires --show with explicit --workspace. Published full metadata is not fetched. Use publish-episode --expect-preview HASH after approval." },
   skill: { usage: "skill export castloop --output DIRECTORY", description: "Export the embedded administrator Skill without networking or external tools. The destination must not exist; existing Skills and AGENTS.md are never overwritten." },
@@ -208,8 +212,11 @@ export function describeCommand(command: string) {
   const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-show", "preview-episode"].includes(command);
   const read = offline || ["service-status", "show-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
   return { command, ...help, options: commandOptions(command),
+    positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
+      SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],
+    constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly"],
     authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
-    effects: { local: offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read ? "read_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" },
+    effects: { local: offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" },
     output_schema: "result", input_schemas: ["service-config", "show-input", "episode-input"],
     recovery: read ? "Bounded observation only; snapshots do not authorize mutations." : "Preserve exact workspace, Show, input and records. Unknown PUT/POST outcomes must not be replayed. Observe the recorded job/operation; upload continuation requires the retained receipt and unchanged input.",
     paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };

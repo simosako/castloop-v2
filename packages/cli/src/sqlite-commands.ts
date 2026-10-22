@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { episodeDraftSchema, parseShowMetadata, showMetadataSchema, stringifyToml, validateId } from "@castloop/shared";
+import { parseShowMetadata, stringifyToml, validateId } from "@castloop/shared";
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteRuntimeRequestSchema, sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
@@ -20,6 +20,7 @@ import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { runSqliteOperationCommand } from "./sqlite-operation-commands";
 import type { OperationReadOptions } from "./sqlite-operation-commands";
 import { draftPreview } from "./draft-preview";
+import { showTemplate, episodeTemplate } from "./input-templates";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -46,9 +47,7 @@ const controlSchema = z.object({ action: z.enum(["pause", "resume"]), show_id: z
 });
 
 async function registeredShow(root: string, config: SqliteServiceConfig, showId: string, siteUrl: string, client: SqliteServiceClient): Promise<string> {
-  const metadata = showMetadataSchema.parse({ schema_version: 1, show_id: showId, title: showId,
-    description: "Edit this description before publication", language: "ja", author: "Edit author", owner_name: "Edit owner",
-    owner_email: "owner@example.com", categories: ["Technology"], explicit: false, site_url: siteUrl, image_path: "cover.jpg" });
+  const metadata = showTemplate(showId, siteUrl);
   const journal = createLocalJournalStorage(root, "sqlite-registrations", config.service_id, `${showId}.json`);
   let existing: z.infer<typeof registrationSchema> | null = null;
   try { existing = registrationSchema.parse(journal.read()); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -140,8 +139,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     if (!["draft", "published"].includes(inspection.show_lifecycle) || inspection.episode_lifecycle !== "missing") throw new Error("Episode identity is unavailable");
     const directory = join(root, showId);
     if (!lstatSync(directory).isDirectory() || parseShowMetadata((await readLocalMetadata(join(directory, "show.toml"))).toString("utf8")).show_id !== showId) throw new Error("Local Show directory differs");
-    const metadata = episodeDraftSchema.parse({ schema_version: 1, episode_id: episodeId, guid: crypto.randomUUID(), title: episodeId,
-      description: "Edit this description before publication", published_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") });
+    const metadata = episodeTemplate(episodeId, crypto.randomUUID(), new Date().toISOString().replace(/\.\d{3}Z$/, "Z"));
     const file = join(directory, `episode-${episodeId}.toml`); writeSyncedLocalFile(file, () => stringifyToml(metadata)); syncLocalJournalDirectory(directory); return file;
   }
   if (command === "target-show" && args.length === 1) return client.inspect(validateId(args[0], "show"));

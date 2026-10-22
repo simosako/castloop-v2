@@ -1,4 +1,4 @@
-import { parseEpisodeDraft, parseShowMetadata, assertEpisodeDraftInputLimits, assertShowMetadataInputLimits } from "@castloop/shared";
+import { parseEpisodeDraft, parseShowMetadata, episodeDraftInputSchema, showMetadataInputSchema } from "@castloop/shared";
 import { parseSqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { AgentError } from "./agent-output";
 import { readLocalMetadata } from "./local-metadata-read";
@@ -12,10 +12,10 @@ export async function loadLocalInput(kind: string, file: string) {
   const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   if (kind === "service") return { bytes, value: parseSqliteServiceConfig(source) };
   if (kind === "show") {
-    const value = parseShowMetadata(source); assertShowMetadataInputLimits(value); return { bytes, value };
+    const value = showMetadataInputSchema.parse(parseShowMetadata(source)); return { bytes, value };
   }
   if (kind === "episode") {
-    const value = parseEpisodeDraft(source); assertEpisodeDraftInputLimits(value); return { bytes, value };
+    const value = episodeDraftInputSchema.parse(parseEpisodeDraft(source)); return { bytes, value };
   }
   throw new AgentError("invalid_kind", "Choose service, show or episode.");
 }

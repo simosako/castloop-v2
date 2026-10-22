@@ -40,8 +40,10 @@ jobs:
           npm run build:cli -- linux-x64
           cp THIRD_PARTY_NOTICES.md dist/
           cp LICENSE dist/
+          tar -czf dist/castloop-skill.tar.gz -C skills castloop
           cd dist
           sha256sum castloop-linux-x64 > SHA256SUMS
+          sha256sum castloop-skill.tar.gz > SKILL_SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: castloop-linux-x64
@@ -50,6 +52,8 @@ jobs:
             dist/SHA256SUMS
             dist/THIRD_PARTY_NOTICES.md
             dist/LICENSE
+            dist/castloop-skill.tar.gz
+            dist/SKILL_SHA256SUMS
           if-no-files-found: error
 
   smoke:
@@ -106,6 +110,8 @@ jobs:
             exit 1
           fi
           grep -F 'Usage: castloop publish-rss-import DIRECTORY' publish-rss-import-error.txt
+      - name: Verify standalone agent workflows without external programs
+        run: node scripts/smoke-agent-cli.mjs dist/castloop-linux-x64
 
   release:
     if: github.event_name == 'push' && github.ref_type == 'tag'
@@ -126,6 +132,7 @@ jobs:
         run: |
           cd dist
           sha256sum --check SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" castloop-linux-x64 SHA256SUMS THIRD_PARTY_NOTICES.md LICENSE \
+          sha256sum --check SKILL_SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" castloop-linux-x64 castloop-skill.tar.gz SHA256SUMS SKILL_SHA256SUMS THIRD_PARTY_NOTICES.md LICENSE \
             --repo "$GITHUB_REPOSITORY" --title "castloop $GITHUB_REF_NAME" \
             --notes-file "../docs/release-${GITHUB_REF_NAME}.md"

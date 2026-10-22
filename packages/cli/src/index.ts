@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { stringifyToml, validateId } from "@castloop/shared";
+import { z } from "zod";
 import { version } from "../../../package.json";
 import { COMMAND_HELP, commandHelp, commandOptions, describeCommand } from "./help";
 import { CONTRACT_VERSION, INPUT_SCHEMAS, inputSchema } from "./agent-schema";
@@ -62,6 +63,7 @@ async function sqliteWorkerSource(): Promise<string> {
 async function init(target: string, flags: Record<string, string>, onStart: () => void): Promise<unknown> {
   allowedFlags(flags, ["publication-protocol", "service-id", "account-id", "bucket-name", "workers-subdomain", "operation-id"]);
   if (flags["publication-protocol"] && flags["publication-protocol"] !== "sqlite-sequential-v1") throw new Error("Unknown publication protocol");
+  if (flags["operation-id"]) z.uuid().parse(flags["operation-id"]);
   const root = resolve(target);
   if (existsSync(root) && !lstatSync(root).isDirectory()) throw new Error("Workspace must be a real directory");
   const file = join(root, "castloop.toml");
@@ -89,7 +91,7 @@ async function init(target: string, flags: Record<string, string>, onStart: () =
   return runSqliteCommand(root, config, "init", flags["operation-id"] ? [flags["operation-id"]] : [], { workerSource: sqliteWorkerSource });
 }
 
-type Invocation = { target: { workspace?: string; show_id?: string }; mutationStarted: boolean };
+type Invocation = { target: { workspace?: string; show_id?: string }; mutationStarted: boolean; failureResult?: () => Promise<unknown> };
 
 async function main(context: Invocation): Promise<unknown> {
   let [command, ...rest] = process.argv.slice(2);
@@ -122,6 +124,19 @@ async function main(context: Invocation): Promise<unknown> {
     const { exportAdminSkill } = await import("./admin-skill");
     context.mutationStarted = true;
     return exportAdminSkill(flags.output);
+  }
+  if (command === "template") {
+    if (positional.length !== 1) throw new AgentError("invalid_arguments", "Expected template service-config|show|episode.");
+    const { inputTemplate } = await import("./input-templates");
+    return inputTemplate(positional[0]!);
+  }
+  if (command === "doctor") {
+    if (positional.length) throw new AgentError("invalid_arguments", "doctor accepts no positional arguments.");
+    const { diagnoseLocal, formatDoctor } = await import("./doctor");
+    const root = resolve(flags.workspace ?? process.cwd()); context.target.workspace = root;
+    const result = await diagnoseLocal(root);
+    if (result.summary.fail) process.exitCode = 1;
+    return flags.json ? result : formatDoctor(result);
   }
   delete flags.json;
   delete flags["non-interactive"];
@@ -193,8 +208,20 @@ async function main(context: Invocation): Promise<unknown> {
   }
   context.target.workspace = root;
   const workspace = await loadWorkspaceConfig(root);
+  if (["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode"].includes(command)) {
+    const showId = validateId(positional[0], "show"); context.target.show_id = showId;
+    const target = { kind: episodeCommand ? "episode" as const : "show" as const, show_id: showId,
+      ...(episodeCommand ? { episode_id: validateId(positional[1], "episode") } : {}) };
+    context.failureResult = async () => {
+      const { readSqliteDraftRecord } = await import("./sqlite-draft-journal");
+      const record = await readSqliteDraftRecord(root, workspace, target);
+      return record ? { job_id: record.target.job_id, state: record.publication?.status?.state ?? (record.publication ? "unknown" : "draft"),
+        last_known_only: true, publication_requested: !!record.publication } : null;
+    };
+  }
   const { runSqliteCommand } = await import("./sqlite-commands");
-  context.mutationStarted = describeCommand(command === "update-service" ? "deploy" : command).effects.remote === "may_mutate";
+  const effects = describeCommand(command === "update-service" ? "deploy" : command).effects;
+  context.mutationStarted = effects.remote === "may_mutate" || effects.local === "may_write_records";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
     ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
@@ -211,10 +238,16 @@ const invocation: Invocation = { target: {}, mutationStarted: false };
 try {
   const result = await main(invocation);
   const command = process.argv[2] ?? "help";
-  const output = process.argv.includes("--json") && !["schema", "describe"].includes(command) ? agentEnvelope(command, invocation.target, result) : result;
+  const output = process.argv.includes("--json") && !["schema", "describe"].includes(command) ? agentEnvelope(command, invocation.target, result,
+    process.exitCode === 1 ? new AgentError("diagnostic_failed", "One or more local checks failed.") : undefined) : result;
   console.log(typeof output === "string" ? output : JSON.stringify(output, null, 2));
 } catch (error) {
-  if (process.argv.includes("--json")) console.log(JSON.stringify(agentEnvelope(process.argv[2] ?? "help", invocation.target, null, error, invocation.mutationStarted), null, 2));
+  let retained: unknown = null;
+  if (invocation.failureResult) {
+    try { retained = await invocation.failureResult(); }
+    catch { retained = { records_unavailable: true }; }
+  }
+  if (process.argv.includes("--json")) console.log(JSON.stringify(agentEnvelope(process.argv[2] ?? "help", invocation.target, retained, error, invocation.mutationStarted), null, 2));
   else console.error(error instanceof Error ? error.message : "Command failed");
   process.exitCode = 1;
 }

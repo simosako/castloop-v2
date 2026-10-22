@@ -10,11 +10,12 @@ export const ADMIN_SKILL_FILES = { "SKILL.md": skill, "references/setup.md": set
   "references/publish.md": publish, "references/recovery.md": recovery };
 
 function realDirectory(path: string): void {
+  if (dirname(path) !== path) realDirectory(dirname(path));
   try {
     if (!lstatSync(path).isDirectory()) throw new AgentError("unsafe_destination", "Skill parent must be a real directory, not a symlink.");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    realDirectory(dirname(path)); mkdirSync(path, { mode: 0o700 });
+    mkdirSync(path, { mode: 0o700 });
   }
 }
 
