@@ -2,7 +2,7 @@
 
 ## Repository and checks
 - `packages/cli/src/`: the Bun single-executable CLI; `packages/shared/src/`: shared utilities; `src/`: Cloudflare Worker services.
-- Run `bun test` and `npm run check` for automated tests and TypeScript validation.
+- Run `bun test` and `npm run check` for automated tests and TypeScript validation. Skip both for documentation-only or other changes that do not affect code, builds, or runtime behavior.
 - No lint or formatter is configured. Do not add tooling without an explicit request.
 - Update the relevant design and usage docs when behavior changes.
 
