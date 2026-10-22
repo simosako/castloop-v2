@@ -1,6 +1,7 @@
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
+  validate: { usage: "validate service|show|episode FILE [--assets] [--audio MP3] [--json]", description: "Read-only offline validation using publication input rules. File/audio paths use caller cwd; cover uses the TOML directory. Does not prove remote readiness or publication success." },
   describe: { usage: "describe [COMMAND] [--json]", description: "Read offline command specifications, effects and recovery rules. No credentials or workspace required." },
   schema: { usage: "schema service-config|show-input|episode-input|result [--format json-schema]", description: "Print the embedded JSON Schema. Additional measured constraints require castloop validate; TOML dates must be quoted strings." },
   init: {

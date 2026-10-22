@@ -26,7 +26,8 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
       stdin: "ignore", stdout: "pipe", stderr: "pipe" });
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     if (code !== 0) throw new Error(`Local CLI ${args[0]} failed: ${stderr}`);
-    return JSON.parse(stdout) as Record<string, unknown>;
+    const output = JSON.parse(stdout) as Record<string, unknown>;
+    return args.includes("--json") ? output.result as Record<string, unknown> : output;
   }
   try {
     expect(await command(["init", ".", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
@@ -44,8 +45,9 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     const [episodeError, episodeCode] = await Promise.all([new Response(episode.stderr).text(), episode.exited]);
     await new Response(episode.stdout).text(); expect(episodeCode, episodeError).toBe(0);
     writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-    await command(["update-episode", "first"], directory); await command(["update-episode-audio", "first", "audio.mp3"], directory);
-    const publication = await command(["publish-episode", "first"], directory); expect(publication).toMatchObject({ state: "succeeded" });
+    await command(["update-episode", "first", "--workspace", setup.root, "--show", "daily", "--non-interactive", "--json"], "/tmp/opencode");
+    await command(["update-episode-audio", "first", "audio.mp3", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode");
+    const publication = await command(["publish-episode", "first", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode"); expect(publication).toMatchObject({ state: "succeeded" });
     expect(await command(["job-status", String(publication.job_id)])).toMatchObject({ status: { state: "succeeded" } });
     expect(await command(["list-shows", "--json"])).toMatchObject({ shows: [{ show_id: "daily", lifecycle: "published" }] });
     expect(await command(["list-episodes", "daily", "--json"])).toMatchObject({ episodes: [{ episode_id: "first", lifecycle: "published" }] });

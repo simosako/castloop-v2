@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, parseEpisodeDraft, parseShowMetadata, parseSqlitePublicationRequest, sqlitePublicationRequestHash,
   sqliteServiceConfigSchema, sqliteVerifiedUploadSchema } from "@castloop/shared";
-import type { SqlitePublicationStatus, SqliteServiceConfig, StagePayload } from "@castloop/shared";
+import type { EpisodeDraft, ShowMetadata, SqlitePublicationStatus, SqliteServiceConfig, StagePayload } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
-import { readLocalMetadata } from "./local-metadata-read";
 import { openSqliteDraftJournal, requireSqliteStatus, sqliteDraftAssetSchema } from "./sqlite-draft-journal";
 import type { SqliteDraftJournal, SqliteDraftRecord, SqliteDraftTarget } from "./sqlite-draft-journal";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
@@ -14,6 +13,7 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { assertLocalStagingSource, inspectLocalStagingSource } from "./staging-sources";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { sha256HexSync as sha256 } from "./sha256";
+import { loadLocalInput, inspectCover } from "./local-input";
 import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
@@ -55,14 +55,13 @@ export class SqliteDraft {
     for (const path of [this.root, join(this.root, record.target.show_id)]) {
       if (!(await lstat(path)).isDirectory()) throw new Error("SQLite local content parents must be real directories, not symlinks");
     }
-    const bytes = await readLocalMetadata(this.metadataPath(record));
-    const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    const { bytes, value } = await loadLocalInput(record.target.kind, this.metadataPath(record));
     if (record.target.kind === "show") {
-      const show = parseShowMetadata(source);
+      const show = value as ShowMetadata;
       if (show.show_id !== record.target.show_id) throw new Error("SQLite metadata targets another Show");
       assertShowMetadataInputLimits(show);
     } else {
-      const episode = parseEpisodeDraft(source);
+      const episode = value as EpisodeDraft;
       if (episode.episode_id !== record.target.episode_id) throw new Error("SQLite metadata targets another Episode");
       assertEpisodeDraftInputLimits(episode);
     }
@@ -90,11 +89,8 @@ export class SqliteDraft {
       if (selection.asset === "show") {
         const show = parseShowMetadata(metadata.toString("utf8"));
         const path = join(this.root, record.target.show_id, show.image_path);
-        const asset = show.image_path.toLowerCase().endsWith(".png") ? "cover_png" : "cover_jpg";
-        const cover = await inspectLocalStagingSource(path, asset);
-        const signature = asset === "cover_png" ? Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]) : Buffer.from([255, 216, 255]);
-        if (!cover.prefix.subarray(0, signature.length).equals(signature)) throw new Error("Local cover signature differs from its extension");
-        payloads.push({ asset: "show_metadata", length_bytes: metadata.length, sha256: sha256(metadata) }, cover.payload);
+        const cover = await inspectCover(path);
+        payloads.push({ asset: "show_metadata", length_bytes: metadata.length, sha256: sha256(metadata) }, cover);
         paths.push(metadataPath, path);
       } else if (selection.asset === "episode_metadata") {
         payloads.push({ asset: "episode_metadata", length_bytes: metadata.length, sha256: sha256(metadata) });

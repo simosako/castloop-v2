@@ -4,7 +4,7 @@ import { stringifyToml, validateId } from "@castloop/shared";
 import { version } from "../../../package.json";
 import { COMMAND_HELP, commandHelp, commandOptions, describeCommand } from "./help";
 import { CONTRACT_VERSION, INPUT_SCHEMAS, inputSchema } from "./agent-schema";
-import { agentEnvelope } from "./agent-output";
+import { AgentError, agentEnvelope } from "./agent-output";
 import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
 import { embeddedSqliteWorkerSource } from "./worker-payload";
 import { loadWorkspaceConfig } from "./workspace-config";
@@ -42,7 +42,7 @@ function allowedFlags(flags: Record<string, string>, allowed: string[]): void {
 
 async function ask(value: string | undefined, name: string, label: string): Promise<string> {
   if (value) return value;
-  if (!process.stdin.isTTY) throw new Error(`Missing --${name}`);
+  if (!process.stdin.isTTY || process.argv.includes("--non-interactive") || process.argv.includes("--json")) throw new AgentError("missing_input", `Missing --${name}`);
   const prompt = createInterface({ input: process.stdin, output: process.stdout });
   try {
     const answer = (await prompt.question(`${label}: `)).trim();
@@ -59,11 +59,11 @@ async function sqliteWorkerSource(): Promise<string> {
   return result.outputs[0].text();
 }
 
-async function init(target: string, flags: Record<string, string>): Promise<unknown> {
+async function init(target: string, flags: Record<string, string>, onStart: () => void): Promise<unknown> {
   allowedFlags(flags, ["publication-protocol", "service-id", "account-id", "bucket-name", "workers-subdomain", "operation-id"]);
   if (flags["publication-protocol"] && flags["publication-protocol"] !== "sqlite-sequential-v1") throw new Error("Unknown publication protocol");
-  const root = resolve(target); mkdirSync(root, { recursive: true });
-  if (!lstatSync(root).isDirectory()) throw new Error("Workspace must be a real directory");
+  const root = resolve(target);
+  if (existsSync(root) && !lstatSync(root).isDirectory()) throw new Error("Workspace must be a real directory");
   const file = join(root, "castloop.toml");
   if (!existsSync(file)) {
     if (existsSync(join(root, ".castloop"))) throw new Error("Fresh SQLite initialization cannot adopt retained local state");
@@ -75,6 +75,8 @@ async function init(target: string, flags: Record<string, string>): Promise<unkn
       account_id: await ask(flags["account-id"] ?? process.env.CLOUDFLARE_ACCOUNT_ID, "account-id", "Cloudflare account ID"),
       bucket_name: await ask(flags["bucket-name"], "bucket-name", "Private R2 bucket name"), worker_name: worker,
       public_base_url: origin, workers_dev_base_url: origin });
+    onStart();
+    mkdirSync(root, { recursive: true });
     writeSyncedLocalFile(file, () => stringifyToml(config));
     syncLocalJournalDirectory(root);
   } else {
@@ -83,10 +85,13 @@ async function init(target: string, flags: Record<string, string>): Promise<unkn
   }
   const config = await loadWorkspaceConfig(root);
   const { runSqliteCommand } = await import("./sqlite-commands");
+  onStart();
   return runSqliteCommand(root, config, "init", flags["operation-id"] ? [flags["operation-id"]] : [], { workerSource: sqliteWorkerSource });
 }
 
-async function main(): Promise<unknown> {
+type Invocation = { target: { workspace?: string; show_id?: string }; mutationStarted: boolean };
+
+async function main(context: Invocation): Promise<unknown> {
   let [command, ...rest] = process.argv.slice(2);
   if (!command || (["help", "--help", "-h"].includes(command) && !rest.length)) return USAGE;
   if (command === "help" && rest.length === 1) return commandHelp(rest[0]!);
@@ -107,27 +112,47 @@ async function main(): Promise<unknown> {
     if (positional.length !== 1 || flags.format && flags.format !== "json-schema") throw new Error(commandHelp(command));
     return inputSchema(positional[0]!);
   }
+  if (command === "validate") {
+    if (positional.length !== 2) throw new AgentError("invalid_arguments", "Expected validate KIND FILE.");
+    const { validateLocalInput } = await import("./local-input");
+    return validateLocalInput(positional[0]!, resolve(positional[1]!), { assets: !!flags.assets, audio: flags.audio });
+  }
   delete flags.json;
   delete flags["non-interactive"];
+  const explicitRoot = flags.workspace === undefined ? undefined : resolve(flags.workspace);
+  const explicitShow = flags.show;
+  delete flags.workspace;
+  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode"].includes(command);
+  if (episodeCommand && explicitRoot && !explicitShow) throw new AgentError("missing_show", "Explicit --workspace requires --show for Episode commands.");
+  if (explicitShow) {
+    validateId(explicitShow, "show");
+    if (!episodeCommand && !command.startsWith("operation-")) throw new AgentError("invalid_options", "This command does not accept --show; use its Show positional argument.");
+  }
+  if (episodeCommand) delete flags.show;
+  context.target = { ...(explicitRoot ? { workspace: explicitRoot } : {}), ...(explicitShow ? { show_id: explicitShow } : {}) };
   if (command === "import-rss") {
     allowedFlags(flags, ["dry-run", "output"]);
     if (positional.length !== 2 || Boolean(flags["dry-run"]) === Boolean(flags.output)) throw new Error(commandHelp(command));
     const { importRssLocally, inspectRssImport } = await import("./rss-import-local");
+    context.mutationStarted = !!flags.output;
     return flags["dry-run"] ? inspectRssImport(positional[0]!, positional[1]!) : importRssLocally(positional[0]!, positional[1]!, flags.output!);
   }
   if (command === "publish-rss-import") {
     allowedFlags(flags, []);
     if (positional.length !== 1) throw new Error(commandHelp(command));
-    const root = process.cwd();
+    const root = explicitRoot ?? process.cwd();
     const config = await loadWorkspaceConfig(root);
     const { publishSqliteRssImport } = await import("./sqlite-rss-publication");
+    context.mutationStarted = true;
     return publishSqliteRssImport(root, config, positional[0]!);
   }
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
-    return init(positional[0] ?? ".", flags);
+    if (explicitRoot && positional[0] && resolve(positional[0]) !== explicitRoot) throw new AgentError("target_mismatch", "init target and --workspace differ.");
+    context.target.workspace = explicitRoot ?? resolve(positional[0] ?? ".");
+    return init(context.target.workspace, flags, () => { context.mutationStarted = true; });
   }
-  let root = process.cwd();
+  let root = explicitRoot ?? process.cwd();
   if (command === "create-show") {
     allowedFlags(flags, ["site-url"]);
     if (positional.length !== 1) throw new Error(commandHelp(command));
@@ -151,12 +176,16 @@ async function main(): Promise<unknown> {
   if (count === undefined || !count.includes(positional.length)) throw new Error(commandHelp(command === "update-service" ? "deploy" : command));
   if (["preview-show-lifecycle", "preview-episode-lifecycle"].includes(command) && !["unpublish", "restore"].includes(positional.at(-1)!) ||
     command === "lifecycle-execute" && positional[2] !== "confirm") throw new Error(commandHelp(command));
-  if (["create-episode", "update-episode", "update-episode-audio", "publish-episode"].includes(command)) {
-    positional.unshift(validateId(basename(root), "show"));
-    root = resolve(root, "..");
+  if (episodeCommand) {
+    const showId = validateId(explicitShow ?? basename(root), "show");
+    positional.unshift(showId);
+    if (!explicitRoot && !explicitShow) root = resolve(root, "..");
+    context.target.show_id = showId;
   }
+  context.target.workspace = root;
   const workspace = await loadWorkspaceConfig(root);
   const { runSqliteCommand } = await import("./sqlite-commands");
+  context.mutationStarted = describeCommand(command === "update-service" ? "deploy" : command).effects.remote === "may_mutate";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
     ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
@@ -169,13 +198,14 @@ async function main(): Promise<unknown> {
   return result;
 }
 
+const invocation: Invocation = { target: {}, mutationStarted: false };
 try {
-  const result = await main();
+  const result = await main(invocation);
   const command = process.argv[2] ?? "help";
-  const output = process.argv.includes("--json") && !["schema", "describe"].includes(command) ? agentEnvelope(command, {}, result) : result;
+  const output = process.argv.includes("--json") && !["schema", "describe"].includes(command) ? agentEnvelope(command, invocation.target, result) : result;
   console.log(typeof output === "string" ? output : JSON.stringify(output, null, 2));
 } catch (error) {
-  if (process.argv.includes("--json")) console.log(JSON.stringify(agentEnvelope(process.argv[2] ?? "help", {}, null, error, true), null, 2));
+  if (process.argv.includes("--json")) console.log(JSON.stringify(agentEnvelope(process.argv[2] ?? "help", invocation.target, null, error, invocation.mutationStarted), null, 2));
   else console.error(error instanceof Error ? error.message : "Command failed");
   process.exitCode = 1;
 }
