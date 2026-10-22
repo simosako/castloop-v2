@@ -37,6 +37,8 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 
 ## アーカイブ
 
+レビュー修正の実機試験環境`rv22-8988de53`は[2026-10-22の削除記録](archive/cloudflare_review_test_cleanup_20261022.md)を参照する。Worker・専用namespace・R2全39オブジェクトとbucketを削除し、保持サービス・元の証跡・非公開退避は維持した。観測の未解決事項を解消済みへ変更したものではない。
+
 v0.6.0のQueueコード削除に伴い、次をv0.5.x以前の履歴へ分離した。保存した契約や過去の承認は、現行SQLiteの新機能・移行・復旧・実環境操作の許可ではない。
 
 - [v0.5.2全体設計](archive/initial_design_v052.md)
