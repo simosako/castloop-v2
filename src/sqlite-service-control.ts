@@ -119,7 +119,7 @@ export class SqliteServiceControl {
       }
       if (shows.length > SQLITE_CATALOG_PAGE_SIZE || rows.length < SQLITE_CATALOG_PAGE_SIZE + 1) break;
     }
-    return sqliteCatalogResponseSchema.parse({ ...identity, protocol: "sqlite-sequential-v1", request, state: "paused",
+    return sqliteCatalogResponseSchema.parse({ ...identity, protocol: "sqlite-sequential-v1", request, state: null,
       snapshot_only: true, authorizes_recovery: false, shows: shows.slice(0, SQLITE_CATALOG_PAGE_SIZE),
       next_cursor: shows.length > SQLITE_CATALOG_PAGE_SIZE ? btoa(JSON.stringify({ ...scope, last_id: shows[SQLITE_CATALOG_PAGE_SIZE - 1]!.show_id })) : null });
   }

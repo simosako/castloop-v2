@@ -22,6 +22,7 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 - metadata-onlyは既存音源を再利用。audio-onlyはmetadataのbaseも照合する。
 - GET/HEAD/Range/条件付き応答は既存配信部品を利用し、外側gatewayが毎回DOの最新配信判定を見る。
 - `list-shows`/`list-episodes`はSQLiteの20件ずつの一覧。`--json`、`--include-deleted`、`--cursor`に対応し、R2のmetadata列挙はしない。cursorはruntimeと検索条件へ束縛する。ローカルだけのdraftは含めない。
+- `list-shows`は全体Pauseを判定しない。サービス一覧応答の`state`は`null`（未集約）とし、CLIもopen/pausedを表示しない。全Showの状態集約には`service-status`、対象Showには`show-status`を使う。`list-episodes`のstate/`Show admission`は対象Showだけの状態で、一覧を操作の許可根拠にはしない。
 - Show/Episodeの非公開化・保存済みsnapshotの復元は、preview→hash確認→`lifecycle-execute`で同じFIFOへ送る。
 - レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
 - 同じconfig/SQLite schema/namespaceのcode-only更新を`deploy`で扱う。全Showを個別に明示Pause/drainし、固定した対象集合へのprepare/activation/probe後も各Showはpausedを維持する。
