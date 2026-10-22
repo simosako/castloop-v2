@@ -16,6 +16,7 @@ export type { SqliteServiceConfig, SqliteServiceStatus } from "./sqlite-service"
 export { stageAssetSchema, stagePayloadSchema, stageReadbackReceiptSchema } from "./upload";
 export type { StageAsset, StagePayload, StageReadbackReceipt } from "./upload";
 export { validateId } from "./ids";
+export { assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength } from "./publication-budget";
 export { sha256Hex, toHex } from "./sha256";
 export { parsePublicAssetPath } from "./public-assets";
 export type { PublicAsset } from "./public-assets";

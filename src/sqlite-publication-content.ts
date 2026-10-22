@@ -3,6 +3,7 @@ import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index
 import { parseSqlitePublicationRequest, sqlitePublicationRequestSchema } from "../packages/shared/src/sqlite-publication";
 import type { SqlitePublicationRequest } from "../packages/shared/src/sqlite-publication";
 import { SqlitePublicationInputError } from "./sqlite-publication-alarm";
+import { assertPublicationInventoryBudget } from "../packages/shared/src/publication-budget";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 import { validSqliteCoverIdentity } from "./sqlite-cover";
@@ -130,7 +131,7 @@ export class SqlitePublicationContent {
     const limits = this.storage.sql.exec<{ count: number; bytes: number | null }>(`SELECT COUNT(*) AS count, SUM(length(c.revision_json)) AS bytes
       FROM publication_episode_content c JOIN publication_episodes e USING (show_id, episode_id)
       WHERE e.show_id = ? AND e.lifecycle = 'published'`, showId).toArray()[0]!;
-    if (limits.count > 10000 || (limits.bytes ?? 0) * 4 > 8_000_000) throw new Error("Publication feed index exceeds its rendering budget");
+    assertPublicationInventoryBudget(limits.count, limits.bytes ?? 0);
     return this.storage.sql.exec<{ revision_json: string }>(`SELECT c.revision_json FROM publication_episode_content c
       JOIN publication_episodes e USING (show_id, episode_id) WHERE e.show_id = ? AND e.lifecycle = 'published' ORDER BY e.episode_id`, showId)
       .toArray().map((row) => episodeRevisionSchema.parse(JSON.parse(row.revision_json)));

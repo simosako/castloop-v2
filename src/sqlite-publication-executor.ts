@@ -159,7 +159,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         throw new SqlitePublicationInputError("runtime_mismatch");
       }
       const target = store.target(request);
-      const episodes = store.episodes(request.show_id);
+      const episodes = request.kind === "show" && request.action === "unpublish" ? [] : store.episodes(request.show_id);
       if (request.action === "publish" && request.kind === "episode" && target.base) {
         const media = audioKey(target.base, request.show_id);
         store.requireMedia(request.show_id, target.base, media.revisionId);

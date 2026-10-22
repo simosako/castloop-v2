@@ -1,4 +1,5 @@
-import { parseEpisodeDraft, parseShowMetadata, sameEpisodeIdentity, validateId } from "@castloop/shared";
+import { assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength,
+  parseEpisodeDraft, parseShowMetadata, sameEpisodeIdentity, validateId } from "@castloop/shared";
 import type { EpisodeDraft, ShowMetadata } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
 import { localJournalEntryExists as present } from "./local-journal-path";
@@ -15,7 +16,7 @@ export type PreparedRssImport = { importId: string; root: string; show: ShowMeta
   episodes: Array<{ metadata: EpisodeDraft; audioPath: string; length: number; duration: number; sha256: string }>;
   inputSha256: string; audioBytes: number; coverPath: string; coverSha256: string };
 
-export async function prepareRssImportPublication(output: string): Promise<PreparedRssImport> {
+export async function prepareRssImportPublication(output: string, publicBaseUrl = ""): Promise<PreparedRssImport> {
   const root = resolve(output);
   if (!lstatSync(root).isDirectory() || realpathSync(root) !== root) throw new Error("Import directory must not use symlinks");
   const control = createLocalJournalStorage(root, "rss-import-downloads", undefined, "control.json");
@@ -64,8 +65,11 @@ export async function prepareRssImportPublication(output: string): Promise<Prepa
     audioBytes += audio.length;
     episodes.push({ metadata, audioPath, ...audio, duration: analysis.duration });
   }
-  if (episodes.length * 2 > 10000 || metadataBytes > 8_000_000 ||
-    (Buffer.byteLength(JSON.stringify({ show, episodes })) + episodes.length * 1024) * 6 + episodes.length * 1024 + 4096 > 32_000_000) {
+  assertPublicationInventoryBudget(episodes.length * 2, episodes.reduce((length, episode) =>
+    length + publicationCharacterLength(JSON.stringify(episode.metadata)) + 1024 + publicationCharacterLength(JSON.stringify(publicBaseUrl)), 0));
+  assertPublicationRenderBudget(Buffer.byteLength(JSON.stringify({ show, episodes })) +
+    episodes.length * (1024 + Buffer.byteLength(JSON.stringify(publicBaseUrl))), episodes.length);
+  if (metadataBytes > 8_000_000) {
     throw new Error("RSS import exceeds the existing feed inventory or rendering budget");
   }
   if (present(`${control.path}.lock`) || JSON.stringify(rssImportControlSchema.parse(control.read())) !== JSON.stringify(state)) {
