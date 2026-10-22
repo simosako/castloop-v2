@@ -4,7 +4,11 @@ Issue #40で導入した操作記録の利用方法。サーバーへの記録�
 
 v0.7.0では操作記録を各ShowのDOに保存し、remoteコマンドに`--show SHOW_ID`を必須とする。以下は新layout向けの操作例で、配布済みv0.6.2とは引数が異なる。`--local`と保存済みlifecycle jobの照会にはShow指定は不要。旧layoutへの互換配備・移行は提供しない。
 
+新規stage前のローカルupload検査は、JSON記録10,000件とdirectory全体50,000 entriesを別の予算として扱う。永続的な`.json.lock.sqlite`とそのsidecarは操作件数には含めない。上限到達は記録の削除や未知PUTの再送の許可ではない。既存journalを正本として読むため、検査は引き続き記録数に比例する。検索index・自動期限切れ・lock削除は導入していない。
+
 ## 状態を確認する
+
+`operation-status FAMILY UUID --local`は対象familyだけを読む。upload・publication・rss-import・lifecycleはUUIDのファイルを直接読み、無関係な記録の破損・件数に依存しない。draft・show-registration・cleanupはファイル名が照会IDではないため、そのfamily内を予算付きで走査する。対象の破損は引き続きエラーとし、診断のために記録を書き換えない。`operation-list --local`は従来どおり全familyを一覧する。
 
 サービスの作業ディレクトリで実行する。
 

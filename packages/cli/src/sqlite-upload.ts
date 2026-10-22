@@ -54,8 +54,10 @@ export async function requireNoPendingSqliteUpload(root: string, config: SqliteS
   let names: string[];
   try { names = readdirSync(join(root, ".castloop", "sqlite-uploads", config.service_id)); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error; }
-  if (names.length > 10000) throw new Error("Inspect retained uploads before adding more local records");
-  for (const name of names.filter((entry) => /^[0-9a-f-]{36}\.json$/i.test(entry))) {
+  if (names.length > 50_000) throw new Error("Upload directory exceeds its entry budget; preserve records and lock sidecars for inspection");
+  const records = names.filter((entry) => /^[0-9a-f-]{36}\.json$/i.test(entry));
+  if (records.length > 10_000) throw new Error("Inspect retained uploads before adding more local records");
+  for (const name of records) {
     const value = createLocalJournalStorage(root, "sqlite-uploads", config.service_id, name).read();
     if (!value || typeof value !== "object" || !("schema_version" in value) || value.schema_version !== 2) continue;
     const record = sqliteUploadRecordSchema.parse(value);

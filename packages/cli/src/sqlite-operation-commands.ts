@@ -26,13 +26,19 @@ const briefSchema = z.object({ schema_version: z.number().optional(), operation_
   result: z.object({ operation: z.object({ state: z.string() }) }).optional(),
 });
 
-function localRecords(root: string, config: SqliteServiceConfig) {
+function localRecords(root: string, config: SqliteServiceConfig, target?: { family: string; id: string }) {
   const result: Array<{ family: string; id: string; format: number | null; state: string; step: number | null;
     show_id: string | null; episode_id: string | null; legacy_lock_present: boolean; uploads: Array<{ upload_id: string; state?: string }> }> = [];
   for (const [name, family] of Object.entries(families)) {
+    if (target && name !== target.family) continue;
     ensureLocalJournalParents(root, family, config.service_id);
     let names: string[];
-    try { names = readdirSync(join(root, ".castloop", family, config.service_id)).filter((entry) => entry.endsWith(".json")).sort(); }
+    try {
+      if (target && ["upload", "publication", "rss-import", "lifecycle"].includes(name)) {
+        const file = `${target.id}.json`;
+        names = localJournalEntryExists(join(root, ".castloop", family, config.service_id, file)) ? [file] : [];
+      } else names = readdirSync(join(root, ".castloop", family, config.service_id)).filter((entry) => entry.endsWith(".json")).sort();
+    }
     catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw error; }
     if (names.length + result.length > 10000) throw new Error("Local operation lookup exceeds its record budget");
     for (const file of names) {
@@ -53,10 +59,13 @@ export async function runSqliteOperationCommand(root: string, input: SqliteServi
   const config = sqliteServiceConfigSchema.parse(input);
   if (options.local) {
     if (!["operation-list", "operation-status"].includes(command)) throw new Error("--local is only for read-only operation diagnosis");
-    const records = localRecords(root, config);
-    if (command === "operation-list") return { source: "local", operations: options.incomplete ? records.filter((record) =>
-      !["succeeded", "failed", "cancelled", "completed", "attached", "attached,attached"].includes(record.state)) : records };
+    if (command === "operation-list") {
+      const records = localRecords(root, config);
+      return { source: "local", operations: options.incomplete ? records.filter((record) =>
+        !["succeeded", "failed", "cancelled", "completed", "attached", "attached,attached"].includes(record.state)) : records };
+    }
     if (!Object.hasOwn(families, args[0]!)) throw new Error("Unknown operation family");
+    const records = localRecords(root, config, { family: args[0]!, id: z.uuid().parse(args[1]) });
     return { source: "local", operations: records.filter((record) => record.family === args[0] && record.id === args[1]) };
   }
   if (!options.showId) throw new Error("Remote operation commands require --show SHOW_ID");

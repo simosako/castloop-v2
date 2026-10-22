@@ -6,6 +6,8 @@ import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { sqlitePublicationRequest } from "../../../src/test-support/sqlite-publication";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { administratorKey } from "./administrator-key";
+import { formatSqliteCatalog } from "./sqlite-catalog";
+import { sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -53,6 +55,22 @@ test("a blocked Show does not stop another Show's publication, independent Resum
   await expect(f.update()).rejects.toThrow("pause and drain");
   expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
   expect(f.showCalls.filter((call) => call.action === "prepare")).toEqual([]);
+});
+
+test("the service Show catalog never claims an aggregated pause state for open, mixed or paused Shows", async () => {
+  const f = await fixture(); await f.create("a"); await f.create("b");
+  for (const paused of [0, 1, 2]) {
+    if (paused) await f.pause(paused === 1 ? "a" : "b");
+    expect(await f.run("service-status")).toMatchObject({ state: paused === 2 ? "paused" : "open", paused_shows: paused });
+    const result = sqliteCatalogResponseSchema.parse(await f.run("list-shows"));
+    expect(result.state).toBeNull(); expect(result.shows).toHaveLength(2);
+    expect(formatSqliteCatalog(result)).toStartWith(`Service: ${f.config.service_id}\n`);
+    expect(formatSqliteCatalog(result)).not.toContain("(paused)");
+    expect(formatSqliteCatalog(result)).not.toContain("(open)");
+  }
+  const episodes = sqliteCatalogResponseSchema.parse(await f.run("list-episodes", ["a"]));
+  expect(episodes.state).toBe("paused"); expect(formatSqliteCatalog(episodes)).toContain("Show admission: paused");
+  expect(sqliteCatalogResponseSchema.safeParse({ ...episodes, state: null }).success).toBe(false);
 });
 
 test("separate Alarms progress concurrently while one Show awaits external IO and keep delivery gates independent", async () => {
