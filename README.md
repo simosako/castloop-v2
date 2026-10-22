@@ -63,6 +63,10 @@ npm run build:cli -- linux-x64
 
 The executable is `dist/castloop-linux-x64` and embeds only `src/sqlite-worker.ts`. Source mode is `bun packages/cli/src/index.ts`. See `castloop help COMMAND` for syntax.
 
+## Agent support (unreleased)
+
+The CLI now embeds input schemas, offline validation/templates, a compact local doctor and the administrator Skill. Export it with `castloop skill export castloop --output /path/to/project/.agents/skills/castloop`; no additional runtime or MCP is required. Use explicit `--workspace`, Episode `--show`, `--non-interactive` and versioned `--json` results. Review staged inputs with `preview-show`/`preview-episode`, then bind publication to `--expect-preview HASH`. See the [agent usage guide](docs/agent_usage.md) for installation, approval boundaries, JSON changes and verification limits. These features are not in the existing v0.7.1 release assets.
+
 ## Initialize a new SQLite service
 
 Use a new workspace and unused resource names. Substitute your Cloudflare account's workers.dev subdomain and a fresh UUID for each operation/window:

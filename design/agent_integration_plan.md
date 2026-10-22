@@ -3,6 +3,8 @@
 作成日: 2026-10-22。対象: [Issue #5: agent integration](https://github.com/simosako/castloop-v2/issues/5)。
 v0.7.1時点のCLIと現行のShow分離方式を調査した**提案**であり、実装済み仕様・実環境操作の承認ではない。
 
+実装追補: 本書は検討時点の案を保持する。P0の主要機能とCLI内で完結するP1（local/staged preview・入力fingerprint照合、doctor、template、Skill同梱）を実装した。現在の構文・導入・JSON互換変更と検証結果は[利用ガイド](../docs/agent_usage.md)を参照する。全コマンドの詳細result型・条件付き引数要件の個別schema化は未完。公開済み全文取得・publishedとのfield差分はWorker拡張と分離して未提供。任意のJSON→TOML変換、大きなwizard、MCPは追加していない。全受け入れ条件を実機・実エージェントで証明したという意味ではない。
+
 ## 1. 結論
 
 **「Skills + 自己記述できるCLI + 副作用なしの検証」を基本構成とする。MCPは採用せず、実装対象から外す。**

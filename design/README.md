@@ -14,6 +14,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [エージェントによるPodcast管理の改善案](agent_integration_plan.md) | Issue #5。単一バイナリでのschema・雛形・Skill配布、明示対象指定、オフライン検証、doctor、承認と中断対応。MCPは不採用 |
+| [エージェント向けCLIの利用方法](../docs/agent_usage.md) | 未リリース実装。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |
 | [レビュー修正とPR（2026-10-22）](code_review_fixes_20261022.md) | R1〜R10の対応範囲・commit/PR依存順・全体検証・残る走査コストと実機未確認範囲 |
 | [レビュー修正の小規模実機確認](archive/code_review_fixes_live_verification_20261022.md) | 新規隔離2 Show・3 Episode、11 job成功と最終Pause。tail欠測・canceled Alarm・観測未完了を機能結果と区別 |

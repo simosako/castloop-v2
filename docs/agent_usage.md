@@ -1,0 +1,74 @@
+# エージェントによるPodcast管理
+
+Issue #5の未リリースCLI機能。管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。既存のCloudflare環境・永続形式・公開プロトコルは変更しない。
+
+## Skillの導入
+
+利用するエージェントのSkill配置先を選び、存在しないディレクトリを指定する。
+
+```sh
+castloop skill export castloop --output /path/to/project/.agents/skills/castloop
+```
+
+通信せず同じCLIに埋め込まれたSkillを出力する。既存ディレクトリ・編集は上書きしない。更新は別ディレクトリへexportして差分確認する。releaseには静的な`castloop-skill.tar.gz`と、その検証用の`SKILL_SHA256SUMS`も添付する。既存のバイナリ用`SHA256SUMS`は維持する。
+
+Node.js/npmを既に使う場合の任意の導入方法:
+
+```sh
+npx skills add simosako/castloop-v2 --skill castloop
+```
+
+既定ブランチのSkillである。再現性が必要な場合はリリース後に同じtagの`https://github.com/simosako/castloop-v2/tree/TAG/skills/castloop`を指定する。配置するエージェントとproject/global範囲を選び、開発用Skillをまとめて導入しない。
+
+## 利用仕様と入力
+
+```sh
+castloop describe --json
+castloop describe update-episode --json
+castloop schema show-input --format json-schema
+castloop schema episode-input
+castloop schema service-config
+castloop schema result
+castloop template show
+castloop template episode
+castloop validate show /absolute/workspace/show/show.toml --assets --json
+castloop validate episode /absolute/workspace/show/episode-first.toml --audio /absolute/audio.mp3 --json
+castloop doctor --local --workspace /absolute/workspace --json
+```
+
+describe/schema/template/validate/doctorは通信しない。検証・診断は鍵、journal、lockを生成せず、入力を書き換えない。Skill exportだけは指定先に書き込む。雛形の値は例であり、所有者情報・URL・言語・explicit・日時等は管理者に確認する。offline Episode GUID/dateを実登録identityへ使わず、`create-episode`の保存済み値を保持する。
+
+JSON Schemaはparse後のTOML値を記述する。裸のTOML日時ではなく引用符付きRFC 3339文字列を使う。サービス設定version 2、content version 1、機械出力のcontract_version 1は別物。HTML除外後の文字数、UTF-8 bytes、XML文字、実在日付、URL、field間制約は`x-castloop-validation`を参照し、CLI validateで最終検証する。保存済みsnapshot用schemaに新規入力上限を追加したものではない。
+
+取得できる出力schemaは現段階では共通外枠の`result`であり、コマンドごとの詳細payloadはJSON値として扱う。全管理コマンドの詳細result型・flagの条件付き必須性までを個別JSON Schema化する補強は残る。入力schemaの取得・strict検証とは区別する。
+
+doctorは人向け1項目1行とJSONの`result.checks`を同じ検査から生成する。pass/warn/fail/not_checkedを区別し、failは終了1、warnだけは終了0。認証情報の存在は有効性・権限を証明しない。remote検査・自動修復は行わない。
+
+## 対象・出力・公開前確認
+
+```sh
+castloop update-episode first --workspace /absolute/workspace --show daily --non-interactive --json
+castloop preview-episode first --workspace /absolute/workspace --show daily --json
+# Review metadata, staged hashes, base and input_fingerprint; obtain publication approval.
+castloop publish-episode first --workspace /absolute/workspace --show daily --expect-preview REVIEWED_SHA256 --json
+```
+
+`--workspace`は指定rootだけを使う。Episodeの明示workspaceには`--show`が必須。Show操作は従来のID位置引数を使い、`--show`による別対象指定は拒否する。従来のcwd方式も維持する。MP3相対パスはShow directory、lifecycle planはworkspace、validateのFILE/--audioと--workspace自体は呼出元cwd基準。image_pathはShow directory基準。
+
+`--non-interactive`はCLI質問を停止するだけで承認省略ではない。JSONモードもstdout汚染を避けるため質問しない。initの不足入力はディレクトリ作成前に拒否する。
+
+`--json`は成功・失敗をstdoutへ1つの文書で返す。`describe`と`schema`は取得する仕様そのものを返し、管理結果はcontract_version/command/ok/target/result/operation/error/next_actionsの外枠を使う。**従来から--jsonがあった一覧・操作照会も、結果本体はresultへ移る。** 既定の人向け出力は維持する。失敗は終了1、診断・progressはstderr。未知例外文・入力本文をエラーへ転載しない。
+
+`ok`はCLI要求の成否であり公開完了の別名ではない。publicationのqueued/runningは同じjobを観測し、succeededで初めて完了。失敗時に取得できる保存済みjob/stateは最後の既知状態であり、未知IOの解放や再送を許可しない。next_actionsも実行承認ではない。
+
+`preview-show ID`/`preview-episode ID`はローカル全文・stage済みhashとの一致・base identity・素材再利用を表示する。ローカル検査のみでuploadやjournal作成・要求凍結はしない。`--expect-preview`は同じ入力fingerprintとstage一致を公開時のlock内・要求凍結前に再照合する。素材・metadata・対象・base・stage情報が変われば再previewと再承認が必要。hash自体は承認の証明ではなく、既存の原子的な受付条件・identity照合も残す。
+
+**公開済み全文の管理API取得とfield単位のpublished差分は未提供。** 取得しない内容を推測表示せず`not_checked`にする。ローカル原本がない場合はバックアップを管理者に求め、一覧やRSSから自動採用しない。Worker側の拡張は別作業とする。
+
+## 検証範囲
+
+ローカル模擬Cloudflareによる従来の公開・復旧試験、独立CLI processのcwd非依存操作、オフラインコマンドとSkill exportを検証する。`node scripts/smoke-agent-cli.mjs dist/castloop`は開発用テストであり、実行する子バイナリは空PATH・ソース不在の作業場所から動かす。Nodeは管理者環境の依存ではない。
+
+実エージェントによる質問判断の品質、`npx skills`による各製品への導入、Cloudflare native性能、300MB実機公開、全Free互換はこのローカル検査で証明しない。デプロイ・公開・Resume・実資源変更は行わない。
+
+実装時のローカル確認: `bun test`は579 pass / 0 fail（70 files）、`npm run check`と`npm run build:cli`は成功。構築した`dist/castloop`で上記standalone smokeも成功し、空PATHでの素材検証・Skill内容一致・上書き拒否・local-only previewの無書き込みを確認した。release workflow自体のGitHub上での実行や新releaseの発行は行っていない。
