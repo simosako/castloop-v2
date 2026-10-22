@@ -10,7 +10,9 @@ Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one pri
 
 **v0.7.0 isolates each Show in its own Durable Object — with an independent SQLite FIFO, Alarm and Show-level Pause/Resume — and keeps committed Feeds, covers and approved audio readable during Episode additions/updates and Show metadata/cover updates.** `castloop init` creates a schema-version-2 service with `storage_layout = "show-v1"` only. Queue/R2 service support, its Worker bundle and commands have been removed. Service, content and request schema versions are unchanged. Installing this release does not deploy or change an existing Cloudflare service. See the [release notes](docs/release-v0.7.0.md).
 
-**Compatibility boundary:** v0.7.0 targets fresh `storage_layout = "show-v1"` services and is **incompatible with released v0.6.2 layouts**; there is no update or migration path between layouts. Do not add the layout field to an old workspace to bypass this boundary. See the [tagged v0.6.2 README](https://github.com/simosako/castloop-v2/blob/v0.6.2/README.md) for the previous service-wide layout.
+**v0.7.1** adds publication-budget and RSS preflight fixes, correct local status/catalog handling, bounded reads and Show queries, and release-CI hardening. Persisted formats are unchanged from v0.7.0. Small native functional checks passed; log-capture coverage remains incomplete. See the [v0.7.1 release notes](docs/release-v0.7.1.md).
+
+**Compatibility boundary:** v0.7.x targets fresh `storage_layout = "show-v1"` services and is **incompatible with released v0.6.2 layouts**; there is no update or migration path between layouts. Do not add the layout field to an old workspace to bypass this boundary. See the [tagged v0.6.2 README](https://github.com/simosako/castloop-v2/blob/v0.6.2/README.md) for the previous service-wide layout.
 
 The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen request to the target Show's Durable Object. Each Show has its own SQLite FIFO, Alarm and Pause/Resume window; different Shows can progress independently. A small control DO stores membership and shared Worker-update progress. No Cloudflare Queues or D1 are used. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
 
@@ -34,7 +36,7 @@ Service schema version 1 is rejected before management requests, deployment or a
 
 ## Install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.7.0 release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.0). Verify the checksum, make the executable runnable, and place it on your PATH:
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.7.1 release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.1). Verify the checksum, make the executable runnable, and place it on your PATH:
 
 ```sh
 sha256sum --check SHA256SUMS
@@ -157,7 +159,7 @@ Use `castloop operation-list --show my-show --incomplete` and `castloop operatio
 - `failed` means a deterministic pre-write input/base failure; `blocked` preserves uncertain execution and stops only that Show's FIFO/delivery. Other Shows can operate, Pause/Resume and register independently. A blocked Show still prevents shared Worker updates. An empty queue does not prove unregistered uploads ended.
 - `init-reconcile` and `update-service-reconcile` only reconcile exact, already-completed server evidence. Limited explicit verification continuations exist for acknowledged deployment journals; they do not repeat resource creation/deploy or adopt unknown versions.
 
-See the [changelog](CHANGELOG.md), the [SQLite operations guide](docs/sqlite_sequential_development.md), the [release notes](docs/release-v0.7.0.md), and the [design index](design/README.md). Existing Queue environments must keep v0.5.x and use its [separate guide](docs/queue_service.md). No release, install or test completion automatically deploys, resumes, cleans up or deletes Cloudflare resources. The deep-dive design and operations documents are currently written in Japanese.
+See the [changelog](CHANGELOG.md), the [SQLite operations guide](docs/sqlite_sequential_development.md), the [release notes](docs/release-v0.7.1.md), and the [design index](design/README.md). Existing Queue environments must keep v0.5.x and use its [separate guide](docs/queue_service.md). No release, install or test completion automatically deploys, resumes, cleans up or deletes Cloudflare resources. The deep-dive design and operations documents are currently written in Japanese.
 
 To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md) for the local build/test workflow and the safety rules, [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately, and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
