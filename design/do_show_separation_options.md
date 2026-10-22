@@ -145,6 +145,7 @@ blocked retry/releaseやShow別Worker versionは追加しない。Aのblockedは
 ### 6.5 一覧・operation IDの経路解決
 
 - Show一覧はregistryのShow ID順にkeyset paginationし、対象ページのShowからtitle・lifecycle・未完了状態を照会して20件ずつ返す。cursorはruntime/configと条件へ束縛する。登録途中・照会失敗を「存在しない」として落とさない。検索projectionは作らない。
+- サービスhealthとShow一覧の読取RPCは最大4件のbatchで実行し、開始済みの全応答がsettleしてから成功・失敗を返す。batch失敗後は次を開始せず、結果順序・runtime/config/対象照合を維持する。制御側healthのidentityは集約開始時の1回を再利用する。共有更新のprepare/activate/releaseはこの並列化の対象外であり、配信gateのTTL cacheも追加しない。実機での速度・CPU改善を実証したものではない。
 - remoteのoperation-list/status/resume/cancel/cleanupは`--show SHOW_ID`を必須とする。全Showのoperation集約・operation IDの横断索引は作らない。ローカル診断は引き続きサービスworkspace内の記録を読むだけでよい。
 - `job-status`と保存済みlifecycle要求はjournalに凍結したShowへ到達する。既存の小さい管理URLを使い、`X-Castloop-Show-Id`でgatewayとShow DOの双方が経路を照合する。操作要求journalにもShow経路を固定し、別Showへ再利用しない。
 - 公開状態と操作記録は同じShow DO内で原子的に更新する。登録と配信は全Showへのfan-outを必要とせず、`service-status`だけが全所属Showを集約する。この集約は非原子的な照会であり、共有更新の保守拘束を代替しない。
