@@ -122,6 +122,41 @@ test("Episode lifecycle removes all revision delivery and restores the same snap
   expect(value.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
 });
 
+for (const action of ["addition", "metadata", "restore"] as const) test(`post-operation inventory rejects overflowing ${action} without blocking the next job`, async () => {
+  const value = await fixture(); await value.publishShow(); const first = await value.publishEpisode();
+  const base = value.content.inspect("daily", "first").base!;
+  if (action === "restore") expect((await value.run(value.lifecycle("unpublish", "first"))).state).toBe("succeeded");
+  let characters = action === "restore" ? 0 : JSON.stringify(base).length;
+  for (let index = 0; characters < 1_999_800; index++) {
+    const id = `seed-${index}`, revisionId = crypto.randomUUID();
+    const revision = { ...base, episode_id: id, guid: id, revision_id: revisionId, description: "" };
+    revision.description = "a".repeat(Math.min(10_000, 1_999_800 - characters - JSON.stringify(revision).length));
+    const source = JSON.stringify(revision);
+    value.storage.sql.exec("INSERT INTO publication_episodes (show_id, episode_id, lifecycle, revision_id) VALUES ('daily', ?, 'published', ?)", id, revisionId);
+    value.storage.sql.exec("INSERT INTO publication_episode_content VALUES ('daily', ?, ?, ?)", id, revision.guid, source);
+    characters += source.length;
+  }
+  expect(value.content.episodes("daily").length).toBeGreaterThan(1);
+  const next = action === "restore" ? value.lifecycle("restore", "first") : await value.request("episode",
+    action === "addition" ? "new" : "first", action === "metadata" ? first.job_id : undefined,
+    action === "metadata" ? "metadata" : "both");
+  if (action === "metadata") next.payloads = [await value.payload(next.job_id, "episode_metadata",
+    stringifyToml({ ...metadata("first"), description: "a".repeat(10_000) }))];
+  value.calls.length = 0; const purges = value.purges.length;
+  expect(await value.run(next)).toMatchObject({ state: "failed", reason_code: "validation_failed" });
+  expect(value.calls.some((call) => call.method === "PUT")).toBe(false);
+  expect(value.purges).toHaveLength(purges);
+  expect(value.content.episodes("daily").length).toBeGreaterThan(1);
+  expect((await value.run(value.lifecycle("unpublish"))).state).toBe("succeeded");
+  expect(value.queue.snapshot().drained).toBe(true);
+});
+
+test("Show unpublish does not read or render the Episode inventory", async () => {
+  const value = await fixture(); await value.publishShow();
+  value.content.episodes = () => { throw new Error("Episode inventory must not be read"); };
+  expect((await value.run(value.lifecycle("unpublish"))).state).toBe("succeeded");
+});
+
 test("Show restore never revives individually unpublished Episodes, including child stops while the Show is hidden", async () => {
   const value = await fixture(); await value.publishShow(); const first = await value.publishEpisode(); const second = await value.publishEpisode("second"); await value.publishEpisode("third");
   expect((await value.run(value.lifecycle("unpublish", "first"))).state).toBe("succeeded");

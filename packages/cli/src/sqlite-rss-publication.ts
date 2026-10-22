@@ -49,7 +49,7 @@ export function createSqliteRssEffects(root: string, config: SqliteServiceConfig
 export async function publishSqliteRssImport(root: string, config: SqliteServiceConfig, output: string,
   options: SqliteCommandOptions = {}, effects = createSqliteRssEffects(root, config, options)): Promise<SqliteRssResult> {
   config = sqliteServiceConfigSchema.parse(config);
-  const prepared = await prepareRssImportPublication(resolve(root, output)), key = administratorKey(root);
+  const prepared = await prepareRssImportPublication(resolve(root, output), config.public_base_url), key = administratorKey(root);
   const client = new SqliteServiceClient(config, key, options.transport);
   let health = await client.registrationHealth();
   if (!health.publication_ready) throw new Error("SQLite RSS publication requires a ready service outside shared maintenance");
