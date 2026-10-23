@@ -49,6 +49,7 @@ export class SqliteServiceRuntime {
       feed_storage: "immutable-generation-v1",
       cover_storage: "immutable-generation-v1",
       publication_read_boundary: "show-episode-v1",
+      feed_generation_allocator: "reservation-v1",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
       setup: setup ? { operation_id: setup.operation_id, state: setup.state } : null, runtime_update: this.updates.summary() });

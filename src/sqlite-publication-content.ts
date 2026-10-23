@@ -8,6 +8,7 @@ import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 import { validSqliteCoverIdentity } from "./sqlite-cover";
 import type { SqliteCoverIdentity } from "./sqlite-cover";
+import { SQLITE_CONTENT_SCHEMA_VERSION, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-feed-generations";
 
 type Lifecycle = "draft" | "published" | "unpublished" | "deleted";
 type ShowRow = { show_id: string; reservation_id: string; state_version: number; feed_generation: number; lifecycle: Lifecycle };
@@ -21,11 +22,11 @@ export class SqlitePublicationContent {
   constructor(private readonly storage: PublicationQueueStorage) {
     storage.transactionSync(() => {
       const queue = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
-      if (queue?.version !== 5) throw new Error("Initialize the matching publication queue before its content index");
+      if (queue?.version !== SQLITE_QUEUE_SCHEMA_VERSION) throw new Error("Initialize the matching publication queue before its content index");
       storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_content_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");
       const schema = storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0];
-      if (schema && schema.version !== 6) throw new Error("Unsupported publication content schema; do not reset stored content");
-      storage.sql.exec("INSERT OR IGNORE INTO publication_content_schema (id, version) VALUES (1, 6)");
+      if (schema && schema.version !== SQLITE_CONTENT_SCHEMA_VERSION) throw new Error("Unsupported publication content schema; do not reset stored content");
+      storage.sql.exec("INSERT OR IGNORE INTO publication_content_schema (id, version) VALUES (1, ?)", SQLITE_CONTENT_SCHEMA_VERSION);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_shows (show_id TEXT PRIMARY KEY, reservation_id TEXT UNIQUE NOT NULL,
         state_version INTEGER NOT NULL, feed_generation INTEGER NOT NULL, lifecycle TEXT NOT NULL CHECK(lifecycle IN ('draft', 'published', 'unpublished', 'deleted')))`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_show_content (show_id TEXT PRIMARY KEY, metadata_json TEXT NOT NULL,
@@ -152,7 +153,7 @@ export class SqlitePublicationContent {
   commitShow(request: SqlitePublicationRequest, metadata: ShowMetadata, extension: "jpg" | "png", cover: SqliteCoverIdentity): void {
     this.target(request);
     if (request.action !== "publish" || request.kind !== "show" || metadata.show_id !== request.show_id) throw new Error("Show commit differs from its running target");
-    if (!validSqliteCoverIdentity(cover) || cover.generation !== this.feedGeneration(request)) throw new Error("Prepared cover identity differs");
+    if (!validSqliteCoverIdentity(cover) || cover.generation !== this.publicationSequence(request)) throw new Error("Prepared cover identity differs");
     this.storage.sql.exec(`INSERT INTO publication_show_content (show_id, metadata_json, cover_extension, cover_generation, cover_sha256, cover_length_bytes)
       VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(show_id) DO UPDATE SET metadata_json = excluded.metadata_json,
       cover_extension = excluded.cover_extension, cover_generation = excluded.cover_generation,
@@ -180,6 +181,16 @@ export class SqlitePublicationContent {
   }
 
   feedGeneration(request: SqlitePublicationRequest): number {
+    this.requireRunning(request);
+    const generation = this.storage.sql.exec<{ generation: number }>(`SELECT g.generation FROM publication_feed_generations g
+      JOIN publication_jobs j ON j.job_id = g.owner_id AND j.show_id = g.show_id AND j.request_sha256 = g.request_sha256
+      WHERE g.owner_kind = 'publication' AND j.job_id = ? AND j.feed_generation = g.generation`, request.job_id).toArray()[0]?.generation;
+    if (generation === undefined) throw new Error("Publication Feed generation reservation differs");
+    sqliteFeedSnapshotKey(request.show_id, generation);
+    return generation;
+  }
+
+  publicationSequence(request: SqlitePublicationRequest): number {
     this.requireRunning(request);
     const generation = this.storage.sql.exec<{ sequence: number }>("SELECT sequence FROM publication_jobs WHERE job_id = ?", request.job_id).toArray()[0]!.sequence;
     sqliteFeedSnapshotKey(request.show_id, generation);
@@ -227,7 +238,7 @@ export class SqlitePublicationContent {
 
   private advanceFeed(request: SqlitePublicationRequest): void {
     this.storage.sql.exec(`UPDATE publication_shows SET feed_generation =
-      (SELECT sequence FROM publication_jobs WHERE job_id = ? AND state = 'running') WHERE show_id = ?`, request.job_id, request.show_id);
+      ? WHERE show_id = ?`, this.feedGeneration(request), request.show_id);
   }
 
   commitLifecycle(request: SqlitePublicationRequest): void {

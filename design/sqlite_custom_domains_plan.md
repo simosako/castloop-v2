@@ -281,6 +281,7 @@ castloop domain remove --operation-id UUID --workspace PATH
 - **まだ独自domain機能全体は利用できない。** 本番Worker入口は引き続きworkers.devだけをgatewayへ指定する。DOの設定切替・所属固定/保守排他・不変Feed再生成/世代採番・Cloudflare REST client・CLI/journalは未接続で、既存のconfig等値制約や形式を緩めていない。これらの完成前に対応済みとして公開しない。
 - 新規schemaとgatewayの単体試験、既存回帰、型検査、Linux単一CLI buildで検証する。模擬試験は実機API/DNS/TLS/rolloutの証明ではない。
 - この基盤変更時点のローカル検証: `bun test`は**593 pass / 0 fail**（71 files）。`npm run check`、`npm run build:cli -- linux-x64`、`git diff --check`も成功。実Cloudflare環境は変更していない。
+- Feed世代予約表を通常publish/lifecycleの受付・実行・commitへ接続した。domain用予約と同じ単調増加空間を使い、job FIFO sequence・cover世代・revisionは独立して維持する。新queue/content schemaは6/7、必須health識別は`feed_generation_allocator="reservation-v1"`。旧環境を変換せず、旧識別のWorkerは配備前のhealth照合で拒否する。
 
 ## 10. 受け入れ条件と試験
 

@@ -1,5 +1,7 @@
 # castloop v2 デザインドキュメント
 
+Issue #68開発中: [独自ドメイン計画](sqlite_custom_domains_plan.md)に沿い、Feed世代を公開jobのFIFO sequenceから独立した共通予約表で採番する。内部queue/content schemaは**6/7**、healthの必須`feed_generation_allocator="reservation-v1"`を用いるfresh環境専用。cover世代は引き続きShow公開job sequenceで、Feed世代から推測しない。旧5/6を含む環境の移行・互換配備は提供しない。独自domainの接続・切断CLIはまだ開発中で、利用可能という意味ではない。
+
 2026-10-21追補: [Show更新中のFeed継続配信設計](show_update_feed_availability_plan.md)を実装した。Episode追加・更新に加え、公開済みShowのmetadata/cover/同時更新でも旧Feed・画像・承認済み音源を配信する。Feed/Show/cover世代と対象種別のguardを保存・照合し、不変cover snapshotと新metadata/Feedをpurge後に原子的に切り替える。内部queue/content schema **5/6**、healthの必須`feed_storage`/`cover_storage`は`immutable-generation-v1`、`publication_read_boundary="show-episode-v1"`を使う新規環境専用。第1・第2段階を含む旧環境の移行・互換配備は提供しない。
 
 更新日: 2026-10-21。**v0.7.0の仕様**。v0.6.2の公開・操作記録機能をShow単位DOへ分離し、Pause/ResumeをShow単位に変更する。配布済みv0.6.2の旧layoutとは非互換で、移行・旧版サポートは提供しない。設計と検証範囲は[採用設計](do_show_separation_options.md)、過去のリリースは[v0.6.2](../docs/release-v0.6.2.md)を参照。

@@ -1,5 +1,7 @@
 # SQLiteのShow単位公開方式
 
+Issue #68開発中: 開発版はFeed世代の共通予約採番を導入し、内部queue/content schema **6/7**と必須health識別`feed_generation_allocator="reservation-v1"`を使う。旧5/6等の環境への移行・互換配備は行わず、対応版でfresh initする。独自domainの接続・切断CLI自体はまだ開発中。通常公開のFIFOは変更せず、cover世代はFeed世代と別に維持する。
+
 2026-10-21、Show更新の追補: v0.7.0は世代別Feed/cover保存（healthの`feed_storage`と`cover_storage`が共に`immutable-generation-v1`）、`publication_read_boundary="show-episode-v1"`と内部queue/content schema **5/6**を必要とする。Episode更新の4/5、追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・旧値・未知値をprepare/配備前に拒否する。[Show更新設計と境界](../design/show_update_feed_availability_plan.md)参照。
 
 2026-10-20、Issue #48の新layout専用ガイド。**v0.7.0リリース。配布済みv0.6.2とは非互換**であり、以下の操作にはv0.7.0のCLI/Workerが必要。サービス設定に`storage_layout = "show-v1"`を必須とし、旧設定は副作用前に拒否する。既存設定への追記、旧DO/DB/journalの変換・移行・資源採用は行わない。[採用設計](../design/do_show_separation_options.md)参照。

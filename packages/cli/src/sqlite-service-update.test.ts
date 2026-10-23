@@ -12,7 +12,8 @@ const wait = { attempts: 2, delay: async () => {} };
 
 test("Show/Episode read-boundary and cover storage formats are required before preparing or deploying an update", async () => {
   for (const [field, marker] of [["publication_read_boundary", undefined], ["publication_read_boundary", "episode-revision-v1"],
-    ["publication_read_boundary", "unknown"], ["cover_storage", undefined], ["cover_storage", "fixed-key-v1"]] as const) {
+    ["publication_read_boundary", "unknown"], ["cover_storage", undefined], ["cover_storage", "fixed-key-v1"],
+    ["feed_generation_allocator", undefined], ["feed_generation_allocator", "unknown"]] as const) {
     const { value, id } = await fixture();
     value.calls.length = 0;
     const transport: typeof value.transport = async (input, init) => {
