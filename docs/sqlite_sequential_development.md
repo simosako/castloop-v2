@@ -1,6 +1,6 @@
 # SQLiteのShow単位公開方式
 
-Issue #68開発中: 開発版はFeed世代の共通予約採番を導入し、内部queue/content schema **6/7**と必須health識別`feed_generation_allocator="reservation-v1"`を使う。旧5/6等の環境への移行・互換配備は行わず、対応版でfresh initする。独自domainの接続・切断CLI自体はまだ開発中。通常公開のFIFOは変更せず、cover世代はFeed世代と別に維持する。
+Issue #68の未リリース開発版はFeed世代の共通予約採番を導入し、内部queue/content schema **6/7**と必須health識別`feed_generation_allocator="reservation-v1"`・`domain_changes="sqlite-domain-change-v1"`を使う。旧5/6等の環境への移行・互換配備は行わず、対応版でfresh initする。独自domainは[専用ガイド](sqlite_custom_domains.md)を参照する。通常公開のFIFOは変更せず、cover世代はFeed世代と別に維持する。実機確認・配備の承認は含まない。
 
 2026-10-21、Show更新の追補: v0.7.0は世代別Feed/cover保存（healthの`feed_storage`と`cover_storage`が共に`immutable-generation-v1`）、`publication_read_boundary="show-episode-v1"`と内部queue/content schema **5/6**を必要とする。Episode更新の4/5、追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・旧値・未知値をprepare/配備前に拒否する。[Show更新設計と境界](../design/show_update_feed_availability_plan.md)参照。
 
@@ -29,7 +29,7 @@ status GET切断による中断後は成功済み15 jobを照合し、未開始�
 - レビュー済みのローカルRSS取り込みは`publish-rss-import DIRECTORY`でShow→Episodeの順に公開できる。
 - 同じconfig/SQLite schema/namespaceのcode-only更新を`deploy`で扱う。全Showを個別に明示Pause/drainし、固定した対象集合へのprepare/activation/probe後も各Showはpausedを維持する。
 - v0.6.2から[操作記録・再開・取消](sqlite_operation_recovery.md)を提供する。対応WorkerのDO SQLiteに記録し、条件を満たす未公開staging素材だけを明示的に削除できる。v0.7.0ではremote照会に`--show`が必要である。旧版v0.6.1以前の機能とは区別する。
-- 新規環境はworkers.devのみ。**物理削除、独自ドメイン、既存移行、公開jobのretry/releaseは未対応**。旧方式へfallbackしない。
+- 初期化はworkers.devだけで行う。開発版は完了後に[1サービス1専用subdomain](sqlite_custom_domains.md)を接続できる。**物理削除、既存移行、公開jobのretry/releaseは未対応**。旧方式へfallbackしない。
 
 ## 初期化
 

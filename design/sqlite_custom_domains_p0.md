@@ -24,7 +24,7 @@
 
 Attachの公開入力はhostname、service、Zone指定、enabled/previews設定であり、非上書きflagや期待旧接続IDは掲載されていない。Detachも対象IDによる要求であり、GET時のWorker/hostnameと一致する場合だけ削除する条件指定は掲載されていない。どちらも、他ツールが同時に変更する場合の保護を推測で補わない。
 
-Attach/Detachの受け入れ権限は公式記載では`Workers Scripts Write`。これとは別にZone/DNS/routesの事前読取権限が必要になる。権限変更は自動実行しない。
+Attach/DetachのAPI受け入れ権限は公式記載では`Workers Scripts Write`。これとは別にZone/DNS/routesの事前読取権限が必要になる。Cloudflareのrouting案内は変更対象Zoneの`Workers Routes Write`も要求するため、API単体の記載だけを最小権限の保証にはしない。[利用ガイド](../docs/sqlite_custom_domains.md)に必要範囲を記載し、権限変更は自動実行しない。
 
 Detachの公開成功形式はHTTP 200の`success: true`、`errors`、`messages`を持つenvelope。新実装ではerrorsが空であることと本文の完全読取を要求する案とする。旧バグ対応にあった200/nullや204を、この資料だけから許可する根拠は得られていない。未知形式は未知結果として保持し、後の不在GETで完了へ昇格しない。
 
@@ -102,9 +102,9 @@ Locationは設定された正規originと承認済みpathnameだけから構築�
 - job sequenceとFeed世代の等値に依存するexecutor/commit/guard/fixtureを改修する。coverの不変世代、revision ID、Episode承認mediaは変更しない。
 - queue/contentの新規形式識別を定義し、旧5/6環境を変換・採用しない。service schema 2・show-v1・Worker class/binding/compatibility dateは維持する。
 
-## 6. 次の作業
+## 6. 実装・検証への接続
 
 1. §3の制約に沿って公開RESTを使う。外部同時変更について再承認を求めず、開発を進める。
-2. P1からstrict schema、SQL、HTTP、CLI/journalを順に実装し、模擬故障注入と`bun test`・`npm run check`・CLI buildで確認する。
+2. P1〜P6のstrict schema、SQL、HTTP、CLI/journalと模擬故障注入を実装した。`bun test`・`npm run check`・CLI buildの結果と実機未確認の範囲は[開発計画§9](sqlite_custom_domains_plan.md#9-開発順とレビュー区切り)を参照する。
 
 ローカル模擬試験を追加してもCloudflare APIの未記載の原子性は証明できない。実機試験、権限変更、Cloudflareへの問い合わせも自動では行わない。

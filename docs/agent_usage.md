@@ -1,5 +1,7 @@
 # エージェントによるPodcast管理
 
+未リリースのIssue #68対応版では[独自ドメイン管理](sqlite_custom_domains.md)を追加する。`describe domain --json`と`help domain`で対応を確認し、接続/切断/continueは管理者が明示した対象と範囲でだけ実行する。list/statusは読取専用、continueは変更を含み得る。doctorは未完了domain journalやlockも読取検査するが修復しない。旧versionの環境への移行は提供しない。
+
 v0.7.2で追加したIssue #5のCLI機能。管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。既存のCloudflare環境・永続形式・公開プロトコルは変更しない。[リリースノート](release-v0.7.2.md)を参照する。
 
 ## Skillの導入

@@ -5,13 +5,13 @@ description: castloop CLIでPodcastサービス・番組・エピソードを準
 
 # castloopによるPodcast管理
 
-管理者のcastloop単一バイナリを使う。Bun、Node.js、Wrangler、ffprobe、Git、curl、jqは不要。録音・変換、予約公開、独自ドメイン、移行、物理削除、blocked解除は提供しない。MCPは使わない。
+管理者のcastloop単一バイナリを使う。Bun、Node.js、Wrangler、ffprobe、Git、curl、jqは不要。録音・変換、予約公開、移行、物理削除、blocked解除は提供しない。独自ドメインは対応CLI/Workerでfresh initした同accountのCloudflare DNS専用subdomainを1サービス1つだけ扱う。MCPは使わない。
 
 ## 最初に確認
 
 1. `castloop version`、`castloop describe --json`を実行する。このSkillは`contract_version=1`と`show-v1`に対応する。未対応版へ未知のflagを試さず、管理者に対応版を確認する。
 2. 絶対パスのworkspaceと対象Showを特定する。複数候補を推測で選ばない。`doctor --local --workspace PATH --json`は通信せず状態を変更しない。
-3. 許可された段階が「準備だけ／uploadまで／公開まで」のどれか確認する。init・登録・Resume・deploy・非公開化・復元・取消・cleanupは副作用ごとに対象と範囲を確認する。具体的な内容と公開まで委任済みなら同じ確認を繰り返さない。
+3. 許可された段階が「準備だけ／uploadまで／公開まで」のどれか確認する。init・登録・Resume・deploy・domain接続/切断/continue・非公開化・復元・取消・cleanupは副作用ごとに対象と範囲を確認する。具体的な内容と公開まで委任済みなら同じ確認を繰り返さない。
 4. `describe COMMAND --json`と`schema show-input|episode-input|service-config`を必要に応じて取得する。schemaや構文を記憶だけで作らない。
 
 ## 不足情報を推測しない
@@ -31,6 +31,7 @@ description: castloop CLIでPodcastサービス・番組・エピソードを準
 - `validate`は通信・書き込みなし。成功しても公開可否、remote base、purge成功を証明しない。省略検査も確認する。
 - 一覧は20件ごとに`next_cursor`を追う。要約タイトルを編集元の全文へ逆変換しない。原本がなければバックアップを管理者に求める。
 - `--json`の`ok`はCLI要求の成否。uploadの完了、公開受付、公開完了は別。`next_actions`は承認ではない。
+- domain操作は`help domain`で対応版の条件を確認する。全Showを個別Pause/drainし、未公開draftを完了してから変更する。完了しても自動Resumeしない。list/statusは読取、continueは変更を含み得る。同じadd/removeの再実行で回復を試さず、未知PUT/POST/DELETE・purge/書込blockedは保全する。同じhostname/DNS/接続を他ツールから並行変更しない。workers.devの管理APIは転送せず、公開Feed 301がアプリへ保存された後の切断は購読先自動復帰を保証しない。証明書や元journalを削除しない。
 
 ## 用途別
 

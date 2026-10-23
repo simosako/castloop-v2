@@ -17,9 +17,10 @@
 | SQLite publication, lifecycle or updates | [SQLite guide](docs/sqlite_sequential_development.md), [implementation plan](design/sqlite_sequential_publication_implementation_plan.md) |
 | Show isolation, Pause/Resume or shared Worker maintenance | [Show separation contract](design/do_show_separation_options.md). Keep ordinary admission and delivery local to a Show; shared update membership and partial outcomes belong to the control DO |
 | Worker update continuation | [SQLite recovery contract](design/sqlite_worker_update_recovery.md) |
+| Custom domain changes | [SQLite domain guide](docs/sqlite_custom_domains.md), [domain contract](design/sqlite_custom_domains_p0.md). Use dedicated domain maintenance, not ordinary code-only deploy. Concurrent external changes to the same hostname/DNS/Worker domain are unsupported |
 | Removed Queue code or v0.5.x history | [Removal plan](design/schema_v1_removal_plan.md), [v0.5.x Queue guide](docs/queue_service.md), [archived architecture](design/archive/initial_design_v052.md) |
 | Upload integrity or interrupted IO | [Single PUT and unresolved assumption U1](design/m6_upload_recovery_options.md) |
-| Lifecycle, deletion or retention | [SQLite guide](docs/sqlite_sequential_development.md), [approved retention and safety policy](design/m6_review_queue.md). Physical deletion and custom domains are not implemented; do not transplant archived Queue operations |
+| Lifecycle, deletion or retention | [SQLite guide](docs/sqlite_sequential_development.md), [approved retention and safety policy](design/m6_review_queue.md). Physical deletion is not implemented; do not transplant archived Queue operations |
 | Public delivery or caching | [Current architecture](design/initial_design.md), [SQLite implementation contract](design/sqlite_sequential_publication_implementation_plan.md) |
 | RSS import or publication | [RSS migration guide](docs/rss_migration.md), [RSS design](design/m7_rss_import_plan.md) |
 | Live environments or past acceptance claims | [Cleanup outcome and retained environment](design/archive/cloudflare_test_environment_cleanup_20261017.md), then the relevant measurement record linked from the design index |

@@ -1,9 +1,9 @@
 # Issue #68: SQLite方式の独自ドメイン対応計画
 
-作成日: 2026-10-24。状態: **開発中。外部同時変更は想定外として制約を記録する方針を管理者確認済み。API条件による保留は解消。** [P0の根拠・採用契約](sqlite_custom_domains_p0.md)を参照する。
+作成日: 2026-10-24。状態: **P0〜P6のローカル実装・検証完了。未リリース、P7実機確認は未実施・別承認。外部同時変更は想定外として制約を記録する方針を管理者確認済み。** [P0の根拠・採用契約](sqlite_custom_domains_p0.md)を参照する。
 対象Issue: [#68](https://github.com/simosako/castloop-v2/issues/68)。調査基点: v0.7.2 / commit `72bc9f084c3a8ec6b4532d2b4833ac9a47735932`。
 
-本書は開発範囲・契約・実装順のレビュー用である。現行の「SQLite独自ドメイン未対応」は、実装・検証後に利用文書を更新するまで変わらない。本書の承認も、実Cloudflareへの配備・公開・Resume・DNS/domain/権限/課金変更・削除・証跡cleanupの承認にはしない。
+本書は開発範囲・契約・実装順と検証範囲を記録する。利用手順は[開発版ガイド](../docs/sqlite_custom_domains.md)を参照する。配布済みv0.7.2の対応範囲は変更しない。本書の承認も、実Cloudflareへの配備・公開・Resume・DNS/domain/権限/課金変更・削除・証跡cleanupの承認にはしない。
 
 ## 1. 開発するもの
 
@@ -38,11 +38,11 @@
 - Show別domain、複数domain、apex、wildcard、www alias、外部権威DNSのpartial setup、Cloudflare for SaaS。
 - R2のpublic bucket/domain、別Workerへの転送、Queue/D1等の新規基盤。
 - 旧Queue実装の復活、旧サービス/schema/layout/DB/journalの移行・変換、既存接続や未知資源の採用。
-- `itunes:new-feed-url`、Podcast directoryの自動更新、購読者の自動移行保証。HTTP redirectは追加検討するが、これらまで自動実行する意味にはしない。
+- `itunes:new-feed-url`、Podcast directoryの自動更新、購読者の自動移行保証。HTTP redirectの実装を、これらの自動実行へ拡大しない。
 - 自動Pause/Resume、自動rollback、汎用の設定変更コマンド、blocked jobのretry/release。
 - DNS recordや証明書の個別削除、音源・revision・旧Feed世代のcleanup。
 
-## 2. 現行実装から分かった変更点
+## 2. 調査基点v0.7.2から分かった変更点
 
 | 箇所 | 現状と必要な変更 |
 | --- | --- |
@@ -278,14 +278,35 @@ castloop domain remove --operation-id UUID --workspace PATH
 - P0の公開REST採用と外部同時変更の制約を確定した。同じ対象への並行したdashboard/他ツール操作は想定外とし、この点を開発の停止条件や追加確認フラグにはしない。
 - `packages/shared/src/sqlite-domain.ts`に、専用hostname/Zone、旧・新の完全config、runtime/namespace/source/metadata hashを束縛するstrict要求schemaとhash検証を追加した。切断では既知のdomain ID・接続receiptも凍結する。変更できる設定は公開originだけで、旧版/schema/layoutの採用は許可しない。
 - `src/sqlite-gateway.ts`に、正規公開originを明示した場合の管理origin分離とredirectを追加した。Feedは301、cover/audioは307で、対象Showの最新許可と論理key一致を確認した後だけ返す。query・認証情報を転送先へ組み込まず、正規originのHEAD/Range/条件付き配信を維持する。
-- **まだ独自domain機能全体は利用できない。** Cloudflare REST client・CLI/journalが未接続で、独自domainの接続・切断を正式コマンドから実行する段階には達していない。これらの完成前に対応済みとして公開しない。
-- 新規schemaとgatewayの単体試験、既存回帰、型検査、Linux単一CLI buildで検証する。模擬試験は実機API/DNS/TLS/rolloutの証明ではない。
-- この基盤変更時点のローカル検証: `bun test`は**593 pass / 0 fail**（71 files）。`npm run check`、`npm run build:cli -- linux-x64`、`git diff --check`も成功。実Cloudflare環境は変更していない。
 - Feed世代予約表を通常publish/lifecycleの受付・実行・commitへ接続した。domain用予約と同じ単調増加空間を使い、job FIFO sequence・cover世代・revisionは独立して維持する。新queue/content schemaは6/7、必須health識別は`feed_generation_allocator="reservation-v1"`。旧環境を変換せず、旧識別のWorkerは配備前のhealth照合で拒否する。
-- DO側の専用prepare/activate/status/finalizeを接続した。共有保守表でcode-only更新と排他し、registry集合固定とShow別の原子的なResume拘束、送信開始記録、部分結果を保持する。新configの正確なprepared証拠がある場合だけruntime hashを切り替え、Alarmから不変Feed保存・purge・SQL切替・新config probeを行う。必須health識別は`domain_changes="sqlite-domain-change-v1"`。gatewayはWorkerの検証済み公開originへ接続済み。CLI/REST/journalは引き続き未接続である。
+- DO側の専用prepare/activate/status/finalizeを接続した。共有保守表でcode-only更新と排他し、registry集合固定とShow別の原子的なResume拘束、送信開始記録、部分結果を保持する。新configの正確なprepared証拠がある場合だけruntime hashを切り替え、Alarmから不変Feed保存・purge・SQL切替・新config probeを行う。必須health識別は`domain_changes="sqlite-domain-change-v1"`。gatewayはWorkerの検証済み公開originへ接続済み。
 - server側模擬試験では0/1/2 Showの接続設定切替、切断設定復帰、保守排他、応答喪失、書込/purge失敗、再起動中断、Alarm予約失敗時の原子rollbackを確認する。statusのShow一覧は20件ページで、全対象の完了/native照合を省略しない。
+- 公開Cloudflare REST client、凍結要求・成功receipt・mutation前checkpointを持つ専用journal、設定同期、正式CLIの`domain add/list/status/continue/remove`を接続した。help/describe/JSON/doctor、通常code-only deployの既知接続保持検査を含む。listは未完了のローカル操作・残存lockも表示する。
+- TLS/REST/native観測待ちと管理POST応答喪失を、同一要求の完了証拠で限定続行する。未知接続/切断/設定/配備の再送・採用は拒否する。Feed/purgeのblockedを自動修復しない。
+- 未完了ローカルdraftがあれば変更開始前に拒否する。完了draftと過去jobは、完了済みdomain変更のhash連鎖と元公開結果の証拠を使って読取可能とする。次の明示updateだけが元記録を改変せずarchiveして新configのdraftを作る。未公開要求の書換え・昇格や旧版移行はしない。
+- 模擬REST/DO/R2と独立CLI processでadd→TLS待ち→continue→list/status→Resume→通常公開→Pause→removeを検証する。Episodeの非公開・復元、保存GUID/日時/audio/revision/cover保持、新規Show登録、20件を越えるstatus集計、通常deployによる接続保持を回帰対象に含む。
+- 利用ガイド・エージェント向け文書・feature templateを開発版の範囲へ更新した。[実機確認案](../docs/sqlite_custom_domain_live_acceptance.md)は未実施・未承認であり、実Cloudflare環境は変更していない。模擬試験は実機API/DNS/TLS/rollout/Free適合の証明ではない。
+
+### 9.2 ローカル検証結果
+
+2026-10-24、実装commit `508365d`までの検証:
+
+- `bun test`: **630 pass / 0 fail、75 files**。
+- `npm run check`、`npm run build:cli -- linux-x64`、`git diff --check`: 成功。
+- 生成したLinux単体バイナリの`describe domain --json`で新コマンド仕様を確認。変更Markdownの相対リンクを照合。
+- `packages/shared/src/sqlite-domain.test.ts`: hostname、旧新config/hash、接続receipt、集計完了条件。
+- `src/sqlite-feed-generations.test.ts`と既存publication/lifecycle試験: domain予約とFIFOの独立、衝突防止、旧形式拒否、通常公開の回帰。
+- `src/sqlite-gateway.test.ts`とcache回帰: 両originとredirect、管理/内部/未知origin拒否、配信gate優先、資格情報/query分離、HEAD/Range/条件付き配信。
+- `packages/cli/src/sqlite-domain-runtime.test.ts`: 0/1/2 Show、21 Showのページ外blocked集計、保守排他、部分応答喪失、書込/purge失敗、再起動中断、Alarm transaction rollback。
+- `packages/cli/src/sqlite-domain-operation.test.ts`: REST接続/切断、DNS全ページと既知競合拒否、TLS待ち、同一配備の検証続行、未知mutation非再送、設定編集保全、完了draftの履歴保持、Episode復元、通常deploy接続保持、新規Show。
+- `packages/cli/src/sqlite-domain-entrypoint.test.ts`: 別processの正式CLIからadd/TLS中断/continue/list/status/Resume/通常公開/Pause/remove、JSONと秘密非出力。通信はloopbackの模擬transportへ限定。
+- `packages/cli/src/sqlite-rss-publication.test.ts`: 独自originでRSS公開後のFeed検証と元GUID/permalink/日時の保持。
+
+Cloudflare認証付き実機操作・DNS変更・配備・接続/切断・Resume/公開は行っていない。全API応答差異、実TLS発行、native rollout、DO output gate、Workers Cache purgeの実動作、性能/全Free適合、300MBを今回のローカル合格で証明したとは扱わない。
 
 ## 10. 受け入れ条件と試験
+
+以下は実機を含む総合受け入れ項目であり、P7未実施のため未完了として保持する。ローカルの実施範囲・証拠は§9.2を参照する。
 
 - [ ] 接続・照会・切断・状態確認・限定続行の契約とfresh専用境界があり、旧Queue/layoutへfallbackしない。
 - [ ] 正規originのFeed/cover/audioでGET/HEAD/Range/ETag/日付条件が動作する。旧workers.devの許可済み公開URLは同じパスの独自domainへ転送し、転送先で同じHTTP機能が動作する。独自domain未接続・切断後はworkers.devが本文を配信する。
@@ -318,7 +339,7 @@ castloop domain remove --operation-id UUID --workspace PATH
 - `.github/ISSUE_TEMPLATE/feature_request.yml`: 「SQLite独自ドメイン未対応」を実装後の保証範囲へ変更。
 - リリース時の`CHANGELOG.md`・リリースノート: fresh専用境界、切替時の停止、公開redirectの方向・対象・status、切断時の制約と購読者移行非保証、実機未確認事項。
 
-現時点では、これらの利用文書を「対応済み」へ先行変更しない。
+利用文書は未リリースの開発版と配布済み版を区別して更新した。実機受け入れの提案は`docs/sqlite_custom_domain_live_acceptance.md`へ分離し、旧Queueの実績をSQLiteへ流用しない。
 
 ## 12. レビューの確認状況と残る判断
 
