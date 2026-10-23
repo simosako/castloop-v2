@@ -15,6 +15,8 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [エージェント向け共通ルール](../AGENTS.md) | 常時必要な開発・安全ルールと作業別の参照先。検討履歴は必要なときだけ読む |
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
+| [SQLite独自ドメイン対応計画](sqlite_custom_domains_plan.md) | Issue #68。開発開始承認済み。Cloudflare DNS前提、管理/公開origin分離、旧URLからのredirect、個別停止と設定・Feed切替 |
+| [独自ドメインP0・API条件の確認](sqlite_custom_domains_p0.md) | 公開Attach/Detachを採用。外部同時変更は想定外という制約を記録し、保留解消・開発継続。HTTP/identity/Feed採番の契約 |
 | [エージェントによるPodcast管理の改善案](agent_integration_plan.md) | Issue #5。単一バイナリでのschema・雛形・Skill配布、明示対象指定、オフライン検証、doctor、承認と中断対応。MCPは不採用 |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |

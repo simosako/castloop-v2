@@ -4,11 +4,14 @@ import type { PublicCacheProps } from "./public-assets";
 
 export type SqliteGatewayService = { fetch: (request: Request) => Promise<Response>; delivery: (path: string) => Promise<SqliteDeliveryDecision> };
 export async function serveSqliteGateway(request: Request, managementOrigin: string, service: SqliteGatewayService,
-  cachedFetch: (request: Request, props: PublicCacheProps) => Promise<Response>): Promise<Response> {
+  cachedFetch: (request: Request, props: PublicCacheProps) => Promise<Response>, publicOrigin = managementOrigin): Promise<Response> {
   const url = new URL(request.url);
   try {
-    if (url.origin !== managementOrigin) return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
+    const canonical = new URL(publicOrigin);
+    if (canonical.protocol !== "https:" || canonical.port || canonical.origin !== publicOrigin) throw new Error("Public origin differs");
+    if (url.origin !== managementOrigin && url.origin !== publicOrigin) return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
     if (url.pathname.startsWith("/admin/")) {
+      if (url.origin !== managementOrigin) return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
       return await service.fetch(request);
     }
     const asset = parsePublicAssetPath(url.pathname);
@@ -17,6 +20,10 @@ export async function serveSqliteGateway(request: Request, managementOrigin: str
     const decision = await service.delivery(url.pathname);
     if (decision.status !== 200) return new Response(null, { status: decision.status, headers: { "Cache-Control": "no-store" } });
     if (decision.key !== asset.key) throw new Error("Public delivery target differs");
+    if (url.origin !== publicOrigin) {
+      return new Response(null, { status: asset.kind === "feed" ? 301 : 307,
+        headers: { Location: `${publicOrigin}${url.pathname}`, "Cache-Control": "no-store" } });
+    }
     const headers = new Headers();
     for (const name of ["Range", "If-Range", "If-Match", "If-Unmodified-Since", "If-None-Match", "If-Modified-Since"]) {
       const value = request.headers.get(name); if (value !== null) headers.set(name, value);
