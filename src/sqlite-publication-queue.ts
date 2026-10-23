@@ -282,4 +282,18 @@ export class SqlitePublicationQueue {
     });
     this.runtime = next;
   }
+
+  async changeConfiguration(input: SqlitePublicationRuntime, previous: SqlitePublicationRuntime, apply: () => undefined): Promise<void> {
+    const next = sqlitePublicationRuntimeSchema.parse(input);
+    await this.storage.transaction(async () => {
+      const current = this.requireRuntime(), snapshot = this.snapshot();
+      if (JSON.stringify(this.identity()) !== JSON.stringify(sqlitePublicationRuntimeSchema.parse(previous)) ||
+        current.service_id !== next.service_id || current.service_config_sha256 === next.service_config_sha256 ||
+        current.worker_version_id === next.worker_version_id || snapshot.state !== "paused" || !snapshot.drained) throw new Error("Configuration change requires its exact paused drained preparation");
+      if (apply() !== undefined) throw new Error("Configuration activation must be synchronous");
+      this.storage.sql.exec("UPDATE publication_service SET worker_version_id = ?, service_config_sha256 = ? WHERE id = 1", next.worker_version_id, next.service_config_sha256);
+      await this.storage.setAlarm(this.now());
+    });
+    this.runtime = next;
+  }
 }

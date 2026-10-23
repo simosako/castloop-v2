@@ -96,7 +96,11 @@ async function put(bucket: SqlitePublicationBucket, key: string, value: string |
 
 async function persistFeed(store: SqlitePublicationContent, bucket: SqlitePublicationBucket,
   request: SqlitePublicationRequest, feed: string): Promise<void> {
-  const key = sqliteFeedSnapshotKey(request.show_id, store.feedGeneration(request));
+  await persistSqliteFeedSnapshot(bucket, request.show_id, store.feedGeneration(request), feed);
+}
+
+export async function persistSqliteFeedSnapshot(bucket: SqlitePublicationBucket, showId: string, generation: number, feed: string): Promise<void> {
+  const key = sqliteFeedSnapshotKey(showId, generation);
   const bytes = new TextEncoder().encode(feed), hash = await publicationChecksum(bytes);
   const object = await bucket.put(key, bytes, { onlyIf: new Headers({ "If-None-Match": "*" }), sha256: hash,
     httpMetadata: { contentType: "application/rss+xml; charset=utf-8" } });
@@ -104,7 +108,7 @@ async function persistFeed(store: SqlitePublicationContent, bucket: SqlitePublic
     toHex(object.checksums.sha256) !== hash) throw new Error("Immutable Feed write was not verified");
 }
 
-async function verifyCover(bucket: SqlitePublicationBucket, showId: string, extension: "jpg" | "png", cover: SqliteCoverIdentity): Promise<void> {
+export async function verifyCover(bucket: SqlitePublicationBucket, showId: string, extension: "jpg" | "png", cover: SqliteCoverIdentity): Promise<void> {
   const key = sqliteCoverSnapshotKey(showId, cover.generation, extension);
   const object = await bucket.head(key);
   if (!object || object.key !== key || object.size !== cover.lengthBytes || !object.checksums.sha256 ||

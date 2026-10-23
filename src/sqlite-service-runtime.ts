@@ -12,6 +12,7 @@ import { readSqliteCatalog } from "./sqlite-catalog";
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../packages/shared/src/sqlite-catalog";
 import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
 import { pendingSqliteUpdate, SqliteRuntimeUpdates } from "./sqlite-runtime-update";
+import { SqliteDomainRuntime, pendingSqliteDomain } from "./sqlite-domain-runtime";
 
 type SetupRow = { operation_id: string; state: "scheduled" | "running" | "ready" | "blocked"; request_json: string };
 type ProbeStage = "target" | "admission" | "config_read" | "config_validate" | "cache_describe" | "cache_validate" | "cache_purge" | "commit";
@@ -21,18 +22,20 @@ export type SqliteRuntimeCache = { describe: () => Promise<SqliteCacheRuntime>; 
 export class SqliteServiceRuntime {
   private probing = false;
   readonly updates: SqliteRuntimeUpdates;
+  readonly domains: SqliteDomainRuntime;
   constructor(private readonly storage: PublicationQueueStorage, readonly queue: SqlitePublicationQueue,
     readonly content: SqlitePublicationContent, private readonly bucket: SqlitePublicationBucket,
     private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache,
-    private readonly actual: SqlitePublicationRuntime = queue.identity()) {
+    private readonly actual: SqlitePublicationRuntime = queue.identity(), showId?: string) {
     storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_runtime_setup (id INTEGER PRIMARY KEY CHECK(id = 1),
       operation_id TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('scheduled', 'running', 'ready', 'blocked')), request_json TEXT NOT NULL)`);
     this.updates = new SqliteRuntimeUpdates(storage, queue, actual, () => this.ready());
+    this.domains = new SqliteDomainRuntime(storage, queue, content, bucket, config, cache, actual, () => this.ready(), showId);
   }
   private setup(): SetupRow | null {
     return this.storage.sql.exec<SetupRow>("SELECT operation_id, state, request_json FROM publication_runtime_setup WHERE id = 1").toArray()[0] ?? null;
   }
-  ready(): boolean { return this.setup()?.state === "ready" && this.queue.identity().worker_version_id === this.actual.worker_version_id && !pendingSqliteUpdate(this.storage); }
+  ready(): boolean { return this.setup()?.state === "ready" && this.queue.identity().worker_version_id === this.actual.worker_version_id && !pendingSqliteUpdate(this.storage) && !pendingSqliteDomain(this.storage); }
   catalog(request: SqliteCatalogRequest): SqliteCatalogResponse {
     if (!this.ready()) throw new Error("SQLite runtime is not ready");
     return readSqliteCatalog(this.storage, request, this.queue.identity(), this.config.public_base_url);
@@ -50,6 +53,7 @@ export class SqliteServiceRuntime {
       cover_storage: "immutable-generation-v1",
       publication_read_boundary: "show-episode-v1",
       feed_generation_allocator: "reservation-v1",
+      domain_changes: "sqlite-domain-change-v1",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
       setup: setup ? { operation_id: setup.operation_id, state: setup.state } : null, runtime_update: this.updates.summary() });
@@ -71,7 +75,7 @@ export class SqliteServiceRuntime {
   }
   async alarm(): Promise<boolean> {
     const setup = this.setup();
-    if (setup?.state === "ready") return pendingSqliteUpdate(this.storage);
+    if (setup?.state === "ready") return pendingSqliteUpdate(this.storage) || pendingSqliteDomain(this.storage);
     if (!setup || this.probing) return true;
     if (setup.state === "blocked") return true;
     if (setup.state === "running") {
@@ -117,11 +121,13 @@ export class SqliteServiceRuntime {
         stage = "commit";
         this.storage.transactionSync(() => {
           this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'ready' WHERE id = 1");
+          this.storage.sql.exec("UPDATE publication_domain_changes SET state = 'completed' WHERE operation_id = ? AND state = 'feed_ready'", setup.operation_id);
           this.storage.sql.exec(`UPDATE publication_runtime_updates SET state = 'completed' WHERE operation_id = ? AND state = 'activated'
             AND json_extract(activation_json, '$.new_worker_version_id') = ?`, setup.operation_id, identity.worker_version_id);
         });
         await this.storage.sync();
       } catch {
+        this.storage.sql.exec("UPDATE publication_domain_changes SET state = 'blocked', reason_code = 'domain_effect_unverified' WHERE operation_id = ? AND state = 'feed_ready'", setup.operation_id);
         this.storage.sql.exec("UPDATE publication_runtime_setup SET state = 'blocked' WHERE id = 1");
         await this.storage.sync();
         console.error(JSON.stringify({ event: "sqlite_runtime_setup", ...this.actual, operation_id: setup.operation_id,

@@ -4,7 +4,7 @@ import { classifySqliteInvocation, sanitizeSqliteInvocation, sqliteStatusReadReq
 const version = "11111111-1111-4111-8111-111111111111", jobId = "22222222-2222-4222-8222-222222222222";
 const requestId = "33333333-3333-4333-8333-333333333333", probeId = "44444444-4444-4444-8444-444444444444";
 const runtime = { service_id: "trial", worker_version_id: version, service_config_sha256: "a".repeat(64), admission_window_id: requestId };
-const health = { ...runtime, protocol: "sqlite-sequential-v1", feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1", publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1", invocation_id: requestId, publication_ready: true, state: "open",
+const health = { ...runtime, protocol: "sqlite-sequential-v1", feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1", publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1", domain_changes: "sqlite-domain-change-v1", invocation_id: requestId, publication_ready: true, state: "open",
   admission_window_id: requestId, queued: 0, active: null, drained: true, setup: { operation_id: requestId, state: "ready" }, runtime_update: null };
 const expected = { job_id: jobId, request_id: requestId, request_sha256: "b".repeat(64) };
 const status = { ...expected, service_id: "trial", protocol: "sqlite-sequential-v1", sequence: 1, state: "succeeded" };
