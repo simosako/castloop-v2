@@ -50,11 +50,11 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
 }
 
 function readPath(path: string): boolean {
-  if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-publication/status"].includes(path)) return true;
+  if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-service/domain-state", "/admin/sqlite-publication/status"].includes(path)) return true;
   if (/^\/admin\/sqlite-service\/registrations\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) && path.slice("/admin/sqlite-service/registrations/".length).length <= 32) return true;
   const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   if (path === "/admin/sqlite-operations/list" || new RegExp(`^/admin/sqlite-operations/(?:(?:cleanup|requests)/)?${uuid}$`, "i").test(path)) return true;
-  if (new RegExp(`^/admin/(?:sqlite-publication/jobs|sqlite-service/update-status)/${uuid}$`, "i").test(path)) return true;
+  if (new RegExp(`^/admin/(?:sqlite-publication/jobs|sqlite-service/update-status|sqlite-service/domain-status)/${uuid}$`, "i").test(path)) return true;
   const parts = path.slice("/admin/sqlite-service/targets/".length).split("/");
   return path.startsWith("/admin/sqlite-service/targets/") && parts.length >= 1 && parts.length <= 2 &&
     parts.every((part, index) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(part) && part.length <= (index === 0 ? 32 : 80));
@@ -62,7 +62,8 @@ function readPath(path: string): boolean {
 
 export async function readSqliteManagementGet(url: URL, headers: HeadersInit, options: GetOptions = {}): Promise<unknown | null> {
   const timeout = options.timeoutMs ?? 30000, maximum = options.maximumBytes ?? 16384, attempts = 3;
-  if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") || url.hash || !readPath(url.pathname) ||
+  const domainQuery = url.pathname.startsWith("/admin/sqlite-service/domain-status/") && [...url.searchParams.keys()].every((key) => key === "after") && url.searchParams.getAll("after").length <= 1;
+  if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") && !domainQuery || url.hash || !readPath(url.pathname) ||
     !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 || maximum > 65536) throw new Error("Invalid bounded SQLite management GET");
   const now = options.now ?? (() => performance.now()), delay = options.delay ?? ((ms: number) => Bun.sleep(ms));
   const start = now(), deadline = start + timeout, target = sha256HexSync(url.href);

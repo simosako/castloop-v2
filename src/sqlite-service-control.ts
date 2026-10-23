@@ -294,14 +294,16 @@ export class SqliteServiceControl {
     if (!record || record.request_json !== JSON.stringify(own.request)) throw new Error("Domain membership differs");
     const targets = this.targets(id), results: Array<{ show_id: string; prepare_state: string; activate_state: string; release_state: string; phase: SqliteDomainStatus["phase"] | null }> = [];
     let nativeReady = own.actual_runtime.service_config_sha256 === own.request.target_config_sha256;
-    let completed = 0;
+    let completed = 0, blocked = 0;
     for (const target of targets) {
       let phase: SqliteDomainStatus["phase"] | null = null;
       if (target.prepare_state === "confirmed") {
         const result = this.verifyDomainStatus(await this.peer(target.show_id).domainStatus(id), own, target.show_id);
+        if (record.phase !== "completed" && (!result.paused || !result.drained)) throw new Error("Domain maintenance target resumed before completion");
         phase = result.phase;
         if (result.actual_runtime.worker_version_id !== own.actual_runtime.worker_version_id || phase !== "prepared") nativeReady = false;
         if (phase === "completed") completed++;
+        if (phase === "blocked") blocked++;
       } else nativeReady = false;
       results.push({ ...target, phase });
     }
@@ -310,6 +312,7 @@ export class SqliteServiceControl {
       all_completed: own.phase === "completed" && completed === targets.length,
       target_count: targets.length, prepared_count: targets.filter((target) => target.prepare_state === "confirmed").length,
       completed_count: completed, released_count: targets.filter((target) => target.release_state === "confirmed").length,
+      blocked_count: blocked,
       targets: page.slice(0, 20), next_cursor: page.length > 20 ? page[19].show_id : null });
   }
   async activateDomain(input: SqliteDomainActivation) {
@@ -338,7 +341,7 @@ export class SqliteServiceControl {
   async finalizeDomain(input: SqliteDomainFinalize) {
     const request = sqliteDomainFinalizeSchema.parse(input), status = await this.domainStatus(request.operation_id);
     requireSqliteDomainConnection(request.connection, status.own.request);
-    if (!status.all_completed || status.phase !== "probing" || status.own.request_sha256 !== request.request_sha256 ||
+    if (!status.all_completed || !status.own.paused || !status.own.drained || status.phase !== "probing" || status.own.request_sha256 !== request.request_sha256 ||
       request.detached !== (status.own.request.action === "remove") ||
       JSON.stringify(request.connection) !== JSON.stringify(status.own.activation?.connection)) throw new Error("Domain finalization has no exact complete evidence");
     this.storage.transactionSync(() => {

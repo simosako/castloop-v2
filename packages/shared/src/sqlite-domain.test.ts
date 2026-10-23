@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { parseSqliteDomainRequest, requireSqliteDomainConnection, SQLITE_DOMAIN_PROTOCOL,
-  sqliteDomainHostnameSchema, sqliteDomainRequestHash, sqliteDomainRequestSchema } from "./sqlite-domain";
+  sqliteDomainHostnameSchema, sqliteDomainRequestHash, sqliteDomainRequestSchema, sqliteDomainServiceStatusSchema } from "./sqlite-domain";
 import { sqliteServiceConfigHash } from "./sqlite-service";
 
 async function fixture(action: "add" | "remove" = "add") {
@@ -97,4 +97,17 @@ test("remove freezes a known connection ID and certificate receipt instead of ad
     expect(await sqliteDomainRequestHash({ ...request, connection: { ...connection, ...change } })).not.toBe(await sqliteDomainRequestHash(request));
   }
   expect(sqliteDomainRequestSchema.safeParse({ ...request, connection: { ...connection, hostname: "other.example.com" } }).success).toBe(false);
+});
+
+test("service completion requires consistent aggregate counts rather than only the displayed target page", async () => {
+  const request = await fixture();
+  const status = { own: { request, request_sha256: await sqliteDomainRequestHash(request), actual_runtime: request.previous_runtime,
+    saved_runtime: request.previous_runtime, phase: "completed", feed_generation: null, activation: null, paused: true, drained: true, reason_code: null },
+    phase: "probing", targets_native_ready: true, all_completed: false, target_count: 21, prepared_count: 21,
+    completed_count: 20, released_count: 0, blocked_count: 0, targets: [], next_cursor: null };
+  expect(sqliteDomainServiceStatusSchema.safeParse(status).success).toBe(true);
+  for (const change of [{ all_completed: true }, { completed_count: 22 }, { blocked_count: 2 }, { released_count: 22 }, { phase: "completed" }]) {
+    expect(sqliteDomainServiceStatusSchema.safeParse({ ...status, ...change }).success).toBe(false);
+  }
+  expect(sqliteDomainServiceStatusSchema.safeParse({ ...status, all_completed: true, completed_count: 21 }).success).toBe(true);
 });

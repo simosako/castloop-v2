@@ -56,10 +56,10 @@ export class SqliteDomainRuntime {
     const row = this.row(id), request = await parseSqliteDomainRequest(JSON.parse(row.request_json));
     if (await sqliteDomainRequestHash(request) !== row.request_sha256) throw new Error("Stored domain request differs");
     const snapshot = this.queue.snapshot();
-    if (snapshot.state !== "paused" || !snapshot.drained) throw new Error("Domain change requires retained paused maintenance");
+    if (row.state !== "completed" && (snapshot.state !== "paused" || !snapshot.drained)) throw new Error("Domain change requires retained paused maintenance");
     return sqliteDomainStatusSchema.parse({ request, request_sha256: row.request_sha256, actual_runtime: this.actual,
       saved_runtime: this.queue.identity(), phase: row.state, feed_generation: row.feed_generation,
-      activation: row.activation_json ? JSON.parse(row.activation_json) : null, paused: true, drained: true, reason_code: row.reason_code,
+      activation: row.activation_json ? JSON.parse(row.activation_json) : null, paused: snapshot.state === "paused", drained: snapshot.drained, reason_code: row.reason_code,
       ...(this.showId ? { show_id: this.showId } : {}) });
   }
   async prepare(input: SqliteDomainRequest, bindMaintenance: () => void): Promise<SqliteDomainStatus> {

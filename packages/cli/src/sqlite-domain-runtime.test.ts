@@ -141,3 +141,25 @@ test("activation receipt and native version must match every prepared target, an
   expect(f.showCalls.filter((call) => call.action === "domain-activate")).toEqual([{ action: "domain-activate", showId: "a" }]);
   expect(f.nodes.get("b")!.service.queue.snapshot().state).toBe("paused");
 });
+
+test("paged status counts every Show including a blocked target outside the first page", async () => {
+  const ids = Array.from({ length: 21 }, (_, index) => `show-${String(index).padStart(2, "0")}`);
+  const f = await fixture(ids);
+  const prepared = await f.control.prepareDomain(f.request);
+  expect(prepared.targets).toHaveLength(20); expect(prepared.next_cursor).toBe(ids[19]);
+  const activation = await f.deploy(); await f.control.activateDomain(activation);
+  for (const id of ids.slice(0, 20)) {
+    const node = f.nodes.get(id)!;
+    await node.service.runtime.domains.alarm(); await node.service.alarmRuntime().alarm();
+  }
+  await f.runtime.domains.alarm(); await f.runtime.alarm();
+  const pending = await f.control.domainStatus(f.request.operation_id);
+  expect(pending).toMatchObject({ completed_count: 20, blocked_count: 0, all_completed: false, targets_native_ready: false });
+  expect(pending.targets.every((item) => item.phase === "completed")).toBe(true);
+  f.faults.failDomainPurge = ids[20]; await f.progressDomains();
+  const blocked = await f.control.domainStatus(f.request.operation_id, ids[19]);
+  expect(blocked).toMatchObject({ completed_count: 20, blocked_count: 1, all_completed: false, next_cursor: null });
+  expect(blocked.targets).toMatchObject([{ show_id: ids[20], phase: "blocked" }]);
+  await expect(f.control.finalizeDomain({ operation_id: f.request.operation_id, request_sha256: activation.request_sha256,
+    connection: f.connection, detached: false })).rejects.toThrow();
+});

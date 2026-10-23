@@ -5,6 +5,10 @@ import { parseSqlitePublicationRequest, sqlitePublicationProtocol, sqlitePublica
 import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteServiceConfig } from "@castloop/shared";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import type { LocalJournalStorage } from "./local-journal-storage";
+import { completedDomainConfiguration } from "./sqlite-domain-local";
+import { ensureLocalJournalParents } from "./local-journal-path";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const fields = sqlitePublicationRequestSchema.shape;
 export const sqliteDraftTargetSchema = z.object({ job_id: fields.job_id, kind: fields.kind, show_id: fields.show_id,
@@ -69,10 +73,12 @@ export function sqliteDraftFileName(target: Pick<SqliteDraftTarget, "kind" | "sh
 }
 
 export async function readSqliteDraftRecord(root: string, config: SqliteServiceConfig,
-  target: Pick<SqliteDraftTarget, "kind" | "show_id" | "episode_id">): Promise<SqliteDraftRecord | null> {
+  target: Pick<SqliteDraftTarget, "kind" | "show_id" | "episode_id">, allowCompletedDomainChange = false): Promise<SqliteDraftRecord | null> {
   try {
     const record = checkedRecord(createLocalJournalStorage(root, "sqlite-drafts", config.service_id, sqliteDraftFileName(target)).read());
-    if (record.service_id !== config.service_id || record.service_config_sha256 !== await sqliteServiceConfigHash(config) ||
+    const permitted = record.service_config_sha256 === await sqliteServiceConfigHash(config) || allowCompletedDomainChange &&
+      ["succeeded", "failed"].includes(record.publication?.status?.state ?? "") && await completedDomainConfiguration(root, config, record.service_config_sha256);
+    if (record.service_id !== config.service_id || !permitted ||
       record.target.kind !== target.kind || record.target.show_id !== target.show_id || record.target.episode_id !== target.episode_id) throw new Error("SQLite draft identity differs");
     if (record.publication && await sqlitePublicationRequestHash(record.publication.request) !== record.publication.request_sha256) throw new Error("SQLite draft publication hash differs");
     return record;
@@ -83,7 +89,9 @@ export async function readSqliteArchivedDraft(root: string, config: SqliteServic
   fields.job_id.parse(jobId);
   try {
     const record = checkedRecord(createLocalJournalStorage(root, "sqlite-publications", config.service_id, `${jobId}.json`).read());
-    if (record.target.job_id !== jobId || record.service_id !== config.service_id || record.service_config_sha256 !== await sqliteServiceConfigHash(config) ||
+    const permitted = record.service_config_sha256 === await sqliteServiceConfigHash(config) ||
+      ["succeeded", "failed"].includes(record.publication?.status?.state ?? "") && await completedDomainConfiguration(root, config, record.service_config_sha256);
+    if (record.target.job_id !== jobId || record.service_id !== config.service_id || !permitted ||
       !record.publication || await sqlitePublicationRequestHash(record.publication.request) !== record.publication.request_sha256) throw new Error("Archived SQLite publication differs");
     return record;
   } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
@@ -99,7 +107,9 @@ export async function openSqliteDraftJournal(root: string, input: SqliteServiceC
   storage.initialize(initial);
   const loadAny = async () => {
     const record = checkedRecord(storage.read());
-    if (record.service_id !== config.service_id || record.service_config_sha256 !== hash || record.target.kind !== target.kind ||
+    const permitted = record.service_config_sha256 === hash || ["succeeded", "failed"].includes(record.publication?.status?.state ?? "") &&
+      await completedDomainConfiguration(root, config, record.service_config_sha256);
+    if (record.service_id !== config.service_id || !permitted || record.target.kind !== target.kind ||
       record.target.show_id !== target.show_id || record.target.episode_id !== target.episode_id) throw new Error("SQLite draft belongs to another service or target");
     if (record.publication && record.publication.request_sha256 !== await sqlitePublicationRequestHash(record.publication.request)) {
       throw new Error("SQLite draft has a different frozen publication hash");
@@ -109,6 +119,7 @@ export async function openSqliteDraftJournal(root: string, input: SqliteServiceC
   await storage.exclusively(async () => {
     const existing = await loadAny();
     if (existing.target.job_id === target.job_id) {
+      if (existing.service_config_sha256 !== hash) throw new Error("A completed old-configuration draft may only be archived, never reused");
       if (JSON.stringify(existing.target) !== JSON.stringify(target)) throw new Error("Keep the unpublished draft's original target and base");
       return;
     }
@@ -130,4 +141,18 @@ export async function openSqliteDraftJournal(root: string, input: SqliteServiceC
       JSON.stringify(checked.target) !== JSON.stringify(target)) throw new Error("SQLite draft identity cannot change");
     storage.replace(checked);
   } };
+}
+
+export function requireSettledSqliteDomainDrafts(root: string, config: SqliteServiceConfig): void {
+  ensureLocalJournalParents(root, "sqlite-drafts", config.service_id);
+  let names: string[];
+  try { names = readdirSync(join(root, ".castloop", "sqlite-drafts", config.service_id)).filter((file) => file.endsWith(".json")); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error; }
+  if (names.length > 10000) throw new Error("Draft inspection exceeds its local budget");
+  for (const name of names) {
+    const record = checkedRecord(createLocalJournalStorage(root, "sqlite-drafts", config.service_id, name).read());
+    if (record.service_id !== config.service_id || !["succeeded", "failed"].includes(record.publication?.status?.state ?? "")) {
+      throw new Error("Finish existing local drafts before changing the canonical origin; stale or uncertain inputs cannot be adopted");
+    }
+  }
 }

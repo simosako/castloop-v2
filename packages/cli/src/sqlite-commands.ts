@@ -21,10 +21,14 @@ import { runSqliteOperationCommand } from "./sqlite-operation-commands";
 import type { OperationReadOptions } from "./sqlite-operation-commands";
 import { draftPreview } from "./draft-preview";
 import { showTemplate, episodeTemplate } from "./input-templates";
+import { continueSqliteDomainChange, listSqliteDomains, sqliteDomainOperationStatus, startSqliteDomainChange } from "./sqlite-domain-operation";
+import { sqliteDomainHostnameSchema } from "../../shared/src/sqlite-domain";
+import { completedDomainConfiguration } from "./sqlite-domain-local";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
+  domainOptions?: { zoneId?: string; operationId?: string; cursor?: string };
   listOptions?: { includeDeleted?: boolean; cursor?: string }; operationOptions?: OperationReadOptions;
   parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
@@ -36,6 +40,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "lifecycle-execute": [3], "operation-status": [2], "init-reconcile": [1], "init-continue-verification": [1],
   "update-service": [1], "update-service-verify": [1], "update-service-reconcile": [1],
   "operation-list": [0], "operation-resume": [2], "operation-cancel": [2], "operation-cleanup-preview": [2], "operation-cleanup": [4],
+  domain: [1, 2],
 };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
@@ -89,6 +94,18 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
       ...(episode ? { episode_id: validateId(args[1], "episode") } : {}) });
   }
   const cf = options.cloudflare ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" };
+  if (command === "domain") {
+    const [action, argument] = args, selected = options.domainOptions ?? {};
+    if (action === "list" && args.length === 1 && !selected.zoneId && !selected.operationId && !selected.cursor) return listSqliteDomains(root, config, cf);
+    if (action === "status" && args.length === 2 && !selected.zoneId && !selected.operationId) return sqliteDomainOperationStatus(root, config, z.uuid().parse(argument), cf, selected.cursor);
+    if (action === "continue" && args.length === 2 && !selected.zoneId && !selected.operationId && !selected.cursor && options.workerSource) return continueSqliteDomainChange(root, config, z.uuid().parse(argument), await options.workerSource(), cf);
+    if ((action === "add" && args.length === 2 && selected.zoneId || action === "remove" && args.length === 1 && !selected.zoneId) && !selected.cursor && options.workerSource) {
+      const target = action === "add" ? { hostname: sqliteDomainHostnameSchema.parse(argument), zoneId: z.string().regex(/^[a-f0-9]{32}$/).parse(selected.zoneId) } : undefined;
+      const id = z.uuid().parse(selected.operationId ?? crypto.randomUUID());
+      return startSqliteDomainChange(root, config, action, id, await options.workerSource(), cf, target);
+    }
+    throw new Error("Expected domain add HOST --zone-id ID, remove, list, status UUID or continue UUID with only supported options");
+  }
   if (command.startsWith("operation-") && !(command === "operation-status" && args[0] === "lifecycle" && !options.operationOptions?.local)) {
     return runSqliteOperationCommand(root, config, command, args, options.operationOptions, options.transport, cf);
   }
@@ -158,7 +175,9 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     if (lifecycleStatus !== undefined) return { job_id: jobId, status: lifecycleStatus, snapshot_only: true, authorizes_recovery: false };
     const archived = await readSqliteArchivedDraft(root, config, jobId);
     if (archived?.publication) {
-      const status = await new SqlitePublicationClient(config, key, options.transport).observe(archived.publication.request);
+      const historical = await completedDomainConfiguration(root, config, archived.service_config_sha256);
+      if (!historical) throw new Error("No exact completed domain transition permits this historical job lookup");
+      const status = await new SqlitePublicationClient(historical, key, options.transport).observe(archived.publication.request);
       if (!status) throw new Error("Archived SQLite job is missing remotely; preserve its result");
       requireSqliteStatus(archived.publication.request, archived.publication.request_sha256, status, archived.publication.status);
       return { job_id: jobId, status, snapshot_only: true, authorizes_recovery: false };
@@ -173,9 +192,11 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
         const raw = z.object({ target: z.object({ job_id: z.uuid(), kind: z.enum(["show", "episode"]), show_id: z.string(), episode_id: z.string().optional() }) }).parse(
           createLocalJournalStorage(root, family, config.service_id, name).read());
         if (raw.target.job_id !== jobId) continue;
-        const record = await readSqliteDraftRecord(root, config, raw.target);
+        const record = await readSqliteDraftRecord(root, config, raw.target, true);
         if (!record?.publication) return { job_id: jobId, state: "draft" };
-        const status = await new SqlitePublicationClient(config, key, options.transport).observe(record.publication.request);
+        const historical = await completedDomainConfiguration(root, config, record.service_config_sha256);
+        if (!historical) throw new Error("No exact completed domain transition permits this historical job lookup");
+        const status = await new SqlitePublicationClient(historical, key, options.transport).observe(record.publication.request);
         if (!status && record.publication.status) throw new Error("Previously acknowledged SQLite job is missing remotely; preserve its result");
         if (status) requireSqliteStatus(record.publication.request, record.publication.request_sha256, status, record.publication.status);
         return { job_id: jobId, status, snapshot_only: true, authorizes_recovery: false };
@@ -188,11 +209,19 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (args.length !== (showCommand ? 1 : command === "update-episode-audio" ? 3 : 2) && !(command === "publish-episode" && args.length === 3)) throw new Error("Invalid SQLite content command arguments");
   const targetId = { kind: showCommand ? "show" as const : "episode" as const, show_id: validateId(args[0], "show"),
     ...(episodeCommand ? { episode_id: validateId(args[1], "episode") } : {}) };
-  let retained = await readSqliteDraftRecord(root, config, targetId);
   const publishing = command.startsWith("publish-");
+  let retained = await readSqliteDraftRecord(root, config, targetId, !publishing);
   if (retained?.publication && !publishing) {
-    const previous = await SqliteDraft.open(root, config, retained.target, draftOptions);
-    const status = await previous.observe();
+    let status;
+    if (retained.service_config_sha256 !== await sqliteServiceConfigHash(config)) {
+      const historical = await completedDomainConfiguration(root, config, retained.service_config_sha256);
+      if (!historical) throw new Error("No exact completed domain transition permits archiving the old draft");
+      status = await new SqlitePublicationClient(historical, key, options.transport).observe(retained.publication.request);
+      if (status) requireSqliteStatus(retained.publication.request, retained.publication.request_sha256, status, retained.publication.status);
+    } else {
+      const previous = await SqliteDraft.open(root, config, retained.target, draftOptions);
+      status = await previous.observe();
+    }
     if (!status || !["succeeded", "failed"].includes(status.state)) throw new Error("Publication remains frozen or uncertain; inspect its job without replacing it");
     retained = null;
   }

@@ -10,6 +10,14 @@ import { createLocalJournalStorage } from "./local-journal-storage";
 import type { LocalJournalStorage } from "./local-journal-storage";
 import type { R2RestOptions } from "./verified-r2-put";
 import { sha256HexSync as digest } from "./sha256";
+import { SqliteDomainClient } from "./sqlite-domain-client";
+import { SqliteDomainCloudflare } from "./sqlite-domain-cloudflare";
+
+async function verifyKnownDomains(config: SqliteServiceConfig, key: string, options: R2RestOptions): Promise<void> {
+  const state = await new SqliteDomainClient(config, key, options.transport).state();
+  if (state.runtime.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error("Domain configuration differs during code-only deployment");
+  await new SqliteDomainCloudflare(config, options).verifyKnown(state.connection);
+}
 
 const receipt = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
 const evidence = receipt.extend({ namespace_id: z.string().regex(/^[a-f0-9]{32}$/) }).strict();
@@ -54,6 +62,7 @@ export async function updateSqliteService(root: string, config: SqliteServiceCon
   if (!retained) {
     const health = await client.health();
     if (!health.publication_ready || health.state !== "paused" || !health.drained) throw new Error("Explicitly pause and drain every Show in the ready SQLite service before deployment");
+    await verifyKnownDomains(config, key, options);
     const previous = await api.current();
     if (previous.worker_version_id !== health.worker_version_id) throw new Error("SQLite REST and DO versions differ");
     journal.initialize(stateSchema.parse({ schema_version: 2, protocol: "sqlite-sequential-v1", phase: "prepared", previous, request: {
@@ -79,12 +88,12 @@ export async function updateSqliteService(root: string, config: SqliteServiceCon
     save("deploy_requested");
     if (state.schema_version === 2) save("deploy_acknowledged", { upload_receipt: await api.uploadWorker(deploymentSource, key) });
     else save("deployed", { receipt: await api.deploy(deploymentSource, key) });
-    return verifyAndActivateUpdate(journal, state, client, api, wait);
+    return verifyAndActivateUpdate(journal, state, client, api, wait, () => verifyKnownDomains(config, key, options));
   });
 }
 
 async function verifyAndActivateUpdate(journal: LocalJournalStorage, initial: SqliteServiceUpdateState, client: SqliteServiceClient,
-  api: SqliteCloudflareApi, wait: UpdateWait): Promise<SqliteServiceUpdateState> {
+  api: SqliteCloudflareApi, wait: UpdateWait, verifyDomains: () => Promise<void>): Promise<SqliteServiceUpdateState> {
   let state = initial;
   if (state.phase === "deploy_acknowledged" && state.upload_receipt) {
     const receipt = await api.deploymentReceipt(state.upload_receipt);
@@ -93,11 +102,11 @@ async function verifyAndActivateUpdate(journal: LocalJournalStorage, initial: Sq
   if (!["deployed", "verified"].includes(state.phase) || !state.receipt) throw new Error("SQLite verification requires acknowledged deployment evidence");
   if ((await api.inspect(state.receipt)).namespace_id !== state.request.namespace_id) throw new Error("SQLite update changed its namespace; do not activate it");
   state = stateSchema.parse({ ...state, phase: "verified" }); journal.replace(state);
-  return activateVerifiedUpdate(journal, state, client, api, wait);
+  return activateVerifiedUpdate(journal, state, client, api, wait, verifyDomains);
 }
 
 async function activateVerifiedUpdate(journal: LocalJournalStorage, initial: SqliteServiceUpdateState, client: SqliteServiceClient,
-  api: SqliteCloudflareApi, wait: UpdateWait): Promise<SqliteServiceUpdateState> {
+  api: SqliteCloudflareApi, wait: UpdateWait, verifyDomains: () => Promise<void>): Promise<SqliteServiceUpdateState> {
   let state = initial;
   if (state.phase !== "verified" || !state.receipt) throw new Error("SQLite activation requires an acknowledged verified deployment with no prior activation request");
   const receipt = state.receipt;
@@ -113,6 +122,7 @@ async function activateVerifiedUpdate(journal: LocalJournalStorage, initial: Sql
   }
   if (!nativeVersionVerified) throw new Error("Verified SQLite deployment has not reached the native runtime; preserve the journal and continue verification explicitly without redeploying");
   if ((await api.inspect(receipt)).namespace_id !== state.request.namespace_id) throw new Error("Verified SQLite update namespace changed; do not activate it");
+  await verifyDomains();
   state = stateSchema.parse({ ...state, phase: "activation_requested" }); journal.replace(state);
   try { await client.update("activate", { ...state.request, new_worker_version_id: receipt.worker_version_id,
     deployment_id: receipt.deployment_id, script_etag: receipt.script_etag }); }
@@ -124,6 +134,7 @@ async function activateVerifiedUpdate(journal: LocalJournalStorage, initial: Sql
       const health = await client.health();
       if (!health.publication_ready || health.state !== "paused" || !health.drained || health.worker_version_id !== receipt.worker_version_id || health.setup?.operation_id !== state.request.operation_id) throw new Error("SQLite updated runtime readiness was not verified");
       if ((await api.inspect(receipt)).namespace_id !== state.request.namespace_id) throw new Error("SQLite updated namespace changed");
+      await verifyDomains();
       state = stateSchema.parse({ ...state, phase: "ready" }); journal.replace(state); return state;
     }
     if (index + 1 < wait.attempts) await wait.delay();
@@ -144,7 +155,7 @@ export async function continueSqliteServiceUpdateVerification(root: string, conf
       throw new Error("SQLite update verification continuation requires exact verified or acknowledged deployment evidence, frozen source/configuration and no prior activation request");
     }
     const api = new SqliteCloudflareApi(config, options);
-    return verifyAndActivateUpdate(journal, state, new SqliteServiceClient(config, key, options.transport), api, wait);
+    return verifyAndActivateUpdate(journal, state, new SqliteServiceClient(config, key, options.transport), api, wait, () => verifyKnownDomains(config, key, options));
   });
 }
 
@@ -159,6 +170,7 @@ export async function reconcileSqliteServiceUpdate(root: string, config: SqliteS
     if (status.worker_version_id !== state.receipt.worker_version_id || status.update.state !== "completed" || status.update.new_worker_version_id !== state.receipt.worker_version_id ||
       !health.publication_ready || health.state !== "paused" || !health.drained || health.worker_version_id !== state.receipt.worker_version_id || health.setup?.operation_id !== operationId ||
       (await new SqliteCloudflareApi(config, options).inspect(state.receipt)).namespace_id !== state.request.namespace_id) throw new Error("SQLite update completion was not verified read-only");
+    await verifyKnownDomains(config, key, options);
     const ready = stateSchema.parse({ ...state, phase: "ready" }); journal.replace(ready); return ready;
   });
 }

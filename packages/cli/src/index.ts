@@ -186,6 +186,14 @@ async function main(context: Invocation): Promise<unknown> {
     if (positional.length) throw new Error(commandHelp(command));
     command = "update-service";
     positional.push(flags["operation-id"] ?? randomUUID());
+  } else if (command === "domain") {
+    const [action] = positional;
+    allowedFlags(flags, action === "add" ? ["zone-id", "operation-id"] : action === "remove" ? ["operation-id"] : action === "status" ? ["cursor"] : []);
+    if (action === "add" && (positional.length !== 2 || !flags["zone-id"]) ||
+      ["status", "continue"].includes(action ?? "") && positional.length !== 2 ||
+      ["list", "remove"].includes(action ?? "") && positional.length !== 1 ||
+      !["add", "remove", "list", "status", "continue"].includes(action ?? "")) throw new Error(commandHelp(command));
+    if (["add", "remove"].includes(action)) flags["operation-id"] ??= randomUUID();
   } else if (listing) {
     allowedFlags(flags, ["json", "include-deleted", "cursor"]);
   } else if (operationRead) {
@@ -208,6 +216,14 @@ async function main(context: Invocation): Promise<unknown> {
   }
   context.target.workspace = root;
   const workspace = await loadWorkspaceConfig(root);
+  if (command === "domain" && !["list", "status"].includes(positional[0])) {
+    const operationId = positional[0] === "continue" ? positional[1] : flags["operation-id"];
+    context.failureResult = async () => {
+      const { readSqliteDomainJournal } = await import("./sqlite-domain-journal");
+      const record = readSqliteDomainJournal(root, workspace, operationId);
+      return record ? { operation_id: operationId, phase: record.phase, last_known_only: true } : null;
+    };
+  }
   if (["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode"].includes(command)) {
     const showId = validateId(positional[0], "show"); context.target.show_id = showId;
     const target = { kind: episodeCommand ? "episode" as const : "show" as const, show_id: showId,
@@ -221,8 +237,9 @@ async function main(context: Invocation): Promise<unknown> {
   }
   const { runSqliteCommand } = await import("./sqlite-commands");
   const effects = describeCommand(command === "update-service" ? "deploy" : command).effects;
-  context.mutationStarted = effects.remote === "may_mutate" || effects.local === "may_write_records";
+  context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
+    ...(command === "domain" ? { domainOptions: { zoneId: flags["zone-id"], operationId: flags["operation-id"], cursor: flags.cursor } } : {}),
     ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview });

@@ -2,6 +2,7 @@ import { version } from "../../../package.json";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { administratorKey } from "./administrator-key";
 import type { SqliteServiceConfig } from "@castloop/shared";
+import { pendingLocalDomainChanges } from "./sqlite-domain-local";
 
 type Check = { id: string; status: "pass" | "warn" | "fail" | "not_checked"; code: string; message: string; next_actions: string[] };
 export type DoctorResult = { cli_version: string; checks: Check[]; summary: Record<Check["status"], number> };
@@ -31,6 +32,16 @@ export async function diagnoseLocal(root: string,
     message: accountMismatch ? "Environment account differs from the workspace; do not change resources" : "Account target comparison only; remote ownership not checked",
     next_actions: accountMismatch ? ["confirm_workspace_and_environment"] : [] });
   checks.push({ id: "remote", status: "not_checked", code: "local_only", message: "Remote readiness, operations and publication were not checked", next_actions: [] });
+  if (config) {
+    try {
+      const pending = pendingLocalDomainChanges(root, config).length > 0;
+      checks.push({ id: "domain-records", status: pending ? "warn" : "pass", code: pending ? "domain_operation_pending" : "domain_records_checked",
+        message: pending ? "Unfinished domain records or client locks exist; inspect the same operation without replay or cleanup" : "Local domain records inspected; remote state not checked",
+        next_actions: pending ? ["inspect_domain_operation_status"] : [] });
+    } catch {
+      checks.push({ id: "domain-records", status: "fail", code: "domain_records_unverified", message: "Local domain records could not be verified; preserve records and locks", next_actions: ["inspect_original_domain_records"] });
+    }
+  }
   const summary = { pass: 0, warn: 0, fail: 0, not_checked: 0 };
   for (const check of checks) summary[check.status]++;
   return { cli_version: version, checks, summary };

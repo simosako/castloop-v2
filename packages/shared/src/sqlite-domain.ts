@@ -61,7 +61,7 @@ export const sqliteDomainPhaseSchema = z.enum(["prepared", "activated", "running
 export const sqliteDomainStatusSchema = z.object({ request: sqliteDomainRequestSchema, request_sha256: hash,
   actual_runtime: sqlitePublicationRuntimeSchema, saved_runtime: sqlitePublicationRuntimeSchema,
   phase: sqliteDomainPhaseSchema, feed_generation: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
-  activation: sqliteDomainActivationSchema.nullable(), paused: z.literal(true), drained: z.literal(true),
+  activation: sqliteDomainActivationSchema.nullable(), paused: z.boolean(), drained: z.boolean(),
   reason_code: z.enum(["execution_interrupted", "domain_effect_unverified"]).nullable(),
   show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
 }).strict();
@@ -75,11 +75,22 @@ export const sqliteDomainServiceStatusSchema = z.object({ own: sqliteDomainStatu
   targets_native_ready: z.boolean(), all_completed: z.boolean(),
   target_count: z.number().int().nonnegative(), prepared_count: z.number().int().nonnegative(),
   completed_count: z.number().int().nonnegative(), released_count: z.number().int().nonnegative(),
+  blocked_count: z.number().int().nonnegative(),
   targets: z.array(z.object({ show_id: z.string(), prepare_state: stepState, activate_state: stepState,
     release_state: stepState, phase: sqliteDomainPhaseSchema.nullable() }).strict()).max(20),
   next_cursor: z.string().nullable(),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if ([value.prepared_count, value.completed_count, value.released_count, value.blocked_count, value.targets.length]
+    .some((count) => count > value.target_count) || value.completed_count + value.blocked_count > value.target_count ||
+    value.all_completed && (value.own.phase !== "completed" || value.completed_count !== value.target_count || value.blocked_count !== 0) ||
+    value.phase === "completed" && (!value.all_completed || value.released_count !== value.target_count)) {
+    context.addIssue({ code: "custom", message: "Domain service status completion counts differ" });
+  }
+});
 export type SqliteDomainServiceStatus = z.infer<typeof sqliteDomainServiceStatusSchema>;
+export const sqliteDomainStateSchema = z.object({ runtime: sqlitePublicationRuntimeSchema,
+  connection: sqliteDomainConnectionSchema.nullable(), maintenance: z.object({ operation_id: z.uuid(),
+    phase: z.enum(["preparing", "prepared", "activating", "probing", "releasing"]) }).strict().nullable() }).strict();
 
 export async function parseSqliteDomainRequest(input: unknown): Promise<SqliteDomainRequest> {
   const request = sqliteDomainRequestSchema.parse(input);
