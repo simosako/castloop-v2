@@ -1,6 +1,6 @@
 # SQLite独自ドメインの実機確認案
 
-Issue #68向け。**未実施・実環境操作は未承認**。実装・ローカル試験・commitだけを実行許可にせず、対象account・新規Worker/bucket・専用hostname・許可する接続/配備/公開/Resume/切断の範囲を別途承認してから使う。保持サービス、非テストDNS、共有証明書、原本/journal/私有証跡は変更しない。
+Issue #68向け。**受け入れ未完了**。2026-10-24の別途承認された[初回実機確認](../design/sqlite_custom_domain_live_verification_20261024.md)は接続receipt検証で停止した。全Showをpaused/drained・保守拘束ありで保持し、切断や後続配備は行っていない。以下は完了済みの実績ではない。実装・ローカル試験・commitだけを実行許可にせず、対象account・新規Worker/bucket・専用hostname・許可する接続/配備/公開/Resume/切断の範囲を別途承認してから使う。保持サービス、非テストDNS、共有証明書、原本/journal/私有証跡は変更しない。
 
 1. 対応commit・配布CLI hash・新規fresh環境・空きsubdomainとactive/full Zoneを固定する。既存DNS/routes/接続を上書きしない。CLIの権限確認・準備は[利用ガイド](sqlite_custom_domains.md)に従う。
 2. 2 Showを作り、承認済み短尺音源を公開する。別の非公開Episodeも作り、Feed/cover/audioのGET/HEAD/Range/ETag、GUID/日時/media hash/履歴を基準として保存する。staging・内部世代URLは404を確認する。

@@ -2,7 +2,7 @@
 
 Issue #68の開発版CLI/Worker向け。対応版でfresh initしたservice schema 2 / `show-v1`、内部queue/content schema **6/7**とhealth識別`feed_generation_allocator="reservation-v1"`・`domain_changes="sqlite-domain-change-v1"`を必要とする。旧版のDB・journal・資源・外部で作った接続の移行や採用は行わない。
 
-**ローカル模擬試験とCLI検証の範囲であり、Cloudflare実機のDNS/TLS・API応答・rollout・性能は未確認。** この文書は配備・接続・公開・Resume・削除等の実環境操作の承認ではない。
+**Cloudflare実機の総合受け入れは未完了。** [初回実機確認](../design/sqlite_custom_domain_live_verification_20261024.md)では接続前の通常公開とPauseを確認したが、接続receipt検証で停止した。実APIの空一覧表現・opaque domain IDへの対応を修正し、636件のローカル試験を通過した段階であり、正規domainへの切替・redirect・切断復帰・rollout・性能は実証していない。この文書は配備・接続・公開・Resume・削除等の実環境操作の承認ではない。
 
 ## 前提と制約
 

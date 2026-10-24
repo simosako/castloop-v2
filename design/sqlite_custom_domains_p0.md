@@ -45,7 +45,7 @@ PUTには`override_scope`、`override_existing_origin`、`override_existing_dns_
 
 また、この処理はWorker単位の全体設定を扱う。公開Attach APIに同じflagが使える、false指定ならすべての競合が原子的に防げる、`override_scope`を変更しても同じ意味になる、という保証までは得られない。確認した公開Domains API一覧にはこのchangeset/records契約は掲載されていない。
 
-これは代替APIの調査根拠であって、非公開契約の採用承認やWrangler依存追加の理由ではない。実機でのAPI検証も今回の開発指示からは実施しない。
+これは代替APIの調査根拠であって、非公開契約の採用承認やWrangler依存追加の理由ではない。当初の開発指示では実機API検証を行わず、後に別途承認された試行だけを[初回停止記録](sqlite_custom_domain_live_verification_20261024.md)へ区別して残す。
 
 ## 3. 採用方針と運用上の制約
 

@@ -285,7 +285,7 @@ castloop domain remove --operation-id UUID --workspace PATH
 - TLS/REST/native観測待ちと管理POST応答喪失を、同一要求の完了証拠で限定続行する。未知接続/切断/設定/配備の再送・採用は拒否する。Feed/purgeのblockedを自動修復しない。
 - 未完了ローカルdraftがあれば変更開始前に拒否する。完了draftと過去jobは、完了済みdomain変更のhash連鎖と元公開結果の証拠を使って読取可能とする。次の明示updateだけが元記録を改変せずarchiveして新configのdraftを作る。未公開要求の書換え・昇格や旧版移行はしない。
 - 模擬REST/DO/R2と独立CLI processでadd→TLS待ち→continue→list/status→Resume→通常公開→Pause→removeを検証する。Episodeの非公開・復元、保存GUID/日時/audio/revision/cover保持、新規Show登録、20件を越えるstatus集計、通常deployによる接続保持を回帰対象に含む。
-- 利用ガイド・エージェント向け文書・feature templateを開発版の範囲へ更新した。[実機確認案](../docs/sqlite_custom_domain_live_acceptance.md)は未実施・未承認であり、実Cloudflare環境は変更していない。模擬試験は実機API/DNS/TLS/rollout/Free適合の証明ではない。
+- 利用ガイド・エージェント向け文書・feature templateを開発版の範囲へ更新した。後に別途承認された[初回実機確認](sqlite_custom_domain_live_verification_20261024.md)は接続receipt検証で停止し、P7は未完了。[実機確認案](../docs/sqlite_custom_domain_live_acceptance.md)の全項目を実施した実績ではない。模擬試験は実機API/DNS/TLS/rollout/Free適合の証明ではない。
 
 ### 9.2 ローカル検証結果
 
@@ -302,11 +302,11 @@ castloop domain remove --operation-id UUID --workspace PATH
 - `packages/cli/src/sqlite-domain-entrypoint.test.ts`: 別processの正式CLIからadd/TLS中断/continue/list/status/Resume/通常公開/Pause/remove、JSONと秘密非出力。通信はloopbackの模擬transportへ限定。
 - `packages/cli/src/sqlite-rss-publication.test.ts`: 独自originでRSS公開後のFeed検証と元GUID/permalink/日時の保持。
 
-Cloudflare認証付き実機操作・DNS変更・配備・接続/切断・Resume/公開は行っていない。全API応答差異、実TLS発行、native rollout、DO output gate、Workers Cache purgeの実動作、性能/全Free適合、300MBを今回のローカル合格で証明したとは扱わない。
+上記は実機承認前のローカル検証結果である。後の実機試行で確認したAPI差異への修正・未知receipt非採用の回帰追加後は**636 pass / 0 fail、76 files**、型検査・Linux CLI build成功。別途承認された実機の部分結果と停止状態は[記録](sqlite_custom_domain_live_verification_20261024.md)へ分けて残す。全API応答差異、native rollout、DO output gate、全cache/purge、性能/全Free適合、300MBをローカル合格で証明したとは扱わない。
 
 ## 10. 受け入れ条件と試験
 
-以下は実機を含む総合受け入れ項目であり、P7未実施のため未完了として保持する。ローカルの実施範囲・証拠は§9.2を参照する。
+以下は実機を含む総合受け入れ項目であり、P7が初回試行で停止したため未完了として保持する。ローカルの実施範囲・証拠は§9.2、実機の部分結果は上記記録を参照する。
 
 - [ ] 接続・照会・切断・状態確認・限定続行の契約とfresh専用境界があり、旧Queue/layoutへfallbackしない。
 - [ ] 正規originのFeed/cover/audioでGET/HEAD/Range/ETag/日付条件が動作する。旧workers.devの許可済み公開URLは同じパスの独自domainへ転送し、転送先で同じHTTP機能が動作する。独自domain未接続・切断後はworkers.devが本文を配信する。
