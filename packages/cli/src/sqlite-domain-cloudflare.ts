@@ -10,9 +10,10 @@ import type { R2RestOptions } from "./verified-r2-put";
 const id = z.string().regex(/^[a-f0-9]{32}$/);
 const rawDomain = z.object({ id, hostname: z.string().max(253), service: z.string(), zone_id: id, zone_name: z.string(),
   cert_id: z.string(), environment: z.string(), enabled: z.boolean(), previews_enabled: z.boolean() });
-const pagination = z.object({ page: z.number().int().positive(), per_page: z.number().int().positive(),
-  count: z.number().int().nonnegative(), total_count: z.number().int().nonnegative(), total_pages: z.number().int().nonnegative() });
-const envelope = z.object({ success: z.literal(true), errors: z.array(z.unknown()).max(0), result: z.unknown().optional(),
+const pagination = z.object({ page: z.number().int().positive(), per_page: z.number().int().nonnegative(),
+  count: z.number().int().nonnegative(), total_count: z.number().int().nonnegative(), total_pages: z.number().int().nonnegative().optional() });
+const dnsPagination = pagination.extend({ per_page: z.number().int().positive(), total_pages: z.number().int().nonnegative() });
+const envelope = z.object({ success: z.literal(true), errors: z.array(z.unknown()).max(0).nullable(), result: z.unknown().optional(),
   result_info: pagination.optional() });
 type Envelope = z.infer<typeof envelope>;
 
@@ -46,7 +47,7 @@ export class SqliteDomainCloudflare {
   async list() {
     const response = await this.call("GET", `${this.account}/workers/domains`);
     const domains = z.array(rawDomain).max(10000).parse(response.result);
-    if (response.result_info && (response.result_info.page !== 1 || response.result_info.total_pages > 1 ||
+    if (response.result_info && (response.result_info.page !== 1 || (response.result_info.total_pages ?? 1) > 1 ||
       response.result_info.total_count !== domains.length || response.result_info.count !== domains.length)) throw new Error("Domain listing is incomplete");
     return domains;
   }
@@ -70,7 +71,7 @@ export class SqliteDomainCloudflare {
     const values: unknown[] = []; let total: number | undefined;
     for (let page = 1; page <= 100; page++) {
       const response = await this.call("GET", `${path}?page=${page}&per_page=100`);
-      const items = z.array(z.unknown()).max(100).parse(response.result), info = response.result_info;
+      const items = z.array(z.unknown()).max(100).parse(response.result), info = dnsPagination.parse(response.result_info);
       if (!info || info.page !== page || info.per_page !== 100 || info.count !== items.length || info.total_pages > 100 ||
         total !== undefined && total !== info.total_count) throw new Error("Zone listing pagination was not verified");
       total = info.total_count; values.push(...items);
@@ -95,7 +96,7 @@ export class SqliteDomainCloudflare {
     }
     const response = await this.call("GET", `/zones/${zoneId}/workers/routes`);
     const routes = z.array(z.object({ pattern: z.string() })).max(10000).parse(response.result);
-    if (response.result_info && (response.result_info.page !== 1 || response.result_info.total_pages > 1 ||
+    if (response.result_info && (response.result_info.page !== 1 || (response.result_info.total_pages ?? 1) > 1 ||
       response.result_info.total_count !== routes.length || response.result_info.count !== routes.length)) throw new Error("Worker route listing is incomplete");
     if (routes.some((route) => hostnameCovered(route.pattern, hostname))) throw new Error("An existing Worker route covers this hostname");
     return { hostname, zone_id: zone.id, zone_name: zone.name };
