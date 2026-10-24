@@ -37,6 +37,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [レビュー修正の小規模実機確認](archive/code_review_fixes_live_verification_20261022.md) | 新規隔離2 Show・3 Episode、11 job成功と最終Pause。tail欠測・canceled Alarm・観測未完了を機能結果と区別 |
 | [レビュー実機確認の観測調査](archive/review_observation_investigation_20261022.md) | 音源UUID秘匿化と相関条件の不適合、元の欠測HTTPの保存ログ回収、成功後の重複Alarm取消仮説と未解決の診断欠落 |
 | [リリースCIのAction固定](../docs/ci_security.md) | 不変SHA・upstream確認・権限維持・手動更新の方針 |
+| [Zodセキュリティ更新](../docs/zod_security_update_20261025.md) | Issue #78。Zod 4.6.7への限定更新、ローカル検証、CLI/Worker反映と既存環境の互換境界 |
 | [v0.6.0のQueue方式コード削除計画](schema_v1_removal_plan.md) | Issue #24。v0.5.xのschema version 1機能は維持し、v0.6.0以降はSQLite単独化。削除範囲・共用処理の分離・検証・既存環境の保全 |
 | [単一PUT・U1](m6_upload_recovery_options.md) | 採用方式と未検証の仮定 |
 | [REST URLの構築](rest_url_construction.md) | パス要素のエンコード、R2 keyの区切り保持と単一PUTの不変条件 |
