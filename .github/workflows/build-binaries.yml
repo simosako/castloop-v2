@@ -39,6 +39,9 @@ jobs:
         with:
           bun-version: "1.4.4"
       - run: npm ci
+      - name: Prepare private test workspace
+        if: matrix.target == 'linux-x64'
+        run: mkdir -p -m 700 /tmp/opencode
       - name: Run type check and tests
         # The full regression suite (including the simulated-Cloudflare tests)
         # stays on the Linux reference environment; each OS additionally runs
@@ -47,9 +50,6 @@ jobs:
         run: |
           npm run check
           bun test
-      - name: Prepare private test workspace
-        if: matrix.target == 'linux-x64'
-        run: mkdir -p -m 700 /tmp/opencode
       - name: Verify tag version
         if: github.ref_type == 'tag' && matrix.target == 'linux-x64'
         shell: bash
