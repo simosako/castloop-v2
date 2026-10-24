@@ -2,7 +2,7 @@
 
 Issue #68向け。**受け入れ未完了**。2026-10-24の別途承認された[初回](../design/sqlite_custom_domain_live_verification_20261024.md)・[再試験](../design/sqlite_custom_domain_live_retest_20261024.md)とも接続receipt検証で停止した。全Showをpaused/drained・保守拘束ありで保持し、切断や後続配備は行っていない。以下は完了済みの実績ではない。実装・ローカル試験・commitだけを実行許可にせず、対象account・新規Worker/bucket・専用hostname・許可する接続/配備/公開/Resume/切断の範囲を別途承認してから使う。保持サービス、非テストDNS、共有証明書、原本/journal/私有証跡は変更しない。
 
-[第3試験](../design/sqlite_custom_domain_environment_review.md)は別承認のShow 0件・公開なしの診断に限定し、PUTのenvironment固定検証で停止した。切断は行わず3環境を保持する。以下の2 Show受け入れ全体を実施した実績ではなく、二段階receipt修正案も未承認・未実装である。
+[第3試験](../design/sqlite_custom_domain_environment_review.md)はPUTのenvironment固定検証で停止した。その後の別承認による[ログ付き反復試験](../design/sqlite_custom_domain_iterative_verification_20261024.md)で元PUT空文字と元DELETE空本文を特定・修正し、第8環境では**Show 0件の接続・限定続行・切断・workers.dev設定復帰が完了**した。最終paused/ready/drained・保守なし。旧unknown/残存lockは保持し、未開始の操作を含む以下の2 Show受け入れ全体を合格へ変更しない。
 
 1. 対応commit・配布CLI hash・新規fresh環境・空きsubdomainとactive/full Zoneを固定する。既存DNS/routes/接続を上書きしない。CLIの権限確認・準備は[利用ガイド](sqlite_custom_domains.md)に従う。
 2. 2 Showを作り、承認済み短尺音源を公開する。別の非公開Episodeも作り、Feed/cover/audioのGET/HEAD/Range/ETag、GUID/日時/media hash/履歴を基準として保存する。staging・内部世代URLは404を確認する。

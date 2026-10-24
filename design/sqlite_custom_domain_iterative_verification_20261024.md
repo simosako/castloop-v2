@@ -96,3 +96,30 @@ commit `e702ceb`で`i68r7-5ab503e8` / `castloop-domain68-r7.otftalk.com`を新�
 合わせてnativeの有限rollout待機を`domain_rollout_pending`という固定診断で返し、一般的なcommand_failedとの区別を可能にした。待機回数・検証条件・再送規則は変えない。
 
 回帰では空DELETEのstream/null-body、各不正形式、旧JSON envelope、PUT空文字→production GET、TLS/native待機の独立CLIと操作継続を確認した。native待機mockでno-store headerを落とした試験自身の不備を修正後、全体を再実行し、**666 pass / 0 fail、76 files、83.56秒**。型検査・Linux CLI build・diff検査も成功。
+
+## R8: 修正後の接続・切断が完了
+
+| 項目 | 結果 |
+| --- | --- |
+| 実行commit | `4fcb398e5326b657852abcbbea04faf659c521fd` |
+| Linux単体CLI SHA-256 | `e5ae7af9e647a755637ef2cf5c4662e06d8081b9ccba1befad15e197622d8199` |
+| service / hostname | `i68r8-9b028f6a` / `castloop-domain68-r8.otftalk.com` |
+| Worker / private bucket | `castloop-i68r8-9b028f6a-a9a106ea` / `castloop-i68r8-9b028f6a` |
+| SQLite namespace | `257c14ca4a644daea2b2d99826b898ae` |
+| add | completed。PUT acknowledgementは空文字、完全connectionはproduction。設定・接続一致、ready、保守解除を確認 |
+| remove | completed、detach_acknowledged true。workers.dev復帰、既知connection null、Cloudflare接続0件 |
+| 最終状態 | Show 0件、paused/drained、publication_ready true、maintenance null、queued 0、active null、local_pending空 |
+| 最終version | `4218140d-6303-4c60-833d-d64cfac089dc` |
+| 最終読取確認 | 2026-10-24 10:15:29 UTC |
+
+addはTLS pending、次の続行は配備PUT成功checkpoint（deploy_acknowledged）後の読取検証で一度停止したが、同じ配備から再度明示continueして完了した。removeは有限native待機の`domain_rollout_pending`で一度正常終了し、後の読取で正確なversion/configとtargets_native_readyを確認してからcontinueし、切断とfinalizeが完了した。未知mutationの再送・現在値からの採用や、待機回避の再配備はしていない。成功checkpointがある読取待ちと未知mutationを区別している。
+
+12 CLI操作の送信前記録とstdout/stderr、add/removeのjournal・native/REST証拠、前後のDNS/domain/routes/Worker/bucket一覧を私有保存した。以前の7環境のversion・paused/drained・ready/保守状態が保存状態と一致し、R8追加分を除く一覧も不変だった。既存DBやbucket全objectの完全backupを行ったという意味ではない。R8は元々Show 0件で、素材upload・公開・Resumeは行っていない。過去2環境の4 Showもpausedのまま。
+
+私有証跡は`.local-test-data/results/20261024/i68r8-9b028f6a/`。R4〜R8のSHA-256 manifestはそれぞれ30/58/47/57/64ファイルを記録し、保存後に再照合した。失敗ログも残し、秘密・未公開操作ID・本文をGitへ入れていない。Worker/bucket/namespace、共有証明書、旧未知journalとR5残存lockはすべて保持し、cleanupはしていない。
+
+### 今回の結論と未確認範囲
+
+**Show 0件での実Cloudflare接続・限定続行・切断・workers.dev設定復帰は合格**。元PUT空文字と元DELETE空本文という2つのCLI応答検証不具合を、実測を根拠に修正できた。TLS/native伝播待ちは無効化せず、明示照会・成功receiptからの続行で処理した。
+
+この最小試験で、2 Showの公開Feed切替、旧workers.devの301/307、正規domainでの音源/画像配信・Range/ETag、履歴保持、通常publish/restore/RSS/code-only deploy、性能/全Free適合を実証したとは扱わない。[2 Show受け入れ案](../docs/sqlite_custom_domain_live_acceptance.md)の残りと区別する。既存unknown/lockの修復・旧環境切断・削除を次の通常作業として実施しない。

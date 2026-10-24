@@ -310,6 +310,8 @@ castloop domain remove --operation-id UUID --workspace PATH
 
 その後の追加承認による[ログ付き第4試験](sqlite_custom_domain_iterative_verification_20261024.md)で元PUTのenvironment空文字を確認した。PUT acknowledgementを先に耐久保存し、同IDへのproduction GETで全fieldを一致確認してからconnectedへ進む限定修正を実装した。既存unknown非採用/非再送を維持し、**654 tests / 76 files成功**、型検査・Linux CLI build成功。修正版の実機結果は同記録に区別して記す。
 
+さらに元DELETEのHTTP 200・Content-Length 0・完全0バイト本文を確認して限定修正し、第8環境で**Show 0件の接続・限定続行・切断・workers.dev設定復帰がcompleted**となった。TLS/native待ちの固定診断と非再送の継続も確認した。最終paused/ready/drained・保守なし。ローカルは**666 tests / 76 files成功**、型検査・Linux CLI build成功。2 Showの公開/redirect/履歴等の実機総合受け入れとは区別し、旧unknownと残存lockを保持する。
+
 ## 10. 受け入れ条件と試験
 
 以下は実機を含む総合受け入れ項目であり、P7が初回試行で停止したため未完了として保持する。ローカルの実施範囲・証拠は§9.2、実機の部分結果は上記記録を参照する。
