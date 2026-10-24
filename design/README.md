@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-未リリースのIssue #68開発では、fresh専用の内部queue/content形式を6/7へ変更し、SQLite独自subdomainと旧workers.dev公開URLのredirectを追加する。旧5/6環境の移行・採用はしない。[段階別ログ](sqlite_domain_response_logging.md)による[反復試験](sqlite_custom_domain_iterative_verification_20261024.md)で元PUT空文字とDELETE空本文を特定・修正した。第8環境でShow 0件の接続・限定続行・切断・workers.dev設定復帰が完了し、最終paused/ready/drained・保守なし。2 Showの公開/redirect/履歴を含む実機総合受け入れは未完了。[計画](sqlite_custom_domains_plan.md)で区別する。
+未リリースのIssue #68開発では、fresh専用の内部queue/content形式を6/7へ変更し、SQLite独自subdomainと旧workers.dev公開URLのredirectを追加する。旧5/6環境の移行・採用はしない。[反復試験](sqlite_custom_domain_iterative_verification_20261024.md)の応答修正後、[第9環境の2 Show総合機能試験](sqlite_custom_domain_two_show_verification_20261024.md)で公開・独自origin配信・redirect・個別Pause・更新/復元・通常deploy・切断復帰・履歴保持を確認した。両Show paused/ready/drainedで終了。RSS・故障注入・内部cache状態・性能/全Free適合等の未確認範囲は同記録と[計画](sqlite_custom_domains_plan.md)で区別する。
 
 v0.7.2はエージェント向けCLIと管理者Skillを追加したrelease。Worker・永続形式はv0.7.1から変更しない。[リリースノート](../docs/release-v0.7.2.md)と[利用ガイド](../docs/agent_usage.md)を参照する。Cloudflare実機検証は今回の変更範囲では省略し、ローカル回帰と単体バイナリで確認する。
 
@@ -20,11 +20,12 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [SQLite独自ドメイン対応計画](sqlite_custom_domains_plan.md) | Issue #68。開発版のCLI/REST/DO接続、Cloudflare DNS前提、管理/公開origin分離、redirect、個別停止と設定・Feed切替、ローカル検証範囲 |
 | [独自ドメインP0・API条件の確認](sqlite_custom_domains_p0.md) | 公開Attach/Detachを採用。外部同時変更は想定外という制約を記録し、保留解消・開発継続。HTTP/identity/Feed採番の契約 |
 | [SQLite独自ドメイン操作](../docs/sqlite_custom_domains.md) | 開発版のadd/list/status/continue/remove、必要権限、停止と再開、中断・切断時の制約 |
-| [SQLite独自ドメイン実機確認案](../docs/sqlite_custom_domain_live_acceptance.md) | 新規隔離環境と専用hostnameでの確認手順。初回は別途承認で部分試行・停止。後続操作へ過去承認を流用しない |
+| [SQLite独自ドメイン実機確認](../docs/sqlite_custom_domain_live_acceptance.md) | 新規隔離環境と専用hostnameでの確認手順と2 Showの結果参照。新しい実環境操作へ過去承認を流用しない |
 | [SQLite独自ドメイン初回実機・停止記録](sqlite_custom_domain_live_verification_20261024.md) | 2 Showの通常公開・Pause、API応答/opaque ID修正、未知接続非採用、保守拘束付きの最終停止状態と未試験範囲 |
 | [SQLite独自ドメイン再試験・停止記録](sqlite_custom_domain_live_retest_20261024.md) | 別hostname・fresh環境でもreceipt検証で停止。原因未確定、初回環境保持、履歴hash保持、値を出さないfield診断の追加 |
 | [environment診断とreceipt契約の追加レビュー](sqlite_custom_domain_environment_review.md) | 第3環境の停止記録と提案履歴。ログ調査を優先した経緯 |
 | [ログ付き再試験と修正](sqlite_custom_domain_iterative_verification_20261024.md) | PUT空文字・DELETE空本文を特定/修正。第8環境でShow 0件のadd/remove完了、旧unknown/lock保持と未試験範囲 |
+| [独自ドメイン2 Show総合実機確認](sqlite_custom_domain_two_show_verification_20261024.md) | 第9環境で公開/配信/301・307/個別Pause/更新・復元/接続維持deploy/切断復帰が成功。最終Pause、8履歴object保持、旧8環境不変と検証限界 |
 | [独自domain応答検証ログと調査](sqlite_domain_response_logging.md) | 既存stderrは空で元PUTは欠測。CLIへHTTP/body/JSON/schemaの段階とenvironment固定分類を追加。秘密非出力・非再送のローカル回帰 |
 | [エージェントによるPodcast管理の改善案](agent_integration_plan.md) | Issue #5。単一バイナリでのschema・雛形・Skill配布、明示対象指定、オフライン検証、doctor、承認と中断対応。MCPは不採用 |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |

@@ -2,7 +2,7 @@
 
 Issue #68の開発版CLI/Worker向け。対応版でfresh initしたservice schema 2 / `show-v1`、内部queue/content schema **6/7**とhealth識別`feed_generation_allocator="reservation-v1"`・`domain_changes="sqlite-domain-change-v1"`を必要とする。旧版のDB・journal・資源・外部で作った接続の移行や採用は行わない。
 
-**Show 0件でのCloudflare実機接続・限定続行・切断・workers.dev設定復帰は合格。公開を含む総合受け入れは未完了。** [ログ付き反復試験](../design/sqlite_custom_domain_iterative_verification_20261024.md)で元PUTのenvironment空文字とDELETE成功時の0バイト本文を特定・修正し、最終状態paused/ready/drained・保守なし・接続なしを確認した。666件のローカル試験も成功。2 ShowでのFeed/配信/redirect/履歴/通常deploy等の未確認範囲は同記録を参照する。この文書自体は実環境操作の承認ではない。
+**Cloudflare実機の2 Show小規模総合機能試験は合格。** [確認記録](../design/sqlite_custom_domain_two_show_verification_20261024.md)で公開・独自origin配信・301/307転送・個別Pause・通常更新/非公開化/復元・接続維持deploy・切断とworkers.dev復帰・履歴保持を確認し、両Show paused/ready/drained・保守なしで終了した。RSS、故障注入、cache hit/miss、性能/全Free適合等は未実証。先行[反復試験](../design/sqlite_custom_domain_iterative_verification_20261024.md)の元PUT/DELETE応答修正後、今回の製品コード変更はない。この文書自体は実環境操作の承認ではない。
 
 [Show 0件の第3試験](../design/sqlite_custom_domain_environment_review.md)までの元応答は欠測のまま。[ログ調査と診断追加](../design/sqlite_domain_response_logging.md)後の新規実測を根拠に修正し、既存unknownの再送・採用・補完はしない。
 

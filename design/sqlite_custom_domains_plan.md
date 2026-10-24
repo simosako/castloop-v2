@@ -285,7 +285,7 @@ castloop domain remove --operation-id UUID --workspace PATH
 - TLS/REST/native観測待ちと管理POST応答喪失を、同一要求の完了証拠で限定続行する。未知接続/切断/設定/配備の再送・採用は拒否する。Feed/purgeのblockedを自動修復しない。
 - 未完了ローカルdraftがあれば変更開始前に拒否する。完了draftと過去jobは、完了済みdomain変更のhash連鎖と元公開結果の証拠を使って読取可能とする。次の明示updateだけが元記録を改変せずarchiveして新configのdraftを作る。未公開要求の書換え・昇格や旧版移行はしない。
 - 模擬REST/DO/R2と独立CLI processでadd→TLS待ち→continue→list/status→Resume→通常公開→Pause→removeを検証する。Episodeの非公開・復元、保存GUID/日時/audio/revision/cover保持、新規Show登録、20件を越えるstatus集計、通常deployによる接続保持を回帰対象に含む。
-- 利用ガイド・エージェント向け文書・feature templateを開発版の範囲へ更新した。後に別途承認された[初回実機確認](sqlite_custom_domain_live_verification_20261024.md)は接続receipt検証で停止し、P7は未完了。[実機確認案](../docs/sqlite_custom_domain_live_acceptance.md)の全項目を実施した実績ではない。模擬試験は実機API/DNS/TLS/rollout/Free適合の証明ではない。
+- 利用ガイド・エージェント向け文書・feature templateを開発版の範囲へ更新した。後の実機試行の停止・応答修正を経て、[第9環境の2 Show試験](sqlite_custom_domain_two_show_verification_20261024.md)でP7の小規模通常機能を確認した。公開/配信/redirect/個別Pause/更新・復元/接続維持deploy/切断復帰・履歴保持が成功し、最終paused/ready/drained。RSS、故障注入、内部cache状態、性能/全Free適合等を確認済みにはしない。
 
 ### 9.2 ローカル検証結果
 
@@ -312,9 +312,11 @@ castloop domain remove --operation-id UUID --workspace PATH
 
 さらに元DELETEのHTTP 200・Content-Length 0・完全0バイト本文を確認して限定修正し、第8環境で**Show 0件の接続・限定続行・切断・workers.dev設定復帰がcompleted**となった。TLS/native待ちの固定診断と非再送の継続も確認した。最終paused/ready/drained・保守なし。ローカルは**666 tests / 76 files成功**、型検査・Linux CLI build成功。2 Showの公開/redirect/履歴等の実機総合受け入れとは区別し、旧unknownと残存lockを保持する。
 
+続く[第9環境の2 Show小規模総合機能確認](sqlite_custom_domain_two_show_verification_20261024.md)は製品コードを変えず成功した。64 CLI操作、正規配信11組、redirect12件、private/admin拒否10件、Pauseの503確認120件、日付条件304確認33件、不変履歴8 objectsのhash保持を記録した。code-only deployとremoveのnative待機は成功receiptから続行し、再配備/未知mutation再送なし。以前の8環境と無関係なDNS等は不変。最終両Show paused/ready/drained、接続なし、保守なし。
+
 ## 10. 受け入れ条件と試験
 
-以下は実機を含む総合受け入れ項目であり、P7が初回試行で停止したため未完了として保持する。ローカルの実施範囲・証拠は§9.2、実機の部分結果は上記記録を参照する。
+第9環境で小規模通常機能は合格した。以下は故障注入・全状態・全組合せまで含む広い受け入れ項目であり、小規模試験だけで一括完了にはしない。ローカルの実施範囲・証拠は§9.2、今回実機で確認した範囲と未確認事項は[2 Show確認記録](sqlite_custom_domain_two_show_verification_20261024.md)を参照する。
 
 - [ ] 接続・照会・切断・状態確認・限定続行の契約とfresh専用境界があり、旧Queue/layoutへfallbackしない。
 - [ ] 正規originのFeed/cover/audioでGET/HEAD/Range/ETag/日付条件が動作する。旧workers.devの許可済み公開URLは同じパスの独自domainへ転送し、転送先で同じHTTP機能が動作する。独自domain未接続・切断後はworkers.devが本文を配信する。

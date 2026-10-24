@@ -2,6 +2,8 @@
 
 Issue #68、2026-10-24。管理者は、同じCloudflare accountの新規環境と任意の`castloop-domain68-*` subdomainで、実機調査・修正・再試験を繰り返すことを明示承認した。各試行はShow 0件・公開0件の最小診断とし、接続が完全に検証できた場合だけ切断する。未知mutationの再送・採用、旧環境の解除・削除、無関係なDNS・証明書・権限・課金設定の変更は対象外。
 
+本書はR4〜R8の最小診断の記録。後続の別途指示による[第9環境の2 Show総合実機確認](sqlite_custom_domain_two_show_verification_20261024.md)は別記録とし、旧unknown/残存lockの扱いは変えない。
+
 ## R4: 元PUTの不一致をログで特定
 
 ログ実装済みcommit `22be0c7`、Linux CLI SHA-256 `431599c4c06d7509eaf56a84df38019c04375010f1c0db630729b2d7b5fac808`で、fresh init後にdomain addを1回実行した。
