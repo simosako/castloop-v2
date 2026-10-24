@@ -36,3 +36,21 @@ Cloudflareの[現行Attach仕様](https://developers.cloudflare.com/api/resource
 - `bun test`: **654 pass / 0 fail、76 files、80.32秒**。`npm run check`、Linux単体CLI build成功。
 
 修正版の新規実機試験は別のfresh環境で行う。ローカル成功を実機合格や公開/redirect/性能の確認へ読み替えない。
+
+## R5: 接続完了と切断試験runnerの中断
+
+修正commit `e15b863`で`i68r5-1e52c78f` / `castloop-domain68-r5.otftalk.com`をfresh initした。addは`attachment_acknowledgement.environment=""`を保存し、同IDのGETで`connection.environment="production"`を確認できた。元のPUT検証問題は解消した。
+
+その後、設定書込前のconnectedで一度停止した。元stderrは空なので停止理由をTLS等と断定しない。後の読取検査では完全connection/membership、TLS、元配備照合がすべて通った。成功receiptと同じsource/hashを使う明示continueでaddはcompletedとなり、独自origin設定・native ready・保守解除・ローカル同期・接続一致を確認した。Showは0件のまま、公開/Resumeなし。
+
+removeを開始したが、**エージェントが指定した実行ツールの120秒上限がCLIの全体所要時間より短く、runner/CLIが終了**した。切断不具合が実証されたわけではない。remove journalはverified、成功配備receiptあり、DELETE未開始だがlocal lockが残ったため、強制解除・続行・再送はしない。ローカルは独自origin、配備済み設定はworkers.devという途中状態を保持した。nativeはpaused/drained・ready false・prepared保守中で、Show 0件、queued 0、active null。接続/DNSは残し、R2/namespace/Worker/証跡を削除しない。
+
+R5 Workerは`castloop-i68r5-1e52c78f-3d35f246`、private bucketは`castloop-i68r5-1e52c78f`。読取で現在runtimeに一致する既知のtarget configを使い、旧4環境のhealth、今回追加分を除くDNS/domain/routes/Worker/bucket一覧の不変を確認した。観測runnerのconfig選択とservice/registration healthの違いも修正し、失敗した読取試行の記録は保持した。私有証跡は`.local-test-data/results/20261024/i68r5-1e52c78f/`。
+
+次の試行は新規環境で実行ツールの上限を600秒にし、CLI自身の有限待機後の正常終了を待つ。成功checkpointのないmutationや残存lockを回避するために旧環境を使い回さない。
+
+### TLS診断の追加
+
+connectedでの停止を次から特定できるよう、資格情報なしのTLS HEADにも固定ログを追加した。`api_operation=tls_probe`、`reason_code=tls_transport_unverified/tls_status_unverified`、`domain_tls_pending`を返す。URL・任意例外・応答本文を記録せず、404以外やredirectを受け入れない。新しいretryや検証緩和はない。
+
+追加回帰後は`bun test` **655 pass / 0 fail、76 files、78.34秒**、型検査・Linux CLI build成功。CLI SHA-256は`bbef27619257d916a8f9d5da89ce3f5cf5ae0fd65e5542968caaf6a4aef74a37`。

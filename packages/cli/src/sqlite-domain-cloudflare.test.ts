@@ -181,3 +181,23 @@ test("Cloudflare error logs identify transport, HTTP, body, JSON and envelope bo
     expect(records.join("\n")).not.toContain("api.cloudflare.com");
   } finally { logger.mockRestore(); f.close(); }
 });
+
+test("TLS observation failures have a separate credential-free stage and never expose transport exceptions", async () => {
+  const f = await sqliteServiceFixture(), records: string[] = [];
+  const logger = spyOn(console, "error").mockImplementation((line) => { records.push(String(line)); });
+  try {
+    for (const failure of ["transport", "status"] as const) {
+      const api = new SqliteDomainCloudflare(f.config, { ...f.options, transport: async (_input, init) => {
+        expect(init?.method).toBe("HEAD"); expect(init?.headers).toBeUndefined(); expect(init?.redirect).toBe("error");
+        if (failure === "transport") throw new Error("private-provider-failure");
+        return new Response("private-provider-response", { status: 503 });
+      } });
+      await expect(api.verifyTls("https://podcasts.example.com")).rejects.toMatchObject({ code: "domain_tls_pending" });
+    }
+    expect(records.map((line) => JSON.parse(line))).toEqual([
+      { event: "sqlite_domain_cloudflare", api_operation: "tls_probe", method: "HEAD", reason_code: "tls_transport_unverified", will_retry: false },
+      { event: "sqlite_domain_cloudflare", api_operation: "tls_probe", method: "HEAD", reason_code: "tls_status_unverified", http_status: 503, will_retry: false },
+    ]);
+    expect(records.join("\n")).not.toContain("private-provider"); expect(records.join("\n")).not.toContain("podcasts.example.com");
+  } finally { logger.mockRestore(); f.close(); }
+});

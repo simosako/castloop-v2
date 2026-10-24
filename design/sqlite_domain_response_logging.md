@@ -22,8 +22,8 @@ Issue #68。2026-10-24、管理者の指摘に基づき、契約変更より先�
 
 | field | 記録内容 |
 | --- | --- |
-| api_operation | domain_attach/get/list/detach、zone_get、dns_list、route_listという固定分類 |
-| method | GET / PUT / DELETE |
+| api_operation | domain_attach/get/list/detach、zone_get、dns_list、route_list、tls_probeという固定分類 |
+| method | GET / PUT / DELETE / HEAD |
 | reason_code | 下表の固定コード |
 | http_status | 応答がある場合のstatus数値 |
 | response_kind | 必要な場合だけ、missing/null/array/object/string/number/boolean/other |
@@ -46,6 +46,8 @@ Issue #68。2026-10-24、管理者の指摘に基づき、契約変更より先�
 | connection_schema_unverified | 接続receiptのfield型・形式・固定値の検証 |
 | connection_target_mismatch | schemaを通ったreceiptと凍結したWorker/hostname/Zone等との照合 |
 | connection_receipt_mismatch | GETの接続と保存済みreceiptの一致確認 |
+| tls_transport_unverified | 資格情報なしのTLS HEADで接続/名前解決/期限等の失敗。任意例外は保存しない |
+| tls_status_unverified | TLS HEADが期待する404以外。redirectは追従しない |
 
 PUTのreceipt検証で`http_status=200`が出た場合、HTTP・完全読取・JSON・success envelope検証までは通過したという意味である。接続完了や公開成功の意味ではない。
 

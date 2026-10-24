@@ -56,6 +56,8 @@ castloop domain continue ADD_UUID --workspace ./service --json
 
 失敗時のstderrには1行JSONの`event="sqlite_domain_cloudflare"`を出す。固定の`api_operation`・`method`・`reason_code`でHTTP/本文/JSON/envelope/接続照合のどこで止まったかを区別し、接続receiptでは`environment_kind`で欠落/null/空文字/production/別文字列/不正型を区別する。任意の値・例外・本文・URL・鍵は記録しない。詳細とローカル検証は[応答検証ログ](../design/sqlite_domain_response_logging.md)を参照する。過去PUTをログ取得のために再送せず、既存journalも変更しない。
 
+資格情報なしのTLS HEAD待ちは`domain_tls_pending`と`api_operation=tls_probe`で区別する。接続がconnectedとして保存済みでも、TLS成功前は設定書込・配備へ進まない。
+
 | 停止位置 | 対応 |
 | --- | --- |
 | attachment_acknowledged保存済み、完全接続GET待ち | 同じIDへGETしproduction・全fieldの一致を検証。PUTは再送せず、connected保存前は設定書込・配備しない |

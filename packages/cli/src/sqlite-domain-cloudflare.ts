@@ -19,10 +19,11 @@ const dnsPagination = pagination.extend({ per_page: z.number().int().positive(),
 const envelope = z.object({ success: z.literal(true), errors: z.array(z.unknown()).max(0).nullable(), result: z.unknown().optional(),
   result_info: pagination.optional() });
 type Envelope = z.infer<typeof envelope>;
-type DomainApiOperation = "domain_list" | "domain_attach" | "domain_get" | "domain_detach" | "zone_get" | "dns_list" | "route_list";
-type DomainMethod = "GET" | "PUT" | "DELETE";
+type DomainApiOperation = "domain_list" | "domain_attach" | "domain_get" | "domain_detach" | "zone_get" | "dns_list" | "route_list" | "tls_probe";
+type DomainMethod = "GET" | "PUT" | "DELETE" | "HEAD";
 type DomainFailureCode = "transport_unverified" | "http_status_unverified" | "body_missing" | "partial_response_unverified" | "body_unverified" | "json_unverified" |
-  "envelope_unverified" | "connection_schema_unverified" | "connection_target_mismatch" | "connection_receipt_mismatch";
+  "envelope_unverified" | "connection_schema_unverified" | "connection_target_mismatch" | "connection_receipt_mismatch" |
+  "tls_transport_unverified" | "tls_status_unverified";
 type ResponseKind = "missing" | "null" | "array" | "object" | "string" | "number" | "boolean" | "other";
 type EnvironmentKind = "invalid_result" | "missing" | "null" | "empty_string" | "production" | "other_string" | "non_string";
 type ValidationField = { path: string[]; code: string };
@@ -220,8 +221,14 @@ export class SqliteDomainCloudflare {
     let response: Response;
     try { response = await (this.options.transport ?? fetch)(`${origin}/`, { method: "HEAD", redirect: "error",
       signal: AbortSignal.timeout(10000), cache: "no-store" }); }
-    catch { throw new Error("Domain DNS/TLS is not ready; continue observation explicitly without reconnecting"); }
+    catch {
+      logDomainFailure("tls_probe", "HEAD", "tls_transport_unverified");
+      throw new AgentError("domain_tls_pending", "Domain DNS/TLS is not ready; continue observation explicitly without reconnecting");
+    }
     await response.body?.cancel();
-    if (response.status !== 404) throw new Error("Domain TLS reachability response differs; no redirects are followed");
+    if (response.status !== 404) {
+      logDomainFailure("tls_probe", "HEAD", "tls_status_unverified", { http_status: response.status });
+      throw new AgentError("domain_tls_pending", "Domain TLS reachability response differs; no redirects are followed");
+    }
   }
 }

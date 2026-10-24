@@ -41,6 +41,7 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     const id = crypto.randomUUID(); f.faults.tlsPending = true;
     const failed = await invoke(["domain", "add", "podcasts.example.com", "--zone-id", "c".repeat(32), "--operation-id", id], false);
     expect(failed.result).toMatchObject({ operation_id: id, phase: "connected" });
+    expect(failed.error?.code).toBe("domain_tls_pending");
     expect(readSqliteDomainJournal(f.root, f.config, id)).toMatchObject({ attachment_acknowledgement: { environment: "" }, connection: { environment: "production" } });
     expect(failed.next_actions.some((action) => action.command === "domain" && action.args?.[0] === "status")).toBe(true);
     f.faults.tlsPending = false;
