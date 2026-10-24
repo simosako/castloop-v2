@@ -54,3 +54,13 @@ R5 Workerは`castloop-i68r5-1e52c78f-3d35f246`、private bucketは`castloop-i68r
 connectedでの停止を次から特定できるよう、資格情報なしのTLS HEADにも固定ログを追加した。`api_operation=tls_probe`、`reason_code=tls_transport_unverified/tls_status_unverified`、`domain_tls_pending`を返す。URL・任意例外・応答本文を記録せず、404以外やredirectを受け入れない。新しいretryや検証緩和はない。
 
 追加回帰後は`bun test` **655 pass / 0 fail、76 files、78.34秒**、型検査・Linux CLI build成功。CLI SHA-256は`bbef27619257d916a8f9d5da89ce3f5cf5ae0fd65e5542968caaf6a4aef74a37`。
+
+## R6: TLS待ちを識別、切断の応答形式で停止
+
+commit `f6fe243`で`i68r6-6928816f` / `castloop-domain68-r6.otftalk.com`を新規作成した。addはconnectedで`domain_tls_pending` / `tls_transport_unverified`として終了し、後の読取でTLS成功を確認した。同一成功receiptからの明示continueでadd completed、設定・接続・native ready・保守解除を確認した。TLS伝播待ちはPUT再送や新しい接続を必要としない。
+
+600秒の実行枠でremoveを実行し、workers.devへの配備/native確認・Feed probe・ローカル同期まで完了したが、**DELETEのHTTP 200応答をJSON parseできず**、detach_requestedで停止した。元本文の形はログにないため空本文と断定しない。DELETE成功の耐久acknowledgementはなく、再送・GETの不在による成功昇格・finalizeはしない。Show 0件、paused/drained・ready false、保守拘束と全資源/証跡を保持した。既存5環境と無関係な一覧が試行前と同じことを読取確認した。私有証跡は`.local-test-data/results/20261024/i68r6-6928816f/`。
+
+次の切り分けのため、JSON失敗ログに固定の`body_kind=empty/whitespace/nonempty`、本文byte数、`content_length_kind=missing/zero/positive/invalid`を追加する。本文やheaderの任意値は保存せず、応答の受け入れ条件はまだ変更しない。[現行Detach仕様](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/delete/)は成功envelopeの例を掲載しているが、今回の実応答がそれと異なる理由は未確定。
+
+ログ追加後の`bun test`は**656 pass / 0 fail、76 files、80.39秒**。型検査・Linux CLI build成功。

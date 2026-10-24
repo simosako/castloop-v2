@@ -30,6 +30,8 @@ Issue #68。2026-10-24、管理者の指摘に基づき、契約変更より先�
 | environment_kind | 接続receipt失敗時の固定分類。下記参照 |
 | expected_environment | PUT acknowledgementはempty_or_production、完全GET connectionはproduction |
 | fields | 既知field名と検証codeのみ、最大20件。未知key名は空pathへ伏せる |
+| body_kind / body_bytes | JSON parse失敗時だけ、empty/whitespace/nonemptyとbyte数。本文は保存しない |
+| content_length_kind | 同じ失敗時だけ、Content-Lengthのmissing/zero/positive/invalid分類。任意header値は保存しない |
 | will_retry | false。診断追加による自動再送はしない |
 
 ### どこで失敗したか

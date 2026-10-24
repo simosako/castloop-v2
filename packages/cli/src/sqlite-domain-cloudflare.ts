@@ -28,7 +28,9 @@ type ResponseKind = "missing" | "null" | "array" | "object" | "string" | "number
 type EnvironmentKind = "invalid_result" | "missing" | "null" | "empty_string" | "production" | "other_string" | "non_string";
 type ValidationField = { path: string[]; code: string };
 type DomainDiagnosticDetails = { http_status?: number; response_kind?: ResponseKind; environment_kind?: EnvironmentKind;
-  expected_environment?: "production" | "empty_or_production"; fields?: ValidationField[] };
+  expected_environment?: "production" | "empty_or_production"; fields?: ValidationField[];
+  body_kind?: "empty" | "whitespace" | "nonempty"; body_bytes?: number;
+  content_length_kind?: "missing" | "zero" | "positive" | "invalid" };
 const connectionFields = new Set(["id", "cert_id", "hostname", "zone_id", "zone_name", "service", "environment", "enabled", "previews_enabled"]);
 const validationCodes = new Set(["invalid_type", "invalid_format", "invalid_value", "unrecognized_keys", "too_small", "too_big", "custom"]);
 
@@ -110,7 +112,11 @@ export class SqliteDomainCloudflare {
     let input: unknown;
     try { input = JSON.parse(text); }
     catch {
-      logDomainFailure(operation, method, "json_unverified", { http_status: response.status });
+      const length = response.headers.get("Content-Length");
+      logDomainFailure(operation, method, "json_unverified", { http_status: response.status,
+        body_kind: text === "" ? "empty" : text.trim() === "" ? "whitespace" : "nonempty",
+        body_bytes: new TextEncoder().encode(text).byteLength,
+        content_length_kind: length === null ? "missing" : length === "0" ? "zero" : /^[1-9][0-9]*$/.test(length) ? "positive" : "invalid" });
       throw new Error("Cloudflare domain response was not verified; never replay an uncertain mutation");
     }
     const parsed = envelope.safeParse(input);

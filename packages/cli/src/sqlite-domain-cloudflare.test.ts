@@ -201,3 +201,20 @@ test("TLS observation failures have a separate credential-free stage and never e
     expect(records.join("\n")).not.toContain("private-provider"); expect(records.join("\n")).not.toContain("podcasts.example.com");
   } finally { logger.mockRestore(); f.close(); }
 });
+
+test("invalid JSON logs classify empty, whitespace and nonempty bodies without retaining response data", async () => {
+  const f = await sqliteServiceFixture(), records: string[] = [];
+  const logger = spyOn(console, "error").mockImplementation((line) => { records.push(String(line)); });
+  try {
+    for (const [body, headers, expected] of [
+      ["", { "Content-Length": "0" }, { body_kind: "empty", body_bytes: 0, content_length_kind: "zero" }],
+      [" \n", {}, { body_kind: "whitespace", body_bytes: 2, content_length_kind: "missing" }],
+      ["private-response", { "Content-Length": "16" }, { body_kind: "nonempty", body_bytes: 16, content_length_kind: "positive" }],
+    ] as const) {
+      const api = new SqliteDomainCloudflare(f.config, { ...f.options, transport: async () => new Response(body, { headers }) });
+      await expect(api.list()).rejects.toThrow();
+      expect(JSON.parse(records.at(-1)!)).toMatchObject({ reason_code: "json_unverified", ...expected });
+    }
+    expect(records.join("\n")).not.toContain("private-response");
+  } finally { logger.mockRestore(); f.close(); }
+});
