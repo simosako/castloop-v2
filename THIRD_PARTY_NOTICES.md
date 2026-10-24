@@ -21,7 +21,7 @@ The castloop executable includes code from the following packages. Versions are 
 | `media-typer` | 2.0.0 | MIT | Copyright (c) 2014–2017 Douglas Christopher Wilson |
 | `ieee754` | 1.2.1 | BSD-3-Clause | Copyright 2008 Fair Oaks Labs, Inc. |
 | `win-guid` | 0.2.1 | MIT | Copyright © 2026 Borewit |
-| `zod` | 4.6.5 | MIT | Copyright (c) 2025 Colin McDonnell |
+| `zod` | 4.6.7 | MIT | Copyright (c) 2025 Colin McDonnell |
 | `saxes` | 6.0.0 | ISC | Copyright (c) Contributors; Copyright (c) Isaac Z. Schlueter and Contributors |
 | `xmlchars` | 2.2.0 | MIT | Copyright Louis-Dominique Dubeau and contributors to xmlchars |
 

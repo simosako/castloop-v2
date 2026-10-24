@@ -43,6 +43,6 @@
     "@js-temporal/polyfill": "0.5.1",
     "music-metadata": "11.16.0",
     "saxes": "6.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   }
 }
