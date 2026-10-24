@@ -12,7 +12,7 @@ v0.7.2で追加したIssue #5のCLI機能。管理者側は対応するcastloop�
 castloop skill export castloop --output /path/to/project/.agents/skills/castloop
 ```
 
-通信せず同じCLIに埋め込まれたSkillを出力する。既存ディレクトリ・編集は上書きしない。更新は別ディレクトリへexportして差分確認する。releaseには静的な`castloop-skill.tar.gz`と、その検証用の`SKILL_SHA256SUMS`も添付する。既存のバイナリ用`SHA256SUMS`は維持する。
+通信せず同じCLIに埋め込まれたSkillを出力する。既存ディレクトリ・編集は上書きしない。更新は別ディレクトリへexportして差分確認する。releaseには静的な`castloop-skill.tar.gz`と、その検証用の`SKILL_SHA256SUMS`も添付する。既存のバイナリ用`SHA256SUMS`は維持し、Issue #73以降はLinux・macOS（Apple Silicon）・Windows x64の3バイナリを列挙する。配布対象とOS別の検証範囲は[CLIバイナリ配布](cli_binary_distribution.md)を参照する。
 
 Node.js/npmを既に使う場合の任意の導入方法:
 

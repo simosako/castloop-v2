@@ -10,7 +10,7 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 - Requires new internal queue/content schemas 6/7, independent immutable Feed generation reservations and matching health identifiers. No old-service/DB/journal migration or resource adoption. The [two-Show native functional trial](design/sqlite_custom_domain_two_show_verification_20261024.md) passed publication, canonical delivery, redirects, updates/restore, domain-preserving deploy and workers.dev restoration; both Shows finished paused/ready/drained. Native envelope/opaque-ID, attachment-environment and empty-DELETE response differences are handled with allowlisted diagnostics and durable receipts, without adopting earlier uncertain operations. No automatic deployment, Resume, rollback or certificate cleanup; performance, full Free compatibility and native fault injection are not established.
 
 ## Unreleased
-- None.
+- Issue #73: the release distribution adds `castloop-macos-arm64` (macOS Apple Silicon) and `castloop-windows-x64.exe` alongside `castloop-linux-x64`, built and smoke-checked natively per platform on matching GitHub-hosted runners and covered by the combined `SHA256SUMS`. The binaries remain unsigned; see the [distribution guide](docs/cli_binary_distribution.md) for verified and unverified per-OS scope.
 
 ## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
 

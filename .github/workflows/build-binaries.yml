@@ -1,4 +1,4 @@
-name: Build and release Linux CLI
+name: Build and release CLI binaries
 
 on:
   workflow_dispatch:
@@ -14,7 +14,22 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-24.04, macos-15 and windows-2025 are GitHub-hosted images.
+        # macos-15 runners are Apple Silicon (arm64); windows-2025 is x64.
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64
+            binary: castloop-linux-x64
+          - os: macos-15
+            target: macos-arm64
+            binary: castloop-macos-arm64
+          - os: windows-2025
+            target: windows-x64
+            binary: castloop-windows-x64.exe
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -24,72 +39,110 @@ jobs:
         with:
           bun-version: "1.4.4"
       - run: npm ci
-      - run: npm run check
       - name: Prepare private test workspace
+        if: matrix.target == 'linux-x64'
         run: mkdir -p -m 700 /tmp/opencode
-      - run: bun test
+      - name: Run type check and tests
+        # The full regression suite (including the simulated-Cloudflare tests)
+        # stays on the Linux reference environment; each OS additionally runs
+        # its own native smoke checks in the smoke job.
+        if: matrix.target == 'linux-x64'
+        run: |
+          npm run check
+          bun test
       - name: Verify tag version
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' && matrix.target == 'linux-x64'
         shell: bash
         run: |
           version="$(node -p "require('./package.json').version")"
           test "$GITHUB_REF_NAME" = "v$version"
-      - name: Build Linux x86-64 release binary
+      - name: Build ${{ matrix.target }} release binary
         shell: bash
         run: |
-          npm run build:cli -- linux-x64
+          npm run build:cli -- ${{ matrix.target }}
           cp THIRD_PARTY_NOTICES.md dist/
           cp LICENSE dist/
+          node scripts/release-sha256.mjs "dist/${{ matrix.binary }}" > "dist/${{ matrix.binary }}.sha256"
+          cat "dist/${{ matrix.binary }}.sha256"
+      - name: Build Skill bundle
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
           tar -czf dist/castloop-skill.tar.gz -C skills castloop
           cd dist
-          sha256sum castloop-linux-x64 > SHA256SUMS
           sha256sum castloop-skill.tar.gz > SKILL_SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: castloop-linux-x64
+          name: castloop-${{ matrix.target }}
           path: |
-            dist/castloop-linux-x64
-            dist/SHA256SUMS
+            dist/${{ matrix.binary }}
+            dist/${{ matrix.binary }}.sha256
             dist/THIRD_PARTY_NOTICES.md
             dist/LICENSE
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: matrix.target == 'linux-x64'
+        with:
+          name: castloop-skill
+          path: |
             dist/castloop-skill.tar.gz
             dist/SKILL_SHA256SUMS
           if-no-files-found: error
 
   smoke:
     needs: build
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64
+            binary: castloop-linux-x64
+          - os: macos-15
+            target: macos-arm64
+            binary: castloop-macos-arm64
+          - os: windows-2025
+            target: windows-x64
+            binary: castloop-windows-x64.exe
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: castloop-linux-x64
+          name: castloop-${{ matrix.target }}
           path: dist
-      - name: Verify binary and CLI entrypoint
+      - name: Verify checksum and CLI entrypoint
         shell: bash
         run: |
           expected_version="$(node -p "require('./package.json').version")"
           cd dist
-          sha256sum --check SHA256SUMS
-          chmod +x castloop-linux-x64
-          test "$(./castloop-linux-x64 --version)" = "$expected_version"
-          ./castloop-linux-x64 --help | grep -F 'Usage: castloop'
+          node ../scripts/release-sha256.mjs "${{ matrix.binary }}" | cmp - "${{ matrix.binary }}.sha256"
+          if [ "$RUNNER_OS" != "Windows" ]; then
+            chmod +x "${{ matrix.binary }}"
+          fi
+          actual_version="$("./${{ matrix.binary }}" --version)"
+          actual_version="${actual_version%$'\r'}"
+          test "$actual_version" = "$expected_version"
+          "./${{ matrix.binary }}" --help | grep -F 'Usage: castloop'
           for command in init create-show create-episode update-show publish-show update-episode update-episode-audio publish-episode job-status service-status show-status show-pause show-resume deploy domain init-continue-verification update-service-verify update-service-reconcile preview-show-lifecycle preview-episode-lifecycle lifecycle-execute list-shows list-episodes import-rss publish-rss-import; do
-            ./castloop-linux-x64 "$command" --help | grep -F "Usage: castloop $command"
+            "./${{ matrix.binary }}" "$command" --help | grep -F "Usage: castloop $command"
           done
-          ./castloop-linux-x64 init --help | grep -F 'no protocol option is required'
-          ./castloop-linux-x64 init --help | grep -F 'schema_version=2'
-          if ./castloop-linux-x64 list-episodes > list-episodes-error.txt 2>&1; then
+          "./${{ matrix.binary }}" init --help | grep -F 'no protocol option is required'
+          "./${{ matrix.binary }}" init --help | grep -F 'schema_version=2'
+          if "./${{ matrix.binary }}" list-episodes > list-episodes-error.txt 2>&1; then
             exit 1
           fi
           grep -F 'Usage: castloop list-episodes SHOW_ID' list-episodes-error.txt
           for command in retry-job release-job lifecycle-retry update-service-continue local-operation-status service-pause service-resume; do
-            if ./castloop-linux-x64 "$command" --help > removed-command-error.txt 2>&1; then
+            if "./${{ matrix.binary }}" "$command" --help > removed-command-error.txt 2>&1; then
               exit 1
             fi
             grep -F 'Unknown command' removed-command-error.txt
           done
-          binary="$PWD/castloop-linux-x64"
+          binary="$PWD/${{ matrix.binary }}"
           mkdir rejected-workspace
           cd rejected-workspace
           echo 'schema_version = 1' > castloop.toml
@@ -102,16 +155,17 @@ jobs:
             test "$(cat castloop.toml)" = 'schema_version = 1'
           done
           cd ..
-          if ./castloop-linux-x64 import-rss > import-rss-error.txt 2>&1; then
+          if "./${{ matrix.binary }}" import-rss > import-rss-error.txt 2>&1; then
             exit 1
           fi
           grep -F 'Usage: castloop import-rss SHOW_ID FEED_URL' import-rss-error.txt
-          if ./castloop-linux-x64 publish-rss-import > publish-rss-import-error.txt 2>&1; then
+          if "./${{ matrix.binary }}" publish-rss-import > publish-rss-import-error.txt 2>&1; then
             exit 1
           fi
           grep -F 'Usage: castloop publish-rss-import DIRECTORY' publish-rss-import-error.txt
       - name: Verify standalone agent workflows without external programs
-        run: node scripts/smoke-agent-cli.mjs dist/castloop-linux-x64
+        shell: bash
+        run: node scripts/smoke-agent-cli.mjs "dist/${{ matrix.binary }}"
 
   release:
     if: github.event_name == 'push' && github.ref_type == 'tag'
@@ -123,16 +177,19 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: castloop-linux-x64
+          pattern: "castloop-*"
+          merge-multiple: true
           path: dist
-      - name: Publish Linux release
+      - name: Publish release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd dist
+          ls -l castloop-linux-x64 castloop-macos-arm64 castloop-windows-x64.exe castloop-skill.tar.gz
+          cat castloop-linux-x64.sha256 castloop-macos-arm64.sha256 castloop-windows-x64.sha256 > SHA256SUMS
           sha256sum --check SHA256SUMS
           sha256sum --check SKILL_SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" castloop-linux-x64 castloop-skill.tar.gz SHA256SUMS SKILL_SHA256SUMS THIRD_PARTY_NOTICES.md LICENSE \
+          gh release create "$GITHUB_REF_NAME" castloop-linux-x64 castloop-macos-arm64 castloop-windows-x64.exe castloop-skill.tar.gz SHA256SUMS SKILL_SHA256SUMS THIRD_PARTY_NOTICES.md LICENSE \
             --repo "$GITHUB_REPOSITORY" --title "castloop $GITHUB_REF_NAME" \
             --notes-file "../docs/release-${GITHUB_REF_NAME}.md"

@@ -2,7 +2,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/simosako/castloop-v2)](https://github.com/simosako/castloop-v2/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Build and release Linux CLI](https://github.com/simosako/castloop-v2/actions/workflows/build-binaries.yml/badge.svg)](https://github.com/simosako/castloop-v2/actions/workflows/build-binaries.yml)
+[![Build and release CLI binaries](https://github.com/simosako/castloop-v2/actions/workflows/build-binaries.yml/badge.svg)](https://github.com/simosako/castloop-v2/actions/workflows/build-binaries.yml)
 
 Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one private R2 bucket and one public Worker per service, multiple Shows.
 
@@ -46,17 +46,34 @@ Service schema version 1 is rejected before management requests, deployment or a
 
 ## Install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.7.3 release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.3). Verify the checksum, make the executable runnable, and place it on your PATH:
+Download the binary for your platform plus `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [latest release](https://github.com/simosako/castloop-v2/releases/latest):
+
+| Platform | Artifact | Minimum OS |
+| --- | --- | --- |
+| Linux x86-64 | `castloop-linux-x64` | glibc-based 64-bit Linux |
+| macOS Apple Silicon (arm64) | `castloop-macos-arm64` | macOS 11+ |
+| Windows x64 | `castloop-windows-x64.exe` | 64-bit Windows 10+ |
+
+macOS Intel (x64), Windows ARM, and Linux ARM builds are not distributed. All three artifacts are built and smoke-checked natively on GitHub-hosted runners of the same OS/architecture by the [release workflow](.github/workflows/build-binaries.yml). The binaries are **unsigned** (no code signing, notarization, or Authenticode): macOS Gatekeeper and Microsoft Defender SmartScreen may warn on first launch, and no certificate purchase or warning disabling is assumed. See the [distribution guide](docs/cli_binary_distribution.md) for per-OS setup, verification scope and limits.
+
+Linux and macOS (Apple Silicon):
 
 ```sh
-sha256sum --check SHA256SUMS
+grep 'castloop-linux-x64$' SHA256SUMS | sha256sum -c -   # on macOS: ... | shasum -a 256 -c -
 chmod +x castloop-linux-x64
 ./castloop-linux-x64 --version
 ```
 
+Windows (PowerShell):
+
+```powershell
+Get-FileHash castloop-windows-x64.exe -Algorithm SHA256  # compare with the SHA256SUMS entry
+.\castloop-windows-x64.exe --version
+```
+
 Keep the matching old CLI/source for frozen initialization/update journals. Existing Queue services need [v0.5.x](https://github.com/simosako/castloop-v2/blob/v0.5.2/README.md), not this release; there is no automatic migration.
 
-Keep `LICENSE` and `THIRD_PARTY_NOTICES.md` with the executable. Linux x86-64 is the distributed and runtime-verified target; macOS/Windows binaries are not distributed.
+Keep `LICENSE` and `THIRD_PARTY_NOTICES.md` with the executable.
 
 The administrator's machine needs no Bun, Node.js, Wrangler, source tree, `ffprobe`, or separate R2 S3 credentials. Enable the required Cloudflare products and supply `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. SQLite initialization needs Worker/R2 resource and deployment permissions and access to SQLite-backed Durable Objects; it does not need Queues Edit. The CLI never expands token permissions or changes billing/CPU limits automatically.
 
@@ -71,7 +88,7 @@ bun test
 npm run build:cli -- linux-x64
 ```
 
-The executable is `dist/castloop-linux-x64` and embeds only `src/sqlite-worker.ts`. Source mode is `bun packages/cli/src/index.ts`. See `castloop help COMMAND` for syntax.
+`build:cli` accepts `linux-x64`, `macos-x64`, `macos-arm64`, and `windows-x64` (Bun cross-compiles, so no target machine is needed; the release workflow builds `linux-x64`, `macos-arm64`, and `windows-x64` natively on matching runners). The executable is `dist/castloop-linux-x64` and embeds only `src/sqlite-worker.ts`. Source mode is `bun packages/cli/src/index.ts`. See `castloop help COMMAND` for syntax.
 
 ## Agent support
 
@@ -179,4 +196,4 @@ See the [changelog](CHANGELOG.md), the [SQLite operations guide](docs/sqlite_seq
 
 To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md) for the local build/test workflow and the safety rules, [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately, and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-The [release workflow](.github/workflows/build-binaries.yml) tests, builds and smoke-checks Linux artifacts before publishing matching `v*` tags. castloop uses the MIT License; redistribute [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with the binary.
+The [release workflow](.github/workflows/build-binaries.yml) tests, builds and smoke-checks the Linux, macOS (Apple Silicon) and Windows artifacts on matching native runners before publishing matching `v*` tags. castloop uses the MIT License; redistribute [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with the binary.
