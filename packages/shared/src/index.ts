@@ -2,6 +2,7 @@ import * as TOML from "@iarna/toml";
 import { z } from "zod";
 import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import type { SqliteServiceConfig } from "./sqlite-service";
+import type { AdminConfig } from "./admin-config";
 import { isXml10Text } from "./xml";
 import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits } from "./metadata-limits";
 
@@ -143,6 +144,6 @@ export function parseEpisodeRevision(source: string): EpisodeRevision {
   return episodeRevisionSchema.parse(TOML.parse(source));
 }
 
-export function stringifyToml(value: SqliteServiceConfig | ShowMetadata | EpisodeDraft | EpisodeRevision): string {
+export function stringifyToml(value: SqliteServiceConfig | AdminConfig | ShowMetadata | EpisodeDraft | EpisodeRevision): string {
   return TOML.stringify(value as TOML.JsonMap);
 }

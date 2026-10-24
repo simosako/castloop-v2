@@ -17,6 +17,9 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [エージェント向け共通ルール](../AGENTS.md) | 常時必要な開発・安全ルールと作業別の参照先。検討履歴は必要なときだけ読む |
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
+| [Episode予約公開の設計・開発計画](episode_scheduled_publication_plan.md) | Issue #65の採用方針。Show内予約表とAlarm、既定UTC・任意管理zone、日時identity、停止・再承認。管理用設定の責務・棚卸しと開発段階 |
+| [管理用設定と日時変換](../docs/admin_configuration.md) | Issue #65のCLI基盤。任意のcastloop-admin.toml、schema/template/validate/doctor、非公開・非予約の日時preview。サーバー予約は未提供 |
+| [Issue #65 CLI基盤の実データ検証](issue65_cli_real_data_verification_20261024.md) | 指定サンプル3＋36 Episode、約1.50GB、単体バイナリ162試験が期待どおり。原本不変。ptrace制約で通信観測は欠測、Cloudflare予約実行は未実装・未試験 |
 | [SQLite独自ドメイン対応計画](sqlite_custom_domains_plan.md) | Issue #68。開発版のCLI/REST/DO接続、Cloudflare DNS前提、管理/公開origin分離、redirect、個別停止と設定・Feed切替、ローカル検証範囲 |
 | [独自ドメインP0・API条件の確認](sqlite_custom_domains_p0.md) | 公開Attach/Detachを採用。外部同時変更は想定外という制約を記録し、保留解消・開発継続。HTTP/identity/Feed採番の契約 |
 | [SQLite独自ドメイン操作](../docs/sqlite_custom_domains.md) | 開発版のadd/list/status/continue/remove、必要権限、停止と再開、中断・切断時の制約 |

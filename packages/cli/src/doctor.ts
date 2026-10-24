@@ -3,6 +3,7 @@ import { loadWorkspaceConfig } from "./workspace-config";
 import { administratorKey } from "./administrator-key";
 import type { SqliteServiceConfig } from "@castloop/shared";
 import { pendingLocalDomainChanges } from "./sqlite-domain-local";
+import { loadAdminConfig } from "./admin-config";
 
 type Check = { id: string; status: "pass" | "warn" | "fail" | "not_checked"; code: string; message: string; next_actions: string[] };
 export type DoctorResult = { cli_version: string; checks: Check[]; summary: Record<Check["status"], number> };
@@ -16,6 +17,14 @@ export async function diagnoseLocal(root: string,
     checks.push({ id: "workspace", status: "pass", code: "valid_config", message: "Service configuration is valid", next_actions: [] });
   } catch {
     checks.push({ id: "workspace", status: "fail", code: "invalid_config", message: "Service configuration is missing, unreadable or invalid", next_actions: ["inspect_local_configuration"] });
+  }
+  try {
+    const admin = await loadAdminConfig(root);
+    checks.push({ id: "admin-config", status: "pass", code: admin.timezone ? "admin_timezone_configured" : "server_timezone_default",
+      message: admin.timezone ? "Administrator timezone is valid; service identity is unchanged" : "No administrator timezone preference; server basis is UTC", next_actions: [] });
+  } catch {
+    checks.push({ id: "admin-config", status: "fail", code: "invalid_admin_config",
+      message: "Optional castloop-admin.toml is unreadable or invalid; no fallback to another timezone", next_actions: ["inspect_local_admin_configuration"] });
   }
   try {
     administratorKey(root);

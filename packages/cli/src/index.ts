@@ -126,7 +126,7 @@ async function main(context: Invocation): Promise<unknown> {
     return exportAdminSkill(flags.output);
   }
   if (command === "template") {
-    if (positional.length !== 1) throw new AgentError("invalid_arguments", "Expected template service-config|show|episode.");
+    if (positional.length !== 1) throw new AgentError("invalid_arguments", "Expected template service-config|admin-config|show|episode.");
     const { inputTemplate } = await import("./input-templates");
     return inputTemplate(positional[0]!);
   }
@@ -137,6 +137,19 @@ async function main(context: Invocation): Promise<unknown> {
     const result = await diagnoseLocal(root);
     if (result.summary.fail) process.exitCode = 1;
     return flags.json ? result : formatDoctor(result);
+  }
+  if (command === "preview-schedule-time") {
+    if (positional.length !== 1) throw new AgentError("invalid_arguments", "Expected preview-schedule-time DATETIME.");
+    const root = resolve(flags.workspace ?? process.cwd()); context.target.workspace = root;
+    const { loadAdminConfig } = await import("./admin-config");
+    const { resolveScheduleTime } = await import("./schedule-time");
+    const admin = await loadAdminConfig(root);
+    try {
+      return { ...resolveScheduleTime(positional[0]!, { timezone: flags.timezone, configuredTimezone: admin.timezone }),
+        server_time_checked: false, publication_ready: false };
+    } catch {
+      throw new AgentError("invalid_schedule_time", "Expected a valid ISO date/time and supported IANA zone; resolve DST ambiguity with an explicit offset matching --timezone.");
+    }
   }
   delete flags.json;
   delete flags["non-interactive"];

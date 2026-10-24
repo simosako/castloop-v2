@@ -44,6 +44,8 @@ castloop doctor --local --workspace /absolute/workspace --json
 
 describe/schema/template/validate/doctorは通信しない。検証・診断は鍵、journal、lockを生成せず、入力を書き換えない。Skill exportだけは指定先に書き込む。雛形の値は例であり、所有者情報・URL・言語・explicit・日時等は管理者に確認する。offline Episode GUID/dateを実登録identityへ使わず、`create-episode`の保存済み値を保持する。
 
+Issue #65の開発版では`schema admin-config`／`template admin-config`／`validate admin-config FILE`と、任意の`castloop-admin.toml`のdoctor検査を追加する。`preview-schedule-time DATETIME --workspace PATH [--timezone IANA_ZONE] --json`はローカル日時変換だけで、予約も公開もしない。設定と日時解決規則は[管理用設定ガイド](admin_configuration.md)を参照する。サーバー側予約は未実装であり、preview結果を予約受付や公開承認の証拠にしない。
+
 JSON Schemaはparse後のTOML値を記述する。裸のTOML日時ではなく引用符付きRFC 3339文字列を使う。サービス設定version 2、content version 1、機械出力のcontract_version 1は別物。HTML除外後の文字数、UTF-8 bytes、XML文字、実在日付、URL、field間制約は`x-castloop-validation`を参照し、CLI validateで最終検証する。保存済みsnapshot用schemaに新規入力上限を追加したものではない。
 
 取得できる出力schemaは現段階では共通外枠の`result`であり、コマンドごとの詳細payloadはJSON値として扱う。全管理コマンドの詳細result型・flagの条件付き必須性までを個別JSON Schema化する補強は残る。入力schemaの取得・strict検証とは区別する。
