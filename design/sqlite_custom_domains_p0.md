@@ -34,6 +34,8 @@ Worker domainの`id`はaccount/Zone/namespaceの32桁IDとは別のopaque識別�
 
 別途承認された[Show 0件の第3試験](sqlite_custom_domain_environment_review.md)では、PUT応答の`environment="production"`固定検証で停止することを確認した。元の値/有無は未記録であり、GETのproductionから補完しない。deprecated fieldの扱いとPUT/GETの役割を分ける二段階receipt案を同文書へ提示した。**レビュー待ち・未実装**で、完全接続のproduction gateや既存unknown非採用はまだ変更していない。
 
+管理者の指摘により二段階案は保留し、先に[保存ログの調査・CLI段階別診断](sqlite_domain_response_logging.md)を追加した。元PUTの欠測を新しいログで埋めたとは扱わず、成功応答の許容条件や未知結果の再送/採用条件は変更しない。
+
 ### 2.2 Cloudflareの公開ソースにある別経路
 
 [workers-sdkの固定commit `e651d7c0dd8e171dcc1820679f9f46601971d876`の`publishCustomDomains()`](https://github.com/cloudflare/workers-sdk/blob/e651d7c0dd8e171dcc1820679f9f46601971d876/packages/deploy-helpers/src/triggers/publish-routes.ts)を確認した。

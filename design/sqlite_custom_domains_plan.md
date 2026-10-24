@@ -306,6 +306,8 @@ castloop domain remove --operation-id UUID --workspace PATH
 
 その後の別承認による[Show 0件の診断](sqlite_custom_domain_environment_review.md)では、PUT応答のenvironment固定検証に停止箇所を絞り込んだ。PUT成功acknowledgementとGET完全接続確定を分ける追加契約案はレビュー待ち・未実装。受け入れ完了や既存3操作の昇格を意味しない。
 
+次に管理者の指摘に従い、契約変更は保留して[既存ログ調査と固定分類ログ](sqlite_domain_response_logging.md)を先行した。検証条件・非再送を変えず、**642 tests / 76 files成功**、型検査・Linux CLI build成功。追加ログを実機mutationで収集したものではなく、過去PUTの値/有無は未確認のまま。
+
 ## 10. 受け入れ条件と試験
 
 以下は実機を含む総合受け入れ項目であり、P7が初回試行で停止したため未完了として保持する。ローカルの実施範囲・証拠は§9.2、実機の部分結果は上記記録を参照する。
