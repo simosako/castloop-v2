@@ -4,6 +4,7 @@ import { sqlitePublicationRuntimeSchema } from "./sqlite-publication";
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "./sqlite-service";
 
 export const SQLITE_DOMAIN_PROTOCOL = "sqlite-domain-change-v1" as const;
+export const sqliteDomainIdSchema = z.string().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/);
 const hash = sqlitePublicationRuntimeSchema.shape.service_config_sha256;
 const cloudflareId = z.string().regex(/^[a-f0-9]{32}$/);
 
@@ -15,7 +16,7 @@ export const sqliteDomainHostnameSchema = z.string().min(1).max(253).regex(/^[a-
   }, "Expected an ASCII DNS hostname without a scheme, port, wildcard or IP address");
 
 export const sqliteDomainConnectionSchema = z.object({
-  id: cloudflareId, cert_id: z.uuid(), hostname: sqliteDomainHostnameSchema,
+  id: sqliteDomainIdSchema, cert_id: z.uuid(), hostname: sqliteDomainHostnameSchema,
   zone_id: cloudflareId, zone_name: sqliteDomainHostnameSchema, service: sqliteServiceConfigSchema.shape.worker_name,
   environment: z.literal("production"), enabled: z.literal(true), previews_enabled: z.literal(false),
 }).strict().superRefine((value, context) => {

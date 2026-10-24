@@ -35,6 +35,21 @@ test("native null-error envelopes still reject unsuccessful, error-bearing and i
   } finally { f.close(); }
 });
 
+test("a populated native Worker domain list preserves its 40-character ID without truncation", async () => {
+  const f = await sqliteServiceFixture();
+  try {
+    const connection = { id: "a".repeat(40), cert_id: crypto.randomUUID(), hostname: "podcasts.example.com", zone_id: "c".repeat(32),
+      zone_name: "example.com", service: f.config.worker_name, environment: "production", enabled: true, previews_enabled: false };
+    const api = new SqliteDomainCloudflare(f.config, { ...f.options, transport: async () => Response.json({
+      success: true, errors: null, result: [connection], result_info: { page: 1, per_page: 1, count: 1, total_count: 1 },
+    }) });
+    expect(await api.list()).toEqual([connection]);
+    await new SqliteDomainCloudflare({ ...f.config, public_base_url: "https://podcasts.example.com" }, {
+      ...f.options, transport: async () => Response.json({ success: true, errors: null, result: [connection] }),
+    }).verifyKnown({ ...connection, environment: "production", enabled: true, previews_enabled: false });
+  } finally { f.close(); }
+});
+
 test("DNS pagination retains its explicit page-size and final-page requirements", async () => {
   const f = await sqliteServiceFixture();
   try {

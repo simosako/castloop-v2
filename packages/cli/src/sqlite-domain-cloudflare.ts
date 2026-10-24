@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requireSqliteDomainConnection, sqliteDomainConnectionSchema, sqliteDomainHostnameSchema } from "../../shared/src/sqlite-domain";
+import { requireSqliteDomainConnection, sqliteDomainConnectionSchema, sqliteDomainHostnameSchema, sqliteDomainIdSchema } from "../../shared/src/sqlite-domain";
 import type { SqliteDomainConnection, SqliteDomainRequest } from "../../shared/src/sqlite-domain";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
@@ -8,7 +8,7 @@ import { requireR2RestOptions } from "./verified-r2-put";
 import type { R2RestOptions } from "./verified-r2-put";
 
 const id = z.string().regex(/^[a-f0-9]{32}$/);
-const rawDomain = z.object({ id, hostname: z.string().max(253), service: z.string(), zone_id: id, zone_name: z.string(),
+const rawDomain = z.object({ id: sqliteDomainIdSchema, hostname: z.string().max(253), service: z.string(), zone_id: id, zone_name: z.string(),
   cert_id: z.string(), environment: z.string(), enabled: z.boolean(), previews_enabled: z.boolean() });
 const pagination = z.object({ page: z.number().int().positive(), per_page: z.number().int().nonnegative(),
   count: z.number().int().nonnegative(), total_count: z.number().int().nonnegative(), total_pages: z.number().int().nonnegative().optional() });
@@ -113,7 +113,7 @@ export class SqliteDomainCloudflare {
     requireSqliteDomainConnection(connection, request);
     const zone = await this.zone(request.zone_id);
     if (zone.name !== request.zone_name) throw new Error("Frozen domain zone differs");
-    const current = requireSqliteDomainConnection((await this.call("GET", `${this.account}/workers/domains/${connection.id}`)).result, request);
+    const current = requireSqliteDomainConnection((await this.call("GET", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`)).result, request);
     if (JSON.stringify(current) !== JSON.stringify(connection)) throw new Error("Domain connection receipt changed");
     const domains = (await this.list()).filter((domain) => domain.service === this.config.worker_name);
     if (domains.length !== 1 || JSON.stringify(requireSqliteDomainConnection(domains[0], request)) !== JSON.stringify(connection)) throw new Error("Worker domain membership changed");
@@ -121,7 +121,7 @@ export class SqliteDomainCloudflare {
   async detach(request: SqliteDomainRequest, connection: SqliteDomainConnection): Promise<void> {
     if (request.action !== "remove") throw new Error("Only a remove request can detach a domain");
     await this.inspect(request, connection);
-    const result = await this.call("DELETE", `${this.account}/workers/domains/${connection.id}`);
+    const result = await this.call("DELETE", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`);
     if (result.result !== undefined && result.result !== null) throw new Error("Domain DELETE success response differs");
   }
   async verifyTls(origin: string): Promise<void> {

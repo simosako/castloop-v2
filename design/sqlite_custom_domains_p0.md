@@ -28,6 +28,8 @@ Attach/DetachのAPI受け入れ権限は公式記載では`Workers Scripts Write
 
 Detachの公開成功形式はHTTP 200の`success: true`、`errors`、`messages`を持つenvelope。新実装ではerrorsが空配列またはnullであることと本文の完全読取を要求する。2026-10-24の別途承認された実機確認では、空のWorker domain一覧が`errors: null`、`result_info={page:1,per_page:0,count:0,total_count:0}`（`total_pages`なし）を返した。単一page一覧はcountと全件数の一致を引き続き要求し、DNSの複数page列挙は明示的な`per_page=100`と`total_pages`を必須のまま維持する。旧バグ対応にあった200/nullや204を、この資料だけから許可する根拠は得られていない。未知形式は未知結果として保持し、後の不在GETで完了へ昇格しない。
 
+Worker domainの`id`はaccount/Zone/namespaceの32桁IDとは別のopaque識別子として扱う。公開Get仕様はstringで固定長を定義しておらず、上記実機の読取一覧では40文字だった。長さ1〜256、英数字・`_`・`-`の安全なpath segmentを許容し、GET/DELETEではURL encodeする。IDの切り詰め・変換や別IDの同一視はしない。接続PUTの成功receiptを保存できなかった初回環境は、このparser修正後も読取状態から採用・昇格しない。[初回停止記録](sqlite_custom_domain_live_verification_20261024.md)を参照する。
+
 ### 2.2 Cloudflareの公開ソースにある別経路
 
 [workers-sdkの固定commit `e651d7c0dd8e171dcc1820679f9f46601971d876`の`publishCustomDomains()`](https://github.com/cloudflare/workers-sdk/blob/e651d7c0dd8e171dcc1820679f9f46601971d876/packages/deploy-helpers/src/triggers/publish-routes.ts)を確認した。

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { parseSqliteDomainRequest, requireSqliteDomainConnection, SQLITE_DOMAIN_PROTOCOL,
-  sqliteDomainHostnameSchema, sqliteDomainRequestHash, sqliteDomainRequestSchema, sqliteDomainServiceStatusSchema } from "./sqlite-domain";
+  sqliteDomainHostnameSchema, sqliteDomainIdSchema, sqliteDomainRequestHash, sqliteDomainRequestSchema, sqliteDomainServiceStatusSchema } from "./sqlite-domain";
 import { sqliteServiceConfigHash } from "./sqlite-service";
 
 async function fixture(action: "add" | "remove" = "add") {
@@ -27,6 +27,20 @@ test("domain hostname validation canonicalizes ASCII case and rejects non-hostna
     "xn--test.example.com", "a.xn--test.com", "worker.account.workers.dev"]) {
     expect(sqliteDomainHostnameSchema.safeParse(input).success).toBe(false);
   }
+});
+
+test("Worker domain IDs are bounded opaque path segments, not account or Zone IDs", async () => {
+  for (const value of ["d".repeat(32), "d".repeat(40), "opaque-domain_ID-1"]) {
+    expect(sqliteDomainIdSchema.parse(value)).toBe(value);
+    const request = await fixture("remove");
+    expect(await parseSqliteDomainRequest({ ...request, connection: { ...request.connection, id: value } })).toMatchObject({ connection: { id: value } });
+  }
+  for (const value of ["", "x".repeat(257), ".", "..", "a/b", "a?b", "a#b", "a%b", "a b", "a\nb"]) {
+    expect(sqliteDomainIdSchema.safeParse(value).success).toBe(false);
+  }
+  const request = await fixture("remove");
+  expect(sqliteDomainRequestSchema.safeParse({ ...request, zone_id: "d".repeat(40) }).success).toBe(false);
+  expect(sqliteDomainRequestSchema.safeParse({ ...request, namespace_id: "d".repeat(40) }).success).toBe(false);
 });
 
 test("add and remove bind both complete configurations, management identity and parent zone", async () => {

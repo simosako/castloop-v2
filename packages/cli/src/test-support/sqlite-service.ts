@@ -170,7 +170,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
     if (path === "/workers/domains") {
       if (request.method === "GET") return json(domains);
       const body = await request.json() as { hostname: string; zone_id: string; service: string };
-      const connection: SqliteDomainConnection = { id: crypto.randomUUID().replaceAll("-", ""), cert_id: crypto.randomUUID(), hostname: body.hostname,
+      const connection: SqliteDomainConnection = { id: crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().slice(0, 8), cert_id: crypto.randomUUID(), hostname: body.hostname,
         zone_id: body.zone_id, zone_name: "example.com", service: body.service, environment: "production", enabled: true, previews_enabled: false };
       domains.push(connection);
       if (faults.lostDomain === "attach") throw new Error("Lost domain attachment response");
