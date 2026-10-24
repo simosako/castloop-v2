@@ -25,14 +25,26 @@ try {
   for (const action of ["add", "remove", "list", "status", "continue"]) {
     assert.match(run(["domain", action, "--help"]), /Usage: castloop domain/);
   }
-  for (const name of ["service-config", "show-input", "episode-input", "result"]) {
+  for (const name of ["service-config", "admin-config", "show-input", "episode-input", "result"]) {
     assert.equal(JSON.parse(run(["schema", name])).additionalProperties, false);
   }
   assert.deepEqual(readdirSync(work), []);
-  for (const [kind, file] of [["service-config", "castloop.toml"], ["show", "show.toml"], ["episode", "episode.toml"]]) {
+  const timePreview = (datetime, flags = [], expected = 0) => JSON.parse(run(["preview-schedule-time", datetime, ...flags, "--json"], expected));
+  assert.equal(timePreview("2026-11-01T09:00:00").result.scheduled_at, "2026-11-01T09:00:00Z");
+  assert.deepEqual(readdirSync(work), []);
+  for (const [kind, file] of [["service-config", "castloop.toml"], ["admin-config", "castloop-admin.toml"], ["show", "show.toml"], ["episode", "episode.toml"]]) {
     writeFileSync(join(work, file), run(["template", kind]));
     assert.equal(JSON.parse(run(["validate", kind === "service-config" ? "service" : kind, file, "--json"])).ok, true);
   }
+  const configuredTime = timePreview("2026-11-01T09:00:00").result;
+  assert.equal(configuredTime.scheduled_at, "2026-11-01T00:00:00Z");
+  assert.equal(configuredTime.timezone_source, "config");
+  assert.equal(configuredTime.server_time_checked, false);
+  assert.equal(configuredTime.publication_ready, false);
+  assert.equal(timePreview("2026-11-01T09:00:00", ["--timezone", "UTC"]).result.scheduled_at, "2026-11-01T09:00:00Z");
+  assert.equal(timePreview("2026-11-01T01:30:00-05:00", ["--timezone", "America/New_York"]).result.scheduled_at, "2026-11-01T06:30:00Z");
+  assert.equal(timePreview("2026-11-01T01:30:00", ["--timezone", "America/New_York"], 1).error.code, "invalid_schedule_time");
+  assert.equal(timePreview("2026-11-01T09:00:00Z", ["--timezone", "Asia/Tokyo"], 1).error.code, "invalid_schedule_time");
   writeFileSync(join(work, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
   writeFileSync(join(work, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
   run(["validate", "show", "show.toml", "--assets", "--json"]);

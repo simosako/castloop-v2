@@ -77,6 +77,8 @@ The executable is `dist/castloop-linux-x64` and embeds only `src/sqlite-worker.t
 
 Since v0.7.2, the CLI embeds input schemas, offline validation/templates, a compact local doctor and the administrator Skill. Export it with `castloop skill export castloop --output /path/to/project/.agents/skills/castloop`; no additional runtime or MCP is required. Use explicit `--workspace`, Episode `--show`, `--non-interactive` and versioned `--json` results. Review staged inputs with `preview-show`/`preview-episode`, then bind publication to `--expect-preview HASH`. See the [agent usage guide](docs/agent_usage.md) for installation, approval boundaries, JSON changes and verification limits.
 
+**Issue #65 development foundation:** optional workspace `castloop-admin.toml` can hold a CLI `timezone` preference; missing preferences use the server basis, UTC. `preview-schedule-time DATETIME [--timezone IANA_ZONE]` performs offline conversion only, with explicit offset/DST validation. It does **not** register a schedule or publish. Server-side scheduled publication remains unimplemented. See the [administrator configuration guide](docs/admin_configuration.md) and [adopted development plan](design/episode_scheduled_publication_plan.md).
+
 ## Initialize a new SQLite service
 
 Use a new workspace and unused resource names. Substitute your Cloudflare account's workers.dev subdomain and a fresh UUID for each operation/window:

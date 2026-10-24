@@ -11,13 +11,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Do not change this hostname's DNS or Worker domain connections with other tools during a domain operation. Certificates are retained on remove.\n" +
       "Removing a domain cannot undo feed URLs saved by podcast apps. Preserve the workspace and journals on interruption; no automatic Resume or rollback." },
   doctor: { usage: "doctor [--local] [--workspace PATH] [--json]", description: "Compact offline checks with no writes, key generation, networking or repairs. Warnings alone exit 0; failed checks exit 1. Credential presence is not validity." },
-  template: { usage: "template service-config|show|episode", description: "Print an embedded example TOML without IO or registration. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
+  template: { usage: "template service-config|admin-config|show|episode", description: "Print an embedded example TOML without IO or registration. admin-config is optional workspace CLI preferences, not service identity. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
   "preview-show": { usage: "preview-show ID", description: "Read-only local metadata, staged asset hashes and base identity. Does not fetch published full content or check remote readiness. Review input_fingerprint and use publish-show --expect-preview HASH." },
   "preview-episode": { usage: "preview-episode ID", description: "Read-only local metadata, staged asset hashes and base identity. Requires --show with explicit --workspace. Published full metadata is not fetched. Use publish-episode --expect-preview HASH after approval." },
+  "preview-schedule-time": { usage: "preview-schedule-time DATETIME [--timezone IANA_ZONE]", description: "Offline date/time conversion only: this command does NOT create a reservation or publish. An explicit offset determines the instant; otherwise --timezone overrides optional workspace castloop-admin.toml timezone, then server basis UTC. Prints local time, offset, UTC and sources. Rejects ambiguous/nonexistent DST times and explicit offset/--timezone disagreement. Does not check server time or readiness." },
   skill: { usage: "skill export castloop --output DIRECTORY", description: "Export the embedded administrator Skill without networking or external tools. The destination must not exist; existing Skills and AGENTS.md are never overwritten." },
-  validate: { usage: "validate service|show|episode FILE [--assets] [--audio MP3] [--json]", description: "Read-only offline validation using publication input rules. File/audio paths use caller cwd; cover uses the TOML directory. Does not prove remote readiness or publication success." },
+  validate: { usage: "validate service|admin-config|show|episode FILE [--assets] [--audio MP3] [--json]", description: "Read-only offline validation using publication input rules. admin-config validates optional CLI preferences (UTC or an IANA timezone, not abbreviations). File/audio paths use caller cwd; cover uses the TOML directory. Does not prove remote readiness or publication success." },
   describe: { usage: "describe [COMMAND] [--json]", description: "Read offline command specifications, effects and recovery rules. No credentials or workspace required." },
-  schema: { usage: "schema service-config|show-input|episode-input|result [--format json-schema]", description: "Print the embedded JSON Schema. Additional measured constraints require castloop validate; TOML dates must be quoted strings." },
+  schema: { usage: "schema service-config|admin-config|show-input|episode-input|result [--format json-schema]", description: "Print the embedded JSON Schema. Additional measured constraints require castloop validate; TOML dates must be quoted strings." },
   init: {
     usage: "init [dir] [--publication-protocol sqlite-sequential-v1] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
     description: "Create a fresh SQLite service (schema_version=2) by default; no protocol option is required.\n" +
@@ -208,6 +209,7 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "operation-status": { show: "string", local: "boolean", remote: "boolean", "after-version": "string", "request-cursor": "string" },
     "import-rss": { "dry-run": "boolean", output: "string" },
     validate: { assets: "boolean", audio: "string" }, doctor: { local: "boolean" }, skill: { output: "string" },
+    "preview-schedule-time": { timezone: "string" },
   };
   if (["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode"].includes(command) || command.startsWith("operation-")) options.show = "string";
   if (["publish-show", "publish-episode"].includes(command)) options["expect-preview"] = "string";
@@ -217,15 +219,15 @@ export function commandOptions(command: string): Record<string, "string" | "bool
 export function describeCommand(command: string) {
   const help = COMMAND_HELP[command];
   if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
-  const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-show", "preview-episode"].includes(command);
+  const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-show", "preview-episode", "preview-schedule-time"].includes(command);
   const read = offline || ["service-status", "show-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
-      SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],
+      SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],
     constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly"],
     authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
     effects: { local: offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" },
-    output_schema: "result", input_schemas: ["service-config", "show-input", "episode-input"],
+    output_schema: "result", input_schemas: ["service-config", "admin-config", "show-input", "episode-input"],
     recovery: read ? "Bounded observation only; snapshots do not authorize mutations." : "Preserve exact workspace, Show, input and records. Unknown PUT/POST outcomes must not be replayed. Observe the recorded job/operation; upload continuation requires the retained receipt and unchanged input.",
     paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };
 }

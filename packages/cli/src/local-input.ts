@@ -1,5 +1,6 @@
 import { parseEpisodeDraft, parseShowMetadata, episodeDraftInputSchema, showMetadataInputSchema } from "@castloop/shared";
 import { parseSqliteServiceConfig } from "../../shared/src/sqlite-service";
+import { parseAdminConfig } from "../../shared/src/admin-config";
 import { AgentError } from "./agent-output";
 import { readLocalMetadata } from "./local-metadata-read";
 import { analyzeAudio } from "./audio";
@@ -8,16 +9,17 @@ import { z } from "zod";
 import { dirname, resolve } from "node:path";
 
 export async function loadLocalInput(kind: string, file: string) {
-  const bytes = await readLocalMetadata(file, kind === "service" ? 16384 : 1000000);
+  const bytes = await readLocalMetadata(file, ["service", "admin-config"].includes(kind) ? 16384 : 1000000);
   const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   if (kind === "service") return { bytes, value: parseSqliteServiceConfig(source) };
+  if (kind === "admin-config") return { bytes, value: parseAdminConfig(source) };
   if (kind === "show") {
     const value = showMetadataInputSchema.parse(parseShowMetadata(source)); return { bytes, value };
   }
   if (kind === "episode") {
     const value = episodeDraftInputSchema.parse(parseEpisodeDraft(source)); return { bytes, value };
   }
-  throw new AgentError("invalid_kind", "Choose service, show or episode.");
+  throw new AgentError("invalid_kind", "Choose service, admin-config, show or episode.");
 }
 
 export async function inspectCover(file: string) {
@@ -30,7 +32,7 @@ export async function inspectCover(file: string) {
 }
 
 export async function validateLocalInput(kind: string, file: string, options: { assets?: boolean; audio?: string }) {
-  if (!["service", "show", "episode"].includes(kind) || options.assets && kind !== "show" || options.audio && kind !== "episode") {
+  if (!["service", "admin-config", "show", "episode"].includes(kind) || options.assets && kind !== "show" || options.audio && kind !== "episode") {
     throw new AgentError("invalid_options", "Use --assets for show or --audio for episode.");
   }
   try {
