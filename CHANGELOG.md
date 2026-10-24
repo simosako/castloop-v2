@@ -4,10 +4,13 @@ All notable changes are documented in per-version release notes. This file is an
 
 Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x and earlier were **removed in v0.6.0**. Entries below describe the release that introduced a feature and do not imply it exists in the current release. There is no migration feature from schema version 1.
 
-## Unreleased
+## v0.7.3 — [release note](docs/release-v0.7.3.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.3)
 
 - Issue #68: one dedicated custom subdomain for fresh SQLite services, separate management/public origins, gated Feed 301 and cover/audio 307 redirects, and explicit add/list/status/continue/remove with acknowledged mutation checkpoints. See the [scope and limitations](docs/sqlite_custom_domains.md).
 - Requires new internal queue/content schemas 6/7, independent immutable Feed generation reservations and matching health identifiers. No old-service/DB/journal migration or resource adoption. The [two-Show native functional trial](design/sqlite_custom_domain_two_show_verification_20261024.md) passed publication, canonical delivery, redirects, updates/restore, domain-preserving deploy and workers.dev restoration; both Shows finished paused/ready/drained. Native envelope/opaque-ID, attachment-environment and empty-DELETE response differences are handled with allowlisted diagnostics and durable receipts, without adopting earlier uncertain operations. No automatic deployment, Resume, rollback or certificate cleanup; performance, full Free compatibility and native fault injection are not established.
+
+## Unreleased
+- None.
 
 ## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
 

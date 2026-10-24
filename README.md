@@ -20,6 +20,8 @@ The corrected standalone CLI completed both zero-Show diagnostics and the two-Sh
 
 **v0.7.2** adds agent-oriented CLI discovery, embedded input schemas, offline validation/templates/doctor, explicit targets, structured results, a bundled administrator Skill and reviewed-input publication fingerprints. The Worker and persisted formats are unchanged. Existing `--json` payloads move under `result`; see the [v0.7.2 release notes](docs/release-v0.7.2.md).
 
+**v0.7.3** adds dedicated custom subdomains for fresh SQLite services, with separate management/public origins and explicit domain lifecycle commands. It requires internal queue/content schemas 6/7 and does not migrate existing services; see the [v0.7.3 release notes](docs/release-v0.7.3.md).
+
 **Compatibility boundary:** v0.7.x targets fresh `storage_layout = "show-v1"` services and is **incompatible with released v0.6.2 layouts**; there is no update or migration path between layouts. Do not add the layout field to an old workspace to bypass this boundary. See the [tagged v0.6.2 README](https://github.com/simosako/castloop-v2/blob/v0.6.2/README.md) for the previous service-wide layout.
 
 The CLI uploads and verifies unique R2 objects, then explicitly submits a frozen request to the target Show's Durable Object. Each Show has its own SQLite FIFO, Alarm and Pause/Resume window; different Shows can progress independently. A small control DO stores membership and shared Worker-update progress. No Cloudflare Queues or D1 are used. Local TOML remains the editable source; R2 holds published files and SQLite holds control state.
@@ -44,7 +46,7 @@ Service schema version 1 is rejected before management requests, deployment or a
 
 ## Install
 
-Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.7.2 release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2). Verify the checksum, make the executable runnable, and place it on your PATH:
+Download `castloop-linux-x64`, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [v0.7.3 release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.3). Verify the checksum, make the executable runnable, and place it on your PATH:
 
 ```sh
 sha256sum --check SHA256SUMS

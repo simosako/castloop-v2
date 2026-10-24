@@ -3,6 +3,7 @@
 ## Repository and checks
 - `packages/cli/src/`: the Bun single-executable CLI; `packages/shared/src/`: shared utilities; `src/`: Cloudflare Worker services.
 - Run `bun test` and `npm run check` for automated tests and TypeScript validation. Skip both for documentation-only or other changes that do not affect code, builds, or runtime behavior.
+- When a test or command fails, establish the root cause from its output, logs, or other evidence before changing conditions or making assumptions. If diagnostics are insufficient, add focused, privacy-safe logging and rerun the same reproduction; fix the evidenced cause rather than working around unexplained failures.
 - No lint or formatter is configured. Do not add tooling without an explicit request.
 - Update the relevant design and usage docs when behavior changes.
 
