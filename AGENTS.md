@@ -6,6 +6,7 @@
 - When a test or command fails, establish the root cause from its output, logs, or other evidence before changing conditions or making assumptions. If diagnostics are insufficient, add focused, privacy-safe logging and rerun the same reproduction; fix the evidenced cause rather than working around unexplained failures.
 - No lint or formatter is configured. Do not add tooling without an explicit request.
 - Update the relevant design and usage docs when behavior changes.
+- After writing or updating a specification or plan, reread it and fix any unnatural, ambiguous, or hard-to-understand wording. Explain unfamiliar terms and avoid unexplained shorthand.
 
 ## Read documentation by task
 - Use [design/README.md](design/README.md) to locate relevant documents; do not read all design docs or historical records on every task.
