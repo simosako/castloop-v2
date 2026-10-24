@@ -81,6 +81,26 @@ test("malformed DELETE success bodies remain uncertain rather than throwing on n
   expect(f.domains).toHaveLength(0);
 });
 
+test("an unverified attachment receipt is not reconstructed from a later valid domain listing", async () => {
+  const f = await fixture(), id = crypto.randomUUID();
+  const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
+    const response = await f.transport(input, init);
+    if (init?.method === "PUT" && new URL(String(input)).pathname.endsWith("/workers/domains")) {
+      const body = await response.json() as { result: object };
+      return Response.json({ success: true, errors: null, result: { ...body.result, id: "invalid/domain" } });
+    }
+    return response;
+  } };
+  await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", options, target, wait)).rejects.toThrow();
+  const journal = readSqliteDomainJournal(f.root, f.config, id);
+  expect(journal?.phase).toBe("connection_requested"); expect(journal?.connection).toBeUndefined();
+  expect((await new SqliteDomainCloudflare(f.config, f.options).list())[0]?.id).toHaveLength(40);
+  const calls = f.calls.length;
+  await expect(continueSqliteDomainChange(f.root, f.config, id, "worker", options, wait)).rejects.toThrow("unknown outcome");
+  expect(f.calls).toHaveLength(calls);
+  expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
+});
+
 test("preflight rejects DNS, delegation, covering routes and foreign or inactive zones before any mutation", async () => {
   for (const kind of ["dns", "delegation", "route", "account", "inactive"] as const) {
     const f = await fixture();
