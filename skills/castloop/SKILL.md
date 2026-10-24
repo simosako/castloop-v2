@@ -31,6 +31,7 @@ description: castloop CLIでPodcastサービス・番組・エピソードを準
 - `validate`は通信・書き込みなし。成功しても公開可否、remote base、purge成功を証明しない。省略検査も確認する。
 - 一覧は20件ごとに`next_cursor`を追う。要約タイトルを編集元の全文へ逆変換しない。原本がなければバックアップを管理者に求める。
 - `--json`の`ok`はCLI要求の成否。uploadの完了、公開受付、公開完了は別。`next_actions`は承認ではない。
+- 対応する開発版では`show-admission-pause SHOW UUID`で受付と新しい素材操作だけを止め、`show-pause SHOW UUID`で配信も止める。`show-delivery-resume SHOW UUID`は配信だけを戻すが、既受付処理の終了・動作確認済み・保守中でないことが必要。`show-resume`は受付も戻す。再開の対象と範囲を勝手に広げない。Worker更新・domain変更には引き続き各Showの配信停止が必要。
 - domain操作は`help domain`で対応版の条件を確認する。全Showを個別Pause/drainし、未公開draftを完了してから変更する。完了しても自動Resumeしない。list/statusは読取、continueは変更を含み得る。同じadd/removeの再実行で回復を試さず、未知PUT/POST/DELETE・purge/書込blockedは保全する。同じhostname/DNS/接続を他ツールから並行変更しない。workers.devの管理APIは転送せず、公開Feed 301がアプリへ保存された後の切断は購読先自動復帰を保証しない。証明書や元journalを削除しない。
 
 ## 用途別

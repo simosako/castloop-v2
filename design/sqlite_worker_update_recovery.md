@@ -1,5 +1,7 @@
 # SQLite Worker更新の検証続行
 
+2026-10-25追補: Issue #66の受付だけの停止（`admission_paused`）はWorker更新の準備条件を満たさない。引き続き対象Showすべてを`show-pause`でpausedにして、既受付処理の終了を確認する。更新・確認・保守終了後もpausedを維持する。配信だけなら`show-delivery-resume`、受付も戻すなら`show-resume`を個別に明示する。停止・再開操作の返答喪失は`show-control-status SHOW OPERATION_UUID`で保存結果を読む。[操作ガイド](../docs/show_availability.md)参照。更新中の配信継続、未知prepare/PUT/activationの再送・自動解除は追加しない。
+
 > 2026-10-20: Issue #48の新layoutでは[Show分離契約](do_show_separation_options.md)の共有更新手順を適用する。全体Pauseはなく、各ShowのPause/drain・原子的なprepare/Resume拘束と所属集合固定を行う。全Showと制御DOのprobe成功・保守拘束解除を確認するまで全体完了を返さない。Show別prepare/activation/解除の送信開始と結果を制御DOへ永続記録し、未知応答を再送しない。旧layoutやそのjournalへの互換導入・変換は対象外。以下のPUT checkpoint・正確なruntime照合・非再送の安全条件を新layoutでも維持する。
 
 新layoutの配備後GETは制御DOだけでなく、固定した全Showのnative version/prepared/保守拘束も照合する。`targets_native_ready=false`なら、制御DOが新versionでもactivationを始めない。有限観測で停止後は、同じ既知配備のverifyで読取から続行し、全対象を確認した後だけ初回activationを行う。

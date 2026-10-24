@@ -15,7 +15,7 @@ afterEach(() => { for (const value of fixtures.splice(0)) value.close(); });
 describe("SQLite publication FIFO", () => {
   test("new services remain paused until explicit resume", async () => {
     const value = fixture({ resume: false });
-    expect(value.queue.snapshot()).toEqual({ state: "paused", admission_window_id: null, queued: 0, active: null, drained: true });
+    expect(value.queue.snapshot()).toEqual({ state: "paused", admission_window_id: null, availability_version: 0, queued: 0, active: null, drained: true });
     await expect(value.queue.enqueue(value.request({ admission_window_id: crypto.randomUUID() }))).rejects.toThrow("paused");
     const windowId = crypto.randomUUID();
     expect(value.queue.resume(windowId).admission_window_id).toBe(windowId);

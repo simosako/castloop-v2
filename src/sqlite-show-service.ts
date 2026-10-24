@@ -1,4 +1,7 @@
-import { sqliteRegistrationSchema } from "../packages/shared/src/sqlite-service-api";
+import { sqliteRegistrationSchema, sqliteAvailabilityResponseSchema } from "../packages/shared/src/sqlite-service-api";
+import { sqliteAvailabilityRequestSchema, sqliteAvailabilityActionSchema } from "../packages/shared/src/sqlite-availability";
+import { authenticated } from "./admin-auth";
+import { readBoundedAdminJson } from "./admin-body";
 import type { SqliteHealth } from "../packages/shared/src/sqlite-service-api";
 import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
 import type { SqliteServiceConfig } from "../packages/shared/src/sqlite-service";
@@ -32,7 +35,7 @@ export class SqliteShowService {
 
   constructor(private readonly storage: PublicationQueueStorage, readonly showId: string,
     private readonly actual: SqlitePublicationRuntime, private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache,
-    private readonly bucket: SqlitePublicationBucket & OperationCleanupBucket, key: string) {
+    private readonly bucket: SqlitePublicationBucket & OperationCleanupBucket, private readonly key: string) {
     sqliteRegistrationSchema.shape.show_id.parse(showId);
     storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_show_binding (id INTEGER PRIMARY KEY CHECK(id = 1),
       show_id TEXT NOT NULL, reservation_id TEXT NOT NULL, registration_json TEXT NOT NULL, maintenance_id TEXT)`);
@@ -123,11 +126,37 @@ export class SqliteShowService {
 
   delivery(path: string) {
     if (parsePublicAssetPath(path)?.showId !== this.showId) return { status: 404 as const };
-    return this.ready() ? this.content.delivery(path) : { status: 503 as const };
+    return this.storage.transactionSync(() => this.ready() ? this.content.delivery(path) : { status: 503 as const });
+  }
+  private async controlHttp(request: Request): Promise<Response> {
+    if (!await authenticated(request, this.key)) return adminReply({ error: "unauthorized" }, 401);
+    const url = new URL(request.url), action = url.pathname.slice("/admin/sqlite-service/".length);
+    if (url.search || url.hash) return adminReply({ error: "invalid_route" }, 400);
+    try {
+      if (!this.binding()) throw new Error("Show binding is missing");
+      if (action.startsWith("controls/") && request.method === "GET") {
+        const control = this.queue.controlRecord(action.slice(9));
+        return control ? adminReply(sqliteAvailabilityResponseSchema.parse({ ...this.health(), control })) : adminReply({ error: "not_found" }, 404);
+      }
+      if (action.startsWith("controls/")) return adminReply({ error: "method_not_allowed" }, 405);
+      if (request.method !== "POST") return adminReply({ error: "method_not_allowed" }, 405);
+      if (request.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json" || request.headers.has("Content-Encoding")) {
+        return adminReply({ error: "invalid_input" }, 400);
+      }
+      const input = sqliteAvailabilityRequestSchema.parse(await readBoundedAdminJson(request));
+      if (input.action !== sqliteAvailabilityActionSchema.parse(action) || input.show_id !== this.showId) throw new Error("Show control differs");
+      const control = await this.queue.applyControl(input, this.actual);
+      return adminReply(sqliteAvailabilityResponseSchema.parse({ ...this.health(), control }));
+    } catch {
+      console.error(JSON.stringify({ event: "sqlite_service_http", reason_code: "service_request_unverified" }));
+      return adminReply({ error: "control_unverified" }, 409);
+    }
   }
   async fetch(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
     if (request.headers.get("X-Castloop-Show-Id") !== this.showId) return adminReply({ error: "show_required" }, 400);
+    if (["pause", "resume", "admission-pause", "delivery-resume"].some((action) => path === `/admin/sqlite-service/${action}`) ||
+      path.startsWith("/admin/sqlite-service/controls/")) return this.controlHttp(request);
     if (path === "/admin/sqlite-service/health") {
       const response = await this.serviceHttp(request);
       if (!response.ok) return response;
@@ -138,12 +167,6 @@ export class SqliteShowService {
     if (["/admin/sqlite-service/register-show", "/admin/sqlite-service/prepare", "/admin/sqlite-service/update-prepare", "/admin/sqlite-service/update-activate"].includes(path)) return adminReply({ error: "not_found" }, 404);
     if (request.method === "POST") {
       if (!this.ready()) return adminReply({ error: "show_not_ready" }, 503);
-    }
-    if (["/admin/sqlite-service/pause", "/admin/sqlite-service/resume"].includes(path)) {
-      const response = await this.serviceHttp(request);
-      if (!response.ok) return response;
-      await response.body?.cancel();
-      return adminReply(this.health());
     }
     return path.startsWith("/admin/sqlite-operations/") ? this.operationHttp(request) :
       path.startsWith("/admin/sqlite-service/") ? this.serviceHttp(request) : this.publicationHttp(request);

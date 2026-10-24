@@ -7,6 +7,9 @@ import type { OperationClient } from "../packages/shared/src/sqlite-operations";
 import type { SqliteOperationRecords } from "./sqlite-operation-records";
 import { sqliteDeliveryPolicy } from "./sqlite-feed";
 import { initializeSqliteFeedGenerations, reserveSqliteFeedGeneration, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-feed-generations";
+import { sqliteAvailabilityRequestSchema, sqliteAvailabilityRecordSchema } from "../packages/shared/src/sqlite-availability";
+import type { SqliteAvailabilityRequest, SqliteAvailabilityRecord, SqliteAvailabilityState } from "../packages/shared/src/sqlite-availability";
+import { sha256Hex } from "../packages/shared/src/sha256";
 
 type Binding = string | number | null;
 export type PublicationSql = {
@@ -21,10 +24,10 @@ export type PublicationQueueStorage = {
   setAlarm: (time: number) => Promise<void>;
   sync: () => Promise<void>;
 };
-type ServiceRow = SqlitePublicationRuntime & { state: "open" | "paused"; admission_window_id: string | null };
+type ServiceRow = SqlitePublicationRuntime & { state: SqliteAvailabilityState; admission_window_id: string | null; availability_version: number };
 type JobRow = { sequence: number; request_id: string; job_id: string; show_id: string; request_sha256: string; request_json: string;
   state: SqlitePublicationStatus["state"]; reason_code: string | null; delivery_policy: string };
-export type PublicationQueueSnapshot = { state: "open" | "paused"; admission_window_id: string | null;
+export type PublicationQueueSnapshot = { state: SqliteAvailabilityState; admission_window_id: string | null; availability_version: number;
   queued: number; active: SqlitePublicationStatus | null; drained: boolean };
 export type PublicationClaim = { state: "idle" } | { state: "blocked"; job: SqlitePublicationStatus } |
   { state: "interrupted"; job: SqlitePublicationStatus } |
@@ -47,7 +50,10 @@ export class SqlitePublicationQueue {
       initializeSqliteFeedGenerations(storage);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_service (
         id INTEGER PRIMARY KEY CHECK(id = 1), service_id TEXT NOT NULL, worker_version_id TEXT NOT NULL,
-        service_config_sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('open', 'paused')), admission_window_id TEXT)`);
+        service_config_sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('open', 'admission_paused', 'paused')), admission_window_id TEXT,
+        availability_version INTEGER NOT NULL DEFAULT 0 CHECK(availability_version >= 0 AND availability_version <= 9007199254740991))`);
+      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_availability_controls (
+        operation_id TEXT PRIMARY KEY, request_json TEXT NOT NULL, record_json TEXT NOT NULL, opened_window_id TEXT UNIQUE)`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_jobs (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
         show_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL, feed_generation INTEGER NOT NULL UNIQUE,
@@ -79,7 +85,7 @@ export class SqlitePublicationQueue {
   }
 
   private service(): ServiceRow {
-    const row = this.storage.sql.exec<ServiceRow>("SELECT service_id, worker_version_id, service_config_sha256, state, admission_window_id FROM publication_service WHERE id = 1").toArray()[0];
+    const row = this.storage.sql.exec<ServiceRow>("SELECT service_id, worker_version_id, service_config_sha256, state, admission_window_id, availability_version FROM publication_service WHERE id = 1").toArray()[0];
     if (!row) throw new Error("SQLite publication service is missing");
     return row;
   }
@@ -164,7 +170,7 @@ export class SqlitePublicationQueue {
       const service = this.requireRuntime();
       const active = this.active();
       const queued = this.storage.sql.exec<{ count: number }>("SELECT COUNT(*) AS count FROM publication_jobs WHERE state = 'queued'").toArray()[0]!.count;
-      return { state: service.state, admission_window_id: service.admission_window_id, queued,
+      return { state: service.state, admission_window_id: service.admission_window_id, availability_version: service.availability_version, queued,
         active: active ? this.statusRow(active) : null, drained: queued === 0 && active === undefined };
     });
   }
@@ -175,6 +181,56 @@ export class SqlitePublicationQueue {
       this.storage.sql.exec("UPDATE publication_service SET state = 'paused' WHERE id = 1");
       return this.snapshot();
     });
+  }
+
+  controlRecord(operationId: string): SqliteAvailabilityRecord | null {
+    sqliteAvailabilityRequestSchema.shape.operation_id.parse(operationId);
+    const row = this.storage.sql.exec<{ request_json: string; record_json: string }>(
+      "SELECT request_json, record_json FROM publication_availability_controls WHERE operation_id = ?", operationId).toArray()[0];
+    if (!row) return null;
+    const record = sqliteAvailabilityRecordSchema.parse(JSON.parse(row.record_json));
+    if (record.request.operation_id !== operationId || row.request_json !== JSON.stringify(record.request)) throw new Error("Stored Show control differs");
+    return record;
+  }
+
+  async applyControl(input: SqliteAvailabilityRequest, actual = this.runtime): Promise<SqliteAvailabilityRecord> {
+    const request = sqliteAvailabilityRequestSchema.parse(input), source = JSON.stringify(request);
+    const hash = await sha256Hex(source);
+    const result = this.storage.transactionSync(() => {
+      const service = this.requireRuntime();
+      if (request.service_id !== actual.service_id || request.worker_version_id !== actual.worker_version_id ||
+        request.service_config_sha256 !== actual.service_config_sha256 || this.scope && request.show_id !== this.scope.showId) {
+        throw new Error("Show control target differs");
+      }
+      const previous = this.controlRecord(request.operation_id);
+      if (previous) {
+        if (JSON.stringify(previous.request) !== source || previous.request_sha256 !== hash) throw new PublicationQueueConflict();
+        return previous;
+      }
+      if (request.expected_availability_version !== service.availability_version) throw new Error("Show control observation is stale");
+      if (request.action !== "pause" && this.scope && !this.scope.ready()) throw new Error("Show control requires verified runtime outside maintenance");
+      let state = service.state, window = service.admission_window_id;
+      if (request.action === "pause") state = "paused";
+      else if (request.action === "admission-pause") { if (state === "open") state = "admission_paused"; }
+      else {
+        if (!this.snapshot().drained || state === "open") throw new Error("Show resume requires a drained stopped queue");
+        if (request.action === "delivery-resume") state = "admission_paused";
+        else {
+          if (window === request.admission_window_id) throw new Error("Resume requires a new explicit admission window");
+          window = request.admission_window_id!;
+          state = "open";
+        }
+      }
+      const record = sqliteAvailabilityRecordSchema.parse({ request, request_sha256: hash, applied_at_ms: this.now(),
+        result: { state, admission_window_id: window, availability_version: service.availability_version + 1 } });
+      this.storage.sql.exec(`INSERT INTO publication_availability_controls (operation_id, request_json, record_json, opened_window_id)
+        VALUES (?, ?, ?, ?)`, request.operation_id, source, JSON.stringify(record), request.action === "resume" ? window : null);
+      this.storage.sql.exec("UPDATE publication_service SET state = ?, admission_window_id = ?, availability_version = ? WHERE id = 1",
+        state, window, record.result.availability_version);
+      return record;
+    });
+    await this.storage.sync();
+    return result;
   }
 
   resume(windowId: string): PublicationQueueSnapshot {

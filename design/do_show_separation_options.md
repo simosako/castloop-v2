@@ -1,5 +1,7 @@
 # Issue #48: DOをShow単位で分離する検討
 
+2026-10-25追補: Issue #66の開発版は[受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md)を採用した。Show単位の責務は維持し、`admission_paused`で受付だけを止めて公開済み内容を配信する。既存`paused`の両方停止、共有保守の全Show個別Pause/drain、再開前の動作確認、未知IOの保全は変更しない。以下の通常状態がopen/pausedだけという記述に、この3状態目を加える。新規環境専用の内部queue/content形式7/7で、旧形式を変換しない。
+
 更新日: 2026-10-20。Issue #48への採用設計。**Show単位DO、Show単位Pause/Resume、全体Pauseの廃止、旧版互換・移行不要、および実装・ローカル検証は管理者承認済み。Cloudflareへの配備・資源変更・既存環境の削除は対象外。** v0.6.2の旧構成とは区別する。
 
 実装・ローカル検証は完了。結果と未確認範囲は[検証記録](archive/do_show_separation_verification.md)を参照する。[初回の実機試行](archive/do_show_separation_live_verification_20261020.md)は初期化probeで停止したが、診断改善後の[新規環境再試験](archive/do_show_separation_live_retest_20261021.md)で2 Show・6 Episodeの公開、個別Pause/Resume、配信確認に成功した。[2026-10-21の共有Worker更新](archive/do_show_separation_worker_update_live_20261021.md)も、native反映待ちの明示verifyを経て全DOのprobe・解除・データ保持・更新後公開を確認した。初回purge障害の根本原因とnative同時IO性能は未確認。

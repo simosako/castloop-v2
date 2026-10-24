@@ -36,6 +36,13 @@ try {
   assert.equal(domain.options["zone-id"], "string");
   assert.equal(domain.options["operation-id"], "string");
   assert.equal(domain.options.cursor, "string");
+  for (const command of ["show-admission-pause", "show-delivery-resume", "show-control-status"]) {
+    const description = JSON.parse(run(["describe", command, "--json"])).commands[0];
+    assert.equal(description.command, command);
+    assert.deepEqual(description.positional_counts, [2]);
+    assert.equal(description.effects.remote, command === "show-control-status" ? "read_only" : "may_mutate");
+    assert.match(run([command, "--help"]), /SHOW_ID OPERATION_UUID/);
+  }
   for (const action of ["add", "remove", "list", "status", "continue"]) {
     assert.match(run(["domain", action, "--help"]), /Usage: castloop domain/);
   }

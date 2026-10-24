@@ -30,13 +30,12 @@ export function createSqliteServiceHttp(runtime: SqliteServiceRuntime, key: stri
       if (!runtime.ready()) return reply({ error: "runtime_not_ready" }, 503);
       if (path === "catalog") return reply(runtime.catalog(sqliteCatalogRequestSchema.parse(body)));
       if (path === "pause") {
-        runtime.requireTarget(sqliteRuntimeRequestSchema.parse(body));
-        runtime.queue.pause(); return reply(runtime.health());
+        throw new Error("Show controls require the versioned Show endpoint");
       }
       const parsed = path === "resume" ? sqliteResumeRequestSchema.parse(body) : sqliteRegistrationSchema.parse(body);
       runtime.requireTarget({ service_id: parsed.service_id, worker_version_id: parsed.worker_version_id,
         service_config_sha256: parsed.service_config_sha256, operation_id: parsed.operation_id });
-      if (path === "resume") { runtime.queue.resume(sqliteResumeRequestSchema.parse(parsed).admission_window_id); return reply(runtime.health()); }
+      if (path === "resume") throw new Error("Show controls require the versioned Show endpoint");
       const registration = sqliteRegistrationSchema.parse(parsed), snapshot = runtime.queue.snapshot();
       if (snapshot.state !== "open") return reply({ error: "stale_window" }, 409);
       runtime.content.registerShow(registration.show_id, registration.reservation_id);

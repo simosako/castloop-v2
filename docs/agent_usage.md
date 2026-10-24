@@ -50,6 +50,8 @@ JSON Schemaはparse後のTOML値を記述する。裸のTOML日時ではなく�
 
 取得できる出力schemaは現段階では共通外枠の`result`であり、コマンドごとの詳細payloadはJSON値として扱う。全管理コマンドの詳細result型・flagの条件付き必須性までを個別JSON Schema化する補強は残る。入力schemaの取得・strict検証とは区別する。
 
+Issue #66の開発版は`show-admission-pause SHOW UUID`、`show-delivery-resume SHOW UUID`、`show-control-status SHOW UUID`を追加した。対応CLIのhelp/describeで確認し、対象workspaceを明示する。受付だけの停止では素材アップロードも止まり、配信だけの再開でも既受付処理の終了と動作確認を待つ。`result.control.result`は過去の適用結果、`result.state`は現在状態であり、過去の再開成功を新たな再開許可にしない。`doctor --local`は手元の未完了制御記録を検査するだけで、照会や再送はしない。詳しくは[停止・再開ガイド](show_availability.md)を参照する。新機能は内部形式7/7の新規環境専用で、既存環境を変換しない。
+
 doctorは人向け1項目1行とJSONの`result.checks`を同じ検査から生成する。pass/warn/fail/not_checkedを区別し、failは終了1、warnだけは終了0。認証情報の存在は有効性・権限を証明しない。remote検査・自動修復は行わない。
 
 ## 対象・出力・公開前確認

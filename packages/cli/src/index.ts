@@ -229,6 +229,9 @@ async function main(context: Invocation): Promise<unknown> {
   }
   context.target.workspace = root;
   const workspace = await loadWorkspaceConfig(root);
+  if (["show-status", "show-pause", "show-resume", "show-admission-pause", "show-delivery-resume", "show-control-status"].includes(command)) {
+    context.target.show_id = validateId(positional[0], "show");
+  }
   if (command === "domain" && !["list", "status"].includes(positional[0])) {
     const operationId = positional[0] === "continue" ? positional[1] : flags["operation-id"];
     context.failureResult = async () => {

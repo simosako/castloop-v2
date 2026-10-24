@@ -10,6 +10,7 @@ import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import type { SqlitePublicationEffectFailure } from "./sqlite-publication-executor";
+import type { SqliteAvailabilityRequest } from "../packages/shared/src/sqlite-availability";
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
@@ -95,8 +96,61 @@ async function fixture() {
       ...(episodeId === undefined ? {} : { episode_id: episodeId, base_revision_id: target.base!.revision_id, expected_episode_lifecycle_version: target.episode!.lifecycle_version }), payloads: [] });
   };
   const feed = () => objects.text(sqliteFeedSnapshotKey("daily", content.inspect("daily").show!.feed_generation));
-  return { ...setup, ...objects, feed, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, showUpdate, lifecycle };
+  const control = (action: SqliteAvailabilityRequest["action"]) => setup.queue.applyControl({ ...setup.runtime, action, show_id: "daily",
+    operation_id: crypto.randomUUID(), expected_availability_version: setup.queue.snapshot().availability_version,
+    ...(action === "resume" ? { admission_window_id: crypto.randomUUID() } : {}) });
+  return { ...setup, ...objects, feed, control, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, showUpdate, lifecycle };
 }
+
+test("admission stop drains a running publication while serving only committed generations", async () => {
+  const value = await fixture(); await value.publishShow(); const old = await value.publishEpisode();
+  const previousFeed = value.feed(), next = await value.request("episode", "second");
+  await value.queue.enqueue(next); await value.control("admission-pause");
+  let enter!: () => void, release!: () => void;
+  const entered = new Promise<void>((resolve) => { enter = resolve; }), released = new Promise<void>((resolve) => { release = resolve; });
+  value.hooks.purge = async () => { enter(); await released; };
+  value.clearAlarm(); const pending = value.runner.alarm(); await entered;
+  try {
+    const response = await readPublic(value); expect(response.status).toBe(200); expect(await response.text()).toBe(previousFeed!);
+    expect((await readPublic(value, "/podcasts/daily/cover.jpg")).status).toBe(200);
+    expect((await readPublic(value, `/podcasts/daily/episodes/first/${old.job_id}.mp3`)).status).toBe(200);
+    expect((await readPublic(value, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(404);
+    await expect(value.control("resume")).rejects.toThrow("drained");
+    await value.control("pause"); expect((await readPublic(value)).status).toBe(503);
+    await expect(value.control("delivery-resume")).rejects.toThrow("drained");
+  } finally { release(); }
+  expect((await pending).state).toBe("succeeded");
+  expect(value.queue.snapshot()).toMatchObject({ state: "paused", drained: true, admission_window_id: value.windowId });
+  await value.control("delivery-resume");
+  expect(await (await readPublic(value)).text()).not.toBe(previousFeed!);
+  expect((await readPublic(value, `/podcasts/daily/episodes/second/${next.job_id}.mp3`)).status).toBe(200);
+});
+
+for (const action of ["initial", "unpublish", "restore"] as const) {
+  test(`admission stop does not allow delivery during ${action} publication or its uncertain interruption`, async () => {
+    const value = await fixture();
+    if (action !== "initial") { await value.publishShow(); await value.publishEpisode(); }
+    if (action === "restore") await value.run(value.lifecycle("unpublish", "first"));
+    const request = action === "initial" ? await value.request("show") : value.lifecycle(action, "first");
+    await value.queue.enqueue(request); await value.control("admission-pause");
+    expect(value.queue.claim().state).toBe("claimed");
+    expect((await readPublic(value)).status).toBe(503);
+    await value.queue.block(request.job_id, "execution_interrupted");
+    expect((await readPublic(value)).status).toBe(503);
+    await expect(value.control("resume")).rejects.toThrow("drained");
+  });
+}
+
+test("admission stop preserves only verified blocked reads and still rejects broken guards", async () => {
+  const value = await fixture(); await value.publishShow(); await value.publishEpisode();
+  const oldFeed = value.feed(), request = await value.request("episode", "second");
+  await value.queue.enqueue(request); await value.control("admission-pause");
+  value.hooks.purge = async () => { throw new Error("Injected purge failure"); };
+  value.clearAlarm(); expect((await value.runner.alarm()).state).toBe("blocked");
+  expect(await (await readPublic(value)).text()).toBe(oldFeed!);
+  value.storage.sql.exec("UPDATE publication_jobs SET read_request_sha256 = ? WHERE job_id = ?", "f".repeat(64), request.job_id);
+  expect((await readPublic(value)).status).toBe(503);
+});
 
 test("domain Feed reservations cannot collide with later publication or change cover and revision identity", async () => {
   const value = await fixture();

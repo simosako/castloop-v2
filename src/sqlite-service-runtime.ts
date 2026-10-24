@@ -54,6 +54,8 @@ export class SqliteServiceRuntime {
       publication_read_boundary: "show-episode-v1",
       feed_generation_allocator: "reservation-v1",
       domain_changes: "sqlite-domain-change-v1",
+      availability_controls: "show-admission-delivery-v1", availability_version: snapshot.availability_version,
+      admission_state: snapshot.state === "open" ? "open" : "closed", delivery_policy: snapshot.state === "paused" ? "stopped" : "enabled",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
       setup: setup ? { operation_id: setup.operation_id, state: setup.state } : null, runtime_update: this.updates.summary() });

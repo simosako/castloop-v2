@@ -283,7 +283,7 @@ export class SqlitePublicationContent {
     if (!asset) return { status: 404 };
     return this.storage.transactionSync(() => {
       const service = this.storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
-      if (service?.state !== "open") return { status: 503 };
+      if (service?.state !== "open" && service?.state !== "admission_paused") return { status: 503 };
       const show = this.show(asset.showId);
       if (!show) return { status: 404 };
       const active = this.storage.sql.exec<{ state: string; reason_code: string | null;
