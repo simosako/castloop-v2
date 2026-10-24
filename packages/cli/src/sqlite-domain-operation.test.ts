@@ -1,8 +1,9 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { continueSqliteDomainChange, listSqliteDomains, sqliteDomainOperationStatus, startSqliteDomainChange } from "./sqlite-domain-operation";
-import { readSqliteDomainJournal } from "./sqlite-domain-journal";
+import { readSqliteDomainJournal, sqliteDomainJournalSchema } from "./sqlite-domain-journal";
+import * as journalStorage from "./local-journal-storage";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { SqliteDomainCloudflare } from "./sqlite-domain-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
@@ -59,6 +60,80 @@ test("TLS waiting continues the exact acknowledged connection without reconnecti
   expect((await continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).phase).toBe("completed");
   expect((await listSqliteDomains(f.root, await loadWorkspaceConfig(f.root), f.options)).local_pending).toEqual([]);
   expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
+});
+
+test("empty-environment PUT acknowledgement is saved before production GET and is never treated as a full connection", async () => {
+  const f = await fixture(), id = crypto.randomUUID(); let sawAcknowledgement = false;
+  const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
+    const path = new URL(String(input)).pathname;
+    if (init?.method === "GET" && /\/workers\/domains\/.+$/.test(path)) {
+      const saved = readSqliteDomainJournal(f.root, f.config, id);
+      if (!sawAcknowledgement) {
+        expect(saved).toMatchObject({ phase: "attachment_acknowledged", attachment_acknowledgement: { environment: "" } });
+        expect(saved?.connection).toBeUndefined();
+        expect(path.endsWith(`/${saved?.attachment_acknowledgement?.id}`)).toBe(true);
+        expect(await loadWorkspaceConfig(f.root)).toEqual(f.config);
+        sawAcknowledgement = true;
+      }
+    }
+    const response = await f.transport(input, init);
+    if (init?.method === "PUT" && path.endsWith("/workers/domains")) {
+      const body = await response.json() as { result: object };
+      return Response.json({ success: true, errors: null, result: { ...body.result, environment: "" } });
+    }
+    return response;
+  } };
+  const result = await startSqliteDomainChange(f.root, f.config, "add", id, "worker", options, target, wait);
+  expect(sawAcknowledgement).toBe(true);
+  expect(result).toMatchObject({ phase: "completed", attachment_acknowledgement: { environment: "" }, connection: { environment: "production" } });
+  expect(sqliteDomainJournalSchema.safeParse({ ...result, attachment_acknowledgement: undefined }).success).toBe(false);
+  expect(sqliteDomainJournalSchema.safeParse({ ...result, attachment_acknowledgement: { ...result.attachment_acknowledgement, cert_id: crypto.randomUUID() } }).success).toBe(false);
+});
+
+for (const fault of ["transport", "environment", "cert_id", "id", "enabled", "previews_enabled", "service", "hostname", "zone_id", "zone_name"] as const) {
+  test(`acknowledged attachment rejects GET ${fault} and continues only the exact saved receipt without another PUT`, async () => {
+    const f = await fixture(), id = crypto.randomUUID(); let failing = true;
+    const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
+      const path = new URL(String(input)).pathname;
+      if (failing && init?.method === "GET" && /\/workers\/domains\/.+$/.test(path)) {
+        if (fault === "transport") throw new Error("simulated GET failure");
+        const response = await f.transport(input, init), body = await response.json() as { result: object };
+        const changes = { environment: "", cert_id: crypto.randomUUID(), id: "other-id", enabled: false,
+          previews_enabled: true, service: "other-worker", hostname: "other.example.com", zone_id: "f".repeat(32), zone_name: "other.com" };
+        return Response.json({ success: true, errors: null, result: { ...body.result, [fault]: changes[fault] } });
+      }
+      return f.transport(input, init);
+    } };
+    await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", options, target, wait)).rejects.toThrow();
+    const saved = readSqliteDomainJournal(f.root, f.config, id);
+    expect(saved?.phase).toBe("attachment_acknowledged"); expect(saved?.connection).toBeUndefined();
+    expect(await loadWorkspaceConfig(f.root)).toEqual(f.config);
+    const calls = f.calls.length;
+    await expect(continueSqliteDomainChange(f.root, f.config, id, "changed-source", options, wait)).rejects.toThrow("frozen");
+    expect(f.calls).toHaveLength(calls);
+    failing = false;
+    expect((await continueSqliteDomainChange(f.root, f.config, id, "worker", options, wait)).phase).toBe("completed");
+    expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
+  });
+}
+
+test("failure to durably save an attachment acknowledgement never starts its GET or replays its PUT", async () => {
+  const f = await fixture(), id = crypto.randomUUID(), original = journalStorage.createLocalJournalStorage;
+  const replacement = spyOn(journalStorage, "createLocalJournalStorage").mockImplementation((...args) => {
+    const storage = original(...args);
+    return { ...storage, replace(value) {
+      if ((value as { phase?: string }).phase === "attachment_acknowledged") throw new Error("simulated receipt storage failure");
+      storage.replace(value);
+    } };
+  });
+  try {
+    await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", f.options, target, wait)).rejects.toThrow("storage failure");
+    expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("connection_requested");
+    expect(f.calls.filter((call) => /\/workers\/domains\/.+$/.test(call.path))).toEqual([]);
+    const calls = f.calls.length;
+    await expect(continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).rejects.toThrow("unknown outcome");
+    expect(f.calls).toHaveLength(calls);
+  } finally { replacement.mockRestore(); }
 });
 
 for (const failure of ["attach", "detach"] as const) test(`unknown ${failure} outcome is never adopted or replayed even when current API state shows the result`, async () => {

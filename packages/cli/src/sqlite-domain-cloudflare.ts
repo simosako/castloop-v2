@@ -5,6 +5,8 @@ import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { collectStreamBytes } from "./bounded-http-read";
 import { AgentError } from "./agent-output";
+import { domainAttachmentMatches, requireSqliteDomainAttachment } from "./sqlite-domain-attachment";
+import type { SqliteDomainAttachment } from "./sqlite-domain-attachment";
 import { requireR2RestOptions } from "./verified-r2-put";
 import type { R2RestOptions } from "./verified-r2-put";
 
@@ -25,7 +27,7 @@ type ResponseKind = "missing" | "null" | "array" | "object" | "string" | "number
 type EnvironmentKind = "invalid_result" | "missing" | "null" | "empty_string" | "production" | "other_string" | "non_string";
 type ValidationField = { path: string[]; code: string };
 type DomainDiagnosticDetails = { http_status?: number; response_kind?: ResponseKind; environment_kind?: EnvironmentKind;
-  expected_environment?: "production"; fields?: ValidationField[] };
+  expected_environment?: "production" | "empty_or_production"; fields?: ValidationField[] };
 const connectionFields = new Set(["id", "cert_id", "hostname", "zone_id", "zone_name", "service", "environment", "enabled", "previews_enabled"]);
 const validationCodes = new Set(["invalid_type", "invalid_format", "invalid_value", "unrecognized_keys", "too_small", "too_big", "custom"]);
 
@@ -52,18 +54,21 @@ function logDomainFailure(apiOperation: DomainApiOperation, method: DomainMethod
     reason_code: reason, ...details, will_retry: false }));
 }
 
-function verifiedConnection(input: unknown, request: SqliteDomainRequest, operation: "domain_attach" | "domain_get"): SqliteDomainConnection {
+function receiptFailure(input: unknown, error: unknown, operation: "domain_attach" | "domain_get"): never {
+  const fields = error instanceof z.ZodError ? error.issues.slice(0, 20).map((issue) => ({
+    path: issue.path.length === 1 && typeof issue.path[0] === "string" && connectionFields.has(issue.path[0]) ? [issue.path[0]] : [],
+    code: validationCodes.has(issue.code) ? issue.code : "validation_failed",
+  })) : undefined;
+  logDomainFailure(operation, operation === "domain_attach" ? "PUT" : "GET",
+    error instanceof z.ZodError ? "connection_schema_unverified" : "connection_target_mismatch",
+    { http_status: 200, response_kind: responseKind(input), environment_kind: environmentKind(input),
+      expected_environment: operation === "domain_attach" ? "empty_or_production" : "production", ...(fields ? { fields } : {}) });
+  throw new AgentError("domain_connection_unverified", "Cloudflare domain connection receipt was not verified; preserve its journal without replay or adoption.", fields);
+}
+
+function verifiedConnection(input: unknown, request: SqliteDomainRequest): SqliteDomainConnection {
   try { return requireSqliteDomainConnection(input, request); }
-  catch (error) {
-    const fields = error instanceof z.ZodError ? error.issues.slice(0, 20).map((issue) => ({
-      path: issue.path.length === 1 && typeof issue.path[0] === "string" && connectionFields.has(issue.path[0]) ? [issue.path[0]] : [],
-      code: validationCodes.has(issue.code) ? issue.code : "validation_failed",
-    })) : undefined;
-    logDomainFailure(operation, operation === "domain_attach" ? "PUT" : "GET",
-      error instanceof z.ZodError ? "connection_schema_unverified" : "connection_target_mismatch",
-      { http_status: 200, response_kind: responseKind(input), environment_kind: environmentKind(input), expected_environment: "production", ...(fields ? { fields } : {}) });
-    throw new AgentError("domain_connection_unverified", "Cloudflare domain connection receipt was not verified; preserve its journal without replay or adoption.", fields);
-  }
+  catch (error) { return receiptFailure(input, error, "domain_get"); }
 }
 
 function hostnameCovered(pattern: string, hostname: string): boolean {
@@ -171,19 +176,31 @@ export class SqliteDomainCloudflare {
     if (routes.some((route) => hostnameCovered(route.pattern, hostname))) throw new Error("An existing Worker route covers this hostname");
     return { hostname, zone_id: zone.id, zone_name: zone.name };
   }
-  async attach(request: SqliteDomainRequest): Promise<SqliteDomainConnection> {
+  async attach(request: SqliteDomainRequest): Promise<SqliteDomainAttachment> {
     if (request.action !== "add") throw new Error("Only an add request can attach a domain");
     const target = await this.preflightAdd(request.hostname, request.zone_id);
     if (target.zone_name !== request.zone_name) throw new Error("Frozen domain zone name differs");
-    return verifiedConnection((await this.call("domain_attach", "PUT", `${this.account}/workers/domains`, {
+    const input = (await this.call("domain_attach", "PUT", `${this.account}/workers/domains`, {
       hostname: target.hostname, zone_id: target.zone_id, service: this.config.worker_name, enabled: true, previews_enabled: false,
-    })).result, request, "domain_attach");
+    })).result;
+    try { return requireSqliteDomainAttachment(input, request); }
+    catch (error) { return receiptFailure(input, error, "domain_attach"); }
+  }
+  async confirmAttachment(request: SqliteDomainRequest, receipt: SqliteDomainAttachment): Promise<SqliteDomainConnection> {
+    const acknowledged = requireSqliteDomainAttachment(receipt, request);
+    const connection = verifiedConnection((await this.call("domain_get", "GET",
+      `${this.account}/workers/domains/${encodeURIComponent(acknowledged.id)}`)).result, request);
+    if (!domainAttachmentMatches(acknowledged, connection)) {
+      logDomainFailure("domain_get", "GET", "connection_receipt_mismatch", { http_status: 200 });
+      throw new Error("Domain connection differs from its acknowledged attachment");
+    }
+    return connection;
   }
   async inspect(request: SqliteDomainRequest, connection: SqliteDomainConnection): Promise<void> {
     requireSqliteDomainConnection(connection, request);
     const zone = await this.zone(request.zone_id);
     if (zone.name !== request.zone_name) throw new Error("Frozen domain zone differs");
-    const current = verifiedConnection((await this.call("domain_get", "GET", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`)).result, request, "domain_get");
+    const current = verifiedConnection((await this.call("domain_get", "GET", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`)).result, request);
     if (JSON.stringify(current) !== JSON.stringify(connection)) {
       logDomainFailure("domain_get", "GET", "connection_receipt_mismatch", { http_status: 200 });
       throw new Error("Domain connection receipt changed");

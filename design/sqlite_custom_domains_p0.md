@@ -36,6 +36,8 @@ Worker domainの`id`はaccount/Zone/namespaceの32桁IDとは別のopaque識別�
 
 管理者の指摘により二段階案は保留し、先に[保存ログの調査・CLI段階別診断](sqlite_domain_response_logging.md)を追加した。元PUTの欠測を新しいログで埋めたとは扱わず、成功応答の許容条件や未知結果の再送/採用条件は変更しない。
 
+その後の追加承認による[第4試験と修正](sqlite_custom_domain_iterative_verification_20261024.md)で元PUT空文字を特定した。現行はPUT acknowledgementのenvironmentを空文字/productionに限定し、GETより先に専用checkpointへ保存する。そのIDへのGETはproduction固定と全field一致を要求し、完全connectionを得るまで設定書込・配備しない。旧unknownは非採用・非再送のまま。前段落までの未実装/保留は診断当時の履歴である。
+
 ### 2.2 Cloudflareの公開ソースにある別経路
 
 [workers-sdkの固定commit `e651d7c0dd8e171dcc1820679f9f46601971d876`の`publishCustomDomains()`](https://github.com/cloudflare/workers-sdk/blob/e651d7c0dd8e171dcc1820679f9f46601971d876/packages/deploy-helpers/src/triggers/publish-routes.ts)を確認した。

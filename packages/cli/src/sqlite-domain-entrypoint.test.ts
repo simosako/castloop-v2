@@ -12,7 +12,14 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     const target = request.headers.get("X-Castloop-Test-Target");
     if (!target || !["api.cloudflare.com", "test-worker.example.workers.dev", "podcasts.example.com"].includes(new URL(target).hostname)) return new Response(null, { status: 400 });
     const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
-    try { return await f.transport(target, { method: request.method, headers, ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) }); }
+    try {
+      const response = await f.transport(target, { method: request.method, headers, ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+      if (request.method === "PUT" && new URL(target).pathname.endsWith("/workers/domains")) {
+        const body = await response.json() as { result: object };
+        return Response.json({ success: true, errors: null, result: { ...body.result, environment: "" } });
+      }
+      return response;
+    }
     catch { return new Response(null, { status: 503 }); }
   } });
   const env = { ...process.env, CLOUDFLARE_ACCOUNT_ID: f.config.account_id, CLOUDFLARE_API_TOKEN: "private-token",
@@ -34,6 +41,7 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     const id = crypto.randomUUID(); f.faults.tlsPending = true;
     const failed = await invoke(["domain", "add", "podcasts.example.com", "--zone-id", "c".repeat(32), "--operation-id", id], false);
     expect(failed.result).toMatchObject({ operation_id: id, phase: "connected" });
+    expect(readSqliteDomainJournal(f.root, f.config, id)).toMatchObject({ attachment_acknowledgement: { environment: "" }, connection: { environment: "production" } });
     expect(failed.next_actions.some((action) => action.command === "domain" && action.args?.[0] === "status")).toBe(true);
     f.faults.tlsPending = false;
     expect((await invoke(["domain", "continue", id])).result).toMatchObject({ phase: "completed" });
@@ -80,7 +88,7 @@ test("formal domain CLI emits safe receipt-stage diagnostics to stderr and prese
     expect(result.result).toMatchObject({ ok: false, result: { phase: "connection_requested" }, error: { code: "domain_connection_unverified", outcome: "unknown" } });
     const diagnostics = result.stderr.trim().split("\n").map((line) => JSON.parse(line));
     expect(diagnostics).toContainEqual({ event: "sqlite_domain_cloudflare", api_operation: "domain_attach", method: "PUT",
-      reason_code: "connection_schema_unverified", http_status: 200, response_kind: "object", environment_kind: "null", expected_environment: "production",
+       reason_code: "connection_schema_unverified", http_status: 200, response_kind: "object", environment_kind: "null", expected_environment: "empty_or_production",
       fields: [{ path: ["environment"], code: "invalid_value" }], will_retry: false });
     expect(result.stderr).not.toContain("private-token"); expect(result.stderr).not.toContain("podcasts.example.com");
     expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);

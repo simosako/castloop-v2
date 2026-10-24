@@ -308,6 +308,8 @@ castloop domain remove --operation-id UUID --workspace PATH
 
 次に管理者の指摘に従い、契約変更は保留して[既存ログ調査と固定分類ログ](sqlite_domain_response_logging.md)を先行した。検証条件・非再送を変えず、**642 tests / 76 files成功**、型検査・Linux CLI build成功。追加ログを実機mutationで収集したものではなく、過去PUTの値/有無は未確認のまま。
 
+その後の追加承認による[ログ付き第4試験](sqlite_custom_domain_iterative_verification_20261024.md)で元PUTのenvironment空文字を確認した。PUT acknowledgementを先に耐久保存し、同IDへのproduction GETで全fieldを一致確認してからconnectedへ進む限定修正を実装した。既存unknown非採用/非再送を維持し、**654 tests / 76 files成功**、型検査・Linux CLI build成功。修正版の実機結果は同記録に区別して記す。
+
 ## 10. 受け入れ条件と試験
 
 以下は実機を含む総合受け入れ項目であり、P7が初回試行で停止したため未完了として保持する。ローカルの実施範囲・証拠は§9.2、実機の部分結果は上記記録を参照する。

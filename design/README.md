@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-未リリースのIssue #68開発では、fresh専用の内部queue/content形式を6/7へ変更し、SQLite独自subdomainと旧workers.dev公開URLのredirectを追加する。旧5/6環境の移行・採用はしない。ローカル模擬試験とCloudflare実機未確認の範囲を[計画](sqlite_custom_domains_plan.md)で区別する。[初回](sqlite_custom_domain_live_verification_20261024.md)・[再試験](sqlite_custom_domain_live_retest_20261024.md)はreceipt検証で停止。[Show 0件の診断](sqlite_custom_domain_environment_review.md)でPUTのenvironment固定検証に絞り込み、二段階receipt案は保留して[ログ調査・診断追加](sqlite_domain_response_logging.md)を先行した。受け入れは未完了。
+未リリースのIssue #68開発では、fresh専用の内部queue/content形式を6/7へ変更し、SQLite独自subdomainと旧workers.dev公開URLのredirectを追加する。旧5/6環境の移行・採用はしない。ローカル模擬試験とCloudflare実機未確認の範囲を[計画](sqlite_custom_domains_plan.md)で区別する。初回から第3試験の停止後、[段階別ログ](sqlite_domain_response_logging.md)を先行追加し、[第4試験](sqlite_custom_domain_iterative_verification_20261024.md)で元PUT空文字を特定した。現行は耐久acknowledgementとproduction GETを分離する。受け入れは未完了。
 
 v0.7.2はエージェント向けCLIと管理者Skillを追加したrelease。Worker・永続形式はv0.7.1から変更しない。[リリースノート](../docs/release-v0.7.2.md)と[利用ガイド](../docs/agent_usage.md)を参照する。Cloudflare実機検証は今回の変更範囲では省略し、ローカル回帰と単体バイナリで確認する。
 
@@ -23,7 +23,8 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [SQLite独自ドメイン実機確認案](../docs/sqlite_custom_domain_live_acceptance.md) | 新規隔離環境と専用hostnameでの確認手順。初回は別途承認で部分試行・停止。後続操作へ過去承認を流用しない |
 | [SQLite独自ドメイン初回実機・停止記録](sqlite_custom_domain_live_verification_20261024.md) | 2 Showの通常公開・Pause、API応答/opaque ID修正、未知接続非採用、保守拘束付きの最終停止状態と未試験範囲 |
 | [SQLite独自ドメイン再試験・停止記録](sqlite_custom_domain_live_retest_20261024.md) | 別hostname・fresh環境でもreceipt検証で停止。原因未確定、初回環境保持、履歴hash保持、値を出さないfield診断の追加 |
-| [environment診断とreceipt契約の追加レビュー](sqlite_custom_domain_environment_review.md) | 第3環境はShow 0・公開なし。PUTのenvironment固定検証で停止。二段階receipt案は保留・未実装、ログ調査を優先 |
+| [environment診断とreceipt契約の追加レビュー](sqlite_custom_domain_environment_review.md) | 第3環境の停止記録と提案履歴。ログ調査を優先した経緯 |
+| [ログ付き再試験と修正](sqlite_custom_domain_iterative_verification_20261024.md) | 第4試験でPUT空文字を特定。耐久acknowledgementとproduction GETの分離、旧unknown非採用、反復試験の記録 |
 | [独自domain応答検証ログと調査](sqlite_domain_response_logging.md) | 既存stderrは空で元PUTは欠測。CLIへHTTP/body/JSON/schemaの段階とenvironment固定分類を追加。秘密非出力・非再送のローカル回帰 |
 | [エージェントによるPodcast管理の改善案](agent_integration_plan.md) | Issue #5。単一バイナリでのschema・雛形・Skill配布、明示対象指定、オフライン検証、doctor、承認と中断対応。MCPは不採用 |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |

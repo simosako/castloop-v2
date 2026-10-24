@@ -104,8 +104,15 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
     if (state.phase === "maintenance") {
       await previousApi.inspect(state.previous);
       if (request.action === "add") {
-        save("connection_requested"); const connection = await domains.attach(request); save("connected", { connection });
+        save("connection_requested");
+        const acknowledgement = await domains.attach(request);
+        save("attachment_acknowledged", { attachment_acknowledgement: acknowledgement });
       } else save("connected", { connection: request.connection! });
+    }
+    if (state.phase === "attachment_acknowledged") {
+      await previousApi.inspect(state.previous);
+      const connection = await domains.confirmAttachment(request, state.attachment_acknowledgement!);
+      save("connected", { connection });
     }
     if (state.connection) requireSqliteDomainConnection(state.connection, request);
     if (state.phase === "connected") {

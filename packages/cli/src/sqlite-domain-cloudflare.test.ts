@@ -76,11 +76,11 @@ async function attachmentRequest(f: Awaited<ReturnType<typeof sqliteServiceFixtu
     target_config_sha256: await sqliteServiceConfigHash(target), worker_source_sha256: "d".repeat(64), worker_metadata_sha256: "e".repeat(64) });
 }
 
-test("attachment logs distinguish missing, null, empty, unexpected and non-string environment fields without exposing values", async () => {
+test("attachment logs distinguish missing, null, unexpected and non-string environment fields without exposing values", async () => {
   const records: string[] = [], logger = spyOn(console, "error").mockImplementation((line) => { records.push(String(line)); });
   try {
     for (const [kind, change] of [
-      ["missing", {}], ["null", { environment: null }], ["empty_string", { environment: "" }],
+      ["missing", {}], ["null", { environment: null }],
       ["other_string", { environment: "private-provider-environment" }], ["non_string", { environment: { secret: "private-provider-environment" } }],
     ] as const) {
       const f = await sqliteServiceFixture();
@@ -99,7 +99,7 @@ test("attachment logs distinguish missing, null, empty, unexpected and non-strin
         expect(records).toHaveLength(count + 1);
         expect(JSON.parse(records.at(-1)!)).toEqual({ event: "sqlite_domain_cloudflare", api_operation: "domain_attach", method: "PUT",
           reason_code: "connection_schema_unverified", http_status: 200, response_kind: "object", environment_kind: kind,
-          expected_environment: "production", fields: [{ path: ["environment"], code: "invalid_value" }], will_retry: false });
+          expected_environment: "empty_or_production", fields: [{ path: ["environment"], code: "invalid_value" }], will_retry: false });
         expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
       } finally { f.close(); }
     }
@@ -115,7 +115,7 @@ test("GET connection validation logs its own boundary and successful receipts pr
   const logger = spyOn(console, "error").mockImplementation((line) => { records.push(String(line)); });
   try {
     const request = await attachmentRequest(f), api = new SqliteDomainCloudflare(f.config, f.options);
-    const connection = await api.attach(request); await api.inspect(request, connection);
+    const connection = await api.confirmAttachment(request, await api.attach(request)); await api.inspect(request, connection);
     expect(records).toEqual([]);
     const invalid = new SqliteDomainCloudflare(f.config, { ...f.options, transport: async (input, init) => {
       const response = await f.transport(input, init);

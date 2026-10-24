@@ -1,6 +1,6 @@
 # 独自domainの応答検証ログと調査結果
 
-Issue #68。2026-10-24、管理者の指摘に基づき、契約変更より先に既存ログの調査とCLI診断の追加を行った。**紐付けの再送・切断・配備・追加環境作成はしていない。** 二段階receipt案は保留・未実装であり、接続の検証条件と未知結果の非再送/非採用は維持する。
+Issue #68。2026-10-24、管理者の指摘に基づき、契約変更より先に既存ログの調査とCLI診断の追加を行った。本書の初期調査では実機操作なし。その後、追加承認された[ログ付き再試験と修正](sqlite_custom_domain_iterative_verification_20261024.md)でPUT空文字を確認した。以下の3試験の元応答欠測は解消したことにせず、未知結果の非再送/非採用を維持する。
 
 ## 保存済みログの調査
 
@@ -28,7 +28,7 @@ Issue #68。2026-10-24、管理者の指摘に基づき、契約変更より先�
 | http_status | 応答がある場合のstatus数値 |
 | response_kind | 必要な場合だけ、missing/null/array/object/string/number/boolean/other |
 | environment_kind | 接続receipt失敗時の固定分類。下記参照 |
-| expected_environment | 接続receiptの現行期待値production |
+| expected_environment | PUT acknowledgementはempty_or_production、完全GET connectionはproduction |
 | fields | 既知field名と検証codeのみ、最大20件。未知key名は空pathへ伏せる |
 | will_retry | false。診断追加による自動再送はしない |
 
@@ -71,4 +71,4 @@ PUTのreceipt検証で`http_status=200`が出た場合、HTTP・完全読取・J
 
 ## 次の調査境界
 
-実機の失敗値そのものは未確認のまま。次に承認された新規操作で失敗した場合は、CLIのstdout結果とstderr診断を同じ要求の証拠として保存し、実測した分類を根拠に最小限の修正を判断する。二段階receipt化やenvironmentの許容変更を、ログ追加だけの承認から実装しない。既存3環境の紐付け再送・切断、4つ目の環境作成は別承認とする。
+初期調査時点では実機の失敗値は未確認だった。その後の追加承認では新規環境での調査・修正・反復試験が許可され、第4試験のログで元PUTの`environment_kind=empty_string`を確認した。現行の修正・検証範囲は[反復試験記録](sqlite_custom_domain_iterative_verification_20261024.md)に記す。既存unknownを昇格・再送・切断する許可ではない。
