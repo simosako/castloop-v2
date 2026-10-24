@@ -4,6 +4,7 @@ import type { SqliteDomainConnection, SqliteDomainRequest } from "../../shared/s
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { collectStreamBytes } from "./bounded-http-read";
+import { AgentError } from "./agent-output";
 import { requireR2RestOptions } from "./verified-r2-put";
 import type { R2RestOptions } from "./verified-r2-put";
 
@@ -16,6 +17,19 @@ const dnsPagination = pagination.extend({ per_page: z.number().int().positive(),
 const envelope = z.object({ success: z.literal(true), errors: z.array(z.unknown()).max(0).nullable(), result: z.unknown().optional(),
   result_info: pagination.optional() });
 type Envelope = z.infer<typeof envelope>;
+const connectionFields = new Set(["id", "cert_id", "hostname", "zone_id", "zone_name", "service", "environment", "enabled", "previews_enabled"]);
+const validationCodes = new Set(["invalid_type", "invalid_format", "invalid_value", "unrecognized_keys", "too_small", "too_big", "custom"]);
+
+function verifiedConnection(input: unknown, request: SqliteDomainRequest): SqliteDomainConnection {
+  try { return requireSqliteDomainConnection(input, request); }
+  catch (error) {
+    const fields = error instanceof z.ZodError ? error.issues.slice(0, 20).map((issue) => ({
+      path: issue.path.length === 1 && typeof issue.path[0] === "string" && connectionFields.has(issue.path[0]) ? [issue.path[0]] : [],
+      code: validationCodes.has(issue.code) ? issue.code : "validation_failed",
+    })) : undefined;
+    throw new AgentError("domain_connection_unverified", "Cloudflare domain connection receipt was not verified; preserve its journal without replay or adoption.", fields);
+  }
+}
 
 function hostnameCovered(pattern: string, hostname: string): boolean {
   const host = pattern.toLowerCase().replace(/^(https?:\/\/|\*:\/\/)/, "").split("/")[0];
@@ -105,7 +119,7 @@ export class SqliteDomainCloudflare {
     if (request.action !== "add") throw new Error("Only an add request can attach a domain");
     const target = await this.preflightAdd(request.hostname, request.zone_id);
     if (target.zone_name !== request.zone_name) throw new Error("Frozen domain zone name differs");
-    return requireSqliteDomainConnection((await this.call("PUT", `${this.account}/workers/domains`, {
+    return verifiedConnection((await this.call("PUT", `${this.account}/workers/domains`, {
       hostname: target.hostname, zone_id: target.zone_id, service: this.config.worker_name, enabled: true, previews_enabled: false,
     })).result, request);
   }
@@ -113,7 +127,7 @@ export class SqliteDomainCloudflare {
     requireSqliteDomainConnection(connection, request);
     const zone = await this.zone(request.zone_id);
     if (zone.name !== request.zone_name) throw new Error("Frozen domain zone differs");
-    const current = requireSqliteDomainConnection((await this.call("GET", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`)).result, request);
+    const current = verifiedConnection((await this.call("GET", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`)).result, request);
     if (JSON.stringify(current) !== JSON.stringify(connection)) throw new Error("Domain connection receipt changed");
     const domains = (await this.list()).filter((domain) => domain.service === this.config.worker_name);
     if (domains.length !== 1 || JSON.stringify(requireSqliteDomainConnection(domains[0], request)) !== JSON.stringify(connection)) throw new Error("Worker domain membership changed");

@@ -13,6 +13,7 @@ import { readSqliteDraftRecord } from "./sqlite-draft-journal";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { sqliteFeedSnapshotKey } from "../../../src/sqlite-feed";
 import { diagnoseLocal } from "./doctor";
+import { AgentError, agentEnvelope } from "./agent-output";
 import { readFileSync, writeFileSync } from "node:fs";
 import { stringifyToml } from "@castloop/shared";
 import { join } from "node:path";
@@ -98,6 +99,29 @@ test("an unverified attachment receipt is not reconstructed from a later valid d
   const calls = f.calls.length;
   await expect(continueSqliteDomainChange(f.root, f.config, id, "worker", options, wait)).rejects.toThrow("unknown outcome");
   expect(f.calls).toHaveLength(calls);
+  expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
+});
+
+test("attachment validation diagnostics expose only allowlisted field names and codes, never response values or unknown keys", async () => {
+  const f = await fixture(), id = crypto.randomUUID(), secret = "private-provider-response-value";
+  const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
+    const response = await f.transport(input, init);
+    if (init?.method === "PUT" && new URL(String(input)).pathname.endsWith("/workers/domains")) {
+      const body = await response.json() as { result: object };
+      return Response.json({ success: true, errors: null, result: { ...body.result, cert_id: secret, [secret]: secret } });
+    }
+    return response;
+  } };
+  let failure: unknown;
+  try { await startSqliteDomainChange(f.root, f.config, "add", id, "worker", options, target, wait); }
+  catch (error) { failure = error; }
+  expect(failure).toBeInstanceOf(AgentError);
+  const output = agentEnvelope("domain", { workspace: f.root }, { operation_id: id, phase: "connection_requested" }, failure, true);
+  expect(output.error).toMatchObject({ code: "domain_connection_unverified", outcome: "unknown",
+    fields: [{ path: ["cert_id"], code: "invalid_format" }, { path: [], code: "unrecognized_keys" }] });
+  expect(JSON.stringify(output)).not.toContain(secret);
+  expect(output.next_actions).not.toContainEqual(expect.objectContaining({ args: ["continue", id] }));
+  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("connection_requested");
   expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
 });
 
