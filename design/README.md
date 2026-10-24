@@ -1,5 +1,7 @@
 # 設計文書の案内
 
+Issue #66の未リリース開発版は[受付停止と配信停止の分離](show_admission_delivery_separation_plan.md)を採用し、内部queue/content形式を**7/7**にした。変更番号と操作ID別の結果保存、GETによる結果照会を実装した。ローカル693試験・型検査・Linux単体CLIとオフライン試験が成功。実Cloudflare操作は未実施で、旧形式は変換しない。Worker更新中の配信継続は対象外であり、以下のIssue #68の6/7環境での実機結果を新機能の実証へ流用しない。[停止・再開の利用ガイド](../docs/show_availability.md)参照。
+
 未リリースのIssue #68開発では、fresh専用の内部queue/content形式を6/7へ変更し、SQLite独自subdomainと旧workers.dev公開URLのredirectを追加する。旧5/6環境の移行・採用はしない。[反復試験](sqlite_custom_domain_iterative_verification_20261024.md)の応答修正後、[第9環境の2 Show総合機能試験](sqlite_custom_domain_two_show_verification_20261024.md)で公開・独自origin配信・redirect・個別Pause・更新/復元・通常deploy・切断復帰・履歴保持を確認した。両Show paused/ready/drainedで終了。RSS・故障注入・内部cache状態・性能/全Free適合等の未確認範囲は同記録と[計画](sqlite_custom_domains_plan.md)で区別する。
 
 v0.7.2はエージェント向けCLIと管理者Skillを追加したrelease。Worker・永続形式はv0.7.1から変更しない。[リリースノート](../docs/release-v0.7.2.md)と[利用ガイド](../docs/agent_usage.md)を参照する。Cloudflare実機検証は今回の変更範囲では省略し、ローカル回帰と単体バイナリで確認する。
@@ -18,6 +20,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [Episode予約公開の設計・開発計画](episode_scheduled_publication_plan.md) | Issue #65の採用方針。Show内予約表とAlarm、既定UTC・任意管理zone、日時identity、停止・再承認。管理用設定の責務・棚卸しと開発段階 |
+| [公開受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md) | Issue #66・全項目承認済み。3状態、停止・再開、変更番号と操作結果の保存・GET照会を実装。再開は処理終了を待ち、受付停止ではuploadも止める。内部形式7/7の新規環境専用。Worker更新中の配信継続は対象外 |
 | [管理用設定と日時変換](../docs/admin_configuration.md) | Issue #65のCLI基盤。任意のcastloop-admin.toml、schema/template/validate/doctor、非公開・非予約の日時preview。サーバー予約は未提供 |
 | [Issue #65 CLI基盤の実データ検証](issue65_cli_real_data_verification_20261024.md) | 指定サンプル3＋36 Episode、約1.50GB、単体バイナリ162試験が期待どおり。原本不変。ptrace制約で通信観測は欠測、Cloudflare予約実行は未実装・未試験 |
 | [SQLite独自ドメイン対応計画](sqlite_custom_domains_plan.md) | Issue #68。開発版のCLI/REST/DO接続、Cloudflare DNS前提、管理/公開origin分離、redirect、個別停止と設定・Feed切替、ローカル検証範囲 |

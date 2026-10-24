@@ -1,5 +1,7 @@
 # SQLiteのShow単位公開方式
 
+Issue #66の未リリース開発版は、公開受付と配信の停止を分ける。`show-admission-pause`は受付と素材アップロードだけを止め、公開済み内容の配信は続ける。`show-pause`は従来どおり両方を止める。配信だけ戻す`show-delivery-resume`と、操作結果を読む`show-control-status`を追加した。再開には既受付処理の終了・サーバーの動作確認済み・保守中でないことが必要。内部queue/content形式**7/7**と必須`availability_controls="show-admission-delivery-v1"`を使う新規環境専用で、旧形式を変換しない。[停止・再開の操作ガイド](show_availability.md)を優先する。Worker更新やドメイン変更は引き続き配信も停止して行う。
+
 Issue #68の未リリース開発版はFeed世代の共通予約採番を導入し、内部queue/content schema **6/7**と必須health識別`feed_generation_allocator="reservation-v1"`・`domain_changes="sqlite-domain-change-v1"`を使う。旧5/6等の環境への移行・互換配備は行わず、対応版でfresh initする。独自domainは[専用ガイド](sqlite_custom_domains.md)を参照する。通常公開のFIFOは変更せず、cover世代はFeed世代と別に維持する。実機確認・配備の承認は含まない。
 
 2026-10-21、Show更新の追補: v0.7.0は世代別Feed/cover保存（healthの`feed_storage`と`cover_storage`が共に`immutable-generation-v1`）、`publication_read_boundary="show-episode-v1"`と内部queue/content schema **5/6**を必要とする。Episode更新の4/5、追加専用の3/4や固定Feed方式の既存show-v1環境も互換更新・移行の対象外であり、新規環境を使う。対応CLIは形式識別の欠落・旧値・未知値をprepare/配備前に拒否する。[Show更新設計と境界](../design/show_update_feed_availability_plan.md)参照。

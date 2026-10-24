@@ -110,6 +110,18 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "show-pause SHOW_ID PAUSE_UUID",
     description: "Pause this Show's delivery and new admission. Already accepted jobs drain; other Shows are unaffected.",
   },
+  "show-admission-pause": {
+    usage: "show-admission-pause SHOW_ID OPERATION_UUID",
+    description: "Stop new publication and upload admission for this Show while keeping approved content delivery enabled. Accepted jobs continue; maintenance and other delivery checks still apply.",
+  },
+  "show-delivery-resume": {
+    usage: "show-delivery-resume SHOW_ID OPERATION_UUID",
+    description: "Enable only approved content delivery for a verified, drained Show outside maintenance. Publication and upload admission stay closed.",
+  },
+  "show-control-status": {
+    usage: "show-control-status SHOW_ID OPERATION_UUID",
+    description: "Read the saved result of a Show stop/resume operation and its current status. Does not replay requests or change local records. Missing results do not prove a request was never applied.",
+  },
   "show-resume": {
     usage: "show-resume SHOW_ID NEW_WINDOW_UUID",
     description: "Resume this verified, drained Show with a NEW admission window outside shared maintenance.\n" +
@@ -220,7 +232,7 @@ export function describeCommand(command: string) {
   const help = COMMAND_HELP[command];
   if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
   const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-show", "preview-episode", "preview-schedule-time"].includes(command);
-  const read = offline || ["service-status", "show-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
+  const read = offline || ["service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],

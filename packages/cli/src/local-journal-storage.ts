@@ -60,7 +60,7 @@ export function createLocalJournalStorage(root: string, family: JournalFamily, s
       checkParents();
       const record = readBoundedLocalJournal(file);
       if (record && typeof record === "object" && "schema_version" in record && record.schema_version === 2 &&
-        ["sqlite-drafts", "sqlite-uploads", "sqlite-rss-imports", "sqlite-operation-requests"].includes(family)) {
+        ["sqlite-drafts", "sqlite-uploads", "sqlite-rss-imports", "sqlite-operation-requests", "sqlite-controls"].includes(family)) {
         if (localJournalEntryExists(lock)) throw new Error("Preserve the retained legacy client lock");
         return withProcessJournalLock(`${file}.lock.sqlite`, async () => {
           if (localJournalEntryExists(lock)) throw new Error("Preserve the concurrent legacy client lock");

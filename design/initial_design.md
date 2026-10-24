@@ -1,5 +1,7 @@
 # castloop v2 デザインドキュメント
 
+Issue #66の未リリース開発版では、Showの状態を`open / admission_paused / paused`に分ける。`admission_paused`は新しい公開依頼と素材アップロードを止め、既存の検証条件を満たす公開済み内容は配信する。`paused`は受付と配信を両方止める従来の意味を維持する。停止・再開ごとの変更番号と操作ID別の適用結果を同じShow内で保存し、古い確認結果による再開を拒否する。応答喪失後は結果のGET照会だけを行う。内部queue/content形式**7/7**と必須`availability_controls="show-admission-delivery-v1"`を使う新規環境専用。Worker更新中の配信継続や旧環境の変換は提供しない。[採用設計](show_admission_delivery_separation_plan.md)と[操作ガイド](../docs/show_availability.md)を優先し、下記のリリース時点の2状態・6/7形式の記述と区別する。
+
 Issue #68の未リリース開発版: [独自ドメイン計画](sqlite_custom_domains_plan.md)に沿い、Feed世代を公開jobのFIFO sequenceから独立した共通予約表で採番する。内部queue/content schemaは**6/7**、healthの必須`feed_generation_allocator="reservation-v1"`を用いるfresh環境専用。cover世代は引き続きShow公開job sequenceで、Feed世代から推測しない。旧5/6を含む環境の移行・互換配備は提供しない。CLI/REST連携は[専用ガイド](../docs/sqlite_custom_domains.md)を参照し、実機未確認・未承認と区別する。
 
 DO側のdomain変更は専用prepare/activate/status/finalizeと`domain_changes="sqlite-domain-change-v1"`で識別する。全Showをpaused/drainedで保守拘束し、所属を固定して新configへ配備した後、全対象native確認・不変Feed再生成/purge・readinessを経て明示finalizeする。全体Pauseや自動Resumeは追加しない。独自originの管理APIは404、旧workers.devの許可済み公開URLは明示Resume後だけFeed 301/cover・audio 307とする。同対象への外部ツールの並行DNS/接続変更は想定外として制約を記録する。

@@ -1,6 +1,10 @@
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
-import { sqliteHealthSchema, sqliteInspectionSchema, sqliteRegistryStatusSchema } from "../../shared/src/sqlite-service-api";
+import { sqliteHealthSchema, sqliteInspectionSchema, sqliteRegistryStatusSchema, sqliteAvailabilityResponseSchema } from "../../shared/src/sqlite-service-api";
+import type { SqliteAvailabilityResponse } from "../../shared/src/sqlite-service-api";
+import { sqliteAvailabilityRequestSchema } from "../../shared/src/sqlite-availability";
+import type { SqliteAvailabilityRequest } from "../../shared/src/sqlite-availability";
+import { sha256Hex } from "../../shared/src/sha256";
 import type { SqliteHealth, SqliteInspection, SqliteRuntimeRequest } from "../../shared/src/sqlite-service-api";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadOptions } from "./sqlite-management-http";
@@ -81,11 +85,23 @@ export class SqliteServiceClient {
     await this.identity(value);
     if (value.show_id !== showId || value.episode_id !== episodeId) throw new Error("SQLite target response differs"); return value;
   }
-  async control(action: "pause" | "resume", request: SqliteRuntimeRequest, window?: string, showId?: string): Promise<SqliteHealth> {
-    const value = sqliteHealthSchema.parse(await this.call(action, { ...request, ...(window ? { admission_window_id: window } : {}) }, showId));
-    await this.identity(value);
-    if (showId && value.show_id !== showId || value.worker_version_id !== request.worker_version_id || value.state !== (action === "pause" ? "paused" : "open") ||
-      action === "resume" && value.admission_window_id !== window) throw new Error("SQLite service control result differs");
+  private async checkedControl(input: unknown, showId: string): Promise<SqliteAvailabilityResponse> {
+    const value = sqliteAvailabilityResponseSchema.parse(input); await this.identity(value);
+    if (value.scope !== "show" || value.show_id !== showId || value.control.request.show_id !== showId ||
+      value.control.request.service_id !== this.config.service_id ||
+      value.control.request_sha256 !== await sha256Hex(JSON.stringify(value.control.request))) throw new Error("Show control result differs");
+    return value;
+  }
+  async control(input: SqliteAvailabilityRequest): Promise<SqliteAvailabilityResponse> {
+    const request = sqliteAvailabilityRequestSchema.parse(input);
+    const value = await this.checkedControl(await this.call(request.action, request, request.show_id), request.show_id);
+    if (JSON.stringify(value.control.request) !== JSON.stringify(request)) throw new Error("Show control frozen request differs");
+    return value;
+  }
+  async controlStatus(showId: string, operationId: string): Promise<SqliteAvailabilityResponse> {
+    sqliteAvailabilityRequestSchema.shape.operation_id.parse(operationId);
+    const value = await this.checkedControl(await this.call(`controls/${operationId}`, undefined, showId), showId);
+    if (value.control.request.operation_id !== operationId) throw new Error("Show control operation differs");
     return value;
   }
   async register(request: SqliteRuntimeRequest, showId: string, reservationId: string): Promise<SqliteInspection> {

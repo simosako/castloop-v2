@@ -2,6 +2,7 @@ import * as TOML from "@iarna/toml";
 import { z } from "zod";
 import { sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
 import { sha256Hex } from "./sha256";
+import { sqliteAvailabilityStateSchema } from "./sqlite-availability";
 
 const resourceName = z.string().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/);
 const origin = z.url().refine((value) => {
@@ -25,7 +26,7 @@ export const sqliteServiceConfigSchema = z.object({ schema_version: z.literal(2)
 
 export const sqliteServiceStatusSchema = sqlitePublicationRuntimeSchema.extend({
   show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
-  protocol: z.literal(sqlitePublicationProtocol), state: z.enum(["open", "paused"]),
+  protocol: z.literal(sqlitePublicationProtocol), state: sqliteAvailabilityStateSchema,
   admission_window_id: z.uuid().nullable(), publication_ready: z.literal(true),
 }).strict().superRefine((value, context) => {
   if (value.state === "open" && value.admission_window_id === null) {

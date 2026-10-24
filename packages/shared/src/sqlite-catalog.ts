@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { sqlitePublicationProtocol, sqlitePublicationRequestSchema, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { sqliteAvailabilityStateSchema } from "./sqlite-availability";
 
 export const SQLITE_CATALOG_PAGE_SIZE = 20;
 const lifecycle = z.enum(["draft", "published", "unpublished", "deleted"]);
@@ -11,7 +12,7 @@ export const sqliteCatalogRequestSchema = z.object(options).strict().superRefine
 const show = z.object({ show_id: sqlitePublicationRequestSchema.shape.show_id, lifecycle,
   unfinished_operation: z.boolean(), title: z.string().min(1).max(200).nullable(), feed_url: z.url().nullable() }).strict();
 export const sqliteCatalogResponseSchema = sqlitePublicationRuntimeSchema.extend({ protocol: z.literal(sqlitePublicationProtocol),
-  request: sqliteCatalogRequestSchema, state: z.enum(["open", "paused"]).nullable(), snapshot_only: z.literal(true), authorizes_recovery: z.literal(false),
+  request: sqliteCatalogRequestSchema, state: sqliteAvailabilityStateSchema.nullable(), snapshot_only: z.literal(true), authorizes_recovery: z.literal(false),
   next_cursor: z.string().min(1).max(2048).nullable(), shows: z.array(show).max(SQLITE_CATALOG_PAGE_SIZE).optional(),
   show: show.pick({ show_id: true, lifecycle: true, unfinished_operation: true }).optional(),
   episodes: z.array(z.object({ episode_id: sqlitePublicationRequestSchema.shape.episode_id.unwrap(), lifecycle,

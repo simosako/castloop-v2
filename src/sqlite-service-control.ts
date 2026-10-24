@@ -75,7 +75,8 @@ export class SqliteServiceControl {
     return { show_id: showId, reservation_id: row?.reservation_id ?? null, state: row?.state ?? "missing" };
   }
   registrationHealth(): SqliteHealth {
-    return { ...this.runtime.health(), scope: "service", maintenance: this.maintenance(), publication_ready: this.runtime.ready() && !this.pending() };
+    return { ...this.runtime.health(), scope: "service", maintenance: this.maintenance(),
+      availability_version: null, admission_state: null, delivery_policy: null, publication_ready: this.runtime.ready() && !this.pending() };
   }
   private verifyHealth(input: SqliteHealth, showId: string, version?: string, identity = this.runtime.health()): SqliteHealth {
     const health = sqliteHealthSchema.parse(input);
@@ -105,7 +106,11 @@ export class SqliteServiceControl {
     if (rows.length > 10000) throw new Error("Service status exceeds its Show budget");
     const health = await readShowSnapshots(rows, async (row) =>
       this.verifyHealth(await this.peer(row.show_id).health(), row.show_id, undefined, own));
-    return { ...own, scope: "service", maintenance: this.maintenance(), state: health.some((item) => item.state === "open") ? "open" : "paused",
+    return { ...own, scope: "service", maintenance: this.maintenance(), state: health.some((item) => item.state === "open") ? "open" :
+      health.some((item) => item.state === "admission_paused") ? "admission_paused" : "paused",
+      availability_version: null, admission_state: null, delivery_policy: null,
+      open_shows: health.filter((item) => item.state === "open").length,
+      admission_paused_shows: health.filter((item) => item.state === "admission_paused").length,
       admission_window_id: null, show_count: rows.length, paused_shows: health.filter((item) => item.state === "paused").length,
       publication_ready: own.publication_ready && !this.pending() && rows.every((row) => row.state === "registered") && health.every((item) => item.publication_ready),
       queued: health.reduce((sum, item) => sum + item.queued, 0), active: health.some((item) => item.active === "blocked") ? "blocked" :

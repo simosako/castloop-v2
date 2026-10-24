@@ -61,15 +61,18 @@ test("a lost registration response is inspected without resending and advanced S
   await expect(value.command("create-show", ["daily", "https://example.com"])).rejects.toThrow("advanced/deleted");
 });
 
-test("unknown pause/resume outcomes are never resent or treated as recovery authority", async () => {
+test("acknowledged server controls reconcile lost responses using only GET without reopening later pauses", async () => {
   const value = await fixture(), window = crypto.randomUUID();
   await value.command("create-show", ["daily", "https://example.com"]);
   value.faults.lost = "control";
   await expect(value.command("show-resume", ["daily", window])).rejects.toThrow();
   value.faults.lost = undefined; value.calls.length = 0;
-  await expect(value.command("show-resume", ["daily", window])).rejects.toThrow("unknown");
-  expect(value.calls).toEqual([]);
-  expect(await value.command("show-status", ["daily"])).toMatchObject({ state: "open", admission_window_id: window });
+  expect(await value.command("show-resume", ["daily", window])).toMatchObject({ state: "open", admission_window_id: window,
+    control: { result: { state: "open" } } });
+  expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+  await value.command("show-pause", ["daily", crypto.randomUUID()]); value.calls.length = 0;
+  expect(await value.command("show-resume", ["daily", window])).toMatchObject({ state: "paused", control: { result: { state: "open" } } });
+  expect(value.calls.every((call) => call.method === "GET")).toBe(true);
 });
 
 test("unsupported SQLite commands fail explicitly without legacy fallback or remote mutations", async () => {

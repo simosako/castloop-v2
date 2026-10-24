@@ -92,18 +92,19 @@ test("pending purge is not ready, remains responsive, and cannot be mistaken for
   expect(value.runtime.ready()).toBe(true);
 });
 
-test("authenticated service commands bind exact runtime and explicit resume window", async () => {
+test("service handler rejects unversioned Show controls and registration binds exact runtime", async () => {
   const value = await fixture();
   expect((await value.call("prepare", value.request)).status).toBe(202); await value.runtime.alarm();
   expect((await value.call("resume", { ...value.request, worker_version_id: crypto.randomUUID(), admission_window_id: crypto.randomUUID() })).status).toBe(409);
   const window = crypto.randomUUID();
-  expect((await value.call("resume", { ...value.request, admission_window_id: window })).status).toBe(200);
+  expect((await value.call("resume", { ...value.request, admission_window_id: window })).status).toBe(409);
+  value.queue.resume(window);
   const registration = { ...value.request, show_id: "daily", reservation_id: crypto.randomUUID() };
   expect((await value.call("register-show", registration)).status).toBe(200);
   expect(await value.runtime.inspect("daily")).toMatchObject({ show_lifecycle: "draft", expected_show_state_version: 0, reservation_id: registration.reservation_id });
   expect((await value.call("register-show", { ...registration, reservation_id: crypto.randomUUID() })).status).toBe(409);
-  expect((await value.call("pause", value.request)).status).toBe(200);
-  expect(value.runtime.health()).toMatchObject({ state: "paused", drained: true });
+  expect((await value.call("pause", value.request)).status).toBe(409);
+  expect(value.runtime.health()).toMatchObject({ state: "open", drained: true });
 });
 
 test("both SQLite HTTP handlers await authentication before runtime access or body parsing", async () => {

@@ -71,6 +71,11 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     const cleaned = operationResultSchema.parse(await command(["operation-cleanup", "upload", upload.operation_id, cleanup.plan_sha256, "confirm"]));
     expect(cleaned.operation.state).toBe("succeeded");
     expect(await command(["operation-status", "cleanup", cleaned.operation.operation_id])).toMatchObject({ operation: { state: "succeeded" } });
+    const admissionStop = crypto.randomUUID();
+    expect(await command(["show-admission-pause", "daily", admissionStop, "--json"])).toMatchObject({ state: "admission_paused", admission_state: "closed" });
+    expect(await command(["show-control-status", "daily", admissionStop, "--json"])).toMatchObject({ control: { result: { state: "admission_paused" } } });
+    await command(["show-pause", "daily", crypto.randomUUID()]);
+    expect(await command(["show-delivery-resume", "daily", crypto.randomUUID(), "--json"])).toMatchObject({ state: "admission_paused", delivery_policy: "enabled" });
     await command(["show-pause", "daily", crypto.randomUUID()]);
     expect(await command(["service-status"])).toMatchObject({ state: "paused", drained: true });
     expect(await command(["deploy", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });

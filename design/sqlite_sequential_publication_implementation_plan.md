@@ -1,5 +1,7 @@
 # DO SQLite逐次キューによる公開処理の実装計画
 
+> 2026-10-25追補: Issue #66の[受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md)を優先する。`admission_paused`では受付・素材操作を閉じ、既存の検証条件を満たす公開済み内容を配信する。既受付FIFOの実行、公開完了前の必要なキャッシュ削除、readiness・保守・非公開状態の配信拒否は維持する。停止・再開の変更番号と結果を同じShow内のtransactionに保存し、応答不明時はGET照会のみ行う。内部queue/content形式7/7の新規環境専用で、旧形式を変換しない。共有Worker更新中の配信は引き続き停止する。
+
 > 2026-10-21第3段階追補: [Show更新中の継続配信契約](show_update_feed_availability_plan.md)を実装した。公開済みShow更新も旧Feed/cover/audioを継続配信し、coverを不変snapshotへ保存してmetadata/cover identity/Feedをpurge後に原子切替する。Feed/Show/coverと対象種別のguard、Show更新の旧画像HEAD検証、復元の保存済みcover再利用を必須とする。公開cover URLは維持し、別HTTP要求間の世代一致までは保証しない。内部queue/content schema **5/6**、必須`cover_storage="immutable-generation-v1"`と`publication_read_boundary="show-episode-v1"`へ更新。以下の第1・第2段階の範囲・形式は導入履歴で、現行は本追補を優先する。初回Show/lifecycle/明示停止のgate、blocked FIFO停止、未知IO保全、移行なしは維持する。
 
 > 2026-10-21追補: Issue #50の[Feed継続配信契約](episode_add_feed_availability_plan.md)を優先する。固定Feed上書きと一律running/blocked配信503を改め、全Feed writerを世代別の不変R2 snapshotへ統一した。purge後のcontent/media/Feed世代/job/操作記録/次回Alarm予約の原子完了は維持する。新規Episode追加のみ、開始時に保存した保護根拠が成立するrunning/blockedで旧公開内容を配信する。その他の更新・lifecycleや要求破損は従来どおり停止する。内部queue/content schemaは3/4、新規環境専用・変換なし。下記の固定key・旧schema・一律503の記述は導入時の履歴である。

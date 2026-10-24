@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
 import { sqliteUpdateSummarySchema } from "./sqlite-runtime-update";
+import { sqliteAvailabilityStateSchema, sqliteAvailabilityRecordSchema } from "./sqlite-availability";
 
 export const sqliteRuntimeRequestSchema = sqlitePublicationRuntimeSchema.extend({ operation_id: z.uuid() }).strict();
 export const sqliteResumeRequestSchema = sqliteRuntimeRequestSchema.extend({ admission_window_id: z.uuid() }).strict();
@@ -14,17 +15,21 @@ export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protoc
   publication_read_boundary: z.literal("show-episode-v1"),
   feed_generation_allocator: z.literal("reservation-v1"),
   domain_changes: z.literal("sqlite-domain-change-v1"),
+  availability_controls: z.literal("show-admission-delivery-v1"),
+  availability_version: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable(),
+  admission_state: z.enum(["open", "closed"]).nullable(), delivery_policy: z.enum(["enabled", "stopped"]).nullable(),
   scope: z.enum(["service", "show"]).optional(), show_id: sqliteRegistrationSchema.shape.show_id.optional(),
   show_count: z.number().int().nonnegative().optional(), paused_shows: z.number().int().nonnegative().optional(),
+  open_shows: z.number().int().nonnegative().optional(), admission_paused_shows: z.number().int().nonnegative().optional(),
   maintenance_operation_id: z.uuid().nullable().optional(),
   maintenance: z.object({ operation_id: z.uuid(), phase: z.enum(["preparing", "prepared", "activating", "probing", "releasing"]) }).strict().nullable().optional(),
-  invocation_id: z.uuid(), publication_ready: z.boolean(), state: z.enum(["open", "paused"]), admission_window_id: z.uuid().nullable(),
+  invocation_id: z.uuid(), publication_ready: z.boolean(), state: sqliteAvailabilityStateSchema, admission_window_id: z.uuid().nullable(),
   queued: z.number().int().nonnegative(), active: z.enum(["running", "blocked"]).nullable(), drained: z.boolean(),
   setup: z.object({ operation_id: z.uuid(), state: z.enum(["scheduled", "running", "ready", "blocked"]) }).strict().nullable(),
   runtime_update: sqliteUpdateSummarySchema.nullable().optional(),
 }).strict();
 export const sqliteInspectionSchema = sqlitePublicationRuntimeSchema.extend({ protocol: z.literal(sqlitePublicationProtocol),
-  state: z.enum(["open", "paused"]), admission_window_id: z.uuid().nullable(), publication_ready: z.literal(true),
+  state: sqliteAvailabilityStateSchema, admission_window_id: z.uuid().nullable(), publication_ready: z.literal(true),
   show_id: sqliteRegistrationSchema.shape.show_id, episode_id: z.string().max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   show_lifecycle: z.enum(["missing", "draft", "published", "unpublished", "deleted"]),
   reservation_id: z.uuid().nullable(), expected_show_state_version: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
@@ -41,3 +46,11 @@ export const sqliteInspectionSchema = sqlitePublicationRuntimeSchema.extend({ pr
 export type SqliteRuntimeRequest = z.infer<typeof sqliteRuntimeRequestSchema>;
 export type SqliteHealth = z.infer<typeof sqliteHealthSchema>;
 export type SqliteInspection = z.infer<typeof sqliteInspectionSchema>;
+export const sqliteAvailabilityResponseSchema = sqliteHealthSchema.extend({ control: sqliteAvailabilityRecordSchema }).strict().superRefine((value, context) => {
+  if (value.scope !== "show" || value.show_id !== value.control.request.show_id || value.service_id !== value.control.request.service_id ||
+    value.availability_version === null || value.availability_version < value.control.result.availability_version ||
+    value.admission_state !== (value.state === "open" ? "open" : "closed") || value.delivery_policy !== (value.state === "paused" ? "stopped" : "enabled")) {
+    context.addIssue({ code: "custom", message: "Current Show status differs from its control observation" });
+  }
+});
+export type SqliteAvailabilityResponse = z.infer<typeof sqliteAvailabilityResponseSchema>;

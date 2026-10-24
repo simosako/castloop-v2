@@ -2,7 +2,8 @@ import { z } from "zod";
 import { parseShowMetadata, stringifyToml, validateId } from "@castloop/shared";
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
-import { sqliteRuntimeRequestSchema, sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
+import { sqliteAvailabilityActionSchema, sqliteAvailabilityRequestSchema } from "../../shared/src/sqlite-availability";
+import { sqliteControlJournalSchema as controlSchema } from "./sqlite-control-journal";
 import { administratorKey } from "./administrator-key";
 import { SqliteDraft } from "./sqlite-draft";
 import { readSqliteArchivedDraft, readSqliteDraftRecord, requireSqliteStatus } from "./sqlite-draft-journal";
@@ -36,6 +37,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "create-show": [2], "create-episode": [1], "update-show": [1], "publish-show": [1],
   "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
   "service-status": [0], "show-status": [1], "show-pause": [2], "show-resume": [2], "target-show": [1], "target-episode": [2],
+  "show-admission-pause": [2], "show-delivery-resume": [2], "show-control-status": [2],
   "list-shows": [0], "list-episodes": [1], "preview-show-lifecycle": [2], "preview-episode-lifecycle": [3],
   "lifecycle-execute": [3], "operation-status": [2], "init-reconcile": [1], "init-continue-verification": [1],
   "update-service": [1], "update-service-verify": [1], "update-service-reconcile": [1],
@@ -44,12 +46,6 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
 };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
-const controlSchema = z.object({ action: z.enum(["pause", "resume"]), show_id: z.string(), request: sqliteRuntimeRequestSchema, window: z.uuid().optional(),
-  phase: z.enum(["prepared", "requested", "confirmed"]), result: sqliteHealthSchema.optional() }).strict().superRefine((value, context) => {
-  if ((value.action === "resume") !== (value.window !== undefined) || (value.phase === "confirmed") !== (value.result !== undefined)) {
-    context.addIssue({ code: "custom", message: "Service control phase and evidence differ" });
-  }
-});
 
 async function registeredShow(root: string, config: SqliteServiceConfig, showId: string, siteUrl: string, client: SqliteServiceClient): Promise<string> {
   const metadata = showTemplate(showId, siteUrl);
@@ -128,26 +124,31 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     return client.catalog({ kind: command === "list-shows" ? "show" : "episode", ...(command === "list-episodes" ? { show_id: validateId(args[0], "show") } : {}),
       include_deleted: options.listOptions?.includeDeleted ?? false, ...(options.listOptions?.cursor ? { cursor: options.listOptions.cursor } : {}) });
   }
-  if (["show-pause", "show-resume"].includes(command) && args.length === 2) {
-    const showId = validateId(args[0], "show"), id = z.uuid().parse(args[1]), action = command === "show-pause" ? "pause" : "resume";
+  if (command === "show-control-status" && args.length === 2) return client.controlStatus(validateId(args[0], "show"), z.uuid().parse(args[1]));
+  if (["show-pause", "show-resume", "show-admission-pause", "show-delivery-resume"].includes(command) && args.length === 2) {
+    const showId = validateId(args[0], "show"), id = z.uuid().parse(args[1]), action = sqliteAvailabilityActionSchema.parse(command.slice(5));
     const journal = createLocalJournalStorage(root, "sqlite-controls", config.service_id, `${id}.json`);
     let prior: z.infer<typeof controlSchema> | null = null;
     try { prior = controlSchema.parse(journal.read()); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
     if (prior) {
-      if (prior.action !== action || prior.show_id !== showId || prior.request.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error("Retained Show control differs");
-      if (prior.phase === "requested") throw new Error("Service control outcome is unknown; inspect service-status without replaying it");
-      if (prior.phase === "confirmed") return client.health(showId);
+      if (prior.request.action !== action || prior.request.show_id !== showId || prior.request.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error("Retained Show control differs");
+      if (prior.phase !== "prepared") return journal.exclusively(async () => {
+        const state = controlSchema.parse(journal.read());
+        const result = await client.controlStatus(showId, id);
+        if (JSON.stringify(result.control.request) !== JSON.stringify(state.request)) throw new Error("Show control outcome is unknown or differs");
+        journal.replace({ ...state, phase: "confirmed", result }); return result;
+      });
     }
     const health = await client.health(showId);
-    const request = sqliteRuntimeRequestSchema.parse({ service_id: config.service_id, service_config_sha256: health.service_config_sha256,
-      worker_version_id: health.worker_version_id, operation_id: id });
-    journal.initialize({ action, show_id: showId, request, ...(action === "resume" ? { window: id } : {}), phase: "prepared" });
+    const request = prior?.request ?? sqliteAvailabilityRequestSchema.parse({ service_id: config.service_id, service_config_sha256: health.service_config_sha256,
+      worker_version_id: health.worker_version_id, operation_id: id, action, show_id: showId,
+      expected_availability_version: health.availability_version, ...(action === "resume" ? { admission_window_id: id } : {}) });
+    journal.initialize({ schema_version: 2, request, phase: "prepared" });
     return journal.exclusively(async () => {
       const state = controlSchema.parse(journal.read());
-      if (state.phase === "confirmed") return client.health(showId);
-      if (state.phase !== "prepared" || state.action !== action || JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("Service control is uncertain or changed; do not replay it");
+      if (state.phase !== "prepared" || JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("Service control is uncertain or changed; do not replay it");
       journal.replace({ ...state, phase: "requested" });
-      const result = await client.control(action, request, state.window, showId); journal.replace({ ...state, phase: "confirmed", result }); return result;
+      const result = await client.control(request); journal.replace({ ...state, phase: "confirmed", result }); return result;
     });
   }
   if (command === "create-show" && args.length === 2) return registeredShow(root, config, validateId(args[0], "show"), args[1], client);
