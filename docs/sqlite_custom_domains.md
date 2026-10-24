@@ -2,7 +2,7 @@
 
 Issue #68の開発版CLI/Worker向け。対応版でfresh initしたservice schema 2 / `show-v1`、内部queue/content schema **6/7**とhealth識別`feed_generation_allocator="reservation-v1"`・`domain_changes="sqlite-domain-change-v1"`を必要とする。旧版のDB・journal・資源・外部で作った接続の移行や採用は行わない。
 
-**Cloudflare実機の総合受け入れは未完了。** [初回](../design/sqlite_custom_domain_live_verification_20261024.md)・[再試験](../design/sqlite_custom_domain_live_retest_20261024.md)とも接続前の通常公開とPauseを確認したが、接続receipt検証で停止した。[ログ付き第4試験](../design/sqlite_custom_domain_iterative_verification_20261024.md)で元PUTのenvironmentが空文字であることを特定し、PUT acknowledgementとproduction GET検証を分離した。654件のローカル試験を通過。実機の切替・redirect・切断復帰・性能の確認範囲は同記録を参照する。この文書自体は実環境操作の承認ではない。
+**Cloudflare実機の総合受け入れは未完了。** [初回](../design/sqlite_custom_domain_live_verification_20261024.md)・[再試験](../design/sqlite_custom_domain_live_retest_20261024.md)後の[ログ付き反復試験](../design/sqlite_custom_domain_iterative_verification_20261024.md)で、元PUTのenvironment空文字とDELETE成功時の0バイト本文を特定し、限定修正した。Show 0件での接続完了まで実証。切断復帰・公開redirect等の実機確認範囲は同記録を参照する。この文書自体は実環境操作の承認ではない。
 
 [Show 0件の第3試験](../design/sqlite_custom_domain_environment_review.md)までの元応答は欠測のまま。[ログ調査と診断追加](../design/sqlite_domain_response_logging.md)後の新規実測を根拠に修正し、既存unknownの再送・採用・補完はしない。
 
@@ -58,6 +58,8 @@ castloop domain continue ADD_UUID --workspace ./service --json
 
 資格情報なしのTLS HEAD待ちは`domain_tls_pending`と`api_operation=tls_probe`で区別する。接続がconnectedとして保存済みでも、TLS成功前は設定書込・配備へ進まない。
 
+成功配備後の有限native待機は`domain_rollout_pending`として停止する。同じ配備receiptから明示continueし、再配備しない。CLI全体の実行時間は有限待機120回に加え各HTTP/照合時間も含むため、外部runnerの120秒制限で強制終了しない。残ったlockは強制解除しない。
+
 | 停止位置 | 対応 |
 | --- | --- |
 | attachment_acknowledged保存済み、完全接続GET待ち | 同じIDへGETしproduction・全fieldの一致を検証。PUTは再送せず、connected保存前は設定書込・配備しない |
@@ -82,6 +84,8 @@ castloop domain list --workspace ./service --json
 ```
 
 全Showの停止後、先にFeed/R2/Worker/DO/ローカル設定をworkers.devへ復帰・検証してから、正確な既知domain IDだけを切断する。成功後もpausedで、個別Resume後はworkers.devから本文を返す。旧独自originは配信allowlistから外れ、恒久的な転送維持はしない。音源・cover・revision・Feed履歴と共有証明書は削除しない。証明書がCloudflareに残る場合も自動整理しない。
+
+切断DELETEは、正常なJSON成功envelope、またはHTTP 200・Content-Length 0・完全な0バイト本文を検証してから成功保存する。空応答の許容はこのDELETEだけで、HTTP statusだけの推測や後の不在GETから未知操作を成功へ昇格するものではない。
 
 同configの通常`deploy`はdomain変更とは別操作で、既知接続を照合・保持するだけで接続/切断しない。
 

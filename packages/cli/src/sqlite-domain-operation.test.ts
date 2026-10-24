@@ -157,6 +157,45 @@ test("malformed DELETE success bodies remain uncertain rather than throwing on n
   expect(f.domains).toHaveLength(0);
 });
 
+for (const body of ["stream", "null"] as const) test(`DELETE HTTP 200 with Content-Length zero and an empty ${body} body durably completes detachment`, async () => {
+  const f = await fixture();
+  await startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait);
+  const config = await loadWorkspaceConfig(f.root), id = crypto.randomUUID();
+  const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
+    const response = await f.transport(input, init);
+    return init?.method === "DELETE" ? new Response(body === "stream" ? "" : null, { headers: { "Content-Length": "0" } }) : response;
+  } };
+  const result = await startSqliteDomainChange(f.root, config, "remove", id, "worker", options, undefined, wait);
+  expect(result).toMatchObject({ phase: "completed", detach_acknowledged: true });
+  expect(await loadWorkspaceConfig(f.root)).toEqual(f.config); expect(f.domains).toEqual([]);
+  expect(f.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
+  expect((await new SqliteServiceClient(f.config, administratorKey(f.root), f.transport).health()).publication_ready).toBe(true);
+});
+
+for (const kind of ["missing_length", "whitespace", "nonempty", "status", "partial", "truncated", "json_error"] as const) {
+  test(`DELETE ${kind} is not accepted as an empty acknowledgement and is never resent`, async () => {
+    const f = await fixture();
+    await startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait);
+    const config = await loadWorkspaceConfig(f.root), id = crypto.randomUUID();
+    const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
+      const response = await f.transport(input, init);
+      if (init?.method !== "DELETE") return response;
+      if (kind === "missing_length") return new Response("");
+      if (kind === "status") return new Response(null, { status: 204, headers: { "Content-Length": "0" } });
+      if (kind === "partial") return new Response("", { headers: { "Content-Length": "0", "Content-Range": "bytes */0" } });
+      if (kind === "truncated") return new Response(new ReadableStream({ start(controller) { controller.error(new Error("unsettled response")); } }), { headers: { "Content-Length": "0" } });
+      if (kind === "json_error") return Response.json({ success: false, errors: [{ code: 1000 }] });
+      return new Response(kind === "whitespace" ? " \n" : "unexpected", { headers: { "Content-Length": "0" } });
+    } };
+    await expect(startSqliteDomainChange(f.root, config, "remove", id, "worker", options, undefined, wait)).rejects.toThrow();
+    const state = readSqliteDomainJournal(f.root, config, id);
+    expect(state?.phase).toBe("detach_requested"); expect(state?.detach_acknowledged).toBeUndefined();
+    const calls = f.calls.length;
+    await expect(continueSqliteDomainChange(f.root, await loadWorkspaceConfig(f.root), id, "worker", options, wait)).rejects.toThrow("unknown outcome");
+    expect(f.calls).toHaveLength(calls); expect(f.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
+  });
+}
+
 test("an unverified attachment receipt is not reconstructed from a later valid domain listing", async () => {
   const f = await fixture(), id = crypto.randomUUID();
   const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
@@ -274,6 +313,23 @@ test("an acknowledged deployment continues failed REST verification without uplo
   f.faults.afterDeploy = undefined;
   const uploads = f.calls.filter((call) => call.method === "PUT").length;
   expect((await continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).phase).toBe("completed");
+  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(uploads);
+});
+
+test("native rollout waiting is diagnosed explicitly and continues the saved deployment without another upload", async () => {
+  const f = await fixture(), id = crypto.randomUUID(), previous = f.runtime.health(); let pending = true;
+  const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
+    const response = await f.transport(input, init);
+    if (pending && new URL(String(input)).pathname.endsWith("/registration-health")) {
+      const body = await response.json() as object;
+      return Response.json({ ...body, worker_version_id: previous.worker_version_id, service_config_sha256: previous.service_config_sha256 }, { headers: response.headers });
+    }
+    return response;
+  } };
+  await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", options, target, wait)).rejects.toMatchObject({ code: "domain_rollout_pending" });
+  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("verified");
+  const uploads = f.calls.filter((call) => call.method === "PUT").length; pending = false;
+  expect((await continueSqliteDomainChange(f.root, f.config, id, "worker", options, wait)).phase).toBe("completed");
   expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(uploads);
 });
 

@@ -87,7 +87,10 @@ export class SqliteDomainCloudflare {
     this.config = sqliteServiceConfigSchema.parse(config); requireR2RestOptions(this.config.account_id, options);
     this.account = `/accounts/${this.config.account_id}`;
   }
-  private async call(operation: DomainApiOperation, method: DomainMethod, path: string, body?: object): Promise<Envelope> {
+  private call(operation: "domain_detach", method: "DELETE", path: string): Promise<Envelope | undefined>;
+  private call(operation: Exclude<DomainApiOperation, "domain_detach" | "tls_probe">,
+    method: "GET" | "PUT", path: string, body?: object): Promise<Envelope>;
+  private async call(operation: DomainApiOperation, method: DomainMethod, path: string, body?: object): Promise<Envelope | undefined> {
     let response: Response;
     try {
       response = await (this.options.transport ?? fetch)(`https://api.cloudflare.com/client/v4${path}`, { method,
@@ -97,14 +100,20 @@ export class SqliteDomainCloudflare {
       logDomainFailure(operation, method, "transport_unverified");
       throw new Error("Cloudflare domain request outcome is unknown; preserve its journal without replay");
     }
-    if (response.status !== 200 || !response.body || response.headers.has("Content-Range")) {
+    const emptyDetach = operation === "domain_detach" && method === "DELETE" && response.headers.get("Content-Length") === "0";
+    if (response.status !== 200 || !response.body && !emptyDetach || response.headers.has("Content-Range")) {
       logDomainFailure(operation, method, response.status !== 200 ? "http_status_unverified" : !response.body ? "body_missing" : "partial_response_unverified",
         { http_status: response.status });
       await response.body?.cancel(); throw new Error(`Cloudflare domain response was not verified (HTTP ${response.status})`);
     }
     let text: string;
     try {
-      text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(await collectStreamBytes(response.body, 1_000_000, true));
+      const bytes = response.body ? await collectStreamBytes(response.body, 1_000_000, true) : new Uint8Array();
+      if (emptyDetach) {
+        if (bytes.byteLength !== 0) throw new Error("Domain DELETE response length differs");
+        return undefined;
+      }
+      text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
     } catch {
       logDomainFailure(operation, method, "body_unverified", { http_status: response.status });
       throw new Error("Cloudflare domain response was not verified; never replay an uncertain mutation");
@@ -219,7 +228,7 @@ export class SqliteDomainCloudflare {
     if (request.action !== "remove") throw new Error("Only a remove request can detach a domain");
     await this.inspect(request, connection);
     const result = await this.call("domain_detach", "DELETE", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`);
-    if (result.result !== undefined && result.result !== null) throw new Error("Domain DELETE success response differs");
+    if (result?.result !== undefined && result.result !== null) throw new Error("Domain DELETE success response differs");
   }
   async verifyTls(origin: string): Promise<void> {
     const url = new URL(origin);

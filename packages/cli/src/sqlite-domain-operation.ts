@@ -5,6 +5,7 @@ import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
 import { administratorKey } from "./administrator-key";
+import { AgentError } from "./agent-output";
 import { SqliteCloudflareApi } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { SqliteDomainClient } from "./sqlite-domain-client";
@@ -137,7 +138,7 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
         if (current && (await client.status(request)).targets_native_ready) { ready = true; break; }
         if (attempt + 1 < wait.attempts) await wait.delay();
       }
-      if (!ready) throw new Error("Domain native rollout remains pending; continue observation explicitly without redeploying");
+      if (!ready) throw new AgentError("domain_rollout_pending", "Domain native rollout remains pending; continue observation explicitly without redeploying");
       if ((await api.inspect(state.receipt!)).namespace_id !== request.namespace_id) throw new Error("Domain namespace changed before activation");
       await domains.inspect(request, state.connection!);
       save("activation_requested", { activation: { operation_id: id, request_sha256: state.request_sha256,

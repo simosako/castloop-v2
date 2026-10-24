@@ -18,6 +18,9 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
         const body = await response.json() as { result: object };
         return Response.json({ success: true, errors: null, result: { ...body.result, environment: "" } });
       }
+      if (request.method === "DELETE" && new URL(target).pathname.includes("/workers/domains/")) {
+        return new Response("", { headers: { "Content-Length": "0" } });
+      }
       return response;
     }
     catch { return new Response(null, { status: 503 }); }

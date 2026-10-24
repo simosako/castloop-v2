@@ -64,3 +64,35 @@ commit `f6fe243`で`i68r6-6928816f` / `castloop-domain68-r6.otftalk.com`を新�
 次の切り分けのため、JSON失敗ログに固定の`body_kind=empty/whitespace/nonempty`、本文byte数、`content_length_kind=missing/zero/positive/invalid`を追加する。本文やheaderの任意値は保存せず、応答の受け入れ条件はまだ変更しない。[現行Detach仕様](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/delete/)は成功envelopeの例を掲載しているが、今回の実応答がそれと異なる理由は未確定。
 
 ログ追加後の`bun test`は**656 pass / 0 fail、76 files、80.39秒**。型検査・Linux CLI build成功。
+
+## R7: 元DELETEの空本文を特定、限定修正
+
+commit `e702ceb`で`i68r7-5ab503e8` / `castloop-domain68-r7.otftalk.com`を新規作成した。addはTLS pendingの後、同じ成功receiptからcontinueしてcompleted。removeはverifiedの有限待機で2回正常終了し、その後の読取でREST/nativeのversion・config hashが一致し、targets_native_ready trueであることを確認した。再配備せず、保存済み配備から続行した。
+
+切断DELETEの応答で次の固定ログを保存できた。
+
+```json
+{
+  "api_operation": "domain_detach",
+  "method": "DELETE",
+  "reason_code": "json_unverified",
+  "http_status": 200,
+  "body_kind": "empty",
+  "body_bytes": 0,
+  "content_length_kind": "zero"
+}
+```
+
+**元DELETEはHTTP 200・Content-Length 0・完全読取0バイトなのに、CLIがJSON本文を必須とした**のが今回の停止原因である。未知結果はdetach_requestedのまま保持し、不在GETから補完・finalizeしない。R7もShow 0件・paused/drained、ready false・保守拘束付きで保持した。既存6環境のhealthと無関係な一覧は不変。私有証跡は`.local-test-data/results/20261024/i68r7-5ab503e8/`。
+
+### 現行のDELETE成功条件
+
+- 正確な既知ID/全connectionの事前照合と、workers.dev復帰の全検証・ローカル同期は従来どおり必須。
+- domain_detachのDELETEだけ、HTTP 200・Content-Lengthが正確に0・Content-Rangeなし・完全読取0バイトを、本文なしの成功acknowledgementとして受け入れる。架空のJSON成功envelopeは生成しない。
+- HTTP 200の正常な従来JSON成功envelopeも引き続き扱う。
+- 他APIの空本文、長さ未指定の空本文、空白/非空本文と長さ0の不一致、204、不完全読取、失敗envelope、未知DELETEは受け入れず、再送しない。
+- 新規成功応答からのみdetach_acknowledgedを保存してfinalizeする。R6/R7のunknownを後付け補完しない。
+
+合わせてnativeの有限rollout待機を`domain_rollout_pending`という固定診断で返し、一般的なcommand_failedとの区別を可能にした。待機回数・検証条件・再送規則は変えない。
+
+回帰では空DELETEのstream/null-body、各不正形式、旧JSON envelope、PUT空文字→production GET、TLS/native待機の独立CLIと操作継続を確認した。native待機mockでno-store headerを落とした試験自身の不備を修正後、全体を再実行し、**666 pass / 0 fail、76 files、83.56秒**。型検査・Linux CLI build・diff検査も成功。

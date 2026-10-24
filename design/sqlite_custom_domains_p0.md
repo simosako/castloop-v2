@@ -38,6 +38,8 @@ Worker domainの`id`はaccount/Zone/namespaceの32桁IDとは別のopaque識別�
 
 その後の追加承認による[第4試験と修正](sqlite_custom_domain_iterative_verification_20261024.md)で元PUT空文字を特定した。現行はPUT acknowledgementのenvironmentを空文字/productionに限定し、GETより先に専用checkpointへ保存する。そのIDへのGETはproduction固定と全field一致を要求し、完全connectionを得るまで設定書込・配備しない。旧unknownは非採用・非再送のまま。前段落までの未実装/保留は診断当時の履歴である。
 
+同記録の第7試験では、元DELETEのHTTP 200・Content-Length 0・完全0バイト本文を特定した。このDELETEだけ本文なし成功を検証できるよう修正し、他API/不完全応答/長さ不明の空応答は引き続き拒否する。旧detach_requestedもGET不在から昇格しない。
+
 ### 2.2 Cloudflareの公開ソースにある別経路
 
 [workers-sdkの固定commit `e651d7c0dd8e171dcc1820679f9f46601971d876`の`publishCustomDomains()`](https://github.com/cloudflare/workers-sdk/blob/e651d7c0dd8e171dcc1820679f9f46601971d876/packages/deploy-helpers/src/triggers/publish-routes.ts)を確認した。
