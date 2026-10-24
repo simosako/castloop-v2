@@ -1,5 +1,7 @@
 # SQLite独自ドメイン再試験・停止記録（2026-10-24）
 
+後の別承認による[Show 0件の第3診断](sqlite_custom_domain_environment_review.md)では、PUTのenvironment固定検証に停止箇所を絞り込んだ。以下の再試験時点にはそのfield別証拠がなく、元PUTの値/有無を復元したものではない。既存停止環境は変更していない。
+
 ## 結論
 
 **再試験も接続receipt検証で停止し、受け入れは未完了。原因は未確定。** [初回停止](sqlite_custom_domain_live_verification_20261024.md)で判明した空一覧表現・opaque domain IDを修正した版で、別hostname・別のfresh環境を使った。新規2 Showの通常公開とPause/drainまでは成功したが、domain addは再び`connection_requested`に留まった。

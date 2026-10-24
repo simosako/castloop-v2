@@ -2,6 +2,8 @@
 
 Issue #68向け。**受け入れ未完了**。2026-10-24の別途承認された[初回](../design/sqlite_custom_domain_live_verification_20261024.md)・[再試験](../design/sqlite_custom_domain_live_retest_20261024.md)とも接続receipt検証で停止した。全Showをpaused/drained・保守拘束ありで保持し、切断や後続配備は行っていない。以下は完了済みの実績ではない。実装・ローカル試験・commitだけを実行許可にせず、対象account・新規Worker/bucket・専用hostname・許可する接続/配備/公開/Resume/切断の範囲を別途承認してから使う。保持サービス、非テストDNS、共有証明書、原本/journal/私有証跡は変更しない。
 
+[第3試験](../design/sqlite_custom_domain_environment_review.md)は別承認のShow 0件・公開なしの診断に限定し、PUTのenvironment固定検証で停止した。切断は行わず3環境を保持する。以下の2 Show受け入れ全体を実施した実績ではなく、二段階receipt修正案も未承認・未実装である。
+
 1. 対応commit・配布CLI hash・新規fresh環境・空きsubdomainとactive/full Zoneを固定する。既存DNS/routes/接続を上書きしない。CLIの権限確認・準備は[利用ガイド](sqlite_custom_domains.md)に従う。
 2. 2 Showを作り、承認済み短尺音源を公開する。別の非公開Episodeも作り、Feed/cover/audioのGET/HEAD/Range/ETag、GUID/日時/media hash/履歴を基準として保存する。staging・内部世代URLは404を確認する。
 3. 各ShowをPause/drainし、cold/warm cache・条件付き要求でも両originの配信が停止することを確認する。専用UUIDでdomain addを1回だけ実行し、接続成功receipt・TLS待ち・配備receipt/native確認・全対象Feed/purge/probe・paused完了を区別する。

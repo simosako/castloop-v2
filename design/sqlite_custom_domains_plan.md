@@ -304,6 +304,8 @@ castloop domain remove --operation-id UUID --workspace PATH
 
 上記は実機承認前のローカル検証結果である。後の実機試行で確認したAPI差異への修正・未知receipt非採用・秘密を出さないfield診断の回帰追加後は**637 pass / 0 fail、76 files**、型検査・Linux CLI build成功。別途承認された[初回](sqlite_custom_domain_live_verification_20261024.md)・[再試験](sqlite_custom_domain_live_retest_20261024.md)ともreceipt検証で停止し、原因未確定。全API応答差異、native rollout、DO output gate、全cache/purge、性能/全Free適合、300MBをローカル合格で証明したとは扱わない。
 
+その後の別承認による[Show 0件の診断](sqlite_custom_domain_environment_review.md)では、PUT応答のenvironment固定検証に停止箇所を絞り込んだ。PUT成功acknowledgementとGET完全接続確定を分ける追加契約案はレビュー待ち・未実装。受け入れ完了や既存3操作の昇格を意味しない。
+
 ## 10. 受け入れ条件と試験
 
 以下は実機を含む総合受け入れ項目であり、P7が初回試行で停止したため未完了として保持する。ローカルの実施範囲・証拠は§9.2、実機の部分結果は上記記録を参照する。

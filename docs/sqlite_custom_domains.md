@@ -4,6 +4,8 @@ Issue #68の開発版CLI/Worker向け。対応版でfresh initしたservice sche
 
 **Cloudflare実機の総合受け入れは未完了。** [初回](../design/sqlite_custom_domain_live_verification_20261024.md)・[再試験](../design/sqlite_custom_domain_live_retest_20261024.md)とも接続前の通常公開とPauseを確認したが、接続receipt検証で停止した。空一覧表現・opaque IDの修正だけでは解消せず、原因は未確定。値を出さない項目別診断を追加し、637件のローカル試験を通過した段階であり、正規domainへの切替・redirect・切断復帰・rollout・性能は実証していない。この文書は配備・接続・公開・Resume・削除等の実環境操作の承認ではない。
 
+[Show 0件の第3試験](../design/sqlite_custom_domain_environment_review.md)でPUTのenvironment固定検証に停止箇所を絞り込んだが、元応答の値/有無は未確認。二段階receiptへの変更案はレビュー待ち・未実装であり、以下の操作や既存unknownの再送/採用を許可するものではない。
+
 ## 前提と制約
 
 - 1サービス1専用subdomainで全Show共通。apex・wildcard・Show別domain・複数domain・外部権威DNS・Cloudflare for SaaSは非対応。
