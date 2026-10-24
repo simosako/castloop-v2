@@ -1,5 +1,9 @@
 # castloop v2 デザインドキュメント
 
+Issue #68の未リリース開発版: [独自ドメイン計画](sqlite_custom_domains_plan.md)に沿い、Feed世代を公開jobのFIFO sequenceから独立した共通予約表で採番する。内部queue/content schemaは**6/7**、healthの必須`feed_generation_allocator="reservation-v1"`を用いるfresh環境専用。cover世代は引き続きShow公開job sequenceで、Feed世代から推測しない。旧5/6を含む環境の移行・互換配備は提供しない。CLI/REST連携は[専用ガイド](../docs/sqlite_custom_domains.md)を参照し、実機未確認・未承認と区別する。
+
+DO側のdomain変更は専用prepare/activate/status/finalizeと`domain_changes="sqlite-domain-change-v1"`で識別する。全Showをpaused/drainedで保守拘束し、所属を固定して新configへ配備した後、全対象native確認・不変Feed再生成/purge・readinessを経て明示finalizeする。全体Pauseや自動Resumeは追加しない。独自originの管理APIは404、旧workers.devの許可済み公開URLは明示Resume後だけFeed 301/cover・audio 307とする。同対象への外部ツールの並行DNS/接続変更は想定外として制約を記録する。
+
 2026-10-21追補: [Show更新中のFeed継続配信設計](show_update_feed_availability_plan.md)を実装した。Episode追加・更新に加え、公開済みShowのmetadata/cover/同時更新でも旧Feed・画像・承認済み音源を配信する。Feed/Show/cover世代と対象種別のguardを保存・照合し、不変cover snapshotと新metadata/Feedをpurge後に原子的に切り替える。内部queue/content schema **5/6**、healthの必須`feed_storage`/`cover_storage`は`immutable-generation-v1`、`publication_read_boundary="show-episode-v1"`を使う新規環境専用。第1・第2段階を含む旧環境の移行・互換配備は提供しない。
 
 更新日: 2026-10-21。**v0.7.0の仕様**。v0.6.2の公開・操作記録機能をShow単位DOへ分離し、Pause/ResumeをShow単位に変更する。配布済みv0.6.2の旧layoutとは非互換で、移行・旧版サポートは提供しない。設計と検証範囲は[採用設計](do_show_separation_options.md)、過去のリリースは[v0.6.2](../docs/release-v0.6.2.md)を参照。
@@ -92,7 +96,7 @@ Gateway: 対象Show DOの最新の小さい配信判定 → 同versionのcache o
 
 ## 未提供機能と検証の限界
 
-物理delete、独自domain、既存サービス移行、blocked retry/release、未登録uploadの一般cleanup、予約配信、音源変換、統計は提供しない。旧Queueのdomain／deleteを代替として呼び出さない。
+物理delete、既存サービス移行、blocked retry/release、未登録uploadの一般cleanup、予約配信、音源変換、統計は提供しない。独自domainの開発版対応は本書冒頭と専用ガイドの範囲に限る。旧Queueのdomain／deleteを代替として呼び出さない。
 
 過去のSQLite36件＋更新10回・通常HTTP最大3/5ms・probe60/60は[保存した負荷の結果](archive/sqlite_size36_measurement_20261017.md)。今回の削除版のnative性能や全Free適合を示すものではない。300MB新経路・実機purge rate-limit retry・#13恒久解消・万能復旧は保証しない。
 

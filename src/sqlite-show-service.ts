@@ -17,6 +17,7 @@ import type { SqliteRuntimeCache } from "./sqlite-service-runtime";
 import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
 import type { OperationCleanupBucket } from "./sqlite-operation-records";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
+import type { SqliteDomainRequest, SqliteDomainActivation } from "../packages/shared/src/sqlite-domain";
 
 export type ShowRegistration = ReturnType<typeof sqliteRegistrationSchema.parse>;
 type Binding = { show_id: string; maintenance_id: string | null };
@@ -38,7 +39,7 @@ export class SqliteShowService {
     if (this.binding()?.show_id && this.binding()!.show_id !== showId) throw new Error("Show storage identity differs");
     this.queue = new SqlitePublicationQueue(storage, selectSqliteRuntime(storage, actual), Date.now, { showId, ready: () => this.ready() });
     this.content = new SqlitePublicationContent(storage);
-    this.runtime = new SqliteServiceRuntime(storage, this.queue, this.content, bucket, config, cache, actual);
+    this.runtime = new SqliteServiceRuntime(storage, this.queue, this.content, bucket, config, cache, actual, showId);
     const ready = () => this.ready();
     const records = createSqliteOperationRecords(storage, this.queue, this.content, ready, showId);
     this.publicationHttp = createSqlitePublicationHttp(this.queue, key, ready, showId);
@@ -51,7 +52,7 @@ export class SqliteShowService {
   }
   ready(): boolean { const binding = this.binding(); return !!binding && !binding.maintenance_id && this.runtime.ready(); }
   alarmRuntime(): SqliteServiceRuntime {
-    return new SqliteServiceRuntime(this.storage, this.queue, this.content, this.bucket, this.config, this.cache, this.actual);
+    return new SqliteServiceRuntime(this.storage, this.queue, this.content, this.bucket, this.config, this.cache, this.actual, this.showId);
   }
   health(): SqliteHealth { return { ...this.runtime.health(), scope: "show", show_id: this.showId,
     maintenance_operation_id: this.binding()?.maintenance_id ?? null, publication_ready: this.ready() }; }
@@ -94,6 +95,31 @@ export class SqliteShowService {
     });
   }
   maintenanceHealth(): SqliteHealth { return { ...this.health(), publication_ready: this.runtime.ready() }; }
+
+  async prepareDomain(request: SqliteDomainRequest) {
+    return this.runtime.domains.prepare(request, () => {
+      if (!this.binding() || this.binding()!.maintenance_id) throw new Error("Show maintenance already started");
+      this.storage.sql.exec("UPDATE publication_show_binding SET maintenance_id = ? WHERE id = 1", request.operation_id);
+    });
+  }
+  async activateDomain(request: SqliteDomainActivation) {
+    if (this.binding()?.maintenance_id !== request.operation_id) throw new Error("Show domain maintenance differs");
+    return this.runtime.domains.activate(request);
+  }
+  async domainStatus(id: string) {
+    const status = await this.runtime.domains.status(id);
+    if (status.phase !== "completed" && this.binding()?.maintenance_id !== id) throw new Error("Domain Show maintenance was lost");
+    return status;
+  }
+  async releaseDomain(id: string): Promise<SqliteHealth> {
+    const domain = await this.domainStatus(id);
+    return this.storage.transactionSync(() => {
+      if (domain.phase !== "completed" || !this.runtime.ready() || this.binding()?.maintenance_id !== id ||
+        this.queue.snapshot().state !== "paused" || !this.queue.snapshot().drained) throw new Error("Domain Show probe is not complete");
+      this.storage.sql.exec("UPDATE publication_show_binding SET maintenance_id = NULL WHERE id = 1");
+      return this.health();
+    });
+  }
 
   delivery(path: string) {
     if (parsePublicAssetPath(path)?.showId !== this.showId) return { status: 404 as const };

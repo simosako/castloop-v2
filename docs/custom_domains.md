@@ -1,6 +1,8 @@
 # 独自ドメイン（v0.3.0）
 
-> **v0.5.x以前のQueueサービス専用。** v0.6.0以降のSQLite CLIはdomain操作を提供しない。対応するv0.5.x CLI/Workerと[固定文書](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/custom_domains.md)を使用する。CLI交換だけでは配備済みdomainや旧runtime probeは変わらない。
+**現行SQLiteの開発版は[SQLite独自ドメインガイド](sqlite_custom_domains.md)を参照する。** 以下は旧Queue専用の履歴であり、現行のコマンド・再配備・redirect・続行契約には適用しない。旧版の固定手順は[v0.5.2文書](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/custom_domains.md)を使う。
+
+> **以下はv0.5.x以前のQueueサービス専用。** 対応するv0.5.x CLI/Workerと[固定文書](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/custom_domains.md)を使用する。CLI交換だけでは配備済みdomainや旧runtime probeは変わらない。
 
 このガイドは既存Queue方式（`schema_version = 1`）向けです。v0.5.0のSQLite方式では独自ドメインは未対応で、旧方式へfallbackしません。
 

@@ -92,6 +92,7 @@ for (const kind of ["health", "catalog"] as const) for (const failure of [false,
     const unexpected = async (): Promise<never> => { throw new Error("Read must not mutate Shows"); };
     const control = new SqliteServiceControl(f.controlStorage, f.runtime, (id) => ({
       initialize: unexpected, prepare: unexpected, activate: unexpected, release: unexpected,
+      prepareDomain: unexpected, activateDomain: unexpected, domainStatus: unexpected, releaseDomain: unexpected,
       async health() { await read(id); return f.nodes.get(id)!.service.maintenanceHealth(); },
       async catalog(request) { await read(id); return f.nodes.get(id)!.service.runtime.catalog(request); },
     }));

@@ -7,15 +7,20 @@ import { administratorKey } from "./administrator-key";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { startSqliteDomainChange } from "./sqlite-domain-operation";
+import { loadWorkspaceConfig } from "./workspace-config";
 import { RSS_IMPORT_AUDIO, RSS_IMPORT_SOURCE, rssImportTransport } from "./test-support/rss-import";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
-async function fixture(count = 2) {
+async function fixture(count = 2, customDomain = false) {
   const value = await sqliteServiceFixture(); values.push(value);
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, { attempts: 2, delay: async () => {} });
+  if (customDomain) await startSqliteDomainChange(value.root, value.config, "add", crypto.randomUUID(), "source", value.options,
+    { hostname: "podcasts.example.com", zoneId: "c".repeat(32) }, { attempts: 2, delay: async () => {} });
+  const config = await loadWorkspaceConfig(value.root);
   const options = { transport: value.transport, cloudflare: value.options };
   const item = RSS_IMPORT_SOURCE.match(/<item>[\s\S]*?<\/item>/)![0];
   const items = Array.from({ length: count }, (_, index) => item.replace("old:123", index === 1 ? "https://old.example/second" : `old:${index}`)
@@ -23,11 +28,11 @@ async function fixture(count = 2) {
   const source = RSS_IMPORT_SOURCE.replace(item, items.join("")), output = join(value.root, "import");
   await importRssLocally("imported", "https://source.example/feed", output, rssImportTransport(false, source).effects);
   const report = JSON.parse(readFileSync(join(output, "import.json"), "utf8")) as { import_id: string; episodes: Array<{ metadata: { episode_id: string; guid: string; guid_is_permalink: boolean; published_at: string } }> };
-  const commands: string[] = [], native = createSqliteRssEffects(value.root, value.config, options);
+  const commands: string[] = [], native = createSqliteRssEffects(value.root, config, options);
   const effects = { ...native, async command(name: string, args: string[], context?: Parameters<SqliteRssEffects["command"]>[2]) {
     commands.push(name); return native.command(name, args, context); },
     async readFeed() { return value.text(`public/podcasts/imported/feeds/${value.content.inspect("imported").show!.feed_generation}.xml`); } };
-  const execute = (custom = effects, customOptions = options) => publishSqliteRssImport(value.root, value.config, output, customOptions, custom);
+  const execute = (custom: SqliteRssEffects = effects, customOptions = options) => publishSqliteRssImport(value.root, config, output, customOptions, custom);
   const cursor = join(value.root, ".castloop", "sqlite-rss-imports", value.config.service_id, `${report.import_id}.json`);
   return Object.assign(value, { output, report, commands, effects, execute, cursor, options });
 }
@@ -48,6 +53,20 @@ test("SQLite RSS import publishes 36 Episodes sequentially and preserves externa
   await value.execute(); expect(value.commands).toHaveLength(count);
   expect(value.calls.every((call) => call.method === "GET")).toBe(true);
 }, 60000);
+
+test("RSS publication after a domain change verifies the canonical Feed without rewriting imported identities", async () => {
+  const value = await fixture(2, true), origin = "https://podcasts.example.com";
+  const effects = { ...value.effects, async readFeed(url: string) {
+    expect(url).toBe(`${origin}/podcasts/imported/feed.xml`);
+    return value.effects.readFeed();
+  } };
+  expect(await value.execute(effects)).toMatchObject({ feed_url: `${origin}/podcasts/imported/feed.xml`, episode_count: 2 });
+  for (const original of value.report.episodes) {
+    const published = value.content.episodes("imported").find((episode) => episode.episode_id === original.metadata.episode_id)!;
+    expect(published).toMatchObject(original.metadata); expect(published.enclosure_url.startsWith(`${origin}/`)).toBe(true);
+  }
+  expect(value.domains).toHaveLength(1);
+});
 
 test("a completed publication with a lost import checkpoint is observed without a second publish or upload", async () => {
   const value = await fixture(); let lose = true;

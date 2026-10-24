@@ -14,6 +14,7 @@ import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 import { sqliteCoverSnapshotKey } from "./sqlite-cover";
+import { reserveSqliteFeedGeneration } from "./sqlite-feed-generations";
 import { serveCachedLifecycleAsset } from "./lifecycle-cache";
 import { serveSqliteGateway } from "./sqlite-gateway";
 import { createHash } from "node:crypto";
@@ -96,6 +97,23 @@ async function fixture() {
   const feed = () => objects.text(sqliteFeedSnapshotKey("daily", content.inspect("daily").show!.feed_generation));
   return { ...setup, ...objects, feed, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, showUpdate, lifecycle };
 }
+
+test("domain Feed reservations cannot collide with later publication or change cover and revision identity", async () => {
+  const value = await fixture();
+  reserveSqliteFeedGeneration(value.storage, { kind: "domain", id: crypto.randomUUID(), showId: "daily", requestSha256: "f".repeat(64) });
+  await value.publishShow();
+  expect(value.content.inspect("daily").show!.feed_generation).toBe(2);
+  expect(value.entries.has(sqliteCoverSnapshotKey("daily", 1, "jpg"))).toBe(true);
+  expect(value.entries.has(sqliteFeedSnapshotKey("daily", 2))).toBe(true);
+  const episode = await value.publishEpisode();
+  expect(value.content.inspect("daily", "first").base!.revision_id).toBe(episode.job_id);
+  expect(value.content.inspect("daily").show!.feed_generation).toBe(3);
+  const update = await value.showUpdate(); expect((await value.run(update)).state).toBe("succeeded");
+  expect(value.entries.has(sqliteCoverSnapshotKey("daily", 3, "jpg"))).toBe(true);
+  expect(value.content.inspect("daily").show!.feed_generation).toBe(4);
+  expect((await value.run(value.lifecycle("unpublish", "first"))).state).toBe("succeeded");
+  expect(value.content.inspect("daily").show!.feed_generation).toBe(5);
+});
 
 test("Episode lifecycle removes all revision delivery and restores the same snapshot without audio or metadata writes", async () => {
   const value = await fixture(); await value.publishShow(); const first = await value.publishEpisode(); await value.publishEpisode("second");

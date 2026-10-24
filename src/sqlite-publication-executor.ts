@@ -96,7 +96,11 @@ async function put(bucket: SqlitePublicationBucket, key: string, value: string |
 
 async function persistFeed(store: SqlitePublicationContent, bucket: SqlitePublicationBucket,
   request: SqlitePublicationRequest, feed: string): Promise<void> {
-  const key = sqliteFeedSnapshotKey(request.show_id, store.feedGeneration(request));
+  await persistSqliteFeedSnapshot(bucket, request.show_id, store.feedGeneration(request), feed);
+}
+
+export async function persistSqliteFeedSnapshot(bucket: SqlitePublicationBucket, showId: string, generation: number, feed: string): Promise<void> {
+  const key = sqliteFeedSnapshotKey(showId, generation);
   const bytes = new TextEncoder().encode(feed), hash = await publicationChecksum(bytes);
   const object = await bucket.put(key, bytes, { onlyIf: new Headers({ "If-None-Match": "*" }), sha256: hash,
     httpMetadata: { contentType: "application/rss+xml; charset=utf-8" } });
@@ -104,7 +108,7 @@ async function persistFeed(store: SqlitePublicationContent, bucket: SqlitePublic
     toHex(object.checksums.sha256) !== hash) throw new Error("Immutable Feed write was not verified");
 }
 
-async function verifyCover(bucket: SqlitePublicationBucket, showId: string, extension: "jpg" | "png", cover: SqliteCoverIdentity): Promise<void> {
+export async function verifyCover(bucket: SqlitePublicationBucket, showId: string, extension: "jpg" | "png", cover: SqliteCoverIdentity): Promise<void> {
   const key = sqliteCoverSnapshotKey(showId, cover.generation, extension);
   const object = await bucket.head(key);
   if (!object || object.key !== key || object.size !== cover.lengthBytes || !object.checksums.sha256 ||
@@ -202,7 +206,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
           await requireEmpty(bucket, `public/episodes/${request.show_id}/`);
         }
         const feed = input(() => renderPublicationFeed(metadata, episodes, config.public_base_url, extension));
-        const coverIdentity = { generation: feedGeneration, sha256: coverPayload.sha256, lengthBytes: cover.byteLength };
+        const coverIdentity = { generation: store.publicationSequence(request), sha256: coverPayload.sha256, lengthBytes: cover.byteLength };
         return { kind: "show", request, feedGeneration, metadata, cover, coverIdentity, extension, feed };
       }
       const metadataPayload = request.payloads.find((payload) => payload.asset === "episode_metadata");
@@ -241,7 +245,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
     },
     async publish(prepared) {
       if (prepared.feedGeneration !== store.feedGeneration(prepared.request)) throw new Error("Prepared Feed generation differs");
-      if (prepared.kind === "show" && prepared.coverIdentity.generation !== prepared.feedGeneration) throw new Error("Prepared cover generation differs");
+      if (prepared.kind === "show" && prepared.coverIdentity.generation !== store.publicationSequence(prepared.request)) throw new Error("Prepared cover generation differs");
       const showId = prepared.request.show_id;
       const run = (phase: SqlitePublicationEffectFailure["phase"], operation: () => Promise<void>) => perform(prepared.request, phase, operation);
       if (prepared.kind === "lifecycle") {

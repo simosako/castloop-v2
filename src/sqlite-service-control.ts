@@ -7,6 +7,9 @@ import type { SqliteUpdateActivate, SqliteUpdatePrepare, SqliteUpdateResult } fr
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import type { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { ShowRegistration } from "./sqlite-show-service";
+import { parseSqliteDomainRequest, requireSqliteDomainConnection, sqliteDomainActivationSchema, sqliteDomainConnectionSchema,
+  sqliteDomainFinalizeSchema, sqliteDomainRequestSchema, sqliteDomainServiceStatusSchema, sqliteDomainStatusSchema } from "../packages/shared/src/sqlite-domain";
+import type { SqliteDomainActivation, SqliteDomainRequest, SqliteDomainStatus, SqliteDomainFinalize } from "../packages/shared/src/sqlite-domain";
 
 export type SqliteShowPeer = {
   initialize: (request: ShowRegistration) => Promise<SqliteHealth>;
@@ -15,6 +18,10 @@ export type SqliteShowPeer = {
   prepare: (request: SqliteUpdatePrepare) => Promise<SqliteUpdateResult>;
   activate: (request: SqliteUpdateActivate) => Promise<SqliteUpdateResult>;
   release: (operationId: string) => Promise<SqliteHealth>;
+  prepareDomain: (request: SqliteDomainRequest) => Promise<SqliteDomainStatus>;
+  activateDomain: (request: SqliteDomainActivation) => Promise<SqliteDomainStatus>;
+  domainStatus: (operationId: string) => Promise<SqliteDomainStatus>;
+  releaseDomain: (operationId: string) => Promise<SqliteHealth>;
 };
 type RegistryRow = { show_id: string; reservation_id: string; request_json: string; state: string };
 type MaintenanceRow = { operation_id: string; request_json: string; phase: "preparing" | "prepared" | "activating" | "probing" | "releasing" | "completed" };
@@ -46,6 +53,7 @@ export class SqliteServiceControl {
         activate_state TEXT NOT NULL DEFAULT 'pending' CHECK(activate_state IN ('pending', 'requested', 'confirmed')),
         release_state TEXT NOT NULL DEFAULT 'pending' CHECK(release_state IN ('pending', 'requested', 'confirmed')),
         PRIMARY KEY(operation_id, show_id))`);
+      storage.sql.exec("CREATE TABLE IF NOT EXISTS service_domain_connection (id INTEGER PRIMARY KEY CHECK(id = 1), connection_json TEXT NOT NULL)");
     });
   }
   private pending(): MaintenanceRow | null {
@@ -213,6 +221,7 @@ export class SqliteServiceControl {
   async progress(): Promise<void> {
     const row = this.pending();
     if (!row || row.phase !== "probing") return;
+    if (this.storage.sql.exec("SELECT operation_id FROM publication_domain_changes WHERE operation_id = ?", row.operation_id).toArray().length) return;
     // Polling is read-only; mutating fan-out steps are never replayed by an Alarm.
     const own = this.runtime.health();
     if (own.setup?.state === "blocked" || own.runtime_update?.state === "blocked") return;
@@ -242,5 +251,118 @@ export class SqliteServiceControl {
     }
     this.storage.sql.exec("UPDATE service_show_maintenance SET phase = 'completed' WHERE operation_id = ?", row.operation_id);
     await this.storage.sync();
+  }
+
+  domainState() {
+    const row = this.storage.sql.exec<{ connection_json: string }>("SELECT connection_json FROM service_domain_connection WHERE id = 1").toArray()[0];
+    return { runtime: this.runtime.queue.identity(), connection: row ? sqliteDomainConnectionSchema.parse(JSON.parse(row.connection_json)) : null,
+      maintenance: this.maintenance() };
+  }
+  private verifyDomainStatus(input: SqliteDomainStatus, own: SqliteDomainStatus, showId: string): SqliteDomainStatus {
+    const result = sqliteDomainStatusSchema.parse(input), previous = own.request.previous_runtime;
+    const expectedActual = result.actual_runtime.worker_version_id === previous.worker_version_id ? previous : own.actual_runtime;
+    if (result.show_id !== showId || result.request_sha256 !== own.request_sha256 ||
+      JSON.stringify(result.request) !== JSON.stringify(own.request) ||
+      JSON.stringify(result.actual_runtime) !== JSON.stringify(expectedActual) ||
+      ![JSON.stringify(previous), JSON.stringify(own.actual_runtime)].includes(JSON.stringify(result.saved_runtime))) throw new Error("Show domain evidence differs");
+    return result;
+  }
+  async prepareDomain(input: SqliteDomainRequest) {
+    const request = await parseSqliteDomainRequest(input);
+    const own = await this.runtime.domains.prepare(request, () => {
+      const rows = this.registry(), connection = this.domainState().connection;
+      if (this.pending() || rows.length > 10000 || rows.some((row) => row.state !== "registered") ||
+        (request.action === "add" ? connection !== null : JSON.stringify(connection) !== JSON.stringify(request.connection))) throw new Error("Domain membership or known connection is not settled");
+      this.storage.sql.exec("INSERT INTO service_show_maintenance (operation_id, request_json, phase) VALUES (?, ?, 'preparing')", request.operation_id, JSON.stringify(request));
+      for (const row of rows) this.storage.sql.exec("INSERT INTO service_show_update_targets (operation_id, show_id) VALUES (?, ?)", request.operation_id, row.show_id);
+    });
+    for (const target of this.targets(request.operation_id)) {
+      this.storage.sql.exec("UPDATE service_show_update_targets SET prepare_state = 'requested' WHERE operation_id = ? AND show_id = ?", request.operation_id, target.show_id);
+      await this.storage.sync();
+      const result = this.verifyDomainStatus(await this.peer(target.show_id).prepareDomain(request), own, target.show_id);
+      if (result.phase !== "prepared") throw new Error("Show domain preparation differs");
+      this.storage.sql.exec("UPDATE service_show_update_targets SET prepare_state = 'confirmed' WHERE operation_id = ? AND show_id = ?", request.operation_id, target.show_id);
+    }
+    this.storage.sql.exec("UPDATE service_show_maintenance SET phase = 'prepared' WHERE operation_id = ?", request.operation_id);
+    await this.storage.sync();
+    return this.domainStatus(request.operation_id);
+  }
+  async domainStatus(id: string, after = "") {
+    const own = await this.runtime.domains.status(id);
+    if (after) sqliteDomainStatusSchema.shape.show_id.unwrap().parse(after);
+    const record = this.storage.sql.exec<MaintenanceRow>("SELECT * FROM service_show_maintenance WHERE operation_id = ?", id).toArray()[0];
+    if (!record || record.request_json !== JSON.stringify(own.request)) throw new Error("Domain membership differs");
+    const targets = this.targets(id), results: Array<{ show_id: string; prepare_state: string; activate_state: string; release_state: string; phase: SqliteDomainStatus["phase"] | null }> = [];
+    let nativeReady = own.actual_runtime.service_config_sha256 === own.request.target_config_sha256;
+    let completed = 0, blocked = 0;
+    for (const target of targets) {
+      let phase: SqliteDomainStatus["phase"] | null = null;
+      if (target.prepare_state === "confirmed") {
+        const result = this.verifyDomainStatus(await this.peer(target.show_id).domainStatus(id), own, target.show_id);
+        if (record.phase !== "completed" && (!result.paused || !result.drained)) throw new Error("Domain maintenance target resumed before completion");
+        phase = result.phase;
+        if (result.actual_runtime.worker_version_id !== own.actual_runtime.worker_version_id || phase !== "prepared") nativeReady = false;
+        if (phase === "completed") completed++;
+        if (phase === "blocked") blocked++;
+      } else nativeReady = false;
+      results.push({ ...target, phase });
+    }
+    const page = results.filter((row) => row.show_id > after).slice(0, 21);
+    return sqliteDomainServiceStatusSchema.parse({ own, phase: record.phase, targets_native_ready: nativeReady,
+      all_completed: own.phase === "completed" && completed === targets.length,
+      target_count: targets.length, prepared_count: targets.filter((target) => target.prepare_state === "confirmed").length,
+      completed_count: completed, released_count: targets.filter((target) => target.release_state === "confirmed").length,
+      blocked_count: blocked,
+      targets: page.slice(0, 20), next_cursor: page.length > 20 ? page[19].show_id : null });
+  }
+  async activateDomain(input: SqliteDomainActivation) {
+    const activation = sqliteDomainActivationSchema.parse(input), status = await this.domainStatus(activation.operation_id);
+    requireSqliteDomainConnection(activation.connection, status.own.request);
+    this.storage.transactionSync(() => {
+      if (this.pending()?.operation_id !== activation.operation_id || this.pending()?.phase !== "prepared" ||
+        status.phase !== "prepared" || status.own.phase !== "prepared" || !status.targets_native_ready ||
+        activation.worker_version_id !== status.own.actual_runtime.worker_version_id || activation.request_sha256 !== status.own.request_sha256) throw new Error("Domain activation requires all exact prepared native targets");
+      this.storage.sql.exec("UPDATE service_show_maintenance SET phase = 'activating' WHERE operation_id = ?", activation.operation_id);
+    });
+    await this.storage.sync();
+    for (const target of this.targets(activation.operation_id)) {
+      if (target.activate_state !== "pending") throw new Error("Show domain activation outcome is uncertain");
+      this.storage.sql.exec("UPDATE service_show_update_targets SET activate_state = 'requested' WHERE operation_id = ? AND show_id = ?", activation.operation_id, target.show_id);
+      await this.storage.sync();
+      const result = this.verifyDomainStatus(await this.peer(target.show_id).activateDomain(activation), status.own, target.show_id);
+      if (result.phase !== "activated" || JSON.stringify(result.activation) !== JSON.stringify(activation)) throw new Error("Show domain activation differs");
+      this.storage.sql.exec("UPDATE service_show_update_targets SET activate_state = 'confirmed' WHERE operation_id = ? AND show_id = ?", activation.operation_id, target.show_id);
+    }
+    await this.runtime.domains.activate(activation);
+    this.storage.sql.exec("UPDATE service_show_maintenance SET phase = 'probing' WHERE operation_id = ?", activation.operation_id);
+    await this.storage.sync();
+    return this.domainStatus(activation.operation_id);
+  }
+  async finalizeDomain(input: SqliteDomainFinalize) {
+    const request = sqliteDomainFinalizeSchema.parse(input), status = await this.domainStatus(request.operation_id);
+    requireSqliteDomainConnection(request.connection, status.own.request);
+    if (!status.all_completed || !status.own.paused || !status.own.drained || status.phase !== "probing" || status.own.request_sha256 !== request.request_sha256 ||
+      request.detached !== (status.own.request.action === "remove") ||
+      JSON.stringify(request.connection) !== JSON.stringify(status.own.activation?.connection)) throw new Error("Domain finalization has no exact complete evidence");
+    this.storage.transactionSync(() => {
+      if (this.pending()?.operation_id !== request.operation_id || this.pending()?.phase !== "probing") throw new Error("Domain finalization already started");
+      this.storage.sql.exec("UPDATE service_show_maintenance SET phase = 'releasing' WHERE operation_id = ?", request.operation_id);
+    });
+    await this.storage.sync();
+    for (const target of this.targets(request.operation_id)) {
+      if (target.release_state !== "pending") throw new Error("Show domain release is uncertain");
+      this.storage.sql.exec("UPDATE service_show_update_targets SET release_state = 'requested' WHERE operation_id = ? AND show_id = ?", request.operation_id, target.show_id);
+      await this.storage.sync();
+      const health = this.verifyHealth(await this.peer(target.show_id).releaseDomain(request.operation_id), target.show_id);
+      if (!health.publication_ready || health.maintenance_operation_id || health.state !== "paused" || !health.drained) throw new Error("Domain Show release was not verified");
+      this.storage.sql.exec("UPDATE service_show_update_targets SET release_state = 'confirmed' WHERE operation_id = ? AND show_id = ?", request.operation_id, target.show_id);
+    }
+    this.storage.transactionSync(() => {
+      if (request.detached) this.storage.sql.exec("DELETE FROM service_domain_connection WHERE id = 1");
+      else this.storage.sql.exec("INSERT INTO service_domain_connection (id, connection_json) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET connection_json = excluded.connection_json", JSON.stringify(request.connection));
+      this.storage.sql.exec("UPDATE service_show_maintenance SET phase = 'completed' WHERE operation_id = ?", request.operation_id);
+    });
+    await this.storage.sync();
+    return this.domainStatus(request.operation_id);
   }
 }

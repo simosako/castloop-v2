@@ -1,5 +1,7 @@
 # 設計文書の案内
 
+未リリースのIssue #68開発では、fresh専用の内部queue/content形式を6/7へ変更し、SQLite独自subdomainと旧workers.dev公開URLのredirectを追加する。旧5/6環境の移行・採用はしない。[反復試験](sqlite_custom_domain_iterative_verification_20261024.md)の応答修正後、[第9環境の2 Show総合機能試験](sqlite_custom_domain_two_show_verification_20261024.md)で公開・独自origin配信・redirect・個別Pause・更新/復元・通常deploy・切断復帰・履歴保持を確認した。両Show paused/ready/drainedで終了。RSS・故障注入・内部cache状態・性能/全Free適合等の未確認範囲は同記録と[計画](sqlite_custom_domains_plan.md)で区別する。
+
 v0.7.2はエージェント向けCLIと管理者Skillを追加したrelease。Worker・永続形式はv0.7.1から変更しない。[リリースノート](../docs/release-v0.7.2.md)と[利用ガイド](../docs/agent_usage.md)を参照する。Cloudflare実機検証は今回の変更範囲では省略し、ローカル回帰と単体バイナリで確認する。
 
 v0.7.1はv0.7.0と同じ永続形式・互換境界で、レビュー修正を含むpatch release。[変更点と検証の限界](../docs/release-v0.7.1.md)を参照する。配布・インストールと実環境への配備は別操作である。
@@ -15,6 +17,16 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [エージェント向け共通ルール](../AGENTS.md) | 常時必要な開発・安全ルールと作業別の参照先。検討履歴は必要なときだけ読む |
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
+| [SQLite独自ドメイン対応計画](sqlite_custom_domains_plan.md) | Issue #68。開発版のCLI/REST/DO接続、Cloudflare DNS前提、管理/公開origin分離、redirect、個別停止と設定・Feed切替、ローカル検証範囲 |
+| [独自ドメインP0・API条件の確認](sqlite_custom_domains_p0.md) | 公開Attach/Detachを採用。外部同時変更は想定外という制約を記録し、保留解消・開発継続。HTTP/identity/Feed採番の契約 |
+| [SQLite独自ドメイン操作](../docs/sqlite_custom_domains.md) | 開発版のadd/list/status/continue/remove、必要権限、停止と再開、中断・切断時の制約 |
+| [SQLite独自ドメイン実機確認](../docs/sqlite_custom_domain_live_acceptance.md) | 新規隔離環境と専用hostnameでの確認手順と2 Showの結果参照。新しい実環境操作へ過去承認を流用しない |
+| [SQLite独自ドメイン初回実機・停止記録](sqlite_custom_domain_live_verification_20261024.md) | 2 Showの通常公開・Pause、API応答/opaque ID修正、未知接続非採用、保守拘束付きの最終停止状態と未試験範囲 |
+| [SQLite独自ドメイン再試験・停止記録](sqlite_custom_domain_live_retest_20261024.md) | 別hostname・fresh環境でもreceipt検証で停止。原因未確定、初回環境保持、履歴hash保持、値を出さないfield診断の追加 |
+| [environment診断とreceipt契約の追加レビュー](sqlite_custom_domain_environment_review.md) | 第3環境の停止記録と提案履歴。ログ調査を優先した経緯 |
+| [ログ付き再試験と修正](sqlite_custom_domain_iterative_verification_20261024.md) | PUT空文字・DELETE空本文を特定/修正。第8環境でShow 0件のadd/remove完了、旧unknown/lock保持と未試験範囲 |
+| [独自ドメイン2 Show総合実機確認](sqlite_custom_domain_two_show_verification_20261024.md) | 第9環境で公開/配信/301・307/個別Pause/更新・復元/接続維持deploy/切断復帰が成功。最終Pause、8履歴object保持、旧8環境不変と検証限界 |
+| [独自domain応答検証ログと調査](sqlite_domain_response_logging.md) | 既存stderrは空で元PUTは欠測。CLIへHTTP/body/JSON/schemaの段階とenvironment固定分類を追加。秘密非出力・非再送のローカル回帰 |
 | [エージェントによるPodcast管理の改善案](agent_integration_plan.md) | Issue #5。単一バイナリでのschema・雛形・Skill配布、明示対象指定、オフライン検証、doctor、承認と中断対応。MCPは不採用 |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |
@@ -35,7 +47,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [Show単位のDO分離](do_show_separation_options.md) | Issue #48。Show単位DO/Pause/Resume、全体Pause廃止、所属・共有更新の制御DOを採用。旧版互換・移行不要 |
 | [Episode追加中のFeed継続配信](episode_add_feed_availability_plan.md) | Issue #50第1段階の設計。世代別Feedと原子的な切替、blockedで旧内容を配信、世代蓄積の保持方針。schema 3/4・固定coverは第1段階時点の記録 |
 | [Episode更新中のFeed継続配信](episode_update_feed_availability_plan.md) | metadata-only/audio-only/同時更新で旧Feed・旧MP3を継続配信。base revision/lifecycle guard、blockedの隔離条件。schema 4/5は第2段階時点の記録 |
-| [Show更新中のFeed継続配信（第3段階）](show_update_feed_availability_plan.md) | 現行のschema 5/6・必須health識別。coverも世代別の不変objectへ保存し、公開URLを維持してFeed/画像を原子切替。Show/Episode共通guard、旧cover検証・復元参照とblocked条件 |
+| [Show更新中のFeed継続配信（第3段階）](show_update_feed_availability_plan.md) | v0.7.0〜v0.7.2のschema 5/6・必須health識別。coverの不変object、Feed/画像の原子切替、共通guardとblocked条件。開発版の6/7採番はIssue #68計画を参照 |
 
 入力例は[Show](show-template.toml)と[Episode](episode-template.toml)。
 

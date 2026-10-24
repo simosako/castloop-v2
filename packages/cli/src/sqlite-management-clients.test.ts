@@ -12,7 +12,7 @@ const version = "11111111-1111-4111-8111-111111111111", window = "22222222-2222-
 const runtime = { service_id: config.service_id, service_config_sha256: await sqliteServiceConfigHash(config), worker_version_id: version };
 const request = sqlitePublicationRequest(runtime, window), requestHash = await sqlitePublicationRequestHash(request);
 const status = { protocol: "sqlite-sequential-v1", service_id: config.service_id, request_id: request.request_id, job_id: request.job_id, request_sha256: requestHash, sequence: 1, state: "succeeded" } as const;
-const health = { ...runtime, protocol: "sqlite-sequential-v1", feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1", publication_read_boundary: "show-episode-v1", invocation_id: window, publication_ready: true, state: "open", admission_window_id: window,
+const health = { ...runtime, protocol: "sqlite-sequential-v1", feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1", publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1", domain_changes: "sqlite-domain-change-v1", invocation_id: window, publication_ready: true, state: "open", admission_window_id: window,
   queued: 0, active: null, drained: true, setup: { operation_id: window, state: "ready" }, runtime_update: null } as const;
 const json = (value: unknown, code = 200) => Response.json(value, { status: code, headers: { "Cache-Control": "no-store" } });
 const quiet = { delay: async () => {}, onDiagnostic: () => {} };

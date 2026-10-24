@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Feature requests are welcome, but castloop intentionally excludes some capabilities (schema-version-1 migration, physical deletion, custom domains on SQLite services, recurring RSS sync). If your request touches one of those, say why the current trade-off no longer works for you.
+        Feature requests are welcome, but castloop intentionally excludes some capabilities (schema-version-1 migration, physical deletion, recurring RSS sync). Development supports one dedicated custom subdomain per fresh SQLite service in the same account's active/full Cloudflare DNS zone; apex, multiple domains and Show-specific domains are not supported. If your request touches an excluded capability, say why the current trade-off no longer works for you.
   - type: textarea
     id: problem
     attributes:

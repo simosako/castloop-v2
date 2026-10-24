@@ -4,6 +4,8 @@ import { sqliteUpdateActivateSchema, sqliteUpdatePrepareSchema, sqliteUpdateResu
 import type { SqliteUpdateActivate, SqliteUpdatePrepare, SqliteUpdateResult, SqliteUpdateSummary } from "../packages/shared/src/sqlite-runtime-update";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import type { SqlitePublicationQueue } from "./sqlite-publication-queue";
+import { SQLITE_CONTENT_SCHEMA_VERSION, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-feed-generations";
+import { initializeSqliteDomains, selectPreparedDomainRuntime } from "./sqlite-domain-runtime";
 
 type UpdateRow = { sequence: number; operation_id: string; state: "prepared" | "activated" | "completed";
   request_json: string; activation_json: string | null };
@@ -17,13 +19,18 @@ export function pendingSqliteUpdate(storage: PublicationQueueStorage): boolean {
 }
 export function selectSqliteRuntime(storage: PublicationQueueStorage, actual: SqlitePublicationRuntime): SqlitePublicationRuntime {
   if (storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_queue_schema'").toArray().length &&
-    storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0]?.version !== 5) throw new Error("SQLite runtime update cannot convert an older queue schema");
+    storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0]?.version !== SQLITE_QUEUE_SCHEMA_VERSION) throw new Error("SQLite runtime update cannot convert an older queue schema");
   if (storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_content_schema'").toArray().length &&
-    storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0]?.version !== 6) throw new Error("SQLite runtime update cannot convert an older content schema");
+    storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0]?.version !== SQLITE_CONTENT_SCHEMA_VERSION) throw new Error("SQLite runtime update cannot convert an older content schema");
   initializeSqliteUpdates(storage);
+  initializeSqliteDomains(storage);
   if (!storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_service'").toArray().length) return actual;
   const saved = sqlitePublicationRuntimeSchema.parse(storage.sql.exec("SELECT service_id, worker_version_id, service_config_sha256 FROM publication_service WHERE id = 1").toArray()[0]);
-  if (saved.service_id !== actual.service_id || saved.service_config_sha256 !== actual.service_config_sha256) throw new Error("SQLite service configuration cannot change through a code update");
+  if (saved.service_id !== actual.service_id) throw new Error("SQLite service configuration cannot change through a code update");
+  if (saved.service_config_sha256 !== actual.service_config_sha256) {
+    if (selectPreparedDomainRuntime(storage, saved, actual)) return saved;
+    throw new Error("SQLite service configuration cannot change through a code update");
+  }
   if (saved.worker_version_id !== actual.worker_version_id) {
     const pending = storage.sql.exec<UpdateRow>("SELECT * FROM publication_runtime_updates WHERE state = 'prepared'").toArray()[0];
     const request = pending ? sqliteUpdatePrepareSchema.parse(JSON.parse(pending.request_json)) : null;

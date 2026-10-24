@@ -6,6 +6,7 @@ import type { SqlitePublicationBlock, SqlitePublicationFailure, SqlitePublicatio
 import type { OperationClient } from "../packages/shared/src/sqlite-operations";
 import type { SqliteOperationRecords } from "./sqlite-operation-records";
 import { sqliteDeliveryPolicy } from "./sqlite-feed";
+import { initializeSqliteFeedGenerations, reserveSqliteFeedGeneration, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-feed-generations";
 
 type Binding = string | number | null;
 export type PublicationSql = {
@@ -41,14 +42,15 @@ export class SqlitePublicationQueue {
     storage.transactionSync(() => {
       storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_queue_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");
       const schema = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
-      if (schema && schema.version !== 5) throw new Error("Unsupported SQLite publication schema; do not reset stored state");
-      storage.sql.exec("INSERT OR IGNORE INTO publication_queue_schema (id, version) VALUES (1, 5)");
+      if (schema && schema.version !== SQLITE_QUEUE_SCHEMA_VERSION) throw new Error("Unsupported SQLite publication schema; do not reset stored state");
+      storage.sql.exec("INSERT OR IGNORE INTO publication_queue_schema (id, version) VALUES (1, ?)", SQLITE_QUEUE_SCHEMA_VERSION);
+      initializeSqliteFeedGenerations(storage);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_service (
         id INTEGER PRIMARY KEY CHECK(id = 1), service_id TEXT NOT NULL, worker_version_id TEXT NOT NULL,
         service_config_sha256 TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('open', 'paused')), admission_window_id TEXT)`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_jobs (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
-        show_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL,
+        show_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL, feed_generation INTEGER NOT NULL UNIQUE,
         state TEXT NOT NULL CHECK(state IN ('queued', 'running', 'succeeded', 'failed', 'blocked')), reason_code TEXT,
         delivery_policy TEXT NOT NULL CHECK(delivery_policy IN ('exclusive', 'preserve_committed')),
         read_feed_generation INTEGER, read_show_version INTEGER, read_episode_id TEXT, read_request_sha256 TEXT,
@@ -137,8 +139,10 @@ export class SqlitePublicationQueue {
       if (this.active()?.state === "blocked") throw new Error("SQLite publication queue is blocked; inspect the retained job");
       this.operationRecords?.validatePublicationAssets(request);
       if (client) this.operationRecords?.publicationAccepted(request, hash, client, invocation);
-      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, state, delivery_policy)
-        VALUES (?, ?, ?, ?, ?, 'queued', ?)`, request.request_id, request.job_id, request.show_id, hash, source, sqliteDeliveryPolicy(request));
+      const feedGeneration = reserveSqliteFeedGeneration(this.storage, { kind: "publication", id: request.job_id,
+        showId: request.show_id, requestSha256: hash });
+      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, feed_generation, state, delivery_policy)
+        VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)`, request.request_id, request.job_id, request.show_id, hash, source, feedGeneration, sqliteDeliveryPolicy(request));
       await this.schedule();
       return this.statusRow(this.byJob(request.job_id));
     });
@@ -274,6 +278,20 @@ export class SqlitePublicationQueue {
         current.worker_version_id === next.worker_version_id || snapshot.state !== "paused" || !snapshot.drained) throw new Error("SQLite runtime change requires compatible drained maintenance");
       if (apply() !== undefined) throw new Error("SQLite runtime preparation must be synchronous");
       this.storage.sql.exec("UPDATE publication_service SET worker_version_id = ? WHERE id = 1", next.worker_version_id);
+      await this.storage.setAlarm(this.now());
+    });
+    this.runtime = next;
+  }
+
+  async changeConfiguration(input: SqlitePublicationRuntime, previous: SqlitePublicationRuntime, apply: () => undefined): Promise<void> {
+    const next = sqlitePublicationRuntimeSchema.parse(input);
+    await this.storage.transaction(async () => {
+      const current = this.requireRuntime(), snapshot = this.snapshot();
+      if (JSON.stringify(this.identity()) !== JSON.stringify(sqlitePublicationRuntimeSchema.parse(previous)) ||
+        current.service_id !== next.service_id || current.service_config_sha256 === next.service_config_sha256 ||
+        current.worker_version_id === next.worker_version_id || snapshot.state !== "paused" || !snapshot.drained) throw new Error("Configuration change requires its exact paused drained preparation");
+      if (apply() !== undefined) throw new Error("Configuration activation must be synchronous");
+      this.storage.sql.exec("UPDATE publication_service SET worker_version_id = ?, service_config_sha256 = ? WHERE id = 1", next.worker_version_id, next.service_config_sha256);
       await this.storage.setAlarm(this.now());
     });
     this.runtime = next;

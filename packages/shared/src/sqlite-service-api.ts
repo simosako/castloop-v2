@@ -12,6 +12,8 @@ export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protoc
   feed_storage: z.literal("immutable-generation-v1"),
   cover_storage: z.literal("immutable-generation-v1"),
   publication_read_boundary: z.literal("show-episode-v1"),
+  feed_generation_allocator: z.literal("reservation-v1"),
+  domain_changes: z.literal("sqlite-domain-change-v1"),
   scope: z.enum(["service", "show"]).optional(), show_id: sqliteRegistrationSchema.shape.show_id.optional(),
   show_count: z.number().int().nonnegative().optional(), paused_shows: z.number().int().nonnegative().optional(),
   maintenance_operation_id: z.uuid().nullable().optional(),

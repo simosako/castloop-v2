@@ -3,6 +3,13 @@ import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
+  domain: { usage: "domain add HOSTNAME --zone-id ZONE_ID [--operation-id UUID] | remove [--operation-id UUID] | list | status UUID [--cursor SHOW_ID] | continue UUID",
+    description: "Manage one dedicated custom subdomain in the same account's active/full Cloudflare DNS zone. Registrar transfer is not required.\n" +
+      "add/remove require every Show explicitly paused and drained. They redeploy the same Worker with a new canonical origin, regenerate Feeds and purge caches; finish paused.\n" +
+      "Public workers.dev URLs redirect to the custom domain (Feed 301, cover/audio 307) only after explicit Show Resume. Administration remains on workers.dev.\n" +
+      "list/status are read-only. continue may perform unstarted mutations using exact acknowledged evidence; unknown PUT/POST/DELETE outcomes are never replayed or adopted.\n" +
+      "Do not change this hostname's DNS or Worker domain connections with other tools during a domain operation. Certificates are retained on remove.\n" +
+      "Removing a domain cannot undo feed URLs saved by podcast apps. Preserve the workspace and journals on interruption; no automatic Resume or rollback." },
   doctor: { usage: "doctor [--local] [--workspace PATH] [--json]", description: "Compact offline checks with no writes, key generation, networking or repairs. Warnings alone exit 0; failed checks exit 1. Credential presence is not validity." },
   template: { usage: "template service-config|show|episode", description: "Print an embedded example TOML without IO or registration. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
   "preview-show": { usage: "preview-show ID", description: "Read-only local metadata, staged asset hashes and base identity. Does not fetch published full content or check remote readiness. Review input_fingerprint and use publish-show --expect-preview HASH." },
@@ -195,6 +202,7 @@ export function commandOptions(command: string): Record<string, "string" | "bool
   const byCommand: Record<string, Record<string, "string" | "boolean">> = {
     init: { "publication-protocol": "string", "service-id": "string", "account-id": "string", "bucket-name": "string", "workers-subdomain": "string", "operation-id": "string" },
     "create-show": { "site-url": "string" }, deploy: { "operation-id": "string" }, schema: { format: "string" },
+    domain: { "zone-id": "string", "operation-id": "string", cursor: "string" },
     "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
     "operation-list": { show: "string", local: "boolean", remote: "boolean", incomplete: "boolean", cursor: "string", parent: "string" },
     "operation-status": { show: "string", local: "boolean", remote: "boolean", "after-version": "string", "request-cursor": "string" },
