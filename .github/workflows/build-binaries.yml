@@ -74,7 +74,7 @@ jobs:
           chmod +x castloop-linux-x64
           test "$(./castloop-linux-x64 --version)" = "$expected_version"
           ./castloop-linux-x64 --help | grep -F 'Usage: castloop'
-          for command in init create-show create-episode update-show publish-show update-episode update-episode-audio publish-episode job-status service-status show-status show-pause show-resume deploy init-continue-verification update-service-verify update-service-reconcile preview-show-lifecycle preview-episode-lifecycle lifecycle-execute list-shows list-episodes import-rss publish-rss-import; do
+          for command in init create-show create-episode update-show publish-show update-episode update-episode-audio publish-episode job-status service-status show-status show-pause show-resume deploy domain init-continue-verification update-service-verify update-service-reconcile preview-show-lifecycle preview-episode-lifecycle lifecycle-execute list-shows list-episodes import-rss publish-rss-import; do
             ./castloop-linux-x64 "$command" --help | grep -F "Usage: castloop $command"
           done
           ./castloop-linux-x64 init --help | grep -F 'no protocol option is required'
@@ -83,7 +83,7 @@ jobs:
             exit 1
           fi
           grep -F 'Usage: castloop list-episodes SHOW_ID' list-episodes-error.txt
-          for command in domain retry-job release-job lifecycle-retry update-service-continue local-operation-status service-pause service-resume; do
+          for command in retry-job release-job lifecycle-retry update-service-continue local-operation-status service-pause service-resume; do
             if ./castloop-linux-x64 "$command" --help > removed-command-error.txt 2>&1; then
               exit 1
             fi

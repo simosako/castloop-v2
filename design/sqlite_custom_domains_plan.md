@@ -1,6 +1,6 @@
 # Issue #68: SQLite方式の独自ドメイン対応計画
 
-作成日: 2026-10-24。状態: **P0〜P6のローカル実装・検証完了。未リリース、P7実機確認は未実施・別承認。外部同時変更は想定外として制約を記録する方針を管理者確認済み。** [P0の根拠・採用契約](sqlite_custom_domains_p0.md)を参照する。
+作成日: 2026-10-24。状態: **Issue #68の合意範囲を実装・検証済み。P0〜P6のローカル検証とP7の2 Show小規模総合実機確認が完了、未リリース。外部同時変更は想定外とする確認済み制約を維持する。** 完了判定は§13、[P0の採用契約](sqlite_custom_domains_p0.md)、[実機結果と限界](sqlite_custom_domain_two_show_verification_20261024.md)を参照する。
 対象Issue: [#68](https://github.com/simosako/castloop-v2/issues/68)。調査基点: v0.7.2 / commit `72bc9f084c3a8ec6b4532d2b4833ac9a47735932`。
 
 本書は開発範囲・契約・実装順と検証範囲を記録する。利用手順は[開発版ガイド](../docs/sqlite_custom_domains.md)を参照する。配布済みv0.7.2の対応範囲は変更しない。本書の承認も、実Cloudflareへの配備・公開・Resume・DNS/domain/権限/課金変更・削除・証跡cleanupの承認にはしない。
@@ -314,26 +314,26 @@ castloop domain remove --operation-id UUID --workspace PATH
 
 続く[第9環境の2 Show小規模総合機能確認](sqlite_custom_domain_two_show_verification_20261024.md)は製品コードを変えず成功した。64 CLI操作、正規配信11組、redirect12件、private/admin拒否10件、Pauseの503確認120件、日付条件304確認33件、不変履歴8 objectsのhash保持を記録した。code-only deployとremoveのnative待機は成功receiptから続行し、再配備/未知mutation再送なし。以前の8環境と無関係なDNS等は不変。最終両Show paused/ready/drained、接続なし、保守なし。
 
-## 10. 受け入れ条件と試験
+## 10. 試験観点と検証境界
 
-第9環境で小規模通常機能は合格した。以下は故障注入・全状態・全組合せまで含む広い受け入れ項目であり、小規模試験だけで一括完了にはしない。ローカルの実施範囲・証拠は§9.2、今回実機で確認した範囲と未確認事項は[2 Show確認記録](sqlite_custom_domain_two_show_verification_20261024.md)を参照する。
+第9環境で小規模通常機能は合格した。以下は実装時に整理した広い試験観点で、すべての組合せの実機測定を要求する未完了タスク一覧ではない。Issue本文の必須受け入れ条件と証拠は§13に対応付ける。ローカルの実施範囲は§9.2、実機確認と未確認事項は[2 Show確認記録](sqlite_custom_domain_two_show_verification_20261024.md)を参照し、故障注入のローカル成功をnative性能/全Free適合等の証明へ読み替えない。
 
-- [ ] 接続・照会・切断・状態確認・限定続行の契約とfresh専用境界があり、旧Queue/layoutへfallbackしない。
-- [ ] 正規originのFeed/cover/audioでGET/HEAD/Range/ETag/日付条件が動作する。旧workers.devの許可済み公開URLは同じパスの独自domainへ転送し、転送先で同じHTTP機能が動作する。独自domain未接続・切断後はworkers.devが本文を配信する。
-- [ ] redirectの対象/status/Location/cache方針を確定し、転送ループ・任意転送先・query/資格情報漏洩を防ぐ。管理API・未知origin・内部/未承認パスをredirectしない。
-- [ ] 管理鍵/token/cookieが独自domain・redirect先・cache ownerへ漏れない。TLS検証を省略しない。
-- [ ] 両originのcold/warm cacheと条件付き要求でも、Pause/readiness/保守/非公開/lifecycle/blockedのgateを維持する。許可前に3xx/Locationを返さず、停止中はredirectしない。
-- [ ] 複数Show、Show 0件、Episode 0件、非公開Show/Episode、draft、保存済み過去revisionを含め、GUID/日時/audio/cover/revision履歴が不変である。
-- [ ] 新Feed内の自己参照/画像/音源は目標originで、保存済みrevision本文は不変。hostname長増加を含む生成予算を守る。
-- [ ] 通常publish/lifecycle/domain切替のFeed世代が衝突せず、遅い旧PUT/fillを新世代へ採用しない。
-- [ ] Feed保存・purge・SQL commitの各境界で故障注入し、purge失敗を再書込で隠さず、完了・Resumeを誤許可しない。
-- [ ] 共有deploy/domain変更/Show登録/個別Resumeの競合、部分prepare/activation/probe/解除、再生成・Alarm再配送を試験する。
-- [ ] DNS/TLS未準備、REST/native反映待ち、pagination途中失敗、別Worker/DNS/routesとの競合を正しく停止・表示する。
-- [ ] PUT/POST/DELETEの送信前後・成功応答保存前後・本文喪失・不正応答・lock残存を試験し、未知結果を再送しない。
-- [ ] R2/Worker/DO/ローカルの部分同期を区別し、ローカルの無関係な編集を上書きしない。成功済みreceiptも勝手に置換しない。
-- [ ] 切断前に全Feed/設定をworkers.devへ戻し、切断対象を正確に照合する。切断後の新規要求にredirectを返さず、購読アプリが記憶した301の取り消しは保証しないことを案内する。証明書や既存DNSの個別削除を行わない。
-- [ ] 独自domain設定後の通常publish/restore/RSS公開検証/code-only deployを確認し、接続や既存mediaを保持する。
-- [ ] 単一配布CLIのhelp/describe/JSON/正式コマンド経路から一連の操作を検証できる。
+- 接続・照会・切断・状態確認・限定続行の契約とfresh専用境界があり、旧Queue/layoutへfallbackしない。
+- 正規originのFeed/cover/audioでGET/HEAD/Range/ETag/日付条件が動作する。旧workers.devの許可済み公開URLは同じパスの独自domainへ転送し、転送先で同じHTTP機能が動作する。独自domain未接続・切断後はworkers.devが本文を配信する。
+- redirectの対象/status/Location/cache方針を確定し、転送ループ・任意転送先・query/資格情報漏洩を防ぐ。管理API・未知origin・内部/未承認パスをredirectしない。
+- 管理鍵/token/cookieが独自domain・redirect先・cache ownerへ漏れない。TLS検証を省略しない。
+- 両originのcold/warm cacheと条件付き要求でも、Pause/readiness/保守/非公開/lifecycle/blockedのgateを維持する。許可前に3xx/Locationを返さず、停止中はredirectしない。
+- 複数Show、Show 0件、Episode 0件、非公開Show/Episode、draft、保存済み過去revisionを含め、GUID/日時/audio/cover/revision履歴が不変である。
+- 新Feed内の自己参照/画像/音源は目標originで、保存済みrevision本文は不変。hostname長増加を含む生成予算を守る。
+- 通常publish/lifecycle/domain切替のFeed世代が衝突せず、遅い旧PUT/fillを新世代へ採用しない。
+- Feed保存・purge・SQL commitの各境界で故障注入し、purge失敗を再書込で隠さず、完了・Resumeを誤許可しない。
+- 共有deploy/domain変更/Show登録/個別Resumeの競合、部分prepare/activation/probe/解除、再生成・Alarm再配送を試験する。
+- DNS/TLS未準備、REST/native反映待ち、pagination途中失敗、別Worker/DNS/routesとの競合を正しく停止・表示する。
+- PUT/POST/DELETEの送信前後・成功応答保存前後・本文喪失・不正応答・lock残存を試験し、未知結果を再送しない。
+- R2/Worker/DO/ローカルの部分同期を区別し、ローカルの無関係な編集を上書きしない。成功済みreceiptも勝手に置換しない。
+- 切断前に全Feed/設定をworkers.devへ戻し、切断対象を正確に照合する。切断後の新規要求にredirectを返さず、購読アプリが記憶した301の取り消しは保証しないことを案内する。証明書や既存DNSの個別削除を行わない。
+- 独自domain設定後の通常publish/restore/RSS公開検証/code-only deployを確認し、接続や既存mediaを保持する。
+- 単一配布CLIのhelp/describe/JSON/正式コマンド経路から一連の操作を検証できる。
 
 ローカルは既存のBun SQLite・模擬R2/Cache/Cloudflare RESTと独立CLI processを使う。実機のDNS/TLS・Custom Domain API応答・native rollout・DO output gate・Workers Cache purge・性能/Free適合の証明とは分ける。コードを変更した段階では`bun test`・型検査・影響するCLI buildを実行する。
 
@@ -363,6 +363,23 @@ castloop domain remove --operation-id UUID --workspace PATH
 | 実装開始の区切り | **確認済み**: P0で詳細化し、Cloudflare APIの非上書き条件等に未解決があれば再レビューしてからP1以降へ進める |
 
 停止手順とredirectを実装する方向は管理者確認済みで、開発開始の指示を受けた。P0でFeed 301・cover/audio 307を実装契約とする。APIの外部同時変更は想定外として制約を記録し、開発を進める判断を確認済み。確認済み項目まで再承認を求め直したり、未記載のAPI原子性を保証したりしない。
+
+## 13. Issue #68の完了判定
+
+Issue本文の受け入れ条件6件について、実装とローカル故障注入・正式CLI試験、および承認された2 Show実機試験を照合した。合意した初期範囲の必須未実装・未検証は残っていない。
+
+| Issueの条件 | 証拠 |
+| --- | --- |
+| 設定/接続/照会/切断/途中状態の契約と対応範囲 | sharedのstrict domain要求、専用CLI/journal/DO契約、[利用ガイド](../docs/sqlite_custom_domains.md)。fresh専用・1サービス1専用subdomain、未知資源非採用 |
+| 許可originのGET/HEAD/Range/ETag、未知origin/公開管理API拒否 | `src/sqlite-gateway.test.ts`と2 Show実機。両originの境界、301/307、日付条件も確認 |
+| 非公開/Pause/readiness/blocked gateとstaging非公開 | gateway/既存配信のローカル回帰、`sqlite-domain-runtime.test.ts`のblocked拘束、実機の非公開/個別Pause/停止120要求・private/admin404 |
+| GUID/日時/音源/revision履歴保持 | `sqlite-domain-operation.test.ts`、`sqlite-feed-generations.test.ts`、実機のGUID/日時/hash・8不変objects・新revision保持 |
+| TLS/応答喪失/部分同期/purge/共有更新競合 | `sqlite-domain-operation.test.ts`のunknown非再送・保存失敗・部分同期、`sqlite-domain-runtime.test.ts`のpurge/中断/共有排他、実機のTLS/native待ちと成功checkpointからの限定続行 |
+| 現行文書・feature template更新 | README、利用/設計/agent/Skill、CHANGELOG Unreleased、feature template、CIのdomain help/describe/binary smoke |
+
+RSS公開の独自origin照合は`sqlite-rss-publication.test.ts`でローカル確認済み。RSSの実機公開、ネイティブ障害注入、内部cache hit/miss、性能/全Free適合、全負荷/全組合せは追加検証の範囲で、対応済み・保証済みとは表示しない。リリース/tag/追加配備・旧環境cleanupはPR/mainマージとは別であり、この完了判定から実行しない。
+
+最終確認で、CIの旧「domainは削除済み」期待値を対応済みコマンドへ修正し、空PATHの単体バイナリsmokeへdomainのhelp全5操作・describe/option検査を追加した。`bun test`は**666 pass / 0 fail、76 files、84.02秒**、型検査・Linux CLI build・実workflowのentrypoint shell再現・単体agent smoke・diff検査が成功。製品runtimeは2 Show実機確認から変更しておらず、追加のCloudflare操作は行っていない。
 
 ## 参照
 

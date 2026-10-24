@@ -17,6 +17,14 @@ try {
     return child.stdout;
   }
   assert.equal(JSON.parse(run(["describe", "--json"])).contract_version, 1);
+  const domain = JSON.parse(run(["describe", "domain", "--json"])).commands[0];
+  assert.equal(domain.command, "domain");
+  assert.equal(domain.options["zone-id"], "string");
+  assert.equal(domain.options["operation-id"], "string");
+  assert.equal(domain.options.cursor, "string");
+  for (const action of ["add", "remove", "list", "status", "continue"]) {
+    assert.match(run(["domain", action, "--help"]), /Usage: castloop domain/);
+  }
   for (const name of ["service-config", "show-input", "episode-input", "result"]) {
     assert.equal(JSON.parse(run(["schema", name])).additionalProperties, false);
   }
