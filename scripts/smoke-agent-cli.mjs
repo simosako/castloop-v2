@@ -6,13 +6,24 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const isWindows = process.platform === "win32";
+const defaultBinary = isWindows ? "dist/castloop-windows-x64.exe" : "dist/castloop";
 const root = mkdtempSync(join(process.env.CASTLOOP_TEST_TMP ?? tmpdir(), "castloop-binary-agent-"));
 try {
-  const binary = join(root, "castloop");
-  copyFileSync(resolve(process.argv[2] ?? "dist/castloop"), binary);
+  const binary = join(root, isWindows ? "castloop.exe" : "castloop");
+  copyFileSync(resolve(process.argv[2] ?? defaultBinary), binary);
   const work = join(root, "empty"); mkdirSync(work);
+  // Windows child processes cannot start without the system variables; PATH
+  // stays empty on every platform so no external program can be resolved.
+  const env = isWindows
+    ? {
+        PATH: "", HOME: work,
+        SystemRoot: process.env.SystemRoot ?? "", SystemDrive: process.env.SystemDrive ?? "C:",
+        COMSPEC: process.env.COMSPEC ?? "", TEMP: process.env.TEMP ?? "", TMP: process.env.TMP ?? "",
+      }
+    : { PATH: "", HOME: work };
   function run(args, expected = 0) {
-    const child = spawnSync(binary, args, { cwd: work, env: { PATH: "", HOME: work }, encoding: "utf8" });
+    const child = spawnSync(binary, args, { cwd: work, env, encoding: "utf8" });
     assert.equal(child.status, expected, child.stderr || child.stdout);
     return child.stdout;
   }
