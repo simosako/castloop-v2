@@ -30,6 +30,8 @@ Detachの公開成功形式はHTTP 200の`success: true`、`errors`、`messages`
 
 Worker domainの`id`はaccount/Zone/namespaceの32桁IDとは別のopaque識別子として扱う。公開Get仕様はstringで固定長を定義しておらず、上記実機の読取一覧では40文字だった。長さ1〜256、英数字・`_`・`-`の安全なpath segmentを許容し、GET/DELETEではURL encodeする。IDの切り詰め・変換や別IDの同一視はしない。接続PUTの成功receiptを保存できなかった初回環境は、このparser修正後も読取状態から採用・昇格しない。[初回停止記録](sqlite_custom_domain_live_verification_20261024.md)を参照する。
 
+[再試験](sqlite_custom_domain_live_retest_20261024.md)もreceipt検証で停止し、GETで見える接続が修正版schemaに適合しても元PUTの成功へ昇格しない。ID修正だけで解消したとは扱わない。次の切り分け用に`domain_connection_unverified`とallowlist済みfield名/codeだけの診断を追加し、値・未知field名・任意例外文は出さない。診断追加は応答の受け入れ条件や復旧許可を変えない。
+
 ### 2.2 Cloudflareの公開ソースにある別経路
 
 [workers-sdkの固定commit `e651d7c0dd8e171dcc1820679f9f46601971d876`の`publishCustomDomains()`](https://github.com/cloudflare/workers-sdk/blob/e651d7c0dd8e171dcc1820679f9f46601971d876/packages/deploy-helpers/src/triggers/publish-routes.ts)を確認した。

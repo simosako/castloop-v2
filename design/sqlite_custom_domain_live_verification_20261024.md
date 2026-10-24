@@ -1,5 +1,7 @@
 # SQLite独自ドメインの初回実機確認・停止記録（2026-10-24）
 
+後に別途承認された[別hostname・fresh環境での再試験](sqlite_custom_domain_live_retest_20261024.md)も接続receipt検証で停止した。以下のID制限修正だけで元の問題が解消したとは扱わず、原因は未確定のまま保持する。
+
 ## 結論
 
 **受け入れ未完了。接続PUT後の成功receipt検証で停止し、後続mutationは行っていない。** 新規隔離環境の初期化、2 Show・各1 Episodeの公開と通常配信、個別Pause/drainまでは成功した。接続後の読取一覧では40文字のWorker domain IDが見えたが、実装が32桁に限定していた。元PUTの成功receiptは保存されていないため、そのGETを接続完了の証拠として採用していない。

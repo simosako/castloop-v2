@@ -302,7 +302,7 @@ castloop domain remove --operation-id UUID --workspace PATH
 - `packages/cli/src/sqlite-domain-entrypoint.test.ts`: 別processの正式CLIからadd/TLS中断/continue/list/status/Resume/通常公開/Pause/remove、JSONと秘密非出力。通信はloopbackの模擬transportへ限定。
 - `packages/cli/src/sqlite-rss-publication.test.ts`: 独自originでRSS公開後のFeed検証と元GUID/permalink/日時の保持。
 
-上記は実機承認前のローカル検証結果である。後の実機試行で確認したAPI差異への修正・未知receipt非採用の回帰追加後は**636 pass / 0 fail、76 files**、型検査・Linux CLI build成功。別途承認された実機の部分結果と停止状態は[記録](sqlite_custom_domain_live_verification_20261024.md)へ分けて残す。全API応答差異、native rollout、DO output gate、全cache/purge、性能/全Free適合、300MBをローカル合格で証明したとは扱わない。
+上記は実機承認前のローカル検証結果である。後の実機試行で確認したAPI差異への修正・未知receipt非採用・秘密を出さないfield診断の回帰追加後は**637 pass / 0 fail、76 files**、型検査・Linux CLI build成功。別途承認された[初回](sqlite_custom_domain_live_verification_20261024.md)・[再試験](sqlite_custom_domain_live_retest_20261024.md)ともreceipt検証で停止し、原因未確定。全API応答差異、native rollout、DO output gate、全cache/purge、性能/全Free適合、300MBをローカル合格で証明したとは扱わない。
 
 ## 10. 受け入れ条件と試験
 

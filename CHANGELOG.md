@@ -7,7 +7,7 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 ## Unreleased
 
 - Issue #68: one dedicated custom subdomain for fresh SQLite services, separate management/public origins, gated Feed 301 and cover/audio 307 redirects, and explicit add/list/status/continue/remove with acknowledged mutation checkpoints. See the [scope and limitations](docs/sqlite_custom_domains.md).
-- Requires new internal queue/content schemas 6/7, independent immutable Feed generation reservations and matching health identifiers. No old-service/DB/journal migration or resource adoption. Native Cloudflare acceptance remains incomplete: the [first live trial](design/sqlite_custom_domain_live_verification_20261024.md) stopped after an unverified attachment response. Fix native empty-list envelopes and opaque domain IDs without adopting the uncertain operation; no automatic deployment, Resume, rollback or certificate cleanup.
+- Requires new internal queue/content schemas 6/7, independent immutable Feed generation reservations and matching health identifiers. No old-service/DB/journal migration or resource adoption. Native Cloudflare acceptance remains incomplete: the [first trial](design/sqlite_custom_domain_live_verification_20261024.md) and [retest](design/sqlite_custom_domain_live_retest_20261024.md) stopped after unverified attachment receipts; the cause is unresolved. Fix native empty-list envelopes and opaque domain IDs, and add allowlisted receipt-validation diagnostics without adopting uncertain operations; no automatic deployment, Resume, rollback or certificate cleanup.
 
 ## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
 
