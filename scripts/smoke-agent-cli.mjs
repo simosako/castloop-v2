@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -8,7 +8,10 @@ import { fileURLToPath } from "node:url";
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const isWindows = process.platform === "win32";
 const defaultBinary = isWindows ? "dist/castloop-windows-x64.exe" : "dist/castloop";
-const root = mkdtempSync(join(process.env.CASTLOOP_TEST_TMP ?? tmpdir(), "castloop-binary-agent-"));
+// macOS os.tmpdir() sits under /var -> /private/var; resolve the workspace to
+// its real path so platform ancestor symlinks do not trip the Skill export
+// destination check, which rejects symlinked path components by design.
+const root = realpathSync(mkdtempSync(join(process.env.CASTLOOP_TEST_TMP ?? tmpdir(), "castloop-binary-agent-")));
 try {
   const binary = join(root, isWindows ? "castloop.exe" : "castloop");
   copyFileSync(resolve(process.argv[2] ?? defaultBinary), binary);

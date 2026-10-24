@@ -30,6 +30,8 @@ Issue #73により、releaseには従来のLinux x86-64に加えて、macOS（Ap
 
 **macOS・Windowsで未確認（本配布時点）:** 模擬Cloudflareを使う結合試験、同一workspaceへの同時実行と強制終了時のlock解放、日本語・空白を含むpathやsymlink/junctionを絡めた回帰、実機・実ネットワークでのTLS/DNS経路とRSS download、実Cloudflareでの管理操作全般。これらを実施する場合は、対象と範囲を別途承認の上で行い、結果を文書化すること。`O_NOFOLLOW`等のfile検査はWindowsではOS非対応のためno-opになる可能性があり、実効性はOSごとに異なる。
 
+native検証で判明した挙動: macOS runnerの初回smokeで、`os.tmpdir()`配下（`/var`→`/private/var`という祖先symlink経由のpath）への`skill export`が`unsafe_destination`で拒否されることを確認した。これはsymlink化されたpath構成要素への書込みを拒否する**設計どおりの安全検査**であり、実際の利用では実パスのworkspace配下へexportするため影響はない。smoke側は実パスへ解決した作業ディレクトリを使って検証する。
+
 ## 4. 署名・notarizationとOSの警告
 
 配布バイナリは**いずれも無署名**である（macOS codesign/notarizationなし、Windows Authenticode署名なし）。証明書の購入や警告の恒久的な無効化は前提にしない。
