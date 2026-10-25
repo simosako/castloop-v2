@@ -1,5 +1,81 @@
 # Agent Guide for castloop
 
+## Engineering principles: evidence-driven simplicity
+
+Prefer the simplest correct implementation that satisfies the actual requirements. Optimize for correctness, clarity, maintainability, and minimal complexity, not hypothetical robustness or speculative future needs. Every added abstraction, defensive check, dependency, or layer of indirection must justify its complexity.
+
+**Complexity is a cost, not a sign of engineering quality.** These principles do not override the project-specific safety boundaries, documented invariants, or required checks below.
+
+### 1. Implement only what is required
+- Implement the requested behavior, not imagined future requirements.
+- Follow existing codebase conventions and reuse existing mechanisms.
+- Prefer small, focused changes and direct, readable code over broad refactoring or unnecessarily abstract designs.
+- Do not introduce frameworks, architectural layers, wrappers, factories, interfaces, configuration options, or dependencies without a concrete need.
+- Do not generalize code for hypothetical reuse or create helpers or classes merely to make short, straightforward code appear more structured.
+
+### 2. Evidence-based defensive programming
+Add defensive logic only when justified by at least one of:
+- An explicit requirement or documented invariant.
+- A realistic failure mode supported by the current architecture.
+- An observed bug or test failure.
+- A concrete security threat crossing a trust boundary.
+- A well-established correctness requirement of the language, runtime, or API.
+
+A theoretically possible failure alone is not sufficient justification. In particular:
+- Do not add redundant validation for values already guaranteed by types, contracts, or trusted internal callers, or multiple validation layers for the same invariant without justification.
+- Do not add speculative fallbacks, retries, timeouts, or recovery mechanisms.
+- Do not swallow exceptions or turn unexpected failures into apparent success.
+- Do not add compatibility logic for unsupported or imaginary environments.
+- Do not add concurrency controls without a credible concurrent execution path and a concrete shared-state risk.
+- Do not add defensive branches for impossible states unless the invariant is genuinely untrusted or externally controlled.
+
+Mention an unjustified hypothetical edge case briefly only when materially relevant; do not implement code for it.
+
+### 3. Concurrency and security
+Assess concurrency and security risks using the actual execution model and trust boundaries.
+
+Before adding concurrency protection, identify:
+- Which operations can execute concurrently.
+- Which mutable state or resource they share.
+- What concrete failure could occur.
+- Why existing mechanisms are insufficient.
+
+Before adding security-specific complexity, identify:
+- The trust boundary.
+- The attacker-controlled input or capability.
+- The plausible exploit or failure.
+- The smallest effective mitigation.
+
+Never remove or bypass established security controls, required authorization, input validation at trust boundaries, or essential data-integrity guarantees merely to simplify code.
+
+### 4. Scope and change discipline
+- Make the smallest coherent change that fully resolves the task.
+- Preserve existing behavior unless a change is explicitly requested; do not refactor unrelated code.
+- Do not add dependencies without a clear benefit.
+- Do not create speculative extension points or implement unrequested features.
+- Prioritize tests for realistic behavior, regressions, and documented requirements, not imaginary scenarios.
+- If a broader change is genuinely necessary, explain why before expanding the scope.
+
+### 5. Implementation decision rule
+For each proposed abstraction, defensive mechanism, or architectural addition, ask:
+1. What concrete requirement or realistic failure does this address?
+2. What evidence shows the problem is relevant here?
+3. Can the same goal be achieved with less code or fewer moving parts?
+4. Would removing this mechanism compromise correctness, security, or a documented requirement?
+
+If there is no convincing justification, omit the mechanism. Prefer proven simplicity over speculative completeness.
+
+### 6. Verification
+- Run the relevant existing checks as specified in "Repository and checks" below.
+- Verify the requested behavior and realistic failure paths; do not expand the implementation merely to satisfy hypothetical test cases.
+- Before finishing, review the diff for unnecessary abstractions, defensive branches, dependencies, and unrelated changes. Remove unjustified complexity discovered during that review.
+
+### 7. Communication
+- Clearly distinguish observed facts from assumptions and hypothetical concerns; do not present speculative risks as established problems.
+- Explain significant implementation trade-offs concisely.
+- Mention an unaddressed, low-probability edge case outside the requirements only when materially relevant.
+- Prefer working, straightforward code over elaborate explanations or defensive implementations.
+
 ## Repository and checks
 - `packages/cli/src/`: the Bun single-executable CLI; `packages/shared/src/`: shared utilities; `src/`: Cloudflare Worker services.
 - Run `bun test` and `npm run check` for automated tests and TypeScript validation. Skip both for documentation-only or other changes that do not affect code, builds, or runtime behavior.
