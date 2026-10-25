@@ -51,4 +51,15 @@ Issue #71（Episode別・日別の配信統計）の実装（main統合前の実
 
 - 保持期限による実際の削除（400日/90日経過）と追い込み削除・`pruned` 表示・`lifetime` 合算の実地確認は行っていない（ローカルテストでのみ検証）。
 - 音声差し替え（新audio revision）・非公開化中の404/503・大規模アクセスでのDO書込み行数・CPUへの実影響は未測定。Workers Free枠の実課金行数は未確認。
-- テスト環境 `stats71r1`（Worker・bucket・DO namespace）とローカルworkspace `/tmp/opencode/castloop-stats71-live` は本検証の時点で残置。削除には別途管理者の指示を要する。
+- テスト環境 `stats71r1`（Worker・bucket・DO namespace）とローカルworkspace `/tmp/opencode/castloop-stats71-live` は検証時は保持していたが、PR #84のmerge後に管理者の明示承認を受けて2026-10-25に削除した（次節参照）。
+
+## 環境削除（2026-10-25）
+
+管理者がPR #84のmainへのmergeと実環境削除を承認したため、`issue71-cleanup.ts`（`.local-test-data/`内、証跡: `results/20261025-issue71-live/cleanup/`）により削除した。手順は従来の環境削除（i67live等）と同じ規律である:
+
+- 事前検証: workspace設定と対象3資源（Worker・bucket・namespace）の一致、保護環境（`sq16r-6ec01dc6`のWorker・namespace・bucket）の存在、他Workerからの参照なし、custom domain・routeなし（zone一覧はtoken権限で読み取り不可を記録）、service healthがdrained・queued 0・activeなし・setup readyであることをraw応答で確認。本環境は公開Showを含むためstateは`open`のまま廃棄した（全公開操作はsucceeded済みで、配信中であることは削除の障害ではない）。
+- backup: bucket内28 object（5,970,971 bytes）を全量downloadし、size・ETag(MD5)・sha256を検証の上`objects/`に保存。backup前後のobject一覧fingerprintが不変であることを確認。ローカルworkspace（`castloop.toml`・`.castloop/` journals・draft TOML）も`workspace/`へ退避。
+- 削除: allowlist検証付きのDELETE 3件（object一括 → bucket → Worker。namespaceはWorker削除で消滅）。journalに要求と応答を記録。
+- 事後検証: Worker settings・bucketが404、namespace一覧から消失、管理health endpointと公開feed URLが応答なし、保護環境の3資源がすべて残存。
+
+削除結果（`disposal-result`）: worker `castloop-stats71r1-b4c96324`、bucket `castloop-stats71r1`、namespace `49c9a82a83a74aba884cd7418a5b015b`、object 28件を削除。資源名の再利用はしない。証跡・backup・退避workspaceは保持する。
