@@ -1,5 +1,7 @@
 # 設計文書の案内
 
+v0.7.5はIssue #64の公開済み差分・revision履歴・過去版採用を追加する。内部queue/content形式**7/8**の新規環境専用で、v0.7.4の7/7を含む既存環境は変換しない。[リリースノート](../docs/release-v0.7.5.md)と[公開内容の確認ガイド](../docs/published_content_review.md)を優先し、以下の旧形式・開発時点の記録と区別する。実CloudflareでのCPU・無料枠適合は未検証である。
+
 Issue #66の未リリース開発版は[受付停止と配信停止の分離](show_admission_delivery_separation_plan.md)を採用し、内部queue/content形式を**7/7**にした。変更番号と操作ID別の結果保存、GETによる結果照会を実装した。ローカル693試験・型検査・Linux単体CLIとオフライン試験が成功。実Cloudflare操作は未実施で、旧形式は変換しない。Worker更新中の配信継続は対象外であり、以下のIssue #68の6/7環境での実機結果を新機能の実証へ流用しない。[停止・再開の利用ガイド](../docs/show_availability.md)参照。
 
 未リリースのIssue #68開発では、fresh専用の内部queue/content形式を6/7へ変更し、SQLite独自subdomainと旧workers.dev公開URLのredirectを追加する。旧5/6環境の移行・採用はしない。[反復試験](sqlite_custom_domain_iterative_verification_20261024.md)の応答修正後、[第9環境の2 Show総合機能試験](sqlite_custom_domain_two_show_verification_20261024.md)で公開・独自origin配信・redirect・個別Pause・更新/復元・通常deploy・切断復帰・履歴保持を確認した。両Show paused/ready/drainedで終了。RSS・故障注入・内部cache状態・性能/全Free適合等の未確認範囲は同記録と[計画](sqlite_custom_domains_plan.md)で区別する。

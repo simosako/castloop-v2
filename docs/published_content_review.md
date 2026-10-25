@@ -1,6 +1,6 @@
 # 公開内容の差分確認と過去版の採用
 
-Issue #64の開発版向け。対応版で新規初期化したservice schema 2 / `show-v1`、内部queue/content形式**7/8**、`revision_history="sqlite-revisions-v1"`が必要。旧環境の変換・R2履歴の事後採用は行わない。
+v0.7.5（Issue #64）向け。対応版で新規初期化したservice schema 2 / `show-v1`、内部queue/content形式**7/8**、`revision_history="sqlite-revisions-v1"`が必要。旧環境の変換・R2履歴の事後採用は行わない。
 
 ## 公開前の比較
 

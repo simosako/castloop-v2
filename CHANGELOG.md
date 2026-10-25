@@ -4,6 +4,10 @@ All notable changes are documented in per-version release notes. This file is an
 
 Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x and earlier were **removed in v0.6.0**. Entries below describe the release that introduced a feature and do not imply it exists in the current release. There is no migration feature from schema version 1.
 
+## v0.7.5 — [release note](docs/release-v0.7.5.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.5)
+
+- Issue #64: authenticated published/local/staged metadata and media comparisons, Show/Episode revision history, explicit saved-revision adoption without media reuploads, CLI-generated RSS previews, and non-overwriting metadata exports. Preview fingerprints bind the reviewed remote base; `progress` and `watch` also observe revision-adoption jobs. Requires fresh internal queue/content formats **7/8** and `revision_history="sqlite-revisions-v1"`; no migration or automatic deployment. See the [review guide](docs/published_content_review.md) and [approved design](design/published_diff_and_revision_restore_plan.md). Cloudflare CPU performance and full Free compatibility remain unverified.
+
 ## v0.7.3 — [release note](docs/release-v0.7.3.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.3)
 
 - Issue #68: one dedicated custom subdomain for fresh SQLite services, separate management/public origins, gated Feed 301 and cover/audio 307 redirects, and explicit add/list/status/continue/remove with acknowledged mutation checkpoints. See the [scope and limitations](docs/sqlite_custom_domains.md).
@@ -18,7 +22,7 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 - Issue #78: Zod updated to a patched version (resolved 4.6.7) for CVE-2023-54404/GHSA-mrhx-c7xc-m3w5; no castloop-specific exploitation reported and persisted formats unchanged. See the [update record](docs/zod_security_update_20261025.md).
 
 ## Unreleased
-- Issue #64: authenticated published/local/staged metadata and media comparisons, Show/Episode revision history, explicit saved-revision adoption without media reuploads, CLI-generated RSS previews, and non-overwriting metadata exports. Preview fingerprints bind the reviewed remote base; `progress` and `watch` also observe revision-adoption jobs. Requires fresh internal queue/content formats **7/8** and `revision_history="sqlite-revisions-v1"`; no migration or automatic deployment. See the [review guide](docs/published_content_review.md) and [approved design](design/published_diff_and_revision_restore_plan.md). Cloudflare CPU performance and full Free compatibility remain unverified.
+- None.
 
 ## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
 
