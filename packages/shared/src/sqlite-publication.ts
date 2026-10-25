@@ -36,12 +36,25 @@ export const sqlitePublicationRuntimeSchema = z.object({ service_id: slug(20), w
 
 export const sqlitePublicationRequestSchema = z.object({ schema_version: z.literal(1),
   protocol: z.literal(sqlitePublicationProtocol), service_id: slug(20), request_id: z.uuid(), job_id: z.uuid(),
-  action: z.enum(["publish", "unpublish", "restore"]), kind: z.enum(["show", "episode"]), show_id: slug(32), episode_id: slug(80).optional(),
+  action: z.enum(["publish", "unpublish", "restore", "restore_revision"]), kind: z.enum(["show", "episode"]), show_id: slug(32), episode_id: slug(80).optional(),
   worker_version_id: z.uuid(), service_config_sha256: hash, admission_window_id: z.uuid(),
   expected_show_state_version: counter, base_revision_id: z.uuid().optional(),
-  expected_episode_lifecycle_version: counter.optional(), payloads: z.array(sqliteVerifiedUploadSchema).max(2),
+  expected_episode_lifecycle_version: counter.optional(), target_revision_id: z.uuid().optional(),
+  payloads: z.array(sqliteVerifiedUploadSchema).max(2),
 }).strict().superRefine((value, context) => {
   const assets = value.payloads.map((payload) => payload.asset);
+  if (value.action === "restore_revision") {
+    if (assets.length || !value.target_revision_id ||
+      (value.kind === "show" ? value.episode_id !== undefined || value.base_revision_id !== undefined || value.expected_episode_lifecycle_version !== undefined || value.expected_show_state_version < 1 :
+        value.episode_id === undefined || value.base_revision_id === undefined || value.expected_episode_lifecycle_version === undefined)) {
+      context.addIssue({ code: "custom", message: "Revision restoration requests require an exact saved target, target revision and no uploads" });
+    }
+    return;
+  }
+  if (value.target_revision_id !== undefined) {
+    context.addIssue({ code: "custom", message: "Only revision restoration requests accept target_revision_id" });
+    return;
+  }
   if (value.action !== "publish") {
     if (assets.length || (value.kind === "show" ? value.episode_id !== undefined || value.base_revision_id !== undefined || value.expected_episode_lifecycle_version !== undefined :
       value.episode_id === undefined || value.base_revision_id === undefined || value.expected_episode_lifecycle_version === undefined)) {

@@ -163,7 +163,8 @@ export class SqliteShowService {
       await response.body?.cancel();
       return adminReply(this.health());
     }
-    if (path.startsWith("/admin/sqlite-service/targets/") && path.split("/")[4] !== this.showId) return adminReply({ error: "target_differs" }, 409);
+    if ((path.startsWith("/admin/sqlite-service/targets/") || path.startsWith("/admin/sqlite-service/content/") || path.startsWith("/admin/sqlite-service/content-inventory/") ||
+      path.startsWith("/admin/sqlite-service/revisions/")) && path.split("/")[4] !== this.showId) return adminReply({ error: "target_differs" }, 409);
     if (["/admin/sqlite-service/register-show", "/admin/sqlite-service/prepare", "/admin/sqlite-service/update-prepare", "/admin/sqlite-service/update-activate"].includes(path)) return adminReply({ error: "not_found" }, 404);
     if (request.method === "POST") {
       if (!this.ready()) return adminReply({ error: "show_not_ready" }, 503);

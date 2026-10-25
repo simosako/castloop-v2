@@ -102,6 +102,106 @@ async function fixture() {
   return { ...setup, ...objects, feed, control, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, showUpdate, lifecycle };
 }
 
+function revisionRequest(setup: Awaited<ReturnType<typeof fixture>>, revisionId: string, episodeId?: string) {
+  return parseSqlitePublicationRequest({ ...setup.lifecycle("restore", episodeId), action: "restore_revision", target_revision_id: revisionId });
+}
+
+for (const kind of ["show", "episode"] as const) {
+  test(`${kind} revision adoption appends a new committed record without recopying saved media`, async () => {
+    const f = await fixture(), originalShow = await f.publishShow(), originalEpisode = await f.publishEpisode();
+    if (kind === "show") await f.run(await f.showUpdate());
+    else {
+      const update = await f.request("episode", "first", originalEpisode.job_id, "both");
+      update.payloads[0] = await f.payload(update.job_id, "episode_metadata", stringifyToml({ ...metadata("first"), title: "Corrected title" }));
+      await f.run(update);
+    }
+    const id = kind === "show" ? originalShow.job_id : originalEpisode.job_id;
+    const request = revisionRequest(f, id, kind === "episode" ? "first" : undefined);
+    f.calls.length = 0;
+    expect((await f.run(request)).state).toBe("succeeded");
+    expect(f.calls.some((call) => call.method === "PUT" && (call.key.endsWith(".mp3") || call.key.includes("/covers/")))).toBe(false);
+    const history = kind === "show" ? f.content.listShowRevisions("daily", f.config.public_base_url).items :
+      f.content.listEpisodeRevisions("daily", "first", f.config.public_base_url).items;
+    expect(history).toHaveLength(3);
+    expect(history[0]).toMatchObject({ revision_id: request.job_id, restored_from_revision_id: id, is_current: true });
+    expect(history[2]).toMatchObject({ revision_id: id, is_current: false });
+  });
+
+  for (const phase of ["revision", "feed", "purge", "commit"] as const) {
+    test(`${kind} revision ${phase} failure keeps old delivery and history without replay`, async () => {
+      const f = await fixture(), originalShow = await f.publishShow(), originalEpisode = await f.publishEpisode();
+      if (kind === "show") await f.run(await f.showUpdate());
+      else await f.run(await f.request("episode", "first", originalEpisode.job_id, "audio"));
+      const request = revisionRequest(f, kind === "show" ? originalShow.job_id : originalEpisode.job_id, kind === "episode" ? "first" : undefined);
+      const body = f.feed(), cover = await (await readPublic(f, "/podcasts/daily/cover.jpg")).arrayBuffer();
+      const before = f.storage.sql.exec(`SELECT * FROM publication_${kind}_revisions`).toArray();
+      if (phase === "revision" || phase === "feed") f.bucketHooks.afterPut = async (key) => {
+        if (key.includes(phase === "revision" ? "/revisions/" : "/feeds/")) throw new Error("Unknown output");
+      };
+      if (phase === "purge") f.hooks.purge = async () => { throw new Error("Unknown purge"); };
+      if (phase === "commit") {
+        await f.queue.enqueue(request); await f.queue.enqueue(await f.request("episode", "later")); f.clearAlarm();
+        f.hooks.purge = async () => { f.failAlarm(); };
+        await expect(f.runner.alarm()).rejects.toThrow();
+      } else expect((await f.run(request)).state).toBe("blocked");
+      expect(f.storage.sql.exec(`SELECT * FROM publication_${kind}_revisions`).toArray()).toEqual(before);
+      expect(await (await readPublic(f)).text()).toBe(body);
+      expect(await (await readPublic(f, "/podcasts/daily/cover.jpg")).arrayBuffer()).toEqual(cover);
+      const queue = new SqlitePublicationQueue(f.storage, f.runtime), content = new SqlitePublicationContent(f.storage);
+      const runner = new SqlitePublicationAlarm(queue, createSqlitePublicationExecutor(content, f.bucket, f.config, { purge: async () => {} }), () => {});
+      const calls = f.calls.length;
+      expect((await runner.alarm()).state).toBe("blocked"); expect(f.calls).toHaveLength(calls);
+    });
+  }
+
+  test(`${kind} revision preview base is invalidated by lifecycle ABA before output writes`, async () => {
+    const f = await fixture(), show = await f.publishShow(), episode = await f.publishEpisode();
+    const request = revisionRequest(f, kind === "show" ? show.job_id : episode.job_id, kind === "episode" ? "first" : undefined);
+    await f.run(f.lifecycle("unpublish", kind === "episode" ? "first" : undefined));
+    await f.run(f.lifecycle("restore", kind === "episode" ? "first" : undefined));
+    f.calls.length = 0;
+    expect(await f.run(request)).toMatchObject({ state: "failed", reason_code: "base_conflict" });
+    expect(f.calls.some((call) => call.method === "PUT")).toBe(false);
+  });
+
+  test(`${kind} revision of an unpublished target stays unavailable until completion`, async () => {
+    const f = await fixture(), show = await f.publishShow(), episode = await f.publishEpisode();
+    await f.run(f.lifecycle("unpublish", kind === "episode" ? "first" : undefined));
+    const request = revisionRequest(f, kind === "show" ? show.job_id : episode.job_id, kind === "episode" ? "first" : undefined);
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    f.hooks.purge = async () => { entered.resolve(); await release.promise; };
+    const operation = f.run(request);
+    try { await entered.promise; expect((await readPublic(f)).status).toBe(503); }
+    finally { release.resolve(); }
+    expect((await operation).state).toBe("succeeded"); expect((await readPublic(f)).status).toBe(200);
+  });
+}
+
+test("saved revision metadata has an independent bounded read budget rather than a new input limit", async () => {
+  const f = await fixture(); await f.publishShow(); const original = await f.publishEpisode();
+  const key = `public/episodes/daily/first/revisions/${original.job_id}.toml`;
+  await f.bucket.put(key, `${f.text(key)}\n# ${"x".repeat(1_000_000)}\n`);
+  expect((await f.run(revisionRequest(f, original.job_id, "first"))).state).toBe("succeeded");
+});
+
+for (const fault of ["missing", "corrupt", "media", "throw", "unknown-revision", "oversized"] as const) {
+  test(`revision ${fault} validation cannot publish or append history`, async () => {
+    const f = await fixture(); await f.publishShow(); const original = await f.publishEpisode();
+    const request = revisionRequest(f, fault === "unknown-revision" ? crypto.randomUUID() : original.job_id, "first");
+    const key = `public/episodes/daily/first/revisions/${original.job_id}.toml`;
+    if (fault === "missing") f.entries.delete(key);
+    if (fault === "corrupt") await f.bucket.put(key, "invalid metadata");
+    if (fault === "media") f.entries.delete(`public/podcasts/daily/episodes/first/${original.job_id}.mp3`);
+    if (fault === "throw") f.bucketHooks.beforeGet = async () => { throw new Error("Private body secret"); };
+    if (fault === "oversized") await f.bucket.put(key, "x".repeat(8_388_609));
+    f.calls.length = 0;
+    expect((await f.run(request)).state).toBe(fault === "throw" ? "blocked" : "failed");
+    expect(f.content.listEpisodeRevisions("daily", "first", f.config.public_base_url).items).toHaveLength(1);
+    expect(f.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(JSON.stringify(f.events)).not.toContain("Private body secret");
+  });
+}
+
 test("admission stop drains a running publication while serving only committed generations", async () => {
   const value = await fixture(); await value.publishShow(); const old = await value.publishEpisode();
   const previousFeed = value.feed(), next = await value.request("episode", "second");
@@ -892,7 +992,8 @@ for (const phase of ["old-cover", "validation", "metadata", "cover-writing", "co
       expect(hash(new Uint8Array(await late.arrayBuffer()))).toBe(expected);
     }
     expect(setup.entries.has("public/podcasts/daily/cover.jpg")).toBe(false);
-    expect(setup.calls.some((call) => call.method === "PUT" && (call.key.endsWith(".mp3") || call.key.includes("/revisions/")))).toBe(false);
+    expect(setup.calls.some((call) => call.method === "PUT" && (call.key.endsWith(".mp3") || call.key.startsWith("public/episodes/")))).toBe(false);
+    expect(setup.entries.has(`system/shows/daily/revisions/${next.job_id}.toml`)).toBe(true);
     expect(setup.entries.has(sqliteCoverSnapshotKey("daily", 1, "jpg"))).toBe(true);
     expect(setup.entries.has(sqliteCoverSnapshotKey("daily", 3, "jpg"))).toBe(true);
   });

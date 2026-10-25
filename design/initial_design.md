@@ -1,5 +1,7 @@
 # castloop v2 デザインドキュメント
 
+Issue #64の開発版では、認証付きの公開済み全文・履歴取得とCLIの項目差分・ローカルRSS生成、保存済みrevisionの明示採用を追加した。Show内SQLiteに履歴2表を置き、R2の不変metadata・画像・音源と照合する。採用は新revisionとして保存・purge・SQL確定し、素材再uploadや過去履歴の上書きはしない。内部queue/content形式**7/8**、必須`revision_history="sqlite-revisions-v1"`の新規環境専用で旧環境は変換しない。[採用設計](published_diff_and_revision_restore_plan.md)と[利用ガイド](../docs/published_content_review.md)参照。実Cloudflareの配備・公開・性能確認は行っていない。
+
 Issue #66の未リリース開発版では、Showの状態を`open / admission_paused / paused`に分ける。`admission_paused`は新しい公開依頼と素材アップロードを止め、既存の検証条件を満たす公開済み内容は配信する。`paused`は受付と配信を両方止める従来の意味を維持する。停止・再開ごとの変更番号と操作ID別の適用結果を同じShow内で保存し、古い確認結果による再開を拒否する。応答喪失後は結果のGET照会だけを行う。内部queue/content形式**7/7**と必須`availability_controls="show-admission-delivery-v1"`を使う新規環境専用。Worker更新中の配信継続や旧環境の変換は提供しない。[採用設計](show_admission_delivery_separation_plan.md)と[操作ガイド](../docs/show_availability.md)を優先し、下記のリリース時点の2状態・6/7形式の記述と区別する。
 
 Issue #68の未リリース開発版: [独自ドメイン計画](sqlite_custom_domains_plan.md)に沿い、Feed世代を公開jobのFIFO sequenceから独立した共通予約表で採番する。内部queue/content schemaは**6/7**、healthの必須`feed_generation_allocator="reservation-v1"`を用いるfresh環境専用。cover世代は引き続きShow公開job sequenceで、Feed世代から推測しない。旧5/6を含む環境の移行・互換配備は提供しない。CLI/REST連携は[専用ガイド](../docs/sqlite_custom_domains.md)を参照し、実機未確認・未承認と区別する。

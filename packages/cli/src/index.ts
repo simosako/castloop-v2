@@ -156,11 +156,11 @@ async function main(context: Invocation): Promise<unknown> {
   const explicitRoot = flags.workspace === undefined ? undefined : resolve(flags.workspace);
   const explicitShow = flags.show;
   delete flags.workspace;
-  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode"].includes(command);
+  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode", "list-episode-revisions", "preview-episode-revision"].includes(command);
   if (episodeCommand && explicitRoot && !explicitShow) throw new AgentError("missing_show", "Explicit --workspace requires --show for Episode commands.");
   if (explicitShow) {
     validateId(explicitShow, "show");
-    if (!episodeCommand && !command.startsWith("operation-")) throw new AgentError("invalid_options", "This command does not accept --show; use its Show positional argument.");
+    if (!episodeCommand && !command.startsWith("operation-") && command !== "sync-local-metadata") throw new AgentError("invalid_options", "This command does not accept --show; use its Show positional argument.");
   }
   if (episodeCommand) delete flags.show;
   const expectedPreview = flags["expect-preview"];
@@ -207,6 +207,15 @@ async function main(context: Invocation): Promise<unknown> {
       ["list", "remove"].includes(action ?? "") && positional.length !== 1 ||
       !["add", "remove", "list", "status", "continue"].includes(action ?? "")) throw new Error(commandHelp(command));
     if (["add", "remove"].includes(action)) flags["operation-id"] ??= randomUUID();
+  } else if (["preview-show", "preview-episode"].includes(command)) {
+    allowedFlags(flags, ["local", "remote", "rss-output"]);
+    if (flags.local && flags.remote || flags.local && flags["rss-output"]) throw new Error("Choose remote RSS export or local-only preview, not both");
+  } else if (["list-show-revisions", "list-episode-revisions"].includes(command)) {
+    allowedFlags(flags, ["cursor"]);
+  } else if (command === "sync-local-metadata") {
+    allowedFlags(flags, ["show", "episode", "expect-revision", "output"]);
+    if (!explicitShow || !flags["expect-revision"]) throw new Error("Metadata export requires --show and --expect-revision");
+    if (flags.episode) validateId(flags.episode, "episode");
   } else if (listing) {
     allowedFlags(flags, ["json", "include-deleted", "cursor"]);
   } else if (operationRead) {
@@ -220,13 +229,14 @@ async function main(context: Invocation): Promise<unknown> {
   const count = SQLITE_COMMAND_ARGUMENTS[command];
   if (count === undefined || !count.includes(positional.length)) throw new Error(commandHelp(command === "update-service" ? "deploy" : command));
   if (["preview-show-lifecycle", "preview-episode-lifecycle"].includes(command) && !["unpublish", "restore"].includes(positional.at(-1)!) ||
-    command === "lifecycle-execute" && positional[2] !== "confirm") throw new Error(commandHelp(command));
+    ["lifecycle-execute", "revision-execute"].includes(command) && positional[2] !== "confirm") throw new Error(commandHelp(command));
   if (episodeCommand) {
     const showId = validateId(explicitShow ?? basename(root), "show");
     positional.unshift(showId);
     if (!explicitRoot && !explicitShow) root = resolve(root, "..");
     context.target.show_id = showId;
   }
+  if (command === "sync-local-metadata") positional.push(explicitShow!);
   context.target.workspace = root;
   const workspace = await loadWorkspaceConfig(root);
   if (["show-status", "show-pause", "show-resume", "show-admission-pause", "show-delivery-resume", "show-control-status"].includes(command)) {
@@ -251,10 +261,18 @@ async function main(context: Invocation): Promise<unknown> {
         last_known_only: true, publication_requested: !!record.publication } : null;
     };
   }
+  if (command === "revision-execute") {
+    context.failureResult = async () => {
+      const { revisionProgress } = await import("./sqlite-revision-commands");
+      return revisionProgress(root, workspace, resolve(root, positional[0]!));
+    };
+  }
   const { runSqliteCommand } = await import("./sqlite-commands");
   const effects = describeCommand(command === "update-service" ? "deploy" : command).effects;
   context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
+    previewOptions: { mode: flags.local ? "local" : flags.remote ? "remote" : "auto", rssOutput: flags["rss-output"] },
+    revisionOptions: { cursor: flags.cursor, episodeId: flags.episode, expectedRevision: flags["expect-revision"], output: flags.output },
     ...(command === "domain" ? { domainOptions: { zoneId: flags["zone-id"], operationId: flags["operation-id"], cursor: flags.cursor } } : {}),
     ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),

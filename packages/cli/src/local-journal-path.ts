@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 const JOURNAL_FAMILIES = ["rss-import-downloads",
   "sqlite-drafts", "sqlite-uploads", "sqlite-publications", "sqlite-initializations", "sqlite-registrations", "sqlite-controls",
-  "sqlite-lifecycle", "sqlite-rss-imports", "sqlite-service-updates", "sqlite-domain-changes", "sqlite-client", "sqlite-operation-requests"] as const;
+  "sqlite-lifecycle", "sqlite-revisions", "sqlite-rss-imports", "sqlite-service-updates", "sqlite-domain-changes", "sqlite-client", "sqlite-operation-requests"] as const;
 export type JournalFamily = typeof JOURNAL_FAMILIES[number];
 
 export function localJournalEntryExists(path: string): boolean {

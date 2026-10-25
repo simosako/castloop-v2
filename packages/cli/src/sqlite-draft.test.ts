@@ -22,7 +22,7 @@ afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 test("preview is read-only and publication rejects changes after approval", async () => {
   const f = await fixture(); await f.stage();
   const before = f.management.length;
-  const preview = await draftPreview(f.root, f.config, f.target);
+  const preview = await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" });
   expect(preview.inputs_match_staged).toBe(true);
   expect(preview.published.status).toBe("not_checked");
   expect(f.management.length).toBe(before);
@@ -124,6 +124,7 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
     }
     if (path.startsWith("/admin/sqlite-service/targets/")) {
       return json({ ...setup.runtime, protocol: "sqlite-sequential-v1", publication_ready: true,
+        revision_history: "sqlite-revisions-v1",
         state: "open", admission_window_id: setup.windowId, show_id: target.show_id, show_lifecycle: kind === "show" ? "draft" : "published",
         reservation_id: crypto.randomUUID(), expected_show_state_version: target.expected_show_state_version,
         ...(kind === "episode" ? { episode_id: target.episode_id, episode_lifecycle: updating ? "published" : "missing",

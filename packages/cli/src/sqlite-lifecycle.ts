@@ -9,7 +9,7 @@ import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import type { R2RestTransport } from "./verified-r2-put";
 
-const lifecycleRequest = sqlitePublicationRequestSchema.refine((value) => value.action !== "publish", "Lifecycle plans cannot publish uploads");
+const lifecycleRequest = sqlitePublicationRequestSchema.refine((value) => value.action === "restore" || value.action === "unpublish", "Lifecycle plans cannot publish revisions or uploads");
 export const sqliteLifecyclePlanSchema = z.object({ request: lifecycleRequest,
   request_sha256: sqlitePublicationRequestSchema.shape.service_config_sha256 }).strict();
 export type SqliteLifecyclePlan = z.infer<typeof sqliteLifecyclePlanSchema>;

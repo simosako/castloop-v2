@@ -12,8 +12,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Removing a domain cannot undo feed URLs saved by podcast apps. Preserve the workspace and journals on interruption; no automatic Resume or rollback." },
   doctor: { usage: "doctor [--local] [--workspace PATH] [--json]", description: "Compact offline checks with no writes, key generation, networking or repairs. Warnings alone exit 0; failed checks exit 1. Credential presence is not validity." },
   template: { usage: "template service-config|admin-config|show|episode", description: "Print an embedded example TOML without IO or registration. admin-config is optional workspace CLI preferences, not service identity. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
-  "preview-show": { usage: "preview-show ID", description: "Read-only local metadata, staged asset hashes and base identity. Does not fetch published full content or check remote readiness. Review input_fingerprint and use publish-show --expect-preview HASH." },
-  "preview-episode": { usage: "preview-episode ID", description: "Read-only local metadata, staged asset hashes and base identity. Requires --show with explicit --workspace. Published full metadata is not fetched. Use publish-episode --expect-preview HASH after approval." },
+  "preview-show": { usage: "preview-show ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged content with immutable cover identity. Defaults to authenticated remote reads when local state exists; --local never networks. Remote errors never become unchanged results. RSS is generated locally only into a new file. Bind approval to publish-show --expect-preview HASH." },
+  "preview-episode": { usage: "preview-episode ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged metadata/audio and preserved GUID/date. Requires --show with explicit --workspace. --local reports not_checked; remote failures stop. RSS export is local and never overwrites. Use publish-episode --expect-preview HASH after approval." },
+  "list-show-revisions": { usage: "list-show-revisions SHOW [--cursor SEQUENCE]", description: "Read committed Show revision history, newest first, 20 per page. Snapshots are not publication approval." },
+  "list-episode-revisions": { usage: "list-episode-revisions ID [--cursor SEQUENCE]", description: "Read committed Episode revision history with --show, newest first, 20 per page. Does not expose private media publicly." },
+  "preview-show-revision": { usage: "preview-show-revision SHOW REVISION_UUID", description: "Read current and selected saved Show content and a plan. Does not write journals or publish. Execution republishes saved content without rolling back Episodes." },
+  "preview-episode-revision": { usage: "preview-episode-revision ID REVISION_UUID", description: "Read current and selected saved Episode content with --show. Preview preserves GUID/date and selects saved immutable audio without upload. Execution is explicit." },
+  "revision-execute": { usage: "revision-execute PLAN_JSON REQUEST_SHA256 confirm", description: "Adopt the exact reviewed saved revision as a NEW revision, retaining all history and media. Requires open admission. Waits for the same job; unknown requests are never replayed. Unpublished targets become published. Does not edit local originals." },
+  "sync-local-metadata": { usage: "sync-local-metadata --show SHOW [--episode ID] --expect-revision UUID [--output FILE]", description: "Export exact current metadata to the standard TOML path or a new output file. Refuses existing files and unfinished drafts; never overwrites originals or downloads assets. Output paths use caller cwd." },
   "preview-schedule-time": { usage: "preview-schedule-time DATETIME [--timezone IANA_ZONE]", description: "Offline date/time conversion only: this command does NOT create a reservation or publish. An explicit offset determines the instant; otherwise --timezone overrides optional workspace castloop-admin.toml timezone, then server basis UTC. Prints local time, offset, UTC and sources. Rejects ambiguous/nonexistent DST times and explicit offset/--timezone disagreement. Does not check server time or readiness." },
   skill: { usage: "skill export castloop --output DIRECTORY", description: "Export the embedded administrator Skill without networking or external tools. The destination must not exist; existing Skills and AGENTS.md are never overwritten." },
   validate: { usage: "validate service|admin-config|show|episode FILE [--assets] [--audio MP3] [--json]", description: "Read-only offline validation using publication input rules. admin-config validates optional CLI preferences (UTC or an IANA timezone, not abbreviations). File/audio paths use caller cwd; cover uses the TOML directory. Does not prove remote readiness or publication success." },
@@ -222,8 +228,12 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "import-rss": { "dry-run": "boolean", output: "string" },
     validate: { assets: "boolean", audio: "string" }, doctor: { local: "boolean" }, skill: { output: "string" },
     "preview-schedule-time": { timezone: "string" },
+    "preview-show": { local: "boolean", remote: "boolean", "rss-output": "string" },
+    "preview-episode": { local: "boolean", remote: "boolean", "rss-output": "string" },
+    "list-show-revisions": { cursor: "string" }, "list-episode-revisions": { cursor: "string" },
+    "sync-local-metadata": { show: "string", episode: "string", "expect-revision": "string", output: "string" },
   };
-  if (["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode"].includes(command) || command.startsWith("operation-")) options.show = "string";
+  if (["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode", "list-episode-revisions", "preview-episode-revision"].includes(command) || command.startsWith("operation-")) options.show = "string";
   if (["publish-show", "publish-episode"].includes(command)) options["expect-preview"] = "string";
   return { ...options, ...byCommand[command] };
 }
@@ -231,14 +241,15 @@ export function commandOptions(command: string): Record<string, "string" | "bool
 export function describeCommand(command: string) {
   const help = COMMAND_HELP[command];
   if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
-  const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-show", "preview-episode", "preview-schedule-time"].includes(command);
-  const read = offline || ["service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
+  const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-schedule-time"].includes(command);
+  const preview = ["preview-show", "preview-episode"].includes(command);
+  const read = offline || preview || ["list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],
     constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly"],
     authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
-    effects: { local: offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" },
+    effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" || command === "revision-execute" },
     output_schema: "result", input_schemas: ["service-config", "admin-config", "show-input", "episode-input"],
     recovery: read ? "Bounded observation only; snapshots do not authorize mutations." : "Preserve exact workspace, Show, input and records. Unknown PUT/POST outcomes must not be replayed. Observe the recorded job/operation; upload continuation requires the retained receipt and unchanged input.",
     paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };

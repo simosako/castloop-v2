@@ -1,5 +1,10 @@
-import { episodeRevisionSchema, parsePublicAssetPath, showMetadataSchema } from "../packages/shared/src/index";
+import { episodeDraftFromRevision, episodeRevisionSchema, parsePublicAssetPath, showMetadataSchema } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
+import {
+  SQLITE_REVISION_PAGE_SIZE, sqliteEpisodeRevisionRecordSchema, sqliteEpisodeRevisionSummarySchema,
+  sqliteShowRevisionRecordSchema, sqliteShowRevisionSummarySchema } from "../packages/shared/src/sqlite-revisions";
+import type { SqliteEpisodeRevisionRecord, SqliteEpisodeRevisionSummary,
+  SqliteShowRevisionRecord, SqliteShowRevisionSummary } from "../packages/shared/src/sqlite-revisions";
 import { parseSqlitePublicationRequest, sqlitePublicationRequestSchema } from "../packages/shared/src/sqlite-publication";
 import type { SqlitePublicationRequest } from "../packages/shared/src/sqlite-publication";
 import { SqlitePublicationInputError } from "./sqlite-publication-alarm";
@@ -9,10 +14,16 @@ import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 import { validSqliteCoverIdentity } from "./sqlite-cover";
 import type { SqliteCoverIdentity } from "./sqlite-cover";
 import { SQLITE_CONTENT_SCHEMA_VERSION, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-feed-generations";
+import { canonicalEnclosureUrl } from "./media-url";
 
 type Lifecycle = "draft" | "published" | "unpublished" | "deleted";
 type ShowRow = { show_id: string; reservation_id: string; state_version: number; feed_generation: number; lifecycle: Lifecycle };
 type EpisodeRow = { show_id: string; episode_id: string; lifecycle: Lifecycle; lifecycle_version: number; revision_id: string | null };
+type ShowRevisionRow = { show_id: string; revision_sequence: number; state_version: number; revision_id: string;
+  metadata_json: string; metadata_sha256: string; cover_extension: "jpg" | "png"; cover_generation: number;
+  cover_sha256: string; cover_length_bytes: number; restored_from_revision_id: string | null; updated_at: string };
+type EpisodeRevisionRow = { show_id: string; episode_id: string; revision_sequence: number; revision_id: string;
+  audio_revision_id: string; metadata_sha256: string; revision_json: string; restored_from_revision_id: string | null; updated_at: string };
 export type SqliteContentTarget = { show: ShowRow; metadata: ShowMetadata | null; coverExtension: "jpg" | "png" | null;
   cover: SqliteCoverIdentity | null; episode: EpisodeRow | null; base: EpisodeRevision | null };
 export type SqliteDeliveryDecision = { status: 200; key: string; content_type: string;
@@ -41,6 +52,21 @@ export class SqlitePublicationContent {
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_media (show_id TEXT NOT NULL, episode_id TEXT NOT NULL,
         audio_revision_id TEXT NOT NULL, sha256 TEXT NOT NULL, length_bytes INTEGER NOT NULL,
         PRIMARY KEY(show_id, episode_id, audio_revision_id))`);
+      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_show_revisions (
+        show_id TEXT NOT NULL, revision_sequence INTEGER NOT NULL CHECK(revision_sequence > 0),
+        state_version INTEGER NOT NULL CHECK(state_version > 0), revision_id TEXT NOT NULL UNIQUE,
+        metadata_json TEXT NOT NULL, metadata_sha256 TEXT NOT NULL CHECK(length(metadata_sha256) = 64),
+        cover_extension TEXT NOT NULL CHECK(cover_extension IN ('jpg', 'png')),
+        cover_generation INTEGER NOT NULL CHECK(cover_generation > 0), cover_sha256 TEXT NOT NULL CHECK(length(cover_sha256) = 64),
+        cover_length_bytes INTEGER NOT NULL CHECK(cover_length_bytes > 0 AND cover_length_bytes <= 5000000),
+        restored_from_revision_id TEXT, updated_at TEXT NOT NULL,
+        PRIMARY KEY(show_id, revision_sequence), UNIQUE(show_id, revision_id))`);
+      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_episode_revisions (
+        show_id TEXT NOT NULL, episode_id TEXT NOT NULL, revision_sequence INTEGER NOT NULL CHECK(revision_sequence > 0),
+        revision_id TEXT NOT NULL UNIQUE, audio_revision_id TEXT NOT NULL,
+        metadata_sha256 TEXT NOT NULL CHECK(length(metadata_sha256) = 64), revision_json TEXT NOT NULL,
+        restored_from_revision_id TEXT, updated_at TEXT NOT NULL,
+        PRIMARY KEY(show_id, episode_id, revision_sequence), UNIQUE(show_id, episode_id, revision_id))`);
     });
   }
 
@@ -73,11 +99,47 @@ export class SqlitePublicationContent {
     return validSqliteCoverIdentity(cover) && ["jpg", "png"].includes(cover.extension) ? cover : null;
   }
 
-  inspect(showId: string, episodeId?: string): { show: ShowRow | null; episode: EpisodeRow | null; base: EpisodeRevision | null } {
+  private latestShowRevisionRow(showId: string): ShowRevisionRow | null {
+    return this.storage.sql.exec<ShowRevisionRow>(
+      "SELECT * FROM publication_show_revisions WHERE show_id = ? ORDER BY revision_sequence DESC LIMIT 1", showId).toArray()[0] ?? null;
+  }
+
+  private parseShowRevisionRow(row: ShowRevisionRow, baseUrl: string): SqliteShowRevisionRecord {
+    const metadata = showMetadataSchema.parse(JSON.parse(row.metadata_json));
+    return sqliteShowRevisionRecordSchema.parse({
+      show_id: row.show_id, revision_sequence: row.revision_sequence, state_version: row.state_version,
+      revision_id: row.revision_id, metadata, metadata_sha256: row.metadata_sha256,
+      cover: { extension: row.cover_extension, generation: row.cover_generation, sha256: row.cover_sha256,
+        length_bytes: row.cover_length_bytes, public_url: `${baseUrl.replace(/\/$/, "")}/podcasts/${row.show_id}/cover.${row.cover_extension}` },
+      restored_from_revision_id: row.restored_from_revision_id, updated_at: row.updated_at,
+    });
+  }
+
+  private parseEpisodeRevisionRow(row: EpisodeRevisionRow, baseUrl: string): SqliteEpisodeRevisionRecord {
+    const raw = episodeRevisionSchema.parse(JSON.parse(row.revision_json));
+    const enclosureUrl = canonicalEnclosureUrl(raw, row.show_id, baseUrl);
+    const revision = episodeRevisionSchema.parse({ ...raw, enclosure_url: enclosureUrl });
+    this.requireMedia(row.show_id, revision, row.audio_revision_id);
+    const asset = parsePublicAssetPath(new URL(enclosureUrl).pathname);
+    if (!asset || asset.kind !== "audio" || asset.showId !== row.show_id || asset.episodeId !== row.episode_id || asset.revisionId !== row.audio_revision_id) {
+      throw new Error("Episode revision audio reference differs");
+    }
+    return sqliteEpisodeRevisionRecordSchema.parse({
+      show_id: row.show_id, episode_id: row.episode_id, revision_sequence: row.revision_sequence,
+      revision_id: row.revision_id, metadata: episodeDraftFromRevision(revision), metadata_sha256: row.metadata_sha256,
+      revision, audio: { audio_revision_id: row.audio_revision_id, sha256: revision.sha256,
+        length_bytes: revision.length_bytes, duration_seconds: revision.duration_seconds, enclosure_url: enclosureUrl },
+      restored_from_revision_id: row.restored_from_revision_id, updated_at: row.updated_at,
+    });
+  }
+
+  inspect(showId: string, episodeId?: string): { show: ShowRow | null; episode: EpisodeRow | null; base: EpisodeRevision | null;
+    showRevision?: ShowRevisionRow | null } {
     sqlitePublicationRequestSchema.shape.show_id.parse(showId);
     if (episodeId !== undefined) sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
     return this.storage.transactionSync(() => {
       const show = this.show(showId);
+      const showRevision = show && ["published", "unpublished"].includes(show.lifecycle) ? this.latestShowRevisionRow(showId) : null;
       const episode = episodeId === undefined ? null : this.storage.sql.exec<EpisodeRow>(
         "SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?", showId, episodeId).toArray()[0] ?? null;
       const hasContent = episode && ["published", "unpublished"].includes(episode.lifecycle);
@@ -87,8 +149,142 @@ export class SqlitePublicationContent {
       if (hasContent && (!base || base.revision_id !== episode.revision_id || base.episode_id !== episodeId)) {
         throw new Error("Episode inspection has inconsistent content");
       }
-      return { show, episode, base };
+      return { show, episode, base, showRevision };
     });
+  }
+
+  currentShowRevision(showId: string, baseUrl: string): SqliteShowRevisionRecord | null {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    return this.storage.transactionSync(() => {
+      const show = this.show(showId);
+      if (!show || !["published", "unpublished"].includes(show.lifecycle)) return null;
+      const content = this.storage.sql.exec<{ metadata_json: string; cover_extension: "jpg" | "png" }>(
+        "SELECT metadata_json, cover_extension FROM publication_show_content WHERE show_id = ?", showId).toArray()[0];
+      const cover = this.cover(showId);
+      const row = this.latestShowRevisionRow(showId);
+      if (!content || !cover || !row || row.metadata_json !== content.metadata_json || row.cover_extension !== content.cover_extension ||
+        row.cover_generation !== cover.generation || row.cover_sha256 !== cover.sha256 || row.cover_length_bytes !== cover.lengthBytes ||
+        row.state_version > show.state_version) {
+        throw new Error("Show revision history is inconsistent with current Show content");
+      }
+      return this.parseShowRevisionRow(row, baseUrl);
+    });
+  }
+
+  showRevision(showId: string, revisionId: string, baseUrl: string): SqliteShowRevisionRecord | null {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    sqlitePublicationRequestSchema.shape.job_id.parse(revisionId);
+    return this.storage.transactionSync(() => {
+      const row = this.storage.sql.exec<ShowRevisionRow>(
+        "SELECT * FROM publication_show_revisions WHERE show_id = ? AND revision_id = ?", showId, revisionId).toArray()[0];
+      return row ? this.parseShowRevisionRow(row, baseUrl) : null;
+    });
+  }
+
+  currentEpisodeRevision(showId: string, episodeId: string, baseUrl: string): SqliteEpisodeRevisionRecord | null {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
+    return this.storage.transactionSync(() => {
+      const episode = this.storage.sql.exec<EpisodeRow>(
+        "SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?", showId, episodeId).toArray()[0];
+      if (!episode || !["published", "unpublished"].includes(episode.lifecycle)) return null;
+      const saved = this.storage.sql.exec<{ revision_json: string }>(
+        "SELECT revision_json FROM publication_episode_content WHERE show_id = ? AND episode_id = ?", showId, episodeId).toArray()[0];
+      const row = episode.revision_id ? this.storage.sql.exec<EpisodeRevisionRow>(
+        "SELECT * FROM publication_episode_revisions WHERE show_id = ? AND episode_id = ? AND revision_id = ?",
+        showId, episodeId, episode.revision_id).toArray()[0] : null;
+      if (!saved || !row || row.revision_json !== saved.revision_json) {
+        throw new Error("Episode revision history is inconsistent with current Episode content");
+      }
+      return this.parseEpisodeRevisionRow(row, baseUrl);
+    });
+  }
+
+  episodeRevision(showId: string, episodeId: string, revisionId: string, baseUrl: string): SqliteEpisodeRevisionRecord | null {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
+    sqlitePublicationRequestSchema.shape.job_id.parse(revisionId);
+    return this.storage.transactionSync(() => {
+      const row = this.storage.sql.exec<EpisodeRevisionRow>(
+        "SELECT * FROM publication_episode_revisions WHERE show_id = ? AND episode_id = ? AND revision_id = ?",
+        showId, episodeId, revisionId).toArray()[0];
+      return row ? this.parseEpisodeRevisionRow(row, baseUrl) : null;
+    });
+  }
+
+  listShowRevisions(showId: string, baseUrl: string, afterSequence?: number): {
+    currentRevisionId: string | null; items: SqliteShowRevisionSummary[]; nextCursor: number | null } {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    if (afterSequence !== undefined && (!Number.isSafeInteger(afterSequence) || afterSequence < 1)) throw new Error("Invalid Show revision cursor");
+    return this.storage.transactionSync(() => {
+      const current = this.currentShowRevision(showId, baseUrl);
+      const rows = this.storage.sql.exec(
+        `SELECT show_id, revision_sequence, state_version, revision_id, substr(json_extract(metadata_json, '$.title'), 1, 200) AS title,
+         metadata_sha256, cover_extension, cover_generation, cover_sha256, cover_length_bytes, restored_from_revision_id, updated_at
+         FROM publication_show_revisions WHERE show_id = ? ${afterSequence !== undefined ? "AND revision_sequence < ?" : ""}
+         ORDER BY revision_sequence DESC LIMIT ?`,
+        showId, ...(afterSequence !== undefined ? [afterSequence] : []), SQLITE_REVISION_PAGE_SIZE + 1).toArray();
+      const page = rows.slice(0, SQLITE_REVISION_PAGE_SIZE).map((row) => {
+        return sqliteShowRevisionSummarySchema.parse({
+          show_id: row.show_id, revision_sequence: row.revision_sequence, state_version: row.state_version,
+          revision_id: row.revision_id, title: row.title, metadata_sha256: row.metadata_sha256,
+          cover: { extension: row.cover_extension, generation: row.cover_generation, sha256: row.cover_sha256,
+            length_bytes: row.cover_length_bytes, public_url: `${baseUrl.replace(/\/$/, "")}/podcasts/${showId}/cover.${row.cover_extension}` },
+          restored_from_revision_id: row.restored_from_revision_id, updated_at: row.updated_at,
+          is_current: current?.revision_id === row.revision_id,
+        });
+      });
+      return { currentRevisionId: current?.revision_id ?? null, items: page,
+        nextCursor: rows.length > SQLITE_REVISION_PAGE_SIZE ? page[SQLITE_REVISION_PAGE_SIZE - 1]!.revision_sequence : null };
+    });
+  }
+
+  listEpisodeRevisions(showId: string, episodeId: string, baseUrl: string, afterSequence?: number): {
+    currentRevisionId: string | null; items: SqliteEpisodeRevisionSummary[]; nextCursor: number | null } {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
+    if (afterSequence !== undefined && (!Number.isSafeInteger(afterSequence) || afterSequence < 1)) throw new Error("Invalid Episode revision cursor");
+    return this.storage.transactionSync(() => {
+      const current = this.currentEpisodeRevision(showId, episodeId, baseUrl);
+      const rows = this.storage.sql.exec(
+        `SELECT show_id, episode_id, revision_sequence, revision_id, audio_revision_id, metadata_sha256, restored_from_revision_id, updated_at,
+         substr(json_extract(revision_json, '$.title'), 1, 200) AS title, json_extract(revision_json, '$.published_at') AS published_at,
+         json_extract(revision_json, '$.sha256') AS sha256, json_extract(revision_json, '$.length_bytes') AS length_bytes,
+         json_extract(revision_json, '$.duration_seconds') AS duration_seconds
+         FROM publication_episode_revisions WHERE show_id = ? AND episode_id = ? ${afterSequence !== undefined ? "AND revision_sequence < ?" : ""}
+         ORDER BY revision_sequence DESC LIMIT ?`,
+        showId, episodeId, ...(afterSequence !== undefined ? [afterSequence] : []), SQLITE_REVISION_PAGE_SIZE + 1).toArray();
+      const page = rows.slice(0, SQLITE_REVISION_PAGE_SIZE).map((row) => {
+        return sqliteEpisodeRevisionSummarySchema.parse({
+          show_id: row.show_id, episode_id: row.episode_id, revision_sequence: row.revision_sequence,
+          revision_id: row.revision_id, title: row.title, published_at: row.published_at, metadata_sha256: row.metadata_sha256,
+          audio: { audio_revision_id: row.audio_revision_id, sha256: row.sha256, length_bytes: row.length_bytes,
+            duration_seconds: row.duration_seconds, enclosure_url: `${baseUrl.replace(/\/$/, "")}/podcasts/${showId}/episodes/${episodeId}/${row.audio_revision_id}.mp3` },
+          restored_from_revision_id: row.restored_from_revision_id, updated_at: row.updated_at,
+          is_current: current?.revision_id === row.revision_id,
+        });
+      });
+      return { currentRevisionId: current?.revision_id ?? null, items: page,
+        nextCursor: rows.length > SQLITE_REVISION_PAGE_SIZE ? page[SQLITE_REVISION_PAGE_SIZE - 1]!.revision_sequence : null };
+    });
+  }
+
+  inventoryStats(showId: string): { count: number; chars: number } {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    const row = this.storage.sql.exec<{ count: number; chars: number | null }>(`SELECT COUNT(*) AS count, SUM(length(c.revision_json)) AS chars
+      FROM publication_episode_content c JOIN publication_episodes e USING (show_id, episode_id)
+      WHERE e.show_id = ? AND e.lifecycle = 'published'`, showId).toArray()[0]!;
+    return { count: row.count, chars: row.chars ?? 0 };
+  }
+
+  episodePage(showId: string, after = "") {
+    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    if (after) sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(after);
+    const rows = this.storage.sql.exec<{ episode_id: string; revision_json: string }>(`SELECT e.episode_id, c.revision_json
+      FROM publication_episodes e JOIN publication_episode_content c USING (show_id, episode_id)
+      WHERE e.show_id = ? AND e.lifecycle = 'published' AND e.episode_id > ? ORDER BY e.episode_id LIMIT 21`, showId, after).toArray();
+    return { items: rows.slice(0, 20).map((row) => episodeRevisionSchema.parse(JSON.parse(row.revision_json))),
+      nextCursor: rows.length > 20 ? rows[19]!.episode_id : null };
   }
 
   requireRunning(input: SqlitePublicationRequest): SqlitePublicationRequest {
@@ -101,7 +297,9 @@ export class SqlitePublicationContent {
 
   target(input: SqlitePublicationRequest): SqliteContentTarget {
     const request = this.requireRunning(input), show = this.show(request.show_id);
-    const showStates = request.action === "publish" ? ["draft", "published"] : request.kind === "episode" && request.action === "unpublish" ? ["published", "unpublished"] :
+    const showStates = request.action === "publish" ? ["draft", "published"] :
+      request.action === "restore_revision" ? (request.kind === "show" ? ["published", "unpublished"] : ["published"]) :
+      request.kind === "episode" && request.action === "unpublish" ? ["published", "unpublished"] :
       [request.action === "restore" && request.kind === "show" ? "unpublished" : "published"];
     if (!show || !showStates.includes(show.lifecycle) || request.kind === "episode" && request.action !== "unpublish" && show.lifecycle !== "published") {
       throw new SqlitePublicationInputError("target_unavailable");
@@ -115,11 +313,15 @@ export class SqlitePublicationContent {
     if (["published", "unpublished"].includes(show.lifecycle) && (!metadata || metadata.show_id !== show.show_id || !cover)) throw new Error("Published Show content index is inconsistent");
     const episode = request.kind === "episode" ? this.storage.sql.exec<EpisodeRow>(
       "SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?", request.show_id, request.episode_id!).toArray()[0] ?? null : null;
-    if (request.kind === "episode" && (request.action !== "publish" && !episode || episode && episode.lifecycle !== (request.action === "restore" ? "unpublished" : "published"))) {
+    const allowedEpisodeStates = request.action === "restore_revision" ? ["published", "unpublished"] :
+      [request.action === "restore" ? "unpublished" : "published"];
+    if (request.kind === "episode" && (request.action !== "publish" && !episode || episode && !allowedEpisodeStates.includes(episode.lifecycle))) {
       throw new SqlitePublicationInputError("target_unavailable");
     }
     if (request.kind === "episode" && (episode?.lifecycle_version ?? 0) !== (request.expected_episode_lifecycle_version ?? 0)) throw new SqlitePublicationInputError("base_conflict");
-    if (request.kind === "episode" && request.action !== "publish" && episode?.lifecycle_version === Number.MAX_SAFE_INTEGER) throw new SqlitePublicationInputError("target_unavailable");
+    if (request.kind === "episode" && (request.action !== "publish" || episode?.lifecycle === "unpublished") && episode?.lifecycle_version === Number.MAX_SAFE_INTEGER) {
+      throw new SqlitePublicationInputError("target_unavailable");
+    }
     if (request.kind === "episode" && (episode?.revision_id ?? undefined) !== request.base_revision_id) throw new SqlitePublicationInputError("base_conflict");
     const saved = episode ? this.storage.sql.exec<{ revision_json: string }>(
       "SELECT revision_json FROM publication_episode_content WHERE show_id = ? AND episode_id = ?", request.show_id, request.episode_id!).toArray()[0] : null;
@@ -150,33 +352,87 @@ export class SqlitePublicationContent {
     if (!audio || audio.sha256 !== revision.sha256 || audio.length_bytes !== revision.length_bytes) throw new Error("Episode has no matching immutable media index");
   }
 
-  commitShow(request: SqlitePublicationRequest, metadata: ShowMetadata, extension: "jpg" | "png", cover: SqliteCoverIdentity): void {
-    this.target(request);
-    if (request.action !== "publish" || request.kind !== "show" || metadata.show_id !== request.show_id) throw new Error("Show commit differs from its running target");
-    if (!validSqliteCoverIdentity(cover) || cover.generation !== this.publicationSequence(request)) throw new Error("Prepared cover identity differs");
+  commitShow(request: SqlitePublicationRequest, metadata: ShowMetadata, extension: "jpg" | "png", cover: SqliteCoverIdentity,
+    options: { metadataSha256: string; updatedAt: string; restoredFromRevisionId?: string }): void {
+    const target = this.target(request);
+    if (!["publish", "restore_revision"].includes(request.action) || request.kind !== "show" || metadata.show_id !== request.show_id) {
+      throw new Error("Show commit differs from its running target");
+    }
+    const canonicalMetadata = JSON.stringify(showMetadataSchema.parse(metadata));
+    if (request.action === "publish") {
+      if (!validSqliteCoverIdentity(cover) || cover.generation !== this.publicationSequence(request) || options.restoredFromRevisionId !== undefined) {
+        throw new Error("Prepared cover identity differs");
+      }
+    } else {
+      const source = this.storage.sql.exec<ShowRevisionRow>(
+        "SELECT * FROM publication_show_revisions WHERE show_id = ? AND revision_id = ?", request.show_id, request.target_revision_id!).toArray()[0];
+      if (!source || options.restoredFromRevisionId !== source.revision_id || source.metadata_json !== canonicalMetadata ||
+        source.cover_extension !== extension || source.cover_generation !== cover.generation || source.cover_sha256 !== cover.sha256 ||
+        source.cover_length_bytes !== cover.lengthBytes || !validSqliteCoverIdentity(cover)) {
+        throw new Error("Restored Show revision differs from its stored history");
+      }
+    }
     this.storage.sql.exec(`INSERT INTO publication_show_content (show_id, metadata_json, cover_extension, cover_generation, cover_sha256, cover_length_bytes)
       VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(show_id) DO UPDATE SET metadata_json = excluded.metadata_json,
       cover_extension = excluded.cover_extension, cover_generation = excluded.cover_generation,
       cover_sha256 = excluded.cover_sha256, cover_length_bytes = excluded.cover_length_bytes`,
-    request.show_id, JSON.stringify(showMetadataSchema.parse(metadata)), extension, cover.generation, cover.sha256, cover.lengthBytes);
-    this.storage.sql.exec("UPDATE publication_shows SET lifecycle = 'published', state_version = state_version + 1 WHERE show_id = ?", request.show_id);
+    request.show_id, canonicalMetadata, extension, cover.generation, cover.sha256, cover.lengthBytes);
+    const nextStateVersion = target.show.state_version + 1;
+    this.storage.sql.exec("UPDATE publication_shows SET lifecycle = 'published', state_version = ? WHERE show_id = ?", nextStateVersion, request.show_id);
+    const nextSequence = (this.storage.sql.exec<{ seq: number | null }>(
+      "SELECT MAX(revision_sequence) AS seq FROM publication_show_revisions WHERE show_id = ?", request.show_id).toArray()[0]?.seq ?? 0) + 1;
+    if (!Number.isSafeInteger(nextSequence) || nextSequence < 1) throw new Error("Show revision sequence space is exhausted");
+    this.storage.sql.exec(`INSERT INTO publication_show_revisions (show_id, revision_sequence, state_version, revision_id,
+      metadata_json, metadata_sha256, cover_extension, cover_generation, cover_sha256, cover_length_bytes, restored_from_revision_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    request.show_id, nextSequence, nextStateVersion, request.job_id, canonicalMetadata,
+    options.metadataSha256, extension, cover.generation, cover.sha256, cover.lengthBytes,
+    options.restoredFromRevisionId ?? null, options.updatedAt);
     this.advanceFeed(request);
   }
 
-  commitEpisode(request: SqlitePublicationRequest, revision: EpisodeRevision, audioRevisionId: string, newAudio: boolean): void {
-    this.target(request);
-    if (request.action !== "publish" || request.kind !== "episode" || revision.episode_id !== request.episode_id || revision.revision_id !== request.job_id) {
+  commitEpisode(request: SqlitePublicationRequest, revision: EpisodeRevision, audioRevisionId: string, newAudio: boolean,
+    options: { metadataSha256: string; restoredFromRevisionId?: string }): void {
+    const target = this.target(request);
+    if (!["publish", "restore_revision"].includes(request.action) || request.kind !== "episode" || revision.episode_id !== request.episode_id || revision.revision_id !== request.job_id) {
       throw new Error("Episode commit differs from its running target");
+    }
+    if (request.action === "restore_revision") {
+      const source = this.storage.sql.exec<EpisodeRevisionRow>(
+        "SELECT * FROM publication_episode_revisions WHERE show_id = ? AND episode_id = ? AND revision_id = ?",
+        request.show_id, request.episode_id, request.target_revision_id!).toArray()[0];
+      const sourceRevision = source ? episodeRevisionSchema.parse(JSON.parse(source.revision_json)) : null;
+      if (!source || !sourceRevision || newAudio || options.restoredFromRevisionId !== source.revision_id ||
+        source.audio_revision_id !== audioRevisionId ||
+        JSON.stringify(episodeDraftFromRevision(sourceRevision)) !== JSON.stringify(episodeDraftFromRevision(revision)) ||
+        sourceRevision.sha256 !== revision.sha256 || sourceRevision.length_bytes !== revision.length_bytes ||
+        sourceRevision.duration_seconds !== revision.duration_seconds) {
+        throw new Error("Restored Episode revision differs from its stored history");
+      }
+    } else if (options.restoredFromRevisionId !== undefined) {
+      throw new Error("Published Episode revision cannot set restored_from_revision_id");
     }
     this.requireUniqueGuid(request.show_id, revision);
     if (newAudio) this.storage.sql.exec(`INSERT INTO publication_media (show_id, episode_id, audio_revision_id, sha256, length_bytes)
       VALUES (?, ?, ?, ?, ?)`, request.show_id, revision.episode_id, audioRevisionId, revision.sha256, revision.length_bytes);
     this.requireMedia(request.show_id, revision, audioRevisionId);
-    this.storage.sql.exec(`INSERT INTO publication_episodes (show_id, episode_id, lifecycle, revision_id) VALUES (?, ?, 'published', ?)
-      ON CONFLICT(show_id, episode_id) DO UPDATE SET lifecycle = 'published', revision_id = excluded.revision_id`, request.show_id, revision.episode_id, revision.revision_id);
+    const nextLifecycleVersion = (target.episode?.lifecycle_version ?? 0) + (target.episode?.lifecycle === "unpublished" ? 1 : 0);
+    this.storage.sql.exec(`INSERT INTO publication_episodes (show_id, episode_id, lifecycle, lifecycle_version, revision_id) VALUES (?, ?, 'published', ?, ?)
+      ON CONFLICT(show_id, episode_id) DO UPDATE SET lifecycle = 'published', lifecycle_version = excluded.lifecycle_version, revision_id = excluded.revision_id`,
+    request.show_id, revision.episode_id, nextLifecycleVersion, revision.revision_id);
+    const canonicalRevision = JSON.stringify(episodeRevisionSchema.parse(revision));
     this.storage.sql.exec(`INSERT INTO publication_episode_content (show_id, episode_id, guid, revision_json) VALUES (?, ?, ?, ?)
       ON CONFLICT(show_id, episode_id) DO UPDATE SET guid = excluded.guid, revision_json = excluded.revision_json`,
-    request.show_id, revision.episode_id, revision.guid, JSON.stringify(episodeRevisionSchema.parse(revision)));
+    request.show_id, revision.episode_id, revision.guid, canonicalRevision);
+    const nextSequence = (this.storage.sql.exec<{ seq: number | null }>(
+      "SELECT MAX(revision_sequence) AS seq FROM publication_episode_revisions WHERE show_id = ? AND episode_id = ?",
+      request.show_id, revision.episode_id).toArray()[0]?.seq ?? 0) + 1;
+    if (!Number.isSafeInteger(nextSequence) || nextSequence < 1) throw new Error("Episode revision sequence space is exhausted");
+    this.storage.sql.exec(`INSERT INTO publication_episode_revisions (show_id, episode_id, revision_sequence, revision_id,
+      audio_revision_id, metadata_sha256, revision_json, restored_from_revision_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    request.show_id, revision.episode_id, nextSequence, revision.revision_id, audioRevisionId,
+    options.metadataSha256, canonicalRevision, options.restoredFromRevisionId ?? null, revision.updated_at);
     this.advanceFeed(request);
   }
 
@@ -271,7 +527,7 @@ export class SqlitePublicationContent {
 
   commitLifecycle(request: SqlitePublicationRequest): void {
     const target = this.target(request);
-    if (request.action === "publish") throw new Error("A lifecycle commit cannot publish new content");
+    if (request.action !== "restore" && request.action !== "unpublish") throw new Error("A lifecycle commit cannot publish new content");
     const lifecycle = request.action === "restore" ? "published" : "unpublished";
     if (request.kind === "show") this.storage.sql.exec("UPDATE publication_shows SET lifecycle = ?, state_version = state_version + 1 WHERE show_id = ?", lifecycle, request.show_id);
     else this.storage.sql.exec("UPDATE publication_episodes SET lifecycle = ?, lifecycle_version = lifecycle_version + 1 WHERE show_id = ? AND episode_id = ?", lifecycle, request.show_id, request.episode_id!);

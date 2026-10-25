@@ -1,5 +1,5 @@
 import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, episodeDraftFromRevision, episodeRevisionSchema, parseEpisodeDraft, parsePublicAssetPath,
-  parseShowMetadata, sameEpisodeIdentity, stringifyToml, toHex } from "../packages/shared/src/index";
+  parseShowMetadata, parseEpisodeRevision, sameEpisodeIdentity, stringifyToml, toHex } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import type { SqlitePublicationRequest, SqliteVerifiedUpload } from "../packages/shared/src/sqlite-publication";
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../packages/shared/src/sqlite-service";
@@ -11,6 +11,7 @@ import { publicationChecksum, renderPublicationFeed } from "./publication-inputs
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 import { sqliteCoverSnapshotKey } from "./sqlite-cover";
 import type { SqliteCoverIdentity } from "./sqlite-cover";
+import { canonicalEnclosureUrl } from "./media-url";
 
 type ObjectHead = Pick<R2Object, "key" | "size" | "etag" | "version" | "customMetadata"> & { checksums: Pick<R2Checksums, "sha256"> };
 type ObjectBody = ObjectHead & { body?: ReadableStream<Uint8Array> };
@@ -20,10 +21,11 @@ export type SqlitePublicationBucket = {
   put: (key: string, body: string | Uint8Array | ReadableStream<Uint8Array>, options?: R2PutOptions) => Promise<ObjectHead | null>;
   list: (options: { prefix: string; limit: number }) => Promise<{ objects: Array<{ key: string }>; truncated: boolean }>;
 };
-type PreparedShow = { kind: "show"; request: SqlitePublicationRequest; metadata: ShowMetadata;
-  cover: Uint8Array; coverIdentity: SqliteCoverIdentity; extension: "jpg" | "png"; feed: string };
-type PreparedEpisode = { kind: "episode"; request: SqlitePublicationRequest; revision: EpisodeRevision;
-  audio?: SqliteVerifiedUpload; audioRevisionId: string; feed: string };
+type PreparedShow = { kind: "show"; request: SqlitePublicationRequest; metadata: ShowMetadata; metadataSha256: string;
+  updatedAt: string; cover?: Uint8Array; coverIdentity: SqliteCoverIdentity; extension: "jpg" | "png"; feed: string;
+  restoredFromRevisionId?: string };
+type PreparedEpisode = { kind: "episode"; request: SqlitePublicationRequest; revision: EpisodeRevision; metadataSha256: string;
+  audio?: SqliteVerifiedUpload; audioRevisionId: string; feed: string; restoredFromRevisionId?: string };
 type PreparedLifecycle = { kind: "lifecycle"; request: SqlitePublicationRequest; feed?: string };
 export type PreparedSqlitePublication = (PreparedShow | PreparedEpisode | PreparedLifecycle) & { feedGeneration: number };
 export type SqlitePublicationEffectFailure = { event: "sqlite_publication_effect_failed"; job_id: string; request_id: string;
@@ -63,6 +65,28 @@ async function readPayload(bucket: SqlitePublicationBucket, payload: SqliteVerif
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   if (await publicationChecksum(bytes) !== payload.sha256) throw new SqlitePublicationInputError("validation_failed");
   return bytes;
+}
+
+async function readSavedMetadata(bucket: SqlitePublicationBucket, key: string): Promise<string> {
+  const object = await bucket.get(key);
+  if (!object?.body || object.key !== key || object.size < 1 || object.size > 8_388_608) {
+    await object?.body?.cancel(); throw new SqlitePublicationInputError("validation_failed");
+  }
+  const reader = object.body.getReader(), chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const chunk = await reader.read(); if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > object.size) throw new SqlitePublicationInputError("validation_failed");
+      chunks.push(chunk.value);
+    }
+  } finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
+  if (size !== object.size) throw new SqlitePublicationInputError("validation_failed");
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return text(bytes);
 }
 
 function text(bytes: Uint8Array): string {
@@ -116,6 +140,7 @@ export async function verifyCover(bucket: SqlitePublicationBucket, showId: strin
 }
 
 async function persistCover(bucket: SqlitePublicationBucket, prepared: PreparedShow): Promise<void> {
+  if (!prepared.cover) return;
   const cover = prepared.coverIdentity;
   const key = sqliteCoverSnapshotKey(prepared.request.show_id, cover.generation, prepared.extension);
   const object = await bucket.put(key, prepared.cover, { onlyIf: new Headers({ "If-None-Match": "*" }), sha256: cover.sha256,
@@ -164,15 +189,15 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
       }
       const target = store.target(request);
       const episodes = request.kind === "show" && request.action === "unpublish" ? [] : store.episodes(request.show_id);
-      if (request.action === "publish" && request.kind === "episode" && target.base) {
+      if ((request.action === "publish" || request.action === "restore_revision") && request.kind === "episode" && target.base) {
         const media = audioKey(target.base, request.show_id);
         store.requireMedia(request.show_id, target.base, media.revisionId);
       }
-      if (request.action === "publish" && request.kind === "show" && target.show.lifecycle === "published") {
+      if ((request.action === "publish" || request.action === "restore_revision") && request.kind === "show" && target.show.lifecycle === "published") {
         await verifyCover(bucket, request.show_id, target.coverExtension!, target.cover!);
       }
       store.confirmCommittedReadBoundary(request);
-      if (request.action !== "publish") {
+      if (request.action === "unpublish" || request.action === "restore") {
         const restored = request.kind === "episode" && request.action === "restore" ? [target.base!] : [];
         const visible = request.kind === "episode" ? [...episodes.filter((episode) => episode.episode_id !== request.episode_id), ...restored] : episodes;
         if (request.action === "restore") {
@@ -189,11 +214,71 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         const writeFeed = request.kind === "show" ? request.action === "restore" : target.show.lifecycle === "published";
         return { kind: "lifecycle", request, feedGeneration, ...(writeFeed ? { feed: input(() => renderPublicationFeed(target.metadata!, visible, config.public_base_url, target.coverExtension!)) } : {}) };
       }
+      const timestamp = () => (effects.now ?? (() => new Date().toISOString().replace(/\.\d{3}Z$/, "Z")))();
+      if (request.action === "restore_revision") {
+        if (request.kind === "show") {
+          const source = store.showRevision(request.show_id, request.target_revision_id!, config.public_base_url);
+          if (!source || target.coverExtension !== source.cover.extension) throw new SqlitePublicationInputError("validation_failed");
+          if (await publicationChecksum(new TextEncoder().encode(JSON.stringify(source.metadata))) !== source.metadata_sha256) throw new Error("Stored Show metadata hash differs");
+          const savedSource = await readSavedMetadata(bucket, `system/shows/${request.show_id}/revisions/${source.revision_id}.toml`);
+          const saved = input(() => parseShowMetadata(savedSource));
+          if (JSON.stringify(saved) !== JSON.stringify(source.metadata)) throw new SqlitePublicationInputError("validation_failed");
+          await requireAbsent(bucket, `system/shows/${request.show_id}/revisions/${request.job_id}.toml`);
+          const coverIdentity = { generation: source.cover.generation, sha256: source.cover.sha256, lengthBytes: source.cover.length_bytes };
+          await verifyCover(bucket, request.show_id, source.cover.extension, coverIdentity);
+          if (target.show.lifecycle === "unpublished") {
+            for (const revision of episodes) {
+              const media = audioKey(revision, request.show_id);
+              store.requireMedia(request.show_id, revision, media.revisionId);
+              const object = await bucket.head(media.key);
+              const checksum = object?.checksums.sha256;
+              const hash = checksum ? toHex(checksum) : null;
+              if (!object || object.size !== revision.length_bytes || hash !== revision.sha256 || object.customMetadata?.sha256 !== revision.sha256) {
+                throw new SqlitePublicationInputError("validation_failed");
+              }
+            }
+          }
+          const feed = input(() => renderPublicationFeed(source.metadata, episodes, config.public_base_url, source.cover.extension));
+          return { kind: "show", request, feedGeneration, metadata: source.metadata, metadataSha256: source.metadata_sha256,
+            updatedAt: timestamp(), coverIdentity, extension: source.cover.extension, feed, restoredFromRevisionId: source.revision_id };
+        }
+        const source = store.episodeRevision(request.show_id, request.episode_id!, request.target_revision_id!, config.public_base_url);
+        if (!source || !sameEpisodeIdentity(source.metadata, episodeDraftFromRevision(target.base!))) {
+          throw new SqlitePublicationInputError("validation_failed");
+        }
+        if (await publicationChecksum(new TextEncoder().encode(JSON.stringify(source.metadata))) !== source.metadata_sha256) throw new Error("Stored Episode metadata hash differs");
+        const savedSource = await readSavedMetadata(bucket, `public/episodes/${request.show_id}/${request.episode_id}/revisions/${source.revision_id}.toml`);
+        const saved = input(() => parseEpisodeRevision(savedSource));
+        if (JSON.stringify({ ...saved, enclosure_url: canonicalEnclosureUrl(saved, request.show_id, config.public_base_url) }) !== JSON.stringify(source.revision)) {
+          throw new SqlitePublicationInputError("validation_failed");
+        }
+        await requireAbsent(bucket, `public/episodes/${request.show_id}/${request.episode_id}/revisions/${request.job_id}.toml`);
+        const revision = input(() => episodeRevisionSchema.parse({ ...source.metadata, revision_id: request.job_id,
+          enclosure_url: canonicalEnclosureUrl(source.revision, request.show_id, config.public_base_url),
+          content_type: "audio/mpeg", length_bytes: source.revision.length_bytes,
+          duration_seconds: source.revision.duration_seconds, sha256: source.revision.sha256,
+          updated_at: timestamp() }));
+        store.requireUniqueGuid(request.show_id, revision);
+        const media = audioKey(revision, request.show_id);
+        if (media.revisionId !== source.audio.audio_revision_id) throw new SqlitePublicationInputError("validation_failed");
+        store.requireMedia(request.show_id, revision, media.revisionId);
+        const object = await bucket.head(media.key);
+        const checksum = object?.checksums.sha256;
+        const hash = checksum ? toHex(checksum) : null;
+        if (!object || object.size !== revision.length_bytes || hash !== revision.sha256 || object.customMetadata?.sha256 !== revision.sha256) {
+          throw new SqlitePublicationInputError("validation_failed");
+        }
+        const feed = input(() => renderPublicationFeed(target.metadata!,
+          [...episodes.filter((episode) => episode.episode_id !== request.episode_id), revision], config.public_base_url, target.coverExtension!));
+        return { kind: "episode", request, feedGeneration, revision, metadataSha256: source.metadata_sha256,
+          audioRevisionId: media.revisionId, feed, restoredFromRevisionId: source.revision_id };
+      }
       if (request.kind === "show") {
         const metadataPayload = request.payloads.find((payload) => payload.asset === "show_metadata")!;
         const coverPayload = request.payloads.find((payload) => payload.asset.startsWith("cover_"))!;
         const metadataBytes = await readPayload(bucket, metadataPayload);
         const metadata = input(() => { const parsed = parseShowMetadata(text(metadataBytes)); assertShowMetadataInputLimits(parsed); return parsed; });
+        const metadataSha256 = await publicationChecksum(new TextEncoder().encode(JSON.stringify(metadata)));
         const cover = await readPayload(bucket, coverPayload);
         const extension = coverPayload.asset === "cover_png" ? "png" : "jpg";
         const signature = extension === "png" ? [137, 80, 78, 71, 13, 10, 26, 10] : [255, 216, 255];
@@ -205,9 +290,10 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
           await requireEmpty(bucket, `public/podcasts/${request.show_id}/`);
           await requireEmpty(bucket, `public/episodes/${request.show_id}/`);
         }
+        await requireAbsent(bucket, `system/shows/${request.show_id}/revisions/${request.job_id}.toml`);
         const feed = input(() => renderPublicationFeed(metadata, episodes, config.public_base_url, extension));
         const coverIdentity = { generation: store.publicationSequence(request), sha256: coverPayload.sha256, lengthBytes: cover.byteLength };
-        return { kind: "show", request, feedGeneration, metadata, cover, coverIdentity, extension, feed };
+        return { kind: "show", request, feedGeneration, metadata, metadataSha256, updatedAt: timestamp(), cover, coverIdentity, extension, feed };
       }
       const metadataPayload = request.payloads.find((payload) => payload.asset === "episode_metadata");
       const metadataBytes = metadataPayload ? await readPayload(bucket, metadataPayload) : null;
@@ -215,13 +301,14 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
       if (metadata.episode_id !== request.episode_id || target.base && !sameEpisodeIdentity(metadata, target.base)) {
         throw new SqlitePublicationInputError("validation_failed");
       }
+      const metadataSha256 = await publicationChecksum(new TextEncoder().encode(JSON.stringify(metadata)));
       const audio = request.payloads.find((payload) => payload.asset === "audio");
       if (audio && !matches(await bucket.head(audio.key), audio)) throw new SqlitePublicationInputError("validation_failed");
       const revision = input(() => episodeRevisionSchema.parse({ ...metadata, revision_id: request.job_id,
         enclosure_url: audio ? `${config.public_base_url.replace(/\/$/, "")}/podcasts/${request.show_id}/episodes/${request.episode_id}/${request.job_id}.mp3` : target.base!.enclosure_url,
         content_type: "audio/mpeg", length_bytes: audio?.length_bytes ?? target.base!.length_bytes,
         duration_seconds: audio?.duration_seconds ?? target.base!.duration_seconds, sha256: audio?.sha256 ?? target.base!.sha256,
-        updated_at: (effects.now ?? (() => new Date().toISOString().replace(/\.\d{3}Z$/, "Z")))() }));
+        updated_at: timestamp() }));
       store.requireUniqueGuid(request.show_id, revision);
       const media = audio ? input(() => audioKey(revision, request.show_id)) : audioKey(revision, request.show_id);
       if (!target.base) {
@@ -241,11 +328,11 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
       }
       const feed = input(() => renderPublicationFeed(target.metadata!,
         [...episodes.filter((episode) => episode.episode_id !== request.episode_id), revision], config.public_base_url, target.coverExtension!));
-      return { kind: "episode", request, feedGeneration, revision, audio, audioRevisionId: media.revisionId, feed };
+      return { kind: "episode", request, feedGeneration, revision, metadataSha256, audio, audioRevisionId: media.revisionId, feed };
     },
     async publish(prepared) {
       if (prepared.feedGeneration !== store.feedGeneration(prepared.request)) throw new Error("Prepared Feed generation differs");
-      if (prepared.kind === "show" && prepared.coverIdentity.generation !== store.publicationSequence(prepared.request)) throw new Error("Prepared cover generation differs");
+      if (prepared.kind === "show" && prepared.request.action === "publish" && prepared.coverIdentity.generation !== store.publicationSequence(prepared.request)) throw new Error("Prepared cover generation differs");
       const showId = prepared.request.show_id;
       const run = (phase: SqlitePublicationEffectFailure["phase"], operation: () => Promise<void>) => perform(prepared.request, phase, operation);
       if (prepared.kind === "lifecycle") {
@@ -254,6 +341,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         return;
       }
       if (prepared.kind === "show") {
+        await run("revision", () => put(bucket, `system/shows/${showId}/revisions/${prepared.request.job_id}.toml`, stringifyToml(prepared.metadata), "application/toml", true));
         await run("show_metadata", () => put(bucket, `system/shows/${showId}/show.toml`, stringifyToml(prepared.metadata), "application/toml"));
         await run("cover", () => persistCover(bucket, prepared));
       } else {
@@ -269,8 +357,10 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
     commit(prepared) {
       if (prepared.feedGeneration !== store.feedGeneration(prepared.request)) throw new Error("Prepared Feed generation differs");
       if (prepared.kind === "lifecycle") store.commitLifecycle(prepared.request);
-      else if (prepared.kind === "show") store.commitShow(prepared.request, prepared.metadata, prepared.extension, prepared.coverIdentity);
-      else store.commitEpisode(prepared.request, prepared.revision, prepared.audioRevisionId, prepared.audio !== undefined);
+      else if (prepared.kind === "show") store.commitShow(prepared.request, prepared.metadata, prepared.extension, prepared.coverIdentity, {
+        metadataSha256: prepared.metadataSha256, updatedAt: prepared.updatedAt, restoredFromRevisionId: prepared.restoredFromRevisionId });
+      else store.commitEpisode(prepared.request, prepared.revision, prepared.audioRevisionId, prepared.audio !== undefined, {
+        metadataSha256: prepared.metadataSha256, restoredFromRevisionId: prepared.restoredFromRevisionId });
     },
   };
 }
