@@ -422,4 +422,6 @@ RSS用に`GET /admin/sqlite-service/content-inventory/<showId>/<feedGeneration>[
 
 `main`の`56d7c4b`（Issue #67の観測コマンドと検証環境削除の記録まで）をmergeし、CLIヘルプと読取専用の効果表示を統合した。`progress`・`watch`も過去版採用journalを読み、送信前・応答不明・終端を区別する。Show/Episodeの成功job照会、送信前の無通信、応答不明後の404、既知結果に矛盾する応答について、再送やjournal更新を行わないことを追加確認した。型検査・Linuxビルド・オフライン試験も統合後に再実行して成功した。
 
+PR作成前に`main`の`9e63fbf`（v0.7.4リリース準備とWindowsチェックサム修正まで）もmergeした。リリース済みv0.7.4の形式7/7と、本Issueの未リリース開発形式7/8をREADME・CHANGELOGで区別する。
+
 これらは模擬CloudflareとローカルSQLiteの機能試験であり、Cloudflare実機のCPU時間・無料枠適合やWindows/macOS動作の実証ではない。実Cloudflareへの配備・公開・資源変更は実施していない。内部形式7/8の新規環境が必要で、既存環境の変換は追加していない。
