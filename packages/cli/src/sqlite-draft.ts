@@ -3,7 +3,7 @@ import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, parseEpis
   sqliteServiceConfigSchema, sqliteVerifiedUploadSchema } from "@castloop/shared";
 import type { EpisodeDraft, ShowMetadata, SqlitePublicationStatus, SqliteServiceConfig, StagePayload } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
-import { openSqliteDraftJournal, requireSqliteStatus, sqliteDraftAssetSchema } from "./sqlite-draft-journal";
+import { openSqliteDraftJournal, requireSqliteStatus, sqliteDraftAssetSchema, sqliteDraftRequestTarget } from "./sqlite-draft-journal";
 import type { SqliteDraftJournal, SqliteDraftRecord, SqliteDraftTarget } from "./sqlite-draft-journal";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
 import type { SqliteManagementReadBudget } from "./sqlite-management-http";
@@ -168,10 +168,23 @@ export class SqliteDraft {
       if (record.publication) return this.observeRecord(record);
       const checkPreview = async () => {
         if (!expectedPreview) return;
-        const preview = await draftPreview(this.root, this.config, record.target, record);
-        if (preview.input_fingerprint !== expectedPreview || !preview.inputs_match_staged) {
+        const local = await draftPreview(this.root, this.config, record.target, record, { mode: "local" });
+        if (!local.inputs_match_staged) {
           throw new AgentError("preview_changed", "Reviewed inputs differ; preview and obtain approval again before publication.");
         }
+        if (local.input_fingerprint === expectedPreview) {
+          const inspected = await this.service.inspect(record.target.show_id, record.target.episode_id);
+          if (inspected.expected_show_state_version === record.target.expected_show_state_version &&
+            inspected.base_revision_id === record.target.base_revision_id &&
+            (inspected.expected_episode_lifecycle_version ?? 0) === (record.target.expected_episode_lifecycle_version ?? 0) &&
+            (!record.target.base_show_metadata_sha256 || inspected.base_show_metadata_sha256 === record.target.base_show_metadata_sha256) &&
+            (!record.target.base_cover_sha256 || inspected.base_cover_sha256 === record.target.base_cover_sha256) &&
+            (!record.target.base_metadata_sha256 || inspected.base_metadata_sha256 === record.target.base_metadata_sha256)) return;
+        } else {
+          const preview = await draftPreview(this.root, this.config, record.target, record, { mode: "remote", client: this.service });
+          if (preview.input_fingerprint === expectedPreview && preview.publishable) return;
+        }
+        throw new AgentError("preview_changed", "Reviewed local inputs or published base differ; preview and obtain approval again.");
       };
       await checkPreview();
       const service = await this.client.describe(record.target.show_id);
@@ -182,7 +195,7 @@ export class SqliteDraft {
         await assertLocalStagingSource(entry.source_path, { asset: entry.upload.asset,
           length_bytes: entry.upload.length_bytes, sha256: entry.upload.sha256 });
       }
-      const { base_metadata_sha256: _, ...target } = record.target;
+      const target = sqliteDraftRequestTarget(record.target);
       const request = parseSqlitePublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", ...target,
         service_id: this.config.service_id, request_id: crypto.randomUUID(), action: "publish",
         worker_version_id: service.worker_version_id, service_config_sha256: service.service_config_sha256,

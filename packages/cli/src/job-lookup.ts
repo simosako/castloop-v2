@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { sqlitePublicationRequestHash, sqlitePublicationRequestSchema, sqliteServiceConfigHash, validateId } from "@castloop/shared";
-import type { SqlitePublicationRequest, SqliteServiceConfig } from "@castloop/shared";
+import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteServiceConfig } from "@castloop/shared";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { readSqliteArchivedDraft, readSqliteDraftRecord } from "./sqlite-draft-journal";
 import type { SqliteDraftRecord } from "./sqlite-draft-journal";
 import { completedDomainConfiguration } from "./sqlite-domain-local";
+import { readRevisionJob } from "./sqlite-revision-commands";
 import { ensureLocalJournalParents } from "./local-journal-path";
 import { sqliteUploadRecordSchema } from "./sqlite-upload";
 import type { SqliteUploadRecord } from "./sqlite-upload";
@@ -14,6 +15,8 @@ import { join } from "node:path";
 const lifecycleRecordSchema = z.object({ request: sqlitePublicationRequestSchema, request_sha256: z.string().regex(/^[a-f0-9]{64}$/) });
 
 export type SqliteJobResolution =
+  | { source: "revision"; jobId: string; showId: string; episodeId: string | undefined;
+      request: SqlitePublicationRequest; requestSha256: string; observationConfig: SqliteServiceConfig; submitted: boolean; status: SqlitePublicationStatus | null }
   | { source: "lifecycle"; jobId: string; showId: string; episodeId: string | undefined;
       request: SqlitePublicationRequest; observationConfig: SqliteServiceConfig }
   | { source: "draft"; jobId: string; showId: string; episodeId: string | undefined; record: SqliteDraftRecord }
@@ -22,6 +25,12 @@ export type SqliteJobResolution =
 
 export async function resolveSqliteJob(root: string, config: SqliteServiceConfig, jobId: string): Promise<SqliteJobResolution | null> {
   const id = z.uuid().parse(jobId);
+  const revision = await readRevisionJob(root, config, id);
+  if (revision) {
+    const { record, observationConfig } = revision;
+    return { source: "revision", jobId: id, showId: record.request.show_id, episodeId: record.request.episode_id,
+      request: record.request, requestSha256: record.request_sha256, observationConfig, submitted: record.phase === "requested", status: record.status ?? null };
+  }
   try {
     const record = lifecycleRecordSchema.parse(createLocalJournalStorage(root, "sqlite-lifecycle", config.service_id, `${id}.json`).read());
     if (record.request.job_id !== id || record.request.service_id !== config.service_id ||

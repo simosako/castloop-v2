@@ -168,18 +168,18 @@ Summary: 6 pass, 3 warn, 1 fail, 0 not checked
 | 案 | 内容 | メリット | デメリット |
 | --- | --- | --- | --- |
 | B1: `job-status`へprogress欄を追加 | 既存コマンドの拡張 | コマンド増なし | `job-status`は「statusをそのまま返す」契約で、合成表示を載せると意味が変わる。lifecycle/archived検索との組み合わせで出力が複雑化 |
-| B2: 新規`progress JOB` コマンド（**推奨**） | local journal・remote job状態・operation eventsを合成したフェーズ表示 | 「見える範囲だけ・不明は不明」という表示に専念できる。`job-status`のlookup処理（lifecycle→archived→drafts）を再利用し、job解決は既存と同じ | コマンドが1つ増える |
+| B2: 新規`progress JOB` コマンド（**推奨**） | local journal・remote job状態・operation eventsを合成したフェーズ表示 | 「見える範囲だけ・不明は不明」という表示に専念できる。既存の`job-status`と同じjournal検索を使う | コマンドが1つ増える |
 | B3: `publish-*`の待機出力だけ強化 | wait()の表示を豊かにする | 追加コマンドなし | CLI終了後・他端末からの事後確認ができない。Issueの「後から把握する」用途を満たさない |
 
 **決定（2026-10-24レビュー）: 案B2。** 進捗表示は独立した読取コマンドとし、`publish-*`のwait()は現状維持（段階Dのwatchが待機中の豊富な表示を担う）。
 
 ### 6.2 フェーズモデル
 
-job解決は`job-status`と同じchain（lifecycle journal → archived publication → draft journals → remote観測）を使う。各フェーズは固定順で、状態は`done`/`in_progress`/`pending`/`unknown`/`not_applicable`の5値のみ。
+job解決は`job-status`と同じ検索順（revision journal → lifecycle journal → archived publication → draft journals → remote観測）を使う。Issue #64との統合で追加したrevision journalは、保存済み素材を使う過去版採用の記録である。`job.source="revision"`として表示し、uploadフェーズは持たない。送信開始前は`draft`・送信フェーズ`pending`、開始後の応答不明は`unknown`・送信フェーズ`unknown`とする。保存済みstatusを使う場合はstaleを明示し、観測によるjournal更新や再送は行わない。各フェーズは固定順で、状態は`done`/`in_progress`/`pending`/`unknown`/`not_applicable`の5値のみ。
 
 | phase | 主ソース | 判定材料 |
 | --- | --- | --- |
-| `input_frozen` | local draft journal | target 凍結・`input_fingerprint` |
+| `input_frozen` | local draft / lifecycle / revision journal | draftのtarget・入力の凍結、または計画の保持・要求hashの検証 |
 | `upload:audio` / `upload:metadata` / `upload:cover`（資産ごと） | local journal + operation記録 | `prepared`→`put_requested`→`put_acknowledged`→`verified`（全量readback完了）→`attached` |
 | `publication_submitted` | local journal + `jobs` GET | 凍結要求とqueued受付（sequence） |
 | `fifo_waiting` | `jobs` GET + `health` | state=queued。待機理由を導出（下記）。FIFO内順位は未提供のため表示しない（queued総数のみ） |
@@ -200,7 +200,7 @@ job解決は`job-status`と同じchain（lifecycle journal → archived publicat
 
 ## 7. 機能C: 外形確認 `verify SHOW_ID [--episode EPISODE_ID]`
 
-「処理成功」（server内でjobがsucceeded）と「配信を確認できた」（公開originから取得でき、既知の期待と一致した）を別々に報告する。管理key不要・公開pathのみへのGET/HEADで、管理APIには一切触れない。期待値はworkspaceのlocal記録（draft/publication journal・show.toml・episode TOML）から取り、無い比較は`not_checked`にする（公開全文の管理API取得は未提供という既存方針のまま）。
+「処理成功」（server内でjobがsucceeded）と「配信を確認できた」（公開originから取得でき、既知の期待と一致した）を別々に報告する。管理key不要・公開pathのみへのGET/HEADで、管理APIには一切触れない。期待値はworkspaceのlocal記録（draft/publication journal・show.toml・episode TOML）から取り、無い比較は`not_checked`にする。Issue #64の認証付き全文APIは`verify`では使わない。過去版採用は原本を自動更新しないため、古いlocal期待値との不一致と実際の配信障害を区別する。
 
 ### 7.1 HTTP手法の候補
 
@@ -248,7 +248,7 @@ job解決は`job-status`と同じchain（lifecycle journal → archived publicat
 - 観測対象は`progress`と同じjob解決chain。remote観測は`jobs/{request_id}` GET（Show scoped）。応答喪失時は既定の有限retryの後、`observation_gap`として最終既知状態を維持する。一度でも観測済みのjobが消失した場合は`unobservable`（code: `job_missing`）で即時終了し、継続pollしない。
 - 終端（succeeded/failed/blocked）を観測した時点、または予算消費で`unobservable`（code: `budget_exhausted`）となった時点で終了する。blockedは「解消を待つ」対象ではなく終端として扱う（解消は明示的な運用操作）。
 - SIGINTでは追加pollを行わず終了130とする（最終の外枠文書は出さない）。実行中のGETはbounded readerの中断で決着させ、localへの書込みはないため保全すべき追加状態は生じない。
-- watchは読取専用でlocalへの書込みを行わない。並列実行・再実行は安全であり、同一の終端を再報告するだけである（最終既知状態の保持は`publish-*`/lifecycle実行の既存journalが担う）。
+- watchは読取専用でlocalへの書込みを行わない。並列実行・再実行は安全であり、同一の終端を再報告するだけである（最終既知状態の保持は`publish-*`/lifecycle/過去版採用を実行する既存journalが担う）。過去版採用の送信前計画にはpollせず、保存済み受付記録があるjobの消失は`job_missing`とする。保存済みstatusや直前の観測に矛盾する応答は観測欠測として扱い、終端成功へ変換しない。
 - watchは`--verify`のような合成flagを持たない（2026-10-25レビュー: 案B）。観測終端が`succeeded`のとき、最終報告の`next_actions`に外形確認を含め、agentが次の操作として`verify`コマンド（`show_id`引数付き）を実行できるようにする。処理成功と配信確認は別コマンド＝別報告として分離する。
 
 ### 8.3 通知経路の決定（CLI完結）
@@ -324,7 +324,7 @@ job解決は`job-status`と同じchain（lifecycle journal → archived publicat
 - CLI以外の通知経路（外部webhook・SaaS連携・メール・OS通知等）。常駐daemon。必要になった時点で別Issueとして再設計する。
 - ログ（tail・保存ログ）に基づく判定。CPU時間の推定。
 - Worker管理API・永続形式の変更。全Show横断索引の新設。
-- 公開済み全文の管理API取得・field差分表示（既存の未提供方針を維持）。
+- 公開済み全文の管理API取得・field差分表示は[Issue #64](published_diff_and_revision_restore_plan.md)で扱い、このIssueの観測コマンドからは追加取得しない。
 - 音源全量downloadによる監視・確認（提供しない。将来再検討の可能性は残すが、本Issueの範囲外）。
 
 ## 13. 安全条件・受け入れ条件との対応

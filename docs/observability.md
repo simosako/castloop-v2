@@ -32,7 +32,9 @@ Issue #67で追加した読取専用の観測コマンドの使い分けと出�
 
 ## progress
 
-job-statusと同じ解決chain（lifecycle journal → 公開済みarchive → draft journal）で対象jobを特定し、進捗をフェーズ表として表示する。各フェーズは `done` / `in_progress` / `pending` / `unknown` / `not_applicable` の5値で、観測できないもの（FIFO内順位、実行の内部段階、cache purge）は`unknown`のまま表示し、完了や0値へ変換しない。
+job-statusと同じ検索順（過去版採用のrevision journal → lifecycle journal → 公開済みarchive → draft journal）で対象jobを特定し、進捗をフェーズ表として表示する。各フェーズは `done` / `in_progress` / `pending` / `unknown` / `not_applicable` の5値で、観測できないもの（FIFO内順位、実行の内部段階、cache purge）は`unknown`のまま表示し、完了や0値へ変換しない。
+
+Issue #64の過去版採用jobは`job.source="revision"`となり、素材uploadのフェーズは表示しない。計画保存のみで送信を始めていなければ`state="draft"`、送信開始済みでも受付を確認できなければ`state="unknown"`とする。remote取得失敗時に保存済みstatusを表示する場合は`observation.stale=true`を付ける。記録の書換え・再送・修復は行わない。
 
 待機理由（`waiting_reason`）はjobが`queued`のときだけ導出される:
 
@@ -60,7 +62,7 @@ job-statusと同じ解決chain（lifecycle journal → 公開済みarchive → d
 | `audio`（`--episode`時） | `audio_served` / `audio_missing` / `audio_content_mismatch` / `audio_no_local_expectation` / `audio_not_requested` |
 | `unpublished-episodes` | `unpublished_not_linked` / `linked_without_publication_evidence`（未公開のEpisodeがfeedに載っている）/ `no_unpublished_episodes` |
 
-公開済み全文の管理API取得は未提供のため、local原本・journalがない比較は`not_checked`になる。
+Issue #64で認証付き全文取得APIを追加したが、`verify`は管理鍵不要・公開pathのみの契約を維持するため使用しない。local原本・journalがない比較は`not_checked`になる。過去版採用後も原本は自動更新されないため、比較対象が古い場合は[公開内容の確認・書出し](published_content_review.md)で確認し、古いlocal期待値との不一致を直ちに配信障害と判断しない。
 
 ## watch
 
@@ -69,6 +71,7 @@ job-statusと同じ解決chain（lifecycle journal → 公開済みarchive → d
 - 予算: `--timeout`既定600秒（上限3600）、`--interval`既定5秒（1〜60）、poll回数の絶対上限720。各pollは管理APIへのbounded GET（3回/30秒）。
 - blockedは「解消を待つ」対象ではなく終端として扱う。解消は明示的な運用操作。
 - 観測済みのjobが消失した場合は `unobservable`（`job_missing`）で即時終了する。
+- 過去版採用jobも対象にする。送信前の計画はpollせず`job_not_submitted`を返す。応答不明の送信に対する404は未実行の証明にせず、有限観測を続ける。保存済みstatusで受付を確認できているjobの消失は`job_missing`、保存済み結果に矛盾する応答は観測欠測として扱い、成功・再送へ変換しない。
 - 通知はCLI完結（外部送信なし）。SIGINTは終了130で、最終文書を出さない。
 
 終了code:

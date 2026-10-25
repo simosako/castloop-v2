@@ -26,10 +26,14 @@ import { showTemplate, episodeTemplate } from "./input-templates";
 import { continueSqliteDomainChange, listSqliteDomains, sqliteDomainOperationStatus, startSqliteDomainChange } from "./sqlite-domain-operation";
 import { sqliteDomainHostnameSchema } from "../../shared/src/sqlite-domain";
 import { completedDomainConfiguration } from "./sqlite-domain-local";
+import { executeRevision, previewRevision, readRevisionPlanFile, readRevisionStatus, syncLocalMetadata } from "./sqlite-revision-commands";
+import { exportPreviewRss } from "./preview-rss";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
+  previewOptions?: { mode?: "auto" | "local" | "remote"; rssOutput?: string };
+  revisionOptions?: { cursor?: string; episodeId?: string; expectedRevision?: string; output?: string };
   domainOptions?: { zoneId?: string; operationId?: string; cursor?: string };
   listOptions?: { includeDeleted?: boolean; cursor?: string }; operationOptions?: OperationReadOptions;
   diagnoseOptions?: { maxShows?: number; external?: boolean; environment?: Readonly<Record<string, string | undefined>> };
@@ -38,6 +42,8 @@ export type SqliteCommandOptions = { workerSource?: () => Promise<string>; trans
   parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "preview-show": [1], "preview-episode": [1],
+  "list-show-revisions": [1], "list-episode-revisions": [1], "preview-show-revision": [2], "preview-episode-revision": [2],
+  "revision-execute": [3], "sync-local-metadata": [0],
   "create-show": [2], "create-episode": [1], "update-show": [1], "publish-show": [1],
   "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
   "service-status": [0], "show-status": [1], "show-pause": [2], "show-resume": [2], "target-show": [1], "target-episode": [2],
@@ -92,8 +98,13 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (command === "preview-show" || command === "preview-episode") {
     const episode = command === "preview-episode";
     if (args.length !== (episode ? 2 : 1)) throw new Error("Invalid preview arguments");
-    return draftPreview(root, config, { kind: episode ? "episode" : "show", show_id: validateId(args[0], "show"),
-      ...(episode ? { episode_id: validateId(args[1], "episode") } : {}) });
+    const mode = options.previewOptions?.mode ?? "auto";
+    const client = mode === "local" || !options.transport ? undefined : new SqliteServiceClient(config, administratorKey(root), options.transport);
+    const result = await draftPreview(root, config, { kind: episode ? "episode" : "show", show_id: validateId(args[0], "show"),
+      ...(episode ? { episode_id: validateId(args[1], "episode") } : {}) }, undefined, { mode, client });
+    const rss = options.previewOptions?.rssOutput ? await exportPreviewRss(root, config, result,
+      client ?? new SqliteServiceClient(config, administratorKey(root), options.transport), options.previewOptions.rssOutput) : { status: "not_checked" };
+    return { ...result, rss_preview: rss };
   }
   const cf = options.cloudflare ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" };
   if (command === "domain") {
@@ -121,6 +132,20 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     return verifyShowDelivery(root, config, validateId(args[0], "show"), options.verifyOptions?.episodeId, options.transport);
   }
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);
+  if (command === "list-show-revisions" && args.length === 1 || command === "list-episode-revisions" && args.length === 2) {
+    return client.revisions(validateId(args[0], "show"), args[1] === undefined ? undefined : validateId(args[1], "episode"), options.revisionOptions?.cursor);
+  }
+  if (command === "preview-show-revision" && args.length === 2 || command === "preview-episode-revision" && args.length === 3) {
+    return previewRevision(config, key, validateId(args[0], "show"), z.uuid().parse(args.at(-1)),
+      command === "preview-episode-revision" ? validateId(args[1], "episode") : undefined, options.transport);
+  }
+  if (command === "revision-execute" && args.length === 3) {
+    return executeRevision(root, config, key, readRevisionPlanFile(resolve(root, args[0])), args[1], args[2], options.transport);
+  }
+  if (command === "sync-local-metadata" && args.length === 1 && options.revisionOptions?.expectedRevision) {
+    return syncLocalMetadata(root, config, key, validateId(args[0], "show"), options.revisionOptions.expectedRevision,
+      options.revisionOptions.episodeId, options.revisionOptions.output, options.transport);
+  }
   const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf,
     parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared };
   if (command === "init-reconcile" && args.length === 1) return reconcileSqliteInitialization(root, config, args[0], cf);
@@ -197,6 +222,8 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   }
   if (command === "job-status" && args.length === 1) {
     const jobId = z.uuid().parse(args[0]);
+    const revision = await readRevisionStatus(root, config, key, jobId, options.transport);
+    if (revision !== undefined) return { job_id: jobId, status: revision, snapshot_only: true, authorizes_recovery: false };
     const lifecycleStatus = await readSqliteLifecycleStatus(root, config, key, jobId, options.transport);
     if (lifecycleStatus !== undefined) return { job_id: jobId, status: lifecycleStatus, snapshot_only: true, authorizes_recovery: false };
     const archived = await readSqliteArchivedDraft(root, config, jobId);
@@ -259,6 +286,8 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     if (inspected.state !== "open" || !["draft", "published"].includes(inspected.show_lifecycle) || inspected.expected_show_state_version === null ||
       episodeCommand && (inspected.show_lifecycle !== "published" || !["missing", "published"].includes(inspected.episode_lifecycle!))) throw new Error("SQLite target is not available for this draft");
     target = { ...targetId, job_id: crypto.randomUUID(), expected_show_state_version: inspected.expected_show_state_version,
+      ...(inspected.base_show_metadata_sha256 ? { base_show_metadata_sha256: inspected.base_show_metadata_sha256,
+        base_cover_sha256: inspected.base_cover_sha256 } : {}),
       ...(episodeCommand ? { expected_episode_lifecycle_version: inspected.expected_episode_lifecycle_version } : {}),
       ...(inspected.base_revision_id ? { base_revision_id: inspected.base_revision_id, base_metadata_sha256: inspected.base_metadata_sha256 } : {}) };
   }

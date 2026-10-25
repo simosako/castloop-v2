@@ -9,6 +9,7 @@ const familyServices = {
   "sqlite-drafts": "service", "sqlite-uploads": "service", "sqlite-publications": "service",
   "sqlite-initializations": "service", "sqlite-registrations": "service", "sqlite-controls": "service",
   "sqlite-lifecycle": "service", "sqlite-rss-imports": "service", "sqlite-service-updates": "service", "sqlite-domain-changes": "service",
+  "sqlite-revisions": "service",
   "rss-import-downloads": undefined,
   "sqlite-client": "service", "sqlite-operation-requests": "service",
 } satisfies Record<JournalFamily, string | undefined>;

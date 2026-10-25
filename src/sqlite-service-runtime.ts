@@ -1,4 +1,7 @@
 import { episodeDraftFromRevision } from "../packages/shared/src/index";
+import { sqliteContentSnapshotSchema, sqliteRevisionDetailResponseSchema,
+  sqliteRevisionListResponseSchema, sqlitePreviewInventorySchema } from "../packages/shared/src/sqlite-revisions";
+import type { SqliteContentSnapshot, SqliteRevisionDetailResponse, SqliteRevisionListResponse } from "../packages/shared/src/sqlite-revisions";
 import { sqliteRuntimeRequestSchema, sqliteHealthSchema, sqliteInspectionSchema } from "../packages/shared/src/sqlite-service-api";
 import type { SqliteHealth, SqliteInspection, SqliteRuntimeRequest } from "../packages/shared/src/sqlite-service-api";
 import { parseSqliteServiceConfig, sqliteServiceConfigHash } from "../packages/shared/src/sqlite-service";
@@ -55,6 +58,7 @@ export class SqliteServiceRuntime {
       feed_generation_allocator: "reservation-v1",
       domain_changes: "sqlite-domain-change-v1",
       availability_controls: "show-admission-delivery-v1", availability_version: snapshot.availability_version,
+      revision_history: "sqlite-revisions-v1",
       admission_state: snapshot.state === "open" ? "open" : "closed", delivery_policy: snapshot.state === "paused" ? "stopped" : "enabled",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
@@ -143,11 +147,101 @@ export class SqliteServiceRuntime {
     const snapshot = this.queue.snapshot(), target = this.content.inspect(showId, episodeId);
     const digest = target.base ? await publicationChecksum(new TextEncoder().encode(JSON.stringify(episodeDraftFromRevision(target.base)))) : undefined;
     return sqliteInspectionSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
+      revision_history: "sqlite-revisions-v1",
       state: snapshot.state, admission_window_id: snapshot.admission_window_id, show_id: showId,
       show_lifecycle: target.show?.lifecycle ?? "missing", reservation_id: target.show?.reservation_id ?? null,
       expected_show_state_version: target.show?.state_version ?? null,
+      ...(target.showRevision ? {
+        base_show_revision_id: target.showRevision.revision_id,
+        base_show_metadata_sha256: target.showRevision.metadata_sha256,
+        base_cover_sha256: target.showRevision.cover_sha256,
+        base_cover_extension: target.showRevision.cover_extension,
+        base_cover_generation: target.showRevision.cover_generation,
+      } : {}),
       ...(episodeId !== undefined ? { episode_id: episodeId, episode_lifecycle: target.episode?.lifecycle ?? "missing",
         expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0 } : {}),
       ...(target.base ? { base_revision_id: target.base.revision_id, base_metadata_sha256: digest } : {}) });
+  }
+  contentSnapshot(showId: string, episodeId?: string): SqliteContentSnapshot {
+    if (!this.ready()) throw new Error("SQLite runtime is not ready");
+    return this.storage.transactionSync(() => {
+      const snapshot = this.queue.snapshot(), target = this.content.inspect(showId, episodeId);
+      const stats = this.content.inventoryStats(showId);
+      const showContent = this.content.currentShowRevision(showId, this.config.public_base_url);
+      const episodeContent = episodeId === undefined ? undefined : this.content.currentEpisodeRevision(showId, episodeId, this.config.public_base_url);
+      return sqliteContentSnapshotSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
+        state: snapshot.state, admission_window_id: snapshot.admission_window_id, show_id: showId,
+        show_lifecycle: target.show?.lifecycle ?? "missing", reservation_id: target.show?.reservation_id ?? null,
+        expected_show_state_version: target.show?.state_version ?? null, feed_generation: target.show?.feed_generation ?? null,
+        published_episode_count: stats.count, published_inventory_chars: stats.chars, show_content: showContent,
+        ...(episodeId !== undefined ? { episode_id: episodeId, episode_lifecycle: target.episode?.lifecycle ?? "missing",
+          expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0, episode_content: episodeContent } : {}),
+        snapshot_only: true, authorizes_recovery: false });
+    });
+  }
+  previewInventory(showId: string, feedGeneration: number, after?: string) {
+    if (!this.ready()) throw new Error("SQLite runtime is not ready");
+    return this.storage.transactionSync(() => {
+      const target = this.content.inspect(showId);
+      if (target.show?.feed_generation !== feedGeneration) throw new Error("Preview Feed base changed");
+      const rows = this.content.episodePage(showId, after);
+      return sqlitePreviewInventorySchema.parse({ ...this.queue.identity(), show_id: showId,
+        feed_generation: feedGeneration, after: after ?? null, episodes: rows.items, next_cursor: rows.nextCursor });
+    });
+  }
+  revisions(showId: string, options: { episodeId?: string; afterSequence?: number } = {}): SqliteRevisionListResponse {
+    if (!this.ready()) throw new Error("SQLite runtime is not ready");
+    return this.storage.transactionSync(() => {
+      const snapshot = this.queue.snapshot(), target = this.content.inspect(showId, options.episodeId);
+      const currentShow = this.content.currentShowRevision(showId, this.config.public_base_url);
+      if (options.episodeId !== undefined) {
+        const list = this.content.listEpisodeRevisions(showId, options.episodeId, this.config.public_base_url, options.afterSequence);
+        return sqliteRevisionListResponseSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
+          state: snapshot.state, kind: "episode", show_id: showId, episode_id: options.episodeId,
+          show_lifecycle: target.show?.lifecycle ?? "missing", expected_show_state_version: target.show?.state_version ?? null,
+          current_show_revision_id: currentShow?.revision_id ?? null, episode_lifecycle: target.episode?.lifecycle ?? "missing",
+          expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0, current_episode_revision_id: list.currentRevisionId,
+          next_cursor: list.nextCursor, episode_revisions: list.items, snapshot_only: true, authorizes_recovery: false });
+      }
+      const list = this.content.listShowRevisions(showId, this.config.public_base_url, options.afterSequence);
+      return sqliteRevisionListResponseSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
+        state: snapshot.state, kind: "show", show_id: showId, show_lifecycle: target.show?.lifecycle ?? "missing",
+        expected_show_state_version: target.show?.state_version ?? null, current_show_revision_id: list.currentRevisionId,
+        next_cursor: list.nextCursor, show_revisions: list.items, snapshot_only: true, authorizes_recovery: false });
+    });
+  }
+  revisionDetail(showId: string, revisionId: string, episodeId?: string): SqliteRevisionDetailResponse | null {
+    if (!this.ready()) throw new Error("SQLite runtime is not ready");
+    return this.storage.transactionSync(() => {
+      const snapshot = this.queue.snapshot(), target = this.content.inspect(showId, episodeId);
+      if (!target.show || (target.show.lifecycle !== "published" && target.show.lifecycle !== "unpublished")) {
+        throw new Error("Show has no published revision history");
+      }
+      const currentShow = this.content.currentShowRevision(showId, this.config.public_base_url);
+      if (!currentShow) throw new Error("Current Show revision is missing");
+      if (episodeId !== undefined) {
+        if (!target.episode || (target.episode.lifecycle !== "published" && target.episode.lifecycle !== "unpublished")) {
+          throw new Error("Episode has no published revision history");
+        }
+        const currentEpisode = this.content.currentEpisodeRevision(showId, episodeId, this.config.public_base_url);
+        if (!currentEpisode) throw new Error("Current Episode revision is missing");
+        const targetEpisodeRevision = this.content.episodeRevision(showId, episodeId, revisionId, this.config.public_base_url);
+        if (!targetEpisodeRevision) return null;
+        return sqliteRevisionDetailResponseSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
+          state: snapshot.state, admission_window_id: snapshot.admission_window_id, kind: "episode",
+          show_id: showId, episode_id: episodeId, show_lifecycle: target.show.lifecycle,
+          expected_show_state_version: target.show.state_version, current_show: currentShow,
+          episode_lifecycle: target.episode.lifecycle, expected_episode_lifecycle_version: target.episode.lifecycle_version,
+          current_episode: currentEpisode, target_episode_revision: targetEpisodeRevision,
+          snapshot_only: true, authorizes_recovery: false });
+      }
+      const targetShowRevision = this.content.showRevision(showId, revisionId, this.config.public_base_url);
+      if (!targetShowRevision) return null;
+      return sqliteRevisionDetailResponseSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
+        state: snapshot.state, admission_window_id: snapshot.admission_window_id, kind: "show",
+        show_id: showId, show_lifecycle: target.show.lifecycle, expected_show_state_version: target.show.state_version,
+        current_show: currentShow, target_show_revision: targetShowRevision,
+        snapshot_only: true, authorizes_recovery: false });
+    });
   }
 }

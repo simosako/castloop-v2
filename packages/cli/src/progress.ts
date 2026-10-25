@@ -4,6 +4,7 @@ import type { SqlitePublicationStatus, SqliteServiceConfig } from "@castloop/sha
 import { sqliteUploadRecordSchema } from "./sqlite-upload";
 import type { SqliteUploadRecord } from "./sqlite-upload";
 import { findSqliteUploadRecord, resolveSqliteJob } from "./job-lookup";
+import { requireSqliteStatus } from "./sqlite-draft-journal";
 import { administratorKey } from "./administrator-key";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { SqliteServiceClient } from "./sqlite-service-client";
@@ -18,7 +19,7 @@ export const progressPhaseSchema = z.object({
 }).strict();
 export const progressResultSchema = z.object({
   schema_version: z.literal(1),
-  job: z.object({ job_id: z.uuid(), source: z.enum(["lifecycle", "publication", "draft"]),
+  job: z.object({ job_id: z.uuid(), source: z.enum(["revision", "lifecycle", "publication", "draft"]),
     kind: z.enum(["show", "episode"]), show_id: z.string(), episode_id: z.string().optional() }).strict(),
   status: sqlitePublicationStatusSchema.nullable(),
   state: z.enum(["draft", "queued", "running", "succeeded", "failed", "blocked", "unknown"]),
@@ -45,25 +46,28 @@ export async function readSqliteJobProgress(root: string, config: SqliteServiceC
   const resolution = await resolveSqliteJob(root, config, jobId);
   if (!resolution) throw new Error("No matching SQLite job journal");
   const key = administratorKey(root);
-  const record = resolution.source === "lifecycle" ? null : resolution.record;
+  const record = resolution.source === "publication" || resolution.source === "draft" ? resolution.record : null;
+  const unsubmitted = resolution.source === "draft" || resolution.source === "revision" && !resolution.submitted;
+  const retainedStatus = resolution.source === "revision" ? resolution.status : record?.publication?.status;
   let status: SqlitePublicationStatus | null = null;
   let observed = false;
   let stale = false;
-  if (resolution.source !== "draft") {
+  if (resolution.source !== "draft" && !unsubmitted) {
     try {
       status = await new SqlitePublicationClient(resolution.observationConfig, key, transport).observe(resolution.request);
-      if (status === null && resolution.source === "publication" && resolution.record.publication!.status) {
+      if (status === null && retainedStatus) {
         throw new Error("Previously acknowledged SQLite job is missing remotely; preserve its result");
       }
+      if (status && resolution.source === "revision") requireSqliteStatus(resolution.request, resolution.requestSha256, status, retainedStatus ?? undefined);
       observed = status !== null;
     } catch (error) {
-      if (resolution.source === "publication" && resolution.record.publication!.status) {
-        status = resolution.record.publication!.status;
+      if (retainedStatus) {
+        status = retainedStatus;
         stale = true;
       } else throw error;
     }
   }
-  const state: ProgressResult["state"] = resolution.source === "draft" ? "draft" : status ? status.state : "unknown";
+  const state: ProgressResult["state"] = unsubmitted ? "draft" : status ? status.state : "unknown";
 
   let waiting: ProgressResult["waiting_reason"] = null;
   let healthState: "open" | "admission_paused" | "paused" | null = null;
@@ -95,7 +99,8 @@ export async function readSqliteJobProgress(root: string, config: SqliteServiceC
 
   const phases: ProgressPhase[] = [];
   phases.push({ phase: "input_frozen", state: "done", evidence: "local_journal",
-    detail: resolution.source === "lifecycle" ? "Lifecycle plan is retained and hash-verified" : "Draft target and inputs are frozen" });
+    detail: resolution.source === "revision" ? "Saved-revision adoption plan is retained and hash-verified; no uploads are required" :
+      resolution.source === "lifecycle" ? "Lifecycle plan is retained and hash-verified" : "Draft target and inputs are frozen" });
   const uploadRecord = record ? await findSqliteUploadRecord(root, config, jobId) : null;
   if (record) {
     for (const asset of record.assets) {
@@ -111,7 +116,10 @@ export async function readSqliteJobProgress(root: string, config: SqliteServiceC
       }
     }
   }
-  phases.push(record?.publication
+  phases.push(resolution.source === "revision"
+    ? { phase: "publication_submitted", state: status ? "done" : resolution.submitted ? "unknown" : "pending", evidence: observed ? "remote_status" : "local_journal",
+      detail: status ? "Saved-revision request has been acknowledged" : resolution.submitted ? "Submission started; its outcome is unknown and must not be replayed" : "Saved-revision plan has not been submitted" }
+    : record?.publication
     ? { phase: "publication_submitted", state: "done", evidence: "local_journal",
       detail: observed ? "Publication request is frozen and acknowledged remotely" : "Publication request is frozen" }
     : { phase: "publication_submitted", state: resolution.source === "lifecycle" ? "not_applicable" : "pending", evidence: "local_journal",

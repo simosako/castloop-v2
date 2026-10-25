@@ -21,7 +21,7 @@ async function cancelBody(response: Response): Promise<void> {
 }
 
 export async function readSqliteManagementJson(response: Response, maximum = 16384, signal?: AbortSignal): Promise<unknown> {
-  if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 65536) throw new Error("Invalid SQLite response limit");
+  if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 8_388_608) throw new Error("Invalid SQLite response limit");
   if (!response.body || response.headers.get("Cache-Control") !== "no-store" || response.headers.has("Content-Range") ||
     response.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
     await cancelBody(response); throw new ReadFailure("invalid_response", false);
@@ -55,16 +55,42 @@ function readPath(path: string): boolean {
   const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   if (path === "/admin/sqlite-operations/list" || new RegExp(`^/admin/sqlite-operations/(?:(?:cleanup|requests)/)?${uuid}$`, "i").test(path)) return true;
   if (new RegExp(`^/admin/(?:sqlite-publication/jobs|sqlite-service/update-status|sqlite-service/domain-status|sqlite-service/controls)/${uuid}$`, "i").test(path)) return true;
-  const parts = path.slice("/admin/sqlite-service/targets/".length).split("/");
-  return path.startsWith("/admin/sqlite-service/targets/") && parts.length >= 1 && parts.length <= 2 &&
-    parts.every((part, index) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(part) && part.length <= (index === 0 ? 32 : 80));
+  for (const prefix of ["/admin/sqlite-service/targets/", "/admin/sqlite-service/content/"]) {
+    if (path.startsWith(prefix)) {
+      const parts = path.slice(prefix.length).split("/");
+      return parts.length >= 1 && parts.length <= 2 &&
+        parts.every((part, index) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(part) && part.length <= (index === 0 ? 32 : 80));
+    }
+  }
+  if (path.startsWith("/admin/sqlite-service/revisions/")) {
+    const parts = path.slice("/admin/sqlite-service/revisions/".length).split("/");
+    const validShow = parts.length >= 1 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[0]!) && parts[0]!.length <= 32;
+    if (!validShow) return false;
+    if (parts.length === 1) return true;
+    if (parts.length === 3 && parts[1] === "after") return /^\d+$/.test(parts[2]!) && Number.isSafeInteger(Number(parts[2])) && Number(parts[2]) > 0;
+    if (parts.length === 3 && parts[1] === "item") return new RegExp(`^${uuid}$`, "i").test(parts[2]!);
+    const validEpisode = parts.length >= 3 && parts[1] === "episodes" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[2]!) && parts[2]!.length <= 80;
+    if (!validEpisode) return false;
+    if (parts.length === 3) return true;
+    if (parts.length === 5 && parts[3] === "after") return /^\d+$/.test(parts[4]!) && Number.isSafeInteger(Number(parts[4])) && Number(parts[4]) > 0;
+    if (parts.length === 5 && parts[3] === "item") return new RegExp(`^${uuid}$`, "i").test(parts[4]!);
+    return false;
+  }
+  if (path.startsWith("/admin/sqlite-service/content-inventory/")) {
+    const parts = path.slice("/admin/sqlite-service/content-inventory/".length).split("/");
+    return (parts.length === 2 || parts.length === 4 && parts[2] === "after" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[3]!) && parts[3]!.length <= 80) &&
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[0]!) && parts[0]!.length <= 32 && /^\d+$/.test(parts[1]!) && Number.isSafeInteger(Number(parts[1]));
+  }
+  return false;
 }
 
 export async function readSqliteManagementGet(url: URL, headers: HeadersInit, options: GetOptions = {}): Promise<unknown | null> {
   const timeout = options.timeoutMs ?? 30000, maximum = options.maximumBytes ?? 16384, attempts = 3;
   const domainQuery = url.pathname.startsWith("/admin/sqlite-service/domain-status/") && [...url.searchParams.keys()].every((key) => key === "after") && url.searchParams.getAll("after").length <= 1;
   if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") && !domainQuery || url.hash || !readPath(url.pathname) ||
-    !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 || maximum > 65536) throw new Error("Invalid bounded SQLite management GET");
+    !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 ||
+    maximum > (url.pathname.startsWith("/admin/sqlite-service/content/") || url.pathname.startsWith("/admin/sqlite-service/revisions/") ||
+      url.pathname.startsWith("/admin/sqlite-service/content-inventory/") ? 8_388_608 : 65536)) throw new Error("Invalid bounded SQLite management GET");
   const now = options.now ?? (() => performance.now()), delay = options.delay ?? ((ms: number) => Bun.sleep(ms));
   const start = now(), deadline = start + timeout, target = sha256HexSync(url.href);
   for (let attempt = 1; attempt <= attempts; attempt++) {

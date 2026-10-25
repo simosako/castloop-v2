@@ -1,5 +1,7 @@
 # エージェントによるPodcast管理
 
+Issue #64の開発版は、認証付き全文取得・公開中/local/stagedの項目別差分、revision履歴、素材再uploadなしの過去版採用に対応する。`preview-*`は管理鍵のあるworkspaceでは既定でremote読取を行い、`--local`は通信なし。内部形式7/8の新規環境専用。構文・確認hash・原本保全は[公開内容の確認ガイド](published_content_review.md)を優先する。
+
 未リリースのIssue #68対応版では[独自ドメイン管理](sqlite_custom_domains.md)を追加する。`describe domain --json`と`help domain`で対応を確認し、接続/切断/continueは管理者が明示した対象と範囲でだけ実行する。list/statusは読取専用、continueは変更を含み得る。doctorは未完了domain journalやlockも読取検査するが修復しない。旧versionの環境への移行は提供しない。
 
 v0.7.2で追加したIssue #5のCLI機能。管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。既存のCloudflare環境・永続形式・公開プロトコルは変更しない。[リリースノート](release-v0.7.2.md)を参照する。
@@ -77,7 +79,7 @@ castloop publish-episode first --workspace /absolute/workspace --show daily --ex
 
 `preview-show ID`/`preview-episode ID`はローカル全文・stage済みhashとの一致・base identity・素材再利用を表示する。ローカル検査のみでuploadやjournal作成・要求凍結はしない。`--expect-preview`は同じ入力fingerprintとstage一致を公開時のlock内・要求凍結前に再照合する。素材・metadata・対象・base・stage情報が変われば再previewと再承認が必要。hash自体は承認の証明ではなく、既存の原子的な受付条件・identity照合も残す。
 
-**公開済み全文の管理API取得とfield単位のpublished差分は未提供。** 取得しない内容を推測表示せず`not_checked`にする。ローカル原本がない場合はバックアップを管理者に求め、一覧やRSSから自動採用しない。Worker側の拡張は別作業とする。
+上のlocal-only説明はv0.7.2時点の仕様。Issue #64の開発版はremote差分に対応し、未取得やlocal指定時だけ`not_checked`とする。一覧やRSSを編集元に逆変換しない。全文の取得・新規ファイルへの書出しと、既存workspaceのjournal再構築は別である。
 
 ## 検証範囲
 

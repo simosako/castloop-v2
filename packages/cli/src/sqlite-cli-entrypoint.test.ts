@@ -52,6 +52,20 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     expect(preview.inputs_match_staged).toBe(true);
     const publication = await command(["publish-episode", "first", "--workspace", setup.root, "--show", "daily", "--expect-preview", String(preview.input_fingerprint), "--json"], "/tmp/opencode"); expect(publication).toMatchObject({ state: "succeeded" });
     expect(await command(["job-status", String(publication.job_id)])).toMatchObject({ status: { state: "succeeded" } });
+    expect(await command(["list-episode-revisions", "first", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode")).toMatchObject({
+      episode_revisions: [{ revision_id: publication.job_id, is_current: true }] });
+    const revisionPreview = await command(["preview-episode-revision", "first", String(publication.job_id), "--workspace", setup.root, "--show", "daily", "--json"]);
+    const revisionPlan = revisionPreview.plan as { request: { job_id: string }; request_sha256: string };
+    const revisionFile = join(setup.root, "revision-plan.json"); writeFileSync(revisionFile, JSON.stringify(revisionPreview));
+    expect(await command(["revision-execute", revisionFile, revisionPlan.request_sha256, "confirm", "--workspace", setup.root, "--json"])).toMatchObject({ state: "succeeded" });
+    expect(await command(["progress", revisionPlan.request.job_id, "--workspace", setup.root, "--json"])).toMatchObject({ job: { source: "revision" }, state: "succeeded" });
+    expect(await command(["watch", revisionPlan.request.job_id, "--workspace", setup.root, "--json"])).toMatchObject({ outcome: { state: "succeeded" } });
+    expect(await command(["sync-local-metadata", "--workspace", setup.root, "--show", "daily", "--episode", "first",
+      "--expect-revision", revisionPlan.request.job_id, "--output", join(setup.root, "export.toml"), "--json"])).toMatchObject({ existing_files_overwritten: false });
+    await command(["update-episode", "first", "--workspace", setup.root, "--show", "daily", "--json"]);
+    const rssPreview = await command(["preview-episode", "first", "--workspace", setup.root, "--show", "daily", "--rss-output", join(setup.root, "preview.xml"), "--json"]);
+    expect(rssPreview.rss_preview).toMatchObject({ status: "generated_locally" });
+    expect(await command(["publish-episode", "first", "--workspace", setup.root, "--show", "daily", "--expect-preview", String(rssPreview.input_fingerprint), "--json"])).toMatchObject({ state: "succeeded" });
     expect(await command(["list-shows", "--json"])).toMatchObject({ shows: [{ show_id: "daily", lifecycle: "published" }] });
     expect(await command(["list-episodes", "daily", "--json"])).toMatchObject({ episodes: [{ episode_id: "first", lifecycle: "published" }] });
     expect(await command(["diagnose", "daily", "--json"])).toMatchObject({ schema_version: 1, shows: [{ show_id: "daily" }] });

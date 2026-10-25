@@ -8,6 +8,6 @@ export function sqliteFeedSnapshotKey(showId: string, generation: number): strin
 }
 
 export function sqliteDeliveryPolicy(request: SqlitePublicationRequest): "exclusive" | "preserve_committed" {
-  return request.action === "publish" ?
+  return request.action === "publish" || request.action === "restore_revision" ?
     "preserve_committed" : "exclusive";
 }

@@ -15,6 +15,8 @@ export const sqliteDraftTargetSchema = z.object({ job_id: fields.job_id, kind: f
   episode_id: fields.episode_id, expected_show_state_version: fields.expected_show_state_version,
   base_revision_id: fields.base_revision_id, base_metadata_sha256: fields.service_config_sha256.optional(),
   expected_episode_lifecycle_version: fields.expected_episode_lifecycle_version,
+  base_show_metadata_sha256: fields.service_config_sha256.optional(),
+  base_cover_sha256: fields.service_config_sha256.optional(),
 }).strict().superRefine((value, context) => {
   if (value.kind === "show" ? value.episode_id !== undefined || value.base_revision_id !== undefined || value.base_metadata_sha256 !== undefined || value.expected_episode_lifecycle_version !== undefined :
     value.episode_id === undefined || (value.base_revision_id !== undefined) !== (value.base_metadata_sha256 !== undefined)) {
@@ -44,6 +46,11 @@ export type SqliteDraftRecord = z.infer<typeof recordSchema>;
 export type SqliteDraftJournal = { storage: LocalJournalStorage; load: () => Promise<SqliteDraftRecord>;
   replace: (record: SqliteDraftRecord) => void };
 
+export function sqliteDraftRequestTarget(target: SqliteDraftTarget) {
+  const { base_metadata_sha256, base_show_metadata_sha256, base_cover_sha256, ...requestTarget } = target;
+  return requestTarget;
+}
+
 export function requireSqliteStatus(request: SqlitePublicationRequest, hash: string, status: SqlitePublicationStatus,
   previous?: SqlitePublicationStatus): void {
   if (status.service_id !== request.service_id || status.request_id !== request.request_id || status.job_id !== request.job_id ||
@@ -57,7 +64,7 @@ function checkedRecord(input: unknown): SqliteDraftRecord {
   if (Buffer.byteLength(JSON.stringify(record)) > 16384) throw new Error("SQLite draft exceeds its local journal limit");
   if (record.publication) {
     const request = parseSqlitePublicationRequest(record.publication.request);
-    const { base_metadata_sha256: _, ...target } = record.target;
+    const target = sqliteDraftRequestTarget(record.target);
     if (request.action !== "publish" || request.service_id !== record.service_id || request.service_config_sha256 !== record.service_config_sha256 ||
       Object.entries(target).some(([key, value]) => request[key as keyof SqlitePublicationRequest] !== value) ||
       JSON.stringify(request.payloads) !== JSON.stringify(record.assets.map((entry) => entry.upload))) {

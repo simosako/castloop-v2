@@ -19,7 +19,19 @@
 
 既存GUID・日時・guid_is_permalinkの意味を通常更新で変更しない。identity不一致は確認だけで解除できない。previewが公開済み全文を取得できないと示した場合、差分を推測しない。ローカル原本と管理者のバックアップを使う。
 
-`input_fingerprint`は承認を証明する署名ではない。実行時のbase/lifecycle照合も必要。previewはローカル検査でありremote readinessは保証しない。
+`input_fingerprint`は承認を証明する署名ではない。実行時のbase/lifecycle照合も必要。Issue #64対応版のpreviewは既定で認証付きremote読取を行い、公開中/local/stagedの差分と素材再利用を表示する。`--local`または未初期化workspaceでは公開済み内容を`not_checked`とし、取得失敗を差分なしへ変換しない。確認後のruntime/window/base/Feed世代変更でも再previewする。
+
+`preview-* --rss-output NEW_FILE`は同じrendererで予定RSSをローカル生成する。既存ファイルは上書きせず、R2へ保存しない。画像・音源は手元で確認し、未公開素材の一時公開URLを作らない。
+
+## 過去版の採用（Issue #64対応版）
+
+- `describe`/helpで対応を確認する。内部7/8の新規環境専用。旧形式の変換や履歴の事後採用を行わない。
+- `list-show-revisions SHOW` / `list-episode-revisions ID --show SHOW`で履歴を確認する。`next_cursor`を追い、一覧要約を全文へ逆変換しない。
+- `preview-show-revision SHOW REVISION_UUID` / `preview-episode-revision ID REVISION_UUID --show SHOW`で現在版と選択版の全文・差分・素材identityを確認する。`--workspace`を明示する。
+- 誤編集前へ戻す対象と内容・公開状態になることの承認を得た後だけ、保存したpreview JSONを`revision-execute PLAN_JSON REQUEST_SHA256 confirm`へ渡す。既存`lifecycle restore`は非公開からの最新snapshot復帰で、任意revision採用とは別である。
+- 選択した素材を再uploadせず、新しいrevisionを作る。Show採用でもEpisode履歴や個別非公開は巻き戻さない。未完了draftやblockedを削除して迂回しない。原本TOMLは自動編集されない。
+- 応答不明は同じjobのGET照会だけを行う。queuedや404を成功・未実行と推測しない。jobの`succeeded`を確認する。
+- 編集元が必要なら`sync-local-metadata --show SHOW [--episode ID] --expect-revision CURRENT_UUID --output NEW_FILE`で新規書出しする。既存TOML・画像・音源・journalを上書き・再構築しない。
 
 ## 開発版の日時preview
 

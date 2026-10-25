@@ -13,6 +13,8 @@ import { sqliteCatalogRequestSchema, sqliteCatalogResponseSchema } from "../../s
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../../shared/src/sqlite-catalog";
 import { sqliteUpdateActivateSchema, sqliteUpdatePrepareSchema, sqliteUpdateResultSchema } from "../../shared/src/sqlite-runtime-update";
 import type { SqliteUpdateActivate, SqliteUpdatePrepare, SqliteUpdateResult } from "../../shared/src/sqlite-runtime-update";
+import { sqliteContentSnapshotSchema, sqliteRevisionDetailResponseSchema, sqliteRevisionListResponseSchema, sqlitePreviewInventorySchema } from "../../shared/src/sqlite-revisions";
+import type { SqliteShowRevisionRecord, SqliteEpisodeRevisionRecord } from "../../shared/src/sqlite-revisions";
 
 export class SqliteServiceClient {
   readonly config: SqliteServiceConfig;
@@ -84,6 +86,62 @@ export class SqliteServiceClient {
     const value = sqliteInspectionSchema.parse(await this.call(`targets/${showId}${episodeId === undefined ? "" : `/${episodeId}`}`, undefined, showId));
     await this.identity(value);
     if (value.show_id !== showId || value.episode_id !== episodeId) throw new Error("SQLite target response differs"); return value;
+  }
+  private async contentRead(path: string, showId: string) {
+    sqliteInspectionSchema.shape.show_id.parse(showId);
+    return readSqliteManagementGet(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url),
+      { "X-Castloop-Key": this.key, "X-Castloop-Show-Id": showId },
+      { ...this.readOptions, transport: this.transport, maximumBytes: 8_388_608 });
+  }
+  private async checkRevisionContent(content: SqliteShowRevisionRecord | SqliteEpisodeRevisionRecord | null | undefined) {
+    if (!content) return;
+    if (await sha256Hex(JSON.stringify(content.metadata)) !== content.metadata_sha256) throw new Error("Revision metadata hash differs");
+    if ("audio" in content) {
+      const expected = `${this.config.public_base_url}/podcasts/${content.show_id}/episodes/${content.episode_id}/${content.audio.audio_revision_id}.mp3`;
+      if (content.audio.enclosure_url !== expected) throw new Error("Revision audio target differs");
+    } else if (content.cover.public_url !== `${this.config.public_base_url}/podcasts/${content.show_id}/cover.${content.cover.extension}`) {
+      throw new Error("Revision cover target differs");
+    }
+  }
+  async content(showId: string, episodeId?: string) {
+    if (episodeId !== undefined) sqliteInspectionSchema.shape.episode_id.unwrap().parse(episodeId);
+    const value = sqliteContentSnapshotSchema.parse(await this.contentRead(`content/${showId}${episodeId === undefined ? "" : `/${episodeId}`}`, showId));
+    await this.identity(value);
+    if (value.show_id !== showId || value.episode_id !== episodeId) throw new Error("Content response target differs");
+    await this.checkRevisionContent(value.show_content);
+    await this.checkRevisionContent(value.episode_content);
+    return value;
+  }
+  async revisions(showId: string, episodeId?: string, cursor?: string) {
+    if (episodeId !== undefined) sqliteInspectionSchema.shape.episode_id.unwrap().parse(episodeId);
+    if (cursor !== undefined && (!/^[1-9]\d*$/.test(cursor) || !Number.isSafeInteger(Number(cursor)))) throw new Error("Invalid revision cursor");
+    const path = `revisions/${showId}${episodeId === undefined ? "" : `/episodes/${episodeId}`}${cursor ? `/after/${cursor}` : ""}`;
+    const value = sqliteRevisionListResponseSchema.parse(await this.contentRead(path, showId));
+    await this.identity(value);
+    if (value.show_id !== showId || value.episode_id !== episodeId) throw new Error("History response target differs");
+    return value;
+  }
+  async previewInventory(showId: string, feedGeneration: number, after?: string) {
+    if (!Number.isSafeInteger(feedGeneration) || feedGeneration < 0) throw new Error("Invalid Feed generation");
+    if (after !== undefined) sqliteInspectionSchema.shape.episode_id.unwrap().parse(after);
+    const value = sqlitePreviewInventorySchema.parse(await this.contentRead(
+      `content-inventory/${showId}/${feedGeneration}${after ? `/after/${after}` : ""}`, showId));
+    await this.identity(value);
+    if (value.show_id !== showId || value.feed_generation !== feedGeneration || value.after !== (after ?? null) ||
+      value.episodes.some((episode, index, all) => episode.episode_id <= (index ? all[index - 1]!.episode_id : after ?? "")) ||
+      value.next_cursor !== null && (value.episodes.length !== 20 || value.next_cursor !== value.episodes.at(-1)?.episode_id)) throw new Error("Preview inventory page differs");
+    return value;
+  }
+  async revision(showId: string, revisionId: string, episodeId?: string) {
+    sqliteAvailabilityRequestSchema.shape.operation_id.parse(revisionId);
+    if (episodeId !== undefined) sqliteInspectionSchema.shape.episode_id.unwrap().parse(episodeId);
+    const value = sqliteRevisionDetailResponseSchema.parse(await this.contentRead(
+      `revisions/${showId}${episodeId === undefined ? "" : `/episodes/${episodeId}`}/item/${revisionId}`, showId));
+    await this.identity(value);
+    const selected = episodeId === undefined ? value.target_show_revision : value.target_episode_revision;
+    if (value.show_id !== showId || value.episode_id !== episodeId || selected?.revision_id !== revisionId) throw new Error("Revision response target differs");
+    for (const record of [value.current_show, value.current_episode, value.target_show_revision, value.target_episode_revision]) await this.checkRevisionContent(record);
+    return value;
   }
   private async checkedControl(input: unknown, showId: string): Promise<SqliteAvailabilityResponse> {
     const value = sqliteAvailabilityResponseSchema.parse(input); await this.identity(value);

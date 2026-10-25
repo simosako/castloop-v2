@@ -4,6 +4,7 @@ import type { SqlitePublicationStatus, SqliteServiceConfig } from "@castloop/sha
 import { resolveSqliteJob } from "./job-lookup";
 import { administratorKey } from "./administrator-key";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
+import { requireSqliteStatus } from "./sqlite-draft-journal";
 import type { R2RestTransport } from "./verified-r2-put";
 
 export const WATCH_DEFAULT_TIMEOUT_SECONDS = 600;
@@ -49,7 +50,7 @@ export async function watchSqliteJob(root: string, config: SqliteServiceConfig, 
   const delay = options.delay ?? ((milliseconds: number) => Bun.sleep(milliseconds));
   const emit = options.onEvent ?? ((event: WatchEvent) => console.error(JSON.stringify(event)));
   const budget = { timeout_seconds: timeoutSeconds, interval_seconds: intervalSeconds };
-  if (resolution.source === "draft") {
+  if (resolution.source === "draft" || resolution.source === "revision" && !resolution.submitted) {
     return watchResultSchema.parse({ schema_version: 1, job_id: jobId, show_id: resolution.showId,
       ...(resolution.episodeId !== undefined ? { episode_id: resolution.episodeId } : {}),
       outcome: { state: "unobservable", reason_code: "job_not_submitted" }, status: null,
@@ -72,10 +73,11 @@ export async function watchSqliteJob(root: string, config: SqliteServiceConfig, 
     try {
       const status = await client.observe(resolution.request);
       if (status === null) {
-        if (everObserved) { outcome = { state: "unobservable", reason_code: "job_missing" }; break; }
+        if (everObserved || resolution.source === "revision" && resolution.status) { outcome = { state: "unobservable", reason_code: "job_missing" }; break; }
         emit({ event: "sqlite_watch", job_id: jobId, state: "not_visible", sequence: null, poll: polls, gap: false });
         lastState = "not_visible";
       } else {
+        if (resolution.source === "revision") requireSqliteStatus(resolution.request, resolution.requestSha256, status, last ?? resolution.status ?? undefined);
         everObserved = true;
         last = status;
         lastObservedAt = new Date(now()).toISOString();
