@@ -1,10 +1,10 @@
 # Issue #70: R2上の静的な番組サイト・Episodeページの設計と実装
 
-作成・改訂日: 2026-10-25。**案Bとサイト方式の2択を採用済み。CLI・Show DO・Workerへの接続を実装した開発版**。全公開経路の接続とローカル検証を§13に記録する。実Cloudflare操作の承認は含まない。実ブラウザの操作確認やFree性能の実証とは区別する。
+作成・改訂日: 2026-10-25。**Issue #70の第1段となる最小限実装。案Bとサイト方式の2択を採用し、CLI・Show DO・Workerへ接続した開発版**。全公開経路の接続と検証を§13に記録する。見栄え・日時表示などの改善は後続とし、Issue全体の完了とは扱わない。本設計だけでは実Cloudflare操作の承認にならない。
 
 - 対象: [Issue #70](https://github.com/simosako/castloop-v2/issues/70)。Issue本文・コメントを確認した。確認時点でコメントはない。
 - 改訂時の調査基準: `1d53d0e330d719b6895ddeaf60b7e3143d0103e6`、package version `0.7.5`。main同期後の公開内容取得・revision採用も含む。基準版の内部queue/content形式は7/8。今回の実装は8/9のfresh環境専用とし、旧環境は変換しない。
-- 実装・ローカル検証を進める。配備、公開、Resume、Cloudflare資源・domain・権限・課金設定の変更は行わない。
+- 当初は実装・ローカル検証だけを対象とした。その後、別途明示承認された専用環境で非公開試験を実施した（§13.3）。この承認を他環境の配備・公開・Resume・資源／domain／権限／課金設定変更へ流用しない。
 
 ## 1. 採用方針の要約
 
@@ -492,6 +492,8 @@ Show metadataの設定、内部形式・health識別、SQLの生成索引、正�
 
 利用手順は[サイトガイド](../docs/show_website.md)にまとめた。これらはローカルの模擬環境と単体CLIの確認であり、次節の実機結果を含まない。
 
-### 13.3 実機で未確認の範囲
+### 13.3 承認済みの実機試験と未確認の範囲
 
-§10の受け入れ条件のうち、実Safari／ChromeのPlay・シーク・キーボード操作、native cache HIT／fill競合、Cloudflare Alarm/output gateの実動、FreeのHTTP CPU・DO CPU・duration・SQL・要求数・容量測定は未実施。ローカルの接続完了をこれらの合格と説明しない。追加実装のための判断待ちではなく、対象・範囲を別承認した実機試験の範囲である。保持環境・DNS・私有journal・原本・証跡は変更していない。
+別途明示承認された[Access保護付き試験](show_website_private_trial_verification_20261025.md)では、専用のfresh環境でShowとEpisode 3件の通常公開が成功した。本人からブラウザアクセス・3件再生成功の報告を得た。閲覧前後それぞれの未認証30要求もAccessへ転送され、コンテンツを取得できなかった。既存の保持環境・DNS・私有journal・原本・証跡は変更していない。
+
+§10の受け入れ条件のうち、Episode個別ページ・シーク・モバイル／キーボード操作、native cache HIT／fill競合、Cloudflare Alarm/output gateの異常系、FreeのHTTP CPU・DO CPU・duration・SQL・要求数・容量測定等は未確認。小規模な正常公開・再生を全条件の合格や全Free枠適合と説明しない。Issue #70は継続し、見栄えの改善と残る検証を後続で扱う。

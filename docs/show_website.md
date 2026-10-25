@@ -1,5 +1,7 @@
 # 番組サイトとEpisodeページ（Issue #70開発版）
 
+Issue #70の**第1段となる最小限実装**。まず番組紹介・Episode一覧・ブラウザ標準プレイヤーを提供し、見栄えや日時表示などの改善は後続で行う。Issue全体の完了を意味しない。
+
 新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。内部queue/content形式は**8/9**、healthとinspectionの必須識別は`website="static-show-v1"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。既存環境のDB変換・移行・資源採用は提供しない。
 
 ## サイト方式を選ぶ
@@ -73,3 +75,5 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 無料で無制限の静的hostingではない。HTMLがCDN HITでも外側Worker・内側cache entrypointとShow DOの判定を使うため、それらの要求数、DO duration・SQL、R2 operation・履歴容量を**同一アカウントのFree枠へ合算**する。HTML履歴は自動削除しない。大量のRSS逐次公開では一覧の再生成が累積する。
 
 ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。詳しい比較・予算・受け入れ条件は[設計](../design/show_website_plan.md)参照。
+
+別途承認された[非公開の実機試験](../design/show_website_private_trial_verification_20261025.md)では、新規環境でShowと3 Episodeを公開し、本人からブラウザでのアクセス・3件再生成功の報告を得た。閲覧後の未認証要求もAccessで拒否された。個別ページ・シーク・スマートフォン・CPU性能等の未確認範囲は同記録で区別する。

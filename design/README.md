@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-Issue #70開発版は、内蔵番組サイトの全公開経路・CLI・HTML専用Gateway/CDN cacheを接続した。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用で旧環境は変換しない。[サイト設計](show_website_plan.md)と[利用ガイド](../docs/show_website.md)参照。下記の7/8等は各リリース・機能導入時点の番号であり、サイトの実ブラウザ・native Free性能は未確認。
+Issue #70開発版の第1段は、内蔵番組サイトの全公開経路・CLI・HTML専用Gateway/CDN cacheを接続した最小限実装。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用で旧環境は変換しない。[サイト設計](show_website_plan.md)と[利用ガイド](../docs/show_website.md)参照。下記の7/8等は各リリース・機能導入時点の番号。専用環境で本人の3 Episode再生を確認したが、native Free性能は未確認で、見栄え等の改善は後続とする。
 
 v0.7.5はIssue #64の公開済み差分・revision履歴・過去版採用を追加する。内部queue/content形式**7/8**の新規環境専用で、v0.7.4の7/7を含む既存環境は変換しない。[リリースノート](../docs/release-v0.7.5.md)と[公開内容の確認ガイド](../docs/published_content_review.md)を優先し、以下の旧形式・開発時点の記録と区別する。実CloudflareでのCPU・無料枠適合は未検証である。
 
@@ -24,8 +24,8 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [公開済み内容との差分確認とrevision履歴・過去版採用](published_diff_and_revision_restore_plan.md) | Issue #64・1A〜5A採用。全文取得と差分、確認hash、素材再uploadなしの過去版採用。内部7/8の新規環境専用。[利用ガイド](../docs/published_content_review.md) |
-| [番組サイト・Episodeページの設計](show_website_plan.md) | Issue #70・案Bとサイト方式の2択を採用。事前HTML生成・専用Gateway/cache・Show DOの原子的切替・CLI・全公開経路を接続。内部8/9の新規環境専用。§13でローカル検証と実機未確認を区別する |
-| [非公開の番組サイト画面確認・実機試験案](show_website_private_trial_plan.md) | Issue #70。新規試験サービス＋コンテンツパスのAccess保護。承認後の[実施結果](show_website_private_trial_verification_20261025.md)では4公開job成功・未認証30要求拒否・受付停止を確認。本人ブラウザの表示・再生とCPU測定は未確認 |
+| [番組サイト・Episodeページの設計](show_website_plan.md) | Issue #70第1段・案Bとサイト方式の2択を採用。事前HTML生成・専用Gateway/cache・Show DOの原子的切替・CLI・全公開経路を接続。内部8/9の新規環境専用。§13でローカル・小規模実機検証と未確認範囲を区別する |
+| [非公開の番組サイト画面確認・実機試験案](show_website_private_trial_plan.md) | Issue #70。新規試験サービス＋コンテンツパスのAccess保護。[実施結果](show_website_private_trial_verification_20261025.md)は4公開job成功・受付停止。本人からアクセスと3 Episode再生成功の報告を受け、閲覧後も未認証30要求拒否を確認。個別ページ・seek・スマートフォン・CPU測定は未確認 |
 | [Episode予約公開の設計・開発計画](episode_scheduled_publication_plan.md) | Issue #65の採用方針。Show内予約表とAlarm、既定UTC・任意管理zone、日時identity、停止・再承認。管理用設定の責務・棚卸しと開発段階 |
 | [公開受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md) | Issue #66・全項目承認済み。3状態、停止・再開、変更番号と操作結果の保存・GET照会を実装。再開は処理終了を待ち、受付停止ではuploadも止める。内部形式7/7の新規環境専用。Worker更新中の配信継続は対象外 |
 | [管理用設定と日時変換](../docs/admin_configuration.md) | Issue #65のCLI基盤。任意のcastloop-admin.toml、schema/template/validate/doctor、非公開・非予約の日時preview。サーバー予約は未提供 |
