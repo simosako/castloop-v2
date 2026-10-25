@@ -228,7 +228,7 @@ job解決は`job-status`と同じchain（lifecycle journal → archived publicat
 - Show paused時に公開pathが200を返す場合はgate不整合として`fail`（配信が止まっていないことになる）。
 - 出力は`checks[]`（scope: `external`）に加え、`processing`（local journalのjob終端。無ければ`not_checked`）と`delivery`（外形結果）を独立したblockとして表示する。fail時終了1、warnのみ終了0（doctorと同じ）。
 - 読取には既存のbounded reader（`bounded-http-read.ts`の`collectStreamBytes`）を流用し、回数・時間・byte上限を明示する。feed全量GETのbyte上限はserverのrender予算と同じ32,000,000 bytes（[`publication-budget.ts`](../packages/shared/src/publication-budget.ts)の定数を共通利用し、超過時は`fail`・code: `size_limit_exceeded`）とする（2026-10-25レビュー決定）。`Cache-Control`等の応答headerは観測記録に残すが、検査失敗の理由文に応答本文を転載しない。
-- 実装時の確定（2026-10-25）: (1) cover・audioのURLはfeed内容から導出する。(2) GUID照合はlocal journalでsucceededが記録されたEpisodeに限定する。(3) audioのETag照合は省略しContent-Length照合とした。(4) `unpublished_paths`は`unpublished-episodes`（未公開Episodeのfeed上リンク不在確認）として実装した。
+- 実装時の確定（2026-10-25）: (1) cover・audioのURLはfeed内容から導出する。現在の実装ではaudio revision idは公開job idと一致するためlocal記録からも構成可能だが、serverが宣言するURLをそのまま検証する方を引き続き採用する（server側の採番変更に依存せず、購読者が見るURLそのものを検証できる）。(2) GUID照合はlocal journalでsucceededが記録されたEpisodeに限定する。(3) audioのETag照合は省略しContent-Length照合とした。(4) `unpublished_paths`は`unpublished-episodes`（未公開Episodeのfeed上リンク不在確認）として実装した。
 
 ## 8. 機能D: 継続観測と終端報告 `watch JOB_ID`
 
