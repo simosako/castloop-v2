@@ -187,7 +187,7 @@ jobs:
         run: |
           cd dist
           ls -l castloop-linux-x64 castloop-macos-arm64 castloop-windows-x64.exe castloop-skill.tar.gz
-          cat castloop-linux-x64.sha256 castloop-macos-arm64.sha256 castloop-windows-x64.sha256 > SHA256SUMS
+          cat castloop-linux-x64.sha256 castloop-macos-arm64.sha256 castloop-windows-x64.exe.sha256 > SHA256SUMS
           sha256sum --check SHA256SUMS
           sha256sum --check SKILL_SHA256SUMS
           gh release create "$GITHUB_REF_NAME" castloop-linux-x64 castloop-macos-arm64 castloop-windows-x64.exe castloop-skill.tar.gz SHA256SUMS SKILL_SHA256SUMS THIRD_PARTY_NOTICES.md LICENSE \
