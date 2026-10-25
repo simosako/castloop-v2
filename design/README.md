@@ -25,7 +25,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [公開済み内容との差分確認とrevision履歴・過去版採用](published_diff_and_revision_restore_plan.md) | Issue #64・1A〜5A採用。全文取得と差分、確認hash、素材再uploadなしの過去版採用。内部7/8の新規環境専用。[利用ガイド](../docs/published_content_review.md) |
 | [番組サイト・Episodeページの設計](show_website_plan.md) | Issue #70・案Bとサイト方式の2択を採用。事前HTML生成・専用Gateway/cache・Show DOの原子的切替・CLI・全公開経路を接続。内部8/9の新規環境専用。§13でローカル検証と実機未確認を区別する |
-| [非公開の番組サイト画面確認・実機試験案](show_website_private_trial_plan.md) | Issue #70。新規試験サービス＋コンテンツパスのAccess保護を推奨。Cloudflareログインと本人メールで限定し、minimalの3 Episodeを使う案。まだ資源作成・配備・公開はしていない |
+| [非公開の番組サイト画面確認・実機試験案](show_website_private_trial_plan.md) | Issue #70。新規試験サービス＋コンテンツパスのAccess保護。承認後の[実施結果](show_website_private_trial_verification_20261025.md)では4公開job成功・未認証30要求拒否・受付停止を確認。本人ブラウザの表示・再生とCPU測定は未確認 |
 | [Episode予約公開の設計・開発計画](episode_scheduled_publication_plan.md) | Issue #65の採用方針。Show内予約表とAlarm、既定UTC・任意管理zone、日時identity、停止・再承認。管理用設定の責務・棚卸しと開発段階 |
 | [公開受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md) | Issue #66・全項目承認済み。3状態、停止・再開、変更番号と操作結果の保存・GET照会を実装。再開は処理終了を待ち、受付停止ではuploadも止める。内部形式7/7の新規環境専用。Worker更新中の配信継続は対象外 |
 | [管理用設定と日時変換](../docs/admin_configuration.md) | Issue #65のCLI基盤。任意のcastloop-admin.toml、schema/template/validate/doctor、非公開・非予約の日時preview。サーバー予約は未提供 |

@@ -1,6 +1,8 @@
 # Issue #70: 非公開の画面確認・Cloudflare実機試験案
 
-作成日: 2026-10-25。対象実装はローカルcommit `5c61901`。**本書は試験方法の検討であり、配備・資源作成・Access設定・公開操作はまだ行っていない。** 既存サービスやアカウント全体の設定は変更しない。
+作成日: 2026-10-25。対象実装はローカルcommit `5c61901`。**計画作成時点では、配備・資源作成・Access設定・公開操作は未実施だった。** 既存サービスやアカウント全体の設定は変更しない。
+
+追補: 本書作成後、利用者の明示承認を受けて専用環境を配備した。[実施結果と本人確認待ちの範囲](show_website_private_trial_verification_20261025.md)を参照する。以下の「未実施」は計画作成時点を示す。
 
 ## 1. 推奨する構成
 
@@ -120,7 +122,7 @@ FeedやOGP用画像も本人限定になるため、一般のPodcastアプリや
 
 ## 8. 確認した一次資料
 
-2026-10-25に公開資料を確認した。対象アカウントへの認証付き照会・変更はしていない。
+2026-10-25の計画作成時に公開資料を確認した。その時点では対象アカウントへの認証付き照会・変更はしていなかった。
 
 - [WorkersとCloudflare Access](https://developers.cloudflare.com/workers/configuration/cloudflare-access/): Worker全体／hostname／path保護、評価順序、Worker前の認証。
 - [Cloudflareをログイン元にする](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/cloudflare/): Cloudflareログインとアカウント所属の確認。
