@@ -1,6 +1,6 @@
 # Issue #67 観測コマンドの実機確認（2026-10-25）
 
-Issue #67の`diagnose`/`progress`/`verify`/`watch`を実環境で確認した記録。開発実装はcommit `193f9c6`。本記録は実装・本地試験に続き、実機での読取観測・公開・外形確認が仕様どおり動作した範囲を示す。実環境資源の削除は含まない。
+Issue #67の`diagnose`/`progress`/`verify`/`watch`を実環境で確認した記録。開発実装はcommit `193f9c6`（PR #81としてmerge、rebase後は`00290d7`）。本記録は実装・本地試験に続き、実機での読取観測・公開・外形確認が仕様どおり動作した範囲を示す。検証後、管理者の明示承認（2026-10-25）により本環境は削除済み（末尾の「環境削除」を参照）。
 
 ## 環境
 
@@ -35,4 +35,15 @@ Issue #67の`diagnose`/`progress`/`verify`/`watch`を実環境で確認した記
 
 - 確認したのは観測コマンドの実機動作（分類・進捗・待機・終端・外形確認・終了code）と通常の公開経路。通信断・blocked・job消失・SIGINT等の異常系は本地回帰で担保しており、実機では意図的に発生させていない。
 - CPU時間・課金行数・大規模Show（normal/36件級）・Free枠の長期運用は未測定。watchの長時間実行（既定600秒を超える待機）も未確認。
-- 本環境の実資源（Worker・bucket・namespace）は保持したまま。再開・追加公開・削除には対象と範囲を明示した承認を要する。
+- 本環境の実資源（Worker・bucket・namespace）は検証時は保持していたが、PR #81のmerge後に管理者の明示承認を受けて2026-10-25に削除した（次節参照）。
+
+## 環境削除（2026-10-25）
+
+管理者がPR #81のmainへのmergeと実環境削除を承認したため、`issue67-cleanup.ts`（`.local-test-data/`内、証跡: `results/20261025-issue67-live/cleanup/`）により削除した。手順は従来の環境削除（issue48/rv22）と同じ規律である:
+
+- 事前検証: workspace設定と対象3資源の一致、保護環境（`sq16r-6ec01dc6`のWorker・namespace・bucket）の存在、他Workerからの参照なし、custom domain・routeなし、service healthがpaused・drained・queued 0・setup readyであることをraw応答で確認（配備Workerが#66前の旧世代のため、当時のmain CLIの3値schemaではparseできない点に注意）。
+- backup: bucket内24 object（5,962,473 bytes）を全量downloadし、size・ETag(MD5)・sha256を検証の上`objects/`に保存。
+- 削除: allowlist検証付きのDELETE 3件（object一括 → bucket → Worker。namespaceはWorker削除で消滅）。journalに要求と応答を記録。
+- 事後検証: Worker settings・bucketが404、namespace一覧から消失、保護環境の3資源がすべて残存、旧管理endpointが応答なし、旧公開URLが404。
+
+削除結果（`disposal-result`）: worker `castloop-i67live-1e3b39ec`、bucket `i67live-c04076-private`、namespace `34d3d31ef744499b821efed05b5036de`、object 24件を削除。資源名の再利用はしない。workspace・証跡・backupは保持する。
