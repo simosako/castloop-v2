@@ -37,7 +37,8 @@ export function inputSchema(name: string): object {
   return { ...z.toJSONSchema(schema, { io: "input" }), $id: `urn:castloop:${name}:1`,
     "x-castloop-contract-version": CONTRACT_VERSION,
     "x-castloop-validation": { command: "validate", required: true,
-      toml: "Dates must be quoted RFC 3339 strings. Unknown keys and null are rejected.",
+       toml: "Dates must be quoted RFC 3339 strings. Unknown keys and null are rejected.",
+       ...(name === "show-input" ? { website: "site_mode=builtin forbids site_url; external or omitted site_mode requires site_url. Publication generates builtin HTML; staging alone does not." } : {}),
       additional_checks: name === "admin-config" ? ["Supported IANA time zone name or UTC; abbreviations are rejected"] :
         ["XML 1.0 text", "real calendar dates", "HTTP(S) URLs without credentials or fragment", "cross-field constraints"],
       measured_limits: constraints, measurement: "Trim, strip HTML tags, trim; count Unicode code points or UTF-8 bytes as specified. GUID and URL do not strip HTML.",

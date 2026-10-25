@@ -13,7 +13,7 @@ export class SqlitePublicationInputError extends Error {
 
 export type SqlitePublicationExecutor<Prepared> = {
   validate: (request: SqlitePublicationRequest) => Promise<Prepared>;
-  publish: (prepared: Prepared) => Promise<void>;
+  publish: (prepared: Prepared) => Promise<void | false>;
   commit?: (prepared: Prepared) => undefined;
 };
 export type SqlitePublicationEvent = { event: "sqlite_publication"; phase: "started" | "succeeded" | "failed" | "blocked";
@@ -61,7 +61,7 @@ export class SqlitePublicationAlarm<Prepared> {
         this.emit(job, job.state === "failed" ? "failed" : "blocked", invocation);
         return job;
       }
-      try { await this.executor.publish(prepared); }
+      try { if (await this.executor.publish(prepared) === false) return await this.queue.yield(claim.job.job_id); }
       catch {
         const job = await this.queue.block(claim.job.job_id, "execution_failed", invocation);
         this.emit(job, "blocked", invocation);

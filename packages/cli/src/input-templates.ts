@@ -2,10 +2,11 @@ import { stringifyToml, showMetadataSchema, episodeDraftSchema } from "@castloop
 import type { ShowMetadata, EpisodeDraft } from "@castloop/shared";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 
-export function showTemplate(showId: string, siteUrl: string): ShowMetadata {
+export function showTemplate(showId: string, siteUrl?: string): ShowMetadata {
   return showMetadataSchema.parse({ schema_version: 1, show_id: showId, title: showId,
     description: "Edit this description before publication", language: "ja", author: "Edit author", owner_name: "Edit owner",
-    owner_email: "owner@example.com", categories: ["Technology"], explicit: false, site_url: siteUrl, image_path: "cover.jpg" });
+    owner_email: "owner@example.com", categories: ["Technology"], explicit: false,
+    ...(siteUrl === undefined ? { site_mode: "builtin" } : { site_url: siteUrl }), image_path: "cover.jpg" });
 }
 
 export function episodeTemplate(episodeId: string, guid: string, publishedAt: string): EpisodeDraft {

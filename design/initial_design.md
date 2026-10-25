@@ -1,5 +1,7 @@
 # castloop v2 デザインドキュメント
 
+Issue #70開発版は、Showごとに内蔵サイト／外部サイトを選択できる。内蔵HTMLは既存Show DOのAlarmで生成し、private R2の世代別snapshotへ保存する。`SiteCachedPages`とHTML専用Gatewayは既存media cacheから分離し、最新のShow判定を共有する。必要な両purge後、Feedとサイト全体の世代・ページ参照を同一transactionで確定する。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用。下記の7/8以前の番号は各機能導入時点の履歴である。[サイト設計](show_website_plan.md)・[利用ガイド](../docs/show_website.md)参照。Freeの実機性能・ブラウザ実機再生は未確認。
+
 Issue #64の開発版では、認証付きの公開済み全文・履歴取得とCLIの項目差分・ローカルRSS生成、保存済みrevisionの明示採用を追加した。Show内SQLiteに履歴2表を置き、R2の不変metadata・画像・音源と照合する。採用は新revisionとして保存・purge・SQL確定し、素材再uploadや過去履歴の上書きはしない。内部queue/content形式**7/8**、必須`revision_history="sqlite-revisions-v1"`の新規環境専用で旧環境は変換しない。[採用設計](published_diff_and_revision_restore_plan.md)と[利用ガイド](../docs/published_content_review.md)参照。実Cloudflareの配備・公開・性能確認は行っていない。
 
 Issue #66の未リリース開発版では、Showの状態を`open / admission_paused / paused`に分ける。`admission_paused`は新しい公開依頼と素材アップロードを止め、既存の検証条件を満たす公開済み内容は配信する。`paused`は受付と配信を両方止める従来の意味を維持する。停止・再開ごとの変更番号と操作ID別の適用結果を同じShow内で保存し、古い確認結果による再開を拒否する。応答喪失後は結果のGET照会だけを行う。内部queue/content形式**7/7**と必須`availability_controls="show-admission-delivery-v1"`を使う新規環境専用。Worker更新中の配信継続や旧環境の変換は提供しない。[採用設計](show_admission_delivery_separation_plan.md)と[操作ガイド](../docs/show_availability.md)を優先し、下記のリリース時点の2状態・6/7形式の記述と区別する。
@@ -41,6 +43,7 @@ Gateway: 対象Show DOの最新の小さい配信判定 → 同versionのcache o
 ### WorkerとCLI
 
 - 正式Worker入口は`src/sqlite-worker.ts`。`SqlitePublicationService`がDO、`SqliteCachedAssets`がnamed cache owner。
+- Issue #70ではHTML専用のnamed cache owner `SiteCachedPages`を追加する。既存class・binding・compatibility dateは変更しない。
 - 同じnamespace/class内の`service/<service_id>`を制御DO、`show/<service_id>/<show_id>`をShow DOとする。永続bindingでShowを固定し、異なるShowの公開・操作登録を拒否する。binding/export/cache名とcompatibility dateは維持する。
 - Bunで構築する単一実行ファイルにSQLite Workerのみを埋め込む。source modeは`packages/cli/src/index.ts`。
 - 管理者環境にWrangler／Node.js／Bun／ffprobe／別R2資格情報を要求しない。Linux x86-64が配布・実機検証対象。
@@ -62,12 +65,13 @@ Gateway: 対象Show DOの最新の小さい配信判定 → 同versionのcache o
 - `queued`は受付のみ、`succeeded`はそのjobの全保存・purge・SQL完了。global quiescenceや回復権限の証明ではない。
 - `failed`は副作用前の確定入力/base失敗。`blocked`は途中停止・不明IO等であり対象Showの後続FIFOを止める。Show更新・Episode追加/更新で確定Feed/Show/cover世代・要求hash・対象種別と対象未登録または更新元revision/lifecycleの保存根拠が一致し、検証済みflagと許可reasonが成立する場合だけ旧公開内容の読取を継続する。Show更新は旧coverのkey/size/SHA-256もHEAD照合してから検証済みにする。それ以外は配信503。他Showの通常操作・Pause/Resume・新Show登録を止めない。
 - 再起動／Alarm再配送で残ったrunningを再実行せずblockedとして保全する。経過時間・HEAD不在・空queueで解放せず、未知PUT/POSTを再送しない。blockedのretry/releaseは未提供。
+- サイト生成は最大20 HTML・4,000,000 bytesの有限batchで進める。正常完了と次回Alarm予約を保存したbatch間のrunningだけを再開できる。実行中の中断・未知IOと区別し、Feed／音源／purgeの再送を許可する仕組みにはしない。domain保守も同じHTML生成部品と専用の完了markerを使う。
 - 管理GETだけは有限の一時エラーretryを行う。status待機は最大300 GET・5分経過後に新規GETを始めない。開始済みIOとcleanupのsettlementを待つ。
 - 診断は固定のallowlistコード・許可した識別子だけを保存し、本文・メール・秘密・任意例外文を運用記録へ入れない。
 
 ## 配信とキャッシュ
 
-公開URLは`/podcasts/<showId>/feed.xml`、`cover.jpg|png`、`episodes/<episodeId>/<revisionId>.mp3`のみ。system／staging／metadata／indexを配信しない。
+公開URLは`/podcasts/<showId>/feed.xml`、`cover.jpg|png`、`episodes/<episodeId>/<revisionId>.mp3`。Issue #70の内蔵方式では`/podcasts/<showId>/`、`page/<n>/`（n≥2）、`episodes/<episodeId>/`も配信する。system／staging／metadata／世代別snapshot・内部索引は配信しない。
 
 - gatewayはpublic pathから対象Show DOへ直接到達し、毎回その最新scalar判定でready・Pause・保守拘束・Show/Episode状態・承認音源を確認する。制御DOへの毎回の照会や判定のTTL cacheは行わない。
 - paused/readiness不一致・保守拘束は503、unpublishedは404。Show更新・Episode追加/更新のrunning/条件を満たすblockedでは、保存した保護根拠が成立すれば旧Feed・承認済みcover/audioを配信する。初回Show公開、lifecycleの実行中／blocked、要求破損や保護根拠不一致は503。SQLiteの削除状態に対するgateはあるが物理削除操作は未提供。

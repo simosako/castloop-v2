@@ -41,9 +41,10 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Existing resources are never adopted. Service schema_version=1 requires v0.5.x; migration is not provided.",
   },
   "create-show": {
-    usage: "create-show ID [--site-url URL]",
+    usage: "create-show ID [--site-mode builtin|external] [--site-url URL]",
     description: "Run from the service workspace. Reserve a Show ID and create its local show.toml.\n" +
-      "A real website URL is required (prompted if omitted). Creates a paused Show DO; explicitly show-resume before uploads. Does not publish.",
+      "Use --site-mode builtin for an automatically generated website (no --site-url). Otherwise a real external website URL is required (prompted if omitted).\n" +
+      "Creates a paused Show DO; explicitly show-resume before uploads. Does not publish.",
   },
   "create-episode": {
     usage: "create-episode ID",
@@ -248,7 +249,7 @@ export function commandOptions(command: string): Record<string, "string" | "bool
   if (!["describe", "schema", "import-rss", "validate", "template", "skill"].includes(command)) options.workspace = "string";
   const byCommand: Record<string, Record<string, "string" | "boolean">> = {
     init: { "publication-protocol": "string", "service-id": "string", "account-id": "string", "bucket-name": "string", "workers-subdomain": "string", "operation-id": "string" },
-    "create-show": { "site-url": "string" }, deploy: { "operation-id": "string" }, schema: { format: "string" },
+    "create-show": { "site-url": "string", "site-mode": "string" }, deploy: { "operation-id": "string" }, schema: { format: "string" },
     domain: { "zone-id": "string", "operation-id": "string", cursor: "string" },
     "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
     "operation-list": { show: "string", local: "boolean", remote: "boolean", incomplete: "boolean", cursor: "string", parent: "string" },

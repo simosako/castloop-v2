@@ -1,5 +1,7 @@
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import { isXml10Text } from "../packages/shared/src/xml";
+import { comparePublishedEpisodes } from "../packages/shared/src/episode-order";
+import { sitePageUrl } from "../packages/shared/src/website";
 import { canonicalEnclosureUrl } from "./media-url";
 
 function escapeXml(value: string): string {
@@ -9,13 +11,14 @@ function escapeXml(value: string): string {
   })[character] ?? character);
 }
 
-function renderItem(episode: EpisodeRevision, showId: string, baseUrl: string): string {
+function renderItem(episode: EpisodeRevision, showId: string, baseUrl: string, builtin: boolean): string {
   const hours = Math.floor(episode.duration_seconds / 3600);
   const minutes = Math.floor(episode.duration_seconds % 3600 / 60);
   const seconds = episode.duration_seconds % 60;
   const duration = [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
   return `    <item>\n` +
     `      <title>${escapeXml(episode.title)}</title>\n` +
+    (builtin ? `      <link>${escapeXml(sitePageUrl(baseUrl, { kind: "episode", showId, episodeId: episode.episode_id }))}</link>\n` : "") +
     `      <description>${escapeXml(episode.description)}</description>\n` +
     `      <guid isPermaLink="${episode.guid_is_permalink ?? false}">${escapeXml(episode.guid)}</guid>\n` +
     `      <pubDate>${new Date(episode.published_at).toUTCString()}</pubDate>\n` +
@@ -32,6 +35,7 @@ export function renderFeed(show: ShowMetadata, episodes: EpisodeRevision[],
   baseUrl: string, coverExtension: string): string {
   const coverUrl = `${baseUrl.replace(/\/$/, "")}/podcasts/${show.show_id}/cover.${coverExtension}`;
   const feedUrl = `${baseUrl.replace(/\/$/, "")}/podcasts/${show.show_id}/feed.xml`;
+  const siteUrl = show.site_mode === "builtin" ? sitePageUrl(baseUrl, { kind: "listing", showId: show.show_id, page: 1 }) : show.site_url!;
   return `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" ` +
     `xmlns:content="http://purl.org/rss/1.0/modules/content/" ` +
@@ -39,7 +43,7 @@ export function renderFeed(show: ShowMetadata, episodes: EpisodeRevision[],
     `  <channel>\n` +
     `    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />\n` +
     `    <title>${escapeXml(show.title)}</title>\n` +
-    `    <link>${escapeXml(show.site_url)}</link>\n` +
+    `    <link>${escapeXml(siteUrl)}</link>\n` +
     `    <description>${escapeXml(show.description)}</description>\n` +
     `    <language>${escapeXml(show.language)}</language>\n` +
     `    <itunes:author>${escapeXml(show.author)}</itunes:author>\n` +
@@ -50,10 +54,9 @@ export function renderFeed(show: ShowMetadata, episodes: EpisodeRevision[],
     (show.copyright ? `    <copyright>${escapeXml(show.copyright)}</copyright>\n` : "") +
     (show.show_type ? `    <itunes:type>${show.show_type}</itunes:type>\n` : "") +
     `    <image><url>${escapeXml(coverUrl)}</url><title>${escapeXml(show.title)}</title>` +
-    `<link>${escapeXml(show.site_url)}</link></image>\n` +
+    `<link>${escapeXml(siteUrl)}</link></image>\n` +
     `    <itunes:image href="${escapeXml(coverUrl)}" />\n` +
-    episodes.toSorted((left, right) => Date.parse(right.published_at) - Date.parse(left.published_at) ||
-      left.episode_id.localeCompare(right.episode_id)).map((episode) =>
-        renderItem(episode, show.show_id, baseUrl)).join("") +
+    episodes.toSorted(comparePublishedEpisodes).map((episode) =>
+        renderItem(episode, show.show_id, baseUrl, show.site_mode === "builtin")).join("") +
     `  </channel>\n</rss>\n`;
 }

@@ -20,7 +20,9 @@ import { SqliteDomainRuntime, pendingSqliteDomain } from "./sqlite-domain-runtim
 type SetupRow = { operation_id: string; state: "scheduled" | "running" | "ready" | "blocked"; request_json: string };
 type ProbeStage = "target" | "admission" | "config_read" | "config_validate" | "cache_describe" | "cache_validate" | "cache_purge" | "commit";
 export type SqliteCacheRuntime = { worker_version_id: string; service_config_sha256: string; cache_enabled: boolean };
-export type SqliteRuntimeCache = { describe: () => Promise<SqliteCacheRuntime>; purge: (showId: string) => Promise<void> };
+export type SqliteCachePurgeConfirmation = (entrypoint: "media" | "site") => void;
+export type SqliteRuntimeCache = { describe: () => Promise<SqliteCacheRuntime>;
+  purge: (showId: string, confirmed?: SqliteCachePurgeConfirmation) => Promise<void> };
 
 export class SqliteServiceRuntime {
   private probing = false;
@@ -59,6 +61,7 @@ export class SqliteServiceRuntime {
       domain_changes: "sqlite-domain-change-v1",
       availability_controls: "show-admission-delivery-v1", availability_version: snapshot.availability_version,
       revision_history: "sqlite-revisions-v1",
+      website: "static-show-v1",
       admission_state: snapshot.state === "open" ? "open" : "closed", delivery_policy: snapshot.state === "paused" ? "stopped" : "enabled",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
@@ -148,6 +151,7 @@ export class SqliteServiceRuntime {
     const digest = target.base ? await publicationChecksum(new TextEncoder().encode(JSON.stringify(episodeDraftFromRevision(target.base)))) : undefined;
     return sqliteInspectionSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
       revision_history: "sqlite-revisions-v1",
+      website: "static-show-v1",
       state: snapshot.state, admission_window_id: snapshot.admission_window_id, show_id: showId,
       show_lifecycle: target.show?.lifecycle ?? "missing", reservation_id: target.show?.reservation_id ?? null,
       expected_show_state_version: target.show?.state_version ?? null,

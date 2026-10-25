@@ -10,7 +10,7 @@ type SqliteWorkerBinding = { name: "CASTLOOP_BUCKET"; type: "r2_bucket"; bucket_
 export type SqliteWorkerUploadMetadata = { main_module: "index.js"; compatibility_date: string; compatibility_flags: string[];
   cache_options: { enabled: true; cross_version_cache: false };
   exports: { default: { type: "worker"; cache: { enabled: false } }; SqliteCachedAssets: { type: "worker"; cache: { enabled: true } };
-    SqlitePublicationService: { type: "durable-object"; storage: "sqlite" } };
+    SiteCachedPages: { type: "worker"; cache: { enabled: true } }; SqlitePublicationService: { type: "durable-object"; storage: "sqlite" } };
   observability: { enabled: true; logs: { enabled: true }; traces: { enabled: true } }; bindings: SqliteWorkerBinding[] };
 export function buildSqliteWorkerMetadata(input: SqliteServiceConfig, adminKey: string): SqliteWorkerUploadMetadata {
   const config = sqliteServiceConfigSchema.parse(input);
@@ -18,6 +18,7 @@ export function buildSqliteWorkerMetadata(input: SqliteServiceConfig, adminKey: 
   return { main_module: "index.js", compatibility_date: SQLITE_WORKER_COMPATIBILITY_DATE,
     compatibility_flags: ["enable_ctx_exports"], cache_options: { enabled: true, cross_version_cache: false },
     exports: { default: { type: "worker", cache: { enabled: false } }, SqliteCachedAssets: { type: "worker", cache: { enabled: true } },
+      SiteCachedPages: { type: "worker", cache: { enabled: true } },
       SqlitePublicationService: { type: "durable-object", storage: "sqlite" } },
     observability: { enabled: true, logs: { enabled: true }, traces: { enabled: true } },
     bindings: [{ name: "CASTLOOP_BUCKET", type: "r2_bucket", bucket_name: config.bucket_name },

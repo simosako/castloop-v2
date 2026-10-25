@@ -7,13 +7,21 @@ import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
 import type { SqlitePublicationExecutor } from "./sqlite-publication-alarm";
-import type { PreparedSqlitePublication } from "./sqlite-publication-executor";
+import { withSitePublication } from "./site-publication";
+import type { SitePublication } from "./site-publication";
+import { serveSiteGateway } from "./site-gateway";
+import { serveCachedSitePage } from "./site-cache";
+import type { SiteCacheProps } from "./site-cache";
+import { purgeSitePages } from "./site-storage";
+import type { SitePurgeTarget } from "./site-storage";
+import { parseSitePagePath } from "../packages/shared/src/website";
+import type { SitePage } from "../packages/shared/src/website";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import type { SqliteDeliveryDecision } from "./sqlite-publication-content";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
-import type { SqliteCacheRuntime } from "./sqlite-service-runtime";
+import type { SqliteCachePurgeConfirmation, SqliteCacheRuntime } from "./sqlite-service-runtime";
 import { serveSqliteGateway } from "./sqlite-gateway";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
 import { SqliteShowService } from "./sqlite-show-service";
@@ -49,10 +57,23 @@ export class SqliteCachedAssets extends WorkerEntrypoint<SqliteWorkerEnv, Public
   async invalidate(target: LifecyclePurgeTarget): Promise<void> { await purgeSqliteCache(this.ctx.cache, target); }
 }
 
+export class SiteCachedPages extends WorkerEntrypoint<SqliteWorkerEnv, SiteCacheProps> {
+  fetch(request: Request): Promise<Response> { return serveCachedSitePage(request, this.env.CASTLOOP_BUCKET, this.ctx.props); }
+  async describeRuntime(): Promise<SqliteCacheRuntime> {
+    return { worker_version_id: this.env.CASTLOOP_VERSION_METADATA.id,
+      service_config_sha256: await sqliteServiceConfigHash(sqliteServiceConfigSchema.parse(JSON.parse(this.env.CASTLOOP_SQLITE_CONFIG))),
+      cache_enabled: this.ctx.cache !== undefined };
+  }
+  async invalidate(target: SitePurgeTarget): Promise<void> {
+    if (!this.ctx.cache) throw new Error("Site cache is unavailable");
+    await purgeSitePages(this.ctx.cache, target);
+  }
+}
+
 export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
   private readonly initialized: Promise<void>;
   private runtime!: SqliteServiceRuntime;
-  private executor!: SqlitePublicationExecutor<PreparedSqlitePublication>;
+  private executor!: SqlitePublicationExecutor<SitePublication>;
   private alarmRuntime!: () => SqliteServiceRuntime;
   private serviceHttp!: (request: Request) => Promise<Response>;
   private control?: SqliteServiceControl;
@@ -76,8 +97,8 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
       }
       if (config.public_base_url !== config.workers_dev_base_url && !this.ctx.storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_service'").toArray().length) throw new Error("Fresh initialization requires workers.dev");
       const queue = new SqlitePublicationQueue(this.ctx.storage, selectSqliteRuntime(this.ctx.storage, identity)), content = new SqlitePublicationContent(this.ctx.storage);
-      const cache = { describe: () => this.ctx.exports.SqliteCachedAssets.describeRuntime(),
-        purge: (showId: string) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId }) };
+      const cache = { describe: () => this.describeCaches(),
+        purge: (showId: string, confirmed?: SqliteCachePurgeConfirmation) => this.purgeCaches(showId, confirmed) };
       this.alarmRuntime = () => new SqliteServiceRuntime(this.ctx.storage, queue, content, this.env.CASTLOOP_BUCKET, config, cache, identity);
       this.runtime = this.alarmRuntime();
       this.control = new SqliteServiceControl(this.ctx.storage, this.runtime, (showId) => {
@@ -101,6 +122,23 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     await this.initialized;
     return this.show ? this.show.delivery(path) : { status: 404 };
   }
+  async siteDelivery(page: SitePage) {
+    await this.initialized;
+    return this.show ? this.show.siteDelivery(page) : { status: 404 as const };
+  }
+  private async describeCaches(): Promise<SqliteCacheRuntime> {
+    const media = await this.ctx.exports.SqliteCachedAssets.describeRuntime();
+    const site = await this.ctx.exports.SiteCachedPages.describeRuntime();
+    if (media.worker_version_id !== site.worker_version_id || media.service_config_sha256 !== site.service_config_sha256 ||
+      !site.cache_enabled) throw new Error("Site cache runtime differs");
+    return media;
+  }
+  private async purgeCaches(showId: string, confirmed?: SqliteCachePurgeConfirmation): Promise<void> {
+    await this.ctx.exports.SqliteCachedAssets.invalidate({ showId });
+    confirmed?.("media");
+    await this.ctx.exports.SiteCachedPages.invalidate({ showId });
+    confirmed?.("site");
+  }
   async alarm(): Promise<void> {
     await this.initialized;
     if (this.control) {
@@ -117,10 +155,11 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     if (!this.ctx.id.equals(this.env.CASTLOOP_SQLITE.idFromName(sqliteShowObjectName(this.config.service_id, showId)))) throw new Error("Show namespace identity differs");
     if (this.show) { if (this.show.showId !== showId) throw new Error("Show scope differs"); return this.show; }
     this.show = new SqliteShowService(this.ctx.storage, showId, this.identity, this.config, {
-      describe: () => this.ctx.exports.SqliteCachedAssets.describeRuntime(), purge: (id) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId: id }),
+      describe: () => this.describeCaches(), purge: (id, confirmed) => this.purgeCaches(id, confirmed),
     }, this.env.CASTLOOP_BUCKET, this.env.CASTLOOP_ADMIN_KEY);
-    this.executor = createSqlitePublicationExecutor(this.show.content, this.env.CASTLOOP_BUCKET, this.config,
-      { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) });
+    this.executor = withSitePublication(createSqlitePublicationExecutor(this.show.content, this.env.CASTLOOP_BUCKET, this.config,
+      { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) }),
+      this.show.content, this.env.CASTLOOP_BUCKET, this.config, (target) => this.ctx.exports.SiteCachedPages.invalidate(target));
     return this.show;
   }
   async initializeShow(request: ShowRegistration) { await this.initialized; return this.openShow(request.show_id).initialize(request); }
@@ -162,6 +201,11 @@ export default {
       if (config.service_id !== env.CASTLOOP_SERVICE_ID || config.workers_dev_base_url !== env.CASTLOOP_MANAGEMENT_ORIGIN) throw new Error("Gateway identity differs");
       publicOrigin = config.public_base_url;
     } catch { return new Response(null, { status: 503, headers: { "Cache-Control": "no-store" } }); }
+    if (parseSitePagePath(new URL(request.url).pathname)) return serveSiteGateway(request, {
+      managementOrigin: env.CASTLOOP_MANAGEMENT_ORIGIN, publicOrigin,
+      delivery: (page) => env.CASTLOOP_SQLITE.getByName(name).siteDelivery(page),
+      cachedFetch: (input, props) => ctx.exports.SiteCachedPages({ props }).fetch(input),
+    });
     return serveSqliteGateway(request, env.CASTLOOP_MANAGEMENT_ORIGIN,
       env.CASTLOOP_SQLITE.getByName(name),
       (input, props) => ctx.exports.SqliteCachedAssets({ props }).fetch(input), publicOrigin);

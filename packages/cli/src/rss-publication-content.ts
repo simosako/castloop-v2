@@ -1,4 +1,5 @@
 import { parseEpisodeDraft, parseShowMetadata } from "@castloop/shared";
+import { sitePageUrl } from "../../shared/src/website";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { readLocalMetadata } from "./local-metadata-read";
@@ -21,7 +22,10 @@ export async function writeImportedMetadata(source: string, target: string, expe
 
 export function verifyImportedFeed(prepared: PreparedRssImport, feedUrl: string, source: string): void {
   const published = parseRssImportFeed(source, prepared.show.show_id, feedUrl, 32_000_000);
-  for (const field of ["title", "description", "language", "author", "owner_name", "owner_email", "site_url", "explicit", "show_type", "copyright"] as const) {
+  const siteUrl = prepared.show.site_mode === "builtin" ? sitePageUrl(new URL(feedUrl).origin,
+    { kind: "listing", showId: prepared.show.show_id, page: 1 }) : prepared.show.site_url;
+  if (published.show.site_url !== siteUrl) throw new Error("Published RSS site URL differs from the import");
+  for (const field of ["title", "description", "language", "author", "owner_name", "owner_email", "explicit", "show_type", "copyright"] as const) {
     if (published.show[field] !== prepared.show[field]) throw new Error("Published RSS Show metadata differs from the import");
   }
   if (published.episodes.length !== prepared.episodes.length) throw new Error("Published RSS Episode count differs from the import");

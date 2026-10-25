@@ -27,4 +27,7 @@ test("field diff respects optional absence, order and permalink identity default
   const show = { schema_version: 1 as const, show_id: "daily", title: "Title", description: "Description", language: "ja", author: "Author",
     owner_name: "Owner", owner_email: "owner@example.com", categories: ["Technology", "News"], explicit: false, site_url: "https://example.com", image_path: "cover.jpg" };
   expect(diffShowMetadataFields(show, { ...show, categories: ["News", "Technology"] }).find((field) => field.field === "categories")?.changed).toBe(true);
+  const { site_url, ...withoutSite } = show;
+  expect(diffShowMetadataFields(show, { ...withoutSite, site_mode: "builtin" }).find((field) => field.field === "site_mode"))
+    .toMatchObject({ changed: true, published: null, candidate: "builtin" });
 });

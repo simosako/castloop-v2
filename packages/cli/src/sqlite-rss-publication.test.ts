@@ -9,6 +9,7 @@ import { runSqliteCommand } from "./sqlite-commands";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { startSqliteDomainChange } from "./sqlite-domain-operation";
 import { loadWorkspaceConfig } from "./workspace-config";
+import { parseShowMetadata, stringifyToml } from "@castloop/shared";
 import { RSS_IMPORT_AUDIO, RSS_IMPORT_SOURCE, rssImportTransport } from "./test-support/rss-import";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -67,6 +68,20 @@ test("RSS publication after a domain change verifies the canonical Feed without 
   }
   expect(value.domains).toHaveLength(1);
 });
+
+test("reviewed RSS imports can explicitly select builtin pages without changing imported identities", async () => {
+  const value = await fixture(21), path = join(value.output, "show.toml");
+  const { site_url, ...metadata } = parseShowMetadata(readFileSync(path, "utf8"));
+  writeFileSync(path, stringifyToml({ ...metadata, site_mode: "builtin" }));
+  expect(await value.execute()).toMatchObject({ episode_count: 21 });
+  for (const original of value.report.episodes) {
+    const episodeId = original.metadata.episode_id;
+    const page = value.content.sites.page({ kind: "episode", showId: "imported", episodeId })!;
+    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${episodeId}.html`)).toContain('<audio controls preload="none"');
+    expect(value.content.episodes("imported").find((item) => item.episode_id === episodeId)).toMatchObject(original.metadata);
+  }
+  expect(value.content.sites.page({ kind: "listing", showId: "imported", page: 2 })).not.toBeNull();
+}, 60000);
 
 test("a completed publication with a lost import checkpoint is observed without a second publish or upload", async () => {
   const value = await fixture(); let lose = true;

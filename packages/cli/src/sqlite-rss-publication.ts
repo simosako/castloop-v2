@@ -80,7 +80,7 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
     if (state.bootstrap_state === "create_requested" || state.bootstrap_state === "resume_requested") throw new Error("RSS Show initialization outcome is unknown; inspect without replaying it");
     if (state.bootstrap_state === "prepared") {
       state = { ...state, bootstrap_state: "create_requested" }; save();
-      await effects.command("create-show", [showId, prepared.show.site_url]);
+      await effects.command("create-show", prepared.show.site_url === undefined ? [showId] : [showId, prepared.show.site_url]);
       state = { ...state, bootstrap_state: "created", created_show_sha256: digest(await readLocalMetadata(join(directory, "show.toml"))) }; save();
     }
     if (state.bootstrap_state === "created") {

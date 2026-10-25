@@ -21,6 +21,8 @@ import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
 import type { OperationCleanupBucket } from "./sqlite-operation-records";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
 import type { SqliteDomainRequest, SqliteDomainActivation } from "../packages/shared/src/sqlite-domain";
+import type { SitePage } from "../packages/shared/src/website";
+import type { SiteDeliveryDecision } from "./site-gateway";
 
 export type ShowRegistration = ReturnType<typeof sqliteRegistrationSchema.parse>;
 type Binding = { show_id: string; maintenance_id: string | null };
@@ -127,6 +129,10 @@ export class SqliteShowService {
   delivery(path: string) {
     if (parsePublicAssetPath(path)?.showId !== this.showId) return { status: 404 as const };
     return this.storage.transactionSync(() => this.ready() ? this.content.delivery(path) : { status: 503 as const });
+  }
+  siteDelivery(page: SitePage): SiteDeliveryDecision {
+    if (page.showId !== this.showId) return { status: 404 };
+    return this.storage.transactionSync(() => this.ready() ? this.content.siteDelivery(page) : { status: 503 });
   }
   private async controlHttp(request: Request): Promise<Response> {
     if (!await authenticated(request, this.key)) return adminReply({ error: "unauthorized" }, 401);

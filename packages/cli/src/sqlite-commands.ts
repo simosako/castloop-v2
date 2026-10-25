@@ -44,7 +44,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "preview-show": [1], "preview-episode": [1],
   "list-show-revisions": [1], "list-episode-revisions": [1], "preview-show-revision": [2], "preview-episode-revision": [2],
   "revision-execute": [3], "sync-local-metadata": [0],
-  "create-show": [2], "create-episode": [1], "update-show": [1], "publish-show": [1],
+  "create-show": [1, 2], "create-episode": [1], "update-show": [1], "publish-show": [1],
   "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
   "service-status": [0], "show-status": [1], "show-pause": [2], "show-resume": [2], "target-show": [1], "target-episode": [2],
   "show-admission-pause": [2], "show-delivery-resume": [2], "show-control-status": [2],
@@ -59,7 +59,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
 
-async function registeredShow(root: string, config: SqliteServiceConfig, showId: string, siteUrl: string, client: SqliteServiceClient): Promise<string> {
+async function registeredShow(root: string, config: SqliteServiceConfig, showId: string, siteUrl: string | undefined, client: SqliteServiceClient): Promise<string> {
   const metadata = showTemplate(showId, siteUrl);
   const journal = createLocalJournalStorage(root, "sqlite-registrations", config.service_id, `${showId}.json`);
   let existing: z.infer<typeof registrationSchema> | null = null;
@@ -201,7 +201,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
       const result = await client.control(request); journal.replace({ ...state, phase: "confirmed", result }); return result;
     });
   }
-  if (command === "create-show" && args.length === 2) return registeredShow(root, config, validateId(args[0], "show"), args[1], client);
+  if (command === "create-show" && (args.length === 1 || args.length === 2)) return registeredShow(root, config, validateId(args[0], "show"), args[1], client);
   if (command === "create-episode" && args.length === 2) {
     const showId = validateId(args[0], "show"), episodeId = validateId(args[1], "episode"), inspection = await client.inspect(showId, episodeId);
     if (!["draft", "published"].includes(inspection.show_lifecycle) || inspection.episode_lifecycle !== "missing") throw new Error("Episode identity is unavailable");

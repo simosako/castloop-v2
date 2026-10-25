@@ -5,19 +5,28 @@ import { runSqliteCommand } from "./sqlite-commands";
 import { SQLITE_DOMAIN_PROTOCOL, sqliteDomainRequestHash } from "../../shared/src/sqlite-domain";
 import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import { stringifyToml } from "@castloop/shared";
+import { RSS_IMPORT_AUDIO } from "./test-support/rss-import";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const fixtures: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of fixtures.splice(0)) value.close(); });
-async function fixture(shows = ["a", "b"]) {
+async function fixture(shows = ["a", "b"], builtin = false, episodes = 0) {
   const f = await sqliteServiceFixture(); fixtures.push(f);
   await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "initial", f.options, { attempts: 2, delay: async () => {} });
   const run = (command: string, args: string[] = []) => runSqliteCommand(f.root, f.config, command, args, { transport: f.transport, cloudflare: f.options });
   for (const id of shows) {
-    await run("create-show", [id, "https://example.com"]); await run("show-resume", [id, crypto.randomUUID()]);
+    await run("create-show", builtin ? [id] : [id, "https://example.com"]); await run("show-resume", [id, crypto.randomUUID()]);
     writeFileSync(join(f.root, id, "cover.jpg"), Uint8Array.of(255, 216, 255));
-    await run("update-show", [id]); await run("publish-show", [id]); await run("show-pause", [id, crypto.randomUUID()]);
+    await run("update-show", [id]); await run("publish-show", [id]);
+    for (let index = 0; index < episodes; index++) {
+      const episodeId = `ep-${index}`;
+      await run("create-episode", [id, episodeId]);
+      writeFileSync(join(f.root, id, "audio.mp3"), RSS_IMPORT_AUDIO);
+      await run("update-episode", [id, episodeId]); await run("update-episode-audio", [id, episodeId, "audio.mp3"]);
+      await run("publish-episode", [id, episodeId]);
+    }
+    await run("show-pause", [id, crypto.randomUUID()]);
   }
   const target = { ...f.config, public_base_url: "https://podcasts.example.com" };
   const request = { schema_version: 1 as const, protocol: SQLITE_DOMAIN_PROTOCOL, operation_id: crypto.randomUUID(), action: "add" as const,
@@ -34,6 +43,36 @@ async function fixture(shows = ["a", "b"]) {
   };
   return Object.assign(f, { run, target, request, connection, deploy });
 }
+
+test("domain website regeneration resumes bounded batches after restart and commits only the new canonical origin", async () => {
+  const f = await fixture(["a"], true, 21), page = { kind: "listing" as const, showId: "a", page: 1 };
+  const before = f.content.sites.page(page)!;
+  await f.control.prepareDomain(f.request); const activation = await f.deploy(); await f.control.activateDomain(activation);
+  const writes = f.bucketCalls.length;
+  await f.nodes.get("a")!.service.runtime.domains.alarm();
+  expect((await f.nodes.get("a")!.service.domainStatus(f.request.operation_id)).phase).toBe("running");
+  expect(f.bucketCalls.slice(writes).filter((call) => call.method === "PUT" && call.key.includes("/sites/"))).toHaveLength(20);
+  expect(f.content.sites.page(page)).toEqual(before);
+  f.restart(); await f.progressDomains(); await f.progressDomains();
+  expect((await f.control.domainStatus(f.request.operation_id)).all_completed).toBe(true);
+  const next = f.content.sites.page(page)!;
+  expect(next.generation).not.toBe(before.generation);
+  expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain('href="https://podcasts.example.com/podcasts/a/"');
+  expect(f.text(`public/podcasts/a/sites/${before.generation}/index.html`)).toContain(`${f.config.public_base_url}/podcasts/a/`);
+  expect(f.nodes.get("a")!.service.siteDelivery(page).status).toBe(503);
+}, 60000);
+
+test("unknown domain HTML writes never replace the old page references or replay the generation", async () => {
+  const f = await fixture(["a"], true), page = { kind: "listing" as const, showId: "a", page: 1 };
+  const before = f.content.sites.page(page)!;
+  await f.control.prepareDomain(f.request); const activation = await f.deploy(); await f.control.activateDomain(activation);
+  f.hooks.afterPut = async (key) => { if (key.includes("/sites/")) throw new Error("Unknown HTML outcome"); };
+  await f.progressDomains();
+  expect((await f.nodes.get("a")!.service.domainStatus(f.request.operation_id)).phase).toBe("blocked");
+  expect(f.content.sites.page(page)).toEqual(before);
+  const writes = f.bucketCalls.length; await f.progressDomains();
+  expect(f.bucketCalls).toHaveLength(writes);
+});
 
 for (const shows of [[], ["a"], ["a", "b"]]) test(`domain configuration activation and Feed regeneration complete paused with ${shows.length} Shows`, async () => {
   const f = await fixture(shows);
@@ -79,6 +118,7 @@ for (const failure of ["write", "purge"] as const) test(`Feed ${failure} failure
   else f.faults.failDomainPurge = "a";
   await f.progressDomains(); f.hooks.afterPut = undefined;
   expect((await node.service.domainStatus(f.request.operation_id)).phase).toBe("blocked");
+  expect(node.service.content.sites.build(f.request.operation_id)).toMatchObject({ media_purged: failure === "purge" ? 1 : 0, site_purged: 0 });
   expect(node.service.content.inspect("a").show!.feed_generation).toBe(oldGeneration);
   const writes = f.bucketCalls.filter((call) => call.method === "PUT").length;
   await f.progressDomains(); expect(f.bucketCalls.filter((call) => call.method === "PUT")).toHaveLength(writes);

@@ -9,6 +9,11 @@ import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
+import { withSitePublication } from "./site-publication";
+import { serveSiteGateway } from "./site-gateway";
+import { serveCachedSitePage } from "./site-cache";
+import { siteSnapshotKey } from "../packages/shared/src/website";
+import type { SitePurgeTarget } from "./site-storage";
 import type { SqlitePublicationEffectFailure } from "./sqlite-publication-executor";
 import type { SqliteAvailabilityRequest } from "../packages/shared/src/sqlite-availability";
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
@@ -35,7 +40,9 @@ async function readPublic(setup: Awaited<ReturnType<typeof fixture>>, path = "/p
     (request, props) => serveCachedLifecycleAsset(request, { CASTLOOP_BUCKET: setup.bucket } as never, props));
 }
 
-async function fixture() {
+async function fixture(builtin = false) {
+  const { site_url: externalUrl, ...withoutSite } = show;
+  const showInput = builtin ? { ...withoutSite, site_mode: "builtin" as const } : show;
   const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
     account_id: "a".repeat(32), bucket_name: "test-bucket", worker_name: "test-worker", public_base_url: "https://public.example.com",
     workers_dev_base_url: "https://test-worker.example.workers.dev" };
@@ -47,10 +54,12 @@ async function fixture() {
   content.registerShow("daily", reservationId);
   const purges: Array<{ showId: string; cover: boolean; episodeId?: string }> = [];
   const effectFailures: SqlitePublicationEffectFailure[] = [];
-  const hooks: { purge?: () => Promise<void> } = {};
-  const executor = createSqlitePublicationExecutor(content, objects.bucket, config, { async purge(target) {
+  const sitePurges: SitePurgeTarget[] = [];
+  const hooks: { purge?: () => Promise<void>; sitePurge?: () => Promise<void> } = {};
+  const executor = withSitePublication(createSqlitePublicationExecutor(content, objects.bucket, config, { async purge(target) {
     purges.push(target); await hooks.purge?.();
-  }, now: () => "2026-10-16T13:00:00Z", onFailure: (event) => effectFailures.push(event) });
+  }, now: () => "2026-10-16T13:00:00Z", onFailure: (event) => effectFailures.push(event) }), content, objects.bucket, config,
+  async (target) => { sitePurges.push(target); await hooks.sitePurge?.(); });
   const events: unknown[] = [];
   const runner = new SqlitePublicationAlarm(setup.queue, executor, (event) => events.push(event));
   async function payload(jobId: string, asset: SqliteVerifiedUpload["asset"], source: string | Uint8Array): Promise<SqliteVerifiedUpload> {
@@ -65,7 +74,7 @@ async function fixture() {
     const jobId = crypto.randomUUID();
     const payloads: SqliteVerifiedUpload[] = [];
     if (kind === "show") {
-      payloads.push(await payload(jobId, "show_metadata", stringifyToml(show)), await payload(jobId, "cover_jpg", Uint8Array.from([255, 216, 255, 2])));
+      payloads.push(await payload(jobId, "show_metadata", stringifyToml(showInput)), await payload(jobId, "cover_jpg", Uint8Array.from([255, 216, 255, 2])));
     } else {
       if (selection !== "audio") payloads.push(await payload(jobId, "episode_metadata", stringifyToml(metadata(episodeId))));
       if (selection !== "metadata") payloads.push(await payload(jobId, "audio", Uint8Array.from([255, 251, 144, 100, 1, 2, 3])));
@@ -76,14 +85,17 @@ async function fixture() {
       ...(kind === "episode" ? { episode_id: episodeId, ...(base ? { base_revision_id: base } : {}) } : {}), payloads });
   }
   const run = async (value: SqlitePublicationRequest) => {
-    await setup.queue.enqueue(value); setup.clearAlarm(); return runner.alarm();
+    await setup.queue.enqueue(value);
+    let result;
+    do { setup.clearAlarm(); result = await runner.alarm(); } while (result.state === "running");
+    return result;
   };
   const publishShow = async () => { const value = await request("show"); expect((await run(value)).state).toBe("succeeded"); return value; };
   const publishEpisode = async (episodeId = "first") => { const value = await request("episode", episodeId); expect((await run(value)).state).toBe("succeeded"); return value; };
   const showUpdate = async (selection: "metadata" | "cover" | "both" = "both") => {
     const value = await request("show");
     value.expected_show_state_version = content.inspect("daily").show!.state_version;
-    value.payloads = [await payload(value.job_id, "show_metadata", stringifyToml({ ...show,
+    value.payloads = [await payload(value.job_id, "show_metadata", stringifyToml({ ...showInput,
       ...(selection === "cover" ? {} : { title: "Updated Show" }) })),
       await payload(value.job_id, "cover_jpg", Uint8Array.from([255, 216, 255, selection === "metadata" ? 2 : 3]))];
     return value;
@@ -99,12 +111,146 @@ async function fixture() {
   const control = (action: SqliteAvailabilityRequest["action"]) => setup.queue.applyControl({ ...setup.runtime, action, show_id: "daily",
     operation_id: crypto.randomUUID(), expected_availability_version: setup.queue.snapshot().availability_version,
     ...(action === "resume" ? { admission_window_id: crypto.randomUUID() } : {}) });
-  return { ...setup, ...objects, feed, control, bucketHooks: objects.hooks, config, content, reservationId, purges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, showUpdate, lifecycle };
+  return { ...setup, ...objects, feed, control, bucketHooks: objects.hooks, config, content, reservationId, purges, sitePurges, effectFailures, hooks, executor, events, runner, payload, request, run, publishShow, publishEpisode, showUpdate, lifecycle };
 }
 
 function revisionRequest(setup: Awaited<ReturnType<typeof fixture>>, revisionId: string, episodeId?: string) {
   return parseSqlitePublicationRequest({ ...setup.lifecycle("restore", episodeId), action: "restore_revision", target_revision_id: revisionId });
 }
+
+async function readSite(f: Awaited<ReturnType<typeof fixture>>, path = "/podcasts/daily/", headers: HeadersInit = {}) {
+  return serveSiteGateway(new Request(`${f.config.public_base_url}${path}`, { headers }), {
+    managementOrigin: f.config.workers_dev_base_url, publicOrigin: f.config.public_base_url,
+    delivery: async (page) => f.content.siteDelivery(page),
+    cachedFetch: (request, props) => serveCachedSitePage(request, f.bucket as never, props),
+  });
+}
+
+test("builtin publication atomically exposes static pages, native audio and RSS links without private Show fields", async () => {
+  const f = await fixture(true);
+  expect((await readSite(f)).status).toBe(404);
+  await f.publishShow();
+  expect(await (await readSite(f)).text()).toContain("公開済みのEpisodeはありません");
+  const episode = await f.publishEpisode();
+  const html = await (await readSite(f)).text();
+  expect(html).toContain('<audio controls preload="none"');
+  expect(html).toContain(`${episode.job_id}.mp3`);
+  expect(html).not.toContain("private@example.com");
+  const page = await readSite(f, "/podcasts/daily/episodes/first/");
+  expect(page.status).toBe(200);
+  expect(page.headers.get("Content-Security-Policy")).toContain("script-src 'none'");
+  expect(f.feed()).toContain("<link>https://public.example.com/podcasts/daily/</link>");
+  expect(f.feed()).toContain("<link>https://public.example.com/podcasts/daily/episodes/first/</link>");
+  expect(f.sitePurges).toEqual([{ showId: "daily" }, { showId: "daily", episodeId: "first" }]);
+  await f.control("pause");
+  expect((await readSite(f, "/podcasts/daily/episodes/first/", { "If-None-Match": "*" })).status).toBe(503);
+});
+
+test("builtin metadata/audio revisions and saved revision adoption preserve page URLs and unaffected Episode snapshots", async () => {
+  const f = await fixture(true); await f.publishShow(); const first = await f.publishEpisode(); await f.publishEpisode("second");
+  const other = f.content.sites.page({ kind: "episode", showId: "daily", episodeId: "second" });
+  const update = await f.request("episode", "first", first.job_id, "metadata");
+  update.payloads = [await f.payload(update.job_id, "episode_metadata", stringifyToml({ ...metadata("first"), title: "New title" }))];
+  expect((await f.run(update)).state).toBe("succeeded");
+  let html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  expect(html).toContain("New title"); expect(html).toContain(`${first.job_id}.mp3`);
+  const audio = await f.request("episode", "first", update.job_id, "audio");
+  expect((await f.run(audio)).state).toBe("succeeded");
+  html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  expect(html).toContain(`${audio.job_id}.mp3`);
+  expect((await f.run(revisionRequest(f, first.job_id, "first"))).state).toBe("succeeded");
+  html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  expect(html).toContain(`${first.job_id}.mp3`); expect(html).not.toContain("New title");
+  expect(f.content.sites.page({ kind: "episode", showId: "daily", episodeId: "second" })).toEqual(other);
+  expect(f.entries.has(`public/podcasts/daily/episodes/first/${audio.job_id}.mp3`)).toBe(true);
+});
+
+test("builtin lifecycle hides removed Episodes and regenerates Show restoration including saved revision content", async () => {
+  const f = await fixture(true), original = await f.publishShow(); await f.publishEpisode();
+  expect((await f.run(f.lifecycle("unpublish", "first"))).state).toBe("succeeded");
+  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+  expect(await (await readSite(f)).text()).not.toContain("<audio");
+  expect((await f.run(f.lifecycle("restore", "first"))).state).toBe("succeeded");
+  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(200);
+  expect((await f.run(f.lifecycle("unpublish"))).state).toBe("succeeded");
+  expect((await readSite(f)).status).toBe(404);
+  expect((await f.run(f.lifecycle("restore"))).state).toBe("succeeded");
+  expect(await (await readSite(f)).text()).toContain("<audio");
+  expect((await f.run(await f.showUpdate())).state).toBe("succeeded");
+  expect((await f.run(revisionRequest(f, original.job_id))).state).toBe("succeeded");
+  expect(await (await readSite(f)).text()).not.toContain("Updated Show");
+});
+
+test("external/builtin changes require explicit publication and clear or regenerate all page references", async () => {
+  const f = await fixture(true), original = await f.publishShow(); await f.publishEpisode();
+  const update = await f.showUpdate();
+  update.payloads[0] = await f.payload(update.job_id, "show_metadata", stringifyToml(show));
+  expect((await readSite(f)).status).toBe(200);
+  expect((await f.run(update)).state).toBe("succeeded");
+  expect((await readSite(f)).status).toBe(404);
+  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+  expect(f.feed()).toContain(`<link>${show.site_url}</link>`);
+  expect((await f.run(revisionRequest(f, original.job_id))).state).toBe("succeeded");
+  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(200);
+});
+
+test("bounded site batches survive restart, retain committed reads, and serialize queued publication across admission pause", async () => {
+  const f = await fixture(true); await f.publishShow();
+  for (let index = 0; index < 21; index++) await f.publishEpisode(`ep-${String(index).padStart(2, "0")}`);
+  expect((await (await readSite(f)).text()).match(/<audio /g)).toHaveLength(20);
+  expect((await (await readSite(f, "/podcasts/daily/page/2/")).text()).match(/<audio /g)).toHaveLength(1);
+  const old = await (await readSite(f)).text(), request = await f.showUpdate();
+  await f.queue.enqueue(request); await f.control("admission-pause"); f.clearAlarm(); f.calls.length = 0;
+  expect((await f.runner.alarm()).state).toBe("running");
+  expect(f.calls.filter((call) => call.method === "PUT" && call.key.includes("/sites/"))).toHaveLength(20);
+  expect(f.calls.some((call) => call.method === "PUT" && call.key.includes("/feeds/"))).toBe(false);
+  expect(await (await readSite(f)).text()).toBe(old);
+  await expect(f.control("resume")).rejects.toThrow("drained");
+  const queue = new SqlitePublicationQueue(f.storage, f.runtime), content = new SqlitePublicationContent(f.storage);
+  const executor = withSitePublication(createSqlitePublicationExecutor(content, f.bucket, f.config, { purge: async () => {} }), content, f.bucket, f.config, async () => {});
+  const runner = new SqlitePublicationAlarm(queue, executor, () => {});
+  f.clearAlarm(); expect((await runner.alarm()).state).toBe("succeeded");
+  expect(f.calls.filter((call) => call.method === "PUT" && call.key.includes("/sites/"))).toHaveLength(23);
+  expect(await (await readSite(f)).text()).toContain("Updated Show");
+  expect(queue.snapshot()).toMatchObject({ state: "admission_paused", drained: true });
+});
+
+test("removing the last second-page Episode removes its listing URL without exposing staged HTML", async () => {
+  const f = await fixture(true); await f.publishShow();
+  for (let index = 0; index < 21; index++) await f.publishEpisode(`ep-${index}`);
+  expect((await readSite(f, "/podcasts/daily/page/2/")).status).toBe(200);
+  expect((await f.run(f.lifecycle("unpublish", "ep-20"))).state).toBe("succeeded");
+  expect((await readSite(f, "/podcasts/daily/page/2/")).status).toBe(404);
+  const root = f.content.sites.page({ kind: "listing", showId: "daily", page: 1 })!;
+  expect(f.entries.has(siteSnapshotKey({ kind: "listing", showId: "daily", page: 1 }, root.generation))).toBe(true);
+});
+
+for (const fault of ["html", "media-purge", "site-purge"] as const) test(`builtin ${fault} uncertainty blocks without replay and leaves only the approved site visible`, async () => {
+  const f = await fixture(true); await f.publishShow(); await f.publishEpisode();
+  const old = await (await readSite(f)).text(), feed = f.feed(), update = await f.showUpdate();
+  if (fault === "html") f.bucketHooks.afterPut = async (key) => { if (key.includes("/sites/")) throw new Error("Private unknown IO"); };
+  if (fault === "media-purge") f.hooks.purge = async () => { throw new Error("Unknown media purge"); };
+  if (fault === "site-purge") f.hooks.sitePurge = async () => { throw new Error("Unknown site purge"); };
+  expect((await f.run(update)).state).toBe("blocked");
+  expect(f.content.sites.build(update.job_id)).toMatchObject({ media_purged: fault === "site-purge" ? 1 : 0, site_purged: 0 });
+  expect(f.feed()).toBe(feed); expect(await (await readSite(f)).text()).toBe(old);
+  const calls = f.calls.length, purges = f.purges.length, sitePurges = f.sitePurges.length;
+  expect((await new SqlitePublicationAlarm(f.queue, f.executor, () => {}).alarm()).state).toBe("blocked");
+  expect(f.calls).toHaveLength(calls); expect(f.purges).toHaveLength(purges); expect(f.sitePurges).toHaveLength(sitePurges);
+  expect(JSON.stringify(f.events)).not.toContain("Private unknown IO");
+});
+
+test("site continuation scheduling failure never promotes partial pages or authorizes a replay", async () => {
+  const f = await fixture(true); await f.publishShow();
+  for (let index = 0; index < 20; index++) await f.publishEpisode(`ep-${index}`);
+  const old = await (await readSite(f)).text(), request = await f.showUpdate();
+  await f.queue.enqueue(request); f.clearAlarm(); f.failAlarm();
+  expect((await f.runner.alarm()).state).toBe("blocked");
+  expect(await (await readSite(f)).text()).toBe(old);
+  const writes = f.calls.filter((call) => call.method === "PUT").length;
+  expect((await f.runner.alarm()).state).toBe("blocked");
+  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(writes);
+});
 
 for (const kind of ["show", "episode"] as const) {
   test(`${kind} revision adoption appends a new committed record without recopying saved media`, async () => {
