@@ -26,7 +26,7 @@ const briefSchema = z.object({ schema_version: z.number().optional(), operation_
   result: z.object({ operation: z.object({ state: z.string() }) }).optional(),
 });
 
-function localRecords(root: string, config: SqliteServiceConfig, target?: { family: string; id: string }) {
+export function localRecords(root: string, config: SqliteServiceConfig, target?: { family: string; id: string }) {
   const result: Array<{ family: string; id: string; format: number | null; state: string; step: number | null;
     show_id: string | null; episode_id: string | null; legacy_lock_present: boolean; uploads: Array<{ upload_id: string; state?: string }> }> = [];
   for (const [name, family] of Object.entries(families)) {

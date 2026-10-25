@@ -56,6 +56,10 @@ Issue #66の開発版は`show-admission-pause SHOW UUID`、`show-delivery-resume
 
 doctorは人向け1項目1行とJSONの`result.checks`を同じ検査から生成する。pass/warn/fail/not_checkedを区別し、failは終了1、warnだけは終了0。認証情報の存在は有効性・権限を証明しない。remote検査・自動修復は行わない。
 
+`diagnose SHOW_ID [SHOW_ID...]`は明示指定Showの読取専用remote診断。管理APIへのGETとCloudflare accountへの読取GET 1件だけを行い、各検査にscope（local/remote/cross）とpass/warn/fail/not_checkedを付けて分類する。修復・Resume・purge・再送は行わない。failが1つでもあれば終了1、warnのみは終了0。同時指定は既定5 Showまでで、`--max-shows N`（1〜20）で変更できる。queuedやCLIの`ok`を公開成功として表示しない。
+
+`progress JOB`、`verify SHOW_ID [--episode ID]`、`watch JOB`は[観測コマンドの利用方法](observability.md)を参照。progressは1 jobの進捗と待機理由を統合表示し、verifyは公開pathへのGET/HEADで処理成功と配信確認を分けて報告し、watchは予算付きで終端または観測不能まで観測する（終了code 0/1/2、SIGINT 130）。watchは通知送信を行わず、成功時のnext_actionsがverifyへ誘導する。
+
 ## 対象・出力・公開前確認
 
 ```sh

@@ -13,8 +13,10 @@ export function assertPublicationInventoryBudget(count: number, revisionCharacte
   }
 }
 
+export const PUBLICATION_RENDER_BUDGET_BYTES = 32_000_000;
+
 export function assertPublicationRenderBudget(sourceBytes: number, count: number): void {
-  if (sourceBytes * 6 + count * 1024 + 4096 > 32_000_000) {
+  if (sourceBytes * 6 + count * 1024 + 4096 > PUBLICATION_RENDER_BUDGET_BYTES) {
     throw new Error("Publication feed exceeds its conservative rendering budget");
   }
 }

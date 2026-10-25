@@ -190,6 +190,8 @@ async function main(context: Invocation): Promise<unknown> {
     return init(context.target.workspace, flags, () => { context.mutationStarted = true; });
   }
   let root = explicitRoot ?? process.cwd();
+  const watchSignal = command === "watch" ? new AbortController() : undefined;
+  if (watchSignal) process.once("SIGINT", () => watchSignal.abort());
   if (command === "create-show") {
     allowedFlags(flags, ["site-url"]);
     if (positional.length !== 1) throw new Error(commandHelp(command));
@@ -223,6 +225,14 @@ async function main(context: Invocation): Promise<unknown> {
     if (flags.local && flags.remote) throw new Error("Choose --local or --remote");
   } else if (command.startsWith("operation-")) {
     allowedFlags(flags, ["show"]);
+  } else if (command === "diagnose") {
+    allowedFlags(flags, ["max-shows", "external"]);
+  } else if (command === "progress") {
+    allowedFlags(flags, []);
+  } else if (command === "verify") {
+    allowedFlags(flags, ["episode"]);
+  } else if (command === "watch") {
+    allowedFlags(flags, ["timeout", "interval"]);
   } else {
     allowedFlags(flags, []);
   }
@@ -276,11 +286,39 @@ async function main(context: Invocation): Promise<unknown> {
     ...(command === "domain" ? { domainOptions: { zoneId: flags["zone-id"], operationId: flags["operation-id"], cursor: flags.cursor } } : {}),
     ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
       afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
+    ...(command === "diagnose" ? { diagnoseOptions: { maxShows: flags["max-shows"] === undefined ? undefined : Number(flags["max-shows"]),
+      external: !!flags.external, environment: undefined } } : {}),
+    ...(command === "verify" ? { verifyOptions: { episodeId: flags.episode } } : {}),
+    ...(command === "watch" ? { watchOptions: { timeoutSeconds: flags.timeout === undefined ? undefined : Number(flags.timeout),
+      intervalSeconds: flags.interval === undefined ? undefined : Number(flags.interval), signal: watchSignal?.signal } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview });
   if (listing && !process.argv.includes("--json")) {
     const { formatSqliteCatalog } = await import("./sqlite-catalog");
     const { sqliteCatalogResponseSchema } = await import("../../shared/src/sqlite-catalog");
     return formatSqliteCatalog(sqliteCatalogResponseSchema.parse(result));
+  }
+  if (command === "diagnose") {
+    const { diagnoseResultSchema, formatDiagnose } = await import("./diagnose");
+    const diagnosed = diagnoseResultSchema.parse(result);
+    if (diagnosed.summary.fail) process.exitCode = 1;
+    if (!process.argv.includes("--json")) return formatDiagnose(diagnosed);
+  }
+  if (command === "progress" && !process.argv.includes("--json")) {
+    const { formatProgress, progressResultSchema } = await import("./progress");
+    return formatProgress(progressResultSchema.parse(result));
+  }
+  if (command === "verify") {
+    const { verifyResultSchema, formatVerify } = await import("./verify");
+    const verified = verifyResultSchema.parse(result);
+    if (verified.summary.fail) process.exitCode = 1;
+    if (!process.argv.includes("--json")) return formatVerify(verified);
+  }
+  if (command === "watch") {
+    if (watchSignal?.signal.aborted) process.exit(130);
+    const { watchResultSchema, formatWatch, watchExitCode } = await import("./watch");
+    const watched = watchResultSchema.parse(result);
+    process.exitCode = watchExitCode(watched);
+    if (!process.argv.includes("--json")) return formatWatch(watched);
   }
   return result;
 }

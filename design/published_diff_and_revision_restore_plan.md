@@ -411,7 +411,7 @@ RSS用に`GET /admin/sqlite-service/content-inventory/<showId>/<feedGeneration>[
 
 | 検証 | 結果 |
 | --- | --- |
-| `bun test` | 82ファイル、730件成功・失敗0件 |
+| `bun test` | 最新main取り込み後、86ファイル、760件成功・失敗0件 |
 | `npm run check` | TypeScript型検査成功 |
 | `npm run build:cli -- linux-x64` | Linux x64単体バイナリの生成成功 |
 | `CASTLOOP_TEST_TMP=/tmp/opencode node scripts/smoke-agent-cli.mjs dist/castloop-linux-x64` | 空のPATH、ソース・外部runtimeなしのオフライン確認成功 |
@@ -419,5 +419,7 @@ RSS用に`GET /admin/sqlite-service/content-inventory/<showId>/<feedGeneration>[
 | `git diff --check` | 差分の空白検査成功 |
 
 追加試験では、差分と素材identity、別workspaceの更新・非公開化と復帰による競合、認証とShow分離、20件ページング、RSSのローカル出力、原本上書き拒否、Show/Episodeの過去素材再利用を確認した。公開結果の書込・Feed保存・cache purge・SQLite確定時の失敗について、旧配信と履歴が保たれ、不確かな書込を再実行しないことも確認した。POST応答消失時はjob IDと不明状態を保持し、同じ計画の再実行ではGET観測だけを行う。
+
+`main`の`56d7c4b`（Issue #67の観測コマンドと検証環境削除の記録まで）をmergeし、CLIヘルプと読取専用の効果表示を統合した。`progress`・`watch`も過去版採用journalを読み、送信前・応答不明・終端を区別する。Show/Episodeの成功job照会、送信前の無通信、応答不明後の404、既知結果に矛盾する応答について、再送やjournal更新を行わないことを追加確認した。型検査・Linuxビルド・オフライン試験も統合後に再実行して成功した。
 
 これらは模擬CloudflareとローカルSQLiteの機能試験であり、Cloudflare実機のCPU時間・無料枠適合やWindows/macOS動作の実証ではない。実Cloudflareへの配備・公開・資源変更は実施していない。内部形式7/8の新規環境が必要で、既存環境の変換は追加していない。

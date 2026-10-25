@@ -77,15 +77,23 @@ async function requireNoDraft(root: string, config: SqliteServiceConfig, showId:
   }
 }
 
-export async function readRevisionStatus(root: string, config: SqliteServiceConfig, key: string, jobId: string, transport?: R2RestTransport) {
+export async function readRevisionJob(root: string, config: SqliteServiceConfig, jobId: string) {
   let record: z.infer<typeof journalSchema>;
   try { record = journalSchema.parse(local(root, config, jobId).read()); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
   const historical = await completedDomainConfiguration(root, config, record.request.service_config_sha256);
   if (!historical) throw new Error("No exact completed domain transition permits this revision job lookup");
   await checkedPlan(historical, { request: record.request, request_sha256: record.request_sha256 });
   if (record.request.job_id !== jobId || record.phase === "prepared" && record.status) throw new Error("Revision journal evidence differs");
-  const status = await new SqlitePublicationClient(historical, key, transport).observe(record.request);
+  if (record.status) requireSqliteStatus(record.request, record.request_sha256, record.status);
+  return { record, observationConfig: historical };
+}
+
+export async function readRevisionStatus(root: string, config: SqliteServiceConfig, key: string, jobId: string, transport?: R2RestTransport) {
+  const resolved = await readRevisionJob(root, config, jobId);
+  if (!resolved) return undefined;
+  const { record, observationConfig } = resolved;
+  const status = await new SqlitePublicationClient(observationConfig, key, transport).observe(record.request);
   if (!status && record.status) throw new Error("Previously acknowledged revision job is missing");
   if (status) requireSqliteStatus(record.request, record.request_sha256, status, record.status);
   return status;

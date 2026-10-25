@@ -40,6 +40,8 @@ castloop list-episode-revisions first --workspace /path/to/service --show daily 
 castloop preview-episode-revision first SAVED_REVISION_UUID --workspace /path/to/service --show daily > /path/to/service/.castloop/revision-plan.json
 castloop revision-execute /path/to/service/.castloop/revision-plan.json REVIEWED_REQUEST_SHA256 confirm --workspace /path/to/service --json
 castloop job-status JOB_UUID --workspace /path/to/service --json
+castloop progress JOB_UUID --workspace /path/to/service --json
+castloop watch JOB_UUID --workspace /path/to/service --json
 ```
 
 一覧は新しい順の最大20件。続きは`--cursor`へ`next_cursor`の数値を渡す。Showには`preview-show-revision SHOW REVISION_UUID`を使う。previewは現在版・選択版の全文、項目差分、素材再利用、採用後に公開中になることと`plan`を表示する。計画は既存ファイルを上書きしない新規パスへ保存する。`--json`の結果を保存したファイルも実行に渡せる。計画ファイルの相対パスはworkspace基準であり、`--output`・`--rss-output`の呼出元cwd基準とは異なる。受付停止中も履歴は閲覧できるが、実行可能な計画は受付中だけ作る。
@@ -49,6 +51,8 @@ castloop job-status JOB_UUID --workspace /path/to/service --json
 既存の`lifecycle ... restore`は非公開化から保存済みの最新内容で戻す操作で、revisionを選択しない。本機能の`restore_revision`とは別である。
 
 未完了の同対象local draftがあれば実行を拒否し、削除で迂回しない。`queued`は成功ではなく同じjobの`succeeded`を確認する。応答不明のPOSTは再送しない。同じ計画の再実行は送信開始済みならGET観測だけを行う。404・時間経過・配信結果から未実行を推測しない。`failed`/`blocked`も成功ではない。
+
+`progress`と`watch`も同じ過去版採用journalから読取専用で照会できる。送信前の計画、応答不明の送信、観測済みの終端を区別し、原本やjournalを書き換えない。待機予算・終了codeと配信確認の使い分けは[観測ガイド](observability.md)を参照する。
 
 ## 手元の編集元を取り出す
 

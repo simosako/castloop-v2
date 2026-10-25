@@ -8,6 +8,8 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { draftPreview } from "./draft-preview";
 import { previewRevision, executeRevision, syncLocalMetadata, readRevisionPlanFile, revisionProgress } from "./sqlite-revision-commands";
 import { exportPreviewRss } from "./preview-rss";
+import { progressResultSchema } from "./progress";
+import { watchResultSchema, watchSqliteJob } from "./watch";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -223,4 +225,80 @@ test("invalid plan file errors do not echo JSON input", async () => {
   const f = await fixture(), file = join(f.root, "invalid-plan.json");
   writeFileSync(file, "{private-plan-content-not-for-diagnostics");
   expect(() => readRevisionPlanFile(file)).toThrow("Revision plan JSON is unreadable, invalid or exceeds its read budget");
+});
+
+for (const kind of ["show", "episode"] as const) {
+  test(`${kind} revision jobs support read-only progress and watch without upload phases`, async () => {
+    const f = await fixture(), episodeId = kind === "episode" ? "first" : undefined;
+    const content = await f.client.content("daily", episodeId);
+    const original = kind === "episode" ? content.episode_content! : content.show_content!;
+    const preview = await previewRevision(f.config, f.key, "daily", original.revision_id, episodeId, f.transport);
+    const plan = sqliteRevisionPlanSchema.parse(preview.plan);
+    await executeRevision(f.root, f.config, f.key, plan, plan.request_sha256, "confirm", f.transport);
+    const file = join(f.root, ".castloop", "sqlite-revisions", f.config.service_id, `${plan.request.job_id}.json`);
+    const before = readFileSync(file); f.calls.length = 0;
+    const progress = progressResultSchema.parse(await f.run("progress", [plan.request.job_id]));
+    expect(progress.job).toMatchObject({ source: "revision", kind, show_id: "daily" });
+    expect(progress.state).toBe("succeeded");
+    expect(progress.phases.find((phase) => phase.phase === "publication_submitted")?.state).toBe("done");
+    expect(progress.phases.some((phase) => phase.phase.startsWith("upload:"))).toBe(false);
+    expect(progress.observation).toMatchObject({ observed: true, stale: false });
+    expect(watchResultSchema.parse(await f.run("watch", [plan.request.job_id])).outcome.state).toBe("succeeded");
+    expect(f.calls.every((call) => call.method === "GET")).toBe(true);
+    expect(readFileSync(file)).toEqual(before);
+  });
+}
+
+test("prepared revision plans remain unsubmitted in progress and watch without remote IO", async () => {
+  const f = await fixture(), old = (await f.client.content("daily")).show_content!;
+  const preview = await previewRevision(f.config, f.key, "daily", old.revision_id, undefined, f.transport);
+  const plan = sqliteRevisionPlanSchema.parse(preview.plan);
+  await f.run("show-admission-pause", ["daily", crypto.randomUUID()]);
+  await expect(executeRevision(f.root, f.config, f.key, plan, plan.request_sha256, "confirm", f.transport)).rejects.toThrow("base changed");
+  f.calls.length = 0;
+  const progress = progressResultSchema.parse(await f.run("progress", [plan.request.job_id]));
+  expect(progress.state).toBe("draft"); expect(progress.job.source).toBe("revision");
+  expect(progress.phases.find((phase) => phase.phase === "publication_submitted")?.state).toBe("pending");
+  expect(watchResultSchema.parse(await f.run("watch", [plan.request.job_id])).outcome).toEqual({ state: "unobservable", reason_code: "job_not_submitted" });
+  expect(f.calls).toEqual([]);
+});
+
+test("unknown revision submission stays unknown on 404 and is never retried by observers", async () => {
+  const f = await fixture(), old = (await f.client.content("daily")).show_content!;
+  const preview = await previewRevision(f.config, f.key, "daily", old.revision_id, undefined, f.transport);
+  const plan = sqliteRevisionPlanSchema.parse(preview.plan);
+  const lost: typeof f.transport = async (input, init) => {
+    if (init?.method === "POST") throw new Error("Submit outcome unknown");
+    return f.transport(input, init);
+  };
+  await expect(executeRevision(f.root, f.config, f.key, plan, plan.request_sha256, "confirm", lost)).rejects.toThrow();
+  f.calls.length = 0;
+  const progress = progressResultSchema.parse(await f.run("progress", [plan.request.job_id]));
+  expect(progress.state).toBe("unknown"); expect(progress.status).toBeNull();
+  expect(progress.phases.find((phase) => phase.phase === "publication_submitted")?.state).toBe("unknown");
+  let now = 0;
+  const watched = await watchSqliteJob(f.root, f.config, plan.request.job_id, { transport: f.transport,
+    timeoutSeconds: 1, intervalSeconds: 1, now: () => now, delay: async (ms) => { now += ms; }, onEvent: () => {} });
+  expect(watched.outcome).toEqual({ state: "unobservable", reason_code: "budget_exhausted" });
+  expect(f.calls.every((call) => call.method === "GET")).toBe(true);
+});
+
+test("revision observation preserves retained results and rejects contradictory remote status", async () => {
+  const f = await fixture(), old = (await f.client.content("daily")).show_content!;
+  const preview = await previewRevision(f.config, f.key, "daily", old.revision_id, undefined, f.transport);
+  const plan = sqliteRevisionPlanSchema.parse(preview.plan);
+  await executeRevision(f.root, f.config, f.key, plan, plan.request_sha256, "confirm", f.transport);
+  for (const fault of ["missing", "regressed"] as const) {
+    const transport: typeof f.transport = async (input, init) => {
+      if (fault === "missing") return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
+      const response = await f.transport(input, init), status = await response.json() as Record<string, unknown>;
+      return Response.json({ ...status, state: "queued" }, { headers: { "Cache-Control": "no-store" } });
+    };
+    const progress = progressResultSchema.parse(await f.run("progress", [plan.request.job_id], f.root, transport));
+    expect(progress.state).toBe("succeeded"); expect(progress.observation).toMatchObject({ observed: false, stale: true });
+    let now = 0;
+    const watched = await watchSqliteJob(f.root, f.config, plan.request.job_id, { transport,
+      timeoutSeconds: 1, intervalSeconds: 1, now: () => now, delay: async (ms) => { now += ms; }, onEvent: () => {} });
+    expect(watched.outcome).toEqual({ state: "unobservable", reason_code: fault === "missing" ? "job_missing" : "budget_exhausted" });
+  }
 });

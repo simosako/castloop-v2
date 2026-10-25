@@ -11,6 +11,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Do not change this hostname's DNS or Worker domain connections with other tools during a domain operation. Certificates are retained on remove.\n" +
       "Removing a domain cannot undo feed URLs saved by podcast apps. Preserve the workspace and journals on interruption; no automatic Resume or rollback." },
   doctor: { usage: "doctor [--local] [--workspace PATH] [--json]", description: "Compact offline checks with no writes, key generation, networking or repairs. Warnings alone exit 0; failed checks exit 1. Credential presence is not validity." },
+  diagnose: { usage: "diagnose SHOW_ID [SHOW_ID...] [--max-shows N] [--external]",
+    description: "Read-only local and remote diagnosis for explicitly listed Shows (serial; at most 5 by default, --max-shows up to 20).\n" +
+      "Performs management API GETs plus one Cloudflare account GET; never mutates, repairs, purges, resumes or replays anything.\n" +
+      "Checks workspace, key and credentials, service runtime identity, shared maintenance, admission, FIFO queue, registration, target lifecycle, unfinished operations and local/remote consistency,\n" +
+      "classifying every check with a scope (local/remote/cross/external) and pass/warn/fail/not_checked. Any failed check exits 1; warnings alone exit 0.\n" +
+      "queued or a CLI ok is never reported as publication success; --external adds public-path delivery checks via the verify family." },
   template: { usage: "template service-config|admin-config|show|episode", description: "Print an embedded example TOML without IO or registration. admin-config is optional workspace CLI preferences, not service identity. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
   "preview-show": { usage: "preview-show ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged content with immutable cover identity. Defaults to authenticated remote reads when local state exists; --local never networks. Remote errors never become unchanged results. RSS is generated locally only into a new file. Bind approval to publish-show --expect-preview HASH." },
   "preview-episode": { usage: "preview-episode ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged metadata/audio and preserved GUID/date. Requires --show with explicit --workspace. --local reports not_checked; remote failures stop. RSS export is local and never overwrites. Use publish-episode --expect-preview HASH after approval." },
@@ -74,6 +80,28 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "job-status JOB",
     description: "Run from the service workspace. Read the retained publication/lifecycle job's status.\n" +
       "status.state succeeded proves this operation completed, not global quiescence or recovery authorization.",
+  },
+  progress: {
+    usage: "progress JOB",
+    description: "Run from the service workspace. Read-only merged progress view for one retained publication/lifecycle job:\n" +
+      "frozen inputs, per-asset upload states, submission, FIFO waiting (with reason), execution and terminal state.\n" +
+      "Unobservable steps (queue position, internal execution, cache purge) stay unknown and are never shown as done.\n" +
+      "queued is not publication success. Observational only; exits 0 and never authorizes recovery.",
+  },
+  verify: {
+    usage: "verify SHOW_ID [--episode EPISODE_ID]",
+    description: "Check public delivery with GET/HEAD against the configured public origin only; no administrator key or management API.\n" +
+      "Fetches the feed (bounded by the server render budget), then checks feed structure, enclosure origins, known GUIDs,\n" +
+      "the published cover and (with --episode) the published audio by status/length. Processing success and delivery are reported separately.\n" +
+      "Expected 404/503 answers are classified distinctly; any failed check exits 1.",
+  },
+  watch: {
+    usage: "watch JOB [--timeout SECONDS] [--interval SECONDS]",
+    description: "Run from the service workspace. Bounded read-only observation of one retained job until its terminal state.\n" +
+      "Default timeout 600s (max 3600), interval 5s (1-60), at most 720 polls; each poll is a bounded management GET.\n" +
+      "Progress goes to stderr as JSON lines; the final report is stdout (use --json for one envelope document).\n" +
+      "Exit codes: 0 succeeded observed, 1 failed/blocked observed, 2 unobservable (budget exhausted or job missing); SIGINT exits 130.\n" +
+      "No notifications are sent; on success the report points to castloop verify for external delivery checks.",
   },
   deploy: {
     usage: "deploy [--operation-id UUID]",
@@ -225,6 +253,8 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
     "operation-list": { show: "string", local: "boolean", remote: "boolean", incomplete: "boolean", cursor: "string", parent: "string" },
     "operation-status": { show: "string", local: "boolean", remote: "boolean", "after-version": "string", "request-cursor": "string" },
+    diagnose: { "max-shows": "string", external: "boolean" },
+    verify: { episode: "string" }, watch: { timeout: "string", interval: "string" },
     "import-rss": { "dry-run": "boolean", output: "string" },
     validate: { assets: "boolean", audio: "string" }, doctor: { local: "boolean" }, skill: { output: "string" },
     "preview-schedule-time": { timezone: "string" },
@@ -243,7 +273,7 @@ export function describeCommand(command: string) {
   if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
   const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-schedule-time"].includes(command);
   const preview = ["preview-show", "preview-episode"].includes(command);
-  const read = offline || preview || ["list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle"].includes(command);
+  const read = offline || preview || ["list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "progress", "verify", "watch"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],

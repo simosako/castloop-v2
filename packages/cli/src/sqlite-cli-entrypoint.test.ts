@@ -58,6 +58,8 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     const revisionPlan = revisionPreview.plan as { request: { job_id: string }; request_sha256: string };
     const revisionFile = join(setup.root, "revision-plan.json"); writeFileSync(revisionFile, JSON.stringify(revisionPreview));
     expect(await command(["revision-execute", revisionFile, revisionPlan.request_sha256, "confirm", "--workspace", setup.root, "--json"])).toMatchObject({ state: "succeeded" });
+    expect(await command(["progress", revisionPlan.request.job_id, "--workspace", setup.root, "--json"])).toMatchObject({ job: { source: "revision" }, state: "succeeded" });
+    expect(await command(["watch", revisionPlan.request.job_id, "--workspace", setup.root, "--json"])).toMatchObject({ outcome: { state: "succeeded" } });
     expect(await command(["sync-local-metadata", "--workspace", setup.root, "--show", "daily", "--episode", "first",
       "--expect-revision", revisionPlan.request.job_id, "--output", join(setup.root, "export.toml"), "--json"])).toMatchObject({ existing_files_overwritten: false });
     await command(["update-episode", "first", "--workspace", setup.root, "--show", "daily", "--json"]);
@@ -66,6 +68,17 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     expect(await command(["publish-episode", "first", "--workspace", setup.root, "--show", "daily", "--expect-preview", String(rssPreview.input_fingerprint), "--json"])).toMatchObject({ state: "succeeded" });
     expect(await command(["list-shows", "--json"])).toMatchObject({ shows: [{ show_id: "daily", lifecycle: "published" }] });
     expect(await command(["list-episodes", "daily", "--json"])).toMatchObject({ episodes: [{ episode_id: "first", lifecycle: "published" }] });
+    expect(await command(["diagnose", "daily", "--json"])).toMatchObject({ schema_version: 1, shows: [{ show_id: "daily" }] });
+    expect(await command(["progress", String(publication.job_id), "--json"])).toMatchObject({ state: "succeeded", snapshot_only: true });
+    expect(await command(["watch", String(publication.job_id), "--timeout", "30", "--json"])).toMatchObject({ outcome: { state: "succeeded" } });
+    const verifyChild = Bun.spawn([process.execPath, "--preload", preload, cli, "verify", "daily", "--json"],
+      { cwd: setup.root, env: environment, stdout: "pipe", stderr: "pipe" });
+    const [verifyOutput, verifyError, verifyCode] = await Promise.all([new Response(verifyChild.stdout).text(), new Response(verifyChild.stderr).text(), verifyChild.exited]);
+    expect(verifyCode, verifyError).toBe(1);
+    const verified = resultEnvelopeSchema.parse(JSON.parse(verifyOutput));
+    const verifiedResult = verified.result as { processing: { state: string }; checks: Array<{ id: string; status: string }> };
+    expect(verifiedResult.processing).toMatchObject({ state: "succeeded" });
+    expect(verifiedResult.checks.find((check) => check.id === "feed-status")?.status).toBe("fail");
     for (const action of ["unpublish", "restore"]) {
       const plan = sqliteLifecyclePlanSchema.parse(await command(["preview-episode-lifecycle", "daily", "first", action]));
       const file = join(setup.root, "reviewed-plan.json"); writeFileSync(file, JSON.stringify(plan));
