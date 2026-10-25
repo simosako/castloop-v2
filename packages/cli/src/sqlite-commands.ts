@@ -20,6 +20,7 @@ import { continueSqliteServiceUpdateVerification, reconcileSqliteServiceUpdate, 
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
 import { runSqliteOperationCommand } from "./sqlite-operation-commands";
 import type { OperationReadOptions } from "./sqlite-operation-commands";
+import { diagnoseShows } from "./diagnose";
 import { draftPreview } from "./draft-preview";
 import { showTemplate, episodeTemplate } from "./input-templates";
 import { continueSqliteDomainChange, listSqliteDomains, sqliteDomainOperationStatus, startSqliteDomainChange } from "./sqlite-domain-operation";
@@ -31,6 +32,9 @@ import { join, resolve } from "node:path";
 export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
   domainOptions?: { zoneId?: string; operationId?: string; cursor?: string };
   listOptions?: { includeDeleted?: boolean; cursor?: string }; operationOptions?: OperationReadOptions;
+  diagnoseOptions?: { maxShows?: number; external?: boolean; environment?: Readonly<Record<string, string | undefined>> };
+  verifyOptions?: { episodeId?: string };
+  watchOptions?: { timeoutSeconds?: number; intervalSeconds?: number; signal?: AbortSignal };
   parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "preview-show": [1], "preview-episode": [1],
@@ -42,6 +46,8 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "lifecycle-execute": [3], "operation-status": [2], "init-reconcile": [1], "init-continue-verification": [1],
   "update-service": [1], "update-service-verify": [1], "update-service-reconcile": [1],
   "operation-list": [0], "operation-resume": [2], "operation-cancel": [2], "operation-cleanup-preview": [2], "operation-cleanup": [4],
+  diagnose: Array.from({ length: 20 }, (_, index) => index + 1),
+  progress: [1], verify: [1], watch: [1],
   domain: [1, 2],
 };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
@@ -110,6 +116,10 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     return initializeSqliteService(root, config, args[0] ?? readSqliteInitialization(root, config)?.operation_id ?? crypto.randomUUID(),
       await options.workerSource(), cf);
   }
+  if (command === "verify" && args.length === 1) {
+    const { verifyShowDelivery } = await import("./verify");
+    return verifyShowDelivery(root, config, validateId(args[0], "show"), options.verifyOptions?.episodeId, options.transport);
+  }
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);
   const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf,
     parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared };
@@ -120,6 +130,21 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (command === "update-service-reconcile" && args.length === 1) return reconcileSqliteServiceUpdate(root, config, args[0], cf);
   if (command === "service-status" && !args.length) return client.health();
   if (command === "show-status" && args.length === 1) return client.health(validateId(args[0], "show"));
+  if (command === "diagnose") {
+    return diagnoseShows(root, config, args.map((id) => validateId(id, "show")),
+      { transport: options.transport, cloudflare: cf, maxShows: options.diagnoseOptions?.maxShows,
+        external: options.diagnoseOptions?.external, environment: options.diagnoseOptions?.environment });
+  }
+  if (command === "progress" && args.length === 1) {
+    const { readSqliteJobProgress } = await import("./progress");
+    return readSqliteJobProgress(root, config, z.uuid().parse(args[0]), options.transport);
+  }
+  if (command === "watch" && args.length === 1) {
+    const { watchSqliteJob } = await import("./watch");
+    return watchSqliteJob(root, config, z.uuid().parse(args[0]),
+      { timeoutSeconds: options.watchOptions?.timeoutSeconds, intervalSeconds: options.watchOptions?.intervalSeconds,
+        transport: options.transport, signal: options.watchOptions?.signal });
+  }
   if (command === "list-shows" && !args.length || command === "list-episodes" && args.length === 1) {
     return client.catalog({ kind: command === "list-shows" ? "show" : "episode", ...(command === "list-episodes" ? { show_id: validateId(args[0], "show") } : {}),
       include_deleted: options.listOptions?.includeDeleted ?? false, ...(options.listOptions?.cursor ? { cursor: options.listOptions.cursor } : {}) });
