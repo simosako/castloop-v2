@@ -62,6 +62,7 @@ export class SqliteServiceRuntime {
       availability_controls: "show-admission-delivery-v1", availability_version: snapshot.availability_version,
       revision_history: "sqlite-revisions-v1",
       website: "static-show-v1",
+      delivery_statistics: "episode-daily-v1",
       admission_state: snapshot.state === "open" ? "open" : "closed", delivery_policy: snapshot.state === "paused" ? "stopped" : "enabled",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
       queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,

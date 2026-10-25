@@ -14,6 +14,8 @@ import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { createSqlitePublicationHttp } from "./sqlite-publication-http";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
 import { createSqliteOperationHttp } from "./sqlite-operation-http";
+import { SqliteDeliveryStats } from "./sqlite-delivery-stats";
+import { createSqliteStatsHttp } from "./sqlite-stats-http";
 import { createSqliteOperationRecords } from "./sqlite-operation-runtime";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { SqliteRuntimeCache } from "./sqlite-service-runtime";
@@ -31,9 +33,11 @@ export class SqliteShowService {
   readonly queue: SqlitePublicationQueue;
   readonly content: SqlitePublicationContent;
   readonly runtime: SqliteServiceRuntime;
+  readonly stats: SqliteDeliveryStats;
   private readonly publicationHttp: (request: Request) => Promise<Response>;
   private readonly serviceHttp: (request: Request) => Promise<Response>;
   private readonly operationHttp: (request: Request) => Promise<Response>;
+  private readonly statsHttp: (request: Request) => Promise<Response>;
 
   constructor(private readonly storage: PublicationQueueStorage, readonly showId: string,
     private readonly actual: SqlitePublicationRuntime, private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache,
@@ -50,6 +54,8 @@ export class SqliteShowService {
     this.publicationHttp = createSqlitePublicationHttp(this.queue, key, ready, showId);
     this.serviceHttp = createSqliteServiceHttp(this.runtime, key);
     this.operationHttp = createSqliteOperationHttp(records, key, ready, bucket);
+    this.stats = new SqliteDeliveryStats(storage, showId, actual, Date.now);
+    this.statsHttp = createSqliteStatsHttp(this.stats, key, showId, () => this.health());
   }
 
   private binding(): Binding | null {
@@ -175,6 +181,7 @@ export class SqliteShowService {
     if (request.method === "POST") {
       if (!this.ready()) return adminReply({ error: "show_not_ready" }, 503);
     }
+    if (path.startsWith("/admin/sqlite-stats/")) return this.statsHttp(request);
     return path.startsWith("/admin/sqlite-operations/") ? this.operationHttp(request) :
       path.startsWith("/admin/sqlite-service/") ? this.serviceHttp(request) : this.publicationHttp(request);
   }

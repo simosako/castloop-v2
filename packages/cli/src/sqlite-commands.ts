@@ -39,6 +39,7 @@ export type SqliteCommandOptions = { workerSource?: () => Promise<string>; trans
   diagnoseOptions?: { maxShows?: number; external?: boolean; environment?: Readonly<Record<string, string | undefined>> };
   verifyOptions?: { episodeId?: string };
   watchOptions?: { timeoutSeconds?: number; intervalSeconds?: number; signal?: AbortSignal };
+  statsOptions?: { episodeId?: string; from?: string; to?: string; cursor?: string; retentionOperationId?: string };
   parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "preview-show": [1], "preview-episode": [1],
@@ -55,6 +56,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   diagnose: Array.from({ length: 20 }, (_, index) => index + 1),
   progress: [1], verify: [1], watch: [1],
   domain: [1, 2],
+  stats: [1], "stats-retention": [2],
 };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
@@ -130,6 +132,16 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (command === "verify" && args.length === 1) {
     const { verifyShowDelivery } = await import("./verify");
     return verifyShowDelivery(root, config, validateId(args[0], "show"), options.verifyOptions?.episodeId, options.transport);
+  }
+  if (command === "stats" && args.length === 1) {
+    const { readSqliteStats } = await import("./stats");
+    return readSqliteStats(root, config, args[0], { episodeId: options.statsOptions?.episodeId,
+      from: options.statsOptions?.from, to: options.statsOptions?.to, cursor: options.statsOptions?.cursor, transport: options.transport });
+  }
+  if (command === "stats-retention" && args.length === 2) {
+    const { setSqliteStatsRetention } = await import("./stats");
+    return setSqliteStatsRetention(root, config, validateId(args[0], "show"), z.number().int().parse(Number(args[1])),
+      z.uuid().parse(options.statsOptions?.retentionOperationId), options.transport);
   }
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);
   if (command === "list-show-revisions" && args.length === 1 || command === "list-episode-revisions" && args.length === 2) {

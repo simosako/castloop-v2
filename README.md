@@ -160,6 +160,16 @@ castloop job-status JOB_UUID
 
 Listings return up to 20 entries per page; follow `next_cursor`. Local-only drafts are not listed. Snapshot listings do not authorize changes or recovery.
 
+## Delivery statistics
+
+```sh
+castloop stats my-show                              # per-Episode totals (default: last 30 UTC days)
+castloop stats my-show --episode first --by-revision # daily rows and per-audio-revision totals
+castloop stats-retention my-show 180                 # change the daily retention window (default 400 days)
+```
+
+`stats` reads server-side counters for approved public Episode audio only. It counts full GETs, initial range downloads, served bytes and separates HEAD, 304, small range probes and known bots; no IP addresses or User-Agent strings are stored. Days before measurement started (`unmeasured`) and pruned days (`pruned`, beyond the retention window) never render as zero, and `lifetime` keeps totals across pruning. `stats-retention` applies from the next UTC-day pruning without redeploying; see the [statistics guide](docs/delivery_statistics.md). Requires internal content schema 9 (`delivery_statistics="episode-daily-v1"`); older environments are not migrated.
+
 Use `restore` instead of `unpublish`, or `preview-show-lifecycle my-show ACTION` for a Show. Preview is read-only; execution queues the reviewed request and requires the same job's `succeeded` status. Restore uses saved snapshots, not local edits, and preserves GUID/date/audio. Restoring a Show does not revive individually unpublished Episodes. Unpublish retains payloads and does not reduce storage. **SQLite physical deletion is not implemented.** Custom-domain changes use the [separate maintenance procedure](docs/sqlite_custom_domains.md), not lifecycle deletion or code-only deploy.
 
 ## RSS import
