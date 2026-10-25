@@ -15,6 +15,9 @@ import { validSqliteCoverIdentity } from "./sqlite-cover";
 import type { SqliteCoverIdentity } from "./sqlite-cover";
 import { SQLITE_CONTENT_SCHEMA_VERSION, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-feed-generations";
 import { canonicalEnclosureUrl } from "./media-url";
+import { SqliteSiteContent } from "./sqlite-site-content";
+import type { SitePage } from "../packages/shared/src/website";
+import type { SiteDeliveryDecision } from "./site-gateway";
 
 type Lifecycle = "draft" | "published" | "unpublished" | "deleted";
 type ShowRow = { show_id: string; reservation_id: string; state_version: number; feed_generation: number; lifecycle: Lifecycle };
@@ -30,6 +33,7 @@ export type SqliteDeliveryDecision = { status: 200; key: string; content_type: s
   cache_props: { showGeneration: number; feedGeneration?: number; episodeGeneration?: number; coverGeneration?: number } } | { status: 404 | 410 | 503 };
 
 export class SqlitePublicationContent {
+  readonly sites: SqliteSiteContent;
   constructor(private readonly storage: PublicationQueueStorage) {
     storage.transactionSync(() => {
       const queue = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
@@ -68,6 +72,7 @@ export class SqlitePublicationContent {
         restored_from_revision_id TEXT, updated_at TEXT NOT NULL,
         PRIMARY KEY(show_id, episode_id, revision_sequence), UNIQUE(show_id, episode_id, revision_id))`);
     });
+    this.sites = new SqliteSiteContent(storage);
   }
 
   registerShow(showId: string, reservationId: string, initializing = false): ShowRow {
@@ -89,6 +94,27 @@ export class SqlitePublicationContent {
 
   private show(showId: string): ShowRow | null {
     return this.storage.sql.exec<ShowRow>("SELECT * FROM publication_shows WHERE show_id = ?", showId).toArray()[0] ?? null;
+  }
+
+  siteDelivery(page: SitePage): SiteDeliveryDecision {
+    return this.storage.transactionSync(() => {
+      const decision = this.delivery(`/podcasts/${page.showId}/feed.xml`);
+      if (decision.status !== 200) return { status: decision.status };
+      const site = this.sites.state(page.showId);
+      if (!site || site.generation !== decision.cache_props.feedGeneration) return { status: 503 };
+      if (!site.enabled || page.kind === "listing" && page.page > site.pages) return { status: 404 };
+      let episodeGeneration: number | undefined;
+      if (page.kind === "episode") {
+        const episode = this.storage.sql.exec<EpisodeRow>("SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?",
+          page.showId, page.episodeId).toArray()[0];
+        if (!episode || episode.lifecycle === "unpublished") return { status: 404 };
+        if (episode.lifecycle === "deleted") return { status: 410 };
+        episodeGeneration = episode.lifecycle_version;
+      }
+      const props = this.sites.page(page);
+      return props ? { status: 200, props: { ...props, showGeneration: decision.cache_props.showGeneration,
+        ...(episodeGeneration === undefined ? {} : { episodeGeneration }) } } : { status: 503 };
+    });
   }
 
   private cover(showId: string): (SqliteCoverIdentity & { extension: "jpg" | "png" }) | null {

@@ -49,11 +49,16 @@ export const showMetadataSchema = z.object({
   owner_email: xmlText.pipe(z.email()),
   categories: z.array(trimmedXmlText).min(1),
   explicit: z.boolean(),
-  site_url: xmlText.pipe(webUrl),
+  site_mode: z.enum(["builtin", "external"]).optional(),
+  site_url: xmlText.pipe(webUrl).optional(),
   image_path: z.string().regex(/^[^/\\.][^/\\]*\.(?:jpg|jpeg|png)$/i),
   copyright: xmlText.min(1).optional(),
   show_type: z.enum(["episodic", "serial"]).optional(),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.site_mode === "builtin" ? value.site_url !== undefined : value.site_url === undefined) {
+    context.addIssue({ code: "custom", path: ["site_url"], message: "Builtin sites omit site_url; external sites require site_url" });
+  }
+});
 
 export const episodeGuidSchema = z.string().min(1).max(4096).refine((value) => {
   if (!value.trim() || new TextEncoder().encode(value).byteLength > 4096) return false;

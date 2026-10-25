@@ -54,7 +54,7 @@ export function assertShowMetadataInputLimits(show: ShowMetadata): void {
   checkChars(show.owner_email, SHOW_OWNER_EMAIL_MAX_CHARS, "Show owner_email");
   for (const category of show.categories) checkChars(category, SHOW_CATEGORY_MAX_CHARS, "Show category");
   if (show.copyright !== undefined) checkChars(show.copyright, SHOW_COPYRIGHT_MAX_CHARS, "Show copyright");
-  if (countCharacters(show.site_url.trim()) > SHOW_SITE_URL_MAX_CHARS) {
+  if (show.site_url !== undefined && countCharacters(show.site_url.trim()) > SHOW_SITE_URL_MAX_CHARS) {
     throw new Error("Show site_url exceeds its input limit");
   }
 }

@@ -1,6 +1,7 @@
 import { sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
 import { sqliteRegistrationSchema } from "../packages/shared/src/sqlite-service-api";
 import { parsePublicAssetPath } from "../packages/shared/src/public-assets";
+import { parseSitePagePath } from "../packages/shared/src/website";
 
 export function sqliteShowObjectName(serviceId: string, showId: string): string {
   sqlitePublicationRuntimeSchema.shape.service_id.parse(serviceId);
@@ -11,7 +12,7 @@ export function sqliteShowObjectName(serviceId: string, showId: string): string 
 export function sqliteRequestObjectName(request: Request, serviceId: string): string {
   sqlitePublicationRuntimeSchema.shape.service_id.parse(serviceId);
   const path = new URL(request.url).pathname;
-  const showId = path.startsWith("/admin/") ? request.headers.get("X-Castloop-Show-Id") : parsePublicAssetPath(path)?.showId;
+  const showId = path.startsWith("/admin/") ? request.headers.get("X-Castloop-Show-Id") : (parsePublicAssetPath(path) ?? parseSitePagePath(path))?.showId;
   if (showId === "") throw new Error("Empty Show scope");
   return showId ? sqliteShowObjectName(serviceId, showId) : `service/${serviceId}`;
 }

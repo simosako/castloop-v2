@@ -17,11 +17,18 @@ export async function purgeSqliteCache(cache: Pick<CacheContext, "purge"> | unde
   options: PurgeOptions = {}): Promise<void> {
   const showId = validateId(input.showId, "show");
   const episodeId = input.episodeId === undefined ? undefined : validateId(input.episodeId, "episode");
-  if (!cache) throw new Error("SQLite cached entrypoint purge is unavailable");
   const target: CachePurgeOptions = {
     tags: episodeId ? [`feed-${showId}`, `episode-${showId}/${episodeId}`] : [`show-${showId}`, `feed-${showId}`, `cover-${showId}`],
     pathPrefixes: [episodeId ? `/podcasts/${showId}/episodes/${episodeId}/` : `/podcasts/${showId}/`],
   };
+  return purgeCacheTarget(cache, input, target, options);
+}
+
+export async function purgeCacheTarget(cache: Pick<CacheContext, "purge"> | undefined, input: { showId: string; episodeId?: string },
+  target: CachePurgeOptions, options: PurgeOptions = {}): Promise<void> {
+  const showId = validateId(input.showId, "show");
+  const episodeId = input.episodeId === undefined ? undefined : validateId(input.episodeId, "episode");
+  if (!cache) throw new Error("SQLite cached entrypoint purge is unavailable");
   const emit = (reasonCode: SqliteCachePurgeEvent["reason_code"], attempt: number, willRetry: boolean,
     diagnostic: Pick<SqliteCachePurgeEvent, "failure_kind" | "exception_kind" | "result_kind" | "success_kind"> = {}) => {
     const event: SqliteCachePurgeEvent = { event: "sqlite_cache_purge", show_id: showId,

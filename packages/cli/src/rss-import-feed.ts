@@ -177,7 +177,7 @@ export function parseRssImportFeed(source: string, showId: string, feedUrl: stri
       throw new Error(`RSS Episode ${index + 1} has an invalid GUID, date, metadata or enclosure; no Episodes were imported`);
     }
   }
-  const showValidation = showMetadataSchema.omit({ image_path: true }).safeParse(show);
+  const showValidation = showMetadataSchema.safeParse({ ...show, image_path: "cover.jpg" });
   if (!showValidation.success) missing.unshift(...showValidation.error.issues.map((issue) => `Show: ${issue.path.join(".")}`));
   else {
     try {

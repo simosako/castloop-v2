@@ -193,9 +193,12 @@ async function main(context: Invocation): Promise<unknown> {
   const watchSignal = command === "watch" ? new AbortController() : undefined;
   if (watchSignal) process.once("SIGINT", () => watchSignal.abort());
   if (command === "create-show") {
-    allowedFlags(flags, ["site-url"]);
+    allowedFlags(flags, ["site-url", "site-mode"]);
     if (positional.length !== 1) throw new Error(commandHelp(command));
-    positional.push(await ask(flags["site-url"], "site-url", "Show website URL"));
+    if (flags["site-mode"] !== undefined && !["builtin", "external"].includes(flags["site-mode"])) throw new Error("Choose --site-mode builtin or external");
+    if (flags["site-mode"] === "builtin") {
+      if (flags["site-url"] !== undefined) throw new Error("Builtin sites do not accept --site-url");
+    } else positional.push(await ask(flags["site-url"], "site-url", "Show website URL"));
   } else if (command === "deploy") {
     allowedFlags(flags, ["operation-id"]);
     if (positional.length) throw new Error(commandHelp(command));

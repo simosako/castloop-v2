@@ -36,6 +36,7 @@ castloop import-rss my-show https://old-host.example/feed.xml --output /path/to/
 
 - 元ホストの全Episode件数と取り込み件数が一致するか。元RSSに載っていないEpisodeは取り込めない。
 - タイトル・説明・公開日時・番組情報が正しいか。番組のWebサイトは旧ホスト廃止後も利用できる実在URLにする。
+- Issue #70開発版で[内蔵サイト](show_website.md)を使う場合は、最初の公開前に`show.toml`へ`site_mode = "builtin"`を追加し`site_url`を削除して確認する。既定では元RSSの外部サイトURLを維持する。GUID・日時は変更しない。
 - カバーが開け、各MP3が再生できるか。
 - `import.json`の`warnings`に、残す必要がある情報が含まれていないか。Episode画像・transcript・独自拡張等は保存しない。
 - 説明内のリンクや画像に、廃止する旧ホストへの依存が残っていないか。それらの外部素材はコピーしない。

@@ -1,5 +1,7 @@
 # 設計文書の案内
 
+Issue #70開発版は、内蔵番組サイトの全公開経路・CLI・HTML専用Gateway/CDN cacheを接続した。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用で旧環境は変換しない。[サイト設計](show_website_plan.md)と[利用ガイド](../docs/show_website.md)参照。下記の7/8等は各リリース・機能導入時点の番号であり、サイトの実ブラウザ・native Free性能は未確認。
+
 v0.7.5はIssue #64の公開済み差分・revision履歴・過去版採用を追加する。内部queue/content形式**7/8**の新規環境専用で、v0.7.4の7/7を含む既存環境は変換しない。[リリースノート](../docs/release-v0.7.5.md)と[公開内容の確認ガイド](../docs/published_content_review.md)を優先し、以下の旧形式・開発時点の記録と区別する。実CloudflareでのCPU・無料枠適合は未検証である。
 
 Issue #66の未リリース開発版は[受付停止と配信停止の分離](show_admission_delivery_separation_plan.md)を採用し、内部queue/content形式を**7/7**にした。変更番号と操作ID別の結果保存、GETによる結果照会を実装した。ローカル693試験・型検査・Linux単体CLIとオフライン試験が成功。実Cloudflare操作は未実施で、旧形式は変換しない。Worker更新中の配信継続は対象外であり、以下のIssue #68の6/7環境での実機結果を新機能の実証へ流用しない。[停止・再開の利用ガイド](../docs/show_availability.md)参照。
@@ -22,6 +24,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [管理者キーの照合](admin_authentication.md) | ネイティブ比較、非同期認証、互換環境と診断の制約 |
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [公開済み内容との差分確認とrevision履歴・過去版採用](published_diff_and_revision_restore_plan.md) | Issue #64・1A〜5A採用。全文取得と差分、確認hash、素材再uploadなしの過去版採用。内部7/8の新規環境専用。[利用ガイド](../docs/published_content_review.md) |
+| [番組サイト・Episodeページの設計](show_website_plan.md) | Issue #70・案Bとサイト方式の2択を採用。事前HTML生成・専用Gateway/cache・Show DOの原子的切替・CLI・全公開経路を接続。内部8/9の新規環境専用。§13でローカル検証と実機未確認を区別する |
 | [Episode予約公開の設計・開発計画](episode_scheduled_publication_plan.md) | Issue #65の採用方針。Show内予約表とAlarm、既定UTC・任意管理zone、日時identity、停止・再承認。管理用設定の責務・棚卸しと開発段階 |
 | [公開受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md) | Issue #66・全項目承認済み。3状態、停止・再開、変更番号と操作結果の保存・GET照会を実装。再開は処理終了を待ち、受付停止ではuploadも止める。内部形式7/7の新規環境専用。Worker更新中の配信継続は対象外 |
 | [管理用設定と日時変換](../docs/admin_configuration.md) | Issue #65のCLI基盤。任意のcastloop-admin.toml、schema/template/validate/doctor、非公開・非予約の日時preview。サーバー予約は未提供 |

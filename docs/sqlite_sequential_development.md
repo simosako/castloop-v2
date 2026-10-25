@@ -1,5 +1,7 @@
 # SQLiteのShow単位公開方式
 
+Issue #70開発版は内蔵番組サイトを追加し、現在の内部queue/content形式を**8/9**、必須health/inspection識別を`website="static-show-v1"`にする新規環境専用。`create-show ID --site-mode builtin`で選び、明示公開でHTMLとFeedを確定する。既存7/8等への互換配備・DB変換は行わない。下記の番号は機能導入時点の履歴として区別し、操作・無料枠の制限は[サイトガイド](show_website.md)を参照する。
+
 Issue #64の開発版は、内部queue/content形式**7/8**と必須`revision_history="sqlite-revisions-v1"`を使う新規環境専用。全文差分、Show/Episodeのrevision履歴、保持した素材による明示的な過去版採用を追加した。旧7/7を含めDB変換は行わない。[公開内容の確認ガイド](published_content_review.md)参照。既存の非公開化からの`restore`とは別操作である。
 
 Issue #66の未リリース開発版は、公開受付と配信の停止を分ける。`show-admission-pause`は受付と素材アップロードだけを止め、公開済み内容の配信は続ける。`show-pause`は従来どおり両方を止める。配信だけ戻す`show-delivery-resume`と、操作結果を読む`show-control-status`を追加した。再開には既受付処理の終了・サーバーの動作確認済み・保守中でないことが必要。内部queue/content形式**7/7**と必須`availability_controls="show-admission-delivery-v1"`を使う新規環境専用で、旧形式を変換しない。[停止・再開の操作ガイド](show_availability.md)を優先する。Worker更新やドメイン変更は引き続き配信も停止して行う。

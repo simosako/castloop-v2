@@ -26,7 +26,7 @@ export type PublicationQueueStorage = {
 };
 type ServiceRow = SqlitePublicationRuntime & { state: SqliteAvailabilityState; admission_window_id: string | null; availability_version: number };
 type JobRow = { sequence: number; request_id: string; job_id: string; show_id: string; request_sha256: string; request_json: string;
-  state: SqlitePublicationStatus["state"]; reason_code: string | null; delivery_policy: string };
+  state: SqlitePublicationStatus["state"]; reason_code: string | null; delivery_policy: string; continuation_ready: number };
 export type PublicationQueueSnapshot = { state: SqliteAvailabilityState; admission_window_id: string | null; availability_version: number;
   queued: number; active: SqlitePublicationStatus | null; drained: boolean };
 export type PublicationClaim = { state: "idle" } | { state: "blocked"; job: SqlitePublicationStatus } |
@@ -58,6 +58,7 @@ export class SqlitePublicationQueue {
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
         show_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL, feed_generation INTEGER NOT NULL UNIQUE,
         state TEXT NOT NULL CHECK(state IN ('queued', 'running', 'succeeded', 'failed', 'blocked')), reason_code TEXT,
+        continuation_ready INTEGER NOT NULL DEFAULT 0 CHECK(continuation_ready IN (0, 1)),
         delivery_policy TEXT NOT NULL CHECK(delivery_policy IN ('exclusive', 'preserve_committed')),
         read_feed_generation INTEGER, read_show_version INTEGER, read_episode_id TEXT, read_request_sha256 TEXT,
         read_verified INTEGER NOT NULL DEFAULT 0 CHECK(read_verified IN (0, 1)),
@@ -251,8 +252,8 @@ export class SqlitePublicationQueue {
     return this.storage.transactionSync(() => {
       const service = this.requireRuntime();
       const active = this.active();
-      if (active) return { state: active.state === "blocked" ? "blocked" : "interrupted", job: this.statusRow(active) };
-      const row = this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE state = 'queued' ORDER BY sequence LIMIT 1").toArray()[0];
+      if (active && (active.state === "blocked" || active.continuation_ready !== 1)) return { state: active.state === "blocked" ? "blocked" : "interrupted", job: this.statusRow(active) };
+      const row = active ?? this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE state = 'queued' ORDER BY sequence LIMIT 1").toArray()[0];
       if (!row) return { state: "idle" };
       let request: SqlitePublicationRequest;
       try {
@@ -266,7 +267,7 @@ export class SqlitePublicationQueue {
         this.operationRecords?.publicationChanged(row.job_id, "blocked", "stored_request_invalid", invocation);
         return { state: "blocked", job: this.statusRow(this.byJob(row.job_id)) };
       }
-      if (row.delivery_policy === "preserve_committed" && this.storage.sql.exec(
+      if (!active && row.delivery_policy === "preserve_committed" && this.storage.sql.exec(
         "SELECT name FROM sqlite_master WHERE name = 'publication_shows'").toArray().length) {
         this.storage.sql.exec(`UPDATE publication_jobs SET
           read_feed_generation = (SELECT feed_generation FROM publication_shows WHERE show_id = ?),
@@ -287,7 +288,7 @@ export class SqlitePublicationQueue {
         request.base_revision_id ?? null, request.show_id, request.episode_id ?? null, request.base_revision_id ?? null,
         request.expected_episode_lifecycle_version ?? 0);
       }
-      this.storage.sql.exec("UPDATE publication_jobs SET state = 'running' WHERE job_id = ? AND state = 'queued'", row.job_id);
+      this.storage.sql.exec("UPDATE publication_jobs SET state = 'running', continuation_ready = 0 WHERE job_id = ?", row.job_id);
       this.operationRecords?.publicationChanged(row.job_id, "running", undefined, invocation);
       return { state: "claimed", job: this.statusRow(this.byJob(row.job_id)), request };
     });
@@ -307,6 +308,19 @@ export class SqlitePublicationQueue {
       await this.schedule();
       return this.statusRow(this.byJob(jobId));
     });
+  }
+
+  async yield(jobId: string): Promise<SqlitePublicationStatus> {
+    const status = await this.storage.transaction(async () => {
+      this.requireRuntime();
+      const row = this.byJob(jobId);
+      if (row.state !== "running" || row.continuation_ready !== 0) throw new Error("Only the current execution can yield");
+      this.storage.sql.exec("UPDATE publication_jobs SET continuation_ready = 1 WHERE job_id = ?", jobId);
+      await this.storage.setAlarm(this.now());
+      return this.statusRow(row);
+    });
+    await this.storage.sync();
+    return status;
   }
 
   async block(jobId: string, reason: SqlitePublicationBlock, invocation = crypto.randomUUID()): Promise<SqlitePublicationStatus> {
