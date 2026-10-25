@@ -26,7 +26,7 @@ export const progressResultSchema = z.object({
     detail: z.string().min(1).max(300) }).strict().nullable(),
   phases: z.array(progressPhaseSchema).max(12),
   observation: z.object({ observed: z.boolean(), stale: z.boolean(), observed_at: z.string().nullable(),
-    health_state: z.enum(["open", "paused"]).nullable(), note: z.string().max(300) }).strict(),
+    health_state: z.enum(["open", "admission_paused", "paused"]).nullable(), note: z.string().max(300) }).strict(),
   snapshot_only: z.literal(true),
   authorizes_recovery: z.literal(false),
 }).strict();
@@ -66,7 +66,7 @@ export async function readSqliteJobProgress(root: string, config: SqliteServiceC
   const state: ProgressResult["state"] = resolution.source === "draft" ? "draft" : status ? status.state : "unknown";
 
   let waiting: ProgressResult["waiting_reason"] = null;
-  let healthState: "open" | "paused" | null = null;
+  let healthState: "open" | "admission_paused" | "paused" | null = null;
   let note = "";
   if (state === "queued") {
     if (stale) {
@@ -77,7 +77,9 @@ export async function readSqliteJobProgress(root: string, config: SqliteServiceC
         const health = await client.health(resolution.showId);
         healthState = health.state;
         if (health.state === "paused") {
-          waiting = { reason: "admission_paused", detail: "Show admission is paused; queued jobs are not executed until resume" };
+          waiting = { reason: "admission_paused", detail: "The Show is fully paused; admission and delivery are suspended and queued jobs are not executed until resume" };
+        } else if (health.state === "admission_paused") {
+          waiting = { reason: "admission_paused", detail: "Show admission is paused while delivery continues; queued jobs are not admitted until admission resumes" };
         } else if (health.active === "blocked") {
           waiting = { reason: "head_job_blocked", detail: `The active job is blocked; the Show FIFO is halted${await blockingJobDetail(root, config, key, transport, resolution.showId)}` };
         } else if (health.active === "running") {

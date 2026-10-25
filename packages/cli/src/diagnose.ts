@@ -228,9 +228,11 @@ async function diagnoseShow(root: string, config: SqliteServiceConfig, showId: s
       checks.push(health
         ? health.state === "open" && health.publication_ready
           ? check("admission", "remote", "pass", "admission_open", "Show admission is open and publication-ready")
-          : health.state === "paused"
-            ? check("admission", "remote", "warn", "admission_paused", "Show is paused; admission and delivery are suspended")
-            : check("admission", "remote", "warn", "not_publication_ready", "Show admission is not publication-ready")
+          : health.state === "admission_paused"
+            ? check("admission", "remote", "warn", "admission_paused", "Show admission is paused; published delivery continues")
+            : health.state === "paused"
+              ? check("admission", "remote", "warn", "show_paused", "Show is paused; admission and delivery are suspended")
+              : check("admission", "remote", "warn", "not_publication_ready", "Show admission is not publication-ready")
         : check("admission", "remote", "fail", "observation_unavailable", "Show health was not observable"));
       checks.push(health
         ? health.active === "blocked"

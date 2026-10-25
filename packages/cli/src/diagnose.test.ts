@@ -60,12 +60,22 @@ test("diagnose warns without failing for a paused Show with an unpublished local
   await value.command("update-show", ["daily"]);
   await value.command("show-pause", ["daily", crypto.randomUUID()]);
   const result = diagnoseResultSchema.parse(await value.command("diagnose", ["daily"]));
-  expect(find(result, "admission")).toMatchObject({ status: "warn", code: "admission_paused" });
+  expect(find(result, "admission")).toMatchObject({ status: "warn", code: "show_paused" });
   expect(find(result, "queue")).toMatchObject({ status: "pass", code: "queue_drained" });
   expect(find(result, "target-state")).toMatchObject({ status: "warn", code: "target_draft" });
   expect(find(result, "consistency")).toMatchObject({ status: "warn", code: "draft_pending_publication" });
   expect(result.summary.fail).toBe(0);
   expect(result.summary.warn).toBeGreaterThan(0);
+});
+
+test("diagnose distinguishes admission-only pause from full pause", async () => {
+  const value = await fixture();
+  await value.command("create-show", ["daily", "https://example.com"]);
+  await value.command("show-resume", ["daily", crypto.randomUUID()]);
+  await value.command("show-admission-pause", ["daily", crypto.randomUUID()]);
+  const result = diagnoseResultSchema.parse(await value.command("diagnose", ["daily"]));
+  expect(find(result, "admission")).toMatchObject({ status: "warn", code: "admission_paused" });
+  expect(result.summary.fail).toBe(0);
 });
 
 test("diagnose distinguishes a missing Show from observation failure", async () => {

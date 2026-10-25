@@ -78,6 +78,12 @@ test("progress explains FIFO waiting reasons and paused admission", async () => 
   const paused = progressResultSchema.parse(await value.command("progress", [published.job_id]));
   expect(paused.waiting_reason).toMatchObject({ reason: "admission_paused" });
   expect(paused.observation.health_state).toBe("paused");
+  value.storage.sql.exec("UPDATE publication_jobs SET state = 'succeeded' WHERE job_id = ?", published.job_id);
+  await value.command("show-delivery-resume", ["daily", crypto.randomUUID()]);
+  value.storage.sql.exec("UPDATE publication_jobs SET state = 'queued' WHERE job_id = ?", published.job_id);
+  const admissionPaused = progressResultSchema.parse(await value.command("progress", [published.job_id]));
+  expect(admissionPaused.waiting_reason).toMatchObject({ reason: "admission_paused" });
+  expect(admissionPaused.observation.health_state).toBe("admission_paused");
 });
 
 test("progress falls back to the retained local status when remote observation fails", async () => {

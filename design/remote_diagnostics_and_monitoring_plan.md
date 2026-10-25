@@ -189,7 +189,7 @@ job解決は`job-status`と同じchain（lifecycle journal → archived publicat
 
 待機理由（`waiting_reason`）の導出:
 
-- `admission_paused`: queued中にShow admissionがpaused。
+- `admission_paused`: queued中にShow受付が停止（`admission_paused`状態＝配信継続、`paused`状態＝配信も停止の両方で該当）。
 - `head_job_blocked`: 先頭jobがblocked（該当job_idをlocal出力として表示）。
 - `waiting_for_active`: 他jobがrunning（該当job_id）。
 - `observation_gap`: 状態GETが通信断等で失敗し、表示しているのが最終既知状態（`observed_at`と`stale`表示を併記）。
@@ -371,3 +371,5 @@ job解決は`job-status`と同じchain（lifecycle journal → archived publicat
 ### 実装状況（2026-10-25）
 
 段階A〜D（`diagnose`/`progress`/`verify`/`watch`）を実装し、`bun test`・`npm run check`を通過した。`diagnose --external`（verify検査の集約）、watch成功時のnext_actionsによるverify連鎖、終了code 0/1/2/130を含む。運用文書は[observability.md](../docs/observability.md)。
+
+main取り込み時の対応（Issue #66公開受付・配信分離）: `health.state`が3値（`open`/`admission_paused`/`paused`）になったため、`diagnose`のadmission検査は`admission_paused`（受付のみ停止・配信継続）と`show_paused`（受付・配信とも停止）を区別し、`progress`の`observation.health_state`と待機理由詳細も3値に対応した。`verify`の503分類は配信停止を示す文面に更新した（受付のみ停止ではfeedは配信され続けるため）。

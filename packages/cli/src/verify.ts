@@ -130,7 +130,7 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
       feedXml = new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(response.body ?? new Uint8Array());
     } else if (response.status === 503) {
       checks.push({ id: "feed-status", scope: "external", status: "warn", code: "feed_unavailable",
-        message: "The feed returned 503; the Show may be paused or unavailable (inspect admission with diagnose)", next_actions: [] });
+        message: "The feed returned 503; Show delivery is stopped or unavailable (inspect with diagnose)", next_actions: [] });
     } else if (response.status === 404) {
       checks.push(evidence.showPublished
         ? { id: "feed-status", scope: "external", status: "fail", code: "published_feed_missing",

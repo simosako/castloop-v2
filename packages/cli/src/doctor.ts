@@ -21,10 +21,10 @@ export async function diagnoseLocal(root: string,
   }
   try {
     const admin = await loadAdminConfig(root);
-    checks.push({ id: "admin-config", status: "pass", code: admin.timezone ? "admin_timezone_configured" : "server_timezone_default",
+    checks.push({ id: "admin-config", scope: "local", status: "pass", code: admin.timezone ? "admin_timezone_configured" : "server_timezone_default",
       message: admin.timezone ? "Administrator timezone is valid; service identity is unchanged" : "No administrator timezone preference; server basis is UTC", next_actions: [] });
   } catch {
-    checks.push({ id: "admin-config", status: "fail", code: "invalid_admin_config",
+    checks.push({ id: "admin-config", scope: "local", status: "fail", code: "invalid_admin_config",
       message: "Optional castloop-admin.toml is unreadable or invalid; no fallback to another timezone", next_actions: ["inspect_local_admin_configuration"] });
   }
   try {
@@ -45,11 +45,11 @@ export async function diagnoseLocal(root: string,
   if (config) {
     try {
       const pending = pendingSqliteControls(root, config);
-      checks.push({ id: "show-controls", status: pending ? "warn" : "pass", code: pending ? "show_control_pending" : "show_controls_checked",
+      checks.push({ id: "show-controls", scope: "local", status: pending ? "warn" : "pass", code: pending ? "show_control_pending" : "show_controls_checked",
         message: pending ? "Unfinished Show controls exist; observe their operation IDs without replay" : "Local Show control records checked; remote results not checked",
         next_actions: pending ? ["inspect_show_control_status"] : [] });
     } catch {
-      checks.push({ id: "show-controls", status: "fail", code: "show_controls_unverified",
+      checks.push({ id: "show-controls", scope: "local", status: "fail", code: "show_controls_unverified",
         message: "Local Show control records are unreadable, invalid or unsupported; preserve them without conversion", next_actions: ["inspect_original_show_control_records"] });
     }
     try {

@@ -21,7 +21,7 @@ Issue #67で追加した読取専用の観測コマンドの使い分けと出�
 | `cf-credentials` | `cf_account_readable` / `cf_account_forbidden` / `cf_token_invalid` / `cf_unreachable` / `cf_credentials_absent` | Cloudflare API tokenの有効性と当該accountの読取（1 invocation 1回）。操作権限の保証ではない |
 | `maintenance` | `no_maintenance` / `maintenance_active` / `runtime_update_active` / `setup_active` | 共有保守・更新・setupの進行 |
 | `registration` | `registered` / `registration_missing` / `registration_pending` | Show登録状態 |
-| `admission` | `admission_open` / `admission_paused` / `not_publication_ready` | Show単位の受付と公開可否 |
+| `admission` | `admission_open` / `admission_paused`（受付のみ停止・配信継続）/ `show_paused`（受付も配信も停止）/ `not_publication_ready` | Show単位の受付・配信状態（[3状態モデル](show_availability.md)に対応） |
 | `queue` | `queue_drained` / `jobs_queued` / `active_running` / `active_blocked` | Show FIFO。active blockedはfail |
 | `target-state` | `target_published` / `target_draft` / `target_unpublished` / `target_deleted` / `target_missing` | lifecycle |
 | `unfinished-operations` / `local-unfinished` | `unfinished_operations` / `no_unfinished_operations` | server・localそれぞれの未完了操作 |
@@ -38,7 +38,7 @@ job-statusと同じ解決chain（lifecycle journal → 公開済みarchive → d
 
 | reason | 意味 |
 | --- | --- |
-| `admission_paused` | Showのadmissionがpaused中 |
+| `admission_paused` | Showの受付が停止中（`admission_paused`＝配信継続、`paused`＝配信も停止） |
 | `head_job_blocked` | 先頭jobがblockedしFIFOが停止している |
 | `waiting_for_active` | 他jobが実行中 |
 | `waiting_in_fifo` | 上記以外のFIFO待機（順位は未提供） |
@@ -54,7 +54,7 @@ job-statusと同じ解決chain（lifecycle journal → 公開済みarchive → d
 
 | id | 主なcode |
 | --- | --- |
-| `feed-status` | `feed_served` / `feed_unavailable`（503。pausedか障害かはdiagnoseで確認）/ `published_feed_missing` / `feed_absent_no_publication_evidence` / `feed_transport_error` |
+| `feed-status` | `feed_served` / `feed_unavailable`（503。配信停止か障害かはdiagnoseで確認）/ `published_feed_missing` / `feed_absent_no_publication_evidence` / `feed_transport_error` |
 | `feed-content` | `feed_content_verified` / `guid_missing`（local journalでsucceededのEpisodeのGUIDがfeedにない）/ `enclosure_origin_mismatch` / `feed_parse_failed` / `no_local_expectations` |
 | `cover` | `cover_served` / `cover_missing` / `cover_url_unknown`（feedにcover URLがない） |
 | `audio`（`--episode`時） | `audio_served` / `audio_missing` / `audio_content_mismatch` / `audio_no_local_expectation` / `audio_not_requested` |
