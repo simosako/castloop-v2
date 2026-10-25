@@ -91,6 +91,15 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     expect(upload).toBeDefined();
     expect(await command(["operation-status", "upload", upload.operation_id, "--local"])).toMatchObject({ source: "local" });
     expect(await command(["operation-status", "upload", upload.operation_id, "--remote"])).toMatchObject({ operation: { state: "succeeded" } });
+    const episodeStats = await command(["stats", "daily", "--json"]);
+    expect(episodeStats).toMatchObject({ show_id: "daily", retention_days: 400, episodes: [{ episode_id: "first", lifecycle: "published" }] });
+    const dailyStats = await command(["stats", "daily", "--episode", "first", "--json"]);
+    expect(dailyStats).toMatchObject({ show_id: "daily", episode_id: "first", days: expect.any(Array) });
+    const retentionOperation = crypto.randomUUID();
+    expect(await command(["stats-retention", "daily", "90", "--operation-id", retentionOperation, "--json"])).toMatchObject({ retention: { retention_days: 90 } });
+    expect(await command(["stats-retention", "daily", "90", "--operation-id", retentionOperation, "--json"])).toMatchObject({ retention: { retention_days: 90 } });
+    const afterRetention = await command(["stats", "daily", "--json"]);
+    expect(afterRetention).toMatchObject({ retention_days: 90 });
     await command(["operation-cancel", "upload", upload.operation_id]);
     const cleanup = operationCleanupPlanSchema.parse(await command(["operation-cleanup-preview", "upload", upload.operation_id]));
     const cleaned = operationResultSchema.parse(await command(["operation-cleanup", "upload", upload.operation_id, cleanup.plan_sha256, "confirm"]));

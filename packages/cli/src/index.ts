@@ -234,6 +234,10 @@ async function main(context: Invocation): Promise<unknown> {
     allowedFlags(flags, []);
   } else if (command === "verify") {
     allowedFlags(flags, ["episode"]);
+  } else if (command === "stats") {
+    allowedFlags(flags, ["episode", "from", "to", "by-revision", "cursor"]);
+  } else if (command === "stats-retention") {
+    allowedFlags(flags, ["operation-id"]);
   } else if (command === "watch") {
     allowedFlags(flags, ["timeout", "interval"]);
   } else {
@@ -292,6 +296,8 @@ async function main(context: Invocation): Promise<unknown> {
     ...(command === "diagnose" ? { diagnoseOptions: { maxShows: flags["max-shows"] === undefined ? undefined : Number(flags["max-shows"]),
       external: !!flags.external, environment: undefined } } : {}),
     ...(command === "verify" ? { verifyOptions: { episodeId: flags.episode } } : {}),
+    ...(command === "stats" ? { statsOptions: { episodeId: flags.episode, from: flags.from, to: flags.to, cursor: flags.cursor } } : {}),
+    ...(command === "stats-retention" ? { statsOptions: { retentionOperationId: flags["operation-id"] ?? randomUUID() } } : {}),
     ...(command === "watch" ? { watchOptions: { timeoutSeconds: flags.timeout === undefined ? undefined : Number(flags.timeout),
       intervalSeconds: flags.interval === undefined ? undefined : Number(flags.interval), signal: watchSignal?.signal } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview });
@@ -315,6 +321,15 @@ async function main(context: Invocation): Promise<unknown> {
     const verified = verifyResultSchema.parse(result);
     if (verified.summary.fail) process.exitCode = 1;
     if (!process.argv.includes("--json")) return formatVerify(verified);
+  }
+  if (command === "stats" && !process.argv.includes("--json")) {
+    const { formatSqliteStatsDaily, formatSqliteStatsEpisodes } = await import("./stats");
+    if (flags.episode) {
+      const { sqliteStatsEpisodeDailyResponseSchema } = await import("../../shared/src/sqlite-stats");
+      return formatSqliteStatsDaily(sqliteStatsEpisodeDailyResponseSchema.parse(result), !!flags["by-revision"]);
+    }
+    const { sqliteStatsEpisodesResponseSchema } = await import("../../shared/src/sqlite-stats");
+    return formatSqliteStatsEpisodes(sqliteStatsEpisodesResponseSchema.parse(result));
   }
   if (command === "watch") {
     if (watchSignal?.signal.aborted) process.exit(130);

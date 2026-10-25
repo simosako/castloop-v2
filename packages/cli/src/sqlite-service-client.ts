@@ -1,7 +1,9 @@
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
-import { sqliteHealthSchema, sqliteInspectionSchema, sqliteRegistryStatusSchema, sqliteAvailabilityResponseSchema } from "../../shared/src/sqlite-service-api";
-import type { SqliteAvailabilityResponse } from "../../shared/src/sqlite-service-api";
+import { sqliteHealthSchema, sqliteInspectionSchema, sqliteRegistryStatusSchema, sqliteAvailabilityResponseSchema, sqliteStatsRetentionResponseSchema } from "../../shared/src/sqlite-service-api";
+import type { SqliteAvailabilityResponse, SqliteStatsRetentionResponse } from "../../shared/src/sqlite-service-api";
+import { sqliteStatsEpisodesResponseSchema, sqliteStatsEpisodeDailyResponseSchema, sqliteStatsRetentionRequestSchema } from "../../shared/src/sqlite-stats";
+import type { SqliteStatsEpisodesResponse, SqliteStatsEpisodeDailyResponse, SqliteStatsRetentionRequest } from "../../shared/src/sqlite-stats";
 import { sqliteAvailabilityRequestSchema } from "../../shared/src/sqlite-availability";
 import type { SqliteAvailabilityRequest } from "../../shared/src/sqlite-availability";
 import { sha256Hex } from "../../shared/src/sha256";
@@ -92,6 +94,61 @@ export class SqliteServiceClient {
     return readSqliteManagementGet(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url),
       { "X-Castloop-Key": this.key, "X-Castloop-Show-Id": showId },
       { ...this.readOptions, transport: this.transport, maximumBytes: 8_388_608 });
+  }
+  private statsQuery(query: { from_date_utc?: string; to_date_utc?: string; cursor?: string }): string {
+    const search = new URLSearchParams();
+    for (const [name, value] of [["from", query.from_date_utc], ["to", query.to_date_utc], ["cursor", query.cursor]] as const) {
+      if (value !== undefined) search.set(name, value);
+    }
+    const encoded = search.toString();
+    return encoded ? `?${encoded}` : "";
+  }
+  private async statsRead(path: string, query: { from_date_utc?: string; to_date_utc?: string; cursor?: string }, showId: string): Promise<unknown> {
+    sqliteInspectionSchema.shape.show_id.parse(showId);
+    return readSqliteManagementGet(new URL(`/admin/sqlite-stats/${path}${this.statsQuery(query)}`, this.config.workers_dev_base_url),
+      { "X-Castloop-Key": this.key, "X-Castloop-Show-Id": showId },
+      { ...this.readOptions, transport: this.transport });
+  }
+  async statsEpisodes(showId: string, query: { from_date_utc?: string; to_date_utc?: string; cursor?: string } = {}): Promise<SqliteStatsEpisodesResponse> {
+    const value = sqliteStatsEpisodesResponseSchema.parse(await this.statsRead("episodes", query, showId));
+    await this.identity(value);
+    if (value.show_id !== showId) throw new Error("Delivery statistics response target differs");
+    return value;
+  }
+  async statsEpisodeDaily(showId: string, episodeId: string, query: { from_date_utc?: string; to_date_utc?: string; cursor?: string } = {}): Promise<SqliteStatsEpisodeDailyResponse> {
+    const value = sqliteStatsEpisodeDailyResponseSchema.parse(await this.statsRead(`episodes/${episodeId}`, query, showId));
+    await this.identity(value);
+    if (value.show_id !== showId || value.episode_id !== episodeId) throw new Error("Delivery statistics response target differs");
+    return value;
+  }
+  private async statsPost(body: object, showId: string): Promise<unknown> {
+    try {
+      const response = await this.transport(new URL("/admin/sqlite-stats/retention", this.config.workers_dev_base_url), {
+        method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(30000),
+        headers: { "X-Castloop-Key": this.key, "X-Castloop-Show-Id": showId, "Content-Type": "application/json" },
+        body: JSON.stringify(body) });
+      if (response.status !== 200) {
+        await response.body?.cancel(); throw new Error("Unverified service response");
+      }
+      return await readSqliteManagementJson(response, 16384);
+    } catch { throw new Error("SQLite service request was not verified; preserve its journal without automatic replay"); }
+  }
+  private async checkedRetention(input: unknown, showId: string): Promise<SqliteStatsRetentionResponse> {
+    const value = sqliteStatsRetentionResponseSchema.parse(input);
+    await this.identity(value);
+    if (value.scope !== "show" || value.show_id !== showId || value.retention.request.show_id !== showId ||
+      value.retention.request.service_id !== this.config.service_id) throw new Error("Delivery stats retention result differs");
+    return value;
+  }
+  async statsRetention(input: SqliteStatsRetentionRequest): Promise<SqliteStatsRetentionResponse> {
+    const request = sqliteStatsRetentionRequestSchema.parse(input);
+    const value = await this.checkedRetention(await this.statsPost(request, request.show_id), request.show_id);
+    if (JSON.stringify(value.retention.request) !== JSON.stringify(request)) throw new Error("Delivery stats retention frozen request differs");
+    return value;
+  }
+  async statsRetentionStatus(showId: string, operationId: string): Promise<SqliteStatsRetentionResponse> {
+    sqliteStatsRetentionRequestSchema.shape.operation_id.parse(operationId);
+    return this.checkedRetention(await this.statsRead(`retention/${operationId}`, {}, showId), showId);
   }
   private async checkRevisionContent(content: SqliteShowRevisionRecord | SqliteEpisodeRevisionRecord | null | undefined) {
     if (!content) return;

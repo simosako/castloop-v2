@@ -1,5 +1,6 @@
 import { BoundedReadError, collectStreamBytes } from "./bounded-http-read";
 import type { R2RestTransport } from "./verified-r2-put";
+import { version } from "../../../package.json";
 
 export type PublicHttpFailureCode = "transport_error" | "too_many_redirects" | "insecure_redirect" |
   "size_limit_exceeded" | "body_read_failed" | "invalid_response";
@@ -29,7 +30,9 @@ export async function publicRequest(url: URL, method: "GET" | "HEAD",
   for (;;) {
     let response: Response;
     try {
+      // A distinct User-Agent separates castloop's own verification traffic from listener statistics.
       response = await (options.transport ?? fetch)(current, { method, redirect: "manual", cache: "no-store",
+        headers: { "User-Agent": `castloop-verify/${version}` },
         signal: AbortSignal.timeout(options.timeoutMs ?? 30000) });
     } catch {
       throw new PublicHttpError("transport_error");

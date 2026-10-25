@@ -2,6 +2,7 @@ import { z } from "zod";
 import { sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
 import { sqliteUpdateSummarySchema } from "./sqlite-runtime-update";
 import { sqliteAvailabilityStateSchema, sqliteAvailabilityRecordSchema } from "./sqlite-availability";
+import { sqliteStatsRetentionRecordSchema } from "./sqlite-stats";
 
 export const sqliteRuntimeRequestSchema = sqlitePublicationRuntimeSchema.extend({ operation_id: z.uuid() }).strict();
 export const sqliteResumeRequestSchema = sqliteRuntimeRequestSchema.extend({ admission_window_id: z.uuid() }).strict();
@@ -18,6 +19,7 @@ export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protoc
   availability_controls: z.literal("show-admission-delivery-v1"),
   revision_history: z.literal("sqlite-revisions-v1"),
   website: z.literal("static-show-v1"),
+  delivery_statistics: z.literal("episode-daily-v1"),
   availability_version: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable(),
   admission_state: z.enum(["open", "closed"]).nullable(), delivery_policy: z.enum(["enabled", "stopped"]).nullable(),
   scope: z.enum(["service", "show"]).optional(), show_id: sqliteRegistrationSchema.shape.show_id.optional(),
@@ -63,3 +65,12 @@ export const sqliteAvailabilityResponseSchema = sqliteHealthSchema.extend({ cont
   }
 });
 export type SqliteAvailabilityResponse = z.infer<typeof sqliteAvailabilityResponseSchema>;
+export const sqliteStatsRetentionResponseSchema = sqliteHealthSchema.extend({
+  retention: sqliteStatsRetentionRecordSchema,
+}).strict().superRefine((value, context) => {
+  if (value.scope !== "show" || value.show_id !== value.retention.request.show_id ||
+    value.service_id !== value.retention.request.service_id) {
+    context.addIssue({ code: "custom", message: "Delivery stats retention scope differs from its record" });
+  }
+});
+export type SqliteStatsRetentionResponse = z.infer<typeof sqliteStatsRetentionResponseSchema>;

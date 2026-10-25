@@ -33,6 +33,10 @@
 - 応答不明は同じjobのGET照会だけを行う。queuedや404を成功・未実行と推測しない。jobの`succeeded`を確認する。
 - 編集元が必要なら`sync-local-metadata --show SHOW [--episode ID] --expect-revision CURRENT_UUID --output NEW_FILE`で新規書出しする。既存TOML・画像・音源・journalを上書き・再構築しない。
 
+## 開発版の配信統計
+
+`stats SHOW [--episode ID] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--by-revision] [--json]`は読取専用の配信統計照会。内部7/9の新規環境専用。日別は31日、Episode一覧は20件ごとに`next_cursor`を追う。`unmeasured`（計測開始前）と`pruned`（保持期限切れ）は0と表示せず、`lifetime`が削除分を含む通算。カウンタはサーバー観測事実のみで聴取人数ではない。保持日数の変更は`stats-retention SHOW DAYS [--operation-id UUID]`。応答不明時は同じ操作IDでの照会のみで再送しない。
+
 ## 開発版の日時preview
 
 `preview-schedule-time DATETIME --workspace PATH [--timezone IANA_ZONE] --json`はローカルの日時変換のみ。upload・予約・公開・サーバー時刻／readinessの検証は行わない。任意の`castloop-admin.toml`は`schema_version = 1`と`timezone`を受け付け、未指定ならサーバー基準UTCを使う。明示offsetが絶対時刻を決め、併用した`--timezone`はそのoffsetと一致する必要がある。存在しない／二重となるDST日時を勝手に解決しない。サーバー予約は未実装であり、未来の`published_at`も即時公開を遅らせない。このpreviewを予約受付・公開承認の証拠にしない。

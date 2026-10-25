@@ -42,6 +42,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [独自domain応答検証ログと調査](sqlite_domain_response_logging.md) | 既存stderrは空で元PUTは欠測。CLIへHTTP/body/JSON/schemaの段階とenvironment固定分類を追加。秘密非出力・非再送のローカル回帰 |
 | [エージェントによるPodcast管理の改善案](agent_integration_plan.md) | Issue #5。単一バイナリでのschema・雛形・Skill配布、明示対象指定、オフライン検証、doctor、承認と中断対応。MCPは不採用 |
 | [リモート診断・監視の設計案](remote_diagnostics_and_monitoring_plan.md) | Issue #67。diagnose/progress/verify/watchの4コマンド提案、scope付き検査分類、CLI完結の終端報告、段階実装。レビュー済み、段階A〜D実装済み。[利用方法](../docs/observability.md)。[実機確認記録](remote_diagnostics_live_verification_20261025.md) |
+| [Episode別・日別の配信統計の設計案](episode_delivery_statistics_plan.md) | Issue #71。観測点、指標定義、Range/HEAD/bot/revisionの扱い、未計測と0の区別、PII非保持、Show DO SQLite集計、保持日数設定（`stats-retention`）と通算累計保持（案8-α-2＋案8-A）。実装済み。[実機確認記録](episode_delivery_statistics_live_20261025.md) |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |
 | [レビュー修正とPR（2026-10-22）](code_review_fixes_20261022.md) | R1〜R10の対応範囲・commit/PR依存順・全体検証・残る走査コストと実機未確認範囲 |

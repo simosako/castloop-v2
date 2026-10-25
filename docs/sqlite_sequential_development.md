@@ -1,6 +1,6 @@
 # SQLiteのShow単位公開方式
 
-Issue #70開発版は内蔵番組サイトを追加し、現在の内部queue/content形式を**8/9**、必須health/inspection識別を`website="static-show-v1"`にする新規環境専用。`create-show ID --site-mode builtin`で選び、明示公開でHTMLとFeedを確定する。既存7/8等への互換配備・DB変換は行わない。下記の番号は機能導入時点の履歴として区別し、操作・無料枠の制限は[サイトガイド](show_website.md)を参照する。
+Issue #70/#71の開発版は内蔵番組サイトとEpisode別・日別の配信統計を追加し、現在の内部queue/content形式を**8/9**、必須health/inspection識別を`website="static-show-v1"`と`delivery_statistics="episode-daily-v1"`にする新規環境専用。サイトは`create-show ID --site-mode builtin`で選び、明示公開でHTMLとFeedを確定する。統計の観測はGatewayの応答確定後（キャッシュヒット／ミス両対応）に行い、`ctx.waitUntil`で対象Show DOのSQLiteへ非同期記録する。統計機能の失敗が配信を止めることは構造的にない。保持日数はShowごとに`castloop stats-retention SHOW DAYS`で再配備なしに変更でき（既定400日）、期限を過ぎた日別行は1日1バッチで削除されつつ通算累計表へ合算される。照会は`castloop stats SHOW [--episode ID]`。既存7/8等への互換配備・DB変換は行わない。下記の番号は機能導入時点の履歴として区別し、操作・無料枠の制限は[サイトガイド](show_website.md)と[配信統計ガイド](delivery_statistics.md)、判断の経緯は[サイト設計](../design/show_website_plan.md)と[統計設計](../design/episode_delivery_statistics_plan.md)を参照する。
 
 Issue #64の開発版は、内部queue/content形式**7/8**と必須`revision_history="sqlite-revisions-v1"`を使う新規環境専用。全文差分、Show/Episodeのrevision履歴、保持した素材による明示的な過去版採用を追加した。旧7/7を含めDB変換は行わない。[公開内容の確認ガイド](published_content_review.md)参照。既存の非公開化からの`restore`とは別操作である。
 

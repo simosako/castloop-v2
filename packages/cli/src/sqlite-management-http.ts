@@ -50,9 +50,14 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
 }
 
 function readPath(path: string): boolean {
-  if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-service/domain-state", "/admin/sqlite-publication/status"].includes(path)) return true;
-  if (/^\/admin\/sqlite-service\/registrations\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) && path.slice("/admin/sqlite-service/registrations/".length).length <= 32) return true;
   const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+  if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-service/domain-state", "/admin/sqlite-publication/status", "/admin/sqlite-stats/episodes"].includes(path)) return true;
+  if (path.startsWith("/admin/sqlite-stats/episodes/")) {
+    const episodeId = path.slice("/admin/sqlite-stats/episodes/".length);
+    return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(episodeId) && episodeId.length <= 80;
+  }
+  if (new RegExp(`^/admin/sqlite-stats/retention/${uuid}$`, "i").test(path)) return true;
+  if (/^\/admin\/sqlite-service\/registrations\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) && path.slice("/admin/sqlite-service/registrations/".length).length <= 32) return true;
   if (path === "/admin/sqlite-operations/list" || new RegExp(`^/admin/sqlite-operations/(?:(?:cleanup|requests)/)?${uuid}$`, "i").test(path)) return true;
   if (new RegExp(`^/admin/(?:sqlite-publication/jobs|sqlite-service/update-status|sqlite-service/domain-status|sqlite-service/controls)/${uuid}$`, "i").test(path)) return true;
   for (const prefix of ["/admin/sqlite-service/targets/", "/admin/sqlite-service/content/"]) {
@@ -87,7 +92,9 @@ function readPath(path: string): boolean {
 export async function readSqliteManagementGet(url: URL, headers: HeadersInit, options: GetOptions = {}): Promise<unknown | null> {
   const timeout = options.timeoutMs ?? 30000, maximum = options.maximumBytes ?? 16384, attempts = 3;
   const domainQuery = url.pathname.startsWith("/admin/sqlite-service/domain-status/") && [...url.searchParams.keys()].every((key) => key === "after") && url.searchParams.getAll("after").length <= 1;
-  if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") && !domainQuery || url.hash || !readPath(url.pathname) ||
+  const statsQuery = url.pathname.startsWith("/admin/sqlite-stats/") && [...url.searchParams.keys()].every((key) => ["from", "to", "cursor"].includes(key)) &&
+    ["from", "to", "cursor"].every((key) => url.searchParams.getAll(key).length <= 1);
+  if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") && !domainQuery && !statsQuery || url.hash || !readPath(url.pathname) ||
     !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 ||
     maximum > (url.pathname.startsWith("/admin/sqlite-service/content/") || url.pathname.startsWith("/admin/sqlite-service/revisions/") ||
       url.pathname.startsWith("/admin/sqlite-service/content-inventory/") ? 8_388_608 : 65536)) throw new Error("Invalid bounded SQLite management GET");

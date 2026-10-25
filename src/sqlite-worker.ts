@@ -26,6 +26,7 @@ import { serveSqliteGateway } from "./sqlite-gateway";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
 import { SqliteShowService } from "./sqlite-show-service";
 import type { ShowRegistration } from "./sqlite-show-service";
+import type { SqliteDeliveryObservation } from "../packages/shared/src/sqlite-stats";
 import { SqliteServiceControl } from "./sqlite-service-control";
 import { createSqliteControlHttp } from "./sqlite-control-http";
 import { sqliteRegistrationSchema } from "../packages/shared/src/sqlite-service-api";
@@ -126,6 +127,11 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     await this.initialized;
     return this.show ? this.show.siteDelivery(page) : { status: 404 as const };
   }
+  async recordDeliveryStats(observations: SqliteDeliveryObservation[]): Promise<void> {
+    await this.initialized;
+    if (!this.show) throw new Error("Show is not initialized");
+    this.show.stats.record(observations);
+  }
   private async describeCaches(): Promise<SqliteCacheRuntime> {
     const media = await this.ctx.exports.SqliteCachedAssets.describeRuntime();
     const site = await this.ctx.exports.SiteCachedPages.describeRuntime();
@@ -208,6 +214,13 @@ export default {
     });
     return serveSqliteGateway(request, env.CASTLOOP_MANAGEMENT_ORIGIN,
       env.CASTLOOP_SQLITE.getByName(name),
-      (input, props) => ctx.exports.SqliteCachedAssets({ props }).fetch(input), publicOrigin);
+      (input, props) => ctx.exports.SqliteCachedAssets({ props }).fetch(input), publicOrigin,
+      (observation) => {
+        // Statistics recording never blocks the audio response; failures only count as recording errors.
+        ctx.waitUntil(env.CASTLOOP_SQLITE.getByName(name).recordDeliveryStats([observation]).catch(() => {
+          console.error(JSON.stringify({ event: "sqlite_delivery_stats", show_id: name.startsWith("show/") ? name.split("/")[2] : undefined,
+            reason_code: "stats_record_failed" }));
+        }));
+      });
   },
 } satisfies ExportedHandler<SqliteWorkerEnv>;

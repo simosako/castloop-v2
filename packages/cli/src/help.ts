@@ -96,6 +96,23 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "the published cover and (with --episode) the published audio by status/length. Processing success and delivery are reported separately.\n" +
       "Expected 404/503 answers are classified distinctly; any failed check exits 1.",
   },
+  stats: {
+    usage: "stats SHOW_ID [--episode EPISODE_ID] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--by-revision] [--cursor TOKEN]",
+    description: "Read delivery statistics for approved public Episode audio (UTC days), aggregated per day inside the Show.\n" +
+      "Without --episode: per-Episode totals for the window (default: last 30 days, at most 366; 20 episodes per page).\n" +
+      "With --episode: daily rows (31 days per page) plus per-audio-revision totals; --by-revision prints the revision breakdown.\n" +
+      "Counts are server-side counters only (no IP addresses or User-Agent strings are stored). HEAD, 304, small range probes and\n" +
+      "known bots are separated from initial downloads; response_bytes counts served Content-Length and does not subtract client\n" +
+      "disconnects. Days before measurement started show as unmeasured and pruned days (retention limit) show as pruned, never 0.\n" +
+      "Lifetime totals include pruned days. Read-only; requires the administrator key.",
+  },
+  "stats-retention": {
+    usage: "stats-retention SHOW_ID DAYS [--operation-id UUID]",
+    description: "Change this Show's delivery-statistics daily retention window (30..3650, default 400) without redeploying.\n" +
+      "The new limit applies from the next UTC-day pruning; already pruned daily rows never come back, and shortening prunes\n" +
+      "older rows into lifetime totals instead of losing them. Idempotent per operation ID: the request is journaled locally\n" +
+      "before submission and an unknown outcome is only re-checked by its operation ID, never replayed blindly.",
+  },
   watch: {
     usage: "watch JOB [--timeout SECONDS] [--interval SECONDS]",
     description: "Run from the service workspace. Bounded read-only observation of one retained job until its terminal state.\n" +
@@ -256,6 +273,8 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "operation-status": { show: "string", local: "boolean", remote: "boolean", "after-version": "string", "request-cursor": "string" },
     diagnose: { "max-shows": "string", external: "boolean" },
     verify: { episode: "string" }, watch: { timeout: "string", interval: "string" },
+    stats: { episode: "string", from: "string", to: "string", "by-revision": "boolean", cursor: "string" },
+    "stats-retention": { "operation-id": "string" },
     "import-rss": { "dry-run": "boolean", output: "string" },
     validate: { assets: "boolean", audio: "string" }, doctor: { local: "boolean" }, skill: { output: "string" },
     "preview-schedule-time": { timezone: "string" },
@@ -274,7 +293,7 @@ export function describeCommand(command: string) {
   if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
   const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-schedule-time"].includes(command);
   const preview = ["preview-show", "preview-episode"].includes(command);
-  const read = offline || preview || ["list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "progress", "verify", "watch"].includes(command);
+  const read = offline || preview || ["list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "progress", "verify", "watch", "stats"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],

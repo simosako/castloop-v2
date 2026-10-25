@@ -158,6 +158,53 @@ test("removing the canonical custom origin restores workers.dev bodies and rejec
     async () => { throw new Error("Former origin cannot reach cache"); })).status).toBe(404);
 });
 
+test("gateway observations cover audio responses once after finalization and skip failures, redirects and unclassifiable ranges", async () => {
+  const audio = `/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`;
+  const decision = (path: string): SqliteDeliveryDecision => ({ status: 200, key: `public${path}`, content_type: "audio/mpeg",
+    cache_props: { showGeneration: 1, episodeGeneration: 0 } });
+  const observed: unknown[] = [];
+  const sink = (entry: unknown) => { observed.push(entry); };
+  const serve = async (method: "GET" | "HEAD", headers: Record<string, string>, respond: () => Response, path = audio) =>
+    serveSqliteGateway(new Request(`https://podcasts.example.com${path}`, { method, headers }), "https://worker.example.workers.dev",
+      { fetch: async () => new Response(null), delivery: async () => decision(path) }, async () => respond(), "https://podcasts.example.com", sink);
+  const full = await serve("GET", {}, () => new Response("audio", { status: 200, headers: { "Content-Length": "1200000" } }));
+  expect(full.status).toBe(200);
+  expect(observed).toHaveLength(1);
+  expect(observed[0]).toMatchObject({ episode_id: "first", method: "GET", status: 200, content_length: 1200000, range_offset: null, bot: false });
+  await serve("GET", { Range: "bytes=0-65535", "User-Agent": "AppleCoreMedia/1.0" },
+    () => new Response("data", { status: 206, headers: { "Content-Length": "65536", "Content-Range": "bytes 0-65535/1200000" } }));
+  await serve("GET", { Range: "bytes=524288-", "User-Agent": "Twitterbot/1.0" },
+    () => new Response("data", { status: 206, headers: { "Content-Length": "675512", "Content-Range": "bytes 524288-1199999/1200000" } }));
+  await serve("HEAD", { "User-Agent": "castloop-verify/1.0" }, () => new Response(null, { status: 200, headers: { "Content-Length": "1200000" } }));
+  await serve("GET", { "If-None-Match": '"etag"' }, () => new Response(null, { status: 304 }));
+  await serve("GET", {}, () => new Response(null, { status: 416, headers: { "Content-Range": "bytes */1200000" } }));
+  await serve("GET", {}, () => new Response("data", { status: 206, headers: { "Content-Length": "65536" } }));
+  for (const path of ["/podcasts/daily/feed.xml", "/podcasts/daily/cover.jpg"]) {
+    await serve("GET", {}, () => new Response("data", { status: 200 }), path);
+  }
+  const redirected = await serveSqliteGateway(new Request(`https://worker.example.workers.dev${audio}`), "https://worker.example.workers.dev",
+    { fetch: async () => new Response(null), delivery: async () => decision(audio) }, async () => { throw new Error("Unexpected cache read"); },
+    "https://podcasts.example.com", sink);
+  expect(redirected.status).toBe(307);
+  expect(observed).toHaveLength(5);
+  expect(observed[1]).toMatchObject({ status: 206, range_offset: 0, content_length: 65536, bot: false });
+  expect(observed[2]).toMatchObject({ status: 206, range_offset: 524288, bot: true });
+  expect(observed[3]).toMatchObject({ method: "HEAD", status: 200, bot: true });
+  expect(observed[4]).toMatchObject({ status: 304, content_length: 0 });
+});
+
+test("gateway observations are isolated from delivery failures and never change responses", async () => {
+  const audio = `/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`;
+  const decision: SqliteDeliveryDecision = { status: 200, key: `public${audio}`, content_type: "audio/mpeg",
+    cache_props: { showGeneration: 1, episodeGeneration: 0 } };
+  const exploding = (entry: unknown) => { throw new Error(`statistics sink failed for ${JSON.stringify(entry)}`); };
+  const response = await serveSqliteGateway(new Request(`https://podcasts.example.com${audio}`), "https://worker.example.workers.dev",
+    { fetch: async () => new Response(null), delivery: async () => decision },
+    async () => new Response("audio", { status: 200, headers: { "Content-Length": "5" } }), "https://podcasts.example.com", exploding);
+  expect(response.status).toBe(200);
+  expect(await response.text()).toBe("audio");
+});
+
 test("a mismatched delivery key cannot authorize a redirect", async () => {
   const response = await serveSqliteGateway(new Request(`${management}${feed}`), management,
     { fetch: async () => new Response(null), delivery: async () => ({ ...allowed(1), key: "public/podcasts/other/feed.xml" }) },
