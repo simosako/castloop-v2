@@ -158,6 +158,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
       return new Response(null, { status: 400 });
     }
     if (request.headers.get("Authorization") !== "Bearer private-token") return new Response(null, { status: 403 });
+    if (path === "" && request.method === "GET") return json({ id: config.account_id, name: "Test Account" });
     if (url.pathname.startsWith("/client/v4/zones/")) {
       const pieces = url.pathname.split("/"), zoneId = pieces[4];
       if (pieces.length === 5) return json({ id: zoneId, name: "example.com", status: faults.zoneStatus ?? "active", type: "full", account: { id: faults.zoneAccount ?? config.account_id } });

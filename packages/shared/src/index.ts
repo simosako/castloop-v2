@@ -14,10 +14,12 @@ export type { SqliteUploadIdentity, SqliteVerifiedUpload, SqlitePublicationRunti
   SqlitePublicationStatus, SqlitePublicationFailure, SqlitePublicationBlock } from "./sqlite-publication";
 export { sqliteServiceConfigSchema, sqliteServiceStatusSchema, parseSqliteServiceConfig, sqliteServiceConfigHash } from "./sqlite-service";
 export type { SqliteServiceConfig, SqliteServiceStatus } from "./sqlite-service";
+export { diagnosticCheckSchema, diagnosticScopeSchema, diagnosticStatusSchema, diagnosticSummarySchema } from "./diagnostics";
+export type { DiagnosticCheck, DiagnosticScope, DiagnosticStatus, DiagnosticSummary } from "./diagnostics";
 export { stageAssetSchema, stagePayloadSchema, stageReadbackReceiptSchema } from "./upload";
 export type { StageAsset, StagePayload, StageReadbackReceipt } from "./upload";
 export { validateId } from "./ids";
-export { assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength } from "./publication-budget";
+export { assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength, PUBLICATION_RENDER_BUDGET_BYTES } from "./publication-budget";
 export { sha256Hex, toHex } from "./sha256";
 export { parsePublicAssetPath } from "./public-assets";
 export type { PublicAsset } from "./public-assets";
