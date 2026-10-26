@@ -138,6 +138,44 @@ async function main(context: Invocation): Promise<unknown> {
     if (result.summary.fail) process.exitCode = 1;
     return flags.json ? result : formatDoctor(result);
   }
+  if (command === "backup-create" || command === "backup-verify" || command === "backup-restore-preview" || command === "backup-restore") {
+    delete flags.json;
+    delete flags["non-interactive"];
+    const { backupPassphrase } = await import("./backup-passphrase");
+    if (command === "backup-create") {
+      allowedFlags(flags, ["workspace", "output", "include-audio", "passphrase-file"]);
+      if (!flags.output) throw new AgentError("missing_input", "Expected backup-create --output FILE");
+      const root = resolve(flags.workspace ?? process.cwd());
+      context.target.workspace = root;
+      const { createLocalBackup, formatBackupCreate } = await import("./backup-create");
+      const passphrase = await backupPassphrase(flags, true);
+      context.mutationStarted = true;
+      const result = await createLocalBackup(root, resolve(flags.output), { includeAudio: !!flags["include-audio"], passphrase });
+      return process.argv.includes("--json") ? result : formatBackupCreate(result);
+    }
+    if (command === "backup-verify") {
+      allowedFlags(flags, ["passphrase-file"]);
+      if (positional.length !== 1) throw new AgentError("invalid_arguments", "Expected backup-verify ARCHIVE.");
+      const { verifyLocalBackup, formatBackupVerify } = await import("./backup-restore");
+      const result = verifyLocalBackup(resolve(positional[0]!), await backupPassphrase(flags, false));
+      return process.argv.includes("--json") ? result : formatBackupVerify(result);
+    }
+    if (command === "backup-restore-preview") {
+      allowedFlags(flags, ["dest", "passphrase-file"]);
+      if (positional.length !== 1 || !flags.dest) throw new AgentError("invalid_arguments", "Expected backup-restore-preview ARCHIVE --dest PATH.");
+      const { previewBackupRestore, formatBackupRestorePreview } = await import("./backup-restore");
+      const result = previewBackupRestore(resolve(positional[0]!), flags.dest, await backupPassphrase(flags, false));
+      return process.argv.includes("--json") ? result : formatBackupRestorePreview(result);
+    }
+    allowedFlags(flags, ["passphrase-file"]);
+    if (positional.length !== 3 || positional[2] !== "confirm") throw new AgentError("invalid_arguments", "Expected backup-restore ARCHIVE DEST confirm.");
+    const { restoreLocalBackup, formatBackupRestore } = await import("./backup-restore");
+    const passphrase = await backupPassphrase(flags, false);
+    context.mutationStarted = true;
+    const result = restoreLocalBackup(resolve(positional[0]!), resolve(positional[1]!), passphrase);
+    context.target.workspace = result.restored_to;
+    return process.argv.includes("--json") ? result : formatBackupRestore(result);
+  }
   if (command === "preview-schedule-time") {
     if (positional.length !== 1) throw new AgentError("invalid_arguments", "Expected preview-schedule-time DATETIME.");
     const root = resolve(flags.workspace ?? process.cwd()); context.target.workspace = root;
