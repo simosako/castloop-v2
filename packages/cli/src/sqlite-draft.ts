@@ -1,11 +1,18 @@
 import { z } from "zod";
 import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, parseEpisodeDraft, parseShowMetadata, parseSqlitePublicationRequest, sqlitePublicationRequestHash,
-  sqliteServiceConfigSchema, sqliteVerifiedUploadSchema } from "@castloop/shared";
-import type { EpisodeDraft, ShowMetadata, SqlitePublicationStatus, SqliteServiceConfig, StagePayload } from "@castloop/shared";
+  sqliteScheduleCreateSchema, sqliteSchedulePlanHash, sqliteScheduleReapproveSchema, sqliteServiceConfigSchema, sqliteVerifiedUploadSchema } from "@castloop/shared";
+import type { EpisodeDraft, ShowMetadata, SqlitePublicationRequest, SqlitePublicationStatus, SqliteScheduleCreate,
+  SqliteScheduleStatus, SqliteScheduleTime, SqliteServiceConfig, StagePayload } from "@castloop/shared";
+
+type FrozenSchedule = { schedule_id: string; request: SqlitePublicationRequest; request_sha256: string;
+  preview_sha256: string; scheduled_at: SqliteScheduleTime };
 import { analyzeAudio } from "./audio";
 import { openSqliteDraftJournal, requireSqliteStatus, sqliteDraftAssetSchema, sqliteDraftRequestTarget } from "./sqlite-draft-journal";
 import type { SqliteDraftJournal, SqliteDraftRecord, SqliteDraftTarget } from "./sqlite-draft-journal";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
+import { SqliteScheduleClient } from "./sqlite-schedule-client";
+import { loadAdminConfig } from "./admin-config";
+import { resolveScheduleTime } from "./schedule-time";
 import type { SqliteManagementReadBudget } from "./sqlite-management-http";
 import { attachSqliteUpload, readSqliteUploadRecord, requireNoPendingSqliteUpload, resumeSqliteUpload, uploadSqliteDraftAssets } from "./sqlite-upload";
 import { SqliteOperationClient, sqliteClientIdentity } from "./sqlite-operation-client";
@@ -33,15 +40,17 @@ function sameAssetSlot(left: StagePayload["asset"], right: StagePayload["asset"]
 export class SqliteDraft {
   private constructor(private readonly root: string, private readonly config: SqliteServiceConfig,
     private readonly journal: SqliteDraftJournal, private readonly client: SqlitePublicationClient,
-    private readonly r2: R2RestOptions, private readonly operations: SqliteOperationClient,
+    private readonly schedules: SqliteScheduleClient, private readonly r2: R2RestOptions,
+    private readonly operations: SqliteOperationClient,
     private readonly service: SqliteServiceClient, private readonly context: Pick<SqliteDraftOptions, "parentOperationId" | "importId" | "onUploadPrepared">) {}
 
   static async open(root: string, input: SqliteServiceConfig, target: SqliteDraftTarget,
     options: SqliteDraftOptions): Promise<SqliteDraft> {
     const config = sqliteServiceConfigSchema.parse(input);
     const client = new SqlitePublicationClient(config, options.administratorKey, options.managementTransport);
-    return new SqliteDraft(resolve(root), config, await openSqliteDraftJournal(root, config, target), client, options.r2 ?? {
-      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" },
+    const schedules = new SqliteScheduleClient(config, options.administratorKey, options.managementTransport);
+    return new SqliteDraft(resolve(root), config, await openSqliteDraftJournal(root, config, target), client, schedules,
+      options.r2 ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" },
     new SqliteOperationClient(config, options.administratorKey, options.managementTransport, target.show_id),
     new SqliteServiceClient(config, options.administratorKey, options.managementTransport),
     { parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared });
@@ -83,7 +92,7 @@ export class SqliteDraft {
     const selection = selectionSchema.parse(selectionInput);
     return this.journal.storage.exclusively(async () => {
       const record = await this.journal.load();
-      if (record.publication) throw new Error("SQLite publication was requested; its draft and upload references are frozen");
+      if (record.publication || record.schedule) throw new Error("SQLite publication was requested; its draft and upload references are frozen");
       if ((selection.asset === "show") !== (record.target.kind === "show")) throw new Error("SQLite staging selection differs from its target");
       const metadata = await this.metadata(record), metadataPath = this.metadataPath(record);
       const payloads: StagePayload[] = [], paths: string[] = [];
@@ -166,6 +175,7 @@ export class SqliteDraft {
     return this.journal.storage.exclusively(async () => {
       const record = await this.journal.load();
       if (record.publication) return this.observeRecord(record);
+      if (record.schedule) throw new Error("SQLite draft has a frozen schedule; inspect it instead of publishing immediately");
       const checkPreview = async () => {
         if (!expectedPreview) return;
         const local = await draftPreview(this.root, this.config, record.target, record, { mode: "local" });
@@ -205,6 +215,148 @@ export class SqliteDraft {
       await checkPreview();
       this.journal.replace(frozen);
       return this.retainStatus(frozen, await this.client.submit(request, sqliteClientIdentity(this.root, this.config, true)!));
+    });
+  }
+
+  private async reviewSchedule(record: SqliteDraftRecord, at: string, timezone?: string) {
+    if (record.publication || record.schedule) throw new Error("SQLite draft already has a frozen publication or schedule");
+    const preview = await draftPreview(this.root, this.config, record.target, record, { mode: "remote", client: this.service });
+    if (!preview.inputs_match_staged || preview.publishable !== true) {
+      throw new AgentError("preview_changed", "Stage the current local inputs and resolve the published base before scheduling.");
+    }
+    const admin = await loadAdminConfig(this.root);
+    const time = resolveScheduleTime(at, { timezone, configuredTimezone: admin.timezone });
+    if (time.scheduled_at_ms <= Date.now()) throw new AgentError("invalid_schedule_time", "Schedule must be in the future; preview and approve a new time.");
+    const approval_sha256 = await sqliteSchedulePlanHash({ schema_version: 1, action: "schedule",
+      show_id: record.target.show_id, kind: record.target.kind, ...(record.target.episode_id ? { episode_id: record.target.episode_id } : {}),
+      draft_job_id: record.target.job_id, preview_fingerprint: preview.input_fingerprint, scheduled_at: time });
+    return { preview, time, approval_sha256 };
+  }
+
+  async schedulePlan(at: string, timezone?: string) {
+    const record = await this.journal.load(), review = await this.reviewSchedule(record, at, timezone);
+    return { ...review.preview, schedule: review.time, approval_sha256: review.approval_sha256,
+      server_time_checked: false, publication_ready: false };
+  }
+
+  private retainSchedule(record: SqliteDraftRecord, status: SqliteScheduleStatus, frozen: FrozenSchedule | undefined = undefined) {
+    const schedule = frozen ?? record.schedule, result = status.schedule;
+    if (!schedule || result.schedule_id !== schedule.schedule_id || result.request_id !== schedule.request.request_id ||
+      result.job_id !== schedule.request.job_id || result.request_sha256 !== schedule.request_sha256 ||
+      frozen && (result.preview_sha256 !== frozen.preview_sha256 ||
+        JSON.stringify(result.scheduled_at) !== JSON.stringify(frozen.scheduled_at))) {
+      throw new Error("SQLite schedule status differs from its frozen draft");
+    }
+    this.journal.replace({ ...record, schedule: { ...schedule, preview_sha256: result.preview_sha256,
+      scheduled_at: result.scheduled_at, status: result } });
+    return status;
+  }
+
+  schedule(options: { at: string; timezone?: string; expectedPreview?: string }): Promise<SqliteScheduleStatus> {
+    return this.journal.storage.exclusively(async () => {
+      const record = await this.journal.load();
+      if (record.publication) throw new Error("SQLite publication request is already frozen");
+      if (record.schedule) return this.observeRecordSchedule(record);
+      const review = await this.reviewSchedule(record, options.at, options.timezone);
+      if (options.expectedPreview !== review.approval_sha256) {
+        throw new AgentError("preview_changed", "Reviewed schedule inputs or time differ; preview and obtain approval again.");
+      }
+      const service = await this.client.describe(record.target.show_id);
+      if (service.state !== "open") throw new Error("SQLite publication admission is paused");
+      const metadata = await this.metadata(record);
+      this.requireUnchangedMetadata(record, metadata);
+      for (const entry of record.assets) {
+        await assertLocalStagingSource(entry.source_path, { asset: entry.upload.asset,
+          length_bytes: entry.upload.length_bytes, sha256: entry.upload.sha256 });
+      }
+      const target = sqliteDraftRequestTarget(record.target);
+      const request = parseSqlitePublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", ...target,
+        service_id: this.config.service_id, request_id: crypto.randomUUID(), action: "publish",
+        worker_version_id: service.worker_version_id, service_config_sha256: service.service_config_sha256,
+        admission_window_id: service.admission_window_id, payloads: record.assets.map((entry) => entry.upload) });
+      const again = await draftPreview(this.root, this.config, record.target, record, { mode: "remote", client: this.service });
+      if (!again.inputs_match_staged || again.publishable !== true || again.input_fingerprint !== review.preview.input_fingerprint) {
+        throw new AgentError("preview_changed", "Reviewed schedule inputs or published base changed; preview again.");
+      }
+      if (!metadata.equals(await this.metadata(record))) throw new Error("Local metadata changed before the schedule was frozen");
+      const scheduleId = crypto.randomUUID();
+      const create = sqliteScheduleCreateSchema.parse({ schema_version: 1, protocol: "sqlite-schedule-v1",
+        service_id: this.config.service_id, worker_version_id: service.worker_version_id,
+        service_config_sha256: service.service_config_sha256, show_id: record.target.show_id, schedule_id: scheduleId,
+        expected_version: 0, preview_sha256: review.approval_sha256, scheduled_at: review.time, publication: request });
+      const frozen = { ...record, schedule: { schedule_id: scheduleId, request,
+        request_sha256: await sqlitePublicationRequestHash(request), preview_sha256: review.approval_sha256,
+        scheduled_at: review.time } };
+      this.journal.replace(frozen);
+      const status = await this.schedules.create(create, sqliteClientIdentity(this.root, this.config, true)!);
+      this.journal.replace({ ...frozen, schedule: { ...frozen.schedule, status: status.schedule } });
+      return status;
+    });
+  }
+
+  private async observeRecordSchedule(record: SqliteDraftRecord): Promise<SqliteScheduleStatus> {
+    if (!record.schedule) throw new Error("SQLite draft has no frozen schedule");
+    return this.retainSchedule(record, await this.schedules.status(record.target.show_id, record.schedule.schedule_id));
+  }
+
+  observeSchedule(): Promise<SqliteScheduleStatus> {
+    return this.journal.storage.exclusively(async () => this.observeRecordSchedule(await this.journal.load()));
+  }
+
+  private async reviewReapprove(record: SqliteDraftRecord,
+    options: { at: string; timezone?: string; expectedVersion: number }) {
+    if (!record.schedule) throw new Error("SQLite draft has no frozen schedule");
+    const status = await this.schedules.status(record.target.show_id, record.schedule.schedule_id);
+    if (status.schedule.state !== "needs_approval" || status.schedule.version !== options.expectedVersion) {
+      throw new Error("SQLite schedule does not require reapproval at the expected version");
+    }
+    const reviewed = await draftPreview(this.root, this.config, record.target, record, { mode: "remote", client: this.service });
+    if (!reviewed.inputs_match_staged || reviewed.publishable !== true) {
+      throw new AgentError("preview_changed", "Current inputs or published base are unavailable; cancel this schedule and prepare a new draft.");
+    }
+    const admin = await loadAdminConfig(this.root);
+    const time = resolveScheduleTime(options.at, { timezone: options.timezone, configuredTimezone: admin.timezone });
+    if (time.scheduled_at_ms <= Date.now()) throw new AgentError("invalid_schedule_time", "Schedule must be in the future; preview and approve a new time.");
+    const approval_sha256 = await sqliteSchedulePlanHash({ schema_version: 1, action: "reapprove",
+      show_id: record.target.show_id, schedule_id: record.schedule.schedule_id, expected_version: options.expectedVersion,
+      preview_fingerprint: reviewed.input_fingerprint, scheduled_at: time });
+    return { status, reviewed, time, approval_sha256 };
+  }
+
+  reapproveSchedulePlan(options: { at: string; timezone?: string; expectedVersion: number }) {
+    return this.journal.storage.exclusively(async () => {
+      const record = await this.journal.load(), review = await this.reviewReapprove(record, options);
+      return { ...review.reviewed, schedule: review.time, current: review.status.schedule,
+        expected_version: options.expectedVersion, approval_sha256: review.approval_sha256 };
+    });
+  }
+
+  reapproveSchedule(options: { at: string; timezone?: string; expectedVersion: number; expectedPreview?: string }): Promise<SqliteScheduleStatus> {
+    return this.journal.storage.exclusively(async () => {
+      const record = await this.journal.load(), review = await this.reviewReapprove(record, options);
+      if (!record.schedule) throw new Error("SQLite draft has no frozen schedule");
+      if (options.expectedPreview !== review.approval_sha256) {
+        throw new AgentError("preview_changed", "Reviewed schedule inputs or time differ; preview and obtain approval again.");
+      }
+      const service = await this.client.describe(record.target.show_id);
+      if (service.state !== "open") throw new Error("SQLite publication admission is paused");
+      const target = sqliteDraftRequestTarget(record.target);
+      const request = parseSqlitePublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", ...target,
+        service_id: this.config.service_id, request_id: crypto.randomUUID(), action: "publish",
+        worker_version_id: service.worker_version_id, service_config_sha256: service.service_config_sha256,
+        admission_window_id: service.admission_window_id, payloads: record.assets.map((entry) => entry.upload) });
+      const again = await draftPreview(this.root, this.config, record.target, record, { mode: "remote", client: this.service });
+      if (!again.inputs_match_staged || again.publishable !== true || again.input_fingerprint !== review.reviewed.input_fingerprint) {
+        throw new AgentError("preview_changed", "Reviewed schedule inputs or published base changed; preview again.");
+      }
+      const input = sqliteScheduleReapproveSchema.parse({ schema_version: 1, protocol: "sqlite-schedule-v1",
+        service_id: this.config.service_id, worker_version_id: service.worker_version_id,
+        service_config_sha256: service.service_config_sha256, show_id: record.target.show_id,
+        schedule_id: record.schedule.schedule_id, expected_version: options.expectedVersion,
+        preview_sha256: review.approval_sha256, scheduled_at: review.time, publication: request });
+      const response = await this.schedules.reapprove(input);
+      return this.retainSchedule(record, response, { schedule_id: record.schedule.schedule_id, request,
+        request_sha256: await sqlitePublicationRequestHash(request), preview_sha256: review.approval_sha256, scheduled_at: review.time });
     });
   }
 

@@ -12,6 +12,8 @@ import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { createSqlitePublicationHttp } from "./sqlite-publication-http";
+import { createSqliteScheduleHttp } from "./sqlite-schedule-http";
+import { SqlitePublicationSchedules } from "./sqlite-publication-schedules";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
 import { createSqliteOperationHttp } from "./sqlite-operation-http";
 import { SqliteDeliveryStats } from "./sqlite-delivery-stats";
@@ -32,9 +34,11 @@ type Binding = { show_id: string; maintenance_id: string | null };
 export class SqliteShowService {
   readonly queue: SqlitePublicationQueue;
   readonly content: SqlitePublicationContent;
+  readonly schedules: SqlitePublicationSchedules;
   readonly runtime: SqliteServiceRuntime;
   readonly stats: SqliteDeliveryStats;
   private readonly publicationHttp: (request: Request) => Promise<Response>;
+  private readonly scheduleHttp: (request: Request) => Promise<Response>;
   private readonly serviceHttp: (request: Request) => Promise<Response>;
   private readonly operationHttp: (request: Request) => Promise<Response>;
   private readonly statsHttp: (request: Request) => Promise<Response>;
@@ -48,10 +52,14 @@ export class SqliteShowService {
     if (this.binding()?.show_id && this.binding()!.show_id !== showId) throw new Error("Show storage identity differs");
     this.queue = new SqlitePublicationQueue(storage, selectSqliteRuntime(storage, actual), Date.now, { showId, ready: () => this.ready() });
     this.content = new SqlitePublicationContent(storage);
+    this.schedules = new SqlitePublicationSchedules(storage, this.queue, this.content, Date.now, { showId, ready: () => this.ready() });
     this.runtime = new SqliteServiceRuntime(storage, this.queue, this.content, bucket, config, cache, actual, showId);
     const ready = () => this.ready();
-    const records = createSqliteOperationRecords(storage, this.queue, this.content, ready, showId);
+    const records = createSqliteOperationRecords(storage, this.queue, this.content, ready, showId,
+      (jobId) => this.schedules.hasActiveJob(jobId));
+    this.schedules.operationRecords = records;
     this.publicationHttp = createSqlitePublicationHttp(this.queue, key, ready, showId);
+    this.scheduleHttp = createSqliteScheduleHttp(this.schedules, key, showId);
     this.serviceHttp = createSqliteServiceHttp(this.runtime, key);
     this.operationHttp = createSqliteOperationHttp(records, key, ready, bucket);
     this.stats = new SqliteDeliveryStats(storage, showId, actual, Date.now);
@@ -66,7 +74,8 @@ export class SqliteShowService {
     return new SqliteServiceRuntime(this.storage, this.queue, this.content, this.bucket, this.config, this.cache, this.actual, this.showId);
   }
   health(): SqliteHealth { return { ...this.runtime.health(), scope: "show", show_id: this.showId,
-    maintenance_operation_id: this.binding()?.maintenance_id ?? null, publication_ready: this.ready() }; }
+    maintenance_operation_id: this.binding()?.maintenance_id ?? null, publication_ready: this.ready(),
+    schedules: this.schedules.summary() }; }
 
   async initialize(input: ShowRegistration): Promise<SqliteHealth> {
     const request = sqliteRegistrationSchema.parse(input);
@@ -87,6 +96,7 @@ export class SqliteShowService {
     return this.storage.transactionSync(() => {
       const binding = this.binding();
       if (!binding || binding.maintenance_id) throw new Error("Show maintenance already started");
+      this.schedules.suspendOpen("maintenance");
       const result = this.runtime.updates.prepare(request);
       this.storage.sql.exec("UPDATE publication_show_binding SET maintenance_id = ? WHERE id = 1", request.operation_id);
       return result;
@@ -110,6 +120,7 @@ export class SqliteShowService {
   async prepareDomain(request: SqliteDomainRequest) {
     return this.runtime.domains.prepare(request, () => {
       if (!this.binding() || this.binding()!.maintenance_id) throw new Error("Show maintenance already started");
+      this.schedules.suspendOpen("maintenance");
       this.storage.sql.exec("UPDATE publication_show_binding SET maintenance_id = ? WHERE id = 1", request.operation_id);
     });
   }
@@ -157,7 +168,8 @@ export class SqliteShowService {
       }
       const input = sqliteAvailabilityRequestSchema.parse(await readBoundedAdminJson(request));
       if (input.action !== sqliteAvailabilityActionSchema.parse(action) || input.show_id !== this.showId) throw new Error("Show control differs");
-      const control = await this.queue.applyControl(input, this.actual);
+      const control = await this.queue.applyControl(input, this.actual,
+        (reason) => this.schedules.suspendOpen(reason));
       return adminReply(sqliteAvailabilityResponseSchema.parse({ ...this.health(), control }));
     } catch {
       console.error(JSON.stringify({ event: "sqlite_service_http", reason_code: "service_request_unverified" }));
@@ -182,6 +194,7 @@ export class SqliteShowService {
       if (!this.ready()) return adminReply({ error: "show_not_ready" }, 503);
     }
     if (path.startsWith("/admin/sqlite-stats/")) return this.statsHttp(request);
+    if (path === "/admin/sqlite-schedules" || path.startsWith("/admin/sqlite-schedules/")) return this.scheduleHttp(request);
     return path.startsWith("/admin/sqlite-operations/") ? this.operationHttp(request) :
       path.startsWith("/admin/sqlite-service/") ? this.serviceHttp(request) : this.publicationHttp(request);
   }

@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { parseSqlitePublicationRequest, sqlitePublicationProtocol, sqlitePublicationRequestHash,
-  sqlitePublicationRequestSchema, sqlitePublicationStatusSchema, sqliteServiceConfigHash, sqliteServiceConfigSchema,
-  sqliteUploadKey, sqliteVerifiedUploadSchema } from "@castloop/shared";
-import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteServiceConfig } from "@castloop/shared";
+  sqlitePublicationRequestSchema, sqlitePublicationStatusSchema, sqliteScheduleCancelSchema, sqliteScheduleRecordSchema,
+  sqliteScheduleTimeSchema, sqliteServiceConfigHash, sqliteServiceConfigSchema, sqliteUploadKey,
+  sqliteVerifiedUploadSchema } from "@castloop/shared";
+import type { SqlitePublicationRequest, SqlitePublicationStatus, SqliteScheduleRecord, SqliteScheduleTime,
+  SqliteServiceConfig } from "@castloop/shared";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import type { LocalJournalStorage } from "./local-journal-storage";
 import { completedDomainConfiguration } from "./sqlite-domain-local";
@@ -27,9 +29,13 @@ export const sqliteDraftAssetSchema = z.object({ upload: sqliteVerifiedUploadSch
   source_path: z.string().min(1).max(2048) }).strict();
 const publicationSchema = z.object({ request: sqlitePublicationRequestSchema, request_sha256: fields.service_config_sha256,
   status: sqlitePublicationStatusSchema.optional() }).strict();
+const scheduleSchema = z.object({ schedule_id: sqliteScheduleCancelSchema.shape.schedule_id,
+  request: sqlitePublicationRequestSchema, request_sha256: fields.service_config_sha256,
+  preview_sha256: fields.service_config_sha256, scheduled_at: sqliteScheduleTimeSchema,
+  status: sqliteScheduleRecordSchema.optional() }).strict();
 const recordSchema = z.object({ schema_version: z.union([z.literal(1), z.literal(2)]), protocol: z.literal(sqlitePublicationProtocol),
   service_id: fields.service_id, service_config_sha256: fields.service_config_sha256, target: sqliteDraftTargetSchema,
-  assets: z.array(sqliteDraftAssetSchema).max(2), publication: publicationSchema.optional(),
+  assets: z.array(sqliteDraftAssetSchema).max(2), publication: publicationSchema.optional(), schedule: scheduleSchema.optional(),
 }).strict().superRefine((value, context) => {
   const assets = value.assets.map((entry) => entry.upload.asset);
   if (new Set(assets).size !== assets.length || assets.includes("cover_jpg") && assets.includes("cover_png") ||
@@ -72,7 +78,29 @@ function checkedRecord(input: unknown): SqliteDraftRecord {
     }
     if (record.publication.status) requireSqliteStatus(request, record.publication.request_sha256, record.publication.status);
   }
+  if (record.schedule) {
+    const request = parseSqlitePublicationRequest(record.schedule.request), target = sqliteDraftRequestTarget(record.target);
+    if (request.action !== "publish" || request.service_id !== record.service_id || request.service_config_sha256 !== record.service_config_sha256 ||
+      Object.entries(target).some(([key, value]) => request[key as keyof SqlitePublicationRequest] !== value) ||
+      JSON.stringify(request.payloads) !== JSON.stringify(record.assets.map((entry) => entry.upload))) {
+      throw new Error("SQLite frozen schedule differs from its draft");
+    }
+    if (record.schedule.status) {
+      const status = record.schedule.status;
+      if (status.schedule_id !== record.schedule.schedule_id || status.request_id !== request.request_id ||
+        status.job_id !== request.job_id || status.request_sha256 !== record.schedule.request_sha256 ||
+        status.service_id !== record.service_id || status.show_id !== record.target.show_id) {
+        throw new Error("SQLite schedule status differs from its frozen draft");
+      }
+    }
+  }
+  if (record.publication && record.schedule) throw new Error("SQLite draft cannot freeze publication and schedule together");
   return record;
+}
+
+export function sqliteScheduleSettled(status: SqliteScheduleRecord | undefined): boolean {
+  return status?.state === "cancelled" || status?.state === "failed" ||
+    status?.state === "dispatched" && ["succeeded", "failed"].includes(status.publication_state ?? "");
 }
 
 export function sqliteDraftFileName(target: Pick<SqliteDraftTarget, "kind" | "show_id" | "episode_id">): string {
@@ -84,12 +112,30 @@ export async function readSqliteDraftRecord(root: string, config: SqliteServiceC
   try {
     const record = checkedRecord(createLocalJournalStorage(root, "sqlite-drafts", config.service_id, sqliteDraftFileName(target)).read());
     const permitted = record.service_config_sha256 === await sqliteServiceConfigHash(config) || allowCompletedDomainChange &&
-      ["succeeded", "failed"].includes(record.publication?.status?.state ?? "") && await completedDomainConfiguration(root, config, record.service_config_sha256);
+      (["succeeded", "failed"].includes(record.publication?.status?.state ?? "") || sqliteScheduleSettled(record.schedule?.status)) &&
+      await completedDomainConfiguration(root, config, record.service_config_sha256);
     if (record.service_id !== config.service_id || !permitted ||
       record.target.kind !== target.kind || record.target.show_id !== target.show_id || record.target.episode_id !== target.episode_id) throw new Error("SQLite draft identity differs");
     if (record.publication && await sqlitePublicationRequestHash(record.publication.request) !== record.publication.request_sha256) throw new Error("SQLite draft publication hash differs");
+    if (record.schedule && await sqlitePublicationRequestHash(record.schedule.request) !== record.schedule.request_sha256) throw new Error("SQLite draft schedule hash differs");
     return record;
   } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+}
+
+export async function readSqliteDraftBySchedule(root: string, config: SqliteServiceConfig, scheduleId: string): Promise<SqliteDraftRecord | null> {
+  sqliteScheduleCancelSchema.shape.schedule_id.parse(scheduleId);
+  ensureLocalJournalParents(root, "sqlite-drafts", config.service_id);
+  const folder = join(root, ".castloop", "sqlite-drafts", config.service_id);
+  let names: string[] = [];
+  try { names = readdirSync(folder).filter((name) => name.endsWith(".json")); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+  if (names.length > 10000) throw new Error("Draft inspection exceeds its local budget");
+  for (const name of names) {
+    const record = checkedRecord(createLocalJournalStorage(root, "sqlite-drafts", config.service_id, name).read());
+    if (record.service_id !== config.service_id || record.schedule?.schedule_id !== scheduleId) continue;
+    return readSqliteDraftRecord(root, config, record.target);
+  }
+  return null;
 }
 
 export async function readSqliteArchivedDraft(root: string, config: SqliteServiceConfig, jobId: string): Promise<SqliteDraftRecord | null> {
@@ -114,12 +160,16 @@ export async function openSqliteDraftJournal(root: string, input: SqliteServiceC
   storage.initialize(initial);
   const loadAny = async () => {
     const record = checkedRecord(storage.read());
-    const permitted = record.service_config_sha256 === hash || ["succeeded", "failed"].includes(record.publication?.status?.state ?? "") &&
+    const permitted = record.service_config_sha256 === hash ||
+      (["succeeded", "failed"].includes(record.publication?.status?.state ?? "") || sqliteScheduleSettled(record.schedule?.status)) &&
       await completedDomainConfiguration(root, config, record.service_config_sha256);
     if (record.service_id !== config.service_id || !permitted || record.target.kind !== target.kind ||
       record.target.show_id !== target.show_id || record.target.episode_id !== target.episode_id) throw new Error("SQLite draft belongs to another service or target");
     if (record.publication && record.publication.request_sha256 !== await sqlitePublicationRequestHash(record.publication.request)) {
       throw new Error("SQLite draft has a different frozen publication hash");
+    }
+    if (record.schedule && record.schedule.request_sha256 !== await sqlitePublicationRequestHash(record.schedule.request)) {
+      throw new Error("SQLite draft has a different frozen schedule hash");
     }
     return record;
   };
@@ -130,9 +180,9 @@ export async function openSqliteDraftJournal(root: string, input: SqliteServiceC
       if (JSON.stringify(existing.target) !== JSON.stringify(target)) throw new Error("Keep the unpublished draft's original target and base");
       return;
     }
-    if (!existing.publication?.status || !["succeeded", "failed"].includes(existing.publication.status.state)) {
-      throw new Error("An unpublished or uncertain SQLite draft already exists for this target");
-    }
+    const settled = existing.publication?.status ? ["succeeded", "failed"].includes(existing.publication.status.state) :
+      sqliteScheduleSettled(existing.schedule?.status);
+    if (!settled) throw new Error("An unpublished or uncertain SQLite draft already exists for this target");
     const archive = createLocalJournalStorage(root, "sqlite-publications", config.service_id, `${existing.target.job_id}.json`);
     archive.initialize(existing);
     if (JSON.stringify(checkedRecord(archive.read())) !== JSON.stringify(existing)) throw new Error("Preserve the different SQLite draft archive");
@@ -158,7 +208,9 @@ export function requireSettledSqliteDomainDrafts(root: string, config: SqliteSer
   if (names.length > 10000) throw new Error("Draft inspection exceeds its local budget");
   for (const name of names) {
     const record = checkedRecord(createLocalJournalStorage(root, "sqlite-drafts", config.service_id, name).read());
-    if (record.service_id !== config.service_id || !["succeeded", "failed"].includes(record.publication?.status?.state ?? "")) {
+    const settled = record.publication?.status ? ["succeeded", "failed"].includes(record.publication.status.state) :
+      sqliteScheduleSettled(record.schedule?.status);
+    if (record.service_id !== config.service_id || !settled) {
       throw new Error("Finish existing local drafts before changing the canonical origin; stale or uncertain inputs cannot be adopted");
     }
   }

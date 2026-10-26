@@ -6,7 +6,8 @@ import { sqliteAvailabilityActionSchema, sqliteAvailabilityRequestSchema } from 
 import { sqliteControlJournalSchema as controlSchema } from "./sqlite-control-journal";
 import { administratorKey } from "./administrator-key";
 import { SqliteDraft } from "./sqlite-draft";
-import { readSqliteArchivedDraft, readSqliteDraftRecord, requireSqliteStatus } from "./sqlite-draft-journal";
+import { readSqliteArchivedDraft, readSqliteDraftBySchedule, readSqliteDraftRecord, requireSqliteStatus,
+  sqliteScheduleSettled } from "./sqlite-draft-journal";
 import type { SqliteDraftTarget } from "./sqlite-draft-journal";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
@@ -28,6 +29,9 @@ import { sqliteDomainHostnameSchema } from "../../shared/src/sqlite-domain";
 import { completedDomainConfiguration } from "./sqlite-domain-local";
 import { executeRevision, previewRevision, readRevisionPlanFile, readRevisionStatus, syncLocalMetadata } from "./sqlite-revision-commands";
 import { exportPreviewRss } from "./preview-rss";
+import { SqliteScheduleClient } from "./sqlite-schedule-client";
+import { cancelSqliteSchedule, previewCancelSqliteSchedule, previewRescheduleSqliteSchedule,
+  rescheduleSqliteSchedule } from "./sqlite-schedule";
 import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -40,6 +44,7 @@ export type SqliteCommandOptions = { workerSource?: () => Promise<string>; trans
   verifyOptions?: { episodeId?: string };
   watchOptions?: { timeoutSeconds?: number; intervalSeconds?: number; signal?: AbortSignal };
   statsOptions?: { episodeId?: string; from?: string; to?: string; cursor?: string; retentionOperationId?: string };
+  scheduleOptions?: { at?: string; timezone?: string; expectVersion?: string; cursor?: string };
   parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "preview-show": [1], "preview-episode": [1],
@@ -57,6 +62,11 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   progress: [1], verify: [1], watch: [1],
   domain: [1, 2],
   stats: [1], "stats-retention": [2],
+  "preview-episode-schedule": [1], "schedule-episode": [1],
+  "preview-show-schedule": [1], "schedule-show": [1],
+  "schedule-list": [1], "schedule-status": [2],
+  "preview-schedule-reschedule": [2], "preview-schedule-cancel": [2], "preview-schedule-reapprove": [2],
+  "schedule-reschedule": [2], "schedule-cancel": [2], "schedule-reapprove": [2],
 };
 const registrationSchema = z.object({ service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/), show_id: z.string(), reservation_id: z.uuid(),
   phase: z.enum(["prepared", "requested", "registered"]) }).strict();
@@ -160,6 +170,45 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   }
   const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf,
     parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared };
+  if (command === "schedule-list" && args.length === 1) {
+    return new SqliteScheduleClient(config, key, options.transport).list(validateId(args[0], "show"), options.scheduleOptions?.cursor);
+  }
+  if (command === "schedule-status" && args.length === 2) {
+    return new SqliteScheduleClient(config, key, options.transport).status(validateId(args[0], "show"), z.uuid().parse(args[1]));
+  }
+  if (command === "preview-schedule-cancel" && args.length === 2) {
+    return previewCancelSqliteSchedule(config, key, validateId(args[0], "show"), z.uuid().parse(args[1]), options.transport);
+  }
+  if (command === "preview-schedule-reschedule" && args.length === 2) {
+    return previewRescheduleSqliteSchedule(root, config, key, validateId(args[0], "show"), z.uuid().parse(args[1]),
+      options.scheduleOptions?.at ?? "", options.scheduleOptions?.timezone, options.transport);
+  }
+  if (command === "preview-schedule-reapprove" && args.length === 2) {
+    const showId = validateId(args[0], "show"), scheduleId = z.uuid().parse(args[1]);
+    const retained = await readSqliteDraftBySchedule(root, config, scheduleId);
+    if (!retained || retained.target.show_id !== showId) throw new Error("Schedule reapproval preview requires the frozen local draft and uploaded assets");
+    const draft = await SqliteDraft.open(root, config, retained.target, draftOptions);
+    return draft.reapproveSchedulePlan({ at: options.scheduleOptions?.at ?? "", timezone: options.scheduleOptions?.timezone,
+      expectedVersion: z.number().int().positive().parse(Number(options.scheduleOptions?.expectVersion)) });
+  }
+  if (command === "schedule-cancel" && args.length === 2) {
+    return cancelSqliteSchedule(config, key, validateId(args[0], "show"), z.uuid().parse(args[1]),
+      z.number().int().positive().parse(Number(options.scheduleOptions?.expectVersion)), options.expectedPreview, options.transport);
+  }
+  if (command === "schedule-reschedule" && args.length === 2) {
+    return rescheduleSqliteSchedule(root, config, key, validateId(args[0], "show"), z.uuid().parse(args[1]),
+      options.scheduleOptions?.at ?? "", options.scheduleOptions?.timezone,
+      z.number().int().positive().parse(Number(options.scheduleOptions?.expectVersion)), options.expectedPreview, options.transport);
+  }
+  if (command === "schedule-reapprove" && args.length === 2) {
+    const showId = validateId(args[0], "show"), scheduleId = z.uuid().parse(args[1]);
+    const retained = await readSqliteDraftBySchedule(root, config, scheduleId);
+    if (!retained || retained.target.show_id !== showId) throw new Error("Schedule reapproval requires the frozen local draft and uploaded assets");
+    const draft = await SqliteDraft.open(root, config, retained.target, draftOptions);
+    return draft.reapproveSchedule({ at: options.scheduleOptions?.at ?? "", timezone: options.scheduleOptions?.timezone,
+      expectedVersion: z.number().int().positive().parse(Number(options.scheduleOptions?.expectVersion)),
+      expectedPreview: options.expectedPreview });
+  }
   if (command === "init-reconcile" && args.length === 1) return reconcileSqliteInitialization(root, config, args[0], cf);
   if (command === "init-continue-verification" && args.length === 1 && options.workerSource) return continueSqliteInitialization(root, config, args[0], await options.workerSource(), cf);
   if (command === "update-service" && args.length === 1 && options.workerSource) return updateSqliteService(root, config, args[0], await options.workerSource(), cf);
@@ -269,6 +318,24 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     }
     throw new Error("No matching SQLite job journal");
   }
+  const schedulePreview = ["preview-episode-schedule", "preview-show-schedule"].includes(command);
+  const scheduleCreate = ["schedule-episode", "schedule-show"].includes(command);
+  if (schedulePreview || scheduleCreate) {
+    const showKind = ["preview-show-schedule", "schedule-show"].includes(command);
+    const targetId = { kind: showKind ? "show" as const : "episode" as const, show_id: validateId(args[0], "show"),
+      ...(showKind ? {} : { episode_id: validateId(args[1], "episode") }) };
+    const retained = await readSqliteDraftRecord(root, config, targetId);
+    if (!retained) throw new Error("Stage the current local inputs explicitly before scheduling");
+    if (retained.publication) throw new Error("SQLite publication request is already frozen");
+    if (retained.schedule) {
+      const previous = await (await SqliteDraft.open(root, config, retained.target, draftOptions)).observeSchedule();
+      if (sqliteScheduleSettled(previous.schedule)) throw new Error("This draft's schedule finished; prepare a new draft before scheduling again");
+    }
+    const draft = await SqliteDraft.open(root, config, retained.target, draftOptions);
+    if (schedulePreview) return draft.schedulePlan(options.scheduleOptions?.at ?? "", options.scheduleOptions?.timezone);
+    return draft.schedule({ at: options.scheduleOptions?.at ?? "", timezone: options.scheduleOptions?.timezone,
+      expectedPreview: options.expectedPreview });
+  }
   const showCommand = ["update-show", "publish-show"].includes(command), episodeCommand = ["update-episode", "update-episode-audio", "publish-episode"].includes(command);
   if (!showCommand && !episodeCommand) throw new Error(`Command ${command} is not implemented for sqlite-sequential-v1; no legacy fallback`);
   if (args.length !== (showCommand ? 1 : command === "update-episode-audio" ? 3 : 2) && !(command === "publish-episode" && args.length === 3)) throw new Error("Invalid SQLite content command arguments");
@@ -276,6 +343,21 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     ...(episodeCommand ? { episode_id: validateId(args[1], "episode") } : {}) };
   const publishing = command.startsWith("publish-");
   let retained = await readSqliteDraftRecord(root, config, targetId, !publishing);
+  if (retained?.schedule) {
+    const schedule = retained.schedule;
+    let status;
+    if (retained.service_config_sha256 !== await sqliteServiceConfigHash(config)) {
+      const historical = await completedDomainConfiguration(root, config, retained.service_config_sha256);
+      if (!historical) throw new Error("No exact completed domain transition permits archiving the old schedule");
+      status = await new SqliteScheduleClient(historical, key, options.transport).status(retained.target.show_id, schedule.schedule_id);
+    } else {
+      status = await (await SqliteDraft.open(root, config, retained.target, draftOptions)).observeSchedule();
+    }
+    if (!sqliteScheduleSettled(status.schedule)) {
+      throw new Error("Schedule remains open or uncertain; inspect it without replacing the draft");
+    }
+    retained = null;
+  }
   if (retained?.publication && !publishing) {
     let status;
     if (retained.service_config_sha256 !== await sqliteServiceConfigHash(config)) {

@@ -3,7 +3,7 @@
 作成・改訂日: 2026-10-25。**Issue #70の第1段となる最小限実装。案Bとサイト方式の2択を採用し、CLI・Show DO・Workerへ接続した開発版**。全公開経路の接続と検証を§13に記録する。見栄え・日時表示などの改善は後続とし、Issue全体の完了とは扱わない。本設計だけでは実Cloudflare操作の承認にならない。
 
 - 対象: [Issue #70](https://github.com/simosako/castloop-v2/issues/70)。Issue本文・コメントを確認した。確認時点でコメントはない。
-- 改訂時の調査基準: `1d53d0e330d719b6895ddeaf60b7e3143d0103e6`、package version `0.7.5`。main同期後の公開内容取得・revision採用も含む。基準版の内部queue/content形式は7/8。今回の実装は8/9のfresh環境専用とし、旧環境は変換しない。
+- 改訂時の調査基準: `1d53d0e330d719b6895ddeaf60b7e3143d0103e6`、package version `0.7.5`。main同期後の公開内容取得・revision採用も含む。基準版の内部queue/content形式は7/8。今回の実装はfresh環境専用とし、旧環境は変換しない。Issue #65の予約表追加後はqueue/content **9/9**（queue `9` は予約表を含む）。
 - 当初は実装・ローカル検証だけを対象とした。その後、別途明示承認された専用環境で非公開試験を実施した（§13.3）。この承認を他環境の配備・公開・Resume・資源／domain／権限／課金設定変更へ流用しない。
 
 ## 1. 採用方針の要約
@@ -470,7 +470,7 @@ Show metadataの設定、内部形式・health識別、SQLの生成索引、正�
 | Alarm継続 | `publication_jobs.continuation_ready`を正常batch完了と次回Alarm予約と一緒に保存。claim時に0へ戻してdurability確認後にIOする。0のままのrunningは中断としてblocked。domain専用operationも独立したmarkerを持つ。各batchで全Episodeを再parse／sortしない |
 | 原子的な公開 | `src/site-publication.ts`が既存executorを接続。必要なHTML・既存公開保存・media purge・site purgeが確認済みの場合だけ、既存queue完了transaction内でFeedとサイト参照を切り替える。通常job・domainともentrypointごとのpurge成功を別々のflagへ保存する。未知結果は再送しない |
 | 配信 | HTML専用`src/site-gateway.ts`と`SiteCachedPages`。同Show DOの最新gateを先に評価し、サイト全体のFeed世代と参照を照合する。R2からstreamし、HEAD／条件付き応答・security headerを維持。内部tag・認証・cookieを外へ持ち出さない |
-| readiness・形式 | 既存とHTMLの両cache entrypointのversion/config・cache有効状態とpurgeを検査。内部queue/content **8/9**、health／inspectionに必須`website="static-show-v1"`。旧形式は拒否し、移行しない。既存class/binding/dateは維持 |
+| readiness・形式 | 既存とHTMLの両cache entrypointのversion/config・cache有効状態とpurgeを検査。内部queue/content **9/9**（queue `9` はIssue #65の予約表を含む）、health／inspectionに必須`website="static-show-v1"`。旧形式は拒否し、移行しない。既存class/binding/dateは維持 |
 | 公開経路 | Show/Episodeの公開・更新、非公開化・復元、保存revision採用、RSS逐次公開、domain再生成へ接続。builtin/external切替も明示Show公開として扱う。RSSの紹介linkはbuiltinだけ内蔵URLへ変える |
 
 閲覧要求ではHTML生成、全metadata parse、全Episode走査をしない。最初の入力検証・凍結と最終の既存公開検証には既存の全体予算を維持する。HTML候補と凍結元も保存量・SQL消費へ算入する。一般的なretry／workflow基盤や別生成DOは追加しない。

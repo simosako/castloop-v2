@@ -4,11 +4,20 @@
 
 1. workspace、Show、未完了操作と`show-status`を確認する。既存Showが公開済み・openであることが前提。毎回Pause/Resume/deployしない。
 2. ID、タイトル、説明、日時・タイムゾーン、MP3、任意項目を管理者に確認する。
-3. `create-episode ID --workspace PATH --show SHOW --non-interactive --json`。生成済みGUIDを保持してTOMLを編集する。未来日時は予約配信ではない。
+3. `create-episode ID --workspace PATH --show SHOW --non-interactive --json`。生成済みGUIDを保持してTOMLを編集する。未来の`published_at`は予約配信ではない。予約する場合は下記のscheduleコマンドを使う。
 4. `validate episode ABSOLUTE_TOML --audio ABSOLUTE_MP3 --json`。MP3は300,000,000 bytes以下。
 5. `update-episode ID --workspace PATH --show SHOW --json`と`update-episode-audio ID ABSOLUTE_MP3 --workspace PATH --show SHOW --json`で同じdraftにstageする。まだ公開されない。
 6. `preview-episode ID --workspace PATH --show SHOW --json`で対象・metadata・素材hash・base・未stage変更を確認する。`input_fingerprint`と内容について管理者の承認を得る。
 7. `publish-episode ID --workspace PATH --show SHOW --expect-preview HASH --json`。承認後の変更は再preview・再確認する。同じjobの`succeeded`が公開完了。queued/runningは待機中。
+
+## 予約公開
+
+1. `update-*`で対象metadata／音源を同じdraftへstageする。予約はcreate／uploadを暗黙に行わない。
+2. `preview-episode-schedule ID --workspace PATH --show SHOW --at DATETIME [--timezone ZONE] --json`（Showは`preview-show-schedule SHOW ...`）。対象、素材hash、公開済みbase、現地日時／UTC、`approval_sha256`を確認する。未来日時はサーバー時刻でも判定される。
+3. 管理者の承認後、`schedule-episode ID ... --at ... --expect-preview HASH --json`（Showは`schedule-show`）。`scheduled`は受付であり公開成功ではない。CLIは待機せずschedule IDを返す。
+4. `schedule-list SHOW --workspace PATH --json`と`schedule-status SHOW SCHEDULE_UUID --workspace PATH --json`で観測する。`state`と`publication_state`を分け、`dispatched`や`queued`を公開成功として扱わない。公開完了は`publication_state="succeeded"`。
+5. 日時変更は`preview-schedule-reschedule`→`schedule-reschedule`、取消は`preview-schedule-cancel`→`schedule-cancel`。どちらもFIFO投入前だけ。Pause／受付停止／保守／runtime/base変更で`needs_approval`になった場合は、`preview-schedule-reapprove ... --expect-version N`で現在条件を再確認し、`schedule-reapprove ... --expect-version N --expect-preview HASH`で再承認する。Resumeや保守解除だけで自動再開しない。
+6. 予約実行日時は`published_at`と別。予約公開はRSSの日時を書き換えない。隔離したfresh環境で3 Episodeの予定前未配信・予定後配信は確認済みだが、Pause/再承認・取消・Alarm再配送は未確認。未確認経路をローカル試験の成功から推測しない。
 
 ## 通常更新
 
@@ -39,4 +48,4 @@
 
 ## 開発版の日時preview
 
-`preview-schedule-time DATETIME --workspace PATH [--timezone IANA_ZONE] --json`はローカルの日時変換のみ。upload・予約・公開・サーバー時刻／readinessの検証は行わない。任意の`castloop-admin.toml`は`schema_version = 1`と`timezone`を受け付け、未指定ならサーバー基準UTCを使う。明示offsetが絶対時刻を決め、併用した`--timezone`はそのoffsetと一致する必要がある。存在しない／二重となるDST日時を勝手に解決しない。サーバー予約は未実装であり、未来の`published_at`も即時公開を遅らせない。このpreviewを予約受付・公開承認の証拠にしない。
+`preview-schedule-time DATETIME --workspace PATH [--timezone IANA_ZONE] --json`はローカルの日時変換のみ。upload・予約・公開・サーバー時刻／readinessの検証は行わない。任意の`castloop-admin.toml`は`schema_version = 1`と`timezone`を受け付け、未指定ならサーバー基準UTCを使う。明示offsetが絶対時刻を決め、併用した`--timezone`はそのoffsetと一致する必要がある。存在しない／二重となるDST日時を勝手に解決しない。予約は`preview-episode-schedule`／`schedule-episode`等の別コマンドで行い、未来の`published_at`だけでは公開を遅らせない。この変換previewを予約受付・公開承認の証拠にしない。

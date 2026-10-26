@@ -2,7 +2,7 @@
 
 Issue #70の**第1段となる最小限実装**。まず番組紹介・Episode一覧・ブラウザ標準プレイヤーを提供し、見栄えや日時表示などの改善は後続で行う。Issue全体の完了を意味しない。
 
-新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。内部queue/content形式は**8/9**、healthとinspectionの必須識別は`website="static-show-v1"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。既存環境のDB変換・移行・資源採用は提供しない。
+新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。内部queue/content形式は**9/9**（queue `9` はIssue #65の予約表を含む）、healthとinspectionの必須識別は`website="static-show-v1"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。既存環境のDB変換・移行・資源採用は提供しない。
 
 ## サイト方式を選ぶ
 
