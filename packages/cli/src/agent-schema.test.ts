@@ -8,6 +8,8 @@ test("embedded schemas retain strict keys and measured constraints", () => {
     expect(inputSchema(name)).toMatchObject({ additionalProperties: false, "x-castloop-contract-version": 1 });
   }
   expect(JSON.stringify(inputSchema("show-input"))).toContain("utf8_bytes");
+  expect(inputSchema("show-input")).toMatchObject({ properties: { site_timezone: { type: "string", maxLength: 128 } } });
+  expect(JSON.stringify(inputSchema("show-input"))).toContain("supported IANA time zone name");
   expect(() => inputSchema("unknown")).toThrow();
 });
 

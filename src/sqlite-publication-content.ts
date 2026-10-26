@@ -105,8 +105,10 @@ export class SqlitePublicationContent {
       if (!site.enabled || page.kind === "listing" && page.page > site.pages) return { status: 404 };
       let episodeGeneration: number | undefined;
       if (page.kind === "episode") {
+        const episodeId = this.sites.ids.episode(page.showId, page.siteId);
+        if (!episodeId) return { status: 404 };
         const episode = this.storage.sql.exec<EpisodeRow>("SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?",
-          page.showId, page.episodeId).toArray()[0];
+          page.showId, episodeId).toArray()[0];
         if (!episode || episode.lifecycle === "unpublished") return { status: 404 };
         if (episode.lifecycle === "deleted") return { status: 410 };
         episodeGeneration = episode.lifecycle_version;
@@ -177,6 +179,18 @@ export class SqlitePublicationContent {
       }
       return { show, episode, base, showRevision };
     });
+  }
+
+  matchesScheduledTarget(input: SqlitePublicationRequest): boolean {
+    const request = parseSqlitePublicationRequest(input);
+    if (request.action !== "publish") return false;
+    const target = this.inspect(request.show_id, request.episode_id);
+    if (!target.show || target.show.state_version !== request.expected_show_state_version) return false;
+    if (request.kind === "show") return ["draft", "published"].includes(target.show.lifecycle);
+    return target.show.lifecycle === "published" &&
+      (request.base_revision_id === undefined ? target.episode === null :
+        target.episode?.lifecycle === "published" && target.episode.revision_id === request.base_revision_id &&
+        target.episode.lifecycle_version === request.expected_episode_lifecycle_version);
   }
 
   currentShowRevision(showId: string, baseUrl: string): SqliteShowRevisionRecord | null {

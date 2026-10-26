@@ -1,6 +1,6 @@
 import { sha256Hex, toHex } from "../packages/shared/src/sha256";
 import { validateId } from "../packages/shared/src/ids";
-import { siteSnapshotKey } from "../packages/shared/src/website";
+import { siteSnapshotKey, SITE_ID_PATTERN } from "../packages/shared/src/website";
 import type { SitePage } from "../packages/shared/src/website";
 import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
 import { SITE_HTML_LIMIT_BYTES, siteContentSecurityPolicy } from "./site-renderer";
@@ -23,12 +23,12 @@ export async function persistSitePage(bucket: Pick<SqlitePublicationBucket, "put
   return { page, props: { ...identity, generation, sha256, lengthBytes: bytes.length } };
 }
 
-export type SitePurgeTarget = { showId: string; episodeId?: string };
+export type SitePurgeTarget = { showId: string; siteId?: string };
 export function sitePurgeTags(target: SitePurgeTarget): string[] {
   validateId(target.showId, "show");
-  if (target.episodeId === undefined) return [`site-${target.showId}`];
-  validateId(target.episodeId, "episode");
-  return [`site-list-${target.showId}`, `site-episode-${target.showId}/${target.episodeId}`];
+  if (target.siteId === undefined) return [`site-${target.showId}`];
+  if (!SITE_ID_PATTERN.test(target.siteId)) throw new Error("Invalid Episode site ID");
+  return [`site-list-${target.showId}`, `site-episode-${target.showId}/${target.siteId}`];
 }
 
 export async function purgeSitePages(cache: Pick<CacheContext, "purge">, target: SitePurgeTarget): Promise<void> {

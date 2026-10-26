@@ -16,7 +16,8 @@ const terminal = (state: string) => ["succeeded", "failed", "cancelled"].include
 
 export class SqliteOperationRecords {
   constructor(private readonly storage: PublicationQueueStorage, private readonly identity: () => SqlitePublicationRuntime,
-    private readonly validateTarget: (target: Target) => boolean = () => true, private readonly now: () => number = Date.now) {
+    private readonly validateTarget: (target: Target) => boolean = () => true, private readonly now: () => number = Date.now,
+    private readonly hasScheduledJob: (jobId: string) => boolean = () => false) {
     storage.transactionSync(() => {
       if (storage.sql.exec<{ foreign_keys: number }>("PRAGMA foreign_keys").toArray()[0]?.foreign_keys !== 1) {
         throw new Error("Operation records require SQLite foreign keys");
@@ -215,7 +216,8 @@ export class SqliteOperationRecords {
   }
 
   private hasPublication(jobId: string) {
-    return this.storage.sql.exec("SELECT job_id FROM publication_jobs WHERE job_id = ?", jobId).toArray().length > 0;
+    return this.storage.sql.exec("SELECT job_id FROM publication_jobs WHERE job_id = ?", jobId).toArray().length > 0 ||
+      this.hasScheduledJob(jobId);
   }
 
   publicationAccepted(request: SqlitePublicationRequest, hash: string, source: OperationClient, invocation: string) {

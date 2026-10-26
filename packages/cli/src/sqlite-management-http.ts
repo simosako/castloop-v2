@@ -59,6 +59,7 @@ function readPath(path: string): boolean {
   if (new RegExp(`^/admin/sqlite-stats/retention/${uuid}$`, "i").test(path)) return true;
   if (/^\/admin\/sqlite-service\/registrations\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) && path.slice("/admin/sqlite-service/registrations/".length).length <= 32) return true;
   if (path === "/admin/sqlite-operations/list" || new RegExp(`^/admin/sqlite-operations/(?:(?:cleanup|requests)/)?${uuid}$`, "i").test(path)) return true;
+  if (path === "/admin/sqlite-schedules" || new RegExp(`^/admin/sqlite-schedules/${uuid}$`, "i").test(path)) return true;
   if (new RegExp(`^/admin/(?:sqlite-publication/jobs|sqlite-service/update-status|sqlite-service/domain-status|sqlite-service/controls)/${uuid}$`, "i").test(path)) return true;
   for (const prefix of ["/admin/sqlite-service/targets/", "/admin/sqlite-service/content/"]) {
     if (path.startsWith(prefix)) {
@@ -94,7 +95,9 @@ export async function readSqliteManagementGet(url: URL, headers: HeadersInit, op
   const domainQuery = url.pathname.startsWith("/admin/sqlite-service/domain-status/") && [...url.searchParams.keys()].every((key) => key === "after") && url.searchParams.getAll("after").length <= 1;
   const statsQuery = url.pathname.startsWith("/admin/sqlite-stats/") && [...url.searchParams.keys()].every((key) => ["from", "to", "cursor"].includes(key)) &&
     ["from", "to", "cursor"].every((key) => url.searchParams.getAll(key).length <= 1);
-  if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") && !domainQuery && !statsQuery || url.hash || !readPath(url.pathname) ||
+  const scheduleQuery = url.pathname === "/admin/sqlite-schedules" && [...url.searchParams.keys()].every((key) => key === "after") &&
+    url.searchParams.getAll("after").length <= 1;
+  if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") && !domainQuery && !statsQuery && !scheduleQuery || url.hash || !readPath(url.pathname) ||
     !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 ||
     maximum > (url.pathname.startsWith("/admin/sqlite-service/content/") || url.pathname.startsWith("/admin/sqlite-service/revisions/") ||
       url.pathname.startsWith("/admin/sqlite-service/content-inventory/") ? 8_388_608 : 65536)) throw new Error("Invalid bounded SQLite management GET");

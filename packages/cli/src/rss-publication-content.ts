@@ -3,6 +3,7 @@ import { sitePageUrl } from "../../shared/src/website";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { readLocalMetadata } from "./local-metadata-read";
+import { readShowPublicationInput } from "./show-publication-input";
 import { parseRssImportFeed } from "./rss-import-feed";
 import type { PreparedRssImport } from "./rss-import-preflight";
 import { randomUUID } from "node:crypto";
@@ -11,7 +12,8 @@ import { resolve } from "node:path";
 
 export async function writeImportedMetadata(source: string, target: string, expected: object): Promise<void> {
   const bytes = await readLocalMetadata(source);
-  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+    target.endsWith("show.toml") ? await readShowPublicationInput(source) : bytes);
   const actual = target.endsWith("show.toml") ? parseShowMetadata(text) : parseEpisodeDraft(text);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error("Import metadata changed after publication preparation");
   const temporary = `${target}.${randomUUID()}.tmp`;

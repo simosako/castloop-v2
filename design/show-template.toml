@@ -15,5 +15,7 @@ image_path = "cover.jpg"
 # Optional fields
 # copyright = "Copyright 2026 Taro Yamada"
 # show_type = "episodic"
+# Builtin websites: set site_mode = "builtin" and remove site_url.
+# site_timezone = "Asia/Tokyo" # Optional builtin website date display; default UTC.
 
 # public_base_url belongs in the service config, not in this file.

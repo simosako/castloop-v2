@@ -11,8 +11,11 @@ import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucke
 import { createHash } from "node:crypto";
 
 const origin = "https://podcast.example.com";
+const shortId = (id: string) => createHash("sha256").update(id).digest("hex").slice(0, 16);
 const input = { origin, coverExtension: "jpg" as const, show: { show_id: "daily", title: "番組", description: "紹介",
-  language: "ja", author: "著者", owner_email: "private@example.com", image_path: "local-cover.jpg" } };
+  language: "ja", author: "著者", owner_email: "private@example.com", image_path: "local-cover.jpg" },
+  episodeSiteIds: Object.fromEntries(["first", "offset", "old", "z", "a-b", "a",
+    ...Array.from({ length: 21 }, (_, index) => `ep-${String(index).padStart(2, "0")}`)].map((id) => [id, shortId(id)])) };
 const audioId = "00000000-0000-4000-8000-000000000001";
 function episode(id = "first", date = "2026-10-25T00:00:00Z"): EpisodeRevision {
   return { schema_version: 1, episode_id: id, title: id, description: "説明", guid: `guid-${id}`, published_at: date,
@@ -33,15 +36,65 @@ test("site choices are strict and external URLs cannot carry executable schemes 
     { site_mode: "builtin", unknown: true }]) expect(() => parse(value)).toThrow();
 });
 
+test("website timezone accepts supported regional names or UTC only for builtin Shows", () => {
+  const metadata = { ...input.show, schema_version: 1, owner_name: "Owner", categories: ["Technology"],
+    explicit: false, site_mode: "builtin" };
+  expect(showMetadataSchema.parse(metadata).site_timezone).toBeUndefined();
+  for (const site_timezone of ["UTC", "Asia/Tokyo", "America/New_York", "Asia/Kathmandu"]) {
+    expect(showMetadataSchema.parse({ ...metadata, site_timezone }).site_timezone).toBe(site_timezone);
+  }
+  for (const site_timezone of ["JST", "EST", "+09:00", "Asia/Unknown", "", " Asia/Tokyo", null, 9]) {
+    expect(() => showMetadataSchema.parse({ ...metadata, site_timezone })).toThrow();
+  }
+  for (const site_mode of ["external", undefined]) {
+    expect(() => showMetadataSchema.parse({ ...metadata, site_mode, site_url: "https://example.com", site_timezone: "UTC" })).toThrow();
+  }
+});
+
+test("website dates use the Show timezone on lists and full pages without changing instants, URLs or ordering", () => {
+  const revisions = [episode("first", "2025-12-16T22:00:00Z"), episode("offset", "2025-12-17T07:30:00+09:00")];
+  const before = JSON.stringify(revisions), local = { ...input, show: { ...input.show, site_timezone: "Asia/Tokyo" } };
+  const listing = renderSiteListing(local, revisions, 1);
+  expect(listing.match(/2025-12-17 \(UTC\+09:00\)/g)).toHaveLength(2);
+  expect(listing.indexOf('id="episode-offset-title"')).toBeLessThan(listing.indexOf('id="episode-first-title"'));
+  for (const revision of revisions) {
+    const html = renderSiteEpisode(local, revision);
+    expect(html).toContain(`datetime="${revision.published_at}">2025-12-17 (UTC+09:00)</time>`);
+    expect(html).toContain(`rel="canonical" href="${origin}/podcasts/daily/${shortId(revision.episode_id)}/"`);
+    expect(html).not.toContain("<script");
+  }
+  expect(renderSiteEpisode(input, revisions[0])).toContain("2025-12-16 (UTC+00:00)");
+  expect(JSON.stringify(revisions)).toBe(before);
+});
+
+test("website offsets follow each publication instant including DST and non-hour timezones", () => {
+  for (const [site_timezone, date, display] of [
+    ["America/New_York", "2026-03-08T06:59:59Z", "2026-03-08 (UTC-05:00)"],
+    ["America/New_York", "2026-03-08T07:00:00Z", "2026-03-08 (UTC-04:00)"],
+    ["America/New_York", "2026-11-01T05:30:00Z", "2026-11-01 (UTC-04:00)"],
+    ["America/New_York", "2026-11-01T06:30:00Z", "2026-11-01 (UTC-05:00)"],
+    ["America/Los_Angeles", "2026-01-01T01:00:00Z", "2025-12-31 (UTC-08:00)"],
+    ["Asia/Kathmandu", "2025-12-31T18:30:00Z", "2026-01-01 (UTC+05:45)"],
+    ["Etc/GMT+12", "2026-01-01T01:00:00Z", "2025-12-31 (UTC-12:00)"],
+  ]) {
+    const local = { ...input, show: { ...input.show, site_timezone } }, revision = episode("first", date);
+    expect(renderSiteListing(local, [revision], 1)).toContain(display);
+    expect(renderSiteEpisode(local, revision)).toContain(display);
+  }
+});
+
 test("site paths allow only canonical Show pages, numbered listings and stable Episode pages", () => {
   for (const page of [{ kind: "listing" as const, showId: "daily", page: 1 }, { kind: "listing" as const, showId: "daily", page: 2 },
-    { kind: "episode" as const, showId: "daily", episodeId: "first" }]) {
+    ...[16, 20, 64].map((length) => ({ kind: "episode" as const, showId: "daily", siteId: "a".repeat(length) }))]) {
     expect(parseSitePagePath(sitePagePath(page))).toEqual(page);
     expect(siteSnapshotKey(page, 3)).toStartWith("public/podcasts/daily/sites/3/");
   }
   for (const path of ["/", "/admin/", "/system/x", "/staging/x", "/podcasts/daily", "/podcasts/daily/page/1/",
     "/podcasts/daily/page/0/", "/podcasts/daily/page/02/", "/podcasts/daily/page/9007199254740992/",
-    "/podcasts/daily/sites/1/index.html", "/podcasts/daily/episodes/first/metadata.toml", "/podcasts/daily/episodes/%66irst/"])
+    "/podcasts/daily/sites/1/index.html", "/podcasts/daily/episodes/first/metadata.toml", "/podcasts/daily/episodes/%66irst/",
+    "/podcasts/daily/episodes/first/", "/podcasts/daily/e/0123456789abcdef/", "/podcasts/daily/first/",
+    ...[15, 17, 19, 65].map((length) => `/podcasts/daily/${"a".repeat(length)}/`),
+    "/podcasts/daily/0123456789abcdeF/", "/podcasts/daily/%610123456789abcde/"])
     expect(parseSitePagePath(path)).toBeNull();
   expect(() => siteSnapshotKey({ kind: "listing", showId: "../private", page: 1 }, 1)).toThrow();
   expect(() => siteSnapshotKey({ kind: "listing", showId: "daily", page: 1 }, 0)).toThrow();
@@ -91,14 +144,50 @@ test("HTML and attributes escape imported text; rich HTML and inline handlers ne
   expect(() => renderSiteEpisode(input, { ...episode(), enclosure_url: `${episode().enclosure_url}?secret=x` })).toThrow();
 });
 
+test("description links lead to existing full pages, without enclosing the native player", () => {
+  const description = `<p>${"日😀".repeat(81)}</p><p>次の段落<br>全文の最後</p>`;
+  const revision = { ...episode(), description };
+  const before = JSON.stringify(revision);
+  const html = renderSiteListing(input, [revision], 1);
+  expect(html).toContain(`<a class="cl-description-link" href="/podcasts/daily/${shortId("first")}/">${"日😀".repeat(80)}… <span class="cl-read-more">全文を読む</span></a>`);
+  expect(html).not.toContain("全文の最後");
+  expect(html).toContain('</a></p><audio controls preload="none"');
+  const full = renderSiteEpisode(input, revision);
+  expect(full).toContain(`<div class="cl-description cl-description-full">${description}</div>`);
+  expect(full).toContain(`<meta name="description" content="${"日😀".repeat(80)}…">`);
+  expect(JSON.stringify(revision)).toBe(before);
+  expect(renderSiteListing(input, [{ ...revision, description: "<img src=x>" }], 1)).not.toContain('class="cl-description-link"');
+  const show = renderSiteListing({ ...input, show: { ...input.show, description: "<p>番組<br>紹介 &amp; 補足</p>" } }, [], 1);
+  expect(show).toContain('<div class="cl-description cl-description-full"><p>番組<br>紹介 &amp; 補足</p></div>');
+  expect(show).toContain('<meta name="description" content="番組 紹介 &amp; 補足">');
+});
+
 test("Episode URLs stay fixed on metadata and audio revisions while approved MP3 references change", () => {
   const before = renderSiteEpisode(input, episode());
   const nextId = "00000000-0000-4000-8000-000000000002";
   const after = renderSiteEpisode(input, { ...episode(), title: "改訂", revision_id: nextId,
     enclosure_url: episode().enclosure_url.replace(audioId, nextId) });
-  for (const html of [before, after]) expect(html).toContain(`rel="canonical" href="${origin}/podcasts/daily/episodes/first/"`);
+  for (const html of [before, after]) expect(html).toContain(`rel="canonical" href="${origin}/podcasts/daily/${shortId("first")}/"`);
   expect(before).toContain(`${audioId}.mp3`);
   expect(after).toContain(`${nextId}.mp3`);
+});
+
+test("site pages omit the copyright footer, retain the Show author, and link full descriptions only", () => {
+  const description = '<p>資料 https://example.com/info <a href="http://example.org/docs">詳しく読む</a></p>';
+  const show = { ...input.show, copyright: "Copyright Owner", description };
+  const revision = { ...episode(), description }, before = JSON.stringify({ show, revision });
+  const listing = renderSiteListing({ ...input, show }, [revision], 1);
+  const full = renderSiteEpisode({ ...input, show }, revision);
+  for (const html of [listing, full]) {
+    expect(html).not.toContain("<footer");
+    expect(html).not.toContain("Copyright Owner");
+    expect(html).toContain('<a href="https://example.com/info">https://example.com/info</a>');
+    expect(html).toContain('<a href="http://example.org/docs">詳しく読む</a>');
+    expect(html).toContain('<meta name="description" content="資料 https://example.com/info 詳しく読む">');
+  }
+  expect(listing).toContain('<p class="cl-author">著者</p>');
+  expect(listing).toContain(`<a class="cl-description-link" href="/podcasts/daily/${shortId("first")}/">資料 https://example.com/info 詳しく読む <span`);
+  expect(JSON.stringify({ show, revision })).toBe(before);
 });
 
 test("CSP hashes exactly the fixed stylesheet and rejects header injection", async () => {
@@ -107,6 +196,24 @@ test("CSP hashes exactly the fixed stylesheet and rejects header injection", asy
   expect(siteContentSecurityPolicy(hash)).toContain(`style-src 'sha256-${hash}'`);
   expect(siteContentSecurityPolicy(hash)).toContain("script-src 'none'");
   expect(() => siteContentSecurityPolicy("' unsafe-inline")).toThrow();
+});
+
+test("custom CSS follows the default style and has an exact per-page CSP hash", async () => {
+  const css = ":root{--cl-accent:#882244}\n.cl-episode{border-radius:0}";
+  const html = renderSiteListing({ ...input, show: { ...input.show, site_css: css } }, [episode()], 1);
+  expect(html).toContain(`<style>${SITE_CSS}\n${css}</style>`);
+  const hash = await siteCssHash(css);
+  expect(hash).toBe(createHash("sha256").update(`${SITE_CSS}\n${css}`).digest("base64"));
+  expect(hash).not.toBe(await siteCssHash());
+  expect(html).toContain('class="cl-site cl-page-list"');
+  expect(html).toContain('class="cl-player"');
+  expect(renderSiteEpisode(input, episode("offset", "2026-10-26T01:00:00+09:00"))).toContain("2026-10-25 (UTC+00:00)");
+  for (const css of ["a".repeat(65_537), "\u0000", "\r", "\ud800", "/* </STYLE> */"]) {
+    expect(() => renderSiteListing({ ...input, show: { ...input.show, site_css: css } }, [], 1)).toThrow();
+  }
+  const boundary = "/*" + "あ".repeat(21_844) + "*/";
+  expect(Buffer.byteLength(boundary)).toBe(65_536);
+  expect(renderSiteListing({ ...input, show: { ...input.show, site_css: boundary } }, [], 1)).toContain(boundary);
 });
 
 async function cachedFixture() {
@@ -192,12 +299,12 @@ test("oversized HTML is rejected before PUT and uncertain writes are never repla
 
 test("site purge targets do not include Feed tags and unconfirmed purge cannot succeed", async () => {
   expect(sitePurgeTags({ showId: "daily" })).toEqual(["site-daily"]);
-  expect(sitePurgeTags({ showId: "daily", episodeId: "first" })).toEqual(["site-list-daily", "site-episode-daily/first"]);
+  expect(sitePurgeTags({ showId: "daily", siteId: shortId("first") })).toEqual(["site-list-daily", `site-episode-daily/${shortId("first")}`]);
   let count = 0;
   await expect(purgeSitePages({ purge: async () => { count++; return { success: false, errors: [] }; } }, { showId: "daily" })).rejects.toThrow();
   expect(count).toBe(1);
   await purgeSitePages({ purge: async (target) => {
-    expect(target).toEqual({ tags: ["site-list-daily", "site-episode-daily/first"] });
+    expect(target).toEqual({ tags: ["site-list-daily", `site-episode-daily/${shortId("first")}`] });
     return { success: true, errors: [] };
-  } }, { showId: "daily", episodeId: "first" });
+  } }, { showId: "daily", siteId: shortId("first") });
 });

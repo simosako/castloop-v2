@@ -3,13 +3,15 @@ import { parseSqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { parseAdminConfig } from "../../shared/src/admin-config";
 import { AgentError } from "./agent-output";
 import { readLocalMetadata } from "./local-metadata-read";
+import { readShowPublicationInput } from "./show-publication-input";
 import { analyzeAudio } from "./audio";
 import { inspectLocalStagingSource } from "./staging-sources";
 import { z } from "zod";
 import { dirname, resolve } from "node:path";
 
 export async function loadLocalInput(kind: string, file: string) {
-  const bytes = await readLocalMetadata(file, ["service", "admin-config"].includes(kind) ? 16384 : 1000000);
+  const bytes = kind === "show" ? await readShowPublicationInput(file) :
+    await readLocalMetadata(file, ["service", "admin-config"].includes(kind) ? 16384 : 1000000);
   const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   if (kind === "service") return { bytes, value: parseSqliteServiceConfig(source) };
   if (kind === "admin-config") return { bytes, value: parseAdminConfig(source) };

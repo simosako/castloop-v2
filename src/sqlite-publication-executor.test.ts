@@ -8,6 +8,7 @@ import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
 import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
+import { SqlitePublicationSchedules } from "./sqlite-publication-schedules";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import { withSitePublication } from "./site-publication";
 import { serveSiteGateway } from "./site-gateway";
@@ -33,6 +34,8 @@ const show = { schema_version: 1 as const, show_id: "daily", title: "Private Sho
 const metadata = (episodeId: string) => ({ schema_version: 1 as const, episode_id: episodeId, guid: `stable-${episodeId}`,
   title: `Private ${episodeId}`, description: "Private description", published_at: "2026-10-16T12:00:00+09:00" });
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const shortId = (id: string) => hash(id).slice(0, 16);
+const episodePage = (id = "first") => `/podcasts/daily/${shortId(id)}/`;
 
 async function readPublic(setup: Awaited<ReturnType<typeof fixture>>, path = "/podcasts/daily/feed.xml", headers: HeadersInit = {}) {
   return serveSqliteGateway(new Request(`${setup.config.workers_dev_base_url}${path}`, { headers }), setup.config.workers_dev_base_url,
@@ -126,6 +129,118 @@ async function readSite(f: Awaited<ReturnType<typeof fixture>>, path = "/podcast
   });
 }
 
+test("Show CSS is immutable revision content across publication, Episode lifecycle and past revision adoption", async () => {
+  const f = await fixture(true), firstCss = ":root{--cl-accent:red}", nextCss = ":root{--cl-accent:blue}";
+  const publishCss = async (css: string, initial = false) => {
+    const request = initial ? await f.request("show") : await f.showUpdate();
+    const { site_url, ...metadata } = show;
+    request.payloads[0] = await f.payload(request.job_id, "show_metadata", stringifyToml({ ...metadata,
+      site_mode: "builtin", site_css_path: "site.css", site_css: css }));
+    expect((await f.run(request)).state).toBe("succeeded");
+    return f.content.currentShowRevision("daily", f.config.public_base_url)!;
+  };
+  const first = await publishCss(firstCss, true);
+  await f.publishEpisode("first"); await f.publishEpisode("second");
+  const check = async (css: string) => {
+    for (const path of ["/podcasts/daily/", episodePage(), episodePage("second")]) {
+      const response = await readSite(f, path), html = await response.text();
+      expect(response.status).toBe(200); expect(html).toContain(css);
+      const style = html.match(/<style>([\s\S]*?)<\/style>/)![1];
+      expect(response.headers.get("Content-Security-Policy")).toContain(createHash("sha256").update(style).digest("base64"));
+    }
+  };
+  await check(firstCss);
+  await publishCss(nextCss); await check(nextCss);
+  await f.run(f.lifecycle("unpublish", "first"));
+   expect((await readSite(f, episodePage())).status).toBe(404);
+  await f.run(f.lifecycle("restore", "first")); await check(nextCss);
+  expect((await f.run(revisionRequest(f, first.revision_id))).state).toBe("succeeded"); await check(firstCss);
+  expect(f.content.showRevision("daily", first.revision_id, f.config.public_base_url)!.metadata.site_css).toBe(firstCss);
+  await f.control("pause"); expect((await readSite(f)).status).toBe(503);
+});
+
+test("Show timezone updates regenerate all pages atomically and survive Episode updates, lifecycle and revision adoption", async () => {
+  const f = await fixture(true), utc = await f.publishShow();
+  const first = await f.publishEpisode(); await f.publishEpisode("second");
+  const feed = f.feed(), episodes = f.content.episodes("daily").map(episodeDraftFromRevision);
+  const paths = ["/podcasts/daily/", episodePage(), episodePage("second")];
+  const check = async (date: string) => {
+    for (const path of paths) expect(await (await readSite(f, path)).text()).toContain(date);
+    expect(f.content.episodes("daily").map(episodeDraftFromRevision)).toEqual(episodes);
+    expect(f.feed()).toBe(feed);
+  };
+  await check("2026-10-16 (UTC+00:00)");
+  const update = await f.showUpdate();
+  const metadata = f.content.currentShowRevision("daily", f.config.public_base_url)!.metadata;
+  update.payloads[0] = await f.payload(update.job_id, "show_metadata", stringifyToml({ ...metadata, site_timezone: "Asia/Tokyo" }));
+  f.hooks.sitePurge = async () => { await check("2026-10-16 (UTC+00:00)"); };
+  expect((await f.run(update)).state).toBe("succeeded"); f.hooks.sitePurge = undefined;
+  const tokyo = f.content.currentShowRevision("daily", f.config.public_base_url)!;
+  expect(tokyo.metadata.site_timezone).toBe("Asia/Tokyo");
+  for (const path of paths.slice(1)) {
+    const siteId = path.split("/").at(-2)!;
+    expect(f.content.sites.page({ kind: "episode", showId: "daily", siteId })!.generation).toBe(f.content.inspect("daily").show!.feed_generation);
+  }
+  await check("2026-10-16 (UTC+09:00)");
+  const audio = await f.request("episode", "first", first.job_id, "audio");
+  audio.expected_show_state_version = f.content.inspect("daily").show!.state_version;
+  expect((await f.run(audio)).state).toBe("succeeded");
+  expect(await (await readSite(f, episodePage())).text()).toContain("2026-10-16 (UTC+09:00)");
+  expect((await f.run(revisionRequest(f, first.job_id, "first"))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+09:00)");
+  expect((await f.run(f.lifecycle("unpublish", "first"))).state).toBe("succeeded");
+  expect((await f.run(f.lifecycle("restore", "first"))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+09:00)");
+  expect((await f.run(revisionRequest(f, utc.job_id))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+00:00)");
+  expect((await f.run(revisionRequest(f, tokyo.revision_id))).state).toBe("succeeded");
+  expect((await f.run(f.lifecycle("unpublish"))).state).toBe("succeeded");
+  expect((await f.run(f.lifecycle("restore"))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+09:00)");
+});
+
+test("scheduled publication uses builtin CSS, safe descriptions, short URLs and the Show timezone only when due", async () => {
+  const f = await fixture(true), showRequest = await f.request("show");
+  const { site_url, ...showMetadata } = show;
+  showRequest.payloads[0] = await f.payload(showRequest.job_id, "show_metadata", stringifyToml({ ...showMetadata,
+    site_mode: "builtin", site_css_path: "site.css", site_css: ":root{--cl-accent:red}", site_timezone: "Asia/Tokyo" }));
+  expect((await f.run(showRequest)).state).toBe("succeeded");
+  let now = 1000;
+  const schedules = new SqlitePublicationSchedules(f.storage, f.queue, f.content, () => now,
+    { showId: "daily", ready: () => true });
+  const publication = await f.request("episode");
+  publication.payloads[0] = await f.payload(publication.job_id, "episode_metadata", stringifyToml({ ...metadata("first"),
+    published_at: "2025-12-16T22:00:00Z", description: '<p>全文<br><a href="https://example.com/story">記事</a></p>' }));
+  const scheduleId = crypto.randomUUID();
+  await schedules.create({ schema_version: 1, protocol: "sqlite-schedule-v1", ...f.runtime, show_id: "daily",
+    schedule_id: scheduleId, expected_version: 0, preview_sha256: "c".repeat(64), publication,
+    scheduled_at: { input: "1970-01-01T00:00:02Z", scheduled_at: "1970-01-01T00:00:02Z", scheduled_at_ms: 2000,
+      input_offset: "+00:00", resolution_source: "offset", timezone: "UTC", timezone_source: "server",
+      local_datetime: "1970-01-01T00:00:02", offset: "+00:00" } });
+  expect(await schedules.dispatchDue()).toBe(0);
+  expect(f.queue.snapshot().queued).toBe(0);
+  expect((await readSite(f, episodePage())).status).toBe(404);
+  expect(f.feed()).not.toContain("<item>");
+  now = 2000;
+  expect(await schedules.dispatchDue()).toBe(1);
+  let result;
+  do { f.clearAlarm(); result = await f.runner.alarm(); } while (result.state === "running");
+  expect(result.state).toBe("succeeded");
+  expect(schedules.status(scheduleId).schedule).toMatchObject({ state: "dispatched", publication_state: "succeeded" });
+  for (const path of ["/podcasts/daily/", episodePage()]) {
+    const response = await readSite(f, path), html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain("2025-12-17 (UTC+09:00)");
+    expect(html).toContain(":root{--cl-accent:red}");
+    expect(html).toContain(`<a href="${episodePage()}">`);
+    expect(html).toContain('<audio controls preload="none"');
+    expect(html).not.toContain("<footer");
+    if (path === episodePage()) expect(html).toContain('<a href="https://example.com/story">記事</a>');
+  }
+  expect(f.feed()).toContain(`<link>https://public.example.com${episodePage()}</link>`);
+  expect(f.content.episodes("daily")[0].published_at).toBe("2025-12-16T22:00:00Z");
+});
+
 test("builtin publication atomically exposes static pages, native audio and RSS links without private Show fields", async () => {
   const f = await fixture(true);
   expect((await readSite(f)).status).toBe(404);
@@ -136,42 +251,75 @@ test("builtin publication atomically exposes static pages, native audio and RSS 
   expect(html).toContain('<audio controls preload="none"');
   expect(html).toContain(`${episode.job_id}.mp3`);
   expect(html).not.toContain("private@example.com");
-  const page = await readSite(f, "/podcasts/daily/episodes/first/");
+  const page = await readSite(f, episodePage());
   expect(page.status).toBe(200);
   expect(page.headers.get("Content-Security-Policy")).toContain("script-src 'none'");
+  for (const path of ["/podcasts/daily/episodes/first/", `/podcasts/daily/e/${shortId("first")}/`, "/podcasts/daily/aaaaaaaaaaaaaaaa/"]) {
+    expect((await readSite(f, path)).status).toBe(404);
+  }
   expect(f.feed()).toContain("<link>https://public.example.com/podcasts/daily/</link>");
-  expect(f.feed()).toContain("<link>https://public.example.com/podcasts/daily/episodes/first/</link>");
-  expect(f.sitePurges).toEqual([{ showId: "daily" }, { showId: "daily", episodeId: "first" }]);
+  expect(f.feed()).toContain(`<link>https://public.example.com${episodePage()}</link>`);
+  expect(f.sitePurges).toEqual([{ showId: "daily" }, { showId: "daily", siteId: shortId("first") }]);
   await f.control("pause");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/", { "If-None-Match": "*" })).status).toBe(503);
+  expect((await readSite(f, episodePage(), { "If-None-Match": "*" })).status).toBe(503);
+});
+
+test("extended short URLs stay aligned across HTML, Feed, cache, lifecycle and revision restoration", async () => {
+  const f = await fixture(true); await f.publishShow();
+  f.storage.sql.exec("INSERT INTO publication_site_ids (show_id, episode_id, site_id) VALUES (?, ?, ?)", "daily", "reserved", shortId("first"));
+  const first = await f.publishEpisode(), siteId = hash("first").slice(0, 20), path = `/podcasts/daily/${siteId}/`;
+  const check = async () => {
+    const listing = await (await readSite(f)).text();
+    expect(listing).toContain(`href="${path}"`);
+    const response = await readSite(f, path), html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain(`rel="canonical" href="${f.config.public_base_url}${path}"`);
+    expect(html).toContain(`property="og:url" content="${f.config.public_base_url}${path}"`);
+    expect(f.feed()).toContain(`<link>${f.config.public_base_url}${path}</link>`);
+    expect((await readSite(f, episodePage())).status).toBe(404);
+    const props = f.content.siteDelivery({ kind: "episode", showId: "daily", siteId });
+    if (props.status !== 200) throw new Error("Expected approved short page");
+    const cached = await serveCachedSitePage(new Request(`https://cache.invalid${path}`), f.bucket as never, props.props);
+    expect(cached.headers.get("Cache-Tag")).toContain(`site-episode-daily/${siteId}`);
+  };
+  await check();
+  const update = await f.request("episode", "first", first.job_id, "metadata");
+  expect((await f.run(update)).state).toBe("succeeded"); await check();
+  await f.run(f.lifecycle("unpublish", "first"));
+  expect((await readSite(f, path, { "If-None-Match": "*" })).status).toBe(404);
+  expect(f.content.sites.ids.get("daily", "first")).toBe(siteId);
+  expect(f.content.sites.page({ kind: "episode", showId: "daily", siteId })).toBeNull();
+  await f.run(f.lifecycle("restore", "first")); await check();
+  expect((await f.run(revisionRequest(f, first.job_id, "first"))).state).toBe("succeeded"); await check();
+  expect(f.sitePurges.slice(1).every((target) => target.siteId === siteId)).toBe(true);
 });
 
 test("builtin metadata/audio revisions and saved revision adoption preserve page URLs and unaffected Episode snapshots", async () => {
   const f = await fixture(true); await f.publishShow(); const first = await f.publishEpisode(); await f.publishEpisode("second");
-  const other = f.content.sites.page({ kind: "episode", showId: "daily", episodeId: "second" });
+  const other = f.content.sites.page({ kind: "episode", showId: "daily", siteId: shortId("second") });
   const update = await f.request("episode", "first", first.job_id, "metadata");
   update.payloads = [await f.payload(update.job_id, "episode_metadata", stringifyToml({ ...metadata("first"), title: "New title" }))];
   expect((await f.run(update)).state).toBe("succeeded");
-  let html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  let html = await (await readSite(f, episodePage())).text();
   expect(html).toContain("New title"); expect(html).toContain(`${first.job_id}.mp3`);
   const audio = await f.request("episode", "first", update.job_id, "audio");
   expect((await f.run(audio)).state).toBe("succeeded");
-  html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  html = await (await readSite(f, episodePage())).text();
   expect(html).toContain(`${audio.job_id}.mp3`);
   expect((await f.run(revisionRequest(f, first.job_id, "first"))).state).toBe("succeeded");
-  html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  html = await (await readSite(f, episodePage())).text();
   expect(html).toContain(`${first.job_id}.mp3`); expect(html).not.toContain("New title");
-  expect(f.content.sites.page({ kind: "episode", showId: "daily", episodeId: "second" })).toEqual(other);
+  expect(f.content.sites.page({ kind: "episode", showId: "daily", siteId: shortId("second") })).toEqual(other);
   expect(f.entries.has(`public/podcasts/daily/episodes/first/${audio.job_id}.mp3`)).toBe(true);
 });
 
 test("builtin lifecycle hides removed Episodes and regenerates Show restoration including saved revision content", async () => {
   const f = await fixture(true), original = await f.publishShow(); await f.publishEpisode();
   expect((await f.run(f.lifecycle("unpublish", "first"))).state).toBe("succeeded");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+  expect((await readSite(f, episodePage())).status).toBe(404);
   expect(await (await readSite(f)).text()).not.toContain("<audio");
   expect((await f.run(f.lifecycle("restore", "first"))).state).toBe("succeeded");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(200);
+  expect((await readSite(f, episodePage())).status).toBe(200);
   expect((await f.run(f.lifecycle("unpublish"))).state).toBe("succeeded");
   expect((await readSite(f)).status).toBe(404);
   expect((await f.run(f.lifecycle("restore"))).state).toBe("succeeded");
@@ -188,10 +336,10 @@ test("external/builtin changes require explicit publication and clear or regener
   expect((await readSite(f)).status).toBe(200);
   expect((await f.run(update)).state).toBe("succeeded");
   expect((await readSite(f)).status).toBe(404);
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+  expect((await readSite(f, episodePage())).status).toBe(404);
   expect(f.feed()).toContain(`<link>${show.site_url}</link>`);
   expect((await f.run(revisionRequest(f, original.job_id))).state).toBe("succeeded");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(200);
+  expect((await readSite(f, episodePage())).status).toBe(200);
 });
 
 test("bounded site batches survive restart, retain committed reads, and serialize queued publication across admission pause", async () => {

@@ -23,7 +23,7 @@ export function createSqliteServiceHttp(runtime: SqliteServiceRuntime, key: stri
       if (path.startsWith("content/") && request.method === "GET") {
         const parts = path.slice(8).split("/");
         if (parts.length < 1 || parts.length > 2 || parts.some((part) => !part)) return reply({ error: "invalid_target" }, 400);
-        return reply(runtime.contentSnapshot(parts[0]!, parts[1]));
+        return reply(await runtime.contentSnapshot(parts[0]!, parts[1]));
       }
       if (path.startsWith("content-inventory/") && request.method === "GET") {
         const parts = path.slice(18).split("/");

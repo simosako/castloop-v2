@@ -170,6 +170,10 @@ async function persistAudio(bucket: SqlitePublicationBucket, prepared: PreparedE
 export function createSqlitePublicationExecutor(store: SqlitePublicationContent, bucket: SqlitePublicationBucket,
   configInput: SqliteServiceConfig, effects: SqlitePublicationEffects): SqlitePublicationExecutor<PreparedSqlitePublication> {
   const config = sqliteServiceConfigSchema.parse(configInput);
+  const renderFeed = async (show: ShowMetadata, episodes: EpisodeRevision[], extension: "jpg" | "png") => {
+    const siteIds = await store.sites.ids.reserve(show.show_id, episodes);
+    return input(() => renderPublicationFeed(show, episodes, config.public_base_url, extension, siteIds));
+  };
   const perform = async (request: SqlitePublicationRequest, phase: SqlitePublicationEffectFailure["phase"], operation: () => Promise<void>) => {
     try { await operation(); }
     catch {
@@ -212,7 +216,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
           if (request.kind === "show") await verifyCover(bucket, request.show_id, target.coverExtension!, target.cover!);
         }
         const writeFeed = request.kind === "show" ? request.action === "restore" : target.show.lifecycle === "published";
-        return { kind: "lifecycle", request, feedGeneration, ...(writeFeed ? { feed: input(() => renderPublicationFeed(target.metadata!, visible, config.public_base_url, target.coverExtension!)) } : {}) };
+        return { kind: "lifecycle", request, feedGeneration, ...(writeFeed ? { feed: await renderFeed(target.metadata!, visible, target.coverExtension!) } : {}) };
       }
       const timestamp = () => (effects.now ?? (() => new Date().toISOString().replace(/\.\d{3}Z$/, "Z")))();
       if (request.action === "restore_revision") {
@@ -238,7 +242,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
               }
             }
           }
-          const feed = input(() => renderPublicationFeed(source.metadata, episodes, config.public_base_url, source.cover.extension));
+          const feed = await renderFeed(source.metadata, episodes, source.cover.extension);
           return { kind: "show", request, feedGeneration, metadata: source.metadata, metadataSha256: source.metadata_sha256,
             updatedAt: timestamp(), coverIdentity, extension: source.cover.extension, feed, restoredFromRevisionId: source.revision_id };
         }
@@ -268,8 +272,8 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         if (!object || object.size !== revision.length_bytes || hash !== revision.sha256 || object.customMetadata?.sha256 !== revision.sha256) {
           throw new SqlitePublicationInputError("validation_failed");
         }
-        const feed = input(() => renderPublicationFeed(target.metadata!,
-          [...episodes.filter((episode) => episode.episode_id !== request.episode_id), revision], config.public_base_url, target.coverExtension!));
+        const feed = await renderFeed(target.metadata!,
+          [...episodes.filter((episode) => episode.episode_id !== request.episode_id), revision], target.coverExtension!);
         return { kind: "episode", request, feedGeneration, revision, metadataSha256: source.metadata_sha256,
           audioRevisionId: media.revisionId, feed, restoredFromRevisionId: source.revision_id };
       }
@@ -277,7 +281,11 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         const metadataPayload = request.payloads.find((payload) => payload.asset === "show_metadata")!;
         const coverPayload = request.payloads.find((payload) => payload.asset.startsWith("cover_"))!;
         const metadataBytes = await readPayload(bucket, metadataPayload);
-        const metadata = input(() => { const parsed = parseShowMetadata(text(metadataBytes)); assertShowMetadataInputLimits(parsed); return parsed; });
+        const metadata = input(() => {
+          const parsed = parseShowMetadata(text(metadataBytes));
+          if ((parsed.site_css_path !== undefined) !== (parsed.site_css !== undefined)) throw new Error("Show CSS input is incomplete");
+          assertShowMetadataInputLimits(parsed); return parsed;
+        });
         const metadataSha256 = await publicationChecksum(new TextEncoder().encode(JSON.stringify(metadata)));
         const cover = await readPayload(bucket, coverPayload);
         const extension = coverPayload.asset === "cover_png" ? "png" : "jpg";
@@ -291,7 +299,7 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
           await requireEmpty(bucket, `public/episodes/${request.show_id}/`);
         }
         await requireAbsent(bucket, `system/shows/${request.show_id}/revisions/${request.job_id}.toml`);
-        const feed = input(() => renderPublicationFeed(metadata, episodes, config.public_base_url, extension));
+        const feed = await renderFeed(metadata, episodes, extension);
         const coverIdentity = { generation: store.publicationSequence(request), sha256: coverPayload.sha256, lengthBytes: cover.byteLength };
         return { kind: "show", request, feedGeneration, metadata, metadataSha256, updatedAt: timestamp(), cover, coverIdentity, extension, feed };
       }
@@ -326,8 +334,8 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
           throw new SqlitePublicationInputError("validation_failed");
         }
       }
-      const feed = input(() => renderPublicationFeed(target.metadata!,
-        [...episodes.filter((episode) => episode.episode_id !== request.episode_id), revision], config.public_base_url, target.coverExtension!));
+      const feed = await renderFeed(target.metadata!,
+        [...episodes.filter((episode) => episode.episode_id !== request.episode_id), revision], target.coverExtension!);
       return { kind: "episode", request, feedGeneration, revision, metadataSha256, audio, audioRevisionId: media.revisionId, feed };
     },
     async publish(prepared) {

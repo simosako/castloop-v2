@@ -4,6 +4,8 @@ import { sqliteUpdateSummarySchema } from "./sqlite-runtime-update";
 import { sqliteAvailabilityStateSchema, sqliteAvailabilityRecordSchema } from "./sqlite-availability";
 import { sqliteStatsRetentionRecordSchema } from "./sqlite-stats";
 
+const counter = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+
 export const sqliteRuntimeRequestSchema = sqlitePublicationRuntimeSchema.extend({ operation_id: z.uuid() }).strict();
 export const sqliteResumeRequestSchema = sqliteRuntimeRequestSchema.extend({ admission_window_id: z.uuid() }).strict();
 export const sqliteRegistrationSchema = sqliteRuntimeRequestSchema.extend({ show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -18,7 +20,7 @@ export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protoc
   domain_changes: z.literal("sqlite-domain-change-v1"),
   availability_controls: z.literal("show-admission-delivery-v1"),
   revision_history: z.literal("sqlite-revisions-v1"),
-  website: z.literal("static-show-v1"),
+  website: z.literal("static-show-v2"),
   delivery_statistics: z.literal("episode-daily-v1"),
   availability_version: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable(),
   admission_state: z.enum(["open", "closed"]).nullable(), delivery_policy: z.enum(["enabled", "stopped"]).nullable(),
@@ -31,10 +33,12 @@ export const sqliteHealthSchema = sqlitePublicationRuntimeSchema.extend({ protoc
   queued: z.number().int().nonnegative(), active: z.enum(["running", "blocked"]).nullable(), drained: z.boolean(),
   setup: z.object({ operation_id: z.uuid(), state: z.enum(["scheduled", "running", "ready", "blocked"]) }).strict().nullable(),
   runtime_update: sqliteUpdateSummarySchema.nullable().optional(),
+  schedules: z.object({ scheduled: counter, needs_approval: counter, dispatched: counter,
+    next_scheduled_at_ms: counter.nullable() }).strict().optional(),
 }).strict();
 export const sqliteInspectionSchema = sqlitePublicationRuntimeSchema.extend({ protocol: z.literal(sqlitePublicationProtocol),
   revision_history: z.literal("sqlite-revisions-v1"),
-  website: z.literal("static-show-v1"),
+  website: z.literal("static-show-v2"),
   state: sqliteAvailabilityStateSchema, admission_window_id: z.uuid().nullable(), publication_ready: z.literal(true),
   show_id: sqliteRegistrationSchema.shape.show_id, episode_id: z.string().max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   show_lifecycle: z.enum(["missing", "draft", "published", "unpublished", "deleted"]),

@@ -59,7 +59,7 @@ test("retention journal replays by operation id and refuses divergent repeats", 
     publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1",
     domain_changes: "sqlite-domain-change-v1", invocation_id: window, publication_ready: true,
     state: "open", admission_window_id: window, availability_controls: "show-admission-delivery-v1",
-    revision_history: "sqlite-revisions-v1", delivery_statistics: "episode-daily-v1", website: "static-show-v1",
+    revision_history: "sqlite-revisions-v1", delivery_statistics: "episode-daily-v1", website: "static-show-v2",
     availability_version: 0, admission_state: "open", delivery_policy: "enabled",
     queued: 0, active: null, drained: true, setup: { operation_id: window, state: "ready" }, runtime_update: null };
   const requests: string[] = [];

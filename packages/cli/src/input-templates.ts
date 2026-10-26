@@ -20,7 +20,9 @@ export function inputTemplate(kind: string): string {
   if (kind === "admin-config") return "# Optional workspace CLI preferences. No secrets, targets or approvals.\n" +
     "# Omit timezone to use the server basis (UTC); --timezone overrides this preference.\n" +
     stringifyToml({ schema_version: 1, timezone: "Asia/Tokyo" });
-  if (kind === "show") return note + stringifyToml(showTemplate("samplepodcast", "https://example.com/samplepodcast"));
+  if (kind === "show") return note +
+    "# Builtin websites: set site_mode=\"builtin\", remove site_url; optional site_timezone=\"Asia/Tokyo\" (default UTC).\n" +
+    stringifyToml(showTemplate("samplepodcast", "https://example.com/samplepodcast"));
   if (kind === "episode") return note + "# GUID/date below are examples, NOT a registered Episode identity.\n" +
     stringifyToml(episodeTemplate("first", "550e8400-e29b-41d4-a716-446655440000", "2026-01-02T10:00:00+09:00"));
   if (kind === "service-config") return note + "# Only init creates a service. Never adopt remote resources using this example.\n" + stringifyToml(sqliteServiceConfigSchema.parse({

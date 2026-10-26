@@ -1,6 +1,14 @@
 # 設計文書の案内
 
-Issue #70開発版の第1段は、内蔵番組サイトの全公開経路・CLI・HTML専用Gateway/CDN cacheを接続した最小限実装。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用で旧環境は変換しない。[サイト設計](show_website_plan.md)と[利用ガイド](../docs/show_website.md)参照。下記の7/8等は各リリース・機能導入時点の番号。専用環境で本人の3 Episode再生を確認したが、native Free性能は未確認で、見栄え等の改善は後続とする。
+Issue #65の予約公開とIssue #70の改善を統合した現在の内部queue/content形式は**11/11**、必須サイト識別は`static-show-v2`。新規環境専用であり、予約公開版9/9・サイト試験版10/11等からの変換・互換配備は行わない。以下の番号は各段階の履歴として区別する。合意したサイト機能と本人の画面確認は完了したが、統合版の実配備、native Free性能、スマートフォン／キーボードの実機確認は未完了である。
+
+Issue #70の自動短縮URL版は内部queue/content形式**10/11**・サイト識別`static-show-v2`の新規環境専用。Show直下の自動16文字ハッシュだけをEpisodeページ入口とし、衝突時だけ延長する。HTTP(S)リンク表示とcopyrightフッター削除も実装した。[URL設計と実装](show_website_site_slug_proposal.md)・[利用ガイド](../docs/show_website.md)を参照する。旧9/10等のDBは変換・互換配備しない。
+
+Issue #70のCSSカスタマイズ開発版は内部queue/content形式**9/10**の新規環境専用。固定HTML＋標準デザイン1種類＋任意CSS 1ファイルを接続した。後続の[説明表示改善](show_website_description_display_plan.md)ではHTML解析用の`htmlparser2`を追加し、タグなし抜粋と安全な段落・改行表示を実装した。サイトフレームワーク・生成用サービスは追加しない。[CSS採用方針と実装状況](show_website_customization_options.md)・[利用ガイド](../docs/show_website.md)を参照する。以下の8/9等は各段階時点の番号であり、旧環境への互換配備は行わない。
+
+Issue #70開発版の第1段は、内蔵番組サイトの全公開経路・CLI・HTML専用Gateway/CDN cacheを接続した最小限実装。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用で旧環境は変換しない。[サイト設計](show_website_plan.md)と[利用ガイド](../docs/show_website.md)参照。下記の7/8等は各リリース・機能導入時点の番号。専用環境で本人の3 Episode再生を確認したが、native Free性能は未確認で、当時は見栄え等を後続とした。
+
+Issue #65開発版は、Show内予約表と既存Alarmによるfuture UTCの予約公開を実装した。予約はFIFOを先に占有せず、Pause・受付停止・保守・runtime/base変更では`needs_approval`へ移る。CLIは予約preview、作成、一覧、詳細、日時変更、取消、再承認を提供する。内部queue/content形式は**9/9**（queue `9` は予約表を含む）、fresh環境専用で旧8/9を変換しない。[予約設計](episode_scheduled_publication_plan.md)と[管理用設定ガイド](../docs/admin_configuration.md)参照。隔離したfresh環境で3 Episodeの予定前未配信・予定後配信を確認した。Pause/再承認・取消・Alarm再配送・性能は未確認（[実機検証](issue65_scheduled_publication_live_20261026.md)）。
 
 v0.7.5はIssue #64の公開済み差分・revision履歴・過去版採用を追加する。内部queue/content形式**7/8**の新規環境専用で、v0.7.4の7/7を含む既存環境は変換しない。[リリースノート](../docs/release-v0.7.5.md)と[公開内容の確認ガイド](../docs/published_content_review.md)を優先し、以下の旧形式・開発時点の記録と区別する。実CloudflareでのCPU・無料枠適合は未検証である。
 
@@ -25,11 +33,17 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [全体設計](initial_design.md) | 現在の構成・仕様・未提供機能 |
 | [公開済み内容との差分確認とrevision履歴・過去版採用](published_diff_and_revision_restore_plan.md) | Issue #64・1A〜5A採用。全文取得と差分、確認hash、素材再uploadなしの過去版採用。内部7/8の新規環境専用。[利用ガイド](../docs/published_content_review.md) |
 | [番組サイト・Episodeページの設計](show_website_plan.md) | Issue #70第1段・案Bとサイト方式の2択を採用。事前HTML生成・専用Gateway/cache・Show DOの原子的切替・CLI・全公開経路を接続。内部8/9の新規環境専用。§13でローカル・小規模実機検証と未確認範囲を区別する |
-| [非公開の番組サイト画面確認・実機試験案](show_website_private_trial_plan.md) | Issue #70。新規試験サービス＋コンテンツパスのAccess保護。[実施結果](show_website_private_trial_verification_20261025.md)は4公開job成功・受付停止。本人からアクセスと3 Episode再生成功の報告を受け、閲覧後も未認証30要求拒否を確認。個別ページ・seek・スマートフォン・CPU測定は未確認 |
-| [Episode予約公開の設計・開発計画](episode_scheduled_publication_plan.md) | Issue #65の採用方針。Show内予約表とAlarm、既定UTC・任意管理zone、日時identity、停止・再承認。管理用設定の責務・棚卸しと開発段階 |
+| [番組サイトのカスタマイズ方式の比較・採用方針](show_website_customization_options.md) | Issue #70後続。Bを採用しローカル実装。Free枠内の運用と単純さを優先し、新たな外部依存・生成用サービスは追加しない。比較、CLI／DOの分担、保存・CSPと§12の検証範囲を整理する |
+| [説明文の抜粋・全文表示の改善案](show_website_description_display_plan.md) | Issue #70後続・個別ページ方式を実装し、本人から表示・全文への導線が正常との報告あり。§6.1〜6.2に生成範囲とFree制約、§11にparser選択・20/100/1,000件の確認。§12のHTTP(S)リンク復元・フッター削除は短縮URL版の新規非公開環境へ配備済み |
+| [Episodeページの自動短縮URL設計・実装](show_website_site_slug_proposal.md) | Show直下の自動16文字ハッシュ・衝突時だけ延長・公開後固定を実装。中間のe/・長いページ入口・互換性・移行は不要。内部ID・音源URLは維持し、管理者の設定を増やさない。内部10/11の新規環境向け |
+| [公開日表示のタイムゾーン](show_website_timezone_plan.md) | 案Aを採用。Showの任意site_timezone、未設定UTC、公開時点の夏時間を反映した日付・UTC差を事前HTMLへ出力。管理用timezone・RSS日時とは分離し、新しい依存や閲覧時処理は追加しない。[本人限定環境での確認](show_website_timezone_trial_verification_20261027.md)で東京設定を検査し、本人から日付表示の確認報告あり。native Free性能は未確認 |
+| [自動短縮URL・リンク表示版の非公開実機試験](show_website_short_url_trial_verification_20261026.md) | 旧専用環境の退避・削除、新規本人限定環境への通常音源3件公開、全量音源照合・短いリンクと安全な本文リンク・フッター非表示・公開前後の未認証30要求拒否。823回帰成功。本人による画面確認済み。native Free性能は未確認 |
+| [非公開の番組サイト画面確認・実機試験案](show_website_private_trial_plan.md) | Issue #70。コンテンツパスのAccess保護。[初回結果](show_website_private_trial_verification_20261025.md)は本人の短尺3件再生成功。初回環境を明示承認で削除し、[標準デザイン・通常サイズ3件](show_website_css_large_trial_verification_20261026.md)も本人の再生報告あり。同環境を[説明文表示改善版へ更新](show_website_description_trial_verification_20261026.md)し、未認証拒否・生成HTML、本人による表示と全文への導線を確認。CPU測定は未確認。テスト非公開の共通指示はAGENTS.mdに記載 |
+| [Episode予約公開の設計・開発計画](episode_scheduled_publication_plan.md) | Issue #65の採用方針と実装範囲。Show内予約表とAlarm、既定UTC・任意管理zone、日時identity、停止・再承認、CLI/API、内部9/9。fresh環境で3件確認、Pause/再承認等は未確認 |
 | [公開受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md) | Issue #66・全項目承認済み。3状態、停止・再開、変更番号と操作結果の保存・GET照会を実装。再開は処理終了を待ち、受付停止ではuploadも止める。内部形式7/7の新規環境専用。Worker更新中の配信継続は対象外 |
-| [管理用設定と日時変換](../docs/admin_configuration.md) | Issue #65のCLI基盤。任意のcastloop-admin.toml、schema/template/validate/doctor、非公開・非予約の日時preview。サーバー予約は未提供 |
+| [管理用設定と予約公開](../docs/admin_configuration.md) | Issue #65。任意のcastloop-admin.toml、schema/template/validate/doctor、オフライン日時preview、stage済みdraftの予約preview・作成・一覧・詳細・変更・取消・再承認 |
 | [Issue #65 CLI基盤の実データ検証](issue65_cli_real_data_verification_20261024.md) | 指定サンプル3＋36 Episode、約1.50GB、単体バイナリ162試験が期待どおり。原本不変。ptrace制約で通信観測は欠測、Cloudflare予約実行は未実装・未試験 |
+| [Issue #65 予約公開のCloudflare実機検証](issue65_scheduled_publication_live_20261026.md) | fresh環境で3 Episodeを約3分間隔に予約。予定前のFeed未配信、予定後の追加、`publication_state=succeeded`、dispatch時刻を確認。Pause/再承認・取消・Alarm再配送・性能は未確認 |
 | [SQLite独自ドメイン対応計画](sqlite_custom_domains_plan.md) | Issue #68。開発版のCLI/REST/DO接続、Cloudflare DNS前提、管理/公開origin分離、redirect、個別停止と設定・Feed切替、ローカル検証範囲 |
 | [独自ドメインP0・API条件の確認](sqlite_custom_domains_p0.md) | 公開Attach/Detachを採用。外部同時変更は想定外という制約を記録し、保留解消・開発継続。HTTP/identity/Feed採番の契約 |
 | [SQLite独自ドメイン操作](../docs/sqlite_custom_domains.md) | 開発版のadd/list/status/continue/remove、必要権限、停止と再開、中断・切断時の制約 |

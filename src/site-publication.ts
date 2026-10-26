@@ -27,10 +27,12 @@ export function withSitePublication(base: SqlitePublicationExecutor<PreparedSqli
         episodes = episodes.filter((item) => item.episode_id !== request.episode_id);
         if (request.action === "restore") episodes.push(target.base!);
       }
-      const input: SiteRenderInput | null = enabled ? { origin: config.public_base_url,
+      const input: SiteRenderInput | null = enabled ? { origin: config.public_base_url, episodeSiteIds: content.sites.ids.all(request.show_id),
         coverExtension: prepared.kind === "show" ? prepared.extension : target.coverExtension!,
         show: { show_id: metadata.show_id, title: metadata.title, description: metadata.description, language: metadata.language,
-          author: metadata.author, ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null;
+          author: metadata.author, ...(metadata.site_timezone !== undefined ? { site_timezone: metadata.site_timezone } : {}),
+          ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
+          ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null;
       content.sites.prepare(request.job_id, prepared.feedGeneration, request.show_id, input, episodes,
         request.kind === "episode" ? request.episode_id : undefined);
       return { request, prepared };
@@ -44,8 +46,8 @@ export function withSitePublication(base: SqlitePublicationExecutor<PreparedSqli
       await base.publish(value.prepared);
       content.sites.confirmPurge(value.request.job_id, "media");
       if (content.sites.build(value.request.job_id)!.enabled || content.sites.page({ kind: "listing", showId: value.request.show_id, page: 1 })) {
-        await purge({ showId: value.request.show_id,
-          ...(value.request.kind === "episode" ? { episodeId: value.request.episode_id! } : {}) });
+        const siteId = value.request.kind === "episode" ? content.sites.ids.get(value.request.show_id, value.request.episode_id!) : null;
+        await purge({ showId: value.request.show_id, ...(siteId ? { siteId } : {}) });
       }
       content.sites.confirmPurge(value.request.job_id, "site");
     },

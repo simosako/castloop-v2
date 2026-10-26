@@ -1,5 +1,6 @@
 import { stageAssetSchema, stagePayloadSchema } from "@castloop/shared";
 import type { StageAsset, StagePayload } from "@castloop/shared";
+import { readShowPublicationInput } from "./show-publication-input";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { chmod, lstat, mkdir, mkdtemp, open, rmdir, unlink } from "node:fs/promises";
@@ -21,7 +22,18 @@ async function checkDirectory(path: string): Promise<void> {
   }
 }
 
-async function checkSource(path: string, expected: StagePayload, destination?: string): Promise<void> {
+async function checkSource(path: string, expected: StagePayload, destination?: string, snapshot = false): Promise<void> {
+  if (expected.asset === "show_metadata" && !snapshot) {
+    const bytes = await readShowPublicationInput(path);
+    if (bytes.length !== expected.length_bytes || createHash("sha256").update(bytes).digest("hex") !== expected.sha256) {
+      throw new Error("Local Show or CSS differs from its frozen manifest");
+    }
+    if (destination) {
+      const output = await open(destination, "wx", 0o600);
+      try { await output.writeFile(bytes); await output.sync(); } finally { await output.close(); }
+    }
+    return;
+  }
   const source = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = await source.stat({ bigint: true });
@@ -62,6 +74,11 @@ export async function assertLocalStagingSource(path: string, input: StagePayload
 
 export async function inspectLocalStagingSource(path: string, input: StageAsset): Promise<{ payload: StagePayload; prefix: Buffer }> {
   const asset = stageAssetSchema.parse(input);
+  if (asset === "show_metadata") {
+    const bytes = await readShowPublicationInput(path);
+    return { payload: stagePayloadSchema.parse({ asset, length_bytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex") }), prefix: bytes.subarray(0, 8) };
+  }
   const source = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = await source.stat({ bigint: true });
@@ -126,7 +143,7 @@ export async function freezePayloadSources(root: string, input: readonly StagePa
       if (!Number.isInteger(index) || !snapshots[index] || used.has(index)) throw new Error("Staging source cannot be replayed or selected outside its manifest");
       used.add(index);
       await checkSource(originals[index]!, payloads[index]!);
-      await checkSource(snapshots[index]!, payloads[index]!);
+      await checkSource(snapshots[index]!, payloads[index]!, undefined, true);
       const handle = await open(snapshots[index]!, constants.O_RDONLY | constants.O_NOFOLLOW);
       const stream = handle.createReadStream();
       const settled = finished(stream, { cleanup: true }).catch(() => undefined);

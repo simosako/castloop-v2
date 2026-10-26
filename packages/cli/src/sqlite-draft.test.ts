@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { parseEpisodeDraft, sqliteServiceConfigHash, stringifyToml } from "@castloop/shared";
+import { parseEpisodeDraft, parseShowMetadata, sqliteServiceConfigHash, stringifyToml } from "@castloop/shared";
 import type { SqliteServiceConfig } from "@castloop/shared";
 import { SqliteDraft } from "./sqlite-draft";
 import { draftPreview } from "./draft-preview";
@@ -18,6 +18,36 @@ import { join } from "node:path";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
+
+test("Show CSS edits invalidate the staged preview and cannot be published without staging again", async () => {
+  const f = await fixture("show"), path = join(f.root, "daily", "show.toml"), css = join(f.root, "daily", "site.css");
+  const { site_url, ...show } = parseShowMetadata(readFileSync(path, "utf8"));
+  writeFileSync(path, stringifyToml({ ...show, site_mode: "builtin", site_css_path: "site.css" }));
+  writeFileSync(css, "body{color:red}");
+  await f.draft.stage({ asset: "show" });
+  const preview = await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" });
+  expect(preview.inputs_match_staged).toBe(true);
+  writeFileSync(css, "body{color:blue}");
+  expect((await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" })).inputs_match_staged).toBe(false);
+  await expect(f.draft.publish()).rejects.toThrow("differs");
+  expect((await f.draft.read()).publication).toBeUndefined();
+});
+
+test("Show timezone is frozen in staging and edits require staging again before publication", async () => {
+  const f = await fixture("show"), path = join(f.root, "daily", "show.toml");
+  const { site_url, ...metadata } = parseShowMetadata(readFileSync(path, "utf8"));
+  const show = { ...metadata, site_mode: "builtin" as const, site_timezone: "Asia/Tokyo" };
+  writeFileSync(path, stringifyToml(show));
+  await f.draft.stage({ asset: "show" });
+  expect((await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" })).inputs_match_staged).toBe(true);
+  writeFileSync(path, stringifyToml({ ...show, site_timezone: "America/New_York" }));
+  expect((await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" })).inputs_match_staged).toBe(false);
+  await expect(f.draft.publish()).rejects.toThrow("differs");
+  expect((await f.draft.read()).publication).toBeUndefined();
+  await f.draft.stage({ asset: "show" });
+  await f.draft.publish();
+  expect((await f.draft.read()).publication).toBeDefined();
+});
 
 test("preview is read-only and publication rejects changes after approval", async () => {
   const f = await fixture(); await f.stage();
@@ -125,7 +155,7 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
     if (path.startsWith("/admin/sqlite-service/targets/")) {
       return json({ ...setup.runtime, protocol: "sqlite-sequential-v1", publication_ready: true,
         revision_history: "sqlite-revisions-v1",
-        website: "static-show-v1",
+        website: "static-show-v2",
         state: "open", admission_window_id: setup.windowId, show_id: target.show_id, show_lifecycle: kind === "show" ? "draft" : "published",
         reservation_id: crypto.randomUUID(), expected_show_state_version: target.expected_show_state_version,
         ...(kind === "episode" ? { episode_id: target.episode_id, episode_lifecycle: updating ? "published" : "missing",
