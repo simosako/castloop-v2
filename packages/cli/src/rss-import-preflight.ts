@@ -5,6 +5,7 @@ import { analyzeAudio } from "./audio";
 import { localJournalEntryExists as present } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { readLocalMetadata } from "./local-metadata-read";
+import { readShowPublicationInput } from "./show-publication-input";
 import { parseRssImportFeed } from "./rss-import-feed";
 import { hashRssImportFile, readRssImportSnapshot, rssImportAssetSchema, rssImportControlSchema, rssImportCoverExtension } from "./rss-import-local";
 import { sha256HexSync } from "./sha256";
@@ -29,7 +30,7 @@ export async function prepareRssImportPublication(output: string, publicBaseUrl 
   }
   const feed = parseRssImportFeed(source, state.show_id, state.final_url);
   const text = (bytes: Buffer) => new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
-  const showBytes = await readLocalMetadata(join(root, "show.toml"));
+  const showBytes = await readShowPublicationInput(join(root, "show.toml"));
   const show = parseShowMetadata(text(showBytes));
   assertShowMetadataInputLimits(show);
   if (show.show_id !== state.show_id) throw new Error("Import Show ID changed");

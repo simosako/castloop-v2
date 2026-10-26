@@ -24,7 +24,7 @@ function httpFixture() {
     feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1",
     publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1",
     domain_changes: "sqlite-domain-change-v1", availability_controls: "show-admission-delivery-v1",
-    revision_history: "sqlite-revisions-v1", delivery_statistics: "episode-daily-v1", website: "static-show-v1",
+    revision_history: "sqlite-revisions-v1", delivery_statistics: "episode-daily-v1", website: "static-show-v2",
     invocation_id: crypto.randomUUID(), publication_ready: true, state: "open", admission_window_id: null,
     availability_version: 0, admission_state: "open", delivery_policy: "enabled", queued: 0, active: null,
     drained: true, setup: null, runtime_update: null, scope: "show", show_id: "daily", maintenance_operation_id: null });

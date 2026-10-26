@@ -105,8 +105,10 @@ export class SqlitePublicationContent {
       if (!site.enabled || page.kind === "listing" && page.page > site.pages) return { status: 404 };
       let episodeGeneration: number | undefined;
       if (page.kind === "episode") {
+        const episodeId = this.sites.ids.episode(page.showId, page.siteId);
+        if (!episodeId) return { status: 404 };
         const episode = this.storage.sql.exec<EpisodeRow>("SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?",
-          page.showId, page.episodeId).toArray()[0];
+          page.showId, episodeId).toArray()[0];
         if (!episode || episode.lifecycle === "unpublished") return { status: 404 };
         if (episode.lifecycle === "deleted") return { status: 410 };
         episodeGeneration = episode.lifecycle_version;

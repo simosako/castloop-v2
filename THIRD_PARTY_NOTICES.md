@@ -24,6 +24,28 @@ The castloop executable includes code from the following packages. Versions are 
 | `zod` | 4.6.7 | MIT | Copyright (c) 2025 Colin McDonnell |
 | `saxes` | 6.0.0 | ISC | Copyright (c) Contributors; Copyright (c) Isaac Z. Schlueter and Contributors |
 | `xmlchars` | 2.2.0 | MIT | Copyright Louis-Dominique Dubeau and contributors to xmlchars |
+| `htmlparser2` | 10.1.0 | MIT | Copyright 2010, 2011, Chris Winberry. All rights reserved. |
+| `entities` | 7.0.1, 4.5.0 | BSD-2-Clause | Copyright (c) Felix Böhm. All rights reserved. |
+| `domhandler` | 5.0.3 | BSD-2-Clause | Copyright (c) Felix Böhm. All rights reserved. |
+| `domutils` | 3.2.2 | BSD-2-Clause | Copyright (c) Felix Böhm. All rights reserved. |
+| `domelementtype` | 2.3.0 | BSD-2-Clause | Copyright (c) Felix Böhm. All rights reserved. |
+| `dom-serializer` | 2.0.0 | MIT | Copyright (c) 2014 The cheeriojs contributors |
+
+The website description formatter uses the event-based `Parser` export of `htmlparser2`, not its DOM helpers. The table also lists its installed transitive packages.
+
+## BSD-2-Clause License (`entities`, `domhandler`, `domutils`, `domelementtype`)
+
+Copyright (c) Felix Böhm
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## MIT License (packages marked MIT)
 

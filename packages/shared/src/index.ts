@@ -4,6 +4,8 @@ import { publishedTimestampSchema as publishedAt } from "./metadata-time";
 import type { SqliteServiceConfig } from "./sqlite-service";
 import type { AdminConfig } from "./admin-config";
 import { isXml10Text } from "./xml";
+import { validateSiteCss } from "./site-style";
+import { timeZoneSchema } from "./time-zone";
 import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits } from "./metadata-limits";
 
 export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKey, sqliteVerifiedUploadSchema,
@@ -58,10 +60,21 @@ export const showMetadataSchema = z.object({
   explicit: z.boolean(),
   site_mode: z.enum(["builtin", "external"]).optional(),
   site_url: xmlText.pipe(webUrl).optional(),
+  site_timezone: timeZoneSchema.optional(),
+  site_css_path: z.string().regex(/^[^/\\.][^/\\]*\.css$/i).optional(),
+  site_css: z.string().refine((value) => {
+    try { validateSiteCss(value); return true; } catch { return false; }
+  }, "Invalid site CSS").optional(),
   image_path: z.string().regex(/^[^/\\.][^/\\]*\.(?:jpg|jpeg|png)$/i),
   copyright: xmlText.min(1).optional(),
   show_type: z.enum(["episodic", "serial"]).optional(),
 }).strict().superRefine((value, context) => {
+  if (value.site_mode !== "builtin" && value.site_timezone !== undefined) {
+    context.addIssue({ code: "custom", path: ["site_timezone"], message: "Site timezone requires a builtin site" });
+  }
+  if (value.site_mode !== "builtin" && (value.site_css_path !== undefined || value.site_css !== undefined)) {
+    context.addIssue({ code: "custom", path: ["site_css_path"], message: "Site CSS requires a builtin site" });
+  }
   if (value.site_mode === "builtin" ? value.site_url !== undefined : value.site_url === undefined) {
     context.addIssue({ code: "custom", path: ["site_url"], message: "Builtin sites omit site_url; external sites require site_url" });
   }

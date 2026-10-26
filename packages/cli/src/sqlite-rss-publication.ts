@@ -7,9 +7,10 @@ import { prepareRssImportPublication } from "./rss-import-preflight";
 import { verifyImportedFeed, writeImportedMetadata } from "./rss-publication-content";
 import { hashRssImportFile } from "./rss-import-local";
 import { receiveRssAsset } from "./rss-import-download";
-import { createLocalJournalStorage } from "./local-journal-storage";
+import { createLocalJournalStorage, writeSyncedLocalFile } from "./local-journal-storage";
 import { localJournalEntryExists as present, syncLocalJournalDirectory } from "./local-journal-path";
 import { readLocalMetadata } from "./local-metadata-read";
+import { readShowPublicationInput } from "./show-publication-input";
 import { administratorKey } from "./administrator-key";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { readSqliteDraftRecord } from "./sqlite-draft-journal";
@@ -139,6 +140,11 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       try { await file.sync(); } finally { await file.close(); }
       syncLocalJournalDirectory(directory);
       if ((await hashRssImportFile(destination, 5_000_000)).sha256 !== prepared.coverSha256) throw new Error("Import cover changed during installation");
+      if (prepared.show.site_css_path !== undefined) {
+        if (present(join(directory, prepared.show.site_css_path))) throw new Error("Import CSS destination already exists");
+        writeSyncedLocalFile(join(directory, prepared.show.site_css_path), () => prepared.show.site_css!);
+        syncLocalJournalDirectory(directory);
+      }
       await writeImportedMetadata(join(prepared.root, "show.toml"), join(directory, "show.toml"), prepared.show);
     });
     const command = (name: string, args: string[]) => async () => {
@@ -185,7 +191,7 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
             throw new Error("Completed Show registration differs from its local installation");
           }
         } else if (state.step === 1) {
-          if (JSON.stringify(parseShowMetadata((await readLocalMetadata(join(directory, "show.toml"))).toString("utf8"))) !== JSON.stringify(prepared.show) ||
+          if (JSON.stringify(parseShowMetadata((await readShowPublicationInput(join(directory, "show.toml"))).toString("utf8"))) !== JSON.stringify(prepared.show) ||
             (await hashRssImportFile(join(directory, prepared.show.image_path), 5_000_000)).sha256 !== prepared.coverSha256) throw new Error("Completed Show installation differs from its reviewed import");
         } else {
           const episode = prepared.episodes[(state.step - 4) / 4];
@@ -208,7 +214,8 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       if (target && (!record || record.publication)) throw new Error("SQLite RSS publication requires its exact staged, unpublished draft");
       if (record) {
         const episode = record.target.kind === "episode" ? prepared.episodes.find((entry) => entry.metadata.episode_id === record.target.episode_id)! : undefined;
-        const metadata = await readLocalMetadata(join(directory, episode ? `episode-${episode.metadata.episode_id}.toml` : "show.toml"));
+        const metadata = episode ? await readLocalMetadata(join(directory, `episode-${episode.metadata.episode_id}.toml`)) :
+          await readShowPublicationInput(join(directory, "show.toml"));
         const parsed = episode ? parseEpisodeDraft(metadata.toString("utf8")) : parseShowMetadata(metadata.toString("utf8"));
         if (JSON.stringify(parsed) !== JSON.stringify(episode?.metadata ?? prepared.show) || record.target.base_revision_id ||
           record.target.expected_show_state_version !== (episode ? 1 : 0) || record.assets.length !== 2 ||

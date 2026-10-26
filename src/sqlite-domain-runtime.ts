@@ -67,7 +67,8 @@ export class SqliteDomainRuntime {
     const snapshot = this.snapshot(), snapshotHash = await publicationChecksum(new TextEncoder().encode(snapshot));
     if (this.showId) {
       const target = this.content.domainSnapshot(this.showId);
-      if (target.metadata && target.cover) renderPublicationFeed(target.metadata, target.episodes, request.target_config.public_base_url, target.cover.extension);
+      if (target.metadata && target.cover) renderPublicationFeed(target.metadata, target.episodes, request.target_config.public_base_url,
+        target.cover.extension, this.content.sites.ids.all(this.showId));
     }
     this.storage.transactionSync(() => {
       const queue = this.queue.snapshot();
@@ -130,15 +131,20 @@ export class SqliteDomainRuntime {
             const metadata = target.metadata;
             this.content.sites.prepare(row.operation_id, row.feed_generation, this.showId,
               metadata.site_mode === "builtin" ? { origin: this.config.public_base_url, coverExtension: target.cover.extension,
+                episodeSiteIds: this.content.sites.ids.all(this.showId),
                 show: { show_id: metadata.show_id, title: metadata.title, description: metadata.description,
-                  language: metadata.language, author: metadata.author, ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null,
+                  language: metadata.language, author: metadata.author,
+                  ...(metadata.site_timezone !== undefined ? { site_timezone: metadata.site_timezone } : {}),
+                  ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
+                  ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null,
               target.episodes);
           }
           if (!await this.content.sites.batch(row.operation_id, this.bucket)) {
             await this.continueAfterBatch(row.operation_id); return true;
           }
           await verifyCover(this.bucket, this.showId, target.cover.extension, target.cover);
-          const feed = renderPublicationFeed(target.metadata, target.episodes, this.config.public_base_url, target.cover.extension);
+          const feed = renderPublicationFeed(target.metadata, target.episodes, this.config.public_base_url, target.cover.extension,
+            this.content.sites.ids.all(this.showId));
           await persistSqliteFeedSnapshot(this.bucket, this.showId, row.feed_generation, feed);
           await this.cache.purge(this.showId, (entrypoint) => this.content.sites.confirmPurge(row.operation_id, entrypoint));
         } else if (row.feed_generation !== null || target.metadata) throw new Error("Domain Feed reservation differs");
