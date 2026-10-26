@@ -27,6 +27,18 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "revision-execute": { usage: "revision-execute PLAN_JSON REQUEST_SHA256 confirm", description: "Adopt the exact reviewed saved revision as a NEW revision, retaining all history and media. Requires open admission. Waits for the same job; unknown requests are never replayed. Unpublished targets become published. Does not edit local originals." },
   "sync-local-metadata": { usage: "sync-local-metadata --show SHOW [--episode ID] --expect-revision UUID [--output FILE]", description: "Export exact current metadata to the standard TOML path or a new output file. Refuses existing files and unfinished drafts; never overwrites originals or downloads assets. Output paths use caller cwd." },
   "preview-schedule-time": { usage: "preview-schedule-time DATETIME [--timezone IANA_ZONE]", description: "Offline date/time conversion only: this command does NOT create a reservation or publish. An explicit offset determines the instant; otherwise --timezone overrides optional workspace castloop-admin.toml timezone, then server basis UTC. Prints local time, offset, UTC and sources. Rejects ambiguous/nonexistent DST times and explicit offset/--timezone disagreement. Does not check server time or readiness." },
+  "preview-episode-schedule": { usage: "preview-episode-schedule ID --at DATETIME [--timezone IANA_ZONE] [--show SHOW]", description: "Read-only remote review of a staged Episode draft plus its intended UTC schedule time. Prints the draft preview, local/UTC time, timezone source and approval_sha256. Does not create a schedule or publish. Bind approval to schedule-episode --expect-preview HASH." },
+  "schedule-episode": { usage: "schedule-episode ID --at DATETIME [--timezone IANA_ZONE] --expect-preview HASH [--show SHOW]", description: "Freeze the reviewed Episode inputs and submit a future single-Episode publication schedule. Returns scheduled, not published; the server keeps it outside the FIFO until due. Requires open admission and staged assets. Use schedule-status to observe it." },
+  "preview-show-schedule": { usage: "preview-show-schedule SHOW --at DATETIME [--timezone IANA_ZONE]", description: "Read-only remote review of a staged Show draft plus its intended UTC schedule time. Prints approval_sha256; does not schedule or publish." },
+  "schedule-show": { usage: "schedule-show SHOW --at DATETIME [--timezone IANA_ZONE] --expect-preview HASH", description: "Freeze reviewed Show metadata/cover and submit a future Show publication schedule. Returns scheduled, not published." },
+  "schedule-list": { usage: "schedule-list SHOW [--cursor UUID]", description: "List up to 20 publication schedules for this Show, newest first. Schedule state is separate from publication_state; follow next_cursor." },
+  "schedule-status": { usage: "schedule-status SHOW SCHEDULE_UUID", description: "Read one schedule, its current version, scheduled UTC/local time, approval hash, dispatch time and the resulting publication job state. dispatched is not publication success." },
+  "preview-schedule-reschedule": { usage: "preview-schedule-reschedule SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE]", description: "Read-only preview of moving an undispatched schedule to a new future UTC time. Prints the current schedule, resolved time and approval_sha256; bind it to schedule-reschedule --expect-preview HASH." },
+  "preview-schedule-cancel": { usage: "preview-schedule-cancel SHOW SCHEDULE_UUID", description: "Read-only preview of cancelling the current schedule version. Prints approval_sha256; bind it to schedule-cancel --expect-preview HASH." },
+  "preview-schedule-reapprove": { usage: "preview-schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N", description: "Read-only preview of reapproving a needs_approval schedule with the current runtime/base and frozen local draft. Prints approval_sha256; bind it to schedule-reapprove --expect-preview HASH." },
+  "schedule-reschedule": { usage: "schedule-reschedule SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Move an undispatched schedule to a new future UTC time without changing its frozen content. Rejects a stale version or dispatched/cancelled schedule. Obtain the hash from preview-schedule-reschedule first." },
+  "schedule-cancel": { usage: "schedule-cancel SHOW SCHEDULE_UUID --expect-version N --expect-preview HASH", description: "Cancel a schedule only before FIFO dispatch. Never cancels an already queued/running publication job and never deletes referenced uploads." },
+  "schedule-reapprove": { usage: "schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Reapprove a needs_approval schedule using the current runtime, admission window and unchanged local draft. Freshly freezes the publication request; never silently resumes paused Shows or rebases changed content." },
   skill: { usage: "skill export castloop --output DIRECTORY", description: "Export the embedded administrator Skill without networking or external tools. The destination must not exist; existing Skills and AGENTS.md are never overwritten." },
   validate: { usage: "validate service|admin-config|show|episode FILE [--assets] [--audio MP3] [--json]", description: "Read-only offline validation using publication input rules. admin-config validates optional CLI preferences (UTC or an IANA timezone, not abbreviations). File/audio paths use caller cwd; cover uses the TOML directory. Does not prove remote readiness or publication success." },
   describe: { usage: "describe [COMMAND] [--json]", description: "Read offline command specifications, effects and recovery rules. No credentials or workspace required." },
@@ -278,12 +290,25 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "import-rss": { "dry-run": "boolean", output: "string" },
     validate: { assets: "boolean", audio: "string" }, doctor: { local: "boolean" }, skill: { output: "string" },
     "preview-schedule-time": { timezone: "string" },
+    "preview-episode-schedule": { at: "string", timezone: "string", "expect-preview": "string" },
+    "schedule-episode": { at: "string", timezone: "string", "expect-preview": "string" },
+    "preview-show-schedule": { at: "string", timezone: "string", "expect-preview": "string" },
+    "schedule-show": { at: "string", timezone: "string", "expect-preview": "string" },
+    "schedule-list": { cursor: "string" },
+    "schedule-status": {},
+    "preview-schedule-reschedule": { at: "string", timezone: "string" },
+    "preview-schedule-cancel": {},
+    "preview-schedule-reapprove": { at: "string", timezone: "string", "expect-version": "string" },
+    "schedule-reschedule": { at: "string", timezone: "string", "expect-version": "string", "expect-preview": "string" },
+    "schedule-cancel": { "expect-version": "string", "expect-preview": "string" },
+    "schedule-reapprove": { at: "string", timezone: "string", "expect-version": "string", "expect-preview": "string" },
     "preview-show": { local: "boolean", remote: "boolean", "rss-output": "string" },
     "preview-episode": { local: "boolean", remote: "boolean", "rss-output": "string" },
     "list-show-revisions": { cursor: "string" }, "list-episode-revisions": { cursor: "string" },
     "sync-local-metadata": { show: "string", episode: "string", "expect-revision": "string", output: "string" },
   };
-  if (["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode", "list-episode-revisions", "preview-episode-revision"].includes(command) || command.startsWith("operation-")) options.show = "string";
+  if (["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode",
+    "preview-episode-schedule", "schedule-episode", "list-episode-revisions", "preview-episode-revision"].includes(command) || command.startsWith("operation-")) options.show = "string";
   if (["publish-show", "publish-episode"].includes(command)) options["expect-preview"] = "string";
   return { ...options, ...byCommand[command] };
 }
@@ -292,14 +317,16 @@ export function describeCommand(command: string) {
   const help = COMMAND_HELP[command];
   if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
   const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-schedule-time"].includes(command);
-  const preview = ["preview-show", "preview-episode"].includes(command);
-  const read = offline || preview || ["list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "progress", "verify", "watch", "stats"].includes(command);
+  const preview = ["preview-show", "preview-episode", "preview-episode-schedule", "preview-show-schedule",
+    "preview-schedule-reschedule", "preview-schedule-cancel", "preview-schedule-reapprove"].includes(command);
+  const read = offline || preview || ["schedule-list", "schedule-status", "list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "progress", "verify", "watch", "stats"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],
     constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly"],
     authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
-    effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" || command === "revision-execute" },
+    effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command.startsWith("schedule-") && !["schedule-list", "schedule-status"].includes(command) ||
+      command === "lifecycle-execute" || command === "revision-execute" },
     output_schema: "result", input_schemas: ["service-config", "admin-config", "show-input", "episode-input"],
     recovery: read ? "Bounded observation only; snapshots do not authorize mutations." : "Preserve exact workspace, Show, input and records. Unknown PUT/POST outcomes must not be replayed. Observe the recorded job/operation; upload continuation requires the retained receipt and unchanged input.",
     paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };

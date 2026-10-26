@@ -3,7 +3,8 @@ import type { PublicationQueueStorage, SqlitePublicationQueue } from "./sqlite-p
 import type { SqlitePublicationContent } from "./sqlite-publication-content";
 
 export function createSqliteOperationRecords(storage: PublicationQueueStorage, queue: SqlitePublicationQueue,
-  content: SqlitePublicationContent, ready: () => boolean, showId?: string) {
+  content: SqlitePublicationContent, ready: () => boolean, showId?: string,
+  hasScheduledJob: (jobId: string) => boolean = () => false) {
   const records = new SqliteOperationRecords(storage, () => queue.identity(), (operation) => {
     if (!ready() || showId !== undefined && operation.show_id !== showId) return false;
     const service = queue.snapshot();
@@ -15,7 +16,7 @@ export function createSqliteOperationRecords(storage: PublicationQueueStorage, q
       (target.episode?.lifecycle_version ?? 0) === (operation.expected_episode_lifecycle_version ?? 0) &&
       (!target.episode || target.episode.lifecycle === "published") &&
       (target.base?.revision_id ?? null) === (operation.base_revision_id ?? null);
-  });
+  }, Date.now, hasScheduledJob);
   queue.operationRecords = records;
   return records;
 }

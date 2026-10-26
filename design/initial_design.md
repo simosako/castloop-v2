@@ -1,10 +1,13 @@
 # castloop v2 デザインドキュメント
 
+現在のIssue #65／#70統合版は内部queue/content形式**11/11**・`static-show-v2`の新規環境専用。予約表とサイト改善を両方含むため、旧9/9・10/11等への互換配備・変換はしない。以下は各機能の導入段階の記録であり、現在の操作・形式は[サイト利用ガイド](../docs/show_website.md)を優先する。本人によるサイト表示・再生・東京日付の確認は完了したが、統合版の実配備とnative Free性能は未確認である。
+
 Issue #70の自動短縮URL版は内部queue/content形式10/11の新規環境専用。EpisodeページはShow直下の自動ハッシュURL一つだけとし、長いページ入口・`e/`・互換転送・DB変換は提供しない。HTTP(S)リンク復元とcopyrightフッター削除も含む。[URL設計](show_website_site_slug_proposal.md)・[サイト利用ガイド](../docs/show_website.md)を優先する。
 
 Issue #70のCSSカスタマイズ開発版は内部queue/content形式**9/10**の新規環境専用。固定HTML＋標準デザイン1種類＋Show単位のCSS 1ファイルを提供する。CLIがCSSを検証してShow metadataへ同梱し、既存Show DOがHTMLへ事前に埋め込む。生成用サービスは追加しない。後続の[説明表示改善](show_website_description_display_plan.md)ではHTML解析用の`htmlparser2`を追加し、一覧のタグなし160文字から既存個別ページの全文へリンクする。全文は安全な段落・改行とHTTP(S)リンクで表示する。第1段8/9からの移行・互換配備はしない。[CSS採用方針](show_website_customization_options.md)と[利用ガイド](../docs/show_website.md)を参照する。
 
 Issue #70開発版は、Showごとに内蔵サイト／外部サイトを選択できる。内蔵HTMLは既存Show DOのAlarmで生成し、private R2の世代別snapshotへ保存する。`SiteCachedPages`とHTML専用Gatewayは既存media cacheから分離し、最新のShow判定を共有する。必要な両purge後、Feedとサイト全体の世代・ページ参照を同一transactionで確定する。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用。下記の7/8以前の番号は各機能導入時点の履歴である。[サイト設計](show_website_plan.md)・[利用ガイド](../docs/show_website.md)参照。Freeの実機性能・ブラウザ実機再生は未確認。
+Issue #65開発版は、Show内の予約表と既存Alarmでfuture UTCのEpisode／Show公開を実行する。予約はFIFOへ先に入らず、到来時に同じShowの通常jobとして原子的に投入される。Pause・受付停止・保守・runtime／config／base変更では`needs_approval`へ移り、明示再承認なしに実行しない。予約実行日時は`published_at`と別で、後者を書き換えない。CLIは`preview-episode-schedule`／`schedule-episode`、`schedule-list`／`status`／`reschedule`／`cancel`／`reapprove`を提供する。内部queue/content形式は**9/9**、fresh環境専用で旧8/9を含む環境を変換しない。[予約設計](episode_scheduled_publication_plan.md)・[管理用設定ガイド](../docs/admin_configuration.md)参照。隔離したfresh環境で3 Episodeの予定前未配信・予定後配信を確認した。Pause/再承認・取消・Alarm再配送・性能は未確認（[実機検証](issue65_scheduled_publication_live_20261026.md)）。
 
 Issue #64の開発版では、認証付きの公開済み全文・履歴取得とCLIの項目差分・ローカルRSS生成、保存済みrevisionの明示採用を追加した。Show内SQLiteに履歴2表を置き、R2の不変metadata・画像・音源と照合する。採用は新revisionとして保存・purge・SQL確定し、素材再uploadや過去履歴の上書きはしない。内部queue/content形式**7/8**、必須`revision_history="sqlite-revisions-v1"`の新規環境専用で旧環境は変換しない。[採用設計](published_diff_and_revision_restore_plan.md)と[利用ガイド](../docs/published_content_review.md)参照。実Cloudflareの配備・公開・性能確認は行っていない。
 

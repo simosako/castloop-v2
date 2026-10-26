@@ -78,6 +78,26 @@ export class SqlitePublicationQueue {
       storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_jobs_pending ON publication_jobs (state, sequence)");
       storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_jobs_show_state ON publication_jobs (show_id, state)");
       storage.sql.exec("CREATE UNIQUE INDEX IF NOT EXISTS publication_one_active ON publication_jobs ((1)) WHERE state IN ('running', 'blocked')");
+      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedules (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL UNIQUE, show_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('show', 'episode')), episode_id TEXT,
+        version INTEGER NOT NULL CHECK(version > 0), state TEXT NOT NULL CHECK(state IN ('scheduled', 'needs_approval', 'dispatched', 'cancelled', 'failed', 'blocked')),
+        reason_code TEXT, scheduled_at TEXT NOT NULL, scheduled_at_ms INTEGER NOT NULL, timezone TEXT NOT NULL, timezone_source TEXT NOT NULL,
+        resolution_source TEXT NOT NULL, local_input TEXT NOT NULL, local_datetime TEXT NOT NULL, local_offset TEXT NOT NULL,
+        input_offset TEXT, preview_sha256 TEXT NOT NULL, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
+        request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL, client_json TEXT,
+        created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL, dispatched_at_ms INTEGER, cancelled_at_ms INTEGER,
+        CHECK ((kind = 'show' AND episode_id IS NULL) OR (kind = 'episode' AND episode_id IS NOT NULL)),
+        CHECK ((state = 'dispatched') = (dispatched_at_ms IS NOT NULL)),
+        CHECK ((state = 'cancelled') = (cancelled_at_ms IS NOT NULL)))`);
+      storage.sql.exec(`CREATE UNIQUE INDEX IF NOT EXISTS publication_one_open_schedule
+        ON publication_schedules (show_id, kind, COALESCE(episode_id, '')) WHERE state IN ('scheduled', 'needs_approval')`);
+      storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_schedules_due ON publication_schedules (state, scheduled_at_ms, sequence)");
+      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedule_events (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL, version INTEGER NOT NULL,
+        action TEXT NOT NULL CHECK(action IN ('create', 'reschedule', 'cancel', 'reapprove', 'dispatch', 'suspend', 'fail', 'block')),
+        state TEXT NOT NULL, reason_code TEXT, request_sha256 TEXT NOT NULL, recorded_at_ms INTEGER NOT NULL)`);
+      storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_schedule_events_schedule ON publication_schedule_events (schedule_id, sequence)");
       storage.sql.exec(`INSERT OR IGNORE INTO publication_service
         (id, service_id, worker_version_id, service_config_sha256, state) VALUES (1, ?, ?, ?, 'paused')`,
       this.runtime.service_id, this.runtime.worker_version_id, this.runtime.service_config_sha256);
@@ -119,8 +139,56 @@ export class SqlitePublicationQueue {
   private async schedule(): Promise<void> {
     if (this.active() || !this.storage.sql.exec<{ sequence: number }>(
       "SELECT sequence FROM publication_jobs WHERE state = 'queued' ORDER BY sequence LIMIT 1").toArray().length) return;
+    await this.wakeAt(this.now());
+  }
+
+  private async wakeAt(time: number): Promise<void> {
     const alarm = await this.storage.getAlarm();
-    if (alarm === null) await this.storage.setAlarm(this.now());
+    if (alarm === null || alarm > time) await this.storage.setAlarm(time);
+  }
+
+  async wakeNow(): Promise<void> { await this.wakeAt(this.now()); }
+
+  hasPendingTarget(input: Pick<SqlitePublicationRequest, "show_id" | "kind" | "episode_id">): boolean {
+    return this.storage.sql.exec<{ job_id: string }>(`SELECT job_id FROM publication_jobs
+      WHERE show_id = ? AND state IN ('queued', 'running', 'blocked')
+        AND json_extract(request_json, '$.kind') = ? AND json_extract(request_json, '$.episode_id') IS ?
+      LIMIT 1`, input.show_id, input.kind, input.episode_id ?? null).toArray().length > 0;
+  }
+
+  scheduleAdmission(input: SqlitePublicationRequest): "open" | "paused" | "runtime_mismatch" | "stale_window" | "queue_blocked" | "target_busy" {
+    const service = this.requireRuntime();
+    if (service.state !== "open") return "paused";
+    if (input.worker_version_id !== service.worker_version_id || input.service_config_sha256 !== service.service_config_sha256) return "runtime_mismatch";
+    if (input.admission_window_id !== service.admission_window_id) return "stale_window";
+    if (this.active()?.state === "blocked") return "queue_blocked";
+    if (this.hasPendingTarget(input)) return "target_busy";
+    return "open";
+  }
+
+  admitScheduled(input: SqlitePublicationRequest, hash: string, client: OperationClient | undefined,
+    invocation: string, apply: () => void): SqlitePublicationStatus {
+    const request = parseSqlitePublicationRequest(input);
+    return this.storage.transactionSync(() => {
+      const service = this.requireRuntime();
+      if (this.scope && (request.show_id !== this.scope.showId || !this.scope.ready())) throw new Error("Show publication scope is unavailable");
+      if (service.state !== "open") throw new Error("SQLite publication admission is paused");
+      if (request.worker_version_id !== service.worker_version_id || request.service_config_sha256 !== service.service_config_sha256 ||
+        request.admission_window_id !== service.admission_window_id) throw new Error("Scheduled publication runtime or resume window is stale");
+      if (this.active()?.state === "blocked") throw new Error("SQLite publication queue is blocked");
+      if (this.hasPendingTarget(request)) throw new Error("Scheduled publication target already has pending work");
+      if (this.storage.sql.exec("SELECT job_id FROM publication_jobs WHERE request_id = ? OR job_id = ?",
+        request.request_id, request.job_id).toArray().length) throw new PublicationQueueConflict();
+      this.operationRecords?.validatePublicationAssets(request);
+      if (client) this.operationRecords?.publicationAccepted(request, hash, client, invocation);
+      const feedGeneration = reserveSqliteFeedGeneration(this.storage, { kind: "publication", id: request.job_id,
+        showId: request.show_id, requestSha256: hash });
+      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, feed_generation, state, delivery_policy)
+        VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)`, request.request_id, request.job_id, request.show_id, hash,
+      JSON.stringify(request), feedGeneration, sqliteDeliveryPolicy(request));
+      apply();
+      return this.statusRow(this.byJob(request.job_id));
+    });
   }
 
   async enqueue(input: SqlitePublicationRequest, client?: OperationClient, invocation = crypto.randomUUID()): Promise<SqlitePublicationStatus> {
@@ -194,7 +262,8 @@ export class SqlitePublicationQueue {
     return record;
   }
 
-  async applyControl(input: SqliteAvailabilityRequest, actual = this.runtime): Promise<SqliteAvailabilityRecord> {
+  async applyControl(input: SqliteAvailabilityRequest, actual = this.runtime,
+    suspendSchedules?: (reason: "show_paused" | "show_admission_paused") => void): Promise<SqliteAvailabilityRecord> {
     const request = sqliteAvailabilityRequestSchema.parse(input), source = JSON.stringify(request);
     const hash = await sha256Hex(source);
     const result = this.storage.transactionSync(() => {
@@ -210,6 +279,9 @@ export class SqlitePublicationQueue {
       }
       if (request.expected_availability_version !== service.availability_version) throw new Error("Show control observation is stale");
       if (request.action !== "pause" && this.scope && !this.scope.ready()) throw new Error("Show control requires verified runtime outside maintenance");
+      if (request.action === "pause" || request.action === "admission-pause") {
+        suspendSchedules?.(request.action === "pause" ? "show_paused" : "show_admission_paused");
+      }
       let state = service.state, window = service.admission_window_id;
       if (request.action === "pause") state = "paused";
       else if (request.action === "admission-pause") { if (state === "open") state = "admission_paused"; }

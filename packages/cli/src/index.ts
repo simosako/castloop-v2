@@ -156,7 +156,8 @@ async function main(context: Invocation): Promise<unknown> {
   const explicitRoot = flags.workspace === undefined ? undefined : resolve(flags.workspace);
   const explicitShow = flags.show;
   delete flags.workspace;
-  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode", "list-episode-revisions", "preview-episode-revision"].includes(command);
+  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode",
+    "preview-episode-schedule", "schedule-episode", "list-episode-revisions", "preview-episode-revision"].includes(command);
   if (episodeCommand && explicitRoot && !explicitShow) throw new AgentError("missing_show", "Explicit --workspace requires --show for Episode commands.");
   if (explicitShow) {
     validateId(explicitShow, "show");
@@ -240,6 +241,25 @@ async function main(context: Invocation): Promise<unknown> {
     allowedFlags(flags, ["operation-id"]);
   } else if (command === "watch") {
     allowedFlags(flags, ["timeout", "interval"]);
+  } else if (["preview-episode-schedule", "schedule-episode", "preview-show-schedule", "schedule-show"].includes(command)) {
+    allowedFlags(flags, ["at", "timezone"]);
+    if (!flags.at) throw new Error("Scheduled commands require --at DATETIME");
+  } else if (command === "schedule-list") {
+    allowedFlags(flags, ["cursor"]);
+  } else if (command === "schedule-status" || command === "preview-schedule-cancel") {
+    allowedFlags(flags, []);
+  } else if (command === "preview-schedule-reschedule") {
+    allowedFlags(flags, ["at", "timezone"]);
+    if (!flags.at) throw new Error("Schedule previews require --at DATETIME");
+  } else if (command === "preview-schedule-reapprove") {
+    allowedFlags(flags, ["at", "timezone", "expect-version"]);
+    if (!flags.at || !flags["expect-version"]) throw new Error("Schedule reapproval preview requires --at DATETIME and --expect-version N");
+  } else if (command === "schedule-cancel") {
+    allowedFlags(flags, ["expect-version"]);
+    if (!flags["expect-version"]) throw new Error("Schedule cancellation requires --expect-version N");
+  } else if (["schedule-reschedule", "schedule-reapprove"].includes(command)) {
+    allowedFlags(flags, ["at", "timezone", "expect-version"]);
+    if (!flags.at || !flags["expect-version"]) throw new Error("Schedule changes require --at DATETIME and --expect-version N");
   } else {
     allowedFlags(flags, []);
   }
@@ -300,6 +320,8 @@ async function main(context: Invocation): Promise<unknown> {
     ...(command === "stats-retention" ? { statsOptions: { retentionOperationId: flags["operation-id"] ?? randomUUID() } } : {}),
     ...(command === "watch" ? { watchOptions: { timeoutSeconds: flags.timeout === undefined ? undefined : Number(flags.timeout),
       intervalSeconds: flags.interval === undefined ? undefined : Number(flags.interval), signal: watchSignal?.signal } } : {}),
+    ...(command.includes("schedule") ? { scheduleOptions: { at: flags.at, timezone: flags.timezone,
+      expectVersion: flags["expect-version"], cursor: flags.cursor } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview });
   if (listing && !process.argv.includes("--json")) {
     const { formatSqliteCatalog } = await import("./sqlite-catalog");

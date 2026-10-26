@@ -8,6 +8,7 @@ import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
 import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
+import { SqlitePublicationSchedules } from "./sqlite-publication-schedules";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import { withSitePublication } from "./site-publication";
 import { serveSiteGateway } from "./site-gateway";
@@ -196,6 +197,48 @@ test("Show timezone updates regenerate all pages atomically and survive Episode 
   expect((await f.run(f.lifecycle("unpublish"))).state).toBe("succeeded");
   expect((await f.run(f.lifecycle("restore"))).state).toBe("succeeded");
   await check("2026-10-16 (UTC+09:00)");
+});
+
+test("scheduled publication uses builtin CSS, safe descriptions, short URLs and the Show timezone only when due", async () => {
+  const f = await fixture(true), showRequest = await f.request("show");
+  const { site_url, ...showMetadata } = show;
+  showRequest.payloads[0] = await f.payload(showRequest.job_id, "show_metadata", stringifyToml({ ...showMetadata,
+    site_mode: "builtin", site_css_path: "site.css", site_css: ":root{--cl-accent:red}", site_timezone: "Asia/Tokyo" }));
+  expect((await f.run(showRequest)).state).toBe("succeeded");
+  let now = 1000;
+  const schedules = new SqlitePublicationSchedules(f.storage, f.queue, f.content, () => now,
+    { showId: "daily", ready: () => true });
+  const publication = await f.request("episode");
+  publication.payloads[0] = await f.payload(publication.job_id, "episode_metadata", stringifyToml({ ...metadata("first"),
+    published_at: "2025-12-16T22:00:00Z", description: '<p>全文<br><a href="https://example.com/story">記事</a></p>' }));
+  const scheduleId = crypto.randomUUID();
+  await schedules.create({ schema_version: 1, protocol: "sqlite-schedule-v1", ...f.runtime, show_id: "daily",
+    schedule_id: scheduleId, expected_version: 0, preview_sha256: "c".repeat(64), publication,
+    scheduled_at: { input: "1970-01-01T00:00:02Z", scheduled_at: "1970-01-01T00:00:02Z", scheduled_at_ms: 2000,
+      input_offset: "+00:00", resolution_source: "offset", timezone: "UTC", timezone_source: "server",
+      local_datetime: "1970-01-01T00:00:02", offset: "+00:00" } });
+  expect(await schedules.dispatchDue()).toBe(0);
+  expect(f.queue.snapshot().queued).toBe(0);
+  expect((await readSite(f, episodePage())).status).toBe(404);
+  expect(f.feed()).not.toContain("<item>");
+  now = 2000;
+  expect(await schedules.dispatchDue()).toBe(1);
+  let result;
+  do { f.clearAlarm(); result = await f.runner.alarm(); } while (result.state === "running");
+  expect(result.state).toBe("succeeded");
+  expect(schedules.status(scheduleId).schedule).toMatchObject({ state: "dispatched", publication_state: "succeeded" });
+  for (const path of ["/podcasts/daily/", episodePage()]) {
+    const response = await readSite(f, path), html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain("2025-12-17 (UTC+09:00)");
+    expect(html).toContain(":root{--cl-accent:red}");
+    expect(html).toContain(`<a href="${episodePage()}">`);
+    expect(html).toContain('<audio controls preload="none"');
+    expect(html).not.toContain("<footer");
+    if (path === episodePage()) expect(html).toContain('<a href="https://example.com/story">記事</a>');
+  }
+  expect(f.feed()).toContain(`<link>https://public.example.com${episodePage()}</link>`);
+  expect(f.content.episodes("daily")[0].published_at).toBe("2025-12-16T22:00:00Z");
 });
 
 test("builtin publication atomically exposes static pages, native audio and RSS links without private Show fields", async () => {

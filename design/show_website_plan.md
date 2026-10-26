@@ -1,5 +1,7 @@
 # Issue #70: R2上の静的な番組サイト・Episodeページの設計と実装
 
+**2026-10-27の完了判断：** 第1段後の標準デザイン・任意CSS、説明の抜粋／全文と安全なリンク、自動短縮URL、フッター削除、[Show別タイムゾーン](show_website_timezone_plan.md)を実装し、本人の画面・再生確認を得た。合意した機能開発を完了とする。Issue #65の予約公開を統合した現在の形式は**11/11・static-show-v2**で、新規環境専用。以下は第1段の設計・検証履歴である。現在の操作は[サイトガイド](../docs/show_website.md)を優先する。native Free性能・スマートフォン／キーボードの実機確認・統合版の実配備は未完了であり、機能完了と区別する。
+
 作成・改訂日: 2026-10-25。**Issue #70の第1段となる最小限実装。案Bとサイト方式の2択を採用し、CLI・Show DO・Workerへ接続した開発版**。全公開経路の接続と検証を§13に記録する。見栄え・日時表示などの改善は後続とし、Issue全体の完了とは扱わない。本設計だけでは実Cloudflare操作の承認にならない。
 
 後続のカスタマイズ方式は、2026-10-26のレビューで**固定HTML＋標準デザイン1種類＋Showごとの任意CSS 1ファイル**を採用し、ローカル実装・検証を行った。[カスタマイズの採用方針と検証範囲](show_website_customization_options.md)を参照する。CSS導入時点の版は内部9/10の新規環境専用で、Free枠内の運用と単純さ・外部依存の少なさを優先する。本書の8/9・固定CSSのみという記述は第1段の仕様を示す。後続文書の「案B」はカスタマイズ範囲の選択であり、本書§4.1.1の構成案Bとは別の比較である。
@@ -7,7 +9,7 @@
 さらに[説明表示改善](show_website_description_display_plan.md)を実装した。一覧はタグなし160文字から個別ページへリンクし、全文は安全な段落・改行で表示する。本人レビュー後、HTTP(S)リンク復元・フッター削除・[自動短縮URL](show_website_site_slug_proposal.md)も実装し、[内部10/11・サイト識別static-show-v2の新規非公開環境で検証](show_website_short_url_trial_verification_20261026.md)した。旧試験環境は明示承認で退避・削除した。HTML解析には`htmlparser2`を使い、元説明文と公開時の生成範囲は変更しない。本書の8/9・長いEpisodeページURL・「説明をすべてescapeして文字表示」は第1段の仕様である。
 
 - 対象: [Issue #70](https://github.com/simosako/castloop-v2/issues/70)。Issue本文・コメントを確認した。確認時点でコメントはない。
-- 改訂時の調査基準: `1d53d0e330d719b6895ddeaf60b7e3143d0103e6`、package version `0.7.5`。main同期後の公開内容取得・revision採用も含む。基準版の内部queue/content形式は7/8。今回の実装は8/9のfresh環境専用とし、旧環境は変換しない。
+- 改訂時の調査基準: `1d53d0e330d719b6895ddeaf60b7e3143d0103e6`、package version `0.7.5`。main同期後の公開内容取得・revision採用も含む。基準版の内部queue/content形式は7/8。今回の実装はfresh環境専用とし、旧環境は変換しない。Issue #65の予約表追加後はqueue/content **9/9**（queue `9` は予約表を含む）。
 - 当初は実装・ローカル検証だけを対象とした。その後、別途明示承認された専用環境で非公開試験を実施した（§13.3）。この承認を他環境の配備・公開・Resume・資源／domain／権限／課金設定変更へ流用しない。
 
 ## 1. 採用方針の要約
@@ -474,7 +476,7 @@ Show metadataの設定、内部形式・health識別、SQLの生成索引、正�
 | Alarm継続 | `publication_jobs.continuation_ready`を正常batch完了と次回Alarm予約と一緒に保存。claim時に0へ戻してdurability確認後にIOする。0のままのrunningは中断としてblocked。domain専用operationも独立したmarkerを持つ。各batchで全Episodeを再parse／sortしない |
 | 原子的な公開 | `src/site-publication.ts`が既存executorを接続。必要なHTML・既存公開保存・media purge・site purgeが確認済みの場合だけ、既存queue完了transaction内でFeedとサイト参照を切り替える。通常job・domainともentrypointごとのpurge成功を別々のflagへ保存する。未知結果は再送しない |
 | 配信 | HTML専用`src/site-gateway.ts`と`SiteCachedPages`。同Show DOの最新gateを先に評価し、サイト全体のFeed世代と参照を照合する。R2からstreamし、HEAD／条件付き応答・security headerを維持。内部tag・認証・cookieを外へ持ち出さない |
-| readiness・形式 | 既存とHTMLの両cache entrypointのversion/config・cache有効状態とpurgeを検査。内部queue/content **8/9**、health／inspectionに必須`website="static-show-v1"`。旧形式は拒否し、移行しない。既存class/binding/dateは維持 |
+| readiness・形式 | 既存とHTMLの両cache entrypointのversion/config・cache有効状態とpurgeを検査。内部queue/content **9/9**（queue `9` はIssue #65の予約表を含む）、health／inspectionに必須`website="static-show-v1"`。旧形式は拒否し、移行しない。既存class/binding/dateは維持 |
 | 公開経路 | Show/Episodeの公開・更新、非公開化・復元、保存revision採用、RSS逐次公開、domain再生成へ接続。builtin/external切替も明示Show公開として扱う。RSSの紹介linkはbuiltinだけ内蔵URLへ変える |
 
 閲覧要求ではHTML生成、全metadata parse、全Episode走査をしない。最初の入力検証・凍結と最終の既存公開検証には既存の全体予算を維持する。HTML候補と凍結元も保存量・SQL消費へ算入する。一般的なretry／workflow基盤や別生成DOは追加しない。

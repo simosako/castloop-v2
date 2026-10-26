@@ -1,5 +1,7 @@
 # Issue #65: Episode予約公開の設計・開発計画
 
+**現在の統合版：** Issue #70のサイト改善を統合した開発版は内部queue/content形式**11/11**の新規環境専用。本書の9/9は予約公開単独の導入段階であり、実機検証もその環境の結果である。旧9/9・サイト試験版10/11等からのDB変換・互換配備は提供しない。現在の設定・操作は[管理用設定ガイド](../docs/admin_configuration.md)を参照する。
+
 作成日: 2026-10-24。**管理者レビューにより、scheduler A／管理設定C／日時identity A／停止後Aと4節の日時解決規則を採用し、開発・ローカル検証へ進む。**
 
 - 対象Issue: [#65](https://github.com/simosako/castloop-v2/issues/65)
@@ -346,16 +348,27 @@ castloop schedule-reapprove SCHEDULE_UUID --workspace /path/to/service --show da
 
 ## 13. 現在の実装範囲
 
-管理者レビュー後、最初の区切りとして**管理設定と日時変換のCLI基盤**を実装した。Issue全体やP1全項目の完了を意味しない。
+2026-10-24のCLI基盤に続き、2026-10-26に**サーバー側の予約公開本体**を実装した。fresh環境専用の内部queue/content形式は**9/9**（予約表の追加でqueueを8から9へ更新。contentはIssue #70/#71の9のまま）。旧8/9を含む環境の変換・移行・互換配備は提供しない。
 
-- 3.4節の棚卸しを完了し、既存設定は移動しない。`castloop-admin.toml`は任意の`timezone`だけを扱い、サービスidentityとは分離した。
-- strict schema、安全なoptional読取、template／schema／validate／doctorを追加した。
-- 4節の解決規則を日時helperと`preview-schedule-time`で実装した。UTC既定、CLI／設定の優先度、明示offsetの保持と照合、DSTのgap／fold拒否を扱う。
-- 日時変換に`@js-temporal/polyfill` 0.5.1を固定し、間接依存`jsbi`を含む配布ライセンス表記を追加した。
-- previewはオフライン・無書込であり、予約・upload・公開・サーバー時刻確認を行わない。既存`published_at`を変更しない。
-- **未実装:** 未来`published_at`の即時公開警告、予約表／受付／一覧・詳細・変更・取消・再承認、素材保護とprivate journal、Alarm／FIFO／保守との統合。P0のDDL／API詳細契約もサーバー実装前に確定する。
-- Workerコード・DO永続形式・サービスconfigのschema／hash・Cloudflare環境は今回変更していない。内部形式と能力識別の更新はサーバー実装段階で行う。
+### 実装したもの
 
-ローカル確認はBun **1.4.4**で`bun test`: **674 pass / 0 fail**（78 files）。`npm run check`、Linux単体CLI build、空PATH・ソース／外部runtimeなしのstandalone smokeが成功した。smokeは日時変換・設定・DST／offset拒否と既存agent機能を確認する。計画の基準Bun 1.4.2での別実行、Cloudflare nativeの予約実行や性能は未確認。実環境の配備・公開・Resume・資源変更は行っていない。
+- Show DO内の`publication_schedules`と変更履歴`publication_schedule_events`。`schedule_id`、単調な`version`、UTC期限、状態、承認hash、凍結した公開要求、素材参照を保存する。
+- 状態は`scheduled / needs_approval / dispatched / cancelled / failed / blocked`。公開jobの`queued / running / succeeded / failed / blocked`は別項目`publication_state`で返す。`dispatched`は公開成功ではない。
+- 予約作成・一覧・詳細・日時変更・取消・再承認。期待versionとプレビューhashを必須にし、同一対象の未投入予約を1つに限定する。変更・取消はFIFO投入前だけ許可する。
+- 到来時に予約を同じShow DOの既存FIFOへ原子的に投入する。予約表だけではFIFO順を占有せず、既存queued jobを追い越さない。1回のAlarmで処理する到来予約は最大10件。
+- Pause／受付停止／保守準備では、未投入予約を`needs_approval`へ原子的に移す。Resumeや保守解除だけで自動再開せず、現在のruntime・window・baseで新しい公開要求を凍結して再承認する。
+- 実行時のruntime／config／window／Show state version／Episode base／素材identityを再照合する。base変更は`base_conflict`、素材不正は`target_unavailable`としてFIFOへ入れない。Alarm予約失敗はjob・予約状態の更新をrollbackする。
+- 予約中のupload、draft編集、即時publish、upload取消・cleanupをサーバー側で拒否する。取消・失敗後も素材を自動削除しない。
+- CLI: `preview-episode-schedule`、`schedule-episode`、`preview-show-schedule`、`schedule-show`、`schedule-list`、`schedule-status`、`schedule-reschedule`、`schedule-cancel`、`schedule-reapprove`。`preview-schedule-time`は引き続きオフライン変換専用。
+- `schedule-episode`／`schedule-show`は既存のstage済みdraftとアップロード済み素材だけを使い、`--expect-preview`の承認hashが一致しなければ送信しない。予約受付後はCLIを待機させず、`scheduled`とschedule IDを返す。
+- 未来の`published_at`と予約実行日時は別identityのまま。予約実行で`published_at`を書き換えない。
 
-管理者のテスト指示を受け、指定サンプル3＋36 Episode（約1.50GB）で[単体CLIの実データ検証](issue65_cli_real_data_verification_20261024.md)を実施した。162コマンドが期待どおりで、原本の前後照合も一致。通信トレースはptrace権限制約で取得できず、通信ゼロの実測とはしない。予約本体は未実装のため、Cloudflare nativeの予約公開・Alarm・時刻gateの検証ではない。
+### 未実装・未確認
+
+- 未来`published_at`で即時公開する場合の専用警告（P1の先行項目）は未実装。
+- 通知送信、blocked解除、繰り返し予約、queued/running jobの取消、既存環境の移行は対象外。
+- Alarm再配送・中断、blocked、Pause／再承認、取消、同時刻予約、性能・Free枠はCloudflare実機で未確認。
+
+ローカル回帰はBun 1.4.4で`bun test`: **810 pass / 0 fail**（92 files）。`npm run check`とLinux単体CLI buildも成功した。これはBun SQLiteとmemory R2 fixtureによる検証であり、DO runtimeの永続性・native Alarm再配送・実Cache purgeの証明ではない。
+
+fresh隔離環境で3 Episodeを約3分間隔に予約し、各予定前のFeed未配信と予定後の追加、`publication_state=succeeded`、予約時刻+2msのdispatchを確認した。環境・結果・未確認範囲は[実機検証記録](issue65_scheduled_publication_live_20261026.md)に保存した。CLI基盤の実データ検証（指定サンプル3＋36 Episode、約1.50GB、162コマンド）は[別記録](issue65_cli_real_data_verification_20261024.md)に保持する。これは予約本体の実機検証ではない。

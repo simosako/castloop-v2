@@ -1,8 +1,8 @@
 # 番組サイトとEpisodeページ（Issue #70開発版）
 
-Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を追加した開発版。番組紹介・Episode一覧・ブラウザ標準プレイヤーを固定HTMLで提供する。Issue全体の完了やCloudflare Free性能の実証を意味しない。
+Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を追加した開発版。合意した機能実装と本人の画面確認は完了した。Cloudflare Free性能の実証や全端末での確認を意味しない。
 
-新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。自動短縮URL対応後の内部queue/content形式は**10/11**、healthとinspectionの必須識別は`website="static-show-v2"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。第1段8/9・CSS版9/10を含め、既存環境のDB変換・移行・資源採用は提供しない。旧`static-show-v1`環境はCLIの能力照会で拒否する。
+新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。Issue #65の予約表を統合した内部queue/content形式は**11/11**、healthとinspectionの必須識別は`website="static-show-v2"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。第1段8/9・CSS版9/10・短縮URL試験版10/11・予約公開版9/9を含め、既存環境のDB変換・移行・資源採用は提供しない。旧`static-show-v1`環境はCLIの能力照会で拒否する。
 
 ## サイト方式を選ぶ
 
@@ -119,7 +119,7 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 
 - HTMLは既存Show DOのAlarmで事前生成し、private R2へ不変保存する。閲覧時には生成せず、HTML専用Gatewayと`SiteCachedPages`のCDN cacheで配信する。Feed／画像／音源の`SqliteCachedAssets`とはcache・purgeを分ける。
 - Episode追加・更新では全一覧と対象個別ページを生成し、他の個別ページは再利用する。Show情報・CSS・タイムゾーン更新では全ページを生成する。全件入力のSQL保存とRSS全文生成は分割されておらず、件数・更新頻度に応じた負荷は残る。[生成範囲とFree枠の制約](../design/show_website_description_display_plan.md#61-episode追加時の生成範囲現行実装)を参照する。
-- 自動短縮URL版は保存形式10/11の新規環境専用。9/10以前の環境へのcode-only deploy・DB変換は行わない。同じ10/11環境での後続の表示変更も、Worker更新だけでは保存済みHTMLは変わらず、通常の更新保守手順と対象Showの明示公開が必要である。
+- 予約公開との統合版は保存形式11/11の新規環境専用。既存10/11・9/9等へのcode-only deploy・DB変換は行わない。同じ保存形式での後続の表示変更も、Worker更新だけでは保存済みHTMLは変わらず、通常の更新保守手順と対象Showの明示公開が必要である。
 - 1 batch（1回のAlarmで処理する生成単位）は最大20 HTML・合計4,000,000 UTF-8 bytes、1 HTMLは1,000,000 bytes以下。全入力には既存の公開件数・JSON容量予算も適用する。超過を切り詰めて公開しない。
 - 正常なbatch完了と次回Alarm予約を保存した場合だけ次のbatchへ進む。実行中断・未知のPUTやpurgeは`blocked`として保全し、再送しない。
 - HTML、Feed、必要な音源・metadataの保存確認と両方の必要なpurgeが完了してから、公開参照を同じSQL transactionで切り替える。通常更新中は検証済みの旧内容だけを配信する。
@@ -143,4 +143,4 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 
 別途承認された[非公開の実機試験](../design/show_website_private_trial_verification_20261025.md)では、新規環境でShowと3 Episodeを公開し、本人からブラウザでのアクセス・3件再生成功の報告を得た。閲覧後の未認証要求もAccessで拒否された。個別ページ・シーク・スマートフォン・CPU性能等の未確認範囲は同記録で区別する。
 
-2026-10-26には明示承認を受け、上記の短尺試験環境を削除して、[標準デザインと通常音源3件の別環境](../design/show_website_css_large_trial_verification_20261026.md)を作成し、本人から再生成功の報告を得た。その後の説明表示版のレビューを経て、同環境を退避・削除し、[自動短縮URL・リンク表示版の新規非公開環境](../design/show_website_short_url_trial_verification_20261026.md)を作成した。約53.7〜62.9 MBのMP3の全量hash、短いページURL、元のリンク復元、フッター非表示、公開前後の未認証30要求拒否を確認し、本人からも当該変更の画面更新確認を得た。2026-10-27には別承認で[同環境をタイムゾーン版へ更新](../design/show_website_timezone_trial_verification_20261027.md)し、一覧・個別ページの東京設定と更新前後の未認証拒否を確認した。タイムゾーン版の本人ブラウザレビュー、カスタムCSSの実機公開、native CPU性能等は未確認である。
+2026-10-26には明示承認を受け、上記の短尺試験環境を削除して、[標準デザインと通常音源3件の別環境](../design/show_website_css_large_trial_verification_20261026.md)を作成し、本人から再生成功の報告を得た。その後の説明表示版のレビューを経て、同環境を退避・削除し、[自動短縮URL・リンク表示版の新規非公開環境](../design/show_website_short_url_trial_verification_20261026.md)を作成した。約53.7〜62.9 MBのMP3の全量hash、短いページURL、元のリンク復元、フッター非表示、公開前後の未認証30要求拒否を確認し、本人からも当該変更の画面更新確認を得た。2026-10-27には別承認で[同環境をタイムゾーン版へ更新](../design/show_website_timezone_trial_verification_20261027.md)し、一覧・個別ページの東京設定と更新前後の未認証拒否を確認した。本人もブラウザで東京の日付表示を確認した。カスタムCSSの実機公開、native CPU性能、スマートフォン／キーボードの実機確認等は未完了である。これらの実機結果は統合前10/11環境のものであり、予約公開統合後11/11版は未配備。試験環境をそのまま保持し、互換更新はしない。

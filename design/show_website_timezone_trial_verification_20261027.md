@@ -48,10 +48,12 @@ Showの受付と配信を正式CLIでPauseし、ready・drainedを確認した�
 - 現在値のShow設定1件以外、更新前の31 objectのkey・size・ETagをすべて保持した。新規9 objectが増え、R2は計41 object・361,118,038 bytes。最終読取検査の前後も一覧は一致した。旧HTML・公開snapshot・音源・必要な履歴は削除していない。
 - 更新前、再公開前、最終確認の3段階で、Access設定・private R2・preview無効・別hostnameなしを照合し、各段階30件の未認証要求をすべてAccessログインへの302で拒否した。鍵なし管理APIは401、公開対象外のパスは404だった。共有Access設定は変更していない。
 - 保持サービス`sq16r-6ec01dc6`のWorker設定は前後一致した。有料plan・CPU上限・DNS・domain・共有証明書・元データ・過去の証跡は変更していない。
-- **本人のブラウザでの新しい日付表示・再生確認はレビュー待ち。** エージェントによる確認は管理者認証付きsnapshotとprivate R2の生成物の照合であり、Accessを迂回する閲覧用tokenや公開コピーは作成していない。
+- **本人からブラウザで`2025-12-17 (UTC+09:00)`と表示されることを確認したとの報告を受けた。** この更新後の音源再生の再確認は報告されていない。エージェントによる確認は管理者認証付きsnapshotとprivate R2の生成物の照合であり、Accessを迂回する閲覧用tokenや公開コピーは作成していない。
 
 ## 証跡と検証限界
 
 私有証跡は既存試験directory内の`.local-test-data/results/20261026/site70-url-4bbe7647/timezone-update-0e299959/`へ保存した。最終結果は`verification-complete/review-ready.json`、日付以外のHTML一致は同directoryの`date-only-html-comparison.json`に保存した。正式CLIのjournalは同サービスの既存workspace内に保持する。秘密鍵、token、非公開job／操作ID、説明文を含む診断をGitへ転記しない。
 
 本人以外の認証済みアカウントによる実ログイン拒否、CDN HIT／MISS、Cloudflare native CPU・duration・アカウント全体のFree消費量は未測定。生成HTMLの検査と本人ブラウザの確認を区別する。
+
+後続のmain取り込みでIssue #65の予約表を統合した版は内部11/11の新規環境専用となる。本記録の実機結果は統合前10/11のものであり、統合版の実配備結果ではない。本人限定環境はこの確認済みversionのまま保持し、PR作成・マージを再配備や削除の承認とは扱わない。

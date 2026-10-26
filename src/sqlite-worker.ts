@@ -153,7 +153,11 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
       await this.control.progress();
     } else if (this.show) {
       await this.show.runtime.domains.alarm();
-      if (!await this.show.alarmRuntime().alarm()) await new SqlitePublicationAlarm(this.show.queue, this.executor).alarm();
+      if (!await this.show.alarmRuntime().alarm()) {
+        await this.show.schedules.dispatchDue();
+        await new SqlitePublicationAlarm(this.show.queue, this.executor).alarm();
+        await this.show.schedules.scheduleNext();
+      }
     }
   }
   private openShow(showId: string): SqliteShowService {

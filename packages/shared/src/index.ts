@@ -14,6 +14,13 @@ export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqliteUploadKe
   sqlitePublicationRequestHash } from "./sqlite-publication";
 export type { SqliteUploadIdentity, SqliteVerifiedUpload, SqlitePublicationRuntime, SqlitePublicationRequest,
   SqlitePublicationStatus, SqlitePublicationFailure, SqlitePublicationBlock } from "./sqlite-publication";
+export { sqliteScheduleProtocol, SQLITE_SCHEDULE_PAGE_SIZE, sqliteScheduleTimeSchema, sqliteScheduleReasonSchema,
+  sqliteScheduleCreateSchema, sqliteScheduleRescheduleSchema, sqliteScheduleCancelSchema, sqliteScheduleReapproveSchema,
+  sqliteScheduleStateSchema, sqliteScheduleRecordSchema, sqliteScheduleStatusSchema, sqliteScheduleListSchema,
+  sqliteSchedulePlanSchema, sqliteSchedulePlanHash } from "./sqlite-schedule";
+export type { SqliteScheduleTime, SqliteScheduleReason, SqliteScheduleCreate, SqliteScheduleReschedule,
+  SqliteScheduleCancel, SqliteScheduleReapprove, SqliteScheduleRecord, SqliteScheduleStatus, SqliteScheduleList,
+  SqliteSchedulePlan } from "./sqlite-schedule";
 export { sqliteServiceConfigSchema, sqliteServiceStatusSchema, parseSqliteServiceConfig, sqliteServiceConfigHash } from "./sqlite-service";
 export type { SqliteServiceConfig, SqliteServiceStatus } from "./sqlite-service";
 export { diagnosticCheckSchema, diagnosticScopeSchema, diagnosticStatusSchema, diagnosticSummarySchema } from "./diagnostics";
