@@ -2,6 +2,10 @@
 
 Issue #65のサーバー側予約公開をfreshなCloudflare環境へ配備し、3件のEpisode予約公開を実機で確認した記録。対象は隔離した新規サービスだけであり、既存環境・独自ドメイン・本番DNSは変更していない。
 
+> 現在のIssue #65／#70統合版は内部queue/content形式**11/11**。本記録は予約公開単独の**9/9**環境で取得した履歴であり、11/11環境の実配備・実機確認ではない。
+>
+> 2026-10-27追記: 本試験は非公開運用ルールの追加前に実施した。保持環境はworkers.dev上の公開URLでCloudflare Access保護がなく、追加のupload・publishは行っていない。非公開化・配信停止・削除は別途の明示承認が必要。
+
 ## 1. 対象と前提
 
 - 実装: Show DO内の予約表、既存Alarmによる到来時のFIFO投入、`needs_approval`への停止、CLIの予約preview・作成・一覧・詳細・日時変更・取消・再承認。
@@ -59,9 +63,11 @@ Show公開後、サンプル3 Episodeをmetadata＋MP3でstageした。予約は
 
 ## 5. 未確認範囲
 
+以下は初回3件の時点の記録である。§7でPause／再承認、日時変更・取消、通常FIFOの非占有、直リンクの非公開を追加確認した。残る未確認は§7.6にまとめた。
+
 - Pause／受付停止／保守／runtime・base変更後の`needs_approval`と`schedule-reapprove`はローカル回帰だけで、今回の実機では実行していない。
-- `schedule-reschedule`／`schedule-cancel`の実機操作、Alarm再配送・中断、blocked、同時刻予約、複数Showの同時予約は未確認。
-- 予定前のFeed未配信は確認したが、推測した音源直リンク、R2 object一覧、Cache内部状態は確認していない。
+- Alarm再配送・中断、blocked、同時刻予約、複数Showの同時予約は未確認。
+- 予定前のFeed未配信は確認済み。直リンクは§7.4で予定前404・公開後200/206を確認したが、R2 object一覧とCache内部状態は確認していない。
 - CPU・duration・Free枠、purgeのnative性能、長期Alarm精度は測定していない。予定時刻は実行開始可能時刻であり、最大遅延の保証ではない。
 - 今回はfunctional確認だけであり、Cloudflareの障害注入や再起動試験ではない。
 
@@ -75,3 +81,57 @@ Show公開後、サンプル3 Episodeをmetadata＋MP3でstageした。予約は
 - `evidence/issue65-schedule-ep{1,2,3}.json`: 予約受付結果。
 - `evidence/issue65-feed-{before,after}-ep{1,2,3}.xml`, `issue65-feed-final.xml`: 各時点のFeed。
 - `evidence/schedule-list-final.json`, `evidence/schedule-status-*.json`, `evidence/show-status-final.json`: 最終状態。
+
+## 7. 追加実機確認（2026-10-27 JST / 2026-10-26 UTC）
+
+同じ保持環境で、初回の3件では未確認だったPause／再承認、日時変更・取消、通常FIFOの非占有、直リンクの非公開を追加確認した。新しい環境・資源は作成していない。証跡はworkspaceの`evidence/20261027-addendum/`に保存した。
+
+### 7.1 Pause → needs_approval → Resume → 再承認 → 公開
+
+Episode `ep-pause-20261027`をfuture UTCへ予約した直後に`show-pause`した。
+
+| 時点 | 予約状態 | version | 理由 | 公開job |
+| --- | --- | ---: | --- | --- |
+| 予約直後 | `scheduled` | 1 | - | なし |
+| Pause後 | `needs_approval` | 2 | `show_paused` | なし |
+| Resume後 | `needs_approval` | 2 | `show_paused` | なし |
+| 再承認後 | `scheduled`（15:47:26Z） | 3 | - | なし |
+| 到来後 | `dispatched` | 4 | - | `succeeded` |
+
+- Resumeだけでは再開せず、`preview-schedule-reapprove`と`schedule-reapprove`が新しいruntime・admission window・baseで要求を凍結し直した。
+- dispatchは予約時刻+22ms。予定前のFeedは3 itemで対象titleなし、公開後は4 itemで対象だけ追加された。
+- pause Episodeの`verify`は`pass=3, warn=1, not_checked=1, fail=0`。
+
+### 7.2 日時変更と取消
+
+Episode `ep-cancel-20261027`を16:05:41Zへ予約し、16:15:42Zへ変更後、FIFO投入前に取消した。
+
+- 変更はversion 1→2、取消はversion 2→3。最終状態は`cancelled`、理由`cancelled_by_administrator`。
+- 公開jobは作られず、`publication_state=null`。実際の公開音源path（scheduleのjob IDを使用）は404で、Feedにもtitleは出ない。
+- 取消後のstatusも`cancelled`、version 3のまま。
+
+### 7.3 遠い未来の予約が即時公開を塞がない
+
+Episode `ep-future-20261027`を18:48:18Z（約3時間後）へ予約したまま、別のEpisode `ep-immediate-20261027`を`publish-episode`で即時公開した。
+
+- 即時公開は開始から2秒で`succeeded`。未来予約は`state=scheduled`、`publication_state=null`のまま保持された。
+- Feedは5 itemとなり、即時公開したtitleだけが追加された。未来予約のtitleは出ていない。
+- 未来予約の実際の公開音源path（job IDを使用）は予定前404。確認後に取消し、version 2・`cancelled_by_administrator`とした。
+
+### 7.4 予定前の直リンクと公開後の配信
+
+- 予約4件すべてのstaging object key（`staging/uploads/.../audio.mp3`）は予定前404。公開後に再確認したpause分も404のまま。
+- 未来予約の公開音源path（job IDを使用）は予定前404。取消した2件の公開音源pathも404。
+- 公開後のenclosure URLはHEAD 200、`Range: bytes=0-99`は206。ダウンロードしたMP3のSHA-256はstageした元MP3と一致した（`acb98877...ca0d9`）。
+
+### 7.5 最終状態
+
+`show-status`は`open`、`queued=0`、`active=null`、`drained=true`。予約集計は`scheduled=0`、`needs_approval=0`、`dispatched=4`。Feedは5 item。
+
+### 7.6 残る未確認
+
+Alarm再配送・中断、blocked、同時刻予約、複数Showの同時予約、CPU・duration・Free枠、purgeのnative性能、長期Alarm精度は引き続き未確認。今回は障害注入を行っていない。
+
+### 7.7 future `published_at` 警告の読み取り専用確認
+
+実装後のCLIで、一時的なfuture日時のEpisode TOMLを`preview-episode --local`へ渡し、`warnings[]`に`code=future_published_at`と`published_at`が返ることを確認した。TOMLは確認後に削除し、サーバー状態とuploadは変更していない。証跡は`evidence/20261027-addendum/warning-preview.json`。

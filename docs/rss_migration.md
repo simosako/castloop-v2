@@ -61,6 +61,8 @@ castloop publish-rss-import /path/to/import
 
 全TOML・素材を検証した後、Show登録・Show公開・各Episodeの公開を既存runnerで順番に実行する。既存または削除済みShow IDは採用しない。操作中は取り込みファイルや対象Showを別の操作で変更しない。
 
+インポート元Episodeに未来の`published_at`がある場合、RSS一括公開はそれを待たず即時公開する。開始前に`--allow-future-published-at`を要求し、指定がなければ`future_published_at`で失敗する。将来日時で公開したいEpisodeは、RSS一括公開ではなく`preview-episode-schedule`／`schedule-episode`を使う。
+
 Episodeは古い公開日時から公開し、各jobの完了を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
 
 | 公開先 | 必要な稼働状態 | 完了証拠 |

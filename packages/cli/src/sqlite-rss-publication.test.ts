@@ -16,17 +16,18 @@ import { join } from "node:path";
 
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
-async function fixture(count = 2, customDomain = false) {
+async function fixture(count = 2, customDomain = false, future = false) {
   const value = await sqliteServiceFixture(); values.push(value);
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, { attempts: 2, delay: async () => {} });
   if (customDomain) await startSqliteDomainChange(value.root, value.config, "add", crypto.randomUUID(), "source", value.options,
     { hostname: "podcasts.example.com", zoneId: "c".repeat(32) }, { attempts: 2, delay: async () => {} });
   const config = await loadWorkspaceConfig(value.root);
   const options = { transport: value.transport, cloudflare: value.options };
-  const item = RSS_IMPORT_SOURCE.match(/<item>[\s\S]*?<\/item>/)![0];
+  const original = RSS_IMPORT_SOURCE.match(/<item>[\s\S]*?<\/item>/)![0];
+  const item = future ? original.replace("Wed, 01 Apr 2020 03:00:00 GMT", "Wed, 01 Apr 2099 03:00:00 GMT") : original;
   const items = Array.from({ length: count }, (_, index) => item.replace("old:123", index === 1 ? "https://old.example/second" : `old:${index}`)
     .replace('isPermaLink="false"', `isPermaLink="${index === 1}"`).replace("First", `Episode ${index}`));
-  const source = RSS_IMPORT_SOURCE.replace(item, items.join("")), output = join(value.root, "import");
+  const source = RSS_IMPORT_SOURCE.replace(original, items.join("")), output = join(value.root, "import");
   await importRssLocally("imported", "https://source.example/feed", output, rssImportTransport(false, source).effects);
   const report = JSON.parse(readFileSync(join(output, "import.json"), "utf8")) as { import_id: string; episodes: Array<{ metadata: { episode_id: string; guid: string; guid_is_permalink: boolean; published_at: string } }> };
   const commands: string[] = [], native = createSqliteRssEffects(value.root, config, options);
@@ -37,6 +38,22 @@ async function fixture(count = 2, customDomain = false) {
   const cursor = join(value.root, ".castloop", "sqlite-rss-imports", value.config.service_id, `${report.import_id}.json`);
   return Object.assign(value, { output, report, commands, effects, execute, cursor, options });
 }
+
+test("RSS bulk publication refuses future published_at without explicit acknowledgement", async () => {
+  const value = await fixture(2, false, true);
+  await expect(value.execute()).rejects.toThrow("have a published_at in the future");
+  expect(value.commands).toHaveLength(0);
+  const options = { ...value.options, allowFuturePublishedAt: true };
+  const native = createSqliteRssEffects(value.root, value.config, options);
+  const effects = { ...native, async readFeed() {
+    return value.text(`public/podcasts/imported/feeds/${value.content.inspect("imported").show!.feed_generation}.xml`);
+  } };
+  expect(await publishSqliteRssImport(value.root, value.config, value.output, options, effects)).toMatchObject({ episode_count: 2 });
+  for (const original of value.report.episodes) {
+    expect(value.content.episodes("imported").find((episode) => episode.episode_id === original.metadata.episode_id)).
+      toMatchObject(original.metadata);
+  }
+});
 
 test("SQLite RSS import publishes 36 Episodes sequentially and preserves external GUID/permalink/date identities", async () => {
   const value = await fixture(36);

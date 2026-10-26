@@ -87,4 +87,15 @@ castloop schedule-status daily SCHEDULE_UUID --workspace /path/to/workspace --js
 - 予約中は同じdraftの再upload、即時publish、upload取消・cleanupを拒否する。取消後も素材は自動削除しない。
 - 予約実行が遅延しても`published_at`を書き換えない。予定時刻は「実行を開始してよい最早時刻」であり、その瞬間の公開完了や最大遅延を保証しない。
 
-隔離したfresh Cloudflare環境で3 Episodeを予約し、各予定前のFeed未配信と予定後の配信、`publication_state=succeeded`を確認した。Pause/再承認・取消・Alarm再配送・実Cache purge・性能は未確認である。ローカル試験とmemory R2の成功を、未確認経路の実機証拠にしない。採用設計と未確認範囲は[予約公開計画](../design/episode_scheduled_publication_plan.md)と[実機検証](../design/issue65_scheduled_publication_live_20261026.md)を参照。
+## 未来の`published_at`で即時公開する場合
+
+`published_at`はRSS上の日時であり、予約実行時刻ではない。未来の`published_at`を持つEpisodeでも`publish-episode`は即時公開する。
+
+- `preview-episode`は`warnings`に`code=future_published_at`を返す。予約previewにも同じ警告が含まれるが、予約の実行時刻は`schedule`の値で決まる。
+- 非対話（`--json`または`--non-interactive`）の`publish-episode`は、`--allow-future-published-at`がなければ送信前に`future_published_at`で失敗する。JSONの`outcome`は`not_started`。
+- 対話時は`publish now`の入力を求める。通常の承認hashや`--expect-preview`をこの確認の代用にしない。
+- 既に公開要求を凍結したjobのstatus読取は、この確認を要求しない。
+- `publish-rss-import`はfuture日時のEpisodeを1件でも含む場合、同じ`--allow-future-published-at`を要求する。一括公開の途中で止まらないよう、開始前に拒否する。
+- 予約公開を使う場合は`preview-episode-schedule`／`schedule-episode`を使う。予約実行日時は`published_at`と独立で、予約は`published_at`を書き換えない。
+
+隔離したfresh Cloudflare環境で3 Episodeを予約し、各予定前のFeed未配信と予定後の配信、`publication_state=succeeded`を確認した。同じ環境でPause→`needs_approval`→Resume→再承認→公開、日時変更→取消、約3時間後の予約を残したまま別Episodeの即時公開、予定前の直リンク404と公開後の200/206・SHA-256一致も確認した。Alarm再配送・blocked・同時刻予約・実Cache purge・性能は未確認である。ローカル試験とmemory R2の成功を、未確認経路の実機証拠にしない。採用設計と未確認範囲は[予約公開計画](../design/episode_scheduled_publication_plan.md)と[実機検証](../design/issue65_scheduled_publication_live_20261026.md)を参照。

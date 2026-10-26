@@ -19,7 +19,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "queued or a CLI ok is never reported as publication success; --external adds public-path delivery checks via the verify family." },
   template: { usage: "template service-config|admin-config|show|episode", description: "Print an embedded example TOML without IO or registration. admin-config is optional workspace CLI preferences, not service identity. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
   "preview-show": { usage: "preview-show ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged content with immutable cover identity. Defaults to authenticated remote reads when local state exists; --local never networks. Remote errors never become unchanged results. RSS is generated locally only into a new file. Bind approval to publish-show --expect-preview HASH." },
-  "preview-episode": { usage: "preview-episode ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged metadata/audio and preserved GUID/date. Requires --show with explicit --workspace. --local reports not_checked; remote failures stop. RSS export is local and never overwrites. Use publish-episode --expect-preview HASH after approval." },
+  "preview-episode": { usage: "preview-episode ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged metadata/audio and preserved GUID/date. Requires --show with explicit --workspace. --local reports not_checked; remote failures stop. A future published_at appears in warnings as future_published_at: immediate publish still starts now. RSS export is local and never overwrites. Use publish-episode --expect-preview HASH after approval." },
   "list-show-revisions": { usage: "list-show-revisions SHOW [--cursor SEQUENCE]", description: "Read committed Show revision history, newest first, 20 per page. Snapshots are not publication approval." },
   "list-episode-revisions": { usage: "list-episode-revisions ID [--cursor SEQUENCE]", description: "Read committed Episode revision history with --show, newest first, 20 per page. Does not expose private media publicly." },
   "preview-show-revision": { usage: "preview-show-revision SHOW REVISION_UUID", description: "Read current and selected saved Show content and a plan. Does not write journals or publish. Execution republishes saved content without rolling back Episodes." },
@@ -84,9 +84,11 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Requires Cloudflare credentials; verifies full readback/hash/size/object identity. Does not publish.",
   },
   "publish-episode": {
-    usage: "publish-episode ID [MP3]",
+    usage: "publish-episode ID [MP3] [--allow-future-published-at]",
     description: "Run from the Show directory. Freeze and submit staged changes, then wait for succeeded.\n" +
       "Initial publication requires metadata and audio. Metadata-only updates reuse immutable published audio.\n" +
+      "A future published_at does NOT delay publication: this command starts now. Non-interactive runs require\n" +
+      "--allow-future-published-at; interactive runs ask to type \"publish now\". Use schedule-episode for scheduled publication.\n" +
       "An MP3 argument is optional; if supplied it must match the staged source. Unknown submissions are never resent.",
   },
   "job-status": {
@@ -258,10 +260,11 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Review before publication. Does not migrate subscribers, service schemas or old operational journals.",
   },
   "publish-rss-import": {
-    usage: "publish-rss-import DIRECTORY",
+    usage: "publish-rss-import DIRECTORY [--allow-future-published-at]",
     description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
       "Requires a ready SQLite service, administrator key and Cloudflare credentials; creates and explicitly opens only the new Show.\n" +
       "Validates inputs, preserves GUIDs/dates, then publishes the Show and Episodes sequentially. Not an atomic batch.\n" +
+      "If any imported Episode has a future published_at, publication starts immediately and requires --allow-future-published-at.\n" +
       "Re-running observes acknowledged pending jobs and continues without republishing completed inputs.\n" +
       "Unknown mutations stay blocked. Does not adopt existing Shows, convert services or remove the old host.",
   },
@@ -312,6 +315,8 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     stats: { episode: "string", from: "string", to: "string", "by-revision": "boolean", cursor: "string" },
     "stats-retention": { "operation-id": "string" },
     "import-rss": { "dry-run": "boolean", output: "string" },
+    "publish-rss-import": { "allow-future-published-at": "boolean" },
+    "publish-episode": { "allow-future-published-at": "boolean" },
     validate: { assets: "boolean", audio: "string" }, doctor: { local: "boolean" }, skill: { output: "string" },
     "preview-schedule-time": { timezone: "string" },
     "preview-episode-schedule": { at: "string", timezone: "string", "expect-preview": "string" },

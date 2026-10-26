@@ -273,12 +273,12 @@ castloop schedule-reapprove SCHEDULE_UUID --workspace /path/to/service --show da
 
 ### 未来の`published_at`で即時公開する場合
 
-独立した先行改善として、`publish-episode`で未来の`published_at`を使うときは「これは予約ではなく今すぐ公開する」と表示する。
+独立した先行改善として、`publish-episode`で未来の`published_at`を使うときは「これは予約ではなく今すぐ公開する」と表示する。実装済み。
 
-- 対話時は追加確認、非対話時は専用flag（案: `--allow-future-published-at`）による明示承認を必要とする。
-- 通常の`--yes`や予約用hashをこの確認の代用にしない。即時公開previewにも警告を含める。
+- 対話時は追加確認、非対話時は専用flag（`--allow-future-published-at`）による明示承認を必要とする。
+- 通常の`--yes`や予約用hashをこの確認の代用にしない。`preview-episode`の`warnings`にも`future_published_at`を含める。
 - 初回送信前だけ確認し、既に凍結した要求のstatus読取を妨げない。
-- RSS一括公開の経路でも未来日時を検出し、同じ注意と承認を取りこぼさない。
+- `publish-rss-import`でもfuture日時を検出し、同じflagがなければ送信前に拒否する。
 
 ## 9. 開発の段階
 
@@ -362,13 +362,13 @@ castloop schedule-reapprove SCHEDULE_UUID --workspace /path/to/service --show da
 - CLI: `preview-episode-schedule`、`schedule-episode`、`preview-show-schedule`、`schedule-show`、`schedule-list`、`schedule-status`、`schedule-reschedule`、`schedule-cancel`、`schedule-reapprove`。`preview-schedule-time`は引き続きオフライン変換専用。
 - `schedule-episode`／`schedule-show`は既存のstage済みdraftとアップロード済み素材だけを使い、`--expect-preview`の承認hashが一致しなければ送信しない。予約受付後はCLIを待機させず、`scheduled`とschedule IDを返す。
 - 未来の`published_at`と予約実行日時は別identityのまま。予約実行で`published_at`を書き換えない。
+- 未来`published_at`の即時公開警告を追加した。`preview-episode`は`warnings[].code=future_published_at`を返す。非対話の`publish-episode`は`--allow-future-published-at`がなければ送信前に拒否し、対話時は`publish now`の入力で確認する。`publish-rss-import`はfuture日時のEpisodeを含む場合に同じflagを要求する。既に凍結したjobのstatus読取は妨げない。
 
 ### 未実装・未確認
 
-- 未来`published_at`で即時公開する場合の専用警告（P1の先行項目）は未実装。
 - 通知送信、blocked解除、繰り返し予約、queued/running jobの取消、既存環境の移行は対象外。
-- Alarm再配送・中断、blocked、Pause／再承認、取消、同時刻予約、性能・Free枠はCloudflare実機で未確認。
+- Alarm再配送・中断、blocked、同時刻予約、複数Showの同時予約、性能・Free枠はCloudflare実機で未確認。
 
-ローカル回帰はBun 1.4.4で`bun test`: **810 pass / 0 fail**（92 files）。`npm run check`とLinux単体CLI buildも成功した。これはBun SQLiteとmemory R2 fixtureによる検証であり、DO runtimeの永続性・native Alarm再配送・実Cache purgeの証明ではない。
+ローカル回帰はBun 1.4.4で`bun test`: **857 pass / 0 fail**（96 files）。`npm run check`とLinux単体CLI buildも成功した。これはBun SQLiteとmemory R2 fixtureによる検証であり、DO runtimeの永続性・native Alarm再配送・実Cache purgeの証明ではない。
 
-fresh隔離環境で3 Episodeを約3分間隔に予約し、各予定前のFeed未配信と予定後の追加、`publication_state=succeeded`、予約時刻+2msのdispatchを確認した。環境・結果・未確認範囲は[実機検証記録](issue65_scheduled_publication_live_20261026.md)に保存した。CLI基盤の実データ検証（指定サンプル3＋36 Episode、約1.50GB、162コマンド）は[別記録](issue65_cli_real_data_verification_20261024.md)に保持する。これは予約本体の実機検証ではない。
+fresh隔離環境で3 Episodeを約3分間隔に予約し、各予定前のFeed未配信と予定後の追加、`publication_state=succeeded`、予約時刻+2msのdispatchを確認した。同じ環境で追加確認を行い、Pause→`needs_approval`→Resume→再承認→公開、日時変更→取消、約3時間後の予約を残したまま別Episodeの即時公開、予定前の直リンク404と公開後の200/206・SHA-256一致を確認した。環境・結果・未確認範囲は[実機検証記録](issue65_scheduled_publication_live_20261026.md)に保存した。CLI基盤の実データ検証（指定サンプル3＋36 Episode、約1.50GB、162コマンド）は[別記録](issue65_cli_real_data_verification_20261024.md)に保持する。これは予約本体の実機検証ではない。

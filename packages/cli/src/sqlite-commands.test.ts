@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { parseEpisodeDraft, parseShowMetadata } from "@castloop/shared";
+import { parseEpisodeDraft, parseShowMetadata, stringifyToml } from "@castloop/shared";
 import { runSqliteCommand } from "./sqlite-commands";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
@@ -48,6 +48,33 @@ test("formal SQLite command runners resume, register, stage, publish and inspect
   expect(value.calls.some((call) => /queues|event_notifications|show-publications|system\/jobs/.test(call.path))).toBe(false);
   await value.command("show-pause", ["daily", crypto.randomUUID()]);
   expect(value.runtime.health()).toMatchObject({ state: "paused", drained: true });
+});
+
+test("publish-episode requires explicit future published_at approval through command options", async () => {
+  const value = await fixture();
+  await value.command("create-show", ["daily", "https://example.com"]);
+  await value.command("show-resume", ["daily", crypto.randomUUID()]);
+  const directory = join(value.root, "daily");
+  writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
+  await value.command("update-show", ["daily"]);
+  await value.command("publish-show", ["daily"]);
+  await value.command("create-episode", ["daily", "future"]);
+  const episodePath = join(directory, "episode-future.toml"), draft = parseEpisodeDraft(readFileSync(episodePath, "utf8"));
+  writeFileSync(episodePath, stringifyToml({ ...draft, published_at: "2099-01-01T00:00:00Z" }));
+  writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+  await value.command("update-episode", ["daily", "future"]);
+  await value.command("update-episode-audio", ["daily", "future", "audio.mp3"]);
+  const preview = await value.command("preview-episode", ["daily", "future"]) as {
+    warnings: Array<{ code: string; published_at: string }>; input_fingerprint: string };
+  expect(preview.warnings).toMatchObject([{ code: "future_published_at", published_at: "2099-01-01T00:00:00Z" }]);
+  const posts = value.calls.filter((call) => call.method === "POST").length;
+  await expect(value.command("publish-episode", ["daily", "future"])).rejects.toThrow("future");
+  expect(value.calls.filter((call) => call.method === "POST").length).toBe(posts);
+  expect(value.content.episodes("daily")).toHaveLength(0);
+  expect(await runSqliteCommand(value.root, value.config, "publish-episode", ["daily", "future"], {
+    transport: value.transport, cloudflare: value.options, allowFuturePublishedAt: true,
+    expectedPreview: preview.input_fingerprint })).toMatchObject({ state: "succeeded" });
+  expect(value.content.episodes("daily")[0]).toMatchObject({ title: "future", published_at: "2099-01-01T00:00:00Z" });
 });
 
 test("a lost registration response is inspected without resending and advanced Shows are never recreated", async () => {
