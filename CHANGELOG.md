@@ -22,7 +22,7 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 - Issue #78: Zod updated to a patched version (resolved 4.6.7) for CVE-2023-54404/GHSA-mrhx-c7xc-m3w5; no castloop-specific exploitation reported and persisted formats unchanged. See the [update record](docs/zod_security_update_20261025.md).
 
 ## Unreleased
-- None.
+- Issue #65: server-side scheduled publication inside the Show DO, with future UTC schedules outside the FIFO, atomic dispatch at the due time, Pause/admission/maintenance/base invalidation to `needs_approval`, explicit reapproval, and CLI `preview-*-schedule`, `schedule-*`, `schedule-list`/`schedule-status`/`schedule-reschedule`/`schedule-cancel`/`schedule-reapprove`. Requires fresh internal queue/content formats **9/9**; old 8/9 services are not migrated. See the [administrator guide](docs/admin_configuration.md), [design](design/episode_scheduled_publication_plan.md) and [live verification](design/issue65_scheduled_publication_live_20261026.md). A fresh isolated environment published three scheduled Episodes only after their due times; Pause/reapproval, cancel/reschedule and Alarm redelivery remain unverified there.
 
 ## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
 

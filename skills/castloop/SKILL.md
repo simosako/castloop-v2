@@ -5,7 +5,7 @@ description: castloop CLIでPodcastサービス・番組・エピソードを準
 
 # castloopによるPodcast管理
 
-管理者のcastloop単一バイナリを使う。Bun、Node.js、Wrangler、ffprobe、Git、curl、jqは不要。録音・変換、予約公開、移行、物理削除、blocked解除は提供しない。独自ドメインは対応CLI/Workerでfresh initした同accountのCloudflare DNS専用subdomainを1サービス1つだけ扱う。MCPは使わない。
+管理者のcastloop単一バイナリを使う。Bun、Node.js、Wrangler、ffprobe、Git、curl、jqは不要。録音・変換、移行、物理削除、blocked解除は提供しない。予約公開はfresh環境の対応CLI/Workerでだけ扱い、予約previewの承認hashと現在のruntime／baseを照合する。独自ドメインは対応CLI/Workerでfresh initした同accountのCloudflare DNS専用subdomainを1サービス1つだけ扱う。MCPは使わない。
 
 ## 最初に確認
 

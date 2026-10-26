@@ -1,6 +1,8 @@
 # castloop v2 デザインドキュメント
 
-Issue #70開発版は、Showごとに内蔵サイト／外部サイトを選択できる。内蔵HTMLは既存Show DOのAlarmで生成し、private R2の世代別snapshotへ保存する。`SiteCachedPages`とHTML専用Gatewayは既存media cacheから分離し、最新のShow判定を共有する。必要な両purge後、Feedとサイト全体の世代・ページ参照を同一transactionで確定する。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用。下記の7/8以前の番号は各機能導入時点の履歴である。[サイト設計](show_website_plan.md)・[利用ガイド](../docs/show_website.md)参照。Freeの実機性能・ブラウザ実機再生は未確認。
+Issue #65開発版は、Show内の予約表と既存Alarmでfuture UTCのEpisode／Show公開を実行する。予約はFIFOへ先に入らず、到来時に同じShowの通常jobとして原子的に投入される。Pause・受付停止・保守・runtime／config／base変更では`needs_approval`へ移り、明示再承認なしに実行しない。予約実行日時は`published_at`と別で、後者を書き換えない。CLIは`preview-episode-schedule`／`schedule-episode`、`schedule-list`／`status`／`reschedule`／`cancel`／`reapprove`を提供する。内部queue/content形式は**9/9**、fresh環境専用で旧8/9を含む環境を変換しない。[予約設計](episode_scheduled_publication_plan.md)・[管理用設定ガイド](../docs/admin_configuration.md)参照。隔離したfresh環境で3 Episodeの予定前未配信・予定後配信を確認した。Pause/再承認・取消・Alarm再配送・性能は未確認（[実機検証](issue65_scheduled_publication_live_20261026.md)）。
+
+Issue #70開発版は、Showごとに内蔵サイト／外部サイトを選択できる。内蔵HTMLは既存Show DOのAlarmで生成し、private R2の世代別snapshotへ保存する。`SiteCachedPages`とHTML専用Gatewayは既存media cacheから分離し、最新のShow判定を共有する。必要な両purge後、Feedとサイト全体の世代・ページ参照を同一transactionで確定する。内部queue/content形式は**9/9**（queue `9` はIssue #65の予約表を含む）、必須`website="static-show-v1"`の新規環境専用。下記の8/9以前の番号は各機能導入時点の履歴である。[サイト設計](show_website_plan.md)・[利用ガイド](../docs/show_website.md)参照。Freeの実機性能・ブラウザ実機再生は未確認。
 
 Issue #64の開発版では、認証付きの公開済み全文・履歴取得とCLIの項目差分・ローカルRSS生成、保存済みrevisionの明示採用を追加した。Show内SQLiteに履歴2表を置き、R2の不変metadata・画像・音源と照合する。採用は新revisionとして保存・purge・SQL確定し、素材再uploadや過去履歴の上書きはしない。内部queue/content形式**7/8**、必須`revision_history="sqlite-revisions-v1"`の新規環境専用で旧環境は変換しない。[採用設計](published_diff_and_revision_restore_plan.md)と[利用ガイド](../docs/published_content_review.md)参照。実Cloudflareの配備・公開・性能確認は行っていない。
 

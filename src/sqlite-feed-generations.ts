@@ -2,7 +2,7 @@ import { z } from "zod";
 import { sqlitePublicationRequestSchema, sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 
-export const SQLITE_QUEUE_SCHEMA_VERSION = 8;
+export const SQLITE_QUEUE_SCHEMA_VERSION = 9;
 export const SQLITE_CONTENT_SCHEMA_VERSION = 9;
 const reservationSchema = z.object({ kind: z.enum(["publication", "domain"]), id: z.uuid(),
   showId: sqlitePublicationRequestSchema.shape.show_id,

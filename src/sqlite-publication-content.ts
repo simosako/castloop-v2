@@ -179,6 +179,18 @@ export class SqlitePublicationContent {
     });
   }
 
+  matchesScheduledTarget(input: SqlitePublicationRequest): boolean {
+    const request = parseSqlitePublicationRequest(input);
+    if (request.action !== "publish") return false;
+    const target = this.inspect(request.show_id, request.episode_id);
+    if (!target.show || target.show.state_version !== request.expected_show_state_version) return false;
+    if (request.kind === "show") return ["draft", "published"].includes(target.show.lifecycle);
+    return target.show.lifecycle === "published" &&
+      (request.base_revision_id === undefined ? target.episode === null :
+        target.episode?.lifecycle === "published" && target.episode.revision_id === request.base_revision_id &&
+        target.episode.lifecycle_version === request.expected_episode_lifecycle_version);
+  }
+
   currentShowRevision(showId: string, baseUrl: string): SqliteShowRevisionRecord | null {
     sqlitePublicationRequestSchema.shape.show_id.parse(showId);
     return this.storage.transactionSync(() => {

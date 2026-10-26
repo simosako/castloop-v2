@@ -1,6 +1,6 @@
 # 配信統計（Episode別・日別）の利用ガイド
 
-Issue #71の配信統計の操作ガイド。内部queue/content形式 **8/9**（content `9` と識別 `delivery_statistics="episode-daily-v1"` は本機能による。queue `8` と `website="static-show-v1"` はIssue #70の番組サイト機能による）を使う新規環境専用。旧形式（content `8` 以前）の環境への統計機能追加・データ移行は行わない（[設計](../design/episode_delivery_statistics_plan.md)参照）。
+Issue #71の配信統計の操作ガイド。内部queue/content形式 **9/9**（content `9` と識別 `delivery_statistics="episode-daily-v1"` は本機能、queue `9` はIssue #70の番組サイトとIssue #65の予約表を含む）を使う新規環境専用。旧形式（queue `8` 以前、content `8` 以前）の環境への統計機能追加・データ移行は行わない（[設計](../design/episode_delivery_statistics_plan.md)参照）。
 
 ## 何を数えるか・数えないか
 
