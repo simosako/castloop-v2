@@ -15,6 +15,7 @@ import { administratorKey } from "./administrator-key";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { readSqliteDraftRecord } from "./sqlite-draft-journal";
 import { SqliteDraft } from "./sqlite-draft";
+import { AgentError } from "./agent-output";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { sha256HexSync as digest } from "./sha256";
@@ -51,6 +52,12 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
   options: SqliteCommandOptions = {}, effects = createSqliteRssEffects(root, config, options)): Promise<SqliteRssResult> {
   config = sqliteServiceConfigSchema.parse(config);
   const prepared = await prepareRssImportPublication(resolve(root, output), config.public_base_url), key = administratorKey(root);
+  const futurePublished = prepared.episodes.filter((episode) => Date.parse(episode.metadata.published_at) > Date.now());
+  if (futurePublished.length && !options.allowFuturePublishedAt) {
+    throw new AgentError("future_published_at", `${futurePublished.length} imported Episode(s) have a published_at in the future. ` +
+      `RSS publication starts immediately: ${futurePublished.map((episode) => episode.metadata.episode_id).join(", ")}. ` +
+      "Use publish-episode per Episode for scheduled publication, or pass --allow-future-published-at to publish now.");
+  }
   const client = new SqliteServiceClient(config, key, options.transport);
   let health = await client.registrationHealth();
   if (!health.publication_ready) throw new Error("SQLite RSS publication requires a ready service outside shared maintenance");

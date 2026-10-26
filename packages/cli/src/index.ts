@@ -52,6 +52,15 @@ async function ask(value: string | undefined, name: string, label: string): Prom
   } finally { prompt.close(); }
 }
 
+async function confirmFuturePublishedAt(publishedAt: string): Promise<boolean> {
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await prompt.question(`Episode published_at ${publishedAt} is in the future. ` +
+      'Publishing now will not wait until that time. Type "publish now" to continue: ')).trim();
+    return answer === "publish now";
+  } finally { prompt.close(); }
+}
+
 async function sqliteWorkerSource(): Promise<string> {
   if (embeddedSqliteWorkerSource) return embeddedSqliteWorkerSource;
   if (Bun.isStandaloneExecutable) throw new Error("The executable does not contain its SQLite Worker bundle");
@@ -214,13 +223,13 @@ async function main(context: Invocation): Promise<unknown> {
     return flags["dry-run"] ? inspectRssImport(positional[0]!, positional[1]!) : importRssLocally(positional[0]!, positional[1]!, flags.output!);
   }
   if (command === "publish-rss-import") {
-    allowedFlags(flags, []);
+    allowedFlags(flags, ["allow-future-published-at"]);
     if (positional.length !== 1) throw new Error(commandHelp(command));
     const root = explicitRoot ?? process.cwd();
     const config = await loadWorkspaceConfig(root);
     const { publishSqliteRssImport } = await import("./sqlite-rss-publication");
     context.mutationStarted = true;
-    return publishSqliteRssImport(root, config, positional[0]!);
+    return publishSqliteRssImport(root, config, positional[0]!, { allowFuturePublishedAt: !!flags["allow-future-published-at"] });
   }
   if (command === "init") {
     if (positional.length > 1) throw new Error(commandHelp(command));
@@ -298,6 +307,8 @@ async function main(context: Invocation): Promise<unknown> {
   } else if (["schedule-reschedule", "schedule-reapprove"].includes(command)) {
     allowedFlags(flags, ["at", "timezone", "expect-version"]);
     if (!flags.at || !flags["expect-version"]) throw new Error("Schedule changes require --at DATETIME and --expect-version N");
+  } else if (command === "publish-episode") {
+    allowedFlags(flags, ["allow-future-published-at"]);
   } else {
     allowedFlags(flags, []);
   }
@@ -360,7 +371,10 @@ async function main(context: Invocation): Promise<unknown> {
       intervalSeconds: flags.interval === undefined ? undefined : Number(flags.interval), signal: watchSignal?.signal } } : {}),
     ...(command.includes("schedule") ? { scheduleOptions: { at: flags.at, timezone: flags.timezone,
       expectVersion: flags["expect-version"], cursor: flags.cursor } } : {}),
-    ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview });
+    ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview,
+    allowFuturePublishedAt: !!flags["allow-future-published-at"],
+    confirmFuturePublishedAt: process.stdin.isTTY && !process.argv.includes("--non-interactive") && !process.argv.includes("--json") ?
+      confirmFuturePublishedAt : undefined });
   if (listing && !process.argv.includes("--json")) {
     const { formatSqliteCatalog } = await import("./sqlite-catalog");
     const { sqliteCatalogResponseSchema } = await import("../../shared/src/sqlite-catalog");
@@ -414,7 +428,8 @@ try {
     try { retained = await invocation.failureResult(); }
     catch { retained = { records_unavailable: true }; }
   }
-  if (process.argv.includes("--json")) console.log(JSON.stringify(agentEnvelope(process.argv[2] ?? "help", invocation.target, retained, error, invocation.mutationStarted), null, 2));
+  const mutationStarted = error instanceof AgentError && error.code === "future_published_at" ? false : invocation.mutationStarted;
+  if (process.argv.includes("--json")) console.log(JSON.stringify(agentEnvelope(process.argv[2] ?? "help", invocation.target, retained, error, mutationStarted), null, 2));
   else console.error(error instanceof Error ? error.message : "Command failed");
   process.exitCode = 1;
 }

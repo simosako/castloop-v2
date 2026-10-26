@@ -7,8 +7,8 @@
 3. `create-episode ID --workspace PATH --show SHOW --non-interactive --json`。生成済みGUIDを保持してTOMLを編集する。未来の`published_at`は予約配信ではない。予約する場合は下記のscheduleコマンドを使う。
 4. `validate episode ABSOLUTE_TOML --audio ABSOLUTE_MP3 --json`。MP3は300,000,000 bytes以下。
 5. `update-episode ID --workspace PATH --show SHOW --json`と`update-episode-audio ID ABSOLUTE_MP3 --workspace PATH --show SHOW --json`で同じdraftにstageする。まだ公開されない。
-6. `preview-episode ID --workspace PATH --show SHOW --json`で対象・metadata・素材hash・base・未stage変更を確認する。`input_fingerprint`と内容について管理者の承認を得る。
-7. `publish-episode ID --workspace PATH --show SHOW --expect-preview HASH --json`。承認後の変更は再preview・再確認する。同じjobの`succeeded`が公開完了。queued/runningは待機中。
+6. `preview-episode ID --workspace PATH --show SHOW --json`で対象・metadata・素材hash・base・未stage変更を確認する。`input_fingerprint`と内容について管理者の承認を得る。未来の`published_at`は`warnings[]`の`future_published_at`に出る。
+7. `publish-episode ID --workspace PATH --show SHOW --expect-preview HASH --json`。承認後の変更は再preview・再確認する。同じjobの`succeeded`が公開完了。queued/runningは待機中。未来の`published_at`でも即時公開であり、非対話では`--allow-future-published-at`が必要。対話では`publish now`の入力が別途必要。予約するなら下記のscheduleコマンドを使う。
 
 ## 予約公開
 
@@ -17,7 +17,7 @@
 3. 管理者の承認後、`schedule-episode ID ... --at ... --expect-preview HASH --json`（Showは`schedule-show`）。`scheduled`は受付であり公開成功ではない。CLIは待機せずschedule IDを返す。
 4. `schedule-list SHOW --workspace PATH --json`と`schedule-status SHOW SCHEDULE_UUID --workspace PATH --json`で観測する。`state`と`publication_state`を分け、`dispatched`や`queued`を公開成功として扱わない。公開完了は`publication_state="succeeded"`。
 5. 日時変更は`preview-schedule-reschedule`→`schedule-reschedule`、取消は`preview-schedule-cancel`→`schedule-cancel`。どちらもFIFO投入前だけ。Pause／受付停止／保守／runtime/base変更で`needs_approval`になった場合は、`preview-schedule-reapprove ... --expect-version N`で現在条件を再確認し、`schedule-reapprove ... --expect-version N --expect-preview HASH`で再承認する。Resumeや保守解除だけで自動再開しない。
-6. 予約実行日時は`published_at`と別。予約公開はRSSの日時を書き換えない。隔離したfresh環境で3 Episodeの予定前未配信・予定後配信は確認済みだが、Pause/再承認・取消・Alarm再配送は未確認。未確認経路をローカル試験の成功から推測しない。
+6. 予約実行日時は`published_at`と別。予約公開はRSSの日時を書き換えない。隔離したfresh環境で予定前未配信・予定後配信、Pause→再承認→公開、日時変更→取消、未来予約中の即時公開、直リンクの404/200を確認済み。Alarm再配送・blocked・同時刻予約は未確認。未確認経路をローカル試験の成功から推測しない。
 
 ## 通常更新
 

@@ -45,7 +45,8 @@ export type SqliteCommandOptions = { workerSource?: () => Promise<string>; trans
   watchOptions?: { timeoutSeconds?: number; intervalSeconds?: number; signal?: AbortSignal };
   statsOptions?: { episodeId?: string; from?: string; to?: string; cursor?: string; retentionOperationId?: string };
   scheduleOptions?: { at?: string; timezone?: string; expectVersion?: string; cursor?: string };
-  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string };
+  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string;
+  allowFuturePublishedAt?: boolean; confirmFuturePublishedAt?: (publishedAt: string) => Promise<boolean> };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "preview-show": [1], "preview-episode": [1],
   "list-show-revisions": [1], "list-episode-revisions": [1], "preview-show-revision": [2], "preview-episode-revision": [2],
@@ -169,7 +170,8 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
       options.revisionOptions.episodeId, options.revisionOptions.output, options.transport);
   }
   const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf,
-    parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared };
+    parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared,
+    allowFuturePublishedAt: options.allowFuturePublishedAt, confirmFuturePublishedAt: options.confirmFuturePublishedAt };
   if (command === "schedule-list" && args.length === 1) {
     return new SqliteScheduleClient(config, key, options.transport).list(validateId(args[0], "show"), options.scheduleOptions?.cursor);
   }

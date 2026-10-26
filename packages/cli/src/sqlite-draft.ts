@@ -31,7 +31,8 @@ const selectionSchema = z.discriminatedUnion("asset", [z.object({ asset: z.liter
   z.object({ asset: z.literal("audio"), audio_path: z.string().min(1).max(2048) }).strict()]);
 export type SqliteDraftSelection = z.infer<typeof selectionSchema>;
 export type SqliteDraftOptions = { administratorKey: string; managementTransport?: R2RestTransport; r2?: R2RestOptions;
-  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void };
+  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void;
+  allowFuturePublishedAt?: boolean; confirmFuturePublishedAt?: (publishedAt: string) => Promise<boolean> };
 
 function sameAssetSlot(left: StagePayload["asset"], right: StagePayload["asset"]): boolean {
   return left === right || left.startsWith("cover_") && right.startsWith("cover_");
@@ -42,7 +43,8 @@ export class SqliteDraft {
     private readonly journal: SqliteDraftJournal, private readonly client: SqlitePublicationClient,
     private readonly schedules: SqliteScheduleClient, private readonly r2: R2RestOptions,
     private readonly operations: SqliteOperationClient,
-    private readonly service: SqliteServiceClient, private readonly context: Pick<SqliteDraftOptions, "parentOperationId" | "importId" | "onUploadPrepared">) {}
+    private readonly service: SqliteServiceClient, private readonly context: Pick<SqliteDraftOptions,
+      "parentOperationId" | "importId" | "onUploadPrepared" | "allowFuturePublishedAt" | "confirmFuturePublishedAt">) {}
 
   static async open(root: string, input: SqliteServiceConfig, target: SqliteDraftTarget,
     options: SqliteDraftOptions): Promise<SqliteDraft> {
@@ -53,7 +55,8 @@ export class SqliteDraft {
       options.r2 ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" },
     new SqliteOperationClient(config, options.administratorKey, options.managementTransport, target.show_id),
     new SqliteServiceClient(config, options.administratorKey, options.managementTransport),
-    { parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared });
+    { parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared,
+      allowFuturePublishedAt: options.allowFuturePublishedAt, confirmFuturePublishedAt: options.confirmFuturePublishedAt });
   }
 
   read(): Promise<SqliteDraftRecord> { return this.journal.load(); }
@@ -212,6 +215,14 @@ export class SqliteDraft {
         admission_window_id: service.admission_window_id, payloads: record.assets.map((entry) => entry.upload) });
       const frozen = { ...record, publication: { request, request_sha256: await sqlitePublicationRequestHash(request) } };
       if (!metadata.equals(await this.metadata(record))) throw new Error("Local metadata changed before publication was frozen");
+      if (record.target.kind === "episode") {
+        const episode = parseEpisodeDraft(metadata.toString("utf8"));
+        if (Date.parse(episode.published_at) > Date.now() && !this.context.allowFuturePublishedAt) {
+          const confirmed = this.context.confirmFuturePublishedAt ? await this.context.confirmFuturePublishedAt(episode.published_at) : false;
+          if (!confirmed) throw new AgentError("future_published_at", `Episode published_at ${episode.published_at} is in the future. ` +
+            "publish-episode starts immediately; use schedule-episode to publish at a scheduled time, or pass --allow-future-published-at to publish now.");
+        }
+      }
       await checkPreview();
       this.journal.replace(frozen);
       return this.retainStatus(frozen, await this.client.submit(request, sqliteClientIdentity(this.root, this.config, true)!));

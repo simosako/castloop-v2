@@ -93,6 +93,7 @@ export async function draftPreview(root: string, config: SqliteServiceConfig,
     metadata_sha256: metadataHash, local_assets: assets, publication: record?.publication?.request_sha256 ?? null, remote_base: remoteBase };
   const sameAudio = !!audio && audio.upload.sha256 === snapshot?.episode_content?.audio.sha256 &&
     audio.upload.length_bytes === snapshot.episode_content.audio.length_bytes;
+  const futurePublishedAt = target.kind === "episode" && Date.parse((value as EpisodeDraft).published_at) > Date.now();
   return { target, job_id: record?.target.job_id ?? null, state: record?.publication ? "frozen" : record ? "staged" : "local_only",
     local: { metadata: value, sha256: metadataHash }, staged: { metadata_matches_local: metadataMatches,
       metadata: metadataMatches && metadata ? value : null, assets, cover_path_matches: coverPathMatches },
@@ -111,5 +112,7 @@ export async function draftPreview(root: string, config: SqliteServiceConfig,
       (target.kind === "show" ? !!metadata && !!cover : !!snapshot.episode_content || !!metadata && !!audio) : null,
     input_fingerprint: sha256(JSON.stringify(manifest)), remote_readiness: snapshot ? "checked" : "not_checked",
     verification_paths: assets.map(({ asset, source_path }) => ({ asset, local_source_path: source_path })),
+    warnings: futurePublishedAt ? [{ code: "future_published_at", published_at: (value as EpisodeDraft).published_at,
+      message: "Episode published_at is in the future. Immediate publication starts now; scheduled publication uses the schedule time instead." }] : [],
   };
 }

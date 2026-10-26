@@ -55,6 +55,7 @@ test("preview is read-only and publication rejects changes after approval", asyn
   const preview = await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" });
   expect(preview.inputs_match_staged).toBe(true);
   expect(preview.published.status).toBe("not_checked");
+  expect(preview.warnings).toEqual([]);
   expect(f.management.length).toBe(before);
   const file = join(f.root, "daily", "episode-first.toml");
   const original = readFileSync(file, "utf8");
@@ -65,6 +66,29 @@ test("preview is read-only and publication rejects changes after approval", asyn
   writeFileSync(file, original);
   await f.draft.publish(preview.input_fingerprint);
   expect((await f.draft.read()).publication).toBeDefined();
+});
+
+test("a future published_at warns in preview and requires explicit immediate-publication approval", async () => {
+  const f = await fixture("episode", false, "2099-01-01T00:00:00Z");
+  await f.stage();
+  const preview = await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" });
+  expect(preview.warnings).toMatchObject([{ code: "future_published_at", published_at: "2099-01-01T00:00:00Z" }]);
+  const before = f.management.filter((entry) => entry.startsWith("POST ")).length;
+  await expect(f.draft.publish(preview.input_fingerprint)).
+    rejects.toThrow("published_at 2099-01-01T00:00:00Z is in the future");
+  expect((await f.draft.read()).publication).toBeUndefined();
+  expect(f.management.filter((entry) => entry.startsWith("POST ")).length).toBe(before);
+  const denied = await SqliteDraft.open(f.root, f.config, f.target, { ...f.options, confirmFuturePublishedAt: async () => false });
+  await expect(denied.publish(preview.input_fingerprint)).rejects.toThrow("in the future");
+  expect((await f.draft.read()).publication).toBeUndefined();
+  const confirmed = await SqliteDraft.open(f.root, f.config, f.target, { ...f.options, confirmFuturePublishedAt: async () => true });
+  expect(await confirmed.publish(preview.input_fingerprint)).toMatchObject({ state: "queued" });
+  expect((await f.draft.read()).publication).toBeDefined();
+  let asked = false;
+  const observed = await SqliteDraft.open(f.root, f.config, f.target, { ...f.options,
+    confirmFuturePublishedAt: async () => { asked = true; return false; } });
+  expect(await observed.publish()).toMatchObject({ state: "queued" });
+  expect(asked).toBe(false);
 });
 
 test("SQLite status retries cannot start after the publication waiting deadline", async () => {
@@ -81,7 +105,7 @@ test("SQLite status retries cannot start after the publication waiting deadline"
   expect(f.management.filter((entry) => entry.startsWith("POST ")).length).toBe(1);
 });
 
-async function fixture(kind: "show" | "episode" = "episode", updating = false) {
+async function fixture(kind: "show" | "episode" = "episode", updating = false, publishedAt = "2026-10-16T12:00:00Z") {
   const root = mkdtempSync("/tmp/opencode/castloop-sqlite-cli-");
   const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
     account_id: "a".repeat(32), bucket_name: "private-bucket", worker_name: "castloop-service",
@@ -92,7 +116,7 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false) {
   const directory = join(root, "daily");
   mkdirSync(directory, { mode: 0o700 });
   const metadata = { schema_version: 1 as const, episode_id: "first", guid: "stable-guid", title: "Private title",
-    description: "Private description", published_at: "2026-10-16T12:00:00Z" };
+    description: "Private description", published_at: publishedAt };
   const episodePath = join(directory, "episode-first.toml"), showPath = join(directory, "show.toml");
   writeFileSync(episodePath, stringifyToml(metadata));
   writeFileSync(showPath, stringifyToml({ schema_version: 1, show_id: "daily", title: "Private Show", description: "Private description",
