@@ -1,6 +1,6 @@
 # Issue #65: Episode予約公開の設計・開発計画
 
-**現在の統合版：** Issue #70のサイト改善を統合した開発版は内部queue/content形式**11/11**の新規環境専用。本書の9/9は予約公開単独の導入段階であり、実機検証もその環境の結果である。旧9/9・サイト試験版10/11等からのDB変換・互換配備は提供しない。現在の設定・操作は[管理用設定ガイド](../docs/admin_configuration.md)を参照する。
+**現在の統合版：** Issue #70のサイト改善を統合した開発版は内部queue/content形式**11/11**の新規環境専用。本書の9/9は予約公開単独の導入段階の記録であり、11/11統合版は新規の本人限定環境で予約3件・取消1件とAccess拒否を確認した（[11/11実機検証](issue65_scheduled_publication_11_live_20261027.md)）。旧9/9・サイト試験版10/11等からのDB変換・互換配備は提供しない。現在の設定・操作は[管理用設定ガイド](../docs/admin_configuration.md)を参照する。
 
 作成日: 2026-10-24。**管理者レビューにより、scheduler A／管理設定C／日時identity A／停止後Aと4節の日時解決規則を採用し、開発・ローカル検証へ進む。**
 
@@ -371,4 +371,4 @@ castloop schedule-reapprove SCHEDULE_UUID --workspace /path/to/service --show da
 
 ローカル回帰はBun 1.4.4で`bun test`: **857 pass / 0 fail**（96 files）。`npm run check`とLinux単体CLI buildも成功した。これはBun SQLiteとmemory R2 fixtureによる検証であり、DO runtimeの永続性・native Alarm再配送・実Cache purgeの証明ではない。
 
-fresh隔離環境で3 Episodeを約3分間隔に予約し、各予定前のFeed未配信と予定後の追加、`publication_state=succeeded`、予約時刻+2msのdispatchを確認した。同じ環境で追加確認を行い、Pause→`needs_approval`→Resume→再承認→公開、日時変更→取消、約3時間後の予約を残したまま別Episodeの即時公開、予定前の直リンク404と公開後の200/206・SHA-256一致を確認した。環境・結果・未確認範囲は[実機検証記録](issue65_scheduled_publication_live_20261026.md)に保存した。CLI基盤の実データ検証（指定サンプル3＋36 Episode、約1.50GB、162コマンド）は[別記録](issue65_cli_real_data_verification_20261024.md)に保持する。これは予約本体の実機検証ではない。
+fresh隔離環境で3 Episodeを約3分間隔に予約し、各予定前のFeed未配信と予定後の追加、`publication_state=succeeded`、予約時刻+2msのdispatchを確認した。同じ9/9環境で追加確認を行い、Pause→`needs_approval`→Resume→再承認→公開、日時変更→取消、約3時間後の予約を残したまま別Episodeの即時公開、予定前の直リンク404と公開後の200/206・SHA-256一致を確認した。11/11統合版は新規の本人限定環境で予約3件・取消1件を実行し、予定前後のFeed、Pause/再承認、Access 129要求拒否、site_timezone、音源hashを確認した。環境・結果・未確認範囲は[9/9実機検証](issue65_scheduled_publication_live_20261026.md)と[11/11実機検証](issue65_scheduled_publication_11_live_20261027.md)に保存した。CLI基盤の実データ検証（指定サンプル3＋36 Episode、約1.50GB、162コマンド）は[別記録](issue65_cli_real_data_verification_20261024.md)に保持する。これは予約本体の実機検証ではない。
