@@ -126,6 +126,36 @@ async function readSite(f: Awaited<ReturnType<typeof fixture>>, path = "/podcast
   });
 }
 
+test("Show CSS is immutable revision content across publication, Episode lifecycle and past revision adoption", async () => {
+  const f = await fixture(true), firstCss = ":root{--cl-accent:red}", nextCss = ":root{--cl-accent:blue}";
+  const publishCss = async (css: string, initial = false) => {
+    const request = initial ? await f.request("show") : await f.showUpdate();
+    const { site_url, ...metadata } = show;
+    request.payloads[0] = await f.payload(request.job_id, "show_metadata", stringifyToml({ ...metadata,
+      site_mode: "builtin", site_css_path: "site.css", site_css: css }));
+    expect((await f.run(request)).state).toBe("succeeded");
+    return f.content.currentShowRevision("daily", f.config.public_base_url)!;
+  };
+  const first = await publishCss(firstCss, true);
+  await f.publishEpisode("first"); await f.publishEpisode("second");
+  const check = async (css: string) => {
+    for (const path of ["/podcasts/daily/", "/podcasts/daily/episodes/first/", "/podcasts/daily/episodes/second/"]) {
+      const response = await readSite(f, path), html = await response.text();
+      expect(response.status).toBe(200); expect(html).toContain(css);
+      const style = html.match(/<style>([\s\S]*?)<\/style>/)![1];
+      expect(response.headers.get("Content-Security-Policy")).toContain(createHash("sha256").update(style).digest("base64"));
+    }
+  };
+  await check(firstCss);
+  await publishCss(nextCss); await check(nextCss);
+  await f.run(f.lifecycle("unpublish", "first"));
+  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+  await f.run(f.lifecycle("restore", "first")); await check(nextCss);
+  expect((await f.run(revisionRequest(f, first.revision_id))).state).toBe("succeeded"); await check(firstCss);
+  expect(f.content.showRevision("daily", first.revision_id, f.config.public_base_url)!.metadata.site_css).toBe(firstCss);
+  await f.control("pause"); expect((await readSite(f)).status).toBe(503);
+});
+
 test("builtin publication atomically exposes static pages, native audio and RSS links without private Show fields", async () => {
   const f = await fixture(true);
   expect((await readSite(f)).status).toBe(404);

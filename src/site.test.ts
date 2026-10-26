@@ -91,6 +91,24 @@ test("HTML and attributes escape imported text; rich HTML and inline handlers ne
   expect(() => renderSiteEpisode(input, { ...episode(), enclosure_url: `${episode().enclosure_url}?secret=x` })).toThrow();
 });
 
+test("description links lead to existing full pages, without enclosing the native player", () => {
+  const description = `<p>${"日😀".repeat(81)}</p><p>次の段落<br>全文の最後</p>`;
+  const revision = { ...episode(), description };
+  const before = JSON.stringify(revision);
+  const html = renderSiteListing(input, [revision], 1);
+  expect(html).toContain(`<a class="cl-description-link" href="/podcasts/daily/episodes/first/">${"日😀".repeat(80)}… <span class="cl-read-more">全文を読む</span></a>`);
+  expect(html).not.toContain("全文の最後");
+  expect(html).toContain('</a></p><audio controls preload="none"');
+  const full = renderSiteEpisode(input, revision);
+  expect(full).toContain(`<div class="cl-description cl-description-full">${description}</div>`);
+  expect(full).toContain(`<meta name="description" content="${"日😀".repeat(80)}…">`);
+  expect(JSON.stringify(revision)).toBe(before);
+  expect(renderSiteListing(input, [{ ...revision, description: "<img src=x>" }], 1)).not.toContain('class="cl-description-link"');
+  const show = renderSiteListing({ ...input, show: { ...input.show, description: "<p>番組<br>紹介 &amp; 補足</p>" } }, [], 1);
+  expect(show).toContain('<div class="cl-description cl-description-full"><p>番組<br>紹介 &amp; 補足</p></div>');
+  expect(show).toContain('<meta name="description" content="番組 紹介 &amp; 補足">');
+});
+
 test("Episode URLs stay fixed on metadata and audio revisions while approved MP3 references change", () => {
   const before = renderSiteEpisode(input, episode());
   const nextId = "00000000-0000-4000-8000-000000000002";
@@ -101,12 +119,48 @@ test("Episode URLs stay fixed on metadata and audio revisions while approved MP3
   expect(after).toContain(`${nextId}.mp3`);
 });
 
+test("site pages omit the copyright footer, retain the Show author, and link full descriptions only", () => {
+  const description = '<p>資料 https://example.com/info <a href="http://example.org/docs">詳しく読む</a></p>';
+  const show = { ...input.show, copyright: "Copyright Owner", description };
+  const revision = { ...episode(), description }, before = JSON.stringify({ show, revision });
+  const listing = renderSiteListing({ ...input, show }, [revision], 1);
+  const full = renderSiteEpisode({ ...input, show }, revision);
+  for (const html of [listing, full]) {
+    expect(html).not.toContain("<footer");
+    expect(html).not.toContain("Copyright Owner");
+    expect(html).toContain('<a href="https://example.com/info">https://example.com/info</a>');
+    expect(html).toContain('<a href="http://example.org/docs">詳しく読む</a>');
+    expect(html).toContain('<meta name="description" content="資料 https://example.com/info 詳しく読む">');
+  }
+  expect(listing).toContain('<p class="cl-author">著者</p>');
+  expect(listing).toContain('<a class="cl-description-link" href="/podcasts/daily/episodes/first/">資料 https://example.com/info 詳しく読む <span');
+  expect(JSON.stringify({ show, revision })).toBe(before);
+});
+
 test("CSP hashes exactly the fixed stylesheet and rejects header injection", async () => {
   const hash = await siteCssHash();
   expect(hash).toBe(createHash("sha256").update(SITE_CSS).digest("base64"));
   expect(siteContentSecurityPolicy(hash)).toContain(`style-src 'sha256-${hash}'`);
   expect(siteContentSecurityPolicy(hash)).toContain("script-src 'none'");
   expect(() => siteContentSecurityPolicy("' unsafe-inline")).toThrow();
+});
+
+test("custom CSS follows the default style and has an exact per-page CSP hash", async () => {
+  const css = ":root{--cl-accent:#882244}\n.cl-episode{border-radius:0}";
+  const html = renderSiteListing({ ...input, show: { ...input.show, site_css: css } }, [episode()], 1);
+  expect(html).toContain(`<style>${SITE_CSS}\n${css}</style>`);
+  const hash = await siteCssHash(css);
+  expect(hash).toBe(createHash("sha256").update(`${SITE_CSS}\n${css}`).digest("base64"));
+  expect(hash).not.toBe(await siteCssHash());
+  expect(html).toContain('class="cl-site cl-page-list"');
+  expect(html).toContain('class="cl-player"');
+  expect(renderSiteEpisode(input, episode("offset", "2026-10-26T01:00:00+09:00"))).toContain("2026-10-25 (UTC)");
+  for (const css of ["a".repeat(65_537), "\u0000", "\r", "\ud800", "/* </STYLE> */"]) {
+    expect(() => renderSiteListing({ ...input, show: { ...input.show, site_css: css } }, [], 1)).toThrow();
+  }
+  const boundary = "/*" + "あ".repeat(21_844) + "*/";
+  expect(Buffer.byteLength(boundary)).toBe(65_536);
+  expect(renderSiteListing({ ...input, show: { ...input.show, site_css: boundary } }, [], 1)).toContain(boundary);
 });
 
 async function cachedFixture() {

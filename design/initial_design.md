@@ -1,5 +1,7 @@
 # castloop v2 デザインドキュメント
 
+Issue #70のCSSカスタマイズ開発版は内部queue/content形式**9/10**の新規環境専用。固定HTML＋標準デザイン1種類＋Show単位のCSS 1ファイルを提供する。CLIがCSSを検証してShow metadataへ同梱し、既存Show DOがHTMLへ事前に埋め込む。生成用サービスは追加しない。後続の[説明表示改善](show_website_description_display_plan.md)ではHTML解析用の`htmlparser2`を追加し、一覧のタグなし160文字から既存個別ページの全文へリンクする。全文は安全な段落・改行とHTTP(S)リンクで表示する。第1段8/9からの移行・互換配備はしない。[CSS採用方針](show_website_customization_options.md)と[利用ガイド](../docs/show_website.md)を参照する。
+
 Issue #70開発版は、Showごとに内蔵サイト／外部サイトを選択できる。内蔵HTMLは既存Show DOのAlarmで生成し、private R2の世代別snapshotへ保存する。`SiteCachedPages`とHTML専用Gatewayは既存media cacheから分離し、最新のShow判定を共有する。必要な両purge後、Feedとサイト全体の世代・ページ参照を同一transactionで確定する。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用。下記の7/8以前の番号は各機能導入時点の履歴である。[サイト設計](show_website_plan.md)・[利用ガイド](../docs/show_website.md)参照。Freeの実機性能・ブラウザ実機再生は未確認。
 
 Issue #64の開発版では、認証付きの公開済み全文・履歴取得とCLIの項目差分・ローカルRSS生成、保存済みrevisionの明示採用を追加した。Show内SQLiteに履歴2表を置き、R2の不変metadata・画像・音源と照合する。採用は新revisionとして保存・purge・SQL確定し、素材再uploadや過去履歴の上書きはしない。内部queue/content形式**7/8**、必須`revision_history="sqlite-revisions-v1"`の新規環境専用で旧環境は変換しない。[採用設計](published_diff_and_revision_restore_plan.md)と[利用ガイド](../docs/published_content_review.md)参照。実Cloudflareの配備・公開・性能確認は行っていない。

@@ -4,9 +4,9 @@ import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
 import { SQLITE_DOMAIN_PROTOCOL, sqliteDomainRequestHash } from "../../shared/src/sqlite-domain";
 import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
-import { stringifyToml } from "@castloop/shared";
+import { parseShowMetadata, stringifyToml } from "@castloop/shared";
 import { RSS_IMPORT_AUDIO } from "./test-support/rss-import";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const fixtures: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
@@ -18,6 +18,11 @@ async function fixture(shows = ["a", "b"], builtin = false, episodes = 0) {
   for (const id of shows) {
     await run("create-show", builtin ? [id] : [id, "https://example.com"]); await run("show-resume", [id, crypto.randomUUID()]);
     writeFileSync(join(f.root, id, "cover.jpg"), Uint8Array.of(255, 216, 255));
+    if (builtin) {
+      const path = join(f.root, id, "show.toml");
+      writeFileSync(path, stringifyToml({ ...parseShowMetadata(readFileSync(path, "utf8")), site_css_path: "site.css" }));
+      writeFileSync(join(f.root, id, "site.css"), ":root{--cl-accent:purple}");
+    }
     await run("update-show", [id]); await run("publish-show", [id]);
     for (let index = 0; index < episodes; index++) {
       const episodeId = `ep-${index}`;
@@ -58,6 +63,7 @@ test("domain website regeneration resumes bounded batches after restart and comm
   const next = f.content.sites.page(page)!;
   expect(next.generation).not.toBe(before.generation);
   expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain('href="https://podcasts.example.com/podcasts/a/"');
+  expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain(":root{--cl-accent:purple}");
   expect(f.text(`public/podcasts/a/sites/${before.generation}/index.html`)).toContain(`${f.config.public_base_url}/podcasts/a/`);
   expect(f.nodes.get("a")!.service.siteDelivery(page).status).toBe(503);
 }, 60000);

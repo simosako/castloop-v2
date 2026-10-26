@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { parseEpisodeDraft, sqliteServiceConfigHash, stringifyToml } from "@castloop/shared";
+import { parseEpisodeDraft, parseShowMetadata, sqliteServiceConfigHash, stringifyToml } from "@castloop/shared";
 import type { SqliteServiceConfig } from "@castloop/shared";
 import { SqliteDraft } from "./sqlite-draft";
 import { draftPreview } from "./draft-preview";
@@ -18,6 +18,20 @@ import { join } from "node:path";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
+
+test("Show CSS edits invalidate the staged preview and cannot be published without staging again", async () => {
+  const f = await fixture("show"), path = join(f.root, "daily", "show.toml"), css = join(f.root, "daily", "site.css");
+  const { site_url, ...show } = parseShowMetadata(readFileSync(path, "utf8"));
+  writeFileSync(path, stringifyToml({ ...show, site_mode: "builtin", site_css_path: "site.css" }));
+  writeFileSync(css, "body{color:red}");
+  await f.draft.stage({ asset: "show" });
+  const preview = await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" });
+  expect(preview.inputs_match_staged).toBe(true);
+  writeFileSync(css, "body{color:blue}");
+  expect((await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" })).inputs_match_staged).toBe(false);
+  await expect(f.draft.publish()).rejects.toThrow("differs");
+  expect((await f.draft.read()).publication).toBeUndefined();
+});
 
 test("preview is read-only and publication rejects changes after approval", async () => {
   const f = await fixture(); await f.stage();

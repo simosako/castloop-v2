@@ -1,0 +1,12 @@
+:root {
+  --cl-accent: #8b2942;
+  --cl-background: #fffaf5;
+  --cl-text: #242024;
+  --cl-muted: #665b61;
+  --cl-content-width: 60rem;
+  --cl-radius: 0.75rem;
+}
+
+.cl-page-list .cl-episode {
+  border-color: #e3cbd2;
+}

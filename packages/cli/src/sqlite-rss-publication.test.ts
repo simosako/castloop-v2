@@ -97,6 +97,20 @@ test("a completed publication with a lost import checkpoint is observed without 
   expect(value.commands.filter((name) => name === "update-show")).toHaveLength(1);
 });
 
+test("RSS imports freeze and install the reviewed Show CSS and use it on Episode pages", async () => {
+  const value = await fixture(2), path = join(value.output, "show.toml");
+  const { site_url, ...metadata } = parseShowMetadata(readFileSync(path, "utf8"));
+  writeFileSync(path, stringifyToml({ ...metadata, site_mode: "builtin", site_css_path: "site.css" }));
+  const css = ":root{--cl-accent:#882244}";
+  writeFileSync(join(value.output, "site.css"), css);
+  expect(await value.execute()).toMatchObject({ episode_count: 2 });
+  expect(value.content.currentShowRevision("imported", value.config.public_base_url)!.metadata.site_css).toBe(css);
+  for (const episode of value.content.episodes("imported")) {
+    const page = value.content.sites.page({ kind: "episode", showId: "imported", episodeId: episode.episode_id })!;
+    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${episode.episode_id}.html`)).toContain(css);
+  }
+});
+
 test("RSS resumes acknowledged audio verification and links all new uploads and publications to its import", async () => {
   const value = await fixture(2); let failReadback = true;
   const options = { ...value.options, cloudflare: { ...value.options.cloudflare, transport: async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {

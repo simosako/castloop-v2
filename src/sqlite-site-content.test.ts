@@ -20,6 +20,36 @@ function fixture() {
   return { ...sqlitePublicationBucket(), sites: new SqliteSiteContent(storage.storage), storage: storage.storage };
 }
 
+for (const count of [20, 100, 1000]) test(`Episode update at ${count} Episodes replaces listings and only its own detail`, async () => {
+  const f = fixture(), episodes = Array.from({ length: count }, (_, index) => episode(index, `<p>説明 ${index}<br>全文</p>`));
+  const finish = async (id: string) => {
+    const sizes: number[] = [];
+    while (!f.sites.complete(id)) {
+      const before = f.calls.length;
+      await f.sites.batch(id, f.bucket);
+      const writes = f.calls.slice(before).filter((call) => call.method === "PUT");
+      sizes.push(writes.length);
+      expect(writes.length).toBeLessThanOrEqual(20);
+      expect(writes.reduce((sum, call) => sum + f.entries.get(call.key)!.size, 0)).toBeLessThanOrEqual(4_000_000);
+    }
+    f.sites.confirmPurge(id, "media"); f.sites.confirmPurge(id, "site"); f.sites.commit(id);
+    return sizes;
+  };
+  f.sites.prepare("initial", 1, "daily", input, episodes);
+  await finish("initial");
+  const retained = f.sites.page({ kind: "episode", showId: "daily", episodeId: "ep-1" });
+  const before = JSON.stringify(episodes);
+  f.sites.prepare("changed", 2, "daily", input, episodes, "ep-0");
+  const batches = await finish("changed");
+  expect(batches.reduce((sum, size) => sum + size, 0)).toBe(Math.ceil(count / 20) + 1);
+  expect(batches.length).toBe(Math.ceil((Math.ceil(count / 20) + 1) / 20));
+  expect(f.sites.page({ kind: "episode", showId: "daily", episodeId: "ep-1" })).toEqual(retained);
+  expect(f.sites.page({ kind: "episode", showId: "daily", episodeId: "ep-0" })!.generation).toBe(2);
+  expect(f.storage.sql.exec("SELECT * FROM publication_site_sources WHERE owner_id = ?", "changed").toArray()).toHaveLength(count);
+  expect(f.storage.sql.exec("SELECT * FROM publication_site_candidates WHERE owner_id = ?", "changed").toArray()).toHaveLength(Math.ceil(count / 20) + 1);
+  expect(JSON.stringify(episodes)).toBe(before);
+});
+
 test("site batches enforce byte bounds as well as page counts, without truncating saved descriptions", async () => {
   const f = fixture(), episodes = Array.from({ length: 12 }, (_, index) => episode(index, "&".repeat(100_000)));
   f.sites.prepare("owner", 1, "daily", input, episodes);

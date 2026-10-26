@@ -277,7 +277,11 @@ export function createSqlitePublicationExecutor(store: SqlitePublicationContent,
         const metadataPayload = request.payloads.find((payload) => payload.asset === "show_metadata")!;
         const coverPayload = request.payloads.find((payload) => payload.asset.startsWith("cover_"))!;
         const metadataBytes = await readPayload(bucket, metadataPayload);
-        const metadata = input(() => { const parsed = parseShowMetadata(text(metadataBytes)); assertShowMetadataInputLimits(parsed); return parsed; });
+        const metadata = input(() => {
+          const parsed = parseShowMetadata(text(metadataBytes));
+          if ((parsed.site_css_path !== undefined) !== (parsed.site_css !== undefined)) throw new Error("Show CSS input is incomplete");
+          assertShowMetadataInputLimits(parsed); return parsed;
+        });
         const metadataSha256 = await publicationChecksum(new TextEncoder().encode(JSON.stringify(metadata)));
         const cover = await readPayload(bucket, coverPayload);
         const extension = coverPayload.asset === "cover_png" ? "png" : "jpg";

@@ -131,7 +131,9 @@ export class SqliteDomainRuntime {
             this.content.sites.prepare(row.operation_id, row.feed_generation, this.showId,
               metadata.site_mode === "builtin" ? { origin: this.config.public_base_url, coverExtension: target.cover.extension,
                 show: { show_id: metadata.show_id, title: metadata.title, description: metadata.description,
-                  language: metadata.language, author: metadata.author, ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null,
+                  language: metadata.language, author: metadata.author,
+                  ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
+                  ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null,
               target.episodes);
           }
           if (!await this.content.sites.batch(row.operation_id, this.bucket)) {

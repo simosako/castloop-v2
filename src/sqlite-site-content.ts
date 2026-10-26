@@ -56,7 +56,7 @@ export class SqliteSiteContent {
     const total = this.total(build);
     if (build.cursor === total) return true;
     const input = JSON.parse(build.input_json) as SiteRenderInput;
-    const cssHash = await siteCssHash();
+    const cssHash = await siteCssHash(input.show.site_css);
     let bytes = 0, cursor = build.cursor;
     for (let written = 0; cursor < total && written < 20; cursor++, written++) {
       let page: SitePage, html: string;
