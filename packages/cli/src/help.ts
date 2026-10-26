@@ -253,6 +253,30 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Re-running observes acknowledged pending jobs and continues without republishing completed inputs.\n" +
       "Unknown mutations stay blocked. Does not adopt existing Shows, convert services or remove the old host.",
   },
+  "backup-create": {
+    usage: "backup-create [--workspace PATH] --output FILE [--include-audio] [--passphrase-file FILE] [--json]",
+    description: "Create one encrypted local backup archive of a service workspace: configuration, .castloop state (administrator key, client IDs, journals), Show TOML and covers.\n" +
+      "Offline only; never networks or mutates the service. MP3 originals are excluded unless --include-audio is explicit; every exclusion is recorded in the archive manifest.\n" +
+      "Run while no other castloop command edits the workspace; the archive is a point-in-time snapshot.\n" +
+      "Audio-included backups matter for unpublished originals or account-level disasters; published audio is kept immutably in R2, so a low cadence is enough.\n" +
+      "The passphrase (8 to 1024 bytes) comes from --passphrase-file or an interactive prompt, never from the command line or environment.",
+  },
+  "backup-verify": {
+    usage: "backup-verify FILE [--passphrase-file FILE] [--json]",
+    description: "Decrypt and fully verify one backup archive offline: every entry digest, the manifest, the service configuration and the ciphertext trailer.\n" +
+      "Reports included and excluded files, retained locks and unfinished local operations. Read-only; verification success does not prove server-side recovery.",
+  },
+  "backup-restore-preview": {
+    usage: "backup-restore-preview FILE --dest PATH [--passphrase-file FILE] [--json]",
+    description: "Show the restoration plan for one archive: destination conflict check, expansion list, unfinished local operations and frozen absolute source paths. Writes nothing.",
+  },
+  "backup-restore": {
+    usage: "backup-restore FILE DEST confirm [--passphrase-file FILE] [--json]",
+    description: "Restore an archive into DEST, which must not exist; any failure removes the partial destination.\n" +
+      "Restores the same service identity (configuration hash, administrator key, client IDs) and regenerates .gitignore.\n" +
+      "After restoration run doctor --local; unfinished operations may only be observed (operation-status), never replayed.\n" +
+      "Does not network, publish, resume or authorize anything remotely.",
+  },
 };
 
 export function commandHelp(command: string): string {
@@ -263,7 +287,7 @@ export function commandHelp(command: string): string {
 
 export function commandOptions(command: string): Record<string, "string" | "boolean"> {
   const options: Record<string, "string" | "boolean"> = { json: "boolean", "non-interactive": "boolean" };
-  if (!["describe", "schema", "import-rss", "validate", "template", "skill"].includes(command)) options.workspace = "string";
+  if (!["describe", "schema", "import-rss", "validate", "template", "skill", "backup-verify", "backup-restore-preview", "backup-restore"].includes(command)) options.workspace = "string";
   const byCommand: Record<string, Record<string, "string" | "boolean">> = {
     init: { "publication-protocol": "string", "service-id": "string", "account-id": "string", "bucket-name": "string", "workers-subdomain": "string", "operation-id": "string" },
     "create-show": { "site-url": "string", "site-mode": "string" }, deploy: { "operation-id": "string" }, schema: { format: "string" },
@@ -282,6 +306,10 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "preview-episode": { local: "boolean", remote: "boolean", "rss-output": "string" },
     "list-show-revisions": { cursor: "string" }, "list-episode-revisions": { cursor: "string" },
     "sync-local-metadata": { show: "string", episode: "string", "expect-revision": "string", output: "string" },
+    "backup-create": { output: "string", "include-audio": "boolean", "passphrase-file": "string" },
+    "backup-verify": { "passphrase-file": "string" },
+    "backup-restore-preview": { dest: "string", "passphrase-file": "string" },
+    "backup-restore": { "passphrase-file": "string" },
   };
   if (["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode", "list-episode-revisions", "preview-episode-revision"].includes(command) || command.startsWith("operation-")) options.show = "string";
   if (["publish-show", "publish-episode"].includes(command)) options["expect-preview"] = "string";
@@ -291,15 +319,17 @@ export function commandOptions(command: string): Record<string, "string" | "bool
 export function describeCommand(command: string) {
   const help = COMMAND_HELP[command];
   if (!help || !Object.hasOwn(COMMAND_HELP, command)) throw new Error("Unknown command");
-  const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-schedule-time"].includes(command);
+  const offline = ["describe", "schema", "validate", "template", "skill", "doctor", "preview-schedule-time",
+    "backup-create", "backup-verify", "backup-restore-preview", "backup-restore"].includes(command);
   const preview = ["preview-show", "preview-episode"].includes(command);
   const read = offline || preview || ["list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "progress", "verify", "watch", "stats"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
-      SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1] } as Record<string, number[]>)[command],
+      SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1],
+        "backup-create": [0], "backup-verify": [1], "backup-restore-preview": [1], "backup-restore": [3] } as Record<string, number[]>)[command],
     constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly"],
     authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
-    effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? command === "skill" ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" || command === "revision-execute" },
+    effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? ["skill", "backup-create", "backup-restore"].includes(command) ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command === "lifecycle-execute" || command === "revision-execute" },
     output_schema: "result", input_schemas: ["service-config", "admin-config", "show-input", "episode-input"],
     recovery: read ? "Bounded observation only; snapshots do not authorize mutations." : "Preserve exact workspace, Show, input and records. Unknown PUT/POST outcomes must not be replayed. Observe the recorded job/operation; upload continuation requires the retained receipt and unchanged input.",
     paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };

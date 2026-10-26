@@ -22,7 +22,7 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 - Issue #78: Zod updated to a patched version (resolved 4.6.7) for CVE-2023-54404/GHSA-mrhx-c7xc-m3w5; no castloop-specific exploitation reported and persisted formats unchanged. See the [update record](docs/zod_security_update_20261025.md).
 
 ## Unreleased
-- None.
+- Issue #63: offline encrypted workspace backup, verification and restore — `backup-create` (single-pass hashing, explicit `--include-audio`, manifest recording exclusions, retained locks, unfinished operations and frozen source paths), `backup-verify` (full decrypt with per-entry digests and config validation), `backup-restore-preview` and `backup-restore ... confirm` (nonexistent destination only, same service identity, partial-destination discard on failure). All four commands never network and never mutate the deployed service. See the [backup guide](docs/workspace_backup.md) and the [adopted plan](design/workspace_backup_restore_plan.md).
 
 ## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
 

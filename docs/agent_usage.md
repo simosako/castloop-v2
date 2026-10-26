@@ -81,6 +81,10 @@ castloop publish-episode first --workspace /absolute/workspace --show daily --ex
 
 上のlocal-only説明はv0.7.2時点の仕様。Issue #64の開発版はremote差分に対応し、未取得やlocal指定時だけ`not_checked`とする。一覧やRSSを編集元に逆変換しない。全文の取得・新規ファイルへの書出しと、既存workspaceのjournal再構築は別である。
 
+## バックアップ・復元
+
+workspaceのバックアップ・検証・復元は4つの`backup-*`コマンドで行う。いずれも通信せず、Cloudflare資格情報も読まない。`backup-create`のパスフレーズは`--passphrase-file`またはTTYプロンプトからだけ読み、`--json`・`--non-interactive`では`--passphrase-file`が必須になる。音源原本のバックアップは利用者・エージェントが`--include-audio`を明示したときだけ行われ、既定のバックアップではmanifestに除外として記録される。復元は`backup-restore-preview`で確認してから`backup-restore ARCHIVE DEST confirm`で行い、復元後の未完了操作は観測のみで再送しない。対象・頻度・保証範囲は[バックアップガイド](workspace_backup.md)を優先する。
+
 ## 検証範囲
 
 ローカル模擬Cloudflareによる従来の公開・復旧試験、独立CLI processのcwd非依存操作、オフラインコマンドとSkill exportを検証する。`node scripts/smoke-agent-cli.mjs dist/castloop`は開発用テストであり、実行する子バイナリは空PATH・ソース不在の作業場所から動かす。Nodeは管理者環境の依存ではない。

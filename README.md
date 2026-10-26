@@ -42,7 +42,7 @@ The v0.6.0 trial published 36 full-size Episodes (1.50GB) in **485.53 seconds**,
 
 - castloop is in an **early beta stage**. Behavior may change incompatibly between releases, and several operations are intentionally not provided (see [Supported service configuration](#supported-service-configuration)). Do not rely on it for content you cannot afford to lose.
 - castloop creates and deploys resources **in your own Cloudflare account**. You are responsible for all resulting usage, costs and compliance, and for the availability of your published content. The CLI never expands token permissions or changes billing/CPU limits by itself.
-- Always back up your `.castloop/` state (it contains the administrator key and journals), your `castloop.toml`/Show/Episode TOML files and your audio originals. TOML alone is not a complete workspace; losing `.castloop/` can leave a deployed service unmanageable.
+- Always back up your `.castloop/` state (it contains the administrator key and journals), your `castloop.toml/`Show/Episode TOML files and your audio originals. TOML alone is not a complete workspace; losing `.castloop/` can leave a deployed service unmanageable. The offline `backup-create`/`backup-verify`/`backup-restore` commands automate this (see [Workspace backup and restore](#workspace-backup-and-restore)).
 - castloop is an independent project and is **not affiliated with, or endorsed by, Cloudflare, Inc.**
 - The software is provided "AS IS", without warranty of any kind, express or implied. See [LICENSE](LICENSE) for the full license text and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled third-party licenses.
 
@@ -182,6 +182,10 @@ castloop publish-rss-import /path/to/import
 ```
 
 Run publication from the service root. Imports create a new Show, preserve GUIDs/dates and publish sequentially; completed Episodes become public before the entire import finishes. Subscriber migration, recurring sync, adoption of existing Shows and removal of the old host are not performed. See [RSS usage](docs/rss_migration.md).
+
+## Workspace backup and restore
+
+The four offline `backup-*` commands never network and never mutate the deployed service. `backup-create --workspace DIR --output FILE` writes one encrypted archive (scrypt + AES-256-GCM) covering the configuration, `.castloop/` state (administrator key, client IDs, journals) and Show TOML/covers; MP3 originals are included only with an explicit `--include-audio`. `backup-verify` fully decrypts and checks an archive, `backup-restore-preview` shows the restoration plan, and `backup-restore FILE DEST confirm` restores into a not-yet-existing path with the same service identity. Losing `.castloop/` can leave a deployed service unmanageable, and the administrator key cannot be reissued — see the [backup guide](docs/workspace_backup.md) for scope, passphrase handling, recommended cadence and the limits of verification.
 
 ## Update an existing SQLite Worker
 
