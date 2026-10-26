@@ -15,11 +15,13 @@ export async function exportPreviewRss(root: string, config: SqliteServiceConfig
   const snapshot = preview.published.snapshot;
   if (!snapshot || !preview.publishable || !preview.job_id) throw new Error("RSS export requires a remote preview with unchanged staged inputs and base");
   const episodes: EpisodeRevision[] = [];
+  const siteIds: Record<string, string> = {};
   let after: string | undefined;
   do {
     const page = await client.previewInventory(preview.target.show_id, snapshot.feed_generation!, after);
     if (page.worker_version_id !== snapshot.worker_version_id || episodes.length + page.episodes.length > 10000) throw new Error("RSS inventory base or budget differs");
     episodes.push(...page.episodes);
+    Object.assign(siteIds, page.site_ids);
     after = page.next_cursor ?? undefined;
   } while (after);
   if (episodes.length !== snapshot.published_episode_count) throw new Error("RSS inventory count differs from its snapshot");
@@ -40,9 +42,10 @@ export async function exportPreviewRss(root: string, config: SqliteServiceConfig
       sha256: audio?.sha256 ?? old!.audio.sha256, updated_at: "2000-01-01T00:00:00Z" });
     const index = episodes.findIndex((episode) => episode.episode_id === candidate.episode_id);
     if (index === -1) episodes.push(candidate); else episodes[index] = candidate;
+    siteIds[candidate.episode_id] = snapshot.episode_site_id!;
   }
   if (!show || !extension) throw new Error("RSS preview Show content is missing");
-  const xml = renderPublicationFeed(show, episodes, config.public_base_url, extension);
+  const xml = renderPublicationFeed(show, episodes, config.public_base_url, extension, siteIds);
   const final = await draftPreview(root, config, preview.target, undefined, { mode: "remote", client });
   if (final.input_fingerprint !== preview.input_fingerprint || !final.publishable) throw new Error("RSS preview changed during collection; review again");
   const file = resolve(output);

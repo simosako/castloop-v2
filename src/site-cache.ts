@@ -25,7 +25,7 @@ export async function serveCachedSitePage(request: Request, bucket: Pick<R2Bucke
     const headers = new Headers({ "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": csp,
       "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", ETag: object.httpEtag,
       "Last-Modified": object.uploaded.toUTCString(), "Cache-Control": "public, max-age=300",
-      "Cache-Tag": `site-${page.showId},${page.kind === "episode" ? `site-episode-${page.showId}/${page.episodeId}` : `site-list-${page.showId}`}` });
+      "Cache-Tag": `site-${page.showId},${page.kind === "episode" ? `site-episode-${page.showId}/${page.siteId}` : `site-list-${page.showId}`}` });
     const matches = (value: string, weak: boolean) => value.trim() === "*" || value.split(",").some((item) =>
       (weak ? item.trim().replace(/^W\//, "") : item.trim()) === object.httpEtag);
     const modified = (value: string) => {

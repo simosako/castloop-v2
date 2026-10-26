@@ -3,6 +3,7 @@ import { episodeDraftSchema, episodeDraftFromRevision, episodeRevisionSchema, sh
 import type { EpisodeDraft, ShowMetadata } from "./index";
 import { sqliteAvailabilityStateSchema } from "./sqlite-availability";
 import { sqlitePublicationProtocol, sqlitePublicationRequestSchema, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { SITE_ID_PATTERN } from "./website";
 
 export const SQLITE_REVISION_PAGE_SIZE = 20;
 const slug = (maximum: number) => z.string().max(maximum).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -90,6 +91,8 @@ export const sqliteEpisodeRevisionSummarySchema = z.object({
   is_current: z.boolean(),
 }).strict();
 
+const siteIdSchema = z.string().regex(SITE_ID_PATTERN);
+
 export const sqliteContentSnapshotSchema = sqlitePublicationRuntimeSchema.extend({
   protocol: z.literal(sqlitePublicationProtocol),
   publication_ready: z.literal(true),
@@ -107,6 +110,7 @@ export const sqliteContentSnapshotSchema = sqlitePublicationRuntimeSchema.extend
   episode_lifecycle: z.enum(["missing", "published", "unpublished", "deleted"]).optional(),
   expected_episode_lifecycle_version: counter.optional(),
   episode_content: sqliteEpisodeRevisionRecordSchema.nullable().optional(),
+  episode_site_id: siteIdSchema.optional(),
   snapshot_only: z.literal(true),
   authorizes_recovery: z.literal(false),
 }).strict().superRefine((value, context) => {
@@ -116,7 +120,7 @@ export const sqliteContentSnapshotSchema = sqlitePublicationRuntimeSchema.extend
   if (hasShowContent !== (value.show_content !== null) ||
     value.show_content && value.show_content.show_id !== value.show_id ||
     value.show_content && (value.expected_show_state_version === null || value.show_content.state_version > value.expected_show_state_version) ||
-    hasEpisode !== (value.episode_lifecycle !== undefined && value.expected_episode_lifecycle_version !== undefined && value.episode_content !== undefined) ||
+    hasEpisode !== (value.episode_lifecycle !== undefined && value.expected_episode_lifecycle_version !== undefined && value.episode_content !== undefined && value.episode_site_id !== undefined) ||
     hasEpisode && hasEpisodeContent !== (value.episode_content !== null) ||
     value.episode_content && (value.episode_content.show_id !== value.show_id || value.episode_content.episode_id !== value.episode_id)) {
     context.addIssue({ code: "custom", message: "Content snapshot has inconsistent Show or Episode evidence" });
@@ -235,4 +239,5 @@ export type SqliteRevisionPlan = z.infer<typeof sqliteRevisionPlanSchema>;
 export const sqlitePreviewInventorySchema = sqlitePublicationRuntimeSchema.extend({
   show_id: slug(32), feed_generation: counter, after: slug(80).nullable(),
   episodes: z.array(episodeRevisionSchema).max(20), next_cursor: slug(80).nullable(),
+  site_ids: z.record(slug(80), siteIdSchema),
 }).strict();

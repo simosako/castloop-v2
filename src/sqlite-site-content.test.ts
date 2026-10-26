@@ -7,7 +7,7 @@ import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucke
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 const input = { origin: "https://public.example.com", coverExtension: "jpg" as const,
-  show: { show_id: "daily", title: "Show", description: "Description", language: "ja", author: "Author" } };
+  show: { show_id: "daily", title: "Show", description: "Description", language: "ja", author: "Author" }, episodeSiteIds: {} };
 function episode(index: number, description = "Description"): EpisodeRevision {
   const id = `ep-${index}`, revision = "00000000-0000-4000-8000-000000000001";
   return { schema_version: 1, episode_id: id, revision_id: revision, title: id, description, guid: id,
@@ -35,16 +35,18 @@ for (const count of [20, 100, 1000]) test(`Episode update at ${count} Episodes r
     f.sites.confirmPurge(id, "media"); f.sites.confirmPurge(id, "site"); f.sites.commit(id);
     return sizes;
   };
-  f.sites.prepare("initial", 1, "daily", input, episodes);
+  const episodeSiteIds = await f.sites.ids.reserve("daily", episodes);
+  const page = (id: string) => ({ kind: "episode" as const, showId: "daily", siteId: episodeSiteIds[id] });
+  f.sites.prepare("initial", 1, "daily", { ...input, episodeSiteIds }, episodes);
   await finish("initial");
-  const retained = f.sites.page({ kind: "episode", showId: "daily", episodeId: "ep-1" });
+  const retained = f.sites.page(page("ep-1"));
   const before = JSON.stringify(episodes);
-  f.sites.prepare("changed", 2, "daily", input, episodes, "ep-0");
+  f.sites.prepare("changed", 2, "daily", { ...input, episodeSiteIds }, episodes, "ep-0");
   const batches = await finish("changed");
   expect(batches.reduce((sum, size) => sum + size, 0)).toBe(Math.ceil(count / 20) + 1);
   expect(batches.length).toBe(Math.ceil((Math.ceil(count / 20) + 1) / 20));
-  expect(f.sites.page({ kind: "episode", showId: "daily", episodeId: "ep-1" })).toEqual(retained);
-  expect(f.sites.page({ kind: "episode", showId: "daily", episodeId: "ep-0" })!.generation).toBe(2);
+  expect(f.sites.page(page("ep-1"))).toEqual(retained);
+  expect(f.sites.page(page("ep-0"))!.generation).toBe(2);
   expect(f.storage.sql.exec("SELECT * FROM publication_site_sources WHERE owner_id = ?", "changed").toArray()).toHaveLength(count);
   expect(f.storage.sql.exec("SELECT * FROM publication_site_candidates WHERE owner_id = ?", "changed").toArray()).toHaveLength(Math.ceil(count / 20) + 1);
   expect(JSON.stringify(episodes)).toBe(before);
@@ -52,7 +54,8 @@ for (const count of [20, 100, 1000]) test(`Episode update at ${count} Episodes r
 
 test("site batches enforce byte bounds as well as page counts, without truncating saved descriptions", async () => {
   const f = fixture(), episodes = Array.from({ length: 12 }, (_, index) => episode(index, "&".repeat(100_000)));
-  f.sites.prepare("owner", 1, "daily", input, episodes);
+  const episodeSiteIds = await f.sites.ids.reserve("daily", episodes);
+  f.sites.prepare("owner", 1, "daily", { ...input, episodeSiteIds }, episodes);
   let batches = 0;
   while (!f.sites.complete("owner")) {
     const start = f.calls.length;
@@ -68,7 +71,7 @@ test("site batches enforce byte bounds as well as page counts, without truncatin
   f.sites.confirmPurge("owner", "media");
   expect(() => f.sites.commit("owner")).toThrow("confirmed");
   f.sites.confirmPurge("owner", "site"); f.sites.commit("owner");
-  expect(f.text("public/podcasts/daily/sites/1/episodes/ep-0.html")).toContain("&amp;".repeat(100_000));
+  expect(f.text(`public/podcasts/daily/sites/1/episodes/${episodeSiteIds["ep-0"]}.html`)).toContain("&amp;".repeat(100_000));
   expect(f.sites.state("daily")).toEqual({ generation: 1, enabled: 1, pages: 1 });
 });
 

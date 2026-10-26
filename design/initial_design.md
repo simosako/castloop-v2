@@ -1,5 +1,7 @@
 # castloop v2 デザインドキュメント
 
+Issue #70の自動短縮URL版は内部queue/content形式10/11の新規環境専用。EpisodeページはShow直下の自動ハッシュURL一つだけとし、長いページ入口・`e/`・互換転送・DB変換は提供しない。HTTP(S)リンク復元とcopyrightフッター削除も含む。[URL設計](show_website_site_slug_proposal.md)・[サイト利用ガイド](../docs/show_website.md)を優先する。
+
 Issue #70のCSSカスタマイズ開発版は内部queue/content形式**9/10**の新規環境専用。固定HTML＋標準デザイン1種類＋Show単位のCSS 1ファイルを提供する。CLIがCSSを検証してShow metadataへ同梱し、既存Show DOがHTMLへ事前に埋め込む。生成用サービスは追加しない。後続の[説明表示改善](show_website_description_display_plan.md)ではHTML解析用の`htmlparser2`を追加し、一覧のタグなし160文字から既存個別ページの全文へリンクする。全文は安全な段落・改行とHTTP(S)リンクで表示する。第1段8/9からの移行・互換配備はしない。[CSS採用方針](show_website_customization_options.md)と[利用ガイド](../docs/show_website.md)を参照する。
 
 Issue #70開発版は、Showごとに内蔵サイト／外部サイトを選択できる。内蔵HTMLは既存Show DOのAlarmで生成し、private R2の世代別snapshotへ保存する。`SiteCachedPages`とHTML専用Gatewayは既存media cacheから分離し、最新のShow判定を共有する。必要な両purge後、Feedとサイト全体の世代・ページ参照を同一transactionで確定する。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用。下記の7/8以前の番号は各機能導入時点の履歴である。[サイト設計](show_website_plan.md)・[利用ガイド](../docs/show_website.md)参照。Freeの実機性能・ブラウザ実機再生は未確認。

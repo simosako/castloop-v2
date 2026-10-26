@@ -4,6 +4,8 @@
 
 追補: 本書は初回配備時点の記録。その後、本人から再生に問題がないとの報告を受けた。さらに別承認で、同じ環境を[説明文表示改善版へ更新・再公開](show_website_description_trial_verification_20261026.md)した。現在のversion・生成HTML・確認待ち範囲は後続記録を参照する。
 
+追加追補: 自動短縮URL版は新規保存形式を使うため、別承認で本環境を退避・削除し、[新しい本人限定試験環境](show_website_short_url_trial_verification_20261026.md)を作成した。本書のURLは現在のレビュー先ではない。元workspace・journal・証跡は保持する。
+
 ## 1. 前回環境の削除
 
 [前回の短尺3件の試験](show_website_private_trial_verification_20261025.md)で作成した資源だけを、完全一致の対象として削除した。

@@ -11,7 +11,7 @@ test("publication, operation, target and Show control requests route directly to
 
 test("public delivery uses the approved path, never an injected Show header or the control DO", () => {
   for (const path of ["/podcasts/daily/feed.xml", "/podcasts/daily/cover.jpg", `/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`,
-    "/podcasts/daily/", "/podcasts/daily/page/2/", "/podcasts/daily/episodes/first/"]) {
+    "/podcasts/daily/", "/podcasts/daily/page/2/", "/podcasts/daily/0123456789abcdef/"]) {
     expect(sqliteRequestObjectName(new Request(`https://example.com${path}`, { headers: { "X-Castloop-Show-Id": "other" } }), "service")).toBe("show/service/daily");
   }
 });

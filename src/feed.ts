@@ -11,14 +11,14 @@ function escapeXml(value: string): string {
   })[character] ?? character);
 }
 
-function renderItem(episode: EpisodeRevision, showId: string, baseUrl: string, builtin: boolean): string {
+function renderItem(episode: EpisodeRevision, showId: string, baseUrl: string, builtin: boolean, siteIds: Record<string, string>): string {
   const hours = Math.floor(episode.duration_seconds / 3600);
   const minutes = Math.floor(episode.duration_seconds % 3600 / 60);
   const seconds = episode.duration_seconds % 60;
   const duration = [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
   return `    <item>\n` +
     `      <title>${escapeXml(episode.title)}</title>\n` +
-    (builtin ? `      <link>${escapeXml(sitePageUrl(baseUrl, { kind: "episode", showId, episodeId: episode.episode_id }))}</link>\n` : "") +
+    (builtin ? `      <link>${escapeXml(sitePageUrl(baseUrl, { kind: "episode", showId, siteId: siteIds[episode.episode_id] }))}</link>\n` : "") +
     `      <description>${escapeXml(episode.description)}</description>\n` +
     `      <guid isPermaLink="${episode.guid_is_permalink ?? false}">${escapeXml(episode.guid)}</guid>\n` +
     `      <pubDate>${new Date(episode.published_at).toUTCString()}</pubDate>\n` +
@@ -32,7 +32,7 @@ function renderItem(episode: EpisodeRevision, showId: string, baseUrl: string, b
 }
 
 export function renderFeed(show: ShowMetadata, episodes: EpisodeRevision[],
-  baseUrl: string, coverExtension: string): string {
+  baseUrl: string, coverExtension: string, siteIds: Record<string, string> = {}): string {
   const coverUrl = `${baseUrl.replace(/\/$/, "")}/podcasts/${show.show_id}/cover.${coverExtension}`;
   const feedUrl = `${baseUrl.replace(/\/$/, "")}/podcasts/${show.show_id}/feed.xml`;
   const siteUrl = show.site_mode === "builtin" ? sitePageUrl(baseUrl, { kind: "listing", showId: show.show_id, page: 1 }) : show.site_url!;
@@ -57,6 +57,6 @@ export function renderFeed(show: ShowMetadata, episodes: EpisodeRevision[],
     `<link>${escapeXml(siteUrl)}</link></image>\n` +
     `    <itunes:image href="${escapeXml(coverUrl)}" />\n` +
     episodes.toSorted(comparePublishedEpisodes).map((episode) =>
-        renderItem(episode, show.show_id, baseUrl, show.site_mode === "builtin")).join("") +
+        renderItem(episode, show.show_id, baseUrl, show.site_mode === "builtin", siteIds)).join("") +
     `  </channel>\n</rss>\n`;
 }

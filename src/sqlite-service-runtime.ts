@@ -61,7 +61,7 @@ export class SqliteServiceRuntime {
       domain_changes: "sqlite-domain-change-v1",
       availability_controls: "show-admission-delivery-v1", availability_version: snapshot.availability_version,
       revision_history: "sqlite-revisions-v1",
-      website: "static-show-v1",
+      website: "static-show-v2",
       delivery_statistics: "episode-daily-v1",
       admission_state: snapshot.state === "open" ? "open" : "closed", delivery_policy: snapshot.state === "paused" ? "stopped" : "enabled",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
@@ -152,7 +152,7 @@ export class SqliteServiceRuntime {
     const digest = target.base ? await publicationChecksum(new TextEncoder().encode(JSON.stringify(episodeDraftFromRevision(target.base)))) : undefined;
     return sqliteInspectionSchema.parse({ ...this.queue.identity(), protocol: "sqlite-sequential-v1", publication_ready: true,
       revision_history: "sqlite-revisions-v1",
-      website: "static-show-v1",
+      website: "static-show-v2",
       state: snapshot.state, admission_window_id: snapshot.admission_window_id, show_id: showId,
       show_lifecycle: target.show?.lifecycle ?? "missing", reservation_id: target.show?.reservation_id ?? null,
       expected_show_state_version: target.show?.state_version ?? null,
@@ -167,9 +167,11 @@ export class SqliteServiceRuntime {
         expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0 } : {}),
       ...(target.base ? { base_revision_id: target.base.revision_id, base_metadata_sha256: digest } : {}) });
   }
-  contentSnapshot(showId: string, episodeId?: string): SqliteContentSnapshot {
+  async contentSnapshot(showId: string, episodeId?: string): Promise<SqliteContentSnapshot> {
     if (!this.ready()) throw new Error("SQLite runtime is not ready");
+    const siteId = episodeId === undefined ? undefined : await this.content.sites.ids.preview(showId, episodeId);
     return this.storage.transactionSync(() => {
+      if (!this.ready()) throw new Error("SQLite runtime is not ready");
       const snapshot = this.queue.snapshot(), target = this.content.inspect(showId, episodeId);
       const stats = this.content.inventoryStats(showId);
       const showContent = this.content.currentShowRevision(showId, this.config.public_base_url);
@@ -180,7 +182,7 @@ export class SqliteServiceRuntime {
         expected_show_state_version: target.show?.state_version ?? null, feed_generation: target.show?.feed_generation ?? null,
         published_episode_count: stats.count, published_inventory_chars: stats.chars, show_content: showContent,
         ...(episodeId !== undefined ? { episode_id: episodeId, episode_lifecycle: target.episode?.lifecycle ?? "missing",
-          expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0, episode_content: episodeContent } : {}),
+          expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0, episode_content: episodeContent, episode_site_id: siteId } : {}),
         snapshot_only: true, authorizes_recovery: false });
     });
   }
@@ -191,7 +193,8 @@ export class SqliteServiceRuntime {
       if (target.show?.feed_generation !== feedGeneration) throw new Error("Preview Feed base changed");
       const rows = this.content.episodePage(showId, after);
       return sqlitePreviewInventorySchema.parse({ ...this.queue.identity(), show_id: showId,
-        feed_generation: feedGeneration, after: after ?? null, episodes: rows.items, next_cursor: rows.nextCursor });
+        feed_generation: feedGeneration, after: after ?? null, episodes: rows.items, next_cursor: rows.nextCursor,
+        site_ids: Object.fromEntries(rows.items.map((episode) => [episode.episode_id, this.content.sites.ids.get(showId, episode.episode_id)])) });
     });
   }
   revisions(showId: string, options: { episodeId?: string; afterSequence?: number } = {}): SqliteRevisionListResponse {

@@ -1,8 +1,8 @@
 # 番組サイトとEpisodeページ（Issue #70開発版）
 
-Issue #70の第1段に、標準デザインの改善とShowごとの任意CSS 1ファイルを追加した開発版。番組紹介・Episode一覧・ブラウザ標準プレイヤーを固定HTMLで提供する。Issue全体の完了やCloudflare Free性能の実証を意味しない。
+Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URLを追加した開発版。番組紹介・Episode一覧・ブラウザ標準プレイヤーを固定HTMLで提供する。Issue全体の完了やCloudflare Free性能の実証を意味しない。
 
-新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。内部queue/content形式は**9/10**、healthとinspectionの必須識別は`website="static-show-v1"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。第1段の8/9環境を含め、既存環境のDB変換・移行・資源採用は提供しない。
+新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。自動短縮URL対応後の内部queue/content形式は**10/11**、healthとinspectionの必須識別は`website="static-show-v2"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。第1段8/9・CSS版9/10を含め、既存環境のDB変換・移行・資源採用は提供しない。旧`static-show-v1`環境はCLIの能力照会で拒否する。
 
 ## サイト方式を選ぶ
 
@@ -75,10 +75,14 @@ RSS取り込みでも、最初の公開前に取り込み元directoryのShow TOM
 | --- | --- |
 | 新しい順の先頭20件 | `https://podcasts.example.com/podcasts/my-show/` |
 | 21件目以降 | `https://podcasts.example.com/podcasts/my-show/page/2/` |
-| Episode紹介 | `https://podcasts.example.com/podcasts/my-show/episodes/first/` |
+| Episode紹介 | `https://podcasts.example.com/podcasts/my-show/db0a48404cdf5c53/` |
 | RSS | `https://podcasts.example.com/podcasts/my-show/feed.xml` |
 
 同じ公開日時の回はEpisode ID順。一覧の説明はタグを除き、文字参照（`&amp;`等）を一度だけ文字へ戻し、段落・改行を空白へまとめた先頭160 Unicode文字を表示する。超える場合だけ`…`を付ける。説明文全体と「全文を読む」は既存のEpisodeページへのリンクで、個別ページに文章全文を表示する。本文が空なら説明リンクを作らず、タイトルから移動できる。末尾の`/`を含む上記形式だけを受け付け、`page/1/`や世代別HTMLの直接URLは提供しない。
+
+Episodeページの識別子は、Episode ID全体のSHA-256から先頭16文字の小文字16進数を自動で割り当てる。管理者がslugを入力する設定はない。同じShow内で衝突した場合、新しい回だけ4文字ずつ延ばす（最大64文字）。対応はShowのSQLiteへ永久予約し、非公開化や失敗・中断でも他の回へ再利用しない。外部サイト方式で公開したEpisodeにも予約を保持し、後で内蔵方式へ変更しても同じ規則を使う。
+
+ページ入口はShow直下の短いもの一つだけであり、`e/`付き・`episodes/<episodeId>/`付きのページ入口や旧URLからの転送はない。一覧・RSS item link・canonical・OGPは同じ短いURLを使う。内部Episode ID・GUID・音源URLの`episodes/<episodeId>/<revisionId>.mp3`は変えない。短縮ハッシュ自体にはアクセス制御の効果はない。
 
 全文とShow紹介では段落`p`・改行`br`と、安全なHTTP(S)リンク`a`を作り直す。本文中の`http://`・`https://`のURLは自動でリンクにし、元の`a`はHTTP(S)の絶対URLに限って表示文字列とリンク先を復元する。認証情報付きURL、相対URL、`javascript:`等の別scheme、制御文字・backslashを含むリンク先はリンクにせず本文を残す。元のイベント属性・装飾・`target`等は引き継がず、リンクは同じタブで開く。一覧の抜粋内には外部リンクを作らず、全文ページへのリンクだけを置く。
 
@@ -96,12 +100,14 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 
 - HTMLは既存Show DOのAlarmで事前生成し、private R2へ不変保存する。閲覧時には生成せず、HTML専用Gatewayと`SiteCachedPages`のCDN cacheで配信する。Feed／画像／音源の`SqliteCachedAssets`とはcache・purgeを分ける。
 - Episode追加・更新では全一覧と対象個別ページを生成し、他の個別ページは再利用する。Show情報・CSS更新では全ページを生成する。全件入力のSQL保存とRSS全文生成は分割されておらず、件数・更新頻度に応じた負荷は残る。[生成範囲とFree枠の制約](../design/show_website_description_display_plan.md#61-episode追加時の生成範囲現行実装)を参照する。
-- この説明表示改善は保存形式9/10を変更しないが、Worker更新だけでは保存済みHTMLは変わらない。通常の更新保守手順を完了した後、対象Showを明示公開すれば全ページへ反映できる。音源の再uploadは不要で、実環境操作には別途承認が必要である。
+- 自動短縮URL版は保存形式10/11の新規環境専用。9/10以前の環境へのcode-only deploy・DB変換は行わない。同じ10/11環境での後続の表示変更も、Worker更新だけでは保存済みHTMLは変わらず、通常の更新保守手順と対象Showの明示公開が必要である。
 - 1 batch（1回のAlarmで処理する生成単位）は最大20 HTML・合計4,000,000 UTF-8 bytes、1 HTMLは1,000,000 bytes以下。全入力には既存の公開件数・JSON容量予算も適用する。超過を切り詰めて公開しない。
 - 正常なbatch完了と次回Alarm予約を保存した場合だけ次のbatchへ進む。実行中断・未知のPUTやpurgeは`blocked`として保全し、再送しない。
 - HTML、Feed、必要な音源・metadataの保存確認と両方の必要なpurgeが完了してから、公開参照を同じSQL transactionで切り替える。通常更新中は検証済みの旧内容だけを配信する。
 - `show-admission-pause`は新規受付を止め、確定済み内容の配信を続ける。`show-pause`はHTML・画像・音源も停止する。cache HIT、HEAD、304、旧workers.devからのredirectの前にも最新のShow判定を行う。
 - domain変更は[専用保守](sqlite_custom_domains.md)でHTMLのcanonical／OGPとFeedを新originへ生成する。全Showの保守完了後も自動Resumeしない。code-only deployでdomainを変更しない。
+- 短い識別子のハッシュ計算は新しい予約の作成時だけ。閲覧時は索引で内部Episode IDを解決し、既存の公開・停止・readiness判定を通してHTML cacheへ進む。SQL参照と予約の保存量は増えるが、全件走査や閲覧時生成は追加しない。
+- RSS previewはサーバーから取得した予約を使い、新規Episodeには未予約の候補を表示する。previewで予約・公開はしない。候補の確定は明示公開の処理で行う。
 - 保存済みHTMLや再生buffer、検索・SNSの第三者コピーを遠隔消去することはできない。
 
 ## RSS取り込み
@@ -118,4 +124,4 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 
 別途承認された[非公開の実機試験](../design/show_website_private_trial_verification_20261025.md)では、新規環境でShowと3 Episodeを公開し、本人からブラウザでのアクセス・3件再生成功の報告を得た。閲覧後の未認証要求もAccessで拒否された。個別ページ・シーク・スマートフォン・CPU性能等の未確認範囲は同記録で区別する。
 
-2026-10-26には明示承認を受け、上記の短尺試験環境を削除して、[新しい標準デザインと通常音源3件の別環境](../design/show_website_css_large_trial_verification_20261026.md)を作成した。約53.7〜62.9 MBのMP3の公開・全量R2照合と、説明文を含む生成HTML・未認証30要求の拒否を確認した。本人の新画面・再生確認、カスタムCSSの実機公開、CPU性能等は未確認である。
+2026-10-26には明示承認を受け、上記の短尺試験環境を削除して、[標準デザインと通常音源3件の別環境](../design/show_website_css_large_trial_verification_20261026.md)を作成し、本人から再生成功の報告を得た。その後の説明表示版のレビューを経て、同環境を退避・削除し、[自動短縮URL・リンク表示版の新規非公開環境](../design/show_website_short_url_trial_verification_20261026.md)を作成した。約53.7〜62.9 MBのMP3の全量hash、短いページURL、元のリンク復元、フッター非表示、公開前後の未認証30要求拒否を確認した。最新画面・再生の本人レビュー、カスタムCSSの実機公開、native CPU性能等は未確認である。

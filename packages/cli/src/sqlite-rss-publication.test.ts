@@ -76,8 +76,9 @@ test("reviewed RSS imports can explicitly select builtin pages without changing 
   expect(await value.execute()).toMatchObject({ episode_count: 21 });
   for (const original of value.report.episodes) {
     const episodeId = original.metadata.episode_id;
-    const page = value.content.sites.page({ kind: "episode", showId: "imported", episodeId })!;
-    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${episodeId}.html`)).toContain('<audio controls preload="none"');
+    const siteId = value.content.sites.ids.get("imported", episodeId)!;
+    const page = value.content.sites.page({ kind: "episode", showId: "imported", siteId })!;
+    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${siteId}.html`)).toContain('<audio controls preload="none"');
     expect(value.content.episodes("imported").find((item) => item.episode_id === episodeId)).toMatchObject(original.metadata);
   }
   expect(value.content.sites.page({ kind: "listing", showId: "imported", page: 2 })).not.toBeNull();
@@ -106,8 +107,9 @@ test("RSS imports freeze and install the reviewed Show CSS and use it on Episode
   expect(await value.execute()).toMatchObject({ episode_count: 2 });
   expect(value.content.currentShowRevision("imported", value.config.public_base_url)!.metadata.site_css).toBe(css);
   for (const episode of value.content.episodes("imported")) {
-    const page = value.content.sites.page({ kind: "episode", showId: "imported", episodeId: episode.episode_id })!;
-    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${episode.episode_id}.html`)).toContain(css);
+    const siteId = value.content.sites.ids.get("imported", episode.episode_id)!;
+    const page = value.content.sites.page({ kind: "episode", showId: "imported", siteId })!;
+    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${siteId}.html`)).toContain(css);
   }
 });
 

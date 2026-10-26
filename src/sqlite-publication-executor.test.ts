@@ -33,6 +33,8 @@ const show = { schema_version: 1 as const, show_id: "daily", title: "Private Sho
 const metadata = (episodeId: string) => ({ schema_version: 1 as const, episode_id: episodeId, guid: `stable-${episodeId}`,
   title: `Private ${episodeId}`, description: "Private description", published_at: "2026-10-16T12:00:00+09:00" });
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const shortId = (id: string) => hash(id).slice(0, 16);
+const episodePage = (id = "first") => `/podcasts/daily/${shortId(id)}/`;
 
 async function readPublic(setup: Awaited<ReturnType<typeof fixture>>, path = "/podcasts/daily/feed.xml", headers: HeadersInit = {}) {
   return serveSqliteGateway(new Request(`${setup.config.workers_dev_base_url}${path}`, { headers }), setup.config.workers_dev_base_url,
@@ -139,7 +141,7 @@ test("Show CSS is immutable revision content across publication, Episode lifecyc
   const first = await publishCss(firstCss, true);
   await f.publishEpisode("first"); await f.publishEpisode("second");
   const check = async (css: string) => {
-    for (const path of ["/podcasts/daily/", "/podcasts/daily/episodes/first/", "/podcasts/daily/episodes/second/"]) {
+    for (const path of ["/podcasts/daily/", episodePage(), episodePage("second")]) {
       const response = await readSite(f, path), html = await response.text();
       expect(response.status).toBe(200); expect(html).toContain(css);
       const style = html.match(/<style>([\s\S]*?)<\/style>/)![1];
@@ -149,7 +151,7 @@ test("Show CSS is immutable revision content across publication, Episode lifecyc
   await check(firstCss);
   await publishCss(nextCss); await check(nextCss);
   await f.run(f.lifecycle("unpublish", "first"));
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+   expect((await readSite(f, episodePage())).status).toBe(404);
   await f.run(f.lifecycle("restore", "first")); await check(nextCss);
   expect((await f.run(revisionRequest(f, first.revision_id))).state).toBe("succeeded"); await check(firstCss);
   expect(f.content.showRevision("daily", first.revision_id, f.config.public_base_url)!.metadata.site_css).toBe(firstCss);
@@ -166,42 +168,75 @@ test("builtin publication atomically exposes static pages, native audio and RSS 
   expect(html).toContain('<audio controls preload="none"');
   expect(html).toContain(`${episode.job_id}.mp3`);
   expect(html).not.toContain("private@example.com");
-  const page = await readSite(f, "/podcasts/daily/episodes/first/");
+  const page = await readSite(f, episodePage());
   expect(page.status).toBe(200);
   expect(page.headers.get("Content-Security-Policy")).toContain("script-src 'none'");
+  for (const path of ["/podcasts/daily/episodes/first/", `/podcasts/daily/e/${shortId("first")}/`, "/podcasts/daily/aaaaaaaaaaaaaaaa/"]) {
+    expect((await readSite(f, path)).status).toBe(404);
+  }
   expect(f.feed()).toContain("<link>https://public.example.com/podcasts/daily/</link>");
-  expect(f.feed()).toContain("<link>https://public.example.com/podcasts/daily/episodes/first/</link>");
-  expect(f.sitePurges).toEqual([{ showId: "daily" }, { showId: "daily", episodeId: "first" }]);
+  expect(f.feed()).toContain(`<link>https://public.example.com${episodePage()}</link>`);
+  expect(f.sitePurges).toEqual([{ showId: "daily" }, { showId: "daily", siteId: shortId("first") }]);
   await f.control("pause");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/", { "If-None-Match": "*" })).status).toBe(503);
+  expect((await readSite(f, episodePage(), { "If-None-Match": "*" })).status).toBe(503);
+});
+
+test("extended short URLs stay aligned across HTML, Feed, cache, lifecycle and revision restoration", async () => {
+  const f = await fixture(true); await f.publishShow();
+  f.storage.sql.exec("INSERT INTO publication_site_ids (show_id, episode_id, site_id) VALUES (?, ?, ?)", "daily", "reserved", shortId("first"));
+  const first = await f.publishEpisode(), siteId = hash("first").slice(0, 20), path = `/podcasts/daily/${siteId}/`;
+  const check = async () => {
+    const listing = await (await readSite(f)).text();
+    expect(listing).toContain(`href="${path}"`);
+    const response = await readSite(f, path), html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain(`rel="canonical" href="${f.config.public_base_url}${path}"`);
+    expect(html).toContain(`property="og:url" content="${f.config.public_base_url}${path}"`);
+    expect(f.feed()).toContain(`<link>${f.config.public_base_url}${path}</link>`);
+    expect((await readSite(f, episodePage())).status).toBe(404);
+    const props = f.content.siteDelivery({ kind: "episode", showId: "daily", siteId });
+    if (props.status !== 200) throw new Error("Expected approved short page");
+    const cached = await serveCachedSitePage(new Request(`https://cache.invalid${path}`), f.bucket as never, props.props);
+    expect(cached.headers.get("Cache-Tag")).toContain(`site-episode-daily/${siteId}`);
+  };
+  await check();
+  const update = await f.request("episode", "first", first.job_id, "metadata");
+  expect((await f.run(update)).state).toBe("succeeded"); await check();
+  await f.run(f.lifecycle("unpublish", "first"));
+  expect((await readSite(f, path, { "If-None-Match": "*" })).status).toBe(404);
+  expect(f.content.sites.ids.get("daily", "first")).toBe(siteId);
+  expect(f.content.sites.page({ kind: "episode", showId: "daily", siteId })).toBeNull();
+  await f.run(f.lifecycle("restore", "first")); await check();
+  expect((await f.run(revisionRequest(f, first.job_id, "first"))).state).toBe("succeeded"); await check();
+  expect(f.sitePurges.slice(1).every((target) => target.siteId === siteId)).toBe(true);
 });
 
 test("builtin metadata/audio revisions and saved revision adoption preserve page URLs and unaffected Episode snapshots", async () => {
   const f = await fixture(true); await f.publishShow(); const first = await f.publishEpisode(); await f.publishEpisode("second");
-  const other = f.content.sites.page({ kind: "episode", showId: "daily", episodeId: "second" });
+  const other = f.content.sites.page({ kind: "episode", showId: "daily", siteId: shortId("second") });
   const update = await f.request("episode", "first", first.job_id, "metadata");
   update.payloads = [await f.payload(update.job_id, "episode_metadata", stringifyToml({ ...metadata("first"), title: "New title" }))];
   expect((await f.run(update)).state).toBe("succeeded");
-  let html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  let html = await (await readSite(f, episodePage())).text();
   expect(html).toContain("New title"); expect(html).toContain(`${first.job_id}.mp3`);
   const audio = await f.request("episode", "first", update.job_id, "audio");
   expect((await f.run(audio)).state).toBe("succeeded");
-  html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  html = await (await readSite(f, episodePage())).text();
   expect(html).toContain(`${audio.job_id}.mp3`);
   expect((await f.run(revisionRequest(f, first.job_id, "first"))).state).toBe("succeeded");
-  html = await (await readSite(f, "/podcasts/daily/episodes/first/")).text();
+  html = await (await readSite(f, episodePage())).text();
   expect(html).toContain(`${first.job_id}.mp3`); expect(html).not.toContain("New title");
-  expect(f.content.sites.page({ kind: "episode", showId: "daily", episodeId: "second" })).toEqual(other);
+  expect(f.content.sites.page({ kind: "episode", showId: "daily", siteId: shortId("second") })).toEqual(other);
   expect(f.entries.has(`public/podcasts/daily/episodes/first/${audio.job_id}.mp3`)).toBe(true);
 });
 
 test("builtin lifecycle hides removed Episodes and regenerates Show restoration including saved revision content", async () => {
   const f = await fixture(true), original = await f.publishShow(); await f.publishEpisode();
   expect((await f.run(f.lifecycle("unpublish", "first"))).state).toBe("succeeded");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+  expect((await readSite(f, episodePage())).status).toBe(404);
   expect(await (await readSite(f)).text()).not.toContain("<audio");
   expect((await f.run(f.lifecycle("restore", "first"))).state).toBe("succeeded");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(200);
+  expect((await readSite(f, episodePage())).status).toBe(200);
   expect((await f.run(f.lifecycle("unpublish"))).state).toBe("succeeded");
   expect((await readSite(f)).status).toBe(404);
   expect((await f.run(f.lifecycle("restore"))).state).toBe("succeeded");
@@ -218,10 +253,10 @@ test("external/builtin changes require explicit publication and clear or regener
   expect((await readSite(f)).status).toBe(200);
   expect((await f.run(update)).state).toBe("succeeded");
   expect((await readSite(f)).status).toBe(404);
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(404);
+  expect((await readSite(f, episodePage())).status).toBe(404);
   expect(f.feed()).toContain(`<link>${show.site_url}</link>`);
   expect((await f.run(revisionRequest(f, original.job_id))).state).toBe("succeeded");
-  expect((await readSite(f, "/podcasts/daily/episodes/first/")).status).toBe(200);
+  expect((await readSite(f, episodePage())).status).toBe(200);
 });
 
 test("bounded site batches survive restart, retain committed reads, and serialize queued publication across admission pause", async () => {

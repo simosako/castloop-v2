@@ -9,7 +9,7 @@ import { escapeSiteText as escapeHtml, formatSiteDescription } from "./site-desc
 import type { SiteDescription } from "./site-description";
 
 export type SiteShow = Pick<ShowMetadata, "show_id" | "title" | "description" | "language" | "author" | "copyright" | "site_css">;
-export type SiteRenderInput = { show: SiteShow; origin: string; coverExtension: "jpg" | "png" };
+export type SiteRenderInput = { show: SiteShow; origin: string; coverExtension: "jpg" | "png"; episodeSiteIds: Record<string, string> };
 export const SITE_HTML_LIMIT_BYTES = 1_000_000;
 export const SITE_CSS = `:root{color-scheme:light;--cl-accent:#245c65;--cl-background:#f5f7f8;--cl-text:#202b33;--cl-muted:#53636e;--cl-content-width:64rem;--cl-radius:1rem}
 .cl-description.cl-description-full{white-space:normal}.cl-description-full p{margin:0 0 1em}.cl-description-full p:last-child{margin-bottom:0}.cl-description-link{color:inherit;text-decoration:none}.cl-read-more{color:var(--cl-accent);text-decoration:underline}.cl-description-link:hover .cl-read-more{text-decoration-thickness:2px}
@@ -39,7 +39,7 @@ function audioPath(episode: EpisodeRevision, showId: string): string {
 }
 
 function episodeArticle(input: SiteRenderInput, episode: EpisodeRevision, description: SiteDescription, full: boolean): string {
-  const path = sitePagePath({ kind: "episode", showId: input.show.show_id, episodeId: episode.episode_id });
+  const path = sitePagePath({ kind: "episode", showId: input.show.show_id, siteId: input.episodeSiteIds[episode.episode_id] });
   const audio = escapeHtml(audioPath(episode, input.show.show_id));
   const heading = full ? "h1" : "h2", id = `episode-${episode.episode_id}-title`;
   return `<article class="cl-episode" aria-labelledby="${id}"><${heading} class="cl-episode-title" id="${id}"><a href="${path}">${escapeHtml(episode.title)}</a></${heading}>` +
@@ -94,6 +94,6 @@ export function renderSiteListingPage(input: SiteRenderInput, episodes: EpisodeR
 
 export function renderSiteEpisode(input: SiteRenderInput, episode: EpisodeRevision): string {
   const description = formatSiteDescription(episode.description);
-  return document(input, { kind: "episode", showId: input.show.show_id, episodeId: episode.episode_id },
+  return document(input, { kind: "episode", showId: input.show.show_id, siteId: input.episodeSiteIds[episode.episode_id] },
     `${episode.title} — ${input.show.title}`, description.excerpt, episodeArticle(input, episode, description, true));
 }

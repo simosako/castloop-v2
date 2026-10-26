@@ -13,6 +13,7 @@ import { watchResultSchema, watchSqliteJob } from "./watch";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 
 const close: Array<() => void> = [];
 afterEach(() => { for (const cleanup of close.splice(0)) cleanup(); });
@@ -206,6 +207,30 @@ test("RSS export uses local renderer and a generation-bound inventory, never pub
   expect(f.calls.every((call) => call.method === "GET")).toBe(true);
   await expect(exportPreviewRss(f.root, f.config, preview, f.client, output)).rejects.toThrow();
   expect((await f.client.content("daily", "first")).episode_content!.metadata.title).not.toBe("RSS preview");
+});
+
+test("builtin RSS preview uses stored page IDs and an unreserved collision-safe candidate without publishing", async () => {
+  const f = await fixture();
+  const { site_url, ...show } = parseShowMetadata(readFileSync(f.showFile, "utf8"));
+  writeFileSync(f.showFile, stringifyToml({ ...show, site_mode: "builtin" }));
+  await f.run("update-show", ["daily"]); await f.run("publish-show", ["daily"]);
+  await f.run("create-episode", ["daily", "next"]);
+  await f.run("update-episode", ["daily", "next"]); await f.run("update-episode-audio", ["daily", "next", "audio.mp3"]);
+  const hash = createHash("sha256").update("next").digest("hex");
+  f.node.fixture.storage.sql.exec("INSERT INTO publication_site_ids (show_id, episode_id, site_id) VALUES (?, ?, ?)", "daily", "reserved", hash.slice(0, 16));
+  const target = { kind: "episode" as const, show_id: "daily", episode_id: "next" };
+  const preview = await draftPreview(f.root, f.config, target, undefined, { client: f.client });
+  expect(preview.published.snapshot!.episode_site_id).toBe(hash.slice(0, 20));
+  const before = f.node.service.content.sites.ids.all("daily"), output = join(f.root, "short-preview.xml"); f.calls.length = 0;
+  await exportPreviewRss(f.root, f.config, preview, f.client, output);
+  const xml = readFileSync(output, "utf8");
+  expect(xml).toContain(`<link>${f.config.public_base_url}/podcasts/daily/${hash.slice(0, 20)}/</link>`);
+  expect(xml).toContain(`<link>${f.config.public_base_url}/podcasts/daily/${before.first}/</link>`);
+  expect(f.calls.every((call) => call.method === "GET")).toBe(true);
+  expect(f.node.service.content.sites.ids.all("daily")).toEqual(before);
+  expect(f.node.service.content.inspect("daily", "next").episode).toBeNull();
+  await f.run("publish-episode", ["daily", "next"]);
+  expect(f.node.service.content.sites.ids.get("daily", "next")).toBe(hash.slice(0, 20));
 });
 
 test("read failure and inconsistent remote metadata never become a zero diff or allow publication", async () => {

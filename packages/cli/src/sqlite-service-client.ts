@@ -185,6 +185,7 @@ export class SqliteServiceClient {
       `content-inventory/${showId}/${feedGeneration}${after ? `/after/${after}` : ""}`, showId));
     await this.identity(value);
     if (value.show_id !== showId || value.feed_generation !== feedGeneration || value.after !== (after ?? null) ||
+      Object.keys(value.site_ids).length !== value.episodes.length || value.episodes.some((episode) => !Object.hasOwn(value.site_ids, episode.episode_id)) ||
       value.episodes.some((episode, index, all) => episode.episode_id <= (index ? all[index - 1]!.episode_id : after ?? "")) ||
       value.next_cursor !== null && (value.episodes.length !== 20 || value.next_cursor !== value.episodes.at(-1)?.episode_id)) throw new Error("Preview inventory page differs");
     return value;
