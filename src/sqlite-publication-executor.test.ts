@@ -158,6 +158,46 @@ test("Show CSS is immutable revision content across publication, Episode lifecyc
   await f.control("pause"); expect((await readSite(f)).status).toBe(503);
 });
 
+test("Show timezone updates regenerate all pages atomically and survive Episode updates, lifecycle and revision adoption", async () => {
+  const f = await fixture(true), utc = await f.publishShow();
+  const first = await f.publishEpisode(); await f.publishEpisode("second");
+  const feed = f.feed(), episodes = f.content.episodes("daily").map(episodeDraftFromRevision);
+  const paths = ["/podcasts/daily/", episodePage(), episodePage("second")];
+  const check = async (date: string) => {
+    for (const path of paths) expect(await (await readSite(f, path)).text()).toContain(date);
+    expect(f.content.episodes("daily").map(episodeDraftFromRevision)).toEqual(episodes);
+    expect(f.feed()).toBe(feed);
+  };
+  await check("2026-10-16 (UTC+00:00)");
+  const update = await f.showUpdate();
+  const metadata = f.content.currentShowRevision("daily", f.config.public_base_url)!.metadata;
+  update.payloads[0] = await f.payload(update.job_id, "show_metadata", stringifyToml({ ...metadata, site_timezone: "Asia/Tokyo" }));
+  f.hooks.sitePurge = async () => { await check("2026-10-16 (UTC+00:00)"); };
+  expect((await f.run(update)).state).toBe("succeeded"); f.hooks.sitePurge = undefined;
+  const tokyo = f.content.currentShowRevision("daily", f.config.public_base_url)!;
+  expect(tokyo.metadata.site_timezone).toBe("Asia/Tokyo");
+  for (const path of paths.slice(1)) {
+    const siteId = path.split("/").at(-2)!;
+    expect(f.content.sites.page({ kind: "episode", showId: "daily", siteId })!.generation).toBe(f.content.inspect("daily").show!.feed_generation);
+  }
+  await check("2026-10-16 (UTC+09:00)");
+  const audio = await f.request("episode", "first", first.job_id, "audio");
+  audio.expected_show_state_version = f.content.inspect("daily").show!.state_version;
+  expect((await f.run(audio)).state).toBe("succeeded");
+  expect(await (await readSite(f, episodePage())).text()).toContain("2026-10-16 (UTC+09:00)");
+  expect((await f.run(revisionRequest(f, first.job_id, "first"))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+09:00)");
+  expect((await f.run(f.lifecycle("unpublish", "first"))).state).toBe("succeeded");
+  expect((await f.run(f.lifecycle("restore", "first"))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+09:00)");
+  expect((await f.run(revisionRequest(f, utc.job_id))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+00:00)");
+  expect((await f.run(revisionRequest(f, tokyo.revision_id))).state).toBe("succeeded");
+  expect((await f.run(f.lifecycle("unpublish"))).state).toBe("succeeded");
+  expect((await f.run(f.lifecycle("restore"))).state).toBe("succeeded");
+  await check("2026-10-16 (UTC+09:00)");
+});
+
 test("builtin publication atomically exposes static pages, native audio and RSS links without private Show fields", async () => {
   const f = await fixture(true);
   expect((await readSite(f)).status).toBe(404);

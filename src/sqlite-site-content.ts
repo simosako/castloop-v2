@@ -3,7 +3,7 @@ import { episodeRevisionSchema } from "../packages/shared/src/index";
 import { sitePagePath, SITE_PAGE_SIZE } from "../packages/shared/src/website";
 import type { SitePage } from "../packages/shared/src/website";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
-import { orderedSiteEpisodes, renderSiteListingPage, renderSiteEpisode, siteCssHash } from "./site-renderer";
+import { orderedSiteEpisodes, renderSiteListingPage, renderSiteEpisode, siteCssHash, siteDateFormatter } from "./site-renderer";
 import type { SiteRenderInput } from "./site-renderer";
 import { persistSitePage } from "./site-storage";
 import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
@@ -60,6 +60,7 @@ export class SqliteSiteContent {
     if (build.cursor === total) return true;
     const input = JSON.parse(build.input_json) as SiteRenderInput;
     const cssHash = await siteCssHash(input.show.site_css);
+    const formatDate = siteDateFormatter(input.show.site_timezone);
     let bytes = 0, cursor = build.cursor;
     for (let written = 0; cursor < total && written < 20; cursor++, written++) {
       let page: SitePage, html: string;
@@ -68,7 +69,7 @@ export class SqliteSiteContent {
           WHERE owner_id = ? AND ordinal >= ? AND ordinal < ? ORDER BY ordinal`, id, cursor * SITE_PAGE_SIZE, (cursor + 1) * SITE_PAGE_SIZE)
           .toArray().map((row) => episodeRevisionSchema.parse(JSON.parse(row.revision_json)));
         page = { kind: "listing", showId: build.show_id, page: cursor + 1 };
-        html = renderSiteListingPage(input, episodes, cursor + 1, build.pages);
+        html = renderSiteListingPage(input, episodes, cursor + 1, build.pages, formatDate);
       } else {
         const row = build.changed_episode === null ? this.storage.sql.exec<{ revision_json: string }>(
           "SELECT revision_json FROM publication_site_sources WHERE owner_id = ? AND ordinal = ?", id, cursor - build.pages).toArray()[0] :
@@ -76,7 +77,7 @@ export class SqliteSiteContent {
         if (!row) throw new Error("Frozen site Episode is missing");
         const episode = episodeRevisionSchema.parse(JSON.parse(row.revision_json));
         page = { kind: "episode", showId: build.show_id, siteId: input.episodeSiteIds[episode.episode_id] };
-        html = renderSiteEpisode(input, episode);
+        html = renderSiteEpisode(input, episode, formatDate);
       }
       const length = new TextEncoder().encode(html).byteLength;
       if (bytes + length > 4_000_000 && written > 0) break;

@@ -30,7 +30,8 @@ export function withSitePublication(base: SqlitePublicationExecutor<PreparedSqli
       const input: SiteRenderInput | null = enabled ? { origin: config.public_base_url, episodeSiteIds: content.sites.ids.all(request.show_id),
         coverExtension: prepared.kind === "show" ? prepared.extension : target.coverExtension!,
         show: { show_id: metadata.show_id, title: metadata.title, description: metadata.description, language: metadata.language,
-          author: metadata.author, ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
+          author: metadata.author, ...(metadata.site_timezone !== undefined ? { site_timezone: metadata.site_timezone } : {}),
+          ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
           ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null;
       content.sites.prepare(request.job_id, prepared.feedGeneration, request.show_id, input, episodes,
         request.kind === "episode" ? request.episode_id : undefined);

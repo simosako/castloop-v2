@@ -98,18 +98,20 @@ test("a completed publication with a lost import checkpoint is observed without 
   expect(value.commands.filter((name) => name === "update-show")).toHaveLength(1);
 });
 
-test("RSS imports freeze and install the reviewed Show CSS and use it on Episode pages", async () => {
+test("RSS imports freeze and install the reviewed Show CSS and timezone and use them on Episode pages", async () => {
   const value = await fixture(2), path = join(value.output, "show.toml");
   const { site_url, ...metadata } = parseShowMetadata(readFileSync(path, "utf8"));
-  writeFileSync(path, stringifyToml({ ...metadata, site_mode: "builtin", site_css_path: "site.css" }));
+  writeFileSync(path, stringifyToml({ ...metadata, site_mode: "builtin", site_css_path: "site.css", site_timezone: "Asia/Tokyo" }));
   const css = ":root{--cl-accent:#882244}";
   writeFileSync(join(value.output, "site.css"), css);
   expect(await value.execute()).toMatchObject({ episode_count: 2 });
   expect(value.content.currentShowRevision("imported", value.config.public_base_url)!.metadata.site_css).toBe(css);
+  expect(value.content.currentShowRevision("imported", value.config.public_base_url)!.metadata.site_timezone).toBe("Asia/Tokyo");
   for (const episode of value.content.episodes("imported")) {
     const siteId = value.content.sites.ids.get("imported", episode.episode_id)!;
     const page = value.content.sites.page({ kind: "episode", showId: "imported", siteId })!;
     expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${siteId}.html`)).toContain(css);
+    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${siteId}.html`)).toContain("(UTC+09:00)</time>");
   }
 });
 

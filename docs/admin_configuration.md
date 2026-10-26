@@ -15,6 +15,8 @@ timezone = "Asia/Tokyo"
 
 このファイルは秘密・操作対象・公開承認を持たないCLI設定であり、`castloop.toml`の代わりではない。サービスhash・配備・既存の公開日時を変更しない。初期化時の自動作成や既存設定の移動も行わない。
 
+番組サイトの公開日表示は別のShow設定`site_timezone`で指定する。この管理用`timezone`を変更してもサイトの表示は変わらない。[番組サイトのタイムゾーン設定](show_website.md#公開日表示のタイムゾーン)を参照する。
+
 初版の対応項目は`schema_version`と`timezone`だけ。account・origin・bucketは`castloop.toml`、管理鍵・client ID・journalは`.castloop/`、Cloudflare tokenは既存の環境変数に残す。通信／待機上限、既定Show、承認や`--json`等の出力契約をここへ移さない。
 
 設定は通常ファイル・1〜16,384 bytes・UTF-8に限定する。symlink、FIFO、未知key、未知version、不正zoneは拒否し、UTCへ黙ってfallbackしない。`init`もtemplateコマンドも既存ファイルを上書きしない。

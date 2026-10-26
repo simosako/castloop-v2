@@ -134,6 +134,7 @@ export class SqliteDomainRuntime {
                 episodeSiteIds: this.content.sites.ids.all(this.showId),
                 show: { show_id: metadata.show_id, title: metadata.title, description: metadata.description,
                   language: metadata.language, author: metadata.author,
+                  ...(metadata.site_timezone !== undefined ? { site_timezone: metadata.site_timezone } : {}),
                   ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
                   ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null,
               target.episodes);

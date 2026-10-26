@@ -30,4 +30,9 @@ test("field diff respects optional absence, order and permalink identity default
   const { site_url, ...withoutSite } = show;
   expect(diffShowMetadataFields(show, { ...withoutSite, site_mode: "builtin" }).find((field) => field.field === "site_mode"))
     .toMatchObject({ changed: true, published: null, candidate: "builtin" });
+  const builtin = { ...withoutSite, site_mode: "builtin" as const, site_timezone: "Asia/Tokyo" };
+  expect(diffShowMetadataFields({ ...withoutSite, site_mode: "builtin" }, builtin).find((field) => field.field === "site_timezone"))
+    .toMatchObject({ changed: true, published: null, candidate: "Asia/Tokyo" });
+  expect(diffShowMetadataFields(builtin, { ...builtin, site_timezone: undefined }).find((field) => field.field === "site_timezone"))
+    .toMatchObject({ changed: true, published: "Asia/Tokyo", candidate: null });
 });

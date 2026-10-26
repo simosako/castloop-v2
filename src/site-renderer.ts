@@ -8,7 +8,7 @@ import { validateSiteCss } from "../packages/shared/src/site-style";
 import { escapeSiteText as escapeHtml, formatSiteDescription } from "./site-description";
 import type { SiteDescription } from "./site-description";
 
-export type SiteShow = Pick<ShowMetadata, "show_id" | "title" | "description" | "language" | "author" | "copyright" | "site_css">;
+export type SiteShow = Pick<ShowMetadata, "show_id" | "title" | "description" | "language" | "author" | "copyright" | "site_css" | "site_timezone">;
 export type SiteRenderInput = { show: SiteShow; origin: string; coverExtension: "jpg" | "png"; episodeSiteIds: Record<string, string> };
 export const SITE_HTML_LIMIT_BYTES = 1_000_000;
 export const SITE_CSS = `:root{color-scheme:light;--cl-accent:#245c65;--cl-background:#f5f7f8;--cl-text:#202b33;--cl-muted:#53636e;--cl-content-width:64rem;--cl-radius:1rem}
@@ -38,12 +38,23 @@ function audioPath(episode: EpisodeRevision, showId: string): string {
   return url.pathname;
 }
 
-function episodeArticle(input: SiteRenderInput, episode: EpisodeRevision, description: SiteDescription, full: boolean): string {
+export function siteDateFormatter(timeZone = "UTC"): (timestamp: string) => string {
+  const formatter = new Intl.DateTimeFormat("en-US", { timeZone, calendar: "gregory", numberingSystem: "latn",
+    year: "numeric", month: "2-digit", day: "2-digit", timeZoneName: "longOffset" });
+  return (timestamp) => {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(timestamp)).map(({ type, value }) => [type, value]));
+    const offset = parts.timeZoneName === "GMT" ? "UTC+00:00" : parts.timeZoneName.replace(/^GMT/, "UTC");
+    return `${parts.year.padStart(4, "0")}-${parts.month}-${parts.day} (${offset})`;
+  };
+}
+
+function episodeArticle(input: SiteRenderInput, episode: EpisodeRevision, description: SiteDescription, full: boolean,
+  formatDate: (timestamp: string) => string): string {
   const path = sitePagePath({ kind: "episode", showId: input.show.show_id, siteId: input.episodeSiteIds[episode.episode_id] });
   const audio = escapeHtml(audioPath(episode, input.show.show_id));
   const heading = full ? "h1" : "h2", id = `episode-${episode.episode_id}-title`;
   return `<article class="cl-episode" aria-labelledby="${id}"><${heading} class="cl-episode-title" id="${id}"><a href="${path}">${escapeHtml(episode.title)}</a></${heading}>` +
-    `<time class="cl-episode-date" datetime="${escapeHtml(episode.published_at)}">${new Date(episode.published_at).toISOString().slice(0, 10)} (UTC)</time>` +
+    `<time class="cl-episode-date" datetime="${escapeHtml(episode.published_at)}">${formatDate(episode.published_at)}</time>` +
     (full ? `<div class="cl-description cl-description-full">${description.html}</div>` : description.excerpt ?
       `<p class="cl-description"><a class="cl-description-link" href="${path}">${escapeHtml(description.excerpt)} <span class="cl-read-more">全文を読む</span></a></p>` : "") +
     `<audio controls preload="none" class="cl-player" aria-labelledby="${id}"><source src="${audio}" type="audio/mpeg">` +
@@ -76,13 +87,14 @@ export function renderSiteListing(input: SiteRenderInput, episodes: EpisodeRevis
   return renderSiteListingPage(input, ordered.slice((page - 1) * SITE_PAGE_SIZE, page * SITE_PAGE_SIZE), page, pages);
 }
 
-export function renderSiteListingPage(input: SiteRenderInput, episodes: EpisodeRevision[], page: number, pages: number): string {
+export function renderSiteListingPage(input: SiteRenderInput, episodes: EpisodeRevision[], page: number, pages: number,
+  formatDate = siteDateFormatter(input.show.site_timezone)): string {
   const target: SitePage = { kind: "listing", showId: input.show.show_id, page };
   sitePagePath(target);
   if (!Number.isSafeInteger(pages) || pages < 1 || page > pages || episodes.length > SITE_PAGE_SIZE) throw new Error("Site listing page is missing");
   const root = sitePagePath({ kind: "listing", showId: input.show.show_id, page: 1 });
   const description = formatSiteDescription(input.show.description);
-  const articles = episodes.map((episode) => episodeArticle(input, episode, formatSiteDescription(episode.description), false)).join("");
+  const articles = episodes.map((episode) => episodeArticle(input, episode, formatSiteDescription(episode.description), false, formatDate)).join("");
   const navigation = `<nav class="cl-pagination" aria-label="Episode一覧">` +
     (page > 1 ? `<a href="${sitePagePath({ ...target, page: page - 1 })}">新しい回</a>` : "") +
     (page < pages ? `<a href="${sitePagePath({ ...target, page: page + 1 })}">以前の回</a>` : "") + `</nav>`;
@@ -92,8 +104,9 @@ export function renderSiteListingPage(input: SiteRenderInput, episodes: EpisodeR
     `<div class="cl-episode-list">${articles || `<p>公開済みのEpisodeはありません。</p>`}</div>` + navigation);
 }
 
-export function renderSiteEpisode(input: SiteRenderInput, episode: EpisodeRevision): string {
+export function renderSiteEpisode(input: SiteRenderInput, episode: EpisodeRevision,
+  formatDate = siteDateFormatter(input.show.site_timezone)): string {
   const description = formatSiteDescription(episode.description);
   return document(input, { kind: "episode", showId: input.show.show_id, siteId: input.episodeSiteIds[episode.episode_id] },
-    `${episode.title} — ${input.show.title}`, description.excerpt, episodeArticle(input, episode, description, true));
+    `${episode.title} — ${input.show.title}`, description.excerpt, episodeArticle(input, episode, description, true, formatDate));
 }

@@ -20,7 +20,7 @@ async function fixture(shows = ["a", "b"], builtin = false, episodes = 0) {
     writeFileSync(join(f.root, id, "cover.jpg"), Uint8Array.of(255, 216, 255));
     if (builtin) {
       const path = join(f.root, id, "show.toml");
-      writeFileSync(path, stringifyToml({ ...parseShowMetadata(readFileSync(path, "utf8")), site_css_path: "site.css" }));
+      writeFileSync(path, stringifyToml({ ...parseShowMetadata(readFileSync(path, "utf8")), site_css_path: "site.css", site_timezone: "Asia/Tokyo" }));
       writeFileSync(join(f.root, id, "site.css"), ":root{--cl-accent:purple}");
     }
     await run("update-show", [id]); await run("publish-show", [id]);
@@ -64,6 +64,10 @@ test("domain website regeneration resumes bounded batches after restart and comm
   expect(next.generation).not.toBe(before.generation);
   expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain('href="https://podcasts.example.com/podcasts/a/"');
   expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain(":root{--cl-accent:purple}");
+  expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain("(UTC+09:00)</time>");
+  const siteId = f.content.sites.ids.get("a", "ep-0")!;
+  const detail = f.content.sites.page({ kind: "episode", showId: "a", siteId })!;
+  expect(f.text(`public/podcasts/a/sites/${detail.generation}/episodes/${siteId}.html`)).toContain("(UTC+09:00)</time>");
   expect(f.text(`public/podcasts/a/sites/${before.generation}/index.html`)).toContain(`${f.config.public_base_url}/podcasts/a/`);
   expect(f.nodes.get("a")!.service.siteDelivery(page).status).toBe(503);
 }, 60000);

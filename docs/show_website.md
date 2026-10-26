@@ -1,6 +1,6 @@
 # 番組サイトとEpisodeページ（Issue #70開発版）
 
-Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URLを追加した開発版。番組紹介・Episode一覧・ブラウザ標準プレイヤーを固定HTMLで提供する。Issue全体の完了やCloudflare Free性能の実証を意味しない。
+Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を追加した開発版。番組紹介・Episode一覧・ブラウザ標準プレイヤーを固定HTMLで提供する。Issue全体の完了やCloudflare Free性能の実証を意味しない。
 
 新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。自動短縮URL対応後の内部queue/content形式は**10/11**、healthとinspectionの必須識別は`website="static-show-v2"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。第1段8/9・CSS版9/10を含め、既存環境のDB変換・移行・資源採用は提供しない。旧`static-show-v1`環境はCLIの能力照会で拒否する。
 
@@ -59,13 +59,32 @@ site_css_path = "site.css"
 | 説明文 | `cl-description`、`cl-description-full`、`cl-description-link`、`cl-read-more` |
 | ページ送り | `cl-pagination` |
 
-変数・classは公開した指定先として扱うが、内部の要素の深さや子要素番号は保証しない。CSSでplayerやfocusを隠すことは防げないため、変更後の操作性は管理者が確認する。標準playerの内部UIはブラウザ依存である。日時はUTCの日付で表示し、`datetime`属性に元の公開日時を保持する。
+変数・classは公開した指定先として扱うが、内部の要素の深さや子要素番号は保証しない。CSSでplayerやfocusを隠すことは防げないため、変更後の操作性は管理者が確認する。標準playerの内部UIはブラウザ依存である。公開日は下記のShow設定で表示し、`datetime`属性に元の公開日時を保持する。
 
 HTML構造・表示内容の変更、独自JS、外部CSSのimport、Web font、追加画像のuploadは提供しない。外部画像・font・data URLは既存CSPでも許可しない。Sass等を使う場合の変換は管理者側で行い、castloopに追加runtimeは不要。高度な変更には既存の外部サイト方式を使う。
 
 CSSはShow revisionの一部として保存する。Episode更新・復元では現在のShowのCSSを、Showの過去版採用ではその版のCSSを使う。domain再生成も保存内容だけで行い、ローカルファイルや外部buildを必要としない。CSSは各HTMLと履歴へ重複して保存され、既存のHTML・batch予算とR2無料枠へ算入する。履歴は自動削除しない。
 
 RSS取り込みでも、最初の公開前に取り込み元directoryのShow TOMLへ指定し、同じ場所へCSSを置いてレビューする。公開入力へ固定し、取り込み先へ保存する。開始後にCSSを変更して既存処理を続行しない。
+
+## 公開日表示のタイムゾーン
+
+内蔵サイトの`show.toml`に任意で指定する。未設定ならUTCで表示する。
+
+```toml
+site_mode = "builtin"
+site_timezone = "Asia/Tokyo"
+```
+
+一覧とEpisode個別ページの公開日を、その地域の日付と公開時点のUTCとの差で表示する。例えば`published_at = "2025-12-16T22:00:00Z"`は、UTCでは`2025-12-16 (UTC+00:00)`、`Asia/Tokyo`では`2025-12-17 (UTC+09:00)`になる。時刻は表示しない。夏時間のある地域では各Episodeの公開時点の規則を適用し、例えばNew Yorkは冬`UTC-05:00`・夏`UTC-04:00`となる。
+
+`UTC`またはruntimeが対応するIANA名（`Asia/Tokyo`、`America/New_York`等）を指定する。`JST`・`EST`等の略称、数値offsetだけの指定、未知の地域名はエラーとし、UTCへ自動で戻さない。外部サイト方式ではこの設定を指定しない。
+
+変更後は`update-show SHOW`→`publish-show SHOW`で**全一覧・全公開Episodeページ**を再生成する。設定ファイルの編集やuploadだけでは表示は変わらない。設定を削除して明示公開すればUTCへ戻る。Show revisionに設定を保存するため、Showの過去版採用ではその版の設定、Episodeの更新・復元では現在のShow設定を使う。domain変更時の再生成にも適用する。
+
+変えるのはHTMLの表示だけであり、保存済み`published_at`、RSSの`pubDate`、新しい順の並び、GUID、短いURL、音源は変えない。[管理用設定](admin_configuration.md)の`castloop-admin.toml timezone`はCLIの日時入力・確認用で、サイト表示へは流用しない。PCや閲覧者のタイムゾーンからも推測しない。
+
+変換にはWorker標準の`Intl.DateTimeFormat`を使い、1回のHTML生成batch内で使い回す。閲覧時の変換・追加JavaScript・新しい依存やサービスはない。生成数・既存batch予算は変えず、native Free性能の実測結果は未取得。[採用設計](../design/show_website_timezone_plan.md)も参照する。
 
 ## URLとプレイヤー
 
@@ -99,7 +118,7 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 ## 更新・停止・保守
 
 - HTMLは既存Show DOのAlarmで事前生成し、private R2へ不変保存する。閲覧時には生成せず、HTML専用Gatewayと`SiteCachedPages`のCDN cacheで配信する。Feed／画像／音源の`SqliteCachedAssets`とはcache・purgeを分ける。
-- Episode追加・更新では全一覧と対象個別ページを生成し、他の個別ページは再利用する。Show情報・CSS更新では全ページを生成する。全件入力のSQL保存とRSS全文生成は分割されておらず、件数・更新頻度に応じた負荷は残る。[生成範囲とFree枠の制約](../design/show_website_description_display_plan.md#61-episode追加時の生成範囲現行実装)を参照する。
+- Episode追加・更新では全一覧と対象個別ページを生成し、他の個別ページは再利用する。Show情報・CSS・タイムゾーン更新では全ページを生成する。全件入力のSQL保存とRSS全文生成は分割されておらず、件数・更新頻度に応じた負荷は残る。[生成範囲とFree枠の制約](../design/show_website_description_display_plan.md#61-episode追加時の生成範囲現行実装)を参照する。
 - 自動短縮URL版は保存形式10/11の新規環境専用。9/10以前の環境へのcode-only deploy・DB変換は行わない。同じ10/11環境での後続の表示変更も、Worker更新だけでは保存済みHTMLは変わらず、通常の更新保守手順と対象Showの明示公開が必要である。
 - 1 batch（1回のAlarmで処理する生成単位）は最大20 HTML・合計4,000,000 UTF-8 bytes、1 HTMLは1,000,000 bytes以下。全入力には既存の公開件数・JSON容量予算も適用する。超過を切り詰めて公開しない。
 - 正常なbatch完了と次回Alarm予約を保存した場合だけ次のbatchへ進む。実行中断・未知のPUTやpurgeは`blocked`として保全し、再送しない。
@@ -124,4 +143,4 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 
 別途承認された[非公開の実機試験](../design/show_website_private_trial_verification_20261025.md)では、新規環境でShowと3 Episodeを公開し、本人からブラウザでのアクセス・3件再生成功の報告を得た。閲覧後の未認証要求もAccessで拒否された。個別ページ・シーク・スマートフォン・CPU性能等の未確認範囲は同記録で区別する。
 
-2026-10-26には明示承認を受け、上記の短尺試験環境を削除して、[標準デザインと通常音源3件の別環境](../design/show_website_css_large_trial_verification_20261026.md)を作成し、本人から再生成功の報告を得た。その後の説明表示版のレビューを経て、同環境を退避・削除し、[自動短縮URL・リンク表示版の新規非公開環境](../design/show_website_short_url_trial_verification_20261026.md)を作成した。約53.7〜62.9 MBのMP3の全量hash、短いページURL、元のリンク復元、フッター非表示、公開前後の未認証30要求拒否を確認した。最新画面・再生の本人レビュー、カスタムCSSの実機公開、native CPU性能等は未確認である。
+2026-10-26には明示承認を受け、上記の短尺試験環境を削除して、[標準デザインと通常音源3件の別環境](../design/show_website_css_large_trial_verification_20261026.md)を作成し、本人から再生成功の報告を得た。その後の説明表示版のレビューを経て、同環境を退避・削除し、[自動短縮URL・リンク表示版の新規非公開環境](../design/show_website_short_url_trial_verification_20261026.md)を作成した。約53.7〜62.9 MBのMP3の全量hash、短いページURL、元のリンク復元、フッター非表示、公開前後の未認証30要求拒否を確認し、本人からも当該変更の画面更新確認を得た。2026-10-27には別承認で[同環境をタイムゾーン版へ更新](../design/show_website_timezone_trial_verification_20261027.md)し、一覧・個別ページの東京設定と更新前後の未認証拒否を確認した。タイムゾーン版の本人ブラウザレビュー、カスタムCSSの実機公開、native CPU性能等は未確認である。

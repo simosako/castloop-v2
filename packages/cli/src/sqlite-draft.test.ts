@@ -33,6 +33,22 @@ test("Show CSS edits invalidate the staged preview and cannot be published witho
   expect((await f.draft.read()).publication).toBeUndefined();
 });
 
+test("Show timezone is frozen in staging and edits require staging again before publication", async () => {
+  const f = await fixture("show"), path = join(f.root, "daily", "show.toml");
+  const { site_url, ...metadata } = parseShowMetadata(readFileSync(path, "utf8"));
+  const show = { ...metadata, site_mode: "builtin" as const, site_timezone: "Asia/Tokyo" };
+  writeFileSync(path, stringifyToml(show));
+  await f.draft.stage({ asset: "show" });
+  expect((await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" })).inputs_match_staged).toBe(true);
+  writeFileSync(path, stringifyToml({ ...show, site_timezone: "America/New_York" }));
+  expect((await draftPreview(f.root, f.config, f.target, undefined, { mode: "local" })).inputs_match_staged).toBe(false);
+  await expect(f.draft.publish()).rejects.toThrow("differs");
+  expect((await f.draft.read()).publication).toBeUndefined();
+  await f.draft.stage({ asset: "show" });
+  await f.draft.publish();
+  expect((await f.draft.read()).publication).toBeDefined();
+});
+
 test("preview is read-only and publication rejects changes after approval", async () => {
   const f = await fixture(); await f.stage();
   const before = f.management.length;

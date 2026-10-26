@@ -36,6 +36,53 @@ test("site choices are strict and external URLs cannot carry executable schemes 
     { site_mode: "builtin", unknown: true }]) expect(() => parse(value)).toThrow();
 });
 
+test("website timezone accepts supported regional names or UTC only for builtin Shows", () => {
+  const metadata = { ...input.show, schema_version: 1, owner_name: "Owner", categories: ["Technology"],
+    explicit: false, site_mode: "builtin" };
+  expect(showMetadataSchema.parse(metadata).site_timezone).toBeUndefined();
+  for (const site_timezone of ["UTC", "Asia/Tokyo", "America/New_York", "Asia/Kathmandu"]) {
+    expect(showMetadataSchema.parse({ ...metadata, site_timezone }).site_timezone).toBe(site_timezone);
+  }
+  for (const site_timezone of ["JST", "EST", "+09:00", "Asia/Unknown", "", " Asia/Tokyo", null, 9]) {
+    expect(() => showMetadataSchema.parse({ ...metadata, site_timezone })).toThrow();
+  }
+  for (const site_mode of ["external", undefined]) {
+    expect(() => showMetadataSchema.parse({ ...metadata, site_mode, site_url: "https://example.com", site_timezone: "UTC" })).toThrow();
+  }
+});
+
+test("website dates use the Show timezone on lists and full pages without changing instants, URLs or ordering", () => {
+  const revisions = [episode("first", "2025-12-16T22:00:00Z"), episode("offset", "2025-12-17T07:30:00+09:00")];
+  const before = JSON.stringify(revisions), local = { ...input, show: { ...input.show, site_timezone: "Asia/Tokyo" } };
+  const listing = renderSiteListing(local, revisions, 1);
+  expect(listing.match(/2025-12-17 \(UTC\+09:00\)/g)).toHaveLength(2);
+  expect(listing.indexOf('id="episode-offset-title"')).toBeLessThan(listing.indexOf('id="episode-first-title"'));
+  for (const revision of revisions) {
+    const html = renderSiteEpisode(local, revision);
+    expect(html).toContain(`datetime="${revision.published_at}">2025-12-17 (UTC+09:00)</time>`);
+    expect(html).toContain(`rel="canonical" href="${origin}/podcasts/daily/${shortId(revision.episode_id)}/"`);
+    expect(html).not.toContain("<script");
+  }
+  expect(renderSiteEpisode(input, revisions[0])).toContain("2025-12-16 (UTC+00:00)");
+  expect(JSON.stringify(revisions)).toBe(before);
+});
+
+test("website offsets follow each publication instant including DST and non-hour timezones", () => {
+  for (const [site_timezone, date, display] of [
+    ["America/New_York", "2026-03-08T06:59:59Z", "2026-03-08 (UTC-05:00)"],
+    ["America/New_York", "2026-03-08T07:00:00Z", "2026-03-08 (UTC-04:00)"],
+    ["America/New_York", "2026-11-01T05:30:00Z", "2026-11-01 (UTC-04:00)"],
+    ["America/New_York", "2026-11-01T06:30:00Z", "2026-11-01 (UTC-05:00)"],
+    ["America/Los_Angeles", "2026-01-01T01:00:00Z", "2025-12-31 (UTC-08:00)"],
+    ["Asia/Kathmandu", "2025-12-31T18:30:00Z", "2026-01-01 (UTC+05:45)"],
+    ["Etc/GMT+12", "2026-01-01T01:00:00Z", "2025-12-31 (UTC-12:00)"],
+  ]) {
+    const local = { ...input, show: { ...input.show, site_timezone } }, revision = episode("first", date);
+    expect(renderSiteListing(local, [revision], 1)).toContain(display);
+    expect(renderSiteEpisode(local, revision)).toContain(display);
+  }
+});
+
 test("site paths allow only canonical Show pages, numbered listings and stable Episode pages", () => {
   for (const page of [{ kind: "listing" as const, showId: "daily", page: 1 }, { kind: "listing" as const, showId: "daily", page: 2 },
     ...[16, 20, 64].map((length) => ({ kind: "episode" as const, showId: "daily", siteId: "a".repeat(length) }))]) {
@@ -160,7 +207,7 @@ test("custom CSS follows the default style and has an exact per-page CSP hash", 
   expect(hash).not.toBe(await siteCssHash());
   expect(html).toContain('class="cl-site cl-page-list"');
   expect(html).toContain('class="cl-player"');
-  expect(renderSiteEpisode(input, episode("offset", "2026-10-26T01:00:00+09:00"))).toContain("2026-10-25 (UTC)");
+  expect(renderSiteEpisode(input, episode("offset", "2026-10-26T01:00:00+09:00"))).toContain("2026-10-25 (UTC+00:00)");
   for (const css of ["a".repeat(65_537), "\u0000", "\r", "\ud800", "/* </STYLE> */"]) {
     expect(() => renderSiteListing({ ...input, show: { ...input.show, site_css: css } }, [], 1)).toThrow();
   }

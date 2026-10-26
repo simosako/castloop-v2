@@ -208,7 +208,7 @@ export type SqliteRevisionDetailResponse = z.infer<typeof sqliteRevisionDetailRe
 export type SqliteMetadataFieldDiff = z.infer<typeof sqliteMetadataFieldDiffSchema>;
 
 const SHOW_DIFF_FIELDS = ["title", "description", "language", "author", "owner_name", "owner_email",
-  "categories", "explicit", "site_mode", "site_url", "site_css_path", "site_css", "image_path", "copyright", "show_type"] as const;
+  "categories", "explicit", "site_mode", "site_url", "site_timezone", "site_css_path", "site_css", "image_path", "copyright", "show_type"] as const;
 const EPISODE_DIFF_FIELDS = ["episode_id", "guid", "guid_is_permalink", "title", "description",
   "published_at", "explicit", "episode_type", "season_number", "episode_number"] as const;
 
