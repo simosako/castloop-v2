@@ -43,7 +43,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [公開受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md) | Issue #66・全項目承認済み。3状態、停止・再開、変更番号と操作結果の保存・GET照会を実装。再開は処理終了を待ち、受付停止ではuploadも止める。内部形式7/7の新規環境専用。Worker更新中の配信継続は対象外 |
 | [管理用設定と予約公開](../docs/admin_configuration.md) | Issue #65。任意のcastloop-admin.toml、schema/template/validate/doctor、オフライン日時preview、予約preview・作成・一覧・詳細・変更・取消・再承認、未来`published_at`の即時公開確認とflag |
 | [Issue #65 CLI基盤の実データ検証](issue65_cli_real_data_verification_20261024.md) | 指定サンプル3＋36 Episode、約1.50GB、単体バイナリ162試験が期待どおり。原本不変。ptrace制約で通信観測は欠測、Cloudflare予約実行は未実装・未試験 |
-| [Issue #65 予約公開のCloudflare実機検証](issue65_scheduled_publication_live_20261026.md) | 9/9導入時環境で予約公開、Pause→再承認→公開、日時変更→取消、未来予約中の即時公開、予定前の直リンク404と公開後の200/206・hash一致を確認。Alarm再配送・blocked・同時刻予約・性能は未確認 |
+| [Issue #65 予約公開のCloudflare実機検証](issue65_scheduled_publication_live_20261026.md) | 9/9導入時環境で予約公開、Pause→再承認→公開、日時変更→取消、未来予約中の即時公開、予定前の直リンク404と公開後の200/206・hash一致を確認。環境は2026-10-27に明示承認で削除し、R2 backupとローカル証跡を保持。Alarm再配送・blocked・同時刻予約・性能は未確認 |
 | [Issue #65 予約公開の11/11非公開実機検証](issue65_scheduled_publication_11_live_20261027.md) | 11/11統合版を新規本人限定環境へ配備。予約3件・取消1件、Pause→再承認→公開、予定前後のFeed、Access 129要求拒否、site_timezone、音源hashを確認。最終状態はadmission_paused/delivery enabled。Alarm再配送・blocked・同時刻予約・性能は未確認 |
 | [SQLite独自ドメイン対応計画](sqlite_custom_domains_plan.md) | Issue #68。開発版のCLI/REST/DO接続、Cloudflare DNS前提、管理/公開origin分離、redirect、個別停止と設定・Feed切替、ローカル検証範囲 |
 | [独自ドメインP0・API条件の確認](sqlite_custom_domains_p0.md) | 公開Attach/Detachを採用。外部同時変更は想定外という制約を記録し、保留解消・開発継続。HTTP/identity/Feed採番の契約 |
