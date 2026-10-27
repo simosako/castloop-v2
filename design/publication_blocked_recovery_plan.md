@@ -1,6 +1,7 @@
 # Issue #62: 公開jobのblocked診断と証拠に基づく復旧の設計・開発計画
 
 作成日: 2026-10-27。**初回は設計案のみ。管理者レビュー後に開発へ進む。**
+2026-10-27の管理者レビューで継続方式に**§4.1案A(continuation_ready再利用)を採用**した。復旧不能jobの削除要求は§5.6に検討を記録した。`abandoned`終端状態(§4.2案A)の採用可否は判断継続中である。
 
 - 対象Issue: [#62](https://github.com/simosako/castloop-v2/issues/62)
 - 調査基準: このworktreeの`23c25a5`(origin/main)。Issue本文の調査基準`72bc9f0`(v0.7.2)から、#63〜#71の機能統合と内部queue/content形式11/11を含む。
@@ -119,7 +120,7 @@ continue要求自体も操作種別ごとの操作記録へ保存し、既存の
 | --- | --- |
 | claim/受付検証 | 変更なし。runtime/config/target/base/generation/window・要求hashの全照合を毎回やり直す(既存) |
 | site build | 変更なし。保存済みbuildがあればidentityを照合し、cursorの続きから生成(既存)。buildがなければprepareから |
-| validate | **自分のjobの書込先に限り**、既存オブジェクトのsize/checksumが期待値と一致すれば「書込済み」として許可する。`requireAbsent`は他対象のままとし、第三者の書込・内容不一致は従来どおり拒否 |
+| validate | **自分のjobの書込先に限り**、既存オブジェクトのsize/checksumが期待値と一致すれば「書込済み」として許可する。`requireAbsent`は他対象のままとし、第三者の書込・内容不一致は従来どおり拒否する。draft Show初回公開・新規Episodeの`requireEmpty`(対象prefixの完全空検査)も同様に、存在するobjectが**自分の期待key群のみで全てsize/checksum検証済み**の場合だけ許容し、他のobjectが1つでもあれば従来どおり拒否する |
 | publish | immutable書込を「既存+checksum一致ならPUTせずskip、不一致ならblock」に拡張。上書き系は同一内容を検証付きで書く。site candidatesの重複挿入は既存の一意制約で無視 |
 | cache purge | 変更なし。purge成功の確認前に完了しない。purge再実行はcache無効化の冪等性に依存せず、毎回結果を確認する(既存) |
 | commit | 変更なし。SQLite transactionで状態とカタログを原子的に確定(既存) |
@@ -137,7 +138,7 @@ continue要求自体も操作種別ごとの操作記録へ保存し、既存の
 - 前提: 診断で「観測のみ」または継続不能と判定されたjob。`stored_request_invalid`で要求identityがローカルjournalから裏付けられ、書込状態の確認(存在・hash一致または不在)が取れた場合に限る。
 - 操作は`operation-cleanup`と同じ二段階confirmとする。診断が返す計画hashを確認してから実行する。
 - DO側でblocked→`abandoned`へ移し、操作記録に終了理由と診断要約(allowlist内の固定code)を保存する。read boundary・行・局所的な書込残(immutable追加や上書きkey)はそのまま残す。残った書込は次の公開で上書きされるか、将来の明示的な削除機能の対象とする。**物理削除・prefix掃除は行わない**。
-- 終了後もread boundaryの判定は変わらない。旧配信が継続できるjobなら配信は続く。配信できない(503の)Showは、新規jobでの再公開が「次の判断」であり、案内として表示する。
+- 終了後もread boundaryの判定は変わらない。旧配信が継続できるjobなら配信は続く。配信できない(503の)Showは、新規jobでの再公開が「次の判断」であり、案内として表示する。ただしdraft Showの初回公開・新規Episodeのように書込開始前の空を要求する対象では、残った書込との衝突で新規jobが失敗し得る(§5.6の実害1)。
 - `abandoned`への遷移でFIFO・Resume・共有Worker更新の拘束を解放する。
 
 ### 5.5 API・スキーマ変更のまとめ
@@ -149,7 +150,27 @@ continue要求自体も操作種別ごとの操作記録へ保存し、既存の
 | 管理HTTP | `GET jobs/{request_id}/diagnose`(読取)、`POST jobs/{request_id}/continue`(identity凍結付き)、`POST jobs/{request_id}/abandon`(二段階confirm)を追加。既存`jobs`(受付)・`jobs/{request_id}`(状態)は変更なし |
 | 操作記録 | continue・abandonを操作種別として記録し、`operation-status`で結果を照会できるようにする。診断は記録しない |
 | CLI | `job-diagnose`・`job-continue`・`job-abandon`を追加。`job-status`は`abandoned`表示だけ追加 |
-| executor | validateの自己書込先許可、publishのimmutable skip検証、`timestamp()`の凍結値利用 |
+| executor | validateの自己書込先許可(`requireAbsent`・`requireEmpty`両方)、publishのimmutable skip検証、`timestamp()`の凍結値利用 |
+
+### 5.6 復旧不能jobの削除について(2026-10-27管理者質問への検討)
+
+管理者から「復旧不可能なjobと関連ファイルを管理者判断で削除できると良いのでは」との指摘を受け、次のように検討した。
+
+**job行の削除は導入しない。**`publication_jobs`行はread boundary(`read_*`列と`read_verified`)の保存場所であり、`committedReadBoundary`がblocked中の旧配信可否の判定に直接使う。`publication_feed_generations`の予約行はjobを`owner_id`で参照し、世代番号はR2 snapshot keyに使われるため再利用できない。したがって行を消すことは「ごみの除去」ではなく、配信gateと世代一意性の根拠そのものの除去であり、AGENTS.mdの「blocked行の単なる削除禁止」にも反する。
+
+**R2残置書込の限定cleanupは将来機能とする。**abandon後の残置には実害が2つある。
+
+1. draft Showの初回公開と新規Episode公開は、validateが対象prefixの**完全な空**を要求する(`requireEmpty`)。§5.2の自己許可は同一jobの継続にしか効かないため、abandon前の書込が残る限り、**同じ対象への新しいjobはvalidation_failedで失敗する**。
+2. Episode音源(`public/.../{job_id}.mp3`、最大300MB)などjob固有のimmutable書込は、新しいjobのkeyと衝突しないため**永遠に上書きされず孤児として残る**(staging uploadには既存の未公開素材cleanupがあるが、このpublic keyは対象外)。
+
+このため、次の条件を満たす限定cleanupなら将来導入できる。
+
+- 対象は`abandoned`遷移済みのjobのみ。blocked・実行中のjobには適用しない。
+- 削除keyは当該jobの凍結要求から決定的に列挙できる**job固有のimmutable keyに限る**(revision toml・世代snapshot・`{job_id}`音源・site snapshot)。`show.toml`・`metadata.toml`のような対象をまたぐ共有keyと、他jobや現行commitが参照するkeyは削除しない。
+- keyごとにheadとchecksum一致を確認してから削除する。prefix一括削除はしない。
+- job行・世代予約・操作記録は残す。`operation-cleanup`と同じ二段階confirmとする。
+
+**ただし本Issueでは導入しない。**理由は次のとおり。実害1は「abandoned前身jobの検証済み残置を`requireEmpty`が例外許容する」方式でも解消でき、削除と許容のどちらで解くかは個別に判断すべきである。実害2の孤児は配信・受付に影響せず、abandon自体が証拠が揃わない稀なケースに限られる。また物理削除は取り消せず、AGENTS.mdがpayload削除を明示承認済みのlifecycle削除に限定しているため、削除経路の新規導入は専用の設計・レビューを経るべきである。本Issueは§5.4のとおり`abandoned`への遷移のみを提供し、残置は次の公開での上書き(共有key)か本項の将来cleanup(job固有immutable key)に委ねる。
 
 ## 6. 安全条件(実装・運用で守ること)
 
@@ -167,7 +188,7 @@ continue要求自体も操作種別ごとの操作記録へ保存し、既存の
 
 1. 4つのblocked理由をそれぞれ発生させ、診断が3分類と根拠・不足証拠を正しく返すこと。
 2. 継続の故障注入: (a)応答喪失(再送しない・状態照会からやり直す)、(b)実行中断=execution_interrupted、(c)purge失敗=execution_failed、(d)入力変更・古いbase・並行操作での拒否。
-3. 継続再実行で、**書込済みimmutableオブジェクトを再PUTしないこと**(模擬bucketの操作記録で検証)、内容不一致オブジェクトの存在時に継続が拒否されること。
+3. 継続再実行で、**書込済みimmutableオブジェクトを再PUTしないこと**(模擬bucketの操作記録で検証)、内容不一致オブジェクトの存在時に継続が拒否されること。draft初回公開・新規Episodeの`requireEmpty`検査でも、自分の検証済み書込だけが許容され、第三者のobjectは拒否されること。
 4. 継続成功jobの`updated_at`・feed が初回validate時刻で再現されること(hash一致)。
 5. abandonがblockedのみに作用し、行・read boundary・旧配信を維持すること。abandon後のFIFO・Resume・共有更新の解放と、`stored_request_invalid`でのidentity不一致拒否。
 6. Alarm再配送・watch・統計・catalog・サイト配信がblocked/abandonedを崩さないこと(既存回帰の維持)。
@@ -181,7 +202,7 @@ continue要求自体も操作種別ごとの操作記録へ保存し、既存の
 - 11/11以前の内部形式からの変換・互換配備(新規fresh環境専用)。
 - `failed`(入力系)の再実行。凍結要求の再提出として既存の公開手続きを使う。
 - Worker更新(#11経路)・upload操作(#40経路)・domain保守の各継続手順の変更。それらとの区別はdocsに明記する。
-- 物理削除・R2掃除・site candidates/buildsの整理。
+- 物理削除・R2掃除・site candidates/buildsの整理。復旧不能jobの残置書込の限定cleanupは、§5.6の条件により将来の個別Issueで設計する。
 - 単一PUT U1の検証。U1は未検証の仮定のままである。
 
 ## 9. 関連文書の更新
