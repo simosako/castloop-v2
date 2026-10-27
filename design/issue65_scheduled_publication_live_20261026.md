@@ -2,9 +2,9 @@
 
 Issue #65のサーバー側予約公開をfreshなCloudflare環境へ配備し、3件のEpisode予約公開を実機で確認した記録。対象は隔離した新規サービスだけであり、既存環境・独自ドメイン・本番DNSは変更していない。
 
-> 現在のIssue #65／#70統合版は内部queue/content形式**11/11**。本記録は予約公開単独の**9/9**環境で取得した履歴であり、11/11環境の実配備・実機確認ではない。
+> 現在のIssue #65／#70統合版は内部queue/content形式**11/11**。本記録は予約公開単独の**9/9**環境で取得した履歴であり、11/11環境の実配備・実機確認は[別記録](issue65_scheduled_publication_11_live_20261027.md)を参照する。
 >
-> 2026-10-27追記: 本試験は非公開運用ルールの追加前に実施した。保持環境はworkers.dev上の公開URLでCloudflare Access保護がなく、追加のupload・publishは行っていない。非公開化・配信停止・削除は別途の明示承認が必要。
+> 2026-10-27追記: 本試験は非公開運用ルールの追加前に実施した。保持していたworkers.dev公開URLの環境は、同日の明示承認を受けてCloudflare資源を削除した。削除前にR2 objectを私有領域へ退避し、size/MD5を照合した。DO SQLite全体のexportは行っておらず、ローカルworkspace・journal・証跡は保持している。詳細は§6。
 
 ## 1. 対象と前提
 
@@ -71,11 +71,21 @@ Show公開後、サンプル3 Episodeをmetadata＋MP3でstageした。予約は
 - CPU・duration・Free枠、purgeのnative性能、長期Alarm精度は測定していない。予定時刻は実行開始可能時刻であり、最大遅延の保証ではない。
 - 今回はfunctional確認だけであり、Cloudflareの障害注入や再起動試験ではない。
 
-## 6. 保持
+## 6. 保持と削除（2026-10-27）
 
-環境は削除せず、`open`、`queued=0`、`drained=true`で保持した。workspaceには`castloop.toml`、`.castloop/`の管理鍵・journal、`evidence/`のFeed snapshotとschedule statusを保存している。管理鍵・token・アカウントID・raw秘密はこの文書へ含めない。
+初回試験後は環境を`open`、`queued=0`、`drained=true`で保持し、workspaceの`castloop.toml`、`.castloop/`の管理鍵・journal、`evidence/`のFeed snapshotとschedule statusを保存した。管理鍵・token・アカウントID・raw秘密はこの文書へ含めない。
 
-証跡:
+2026-10-27、管理者の明示承認を受けて9/9環境のCloudflare資源を削除した。
+
+- 対象Worker `castloop-issue65sched143403-533a3c19`を削除し、HTTP 404、専用DO namespaceの消滅、公開URLの404を確認した。
+- private R2の41 object・6,462,289 bytesを削除前に私有directoryへ退避し、全objectのsizeとMD5（weak ETagを含む）を照合した。object削除後の一覧0件を確認してbucketを削除し、GET 404を確認した。
+- 9/9専用のAccess applicationは存在せず、他環境のAccess applicationは変更していない。
+- 保持サービス`sq16r-6ec01dc6`の設定、11/11非公開環境、DNS、共有証明書、権限、課金・CPU設定は変更していない。
+- ローカルworkspace・journal・証跡は保持している。DO SQLite全体のexportは行っていない。
+
+私有の削除証跡は`.local-test-data/results/20261027/issue65-9-cleanup-20261027T001230Z/`に保存した。`cleanup-complete.json`、`r2-backup-summary.json`、`r2-backup-verification.json`、`delete-objects-summary.json`、`delete-bucket.json`、`retained-sq16r-settings-before.json` / `after.json`を含む。
+
+証跡（削除前の試験）:
 
 - `evidence/issue65-preview-ep{1,2,3}.json`: 予約preview、承認hash、解決したUTC/JST。
 - `evidence/issue65-schedule-ep{1,2,3}.json`: 予約受付結果。
