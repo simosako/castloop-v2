@@ -68,20 +68,29 @@ test("progress keeps unsubmitted drafts pending without inventing progress", asy
 test("progress explains FIFO waiting reasons and paused admission", async () => {
   const value = await fixture();
   const published = await publishedShow(value);
-  value.storage.sql.exec("UPDATE publication_jobs SET state = 'queued' WHERE job_id = ?", published.job_id);
-  const queued = progressResultSchema.parse(await value.command("progress", [published.job_id]));
+  const draftPath = join(value.root, ".castloop", "sqlite-drafts", value.config.service_id, "show-daily.json");
+  const draft = JSON.parse(await Bun.file(draftPath).text());
+  draft.publication.status = { ...draft.publication.status, state: "queued" };
+  writeFileSync(draftPath, JSON.stringify(draft));
+  const asQueued: R2RestTransport = async (input, init) => {
+    const response = await value.transport(input, init);
+    if (String(input).includes("/admin/sqlite-publication/jobs/")) {
+      const body = await response.json() as Record<string, unknown>;
+      return Response.json({ ...body, state: "queued" }, { headers: { "Cache-Control": "no-store" } });
+    }
+    return response;
+  };
+  const queued = progressResultSchema.parse(await value.command("progress", [published.job_id], { transport: asQueued }));
   expect(queued.state).toBe("queued");
   expect(queued.waiting_reason).toMatchObject({ reason: "waiting_in_fifo" });
   expect(phase(queued, "fifo_waiting")).toMatchObject({ state: "in_progress" });
   expect(phase(queued, "terminal")).toMatchObject({ state: "pending" });
   await value.command("show-pause", ["daily", crypto.randomUUID()]);
-  const paused = progressResultSchema.parse(await value.command("progress", [published.job_id]));
+  const paused = progressResultSchema.parse(await value.command("progress", [published.job_id], { transport: asQueued }));
   expect(paused.waiting_reason).toMatchObject({ reason: "admission_paused" });
   expect(paused.observation.health_state).toBe("paused");
-  value.storage.sql.exec("UPDATE publication_jobs SET state = 'succeeded' WHERE job_id = ?", published.job_id);
   await value.command("show-delivery-resume", ["daily", crypto.randomUUID()]);
-  value.storage.sql.exec("UPDATE publication_jobs SET state = 'queued' WHERE job_id = ?", published.job_id);
-  const admissionPaused = progressResultSchema.parse(await value.command("progress", [published.job_id]));
+  const admissionPaused = progressResultSchema.parse(await value.command("progress", [published.job_id], { transport: asQueued }));
   expect(admissionPaused.waiting_reason).toMatchObject({ reason: "admission_paused" });
   expect(admissionPaused.observation.health_state).toBe("admission_paused");
 });

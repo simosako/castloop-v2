@@ -1,10 +1,17 @@
+import { sha256Hex } from "../packages/shared/src/sha256";
 import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 import { sqliteCoverSnapshotKey } from "./sqlite-cover";
 
-export type LifecycleCacheEnv = { CASTLOOP_BUCKET: Pick<R2Bucket, "head" | "get"> };
+export type LifecycleFeedRenderer = (showId: string, props: PublicCacheProps) =>
+  Promise<{ xml: string; updatedAt: string } | null> | { xml: string; updatedAt: string } | null;
+export type LifecycleCacheEnv = {
+  CASTLOOP_BUCKET: Pick<R2Bucket, "head" | "get">;
+  renderFeed?: LifecycleFeedRenderer;
+};
 export type LifecyclePurgeTarget = { showId: string; episodeId?: string };
+type AssetMetadata = { size: number; httpEtag: string; uploaded: Date };
 
 function rejected(request: Request, status: 404 | 405 | 412 | 416 | 503, size?: number): Response {
   return new Response(request.method === "HEAD" ? null : JSON.stringify({ error: status === 404 ? "not found" :
@@ -36,7 +43,7 @@ function modifiedAfter(uploaded: Date, value: string): boolean | null {
   return Number.isFinite(date) ? Math.floor(uploaded.getTime() / 1000) > Math.floor(date / 1000) : null;
 }
 
-function preconditionStatus(request: Request, object: R2Object): 304 | 412 | null {
+function preconditionStatus(request: Request, object: AssetMetadata): 304 | 412 | null {
   const match = request.headers.get("If-Match");
   if (match !== null && !matchesEtag(match, object.httpEtag, false)) return 412;
   const unmodified = request.headers.get("If-Unmodified-Since");
@@ -47,7 +54,7 @@ function preconditionStatus(request: Request, object: R2Object): 304 | 412 | nul
   return since !== null && modifiedAfter(object.uploaded, since) === false ? 304 : null;
 }
 
-function requestedRange(request: Request, object: R2Object): { offset: number; length: number } | "unsatisfiable" | null {
+function requestedRange(request: Request, object: AssetMetadata): { offset: number; length: number } | "unsatisfiable" | null {
   if (request.method !== "GET") return null;
   const value = request.headers.get("Range");
   if (!value || value.length > 256) return null;
@@ -75,6 +82,31 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
   if (!asset) return rejected(request, 404);
   if (!validProps(asset, props)) return rejected(request, 503);
   try {
+    if (asset.kind === "feed" && env.renderFeed) {
+      const rendered = await env.renderFeed(asset.showId, props);
+      if (!rendered) return rejected(request, 503);
+      const bytes = new TextEncoder().encode(rendered.xml);
+      const uploaded = new Date(rendered.updatedAt);
+      if (!bytes.byteLength || bytes.byteLength > 52_428_800 || !Number.isFinite(uploaded.getTime())) {
+        throw new Error("Invalid rendered Feed metadata");
+      }
+      const httpEtag = `"${await sha256Hex(bytes)}"`;
+      const meta: AssetMetadata = { size: bytes.byteLength, httpEtag, uploaded };
+      const headers = new Headers({ "Content-Type": asset.contentType, "ETag": httpEtag,
+        "Last-Modified": uploaded.toUTCString(), "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=300", "Cache-Tag": publicAssetCacheTags(asset).join(",") });
+      const condition = preconditionStatus(request, meta);
+      if (condition === 412) return rejected(request, 412);
+      if (condition === 304) return new Response(null, { status: 304, headers });
+      const range = requestedRange(request, meta);
+      if (range === "unsatisfiable") return rejected(request, 416, meta.size);
+      headers.set("Content-Length", String(range ? range.length : meta.size));
+      if (request.method === "HEAD") return new Response(null, { headers });
+      if (range) headers.set("Content-Range", `bytes ${range.offset}-${range.offset + range.length - 1}/${meta.size}`);
+      return new Response(range ? bytes.subarray(range.offset, range.offset + range.length) : bytes, {
+        status: range ? 206 : 200, headers,
+      });
+    }
     const key = asset.kind === "feed" ? sqliteFeedSnapshotKey(asset.showId, props.feedGeneration!) :
       asset.kind === "cover" ? sqliteCoverSnapshotKey(asset.showId, props.coverGeneration!, asset.key.endsWith(".png") ? "png" : "jpg") : asset.key;
     const object = await env.CASTLOOP_BUCKET.head(key);

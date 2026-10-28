@@ -2,9 +2,6 @@ import { stringifyToml } from "@castloop/shared";
 import { sqliteServiceConfigHash } from "../../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../../shared/src/sqlite-service";
 import { SqlitePublicationContent } from "../../../../src/sqlite-publication-content";
-import { SqlitePublicationAlarm } from "../../../../src/sqlite-publication-alarm";
-import { createSqlitePublicationExecutor } from "../../../../src/sqlite-publication-executor";
-import { withSitePublication } from "../../../../src/site-publication";
 import { SqliteServiceRuntime } from "../../../../src/sqlite-service-runtime";
 import type { SqliteCachePurgeConfirmation } from "../../../../src/sqlite-service-runtime";
 import { sqlitePublicationFixture } from "../../../../src/test-support/sqlite-publication";
@@ -40,7 +37,8 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
     purges.push(id); confirmed?.("media");
     if (faults.failDomainPurge === id) throw new Error("Domain purge unavailable");
     confirmed?.("site");
-  } });
+  }, purgeMedia: async ({ showId }: { showId: string; episodeId?: string }) => { purges.push(showId); },
+  purgeSite: async ({ showId }: { showId: string; siteId?: string }) => { purges.push(`site:${showId}`); } });
   const openShow = (id: string) => {
     let node = nodes.get(id);
     if (!node) {
@@ -132,11 +130,6 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
         if (path.endsWith("/resume") || path.endsWith("/pause")) lost("control");
         if (path.endsWith("/jobs") && request.method === "POST" && response.status === 202) {
           node.fixture.clearAlarm();
-          const executor = withSitePublication(createSqlitePublicationExecutor(node.service.content, objects.bucket, activeConfig,
-            { purge: async ({ showId }) => { purges.push(showId); } }), node.service.content, objects.bucket, activeConfig,
-            async ({ showId }) => { purges.push(`site:${showId}`); });
-          const runner = new SqlitePublicationAlarm(node.service.queue, executor, () => {});
-          while ((await runner.alarm()).state === "running") node.fixture.clearAlarm();
           await faults.afterPublish?.();
         }
         return response;

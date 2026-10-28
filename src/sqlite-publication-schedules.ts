@@ -7,6 +7,7 @@ import { SQLITE_SCHEDULE_PAGE_SIZE, sqliteScheduleCancelSchema, sqliteScheduleCr
 import type { SqliteScheduleCancel, SqliteScheduleCreate, SqliteScheduleList, SqliteScheduleReason,
   SqliteScheduleRecord, SqliteScheduleReapprove, SqliteScheduleReschedule, SqliteScheduleStatus } from "../packages/shared/src/sqlite-schedule";
 import type { SqlitePublicationContent } from "./sqlite-publication-content";
+import { SqlitePublicationInputError } from "./sqlite-publication-queue";
 import type { PublicationQueueStorage, SqlitePublicationQueue } from "./sqlite-publication-queue";
 import type { SqliteOperationRecords } from "./sqlite-operation-records";
 
@@ -332,7 +333,7 @@ export class SqlitePublicationSchedules {
       if (!this.scope?.ready()) { this.suspendOne(row.schedule_id, "maintenance"); continue; }
       let request: SqlitePublicationRequest;
       try { request = parseSqlitePublicationRequest(JSON.parse(row.request_json)); }
-      catch { this.blockOne(row.schedule_id, "dispatch_unverified"); continue; }
+      catch { this.failOne(row.schedule_id, "target_unavailable"); continue; }
       const admission = this.queue.scheduleAdmission(request);
       if (admission !== "open") {
         const state = this.queue.snapshot().state;
@@ -347,7 +348,7 @@ export class SqlitePublicationSchedules {
       } catch { this.failOne(row.schedule_id, "target_unavailable"); continue; }
       let client: OperationClient | undefined;
       try { client = row.client_json ? operationClientSchema.parse(JSON.parse(row.client_json)) : undefined; }
-      catch { this.blockOne(row.schedule_id, "dispatch_unverified"); continue; }
+      catch { this.failOne(row.schedule_id, "target_unavailable"); continue; }
       try {
         await this.storage.transaction(async () => {
           const current = this.requireRow(row.schedule_id);
@@ -358,22 +359,24 @@ export class SqlitePublicationSchedules {
             rechecked === "runtime_mismatch" ? "runtime_mismatch" : rechecked === "stale_window" ? "stale_window" :
               rechecked === "queue_blocked" ? "queue_blocked" : "target_busy");
           if (!this.content.matchesScheduledTarget(request)) throw new ScheduleDeferred("base_conflict");
-          this.queue.admitScheduled(request, row.request_sha256, client, invocation, () => {
+          await this.queue.executeScheduled(request, row.request_sha256, client, invocation, () => {
             const time = this.now();
             this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, state = 'dispatched', reason_code = NULL,
               dispatched_at_ms = ?, updated_at_ms = ? WHERE schedule_id = ? AND state = 'scheduled' AND version = ?`,
             time, time, row.schedule_id, row.version);
             this.event(this.requireRow(row.schedule_id), "dispatch", "dispatched", null, time);
           });
-          try { await this.queue.wakeNow(); }
-          catch { throw new ScheduleAlarmError(); }
         });
         dispatched++;
       } catch (error) {
         if (error instanceof ScheduleSkipped) continue;
         if (error instanceof ScheduleDeferred) { this.suspendOne(row.schedule_id, error.reason); continue; }
-        if (error instanceof ScheduleAlarmError) throw error;
-        this.blockOne(row.schedule_id, "dispatch_unverified");
+        if (error instanceof SqlitePublicationInputError) {
+          if (error.reason === "base_conflict") { this.suspendOne(row.schedule_id, "base_conflict"); continue; }
+          this.failOne(row.schedule_id, "target_unavailable");
+          continue;
+        }
+        throw error;
       }
     }
     return dispatched;

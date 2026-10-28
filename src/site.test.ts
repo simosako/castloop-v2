@@ -5,9 +5,8 @@ import { parseSitePagePath, sitePagePath, siteSnapshotKey } from "../packages/sh
 import { SITE_CSS, renderSiteEpisode, renderSiteListing, renderSiteListingPage, siteContentSecurityPolicy, siteCssHash } from "./site-renderer";
 import { serveSiteGateway } from "./site-gateway";
 import { serveCachedSitePage } from "./site-cache";
-import { persistSitePage, purgeSitePages, sitePurgeTags } from "./site-storage";
+import { purgeSitePages, sitePurgeTags } from "./site-storage";
 import type { SiteCacheProps } from "./site-cache";
-import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
 import { createHash } from "node:crypto";
 
 const origin = "https://podcast.example.com";
@@ -217,28 +216,27 @@ test("custom CSS follows the default style and has an exact per-page CSP hash", 
 });
 
 async function cachedFixture() {
-  const objects = sqlitePublicationBucket(), page = { kind: "listing" as const, showId: "daily", page: 1 };
-  const html = renderSiteListing(input, [], 1), sha256 = createHash("sha256").update(html).digest("hex");
-  const props: SiteCacheProps = { generation: 1, showGeneration: 1, cssHash: await siteCssHash(), sha256,
-    lengthBytes: Buffer.byteLength(html) };
-  await objects.bucket.put(siteSnapshotKey(page, 1), html, { sha256 });
-  return { ...objects, props, html, page };
+  const page = { kind: "listing" as const, showId: "daily", page: 1 };
+  const html = renderSiteListing(input, [], 1);
+  const props: SiteCacheProps = { generation: 1, showGeneration: 1 };
+  const render = async (_page: unknown, candidate: SiteCacheProps) =>
+    candidate.generation === 1 && candidate.showGeneration === 1 ? { html, updatedAt: "2026-10-25T00:00:00Z" } : null;
+  return { props, html, page, render };
 }
 
-test("site cache verifies immutable object identity and retains security headers on HEAD and 304", async () => {
+test("site cache renders on-demand pages and retains security headers on HEAD and 304", async () => {
   const f = await cachedFixture(), url = `${origin}/podcasts/daily/`;
-  const bucket = f.bucket as unknown as Pick<R2Bucket, "head" | "get">;
-  const response = await serveCachedSitePage(new Request(url), bucket, f.props);
+  const response = await serveCachedSitePage(new Request(url), f.render, f.props);
   expect(response.status).toBe(200);
   expect(await response.text()).toBe(f.html);
   for (const request of [new Request(url, { method: "HEAD" }), new Request(url, { headers: { "If-None-Match": response.headers.get("ETag")! } })]) {
-    const result = await serveCachedSitePage(request, bucket, f.props);
+    const result = await serveCachedSitePage(request, f.render, f.props);
     expect(result.status).toBe(request.method === "HEAD" ? 200 : 304);
     expect(await result.text()).toBe("");
     expect(result.headers.get("Content-Security-Policy")).toContain("script-src 'none'");
   }
-  expect((await serveCachedSitePage(new Request(url), bucket, { ...f.props, sha256: "b".repeat(64) })).status).toBe(503);
-  expect((await serveCachedSitePage(new Request(url), bucket, { ...f.props, generation: 2 })).status).toBe(503);
+  expect((await serveCachedSitePage(new Request(url), () => ({ html: "a".repeat(1_000_001) }), f.props)).status).toBe(503);
+  expect((await serveCachedSitePage(new Request(url), f.render, { ...f.props, generation: 2 })).status).toBe(503);
 });
 
 test("latest gate always precedes cache, redirect and conditional responses; credentials never reach cache", async () => {
@@ -274,27 +272,6 @@ test("latest gate always precedes cache, redirect and conditional responses; cre
   expect(redirect.headers.get("Location")).toBe(`${origin}/podcasts/daily/`);
   expect(calls).toBe(1);
   expect((await serveSiteGateway(new Request("https://unknown.example/podcasts/daily/"), gateway)).status).toBe(404);
-});
-
-test("site snapshots use checksum-verified conditional creation and never overwrite previous HTML", async () => {
-  const f = await cachedFixture();
-  const candidate = await persistSitePage(f.bucket, f.page, 2, f.html, { cssHash: f.props.cssHash, showGeneration: 1 });
-  expect(candidate.props.sha256).toBe(f.props.sha256);
-  expect(f.text(siteSnapshotKey(f.page, 2))).toBe(f.html);
-  await expect(persistSitePage(f.bucket, f.page, 2, "replacement", { cssHash: f.props.cssHash, showGeneration: 1 })).rejects.toThrow();
-  expect(f.text(siteSnapshotKey(f.page, 2))).toBe(f.html);
-  expect(f.text(siteSnapshotKey(f.page, 1))).toBe(f.html);
-});
-
-test("oversized HTML is rejected before PUT and uncertain writes are never replayed", async () => {
-  const f = await cachedFixture();
-  f.calls.length = 0;
-  await expect(persistSitePage(f.bucket, f.page, 2, "a".repeat(1_000_001), { cssHash: f.props.cssHash, showGeneration: 1 })).rejects.toThrow();
-  expect(f.calls.length).toBe(0);
-  f.hooks.afterPut = async () => { throw new Error("acknowledgement lost"); };
-  await expect(persistSitePage(f.bucket, f.page, 2, f.html, { cssHash: f.props.cssHash, showGeneration: 1 })).rejects.toThrow();
-  expect(f.calls.filter((call) => call.method === "PUT").length).toBe(1);
-  expect(f.entries.has(siteSnapshotKey(f.page, 2))).toBe(true);
 });
 
 test("site purge targets do not include Feed tags and unconfirmed purge cannot succeed", async () => {

@@ -27,12 +27,17 @@ async function fixture() {
   await command("update-show", ["daily"]); await command("publish-show", ["daily"]);
   const node = () => value.nodes.get("daily")!;
   const client = new SqliteServiceClient(value.config, administratorKey(value.root), value.transport);
+  const cacheEnv = {
+    CASTLOOP_BUCKET: value.bucket as unknown as Pick<R2Bucket, "head" | "get">,
+    renderFeed: (showId: string, props: Parameters<typeof serveCachedLifecycleAsset>[2]) =>
+      node().service.content.renderFeed(showId, value.config.public_base_url, props),
+  };
   const read = (path = "/podcasts/daily/feed.xml", method = "GET", headers: HeadersInit = {}, origin = value.config.public_base_url,
     cached = (input: Request, props: Parameters<typeof serveCachedLifecycleAsset>[2]) =>
-      serveCachedLifecycleAsset(input, { CASTLOOP_BUCKET: value.bucket } as never, props)) =>
+      serveCachedLifecycleAsset(input, cacheEnv, props)) =>
     serveSqliteGateway(new Request(`${origin}${path}`, { method, headers }), value.config.workers_dev_base_url,
       { fetch: (input) => node().service.fetch(input), delivery: async (input) => node().service.delivery(input) }, cached, value.config.public_base_url);
-  return { ...value, command, node, client, read };
+  return { ...value, command, node, client, read, cacheEnv };
 }
 
 test("admission stop serves approved Feed, cover and audio with HTTP conditions and refuses uploads", async () => {
@@ -60,7 +65,7 @@ test("admission stop serves approved Feed, cover and audio with HTTP conditions 
   const publicOrigin = "https://podcast.example.com";
   const alternate = (path: string, origin: string) => serveSqliteGateway(new Request(`${origin}${path}`), value.config.workers_dev_base_url,
     { fetch: (input) => value.node().service.fetch(input), delivery: async (input) => value.node().service.delivery(input) },
-    (input, props) => serveCachedLifecycleAsset(input, { CASTLOOP_BUCKET: value.bucket } as never, props), publicOrigin);
+    (input, props) => serveCachedLifecycleAsset(input, value.cacheEnv, props), publicOrigin);
   for (const path of paths) {
     expect((await alternate(path, publicOrigin)).status).toBe(200);
     const redirected = await alternate(path, value.config.workers_dev_base_url);
@@ -124,7 +129,7 @@ test("late cache fills cannot bypass a newer explicit pause", async () => {
   const cached = async (input: Request, props: Parameters<typeof serveCachedLifecycleAsset>[2]) => {
     calls++; const key = JSON.stringify(props), old = cache.get(key); if (old) return old.clone();
     enter(); await released;
-    const response = await serveCachedLifecycleAsset(input, { CASTLOOP_BUCKET: value.bucket } as never, props);
+    const response = await serveCachedLifecycleAsset(input, value.cacheEnv, props);
     cache.set(key, response.clone()); return response;
   };
   const pending = value.read(undefined, "GET", {}, undefined, cached); await entered;

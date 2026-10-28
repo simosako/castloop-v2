@@ -418,8 +418,7 @@ test("domain switching preserves saved Episode identities, unpublished media and
   expect(node.service.content.delivery(new URL(base.enclosure_url).pathname).status).toBe(200);
   const feed = node.service.content.delivery("/podcasts/daily/feed.xml");
   expect(feed.status).toBe(200);
-  const feedObject = f.entries.get(sqliteFeedSnapshotKey("daily", node.service.content.inspect("daily").show!.feed_generation))!;
-  expect(new TextDecoder().decode(feedObject.bytes)).toContain(`https://${target.hostname}/podcasts/daily/`);
+  expect(node.service.renderFeed()!.xml).toContain(`https://${target.hostname}/podcasts/daily/`);
   for (const [key, etag] of preserved) expect(f.entries.get(key)?.etag).toBe(etag);
   expect(readFileSync(local, "utf8")).toContain("Unpublished local edit");
   await run("create-show", ["new-show", "https://example.com/new"]);

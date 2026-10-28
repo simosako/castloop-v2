@@ -49,40 +49,26 @@ async function fixture(shows = ["a", "b"], builtin = false, episodes = 0) {
   return Object.assign(f, { run, target, request, connection, deploy });
 }
 
-test("domain website regeneration resumes bounded batches after restart and commits only the new canonical origin", async () => {
+test("domain configuration activation updates generation and renders on-demand site pages with the new canonical origin", async () => {
   const f = await fixture(["a"], true, 21), page = { kind: "listing" as const, showId: "a", page: 1 };
-  const before = f.content.sites.page(page)!;
+  const beforeGeneration = f.content.inspect("a").show!.feed_generation;
   await f.control.prepareDomain(f.request); const activation = await f.deploy(); await f.control.activateDomain(activation);
-  const writes = f.bucketCalls.length;
-  await f.nodes.get("a")!.service.runtime.domains.alarm();
-  expect((await f.nodes.get("a")!.service.domainStatus(f.request.operation_id)).phase).toBe("running");
-  expect(f.bucketCalls.slice(writes).filter((call) => call.method === "PUT" && call.key.includes("/sites/"))).toHaveLength(20);
-  expect(f.content.sites.page(page)).toEqual(before);
-  f.restart(); await f.progressDomains(); await f.progressDomains();
-  expect((await f.control.domainStatus(f.request.operation_id)).all_completed).toBe(true);
-  const next = f.content.sites.page(page)!;
-  expect(next.generation).not.toBe(before.generation);
-  expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain('href="https://podcasts.example.com/podcasts/a/"');
-  expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain(":root{--cl-accent:purple}");
-  expect(f.text(`public/podcasts/a/sites/${next.generation}/index.html`)).toContain("(UTC+09:00)</time>");
-  const siteId = f.content.sites.ids.get("a", "ep-0")!;
-  const detail = f.content.sites.page({ kind: "episode", showId: "a", siteId })!;
-  expect(f.text(`public/podcasts/a/sites/${detail.generation}/episodes/${siteId}.html`)).toContain("(UTC+09:00)</time>");
-  expect(f.text(`public/podcasts/a/sites/${before.generation}/index.html`)).toContain(`${f.config.public_base_url}/podcasts/a/`);
-  expect(f.nodes.get("a")!.service.siteDelivery(page).status).toBe(503);
-}, 60000);
-
-test("unknown domain HTML writes never replace the old page references or replay the generation", async () => {
-  const f = await fixture(["a"], true), page = { kind: "listing" as const, showId: "a", page: 1 };
-  const before = f.content.sites.page(page)!;
-  await f.control.prepareDomain(f.request); const activation = await f.deploy(); await f.control.activateDomain(activation);
-  f.hooks.afterPut = async (key) => { if (key.includes("/sites/")) throw new Error("Unknown HTML outcome"); };
   await f.progressDomains();
-  expect((await f.nodes.get("a")!.service.domainStatus(f.request.operation_id)).phase).toBe("blocked");
-  expect(f.content.sites.page(page)).toEqual(before);
-  const writes = f.bucketCalls.length; await f.progressDomains();
-  expect(f.bucketCalls).toHaveLength(writes);
-});
+  expect((await f.control.domainStatus(f.request.operation_id)).all_completed).toBe(true);
+  const nextGeneration = f.content.inspect("a").show!.feed_generation;
+  expect(nextGeneration).toBeGreaterThan(beforeGeneration);
+  expect(f.nodes.get("a")!.service.siteDelivery(page).status).toBe(503);
+  await f.control.finalizeDomain({ operation_id: f.request.operation_id, request_sha256: activation.request_sha256, connection: f.connection, detached: false });
+  f.nodes.get("a")!.service.queue.resume(crypto.randomUUID());
+  expect(f.nodes.get("a")!.service.siteDelivery(page)).toMatchObject({ status: 200, props: { generation: nextGeneration } });
+  const listing = f.nodes.get("a")!.service.renderSitePage(page)!.html;
+  expect(listing).toContain('href="https://podcasts.example.com/podcasts/a/"');
+  expect(listing).toContain(":root{--cl-accent:purple}");
+  expect(listing).toContain("(UTC+09:00)</time>");
+  const siteId = f.content.sites.ids.get("a", "ep-0")!;
+  const detail = f.nodes.get("a")!.service.renderSitePage({ kind: "episode", showId: "a", siteId })!.html;
+  expect(detail).toContain("(UTC+09:00)</time>");
+}, 60000);
 
 for (const shows of [[], ["a"], ["a", "b"]]) test(`domain configuration activation and Feed regeneration complete paused with ${shows.length} Shows`, async () => {
   const f = await fixture(shows);
@@ -98,15 +84,18 @@ for (const shows of [[], ["a"], ["a", "b"]]) test(`domain configuration activati
   for (const id of shows) {
     const node = f.nodes.get(id)!;
     expect(node.service.delivery(`/podcasts/${id}/feed.xml`).status).toBe(503);
-    const generation = node.service.content.inspect(id).show!.feed_generation;
-    expect(f.text(`public/podcasts/${id}/feeds/${generation}.xml`)).toContain(`https://podcasts.example.com/podcasts/${id}/feed.xml`);
     expect(node.service.queue.snapshot().state).toBe("paused");
   }
   const result = await f.control.finalizeDomain({ operation_id: f.request.operation_id, request_sha256: activation.request_sha256, connection: f.connection, detached: false });
   expect(result.phase).toBe("completed"); expect(result.released_count).toBe(shows.length);
   expect(f.control.domainState().connection).toEqual(f.connection);
   for (const [key, etag] of previous) if (key !== "system/service.toml") expect(f.entries.get(key)!.etag).toBe(etag);
-  for (const id of shows) { f.nodes.get(id)!.service.queue.resume(crypto.randomUUID()); expect(f.nodes.get(id)!.service.delivery(`/podcasts/${id}/feed.xml`).status).toBe(200); }
+  for (const id of shows) {
+    const node = f.nodes.get(id)!;
+    node.service.queue.resume(crypto.randomUUID());
+    expect(node.service.delivery(`/podcasts/${id}/feed.xml`).status).toBe(200);
+    expect(node.service.renderFeed()!.xml).toContain(`https://podcasts.example.com/podcasts/${id}/feed.xml`);
+  }
 });
 
 test("partial preparation freezes membership, rejects code-only updates and never replays a lost Show request", async () => {
@@ -120,15 +109,13 @@ test("partial preparation freezes membership, rejects code-only updates and neve
   expect(f.showCalls.filter((call) => call.action === "domain-prepare")).toHaveLength(2);
 });
 
-for (const failure of ["write", "purge"] as const) test(`Feed ${failure} failure blocks the exact domain operation without rewriting or activating later work`, async () => {
+test("purge failure blocks the exact domain operation without advancing Feed generation or activating later work", async () => {
   const f = await fixture(["a"]); await f.control.prepareDomain(f.request); const activation = await f.deploy();
   await f.control.activateDomain(activation);
   const node = f.nodes.get("a")!, oldGeneration = node.service.content.inspect("a").show!.feed_generation;
-  if (failure === "write") f.hooks.afterPut = async (key) => { if (key.includes("/feeds/")) throw new Error("Lost immutable write response"); };
-  else f.faults.failDomainPurge = "a";
-  await f.progressDomains(); f.hooks.afterPut = undefined;
+  f.faults.failDomainPurge = "a";
+  await f.progressDomains();
   expect((await node.service.domainStatus(f.request.operation_id)).phase).toBe("blocked");
-  expect(node.service.content.sites.build(f.request.operation_id)).toMatchObject({ media_purged: failure === "purge" ? 1 : 0, site_purged: 0 });
   expect(node.service.content.inspect("a").show!.feed_generation).toBe(oldGeneration);
   const writes = f.bucketCalls.filter((call) => call.method === "PUT").length;
   await f.progressDomains(); expect(f.bucketCalls.filter((call) => call.method === "PUT")).toHaveLength(writes);
@@ -154,9 +141,10 @@ test("remove restores workers.dev Feed URLs before finalizing the exact known co
   expect((await f.control.finalizeDomain(finalized)).phase).toBe("completed");
   expect(f.control.domainState().connection).toBeNull();
   for (const id of ["a", "b"]) {
-    const node = f.nodes.get(id)!, generation = node.service.content.inspect(id).show!.feed_generation;
-    expect(f.text(`public/podcasts/${id}/feeds/${generation}.xml`)).toContain(`${f.config.workers_dev_base_url}/podcasts/${id}/feed.xml`);
+    const node = f.nodes.get(id)!;
     expect(node.service.health()).toMatchObject({ state: "paused", publication_ready: true, maintenance_operation_id: null });
+    node.service.queue.resume(crypto.randomUUID());
+    expect(node.service.content.renderFeed(id, f.config.workers_dev_base_url)!.xml).toContain(`${f.config.workers_dev_base_url}/podcasts/${id}/feed.xml`);
   }
 });
 

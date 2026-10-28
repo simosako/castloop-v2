@@ -82,7 +82,7 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     for (const action of ["unpublish", "restore"]) {
       const plan = sqliteLifecyclePlanSchema.parse(await command(["preview-episode-lifecycle", "daily", "first", action]));
       const file = join(setup.root, "reviewed-plan.json"); writeFileSync(file, JSON.stringify(plan));
-      expect(await command(["lifecycle-execute", file, plan.request_sha256, "confirm"])).toMatchObject({ state: "queued" });
+      expect(await command(["lifecycle-execute", file, plan.request_sha256, "confirm"])).toMatchObject({ state: "succeeded" });
       expect(await command(["job-status", plan.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
     }
     const staged = await command(["update-show", "daily"]);

@@ -33,7 +33,7 @@ async function fixture(count = 2, customDomain = false, future = false) {
   const commands: string[] = [], native = createSqliteRssEffects(value.root, config, options);
   const effects = { ...native, async command(name: string, args: string[], context?: Parameters<SqliteRssEffects["command"]>[2]) {
     commands.push(name); return native.command(name, args, context); },
-    async readFeed() { return value.text(`public/podcasts/imported/feeds/${value.content.inspect("imported").show!.feed_generation}.xml`); } };
+    async readFeed() { return value.nodes.get("imported")!.service.renderFeed()!.xml; } };
   const execute = (custom: SqliteRssEffects = effects, customOptions = options) => publishSqliteRssImport(value.root, config, output, customOptions, custom);
   const cursor = join(value.root, ".castloop", "sqlite-rss-imports", value.config.service_id, `${report.import_id}.json`);
   return Object.assign(value, { output, report, commands, effects, execute, cursor, options });
@@ -46,7 +46,7 @@ test("RSS bulk publication refuses future published_at without explicit acknowle
   const options = { ...value.options, allowFuturePublishedAt: true };
   const native = createSqliteRssEffects(value.root, value.config, options);
   const effects = { ...native, async readFeed() {
-    return value.text(`public/podcasts/imported/feeds/${value.content.inspect("imported").show!.feed_generation}.xml`);
+    return value.nodes.get("imported")!.service.renderFeed()!.xml;
   } };
   expect(await publishSqliteRssImport(value.root, value.config, value.output, options, effects)).toMatchObject({ episode_count: 2 });
   for (const original of value.report.episodes) {
@@ -91,14 +91,14 @@ test("reviewed RSS imports can explicitly select builtin pages without changing 
   const { site_url, ...metadata } = parseShowMetadata(readFileSync(path, "utf8"));
   writeFileSync(path, stringifyToml({ ...metadata, site_mode: "builtin" }));
   expect(await value.execute()).toMatchObject({ episode_count: 21 });
+  const showService = value.nodes.get("imported")!.service;
   for (const original of value.report.episodes) {
     const episodeId = original.metadata.episode_id;
     const siteId = value.content.sites.ids.get("imported", episodeId)!;
-    const page = value.content.sites.page({ kind: "episode", showId: "imported", siteId })!;
-    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${siteId}.html`)).toContain('<audio controls preload="none"');
+    expect(showService.renderSitePage({ kind: "episode", showId: "imported", siteId })!.html).toContain('<audio controls preload="none"');
     expect(value.content.episodes("imported").find((item) => item.episode_id === episodeId)).toMatchObject(original.metadata);
   }
-  expect(value.content.sites.page({ kind: "listing", showId: "imported", page: 2 })).not.toBeNull();
+  expect(showService.renderSitePage({ kind: "listing", showId: "imported", page: 2 })).not.toBeNull();
 }, 60000);
 
 test("a completed publication with a lost import checkpoint is observed without a second publish or upload", async () => {
@@ -124,11 +124,12 @@ test("RSS imports freeze and install the reviewed Show CSS and timezone and use 
   expect(await value.execute()).toMatchObject({ episode_count: 2 });
   expect(value.content.currentShowRevision("imported", value.config.public_base_url)!.metadata.site_css).toBe(css);
   expect(value.content.currentShowRevision("imported", value.config.public_base_url)!.metadata.site_timezone).toBe("Asia/Tokyo");
+  const showService = value.nodes.get("imported")!.service;
   for (const episode of value.content.episodes("imported")) {
     const siteId = value.content.sites.ids.get("imported", episode.episode_id)!;
-    const page = value.content.sites.page({ kind: "episode", showId: "imported", siteId })!;
-    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${siteId}.html`)).toContain(css);
-    expect(value.text(`public/podcasts/imported/sites/${page.generation}/episodes/${siteId}.html`)).toContain("(UTC+09:00)</time>");
+    const html = showService.renderSitePage({ kind: "episode", showId: "imported", siteId })!.html;
+    expect(html).toContain(css);
+    expect(html).toContain("(UTC+09:00)</time>");
   }
 });
 

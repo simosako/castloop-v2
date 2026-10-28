@@ -4,7 +4,7 @@ import { sqliteUpdateActivateSchema, sqliteUpdatePrepareSchema, sqliteUpdateResu
 import type { SqliteUpdateActivate, SqliteUpdatePrepare, SqliteUpdateResult, SqliteUpdateSummary } from "../packages/shared/src/sqlite-runtime-update";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import type { SqlitePublicationQueue } from "./sqlite-publication-queue";
-import { SQLITE_CONTENT_SCHEMA_VERSION, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-feed-generations";
+import { SQLITE_CONTENT_SCHEMA_VERSION, SQLITE_QUEUE_SCHEMA_VERSION } from "./sqlite-publication-queue";
 import { initializeSqliteDomains, selectPreparedDomainRuntime } from "./sqlite-domain-runtime";
 
 type UpdateRow = { sequence: number; operation_id: string; state: "prepared" | "activated" | "completed";

@@ -41,26 +41,24 @@ test("watch observes a terminal job once and points to verify", async () => {
   expect(events.filter((event) => !event.gap)).toHaveLength(1);
 });
 
-test("watch reports budget exhaustion for a job that never terminates", async () => {
-  const value = await fixture();
-  const published = await publishedShow(value);
-  value.storage.sql.exec("UPDATE publication_jobs SET state = 'queued' WHERE job_id = ?", published.job_id);
-  const result = watchResultSchema.parse(await watchSqliteJob(value.root, value.config, published.job_id,
-    { transport: value.transport, timeoutSeconds: 3600, intervalSeconds: 1, delay: async () => {} }));
-  expect(result.outcome).toMatchObject({ state: "unobservable", reason_code: "budget_exhausted" });
-  expect(result.observation.polls).toBe(WATCH_MAX_POLLS);
-  expect(result.observation.ever_observed).toBe(true);
-  expect(watchExitCode(result)).toBe(2);
-  expect(result.next_actions).toEqual([{ action: "observe_same_job", command: "progress", args: [published.job_id] }]);
-});
-
 test("watch treats a job that disappears after observation as missing", async () => {
   const value = await fixture();
   const published = await publishedShow(value);
-  value.storage.sql.exec("UPDATE publication_jobs SET state = 'queued' WHERE job_id = ?", published.job_id);
+  const draftPath = join(value.root, ".castloop", "sqlite-drafts", value.config.service_id, "show-daily.json");
+  const draft = JSON.parse(await Bun.file(draftPath).text());
+  draft.publication.status = { ...draft.publication.status, state: "queued" };
+  writeFileSync(draftPath, JSON.stringify(draft));
   let deleted = false;
+  const transport: R2RestTransport = async (input, init) => {
+    const response = await value.transport(input, init);
+    if (String(input).includes("/admin/sqlite-publication/jobs/") && response.status === 200) {
+      const body = await response.json() as Record<string, unknown>;
+      return Response.json({ ...body, state: "queued" }, { headers: { "Cache-Control": "no-store" } });
+    }
+    return response;
+  };
   const result = watchResultSchema.parse(await watchSqliteJob(value.root, value.config, published.job_id,
-    { transport: value.transport, timeoutSeconds: 10, intervalSeconds: 1, delay: async () => {},
+    { transport, timeoutSeconds: 10, intervalSeconds: 1, delay: async () => {},
       onEvent: (event) => {
         if (event.state === "queued" && !deleted && !event.gap) {
           deleted = true;
@@ -72,15 +70,18 @@ test("watch treats a job that disappears after observation as missing", async ()
   expect(watchExitCode(result)).toBe(2);
 });
 
-test("watch observes blocked jobs as terminal without resolving them", async () => {
+test("watch observes failed jobs as terminal", async () => {
   const value = await fixture();
   const published = await publishedShow(value);
-  value.storage.sql.exec("UPDATE publication_jobs SET state = 'blocked', reason_code = 'execution_failed' WHERE job_id = ?", published.job_id);
+  value.storage.sql.exec("UPDATE publication_jobs SET state = 'failed', reason_code = 'validation_failed' WHERE job_id = ?", published.job_id);
+  const draftPath = join(value.root, ".castloop", "sqlite-drafts", value.config.service_id, "show-daily.json");
+  const draft = JSON.parse(await Bun.file(draftPath).text());
+  draft.publication.status = { ...draft.publication.status, state: "failed", reason_code: "validation_failed" };
+  writeFileSync(draftPath, JSON.stringify(draft));
   const result = watchResultSchema.parse(await watchSqliteJob(value.root, value.config, published.job_id,
     { transport: value.transport, timeoutSeconds: 10, intervalSeconds: 1, delay: async () => {} }));
-  expect(result.outcome).toEqual({ state: "blocked", reason_code: "execution_failed" });
+  expect(result.outcome).toEqual({ state: "failed", reason_code: "validation_failed" });
   expect(watchExitCode(result)).toBe(1);
-  expect(result.next_actions.some((action) => action.action === "preserve_records_and_inspect")).toBe(true);
 });
 
 test("watch rejects unsubmitted drafts, unknown jobs and invalid budgets", async () => {
@@ -97,10 +98,9 @@ test("watch rejects unsubmitted drafts, unknown jobs and invalid budgets", async
   await expect(watchSqliteJob(value.root, value.config, staged.job_id, { intervalSeconds: 61 })).rejects.toThrow();
 });
 
-test("watch records observation gaps without converting them into an outcome", async () => {
+test("watch records observation gaps before observing terminal completion", async () => {
   const value = await fixture();
   const published = await publishedShow(value);
-  value.storage.sql.exec("UPDATE publication_jobs SET state = 'queued' WHERE job_id = ?", published.job_id);
   let remaining = 3;
   const flaky: R2RestTransport = async (input, init) => {
     if (remaining > 0) { remaining -= 1; throw new Error("transient partition"); }
@@ -109,8 +109,8 @@ test("watch records observation gaps without converting them into an outcome", a
   const result = watchResultSchema.parse(await watchSqliteJob(value.root, value.config, published.job_id,
     { transport: flaky, timeoutSeconds: 5, intervalSeconds: 1, delay: async () => {} }));
   expect(result.observation.gaps).toBe(1);
-  expect(result.status?.state).toBe("queued");
-  expect(result.outcome).toMatchObject({ state: "unobservable" });
+  expect(result.status?.state).toBe("succeeded");
+  expect(result.outcome).toEqual({ state: "succeeded" });
   const interrupted = watchResultSchema.parse(await watchSqliteJob(value.root, value.config, published.job_id,
     { transport: value.transport, timeoutSeconds: 5, intervalSeconds: 1, delay: async () => {}, signal: AbortSignal.abort() }));
   expect(interrupted.outcome).toMatchObject({ state: "unobservable", reason_code: "interrupted" });

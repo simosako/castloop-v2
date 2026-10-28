@@ -49,12 +49,11 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     expect(failed.next_actions.some((action) => action.command === "domain" && action.args?.[0] === "status")).toBe(true);
     f.faults.tlsPending = false;
     expect((await invoke(["domain", "continue", id])).result).toMatchObject({ phase: "completed" });
-    const props = f.content.sites.page({ kind: "listing", showId: "daily", page: 1 })!;
-    expect(f.text(`public/podcasts/daily/sites/${props.generation}/index.html`)).toContain('href="https://podcasts.example.com/podcasts/daily/"');
-    expect((await invoke(["domain", "list"])).result).toMatchObject({ connections_match: true });
-    expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
     const custom = await loadWorkspaceConfig(f.root);
     await invoke(["show-resume", "daily", crypto.randomUUID()]);
+    expect(f.content.renderSitePage({ kind: "listing", showId: "daily", page: 1 }, custom.public_base_url)!.html).toContain('href="https://podcasts.example.com/podcasts/daily/"');
+    expect((await invoke(["domain", "list"])).result).toMatchObject({ connections_match: true });
+    expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
     expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
     await invoke(["update-show", "daily"]); await invoke(["publish-show", "daily"]); await invoke(["show-pause", "daily", crypto.randomUUID()]);
     const removed = crypto.randomUUID();

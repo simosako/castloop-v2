@@ -22,7 +22,9 @@ type ProbeStage = "target" | "admission" | "config_read" | "config_validate" | "
 export type SqliteCacheRuntime = { worker_version_id: string; service_config_sha256: string; cache_enabled: boolean };
 export type SqliteCachePurgeConfirmation = (entrypoint: "media" | "site") => void;
 export type SqliteRuntimeCache = { describe: () => Promise<SqliteCacheRuntime>;
-  purge: (showId: string, confirmed?: SqliteCachePurgeConfirmation) => Promise<void> };
+  purge: (showId: string, confirmed?: SqliteCachePurgeConfirmation) => Promise<void>;
+  purgeMedia?: (target: { showId: string; episodeId?: string }) => Promise<void>;
+  purgeSite?: (target: { showId: string; siteId?: string }) => Promise<void> };
 
 export class SqliteServiceRuntime {
   private probing = false;
