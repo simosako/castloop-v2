@@ -1,4 +1,4 @@
-# RSSからのPodcast取り込み（v0.6.0）
+# RSSからのPodcast取り込み
 
 v0.7.0は`storage_layout="show-v1"`の新規サービス専用。`publish-rss-import`は新Showの作成・初期probe・そのShowだけのResumeも含む。全体Pause/Resumeはなく、remote操作記録は`--show SHOW_ID`で対象を指定する。以下の過去の実機結果は新layoutの検証ではない。
 
@@ -63,39 +63,36 @@ castloop publish-rss-import /path/to/import
 
 インポート元Episodeに未来の`published_at`がある場合、RSS一括公開はそれを待たず即時公開する。開始前に`--allow-future-published-at`を要求し、指定がなければ`future_published_at`で失敗する。将来日時で公開したいEpisodeは、RSS一括公開ではなく`preview-episode-schedule`／`schedule-episode`を使う。
 
-Episodeは古い公開日時から公開し、各jobの完了を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
+Episodeは古い公開日時から同期公開し、各応答を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
 
 | 公開先 | 必要な稼働状態 | 完了証拠 |
 | --- | --- | --- |
-| SQLite | 同じconfig/runtimeの`publication_ready: true`、`state: "open"`と受付window | 凍結job IDの`status.state: "succeeded"` |
+| SQLite | 同じconfig/runtimeの`publication_ready: true`、`state: "open"`と受付window | `changed`／`unchanged`と現在revision |
 
-SQLiteはCLIの一意uploadと検証後、DO FIFO/Alarmへ明示要求する。Queues Editは不要。
-公開前にreview済み素材とstaged receiptを照合し、元のjob IDを凍結する。既存/削除済みShowの採用、別draftへの置換、未知要求の再送はしない。
-queued/acceptedだけでは公開成功ではない。
+CLIは検証した素材をハッシュ由来キーへ直接配置し、metadataと素材参照をDOへ送る。DOはパージ後にSQLiteで一括確定する。個別upload/jobの操作追跡や全量readbackは行わず、一括進捗記録を保持する。既存／削除済みShowは採用しない。現行版は新規13/13環境専用で、旧形式から変換しない。
 
 完了時に新RSSの番組情報、Episode件数、GUID・公開日時・説明、音源URLを照合し、`feed_url`を返す。`subscriber_migration_completed: false`は、購読者の移行は別途必要という意味。
 
 ### 停止した場合
 
-- 各job最大300状態照会、5分経過後は新規照会を開始しない。進行中の要求には別timeoutがあり、CLI全体が必ず5分以内に終了するという意味ではない。
-- 複数Episodeのupload・全量readback・公開は逐次処理のため、import全体は数分以上かかり得る。外部の実行ツールやCIから起動する場合、短いcommand全体timeoutで強制終了させない。単一jobの5分予算とbatch全体の時間を区別し、元processの終了とjournalを確認せず二重起動しない。
-- SQLite管理GETの通信/本文断とallowlistの一時HTTP拒否は最大3試行。retryも300 GETへ数える。schema/identity不一致や恒久拒否はretryしない。
-- 保存済みpending publicationがある場合、同じ取り込みはその凍結jobのstatusを確認する。完了済み公開を再送せず、別jobへ置き換えない。v0.7.0の新形式では、成功応答があるuploadの検証・下書き登録、完了確認済みのローカル配置からも続行できる。未知upload・登録・ローカルinstallは自動再実行しない。
-- SQLiteの`failed`は公開書込前の確定的失敗、`blocked`は未知IOや途中停止等で後続FIFOを止める。retry/releaseを提供せず、経過時間・HEAD不在で解放しない。
+- 複数Episodeは逐次処理のため、import全体は数分以上かかり得る。元processの終了を確認せず二重起動しない。
+- 公開応答を失った場合も、同じ取り込み入力で`publish-rss-import`を再実行できる。完了済みの同じ内容は変更なしとなり、進捗を続ける。更新元を自動で取り直す通常公開retryは行わない。
+- Show登録・Resume・ローカルinstallの結果が不明なら、推測で再実行せず停止する。個別uploadのjournalやoperation RPCは使わない。
+- SQLite管理GETの一時障害は最大3試行。POST/PUTを自動再送しない。
 - `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、journal/lockを削除したりしない。
-- v0.7.0は`operation-status rss-import IMPORT_UUID --show my-show --remote`と`operation-list --show my-show --parent IMPORT_UUID`で、取り込み全体と各処理を照合できる。操作は[中断後の手順](sqlite_operation_recovery.md)を参照する。配布済み版では`job-status`/`service-status`を使う。
+- 状態は`show-status`、現在内容はpreview・履歴、配信は`verify`で確認する。[中断後の手順](sqlite_operation_recovery.md)を参照する。
 
 新しい版は既存UUID Episodeも読めるが、任意GUIDを取り込んだ後の旧版へのdowngradeは非対応。
 
 ### Workerの時間ログと性能比較
 
-対応WorkerのCloudflare Workers Logsを使用する。DashboardのObservabilityでjob IDとruntime/version・request/trace IDを照合する。
+対応WorkerのCloudflare Workers Logsを使用し、runtime/version・request/trace IDを照合する。現行経路には公開job IDはない。
 保存ログの収集・CPU数値とapplication log・tail配送の不足は区別する。公開確認のprobe IDが一致しない記録を欠測0msとして扱わない。
 
 SQLiteでは通常Worker HTTP/cacheとDO HTTP/RPC/Alarmを区別する。通常Free HTTPは10ms、DOは既定30秒のCPU上限で評価し、ジョブ全体のCPUを合算する必要はない。
 最新試験の外側/cache HTTP最大は3/5ms、公開probeは60/60対応したが、全invocation・未試験負荷の保証ではない。[測定記録](../design/archive/sqlite_size36_measurement_20261017.md)を参照。
 
-診断ログは本文・秘密・任意例外文を含めず、SQLiteの固定eventとjob/request/versionを照合する。sampling・保持・tail配送不足とCPU 0msを混同しない。v0.6.0の追加確認では通常Workerの最大3/5msを保存ログで確認したが、全ログ収録や全負荷のFree適合は保証しない。
+診断ログは本文・秘密・任意例外文を含めない。sampling・保持・tail配送不足とCPU 0msを混同しない。過去版の最大3/5msという記録は、この開発版の性能証拠ではない。
 
 実機試験には別承認が必要。`scripts/test-support/worker-tail.ts`等の採取器は正式CLIに含まれず、tail削除や未知変更の再送・強制解放を自動実行しない。旧Queueのphase・R2カタログ・診断手順は[v0.5.2時点の資料](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)に保存する。
 

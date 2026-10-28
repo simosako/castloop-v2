@@ -1,6 +1,5 @@
 import { Database } from "bun:sqlite";
-import { parseSqlitePublicationRequest, sqliteUploadKey } from "../../packages/shared/src/sqlite-publication";
-import type { SqlitePublicationRequest, SqlitePublicationRuntime, SqliteVerifiedUpload } from "../../packages/shared/src/sqlite-publication";
+import type { SqlitePublicationRuntime } from "../../packages/shared/src/sqlite-publication";
 import { SqlitePublicationQueue } from "../sqlite-publication-queue";
 import type { PublicationQueueStorage } from "../sqlite-publication-queue";
 
@@ -53,24 +52,6 @@ export function sqlitePublicationFixture(options: { path?: string; runtime?: Sql
   return { database, storage, runtime, queue, windowId,
     alarm: () => alarm, clearAlarm: () => { alarm = null; },
     failAlarm: () => { alarmFailures++; }, failSync: () => { syncFailures++; },
-    request: (overrides: Partial<SqlitePublicationRequest> = {}) => sqlitePublicationRequest(runtime, windowId!, overrides),
     close: () => database.close(),
   };
-}
-
-export function sqlitePublicationRequest(runtime: SqlitePublicationRuntime, windowId: string,
-  overrides: Partial<SqlitePublicationRequest> = {}): SqlitePublicationRequest {
-  const jobId = overrides.job_id ?? crypto.randomUUID();
-  const showId = overrides.show_id ?? "daily";
-  const assets = overrides.kind === "show" ? ["show_metadata", "cover_jpg"] as const : ["episode_metadata", "audio"] as const;
-  const payloads: SqliteVerifiedUpload[] = assets.map((asset) => {
-    const uploadId = crypto.randomUUID();
-    return { upload_id: uploadId, asset, key: sqliteUploadKey({ show_id: showId, draft_job_id: jobId, upload_id: uploadId, asset }),
-      length_bytes: 100, sha256: "b".repeat(64), etag: "verified-etag", version: "verified-version", verified: true,
-      ...(asset === "audio" ? { duration_seconds: 1 } : {}) };
-  });
-  return parseSqlitePublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", ...runtime,
-    admission_window_id: windowId, request_id: crypto.randomUUID(), job_id: jobId, action: "publish", kind: "episode",
-    show_id: showId, episode_id: "first", expected_show_state_version: 0, payloads,
-    ...overrides, ...(overrides.kind === "show" ? { episode_id: undefined } : {}) });
 }

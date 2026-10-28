@@ -10,7 +10,6 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { administratorKey } from "./administrator-key";
 import { updateSqliteService } from "./sqlite-service-update";
 import { runSqliteCommand } from "./sqlite-commands";
-import { readSqliteDraftRecord } from "./sqlite-draft-journal";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { sqliteFeedSnapshotKey } from "../../../src/sqlite-feed";
 import { diagnoseLocal } from "./doctor";
@@ -285,24 +284,17 @@ test("connection listing compares the full known receipt, not only its domain ID
   expect(await listSqliteDomains(f.root, config, f.options)).toMatchObject({ connections_match: false });
 });
 
-test("ordinary Show updates remain usable after domain changes while completed old drafts are archived without rebinding", async () => {
+test("ordinary direct publication remains usable after domain changes without draft rebinding", async () => {
   const f = await fixture();
   const run = (command: string, args: string[], config = f.config) => runSqliteCommand(f.root, config, command, args, { transport: f.transport, cloudflare: f.options });
   await run("create-show", ["daily", "https://example.com"]); await run("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
-  await run("update-show", ["daily"]); await run("publish-show", ["daily"]); await run("show-pause", ["daily", crypto.randomUUID()]);
-  const before = await readSqliteDraftRecord(f.root, f.config, { kind: "show", show_id: "daily" });
+  await run("publish-show", ["daily"]); await run("show-pause", ["daily", crypto.randomUUID()]);
   const id = crypto.randomUUID();
   await startSqliteDomainChange(f.root, f.config, "add", id, "worker", f.options, target, wait);
   const config = await loadWorkspaceConfig(f.root);
-  await expect(readSqliteDraftRecord(f.root, config, { kind: "show", show_id: "daily" })).rejects.toThrow("identity");
   await run("show-resume", ["daily", crypto.randomUUID()], config);
-  expect(await run("update-show", ["daily"], config)).toMatchObject({ state: "staged" });
-  expect(await run("publish-show", ["daily"], config)).toMatchObject({ state: "succeeded" });
-  const current = await readSqliteDraftRecord(f.root, config, { kind: "show", show_id: "daily" });
-  expect(current?.target.job_id).not.toBe(before?.target.job_id);
-  expect(current?.service_config_sha256).not.toBe(before?.service_config_sha256);
-  expect(await run("job-status", [before!.target.job_id], config)).toMatchObject({ status: { state: "succeeded" } });
+  expect(await run("publish-show", ["daily"], config)).toMatchObject({ result: "unchanged" });
 });
 
 test("an acknowledged deployment continues failed REST verification without uploading again", async () => {
@@ -378,14 +370,14 @@ test("continuation never finalizes an acknowledged local synchronization after t
   expect(f.calls.every((call) => call.method === "GET")).toBe(true);
 });
 
-test("unpublished local drafts prevent a domain change before network or journal mutations", async () => {
+test("unpublished local inputs do not impose a draft lock on dedicated domain maintenance", async () => {
   const f = await fixture();
   const run = (command: string, args: string[]) => runSqliteCommand(f.root, f.config, command, args, { transport: f.transport, cloudflare: f.options });
   await run("create-show", ["daily", "https://example.com"]); await run("show-resume", ["daily", crypto.randomUUID()]);
-  writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255)); await run("update-show", ["daily"]);
+  writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
   await run("show-pause", ["daily", crypto.randomUUID()]); f.calls.length = 0;
-  await expect(startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait)).rejects.toThrow("Finish existing local drafts");
-  expect(f.calls).toEqual([]);
+  expect(await startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait)).toMatchObject({ phase: "completed" });
+  expect(readFileSync(join(f.root, "daily", "cover.jpg"))).toEqual(Buffer.from([255, 216, 255]));
 });
 
 test("domain switching preserves saved Episode identities, unpublished media and immutable history through restore", async () => {
@@ -394,10 +386,10 @@ test("domain switching preserves saved Episode identities, unpublished media and
   const run = (name: string, args: string[]) => runSqliteCommand(f.root, config, name, args, { transport: f.transport, cloudflare: f.options });
   await run("create-show", ["daily", "https://example.com"]); await run("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
-  await run("update-show", ["daily"]); await run("publish-show", ["daily"]);
+  await run("publish-show", ["daily"]);
   await run("create-episode", ["daily", "first"]);
   writeFileSync(join(f.root, "daily", "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-  await run("update-episode", ["daily", "first"]); await run("update-episode-audio", ["daily", "first", "audio.mp3"]); await run("publish-episode", ["daily", "first"]);
+  await run("publish-episode", ["daily", "first", "audio.mp3"]);
   const node = f.nodes.get("daily")!, base = node.service.content.inspect("daily", "first").base!;
   const preserved = new Map([...f.entries].filter(([key]) => !key.includes("/feeds/") && key !== "system/service.toml").map(([key, object]) => [key, object.etag]));
   const local = join(f.root, "daily", "episode-first.toml");
@@ -405,8 +397,7 @@ test("domain switching preserves saved Episode identities, unpublished media and
   const lifecycle = async (action: string) => {
     const plan = sqliteLifecyclePlanSchema.parse(await run("preview-episode-lifecycle", ["daily", "first", action]));
     const file = join(f.root, "reviewed-domain-lifecycle.json"); writeFileSync(file, JSON.stringify(plan));
-    await run("lifecycle-execute", [file, plan.request_sha256, "confirm"]);
-    expect(await run("job-status", [plan.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
+    expect(await run("lifecycle-execute", [file, plan.request_sha256, "confirm"])).toMatchObject({ result: "changed" });
   };
   await lifecycle("unpublish"); await run("show-pause", ["daily", crypto.randomUUID()]);
   await startSqliteDomainChange(f.root, config, "add", crypto.randomUUID(), "worker", f.options, target, wait);

@@ -8,8 +8,10 @@ import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
-import { sqlitePublicationFixture, sqlitePublicationRequest } from "./test-support/sqlite-publication";
+import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "./test-support/sqlite-publication-bucket";
+import { parseSqliteDirectPublicationRequest } from "../packages/shared/src/sqlite-direct-publication";
+import { directShow, directCover } from "./test-support/direct-publication";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
@@ -52,7 +54,9 @@ test("SQLite code updates require explicit drained maintenance and finish paused
     state: "paused", drained: true, runtime_update: { state: "completed", operation_id: value.request.operation_id } });
   expect((await current.updates.activate(value.activation)).update.state).toBe("completed"); expect(value.alarm()).toBe(null);
   const window = crypto.randomUUID(); current.queue.resume(window);
-  await expect(current.queue.enqueue(sqlitePublicationRequest(value.runtime, window))).rejects.toThrow("stale");
+  current.queue.executor = { current: () => null, execute: async () => { throw new Error("Unexpected execution"); } };
+  await expect(current.queue.publish(parseSqliteDirectPublicationRequest({ ...value.runtime, schema_version: 1, protocol: "sqlite-sequential-v1", action: "publish", kind: "show",
+    show_id: "daily", admission_window_id: window, expected_show_state_version: 0, metadata: directShow, cover: directCover }))).rejects.toThrow("runtime_mismatch");
 });
 
 test("unprepared versions, changed configuration and earlier content schemas cannot be adopted", async () => {

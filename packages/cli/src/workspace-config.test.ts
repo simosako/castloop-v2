@@ -59,8 +59,8 @@ test("workspace config refuses symbolic links without following or modifying the
 test("formal CLI rejects old service settings before network, build or local state changes", () => {
   const allCommands = [["init"], ["init", "--publication-protocol", "sqlite-sequential-v1"], ["init", "--service-id", "different"],
     ["service-status"], ["show-pause", "daily", crypto.randomUUID()], ["show-resume", "daily", crypto.randomUUID()],
-    ["deploy"], ["create-show", "daily", "--site-url", "https://example.com"], ["update-show", "daily"], ["publish-show", "daily"],
-    ["list-shows"], ["target-show", "daily"], ["job-status", crypto.randomUUID()], ["publish-rss-import", "missing-import"]];
+    ["deploy"], ["create-show", "daily", "--site-url", "https://example.com"], ["preview-show", "daily"], ["publish-show", "daily"],
+    ["list-shows"], ["target-show", "daily"], ["publish-rss-import", "missing-import"]];
   const entrypointCommands = [["init"], ["service-status"], ["publish-rss-import", "missing-import"]];
   for (const [old, commands] of [
     [{ schema_version: 1 }, entrypointCommands],

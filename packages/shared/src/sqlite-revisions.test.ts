@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
-import { sqlitePublicationRequestSchema } from "./sqlite-publication";
+import { sqliteContentActionRequestSchema as sqlitePublicationRequestSchema } from "./sqlite-direct-publication";
 import { diffEpisodeDraftFields, diffShowMetadataFields } from "./sqlite-revisions";
 
 const request = { schema_version: 1, protocol: "sqlite-sequential-v1", service_id: "service", kind: "episode", show_id: "daily", episode_id: "first",
-  action: "restore_revision", request_id: crypto.randomUUID(), job_id: crypto.randomUUID(), worker_version_id: crypto.randomUUID(),
+  action: "restore_revision", worker_version_id: crypto.randomUUID(),
   service_config_sha256: "a".repeat(64), admission_window_id: crypto.randomUUID(), expected_show_state_version: 1,
-  expected_episode_lifecycle_version: 0, base_revision_id: crypto.randomUUID(), target_revision_id: crypto.randomUUID(), payloads: [] };
+  expected_episode_lifecycle_version: 0, base_revision_id: crypto.randomUUID(), target_revision_id: crypto.randomUUID() };
 
 test("revision requests require an exact current base, target revision, valid scope and no uploads", () => {
   expect(sqlitePublicationRequestSchema.safeParse(request).success).toBe(true);
@@ -15,7 +15,6 @@ test("revision requests require an exact current base, target revision, valid sc
   }
   const show = { ...request, kind: "show", episode_id: undefined, base_revision_id: undefined, expected_episode_lifecycle_version: undefined };
   expect(sqlitePublicationRequestSchema.safeParse(show).success).toBe(true);
-  expect(sqlitePublicationRequestSchema.safeParse({ ...show, expected_show_state_version: 0 }).success).toBe(false);
 });
 
 test("field diff respects optional absence, order and permalink identity defaults without truncating text", () => {

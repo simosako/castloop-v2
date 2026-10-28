@@ -29,7 +29,7 @@ test("offline discovery and validation never create state or expose input errors
     expect(badId.code).toBe(1); expect(existsSync(join(root, "bad-id"))).toBe(false);
     const mismatch = await run(["init", "new", "--workspace", join(root, "other"), "--json"], root);
     expect(JSON.parse(mismatch.stdout).error.code).toBe("target_mismatch");
-    const missing = await run(["update-episode", "first", "--workspace", root, "--json"], root);
+    const missing = await run(["publish-episode", "first", "--workspace", root, "--json"], root);
     expect(JSON.parse(missing.stdout).error.code).toBe("missing_show");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

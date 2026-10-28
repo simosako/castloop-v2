@@ -1,156 +1,99 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { sqlitePublicationRequest, sqlitePublicationFixture } from "./test-support/sqlite-publication";
-import { SqlitePublicationContent } from "./sqlite-publication-content";
+import { afterEach, expect, test } from "bun:test";
+import { directPublicationFixture } from "./test-support/direct-publication";
 import { SqlitePublicationSchedules } from "./sqlite-publication-schedules";
 import { sqliteScheduleTimeSchema } from "../packages/shared/src/sqlite-schedule";
-import type { SqliteScheduleCreate } from "../packages/shared/src/sqlite-schedule";
 
-const fixtures: Array<ReturnType<typeof sqlitePublicationFixture>> = [];
-afterEach(() => { for (const value of fixtures.splice(0)) value.close(); });
-
+const cleanups: Array<() => void> = [];
+afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 function time(at: number) {
   const iso = new Date(at).toISOString().replace(/\.\d{3}Z$/, "Z");
   return sqliteScheduleTimeSchema.parse({ input: iso, scheduled_at: iso, scheduled_at_ms: at, input_offset: "+00:00",
     resolution_source: "offset", timezone: "UTC", timezone_source: "server", local_datetime: iso.slice(0, -1), offset: "+00:00" });
 }
-
-function setup(options: { now?: number } = {}) {
-  const value = sqlitePublicationFixture();
-  fixtures.push(value);
-  const content = new SqlitePublicationContent(value.storage);
-  content.registerShow("daily", crypto.randomUUID());
-  let now = options.now ?? 1000;
-  const schedules = new SqlitePublicationSchedules(value.storage, value.queue, content, () => now,
-    { showId: "daily", ready: () => true });
-  return { ...value, content, schedules, setNow: (next: number) => { now = next; } };
+async function setup() {
+  const f = await directPublicationFixture(); cleanups.push(f.close);
+  let now = 1000;
+  const schedules = new SqlitePublicationSchedules(f.storage, f.queue, f.content, () => now, { showId: "daily", ready: () => true });
+  const input = { schema_version: 1 as const, protocol: "sqlite-schedule-v1" as const, ...f.runtime, show_id: "daily",
+    schedule_id: crypto.randomUUID(), expected_version: 0 as const, preview_sha256: "c".repeat(64), scheduled_at: time(2000), publication: f.show() };
+  const mutation = { schema_version: 1 as const, protocol: "sqlite-schedule-v1" as const, ...f.runtime, show_id: "daily", schedule_id: input.schedule_id };
+  return { ...f, schedules, input, mutation, setNow: (value: number) => { now = value; } };
 }
 
-function createInput(value: ReturnType<typeof setup>, overrides: Partial<SqliteScheduleCreate> = {}, publication = value.request({ kind: "show" })): SqliteScheduleCreate {
-  return {
-    schema_version: 1, protocol: "sqlite-schedule-v1", service_id: value.runtime.service_id,
-    worker_version_id: value.runtime.worker_version_id, service_config_sha256: value.runtime.service_config_sha256,
-    show_id: "daily", schedule_id: crypto.randomUUID(), expected_version: 0, preview_sha256: "c".repeat(64),
-    scheduled_at: time(2000), publication, ...overrides,
-  };
-}
+test("create/list/status freeze inline content without creating a publication job", async () => {
+  const f = await setup(), created = await f.schedules.create(f.input);
+  expect(created.schedule).toMatchObject({ state: "scheduled", version: 1, revision_id: null });
+  expect(created.publication).toEqual(f.input.publication); expect(f.alarm()).toBe(2000);
+  expect(f.schedules.list().schedules).toHaveLength(1);
+  expect((await f.schedules.create(f.input)).schedule.version).toBe(1);
+  expect(f.content.inspect("daily").show?.lifecycle).toBe("draft");
+});
 
-describe("SQLite publication schedules", () => {
-  test("create, list and status retain a future frozen publication without a FIFO job", async () => {
-    const value = setup();
-    const input = createInput(value);
-    const created = await value.schedules.create(input);
-    expect(created.schedule).toMatchObject({ state: "scheduled", version: 1, scheduled_at: { scheduled_at_ms: 2000 },
-      job_id: input.publication.job_id, publication_state: null });
-    expect(value.queue.snapshot().queued).toBe(0);
-    expect(value.alarm()).toBe(2000);
-    expect(value.schedules.status(input.schedule_id).schedule.schedule_id).toBe(input.schedule_id);
-    const list = value.schedules.list();
-    expect(list.schedules).toHaveLength(1);
-    expect(list.next_cursor).toBeNull();
-    expect((await value.schedules.create(input)).schedule.version).toBe(1);
-  });
+test("Alarm dispatch commits publication and schedule once, including redelivery", async () => {
+  const f = await setup(); await f.schedules.create(f.input);
+  expect(await f.schedules.dispatchDue()).toBe(0);
+  f.setNow(2000); expect(await f.schedules.dispatchDue()).toBe(1);
+  const done = f.schedules.status(f.input.schedule_id).schedule;
+  expect(done).toMatchObject({ state: "dispatched", version: 2, dispatched_at_ms: 2000 });
+  expect(done.revision_id).toBe(f.content.currentShowRevision("daily", f.config.public_base_url)!.revision_id);
+  const count = f.purges.length;
+  expect(await f.schedules.dispatchDue()).toBe(0); expect(f.purges).toHaveLength(count);
+});
 
-  test("dispatch due schedules once and preserve the publication job as separate state", async () => {
-    const value = setup();
-    const input = createInput(value);
-    await value.schedules.create(input);
-    value.setNow(2000);
-    expect(await value.schedules.dispatchDue()).toBe(1);
-    expect(value.queue.snapshot().queued).toBe(0);
-    expect(value.schedules.status(input.schedule_id).schedule).toMatchObject({ state: "dispatched", version: 2,
-      publication_state: "succeeded" });
-    expect(await value.schedules.dispatchDue()).toBe(0);
-    expect(value.queue.snapshot().queued).toBe(0);
-  });
+test("one undispatched schedule per target is enforced", async () => {
+  const f = await setup(); await f.schedules.create(f.input);
+  await expect(f.schedules.create({ ...f.input, schedule_id: crypto.randomUUID() })).rejects.toThrow("open publication schedule");
+});
 
-  test("pause and maintenance suspend open schedules for explicit reapproval", async () => {
-    const value = setup();
-    const input = createInput(value);
-    await value.schedules.create(input);
-    value.schedules.suspendOpen("show_paused");
-    expect(value.schedules.status(input.schedule_id).schedule).toMatchObject({ state: "needs_approval", version: 2,
-      reason_code: "show_paused" });
-    value.setNow(2000);
-    expect(await value.schedules.dispatchDue()).toBe(0);
-    expect(value.queue.snapshot().queued).toBe(0);
-  });
+test("Show pause suspends schedules atomically and Resume does not reapprove them", async () => {
+  const f = await setup(); await f.schedules.create(f.input);
+  await f.queue.applyControl({ ...f.runtime, operation_id: crypto.randomUUID(), action: "pause", show_id: "daily", expected_availability_version: 0 },
+    f.runtime, (reason) => f.schedules.suspendOpen(reason));
+  expect(f.schedules.status(f.input.schedule_id).schedule).toMatchObject({ state: "needs_approval", reason_code: "show_paused" });
+  f.queue.resume(crypto.randomUUID()); f.setNow(2000);
+  expect(await f.schedules.dispatchDue()).toBe(0);
+});
 
-  test("a Show pause suspends schedules in the same control transaction and resume does not reactivate them", async () => {
-    const value = setup();
-    const input = createInput(value);
-    await value.schedules.create(input);
-    const control = { service_id: value.runtime.service_id, worker_version_id: value.runtime.worker_version_id,
-      service_config_sha256: value.runtime.service_config_sha256, operation_id: crypto.randomUUID(), action: "pause" as const,
-      show_id: "daily", expected_availability_version: 0 };
-    await value.queue.applyControl(control, value.runtime, (reason) => value.schedules.suspendOpen(reason));
-    expect(value.queue.snapshot().state).toBe("paused");
-    expect(value.schedules.status(input.schedule_id).schedule).toMatchObject({ state: "needs_approval", reason_code: "show_paused" });
-    const window = crypto.randomUUID();
-    value.queue.resume(window);
-    expect(value.queue.snapshot().state).toBe("open");
-    expect(value.schedules.status(input.schedule_id).schedule.state).toBe("needs_approval");
-  });
+test("reschedule, reapprove and cancel require the exact current version", async () => {
+  const f = await setup(); await f.schedules.create(f.input);
+  await f.schedules.reschedule({ ...f.mutation, expected_version: 1, preview_sha256: "d".repeat(64), scheduled_at: time(3000) });
+  f.schedules.suspendOpen("maintenance");
+  const needs = f.schedules.status(f.input.schedule_id).schedule;
+  const reapproved = await f.schedules.reapprove({ ...f.mutation, expected_version: needs.version, preview_sha256: "e".repeat(64), scheduled_at: time(4000), publication: f.show() });
+  expect(reapproved.schedule.state).toBe("scheduled");
+  const cancel = { ...f.mutation, expected_version: reapproved.schedule.version, preview_sha256: "f".repeat(64) };
+  expect((await f.schedules.cancel(cancel)).schedule.state).toBe("cancelled");
+  expect((await f.schedules.cancel(cancel)).schedule.state).toBe("cancelled");
+  await expect(f.schedules.cancel({ ...cancel, preview_sha256: "0".repeat(64) })).rejects.toThrow();
+});
 
-  test("reschedule, cancel and reapprove use the expected version", async () => {
-    const value = setup();
-    const input = createInput(value);
-    const created = await value.schedules.create(input);
-    const mutation = { schema_version: 1 as const, protocol: "sqlite-schedule-v1" as const, service_id: value.runtime.service_id,
-      worker_version_id: value.runtime.worker_version_id, service_config_sha256: value.runtime.service_config_sha256,
-      show_id: "daily", schedule_id: input.schedule_id };
-    const rescheduled = await value.schedules.reschedule({ ...mutation, expected_version: created.schedule.version,
-      preview_sha256: "d".repeat(64), scheduled_at: time(3000) });
-    expect(rescheduled.schedule).toMatchObject({ state: "scheduled", version: 2, scheduled_at: { scheduled_at_ms: 3000 } });
-    value.schedules.suspendOpen("maintenance");
-    const needs = value.schedules.status(input.schedule_id).schedule;
-    expect(needs.state).toBe("needs_approval");
-    const publication = value.request({ kind: "show", job_id: input.publication.job_id });
-    const reapproved = await value.schedules.reapprove({ ...mutation, expected_version: needs.version,
-      preview_sha256: "e".repeat(64), scheduled_at: time(4000), publication });
-    expect(reapproved.schedule).toMatchObject({ state: "scheduled", version: needs.version + 1,
-      scheduled_at: { scheduled_at_ms: 4000 } });
-    const cancelled = await value.schedules.cancel({ ...mutation, expected_version: reapproved.schedule.version,
-      preview_sha256: "f".repeat(64) });
-    expect(cancelled.schedule).toMatchObject({ state: "cancelled", version: reapproved.schedule.version + 1,
-      reason_code: "cancelled_by_administrator" });
-    await expect(value.schedules.cancel({ ...mutation, expected_version: reapproved.schedule.version,
-      preview_sha256: "0".repeat(64) })).rejects.toThrow();
-    expect((await value.schedules.cancel({ ...mutation, expected_version: reapproved.schedule.version,
-      preview_sha256: "f".repeat(64) })).schedule.state).toBe("cancelled");
-  });
+test("changed bases require reapproval before Alarm dispatch", async () => {
+  const f = await setup(); await f.schedules.create(f.input); await f.publish(f.show()); f.setNow(2000);
+  expect(await f.schedules.dispatchDue()).toBe(0);
+  expect(f.schedules.status(f.input.schedule_id).schedule).toMatchObject({ state: "needs_approval", reason_code: "base_conflict" });
+});
 
-  test("transient executor failure rolls back dispatch and leaves no job", async () => {
-    const value = setup();
-    const input = createInput(value);
-    await value.schedules.create(input);
-    value.setNow(2000);
-    value.queue.executor = { execute: async () => { throw new Error("transient failure"); } };
-    await expect(value.schedules.dispatchDue()).rejects.toThrow("transient failure");
-    expect(value.schedules.status(input.schedule_id).schedule.state).toBe("scheduled");
-    expect(value.queue.snapshot().queued).toBe(0);
-  });
+test("purge and SQLite failures leave the schedule undispatched and content unchanged", async () => {
+  for (const failure of ["purge", "database"]) {
+    const f = await setup(); await f.schedules.create(f.input); f.setNow(2000);
+    if (failure === "purge") f.hooks.purge = async () => { throw new Error("Injected purge failure"); };
+    else f.database.exec("CREATE TRIGGER fail_dispatch BEFORE UPDATE OF state ON publication_schedules WHEN NEW.state = 'dispatched' BEGIN SELECT RAISE(ABORT, 'injected dispatch failure'); END");
+    await expect(f.schedules.dispatchDue()).rejects.toThrow();
+    expect(f.content.inspect("daily").show?.lifecycle).toBe("draft");
+    expect(f.schedules.status(f.input.schedule_id).schedule).toMatchObject({ state: "scheduled", revision_id: null });
+  }
+});
 
-  test("a changed target base stops dispatch for reapproval instead of entering the FIFO", async () => {
-    const value = setup();
-    const input = createInput(value);
-    await value.schedules.create(input);
-    value.database.exec("UPDATE publication_shows SET state_version = 1 WHERE show_id = 'daily'");
-    value.setNow(2000);
-    expect(await value.schedules.dispatchDue()).toBe(0);
-    expect(value.schedules.status(input.schedule_id).schedule).toMatchObject({ state: "needs_approval",
-      reason_code: "base_conflict" });
-    expect(value.queue.snapshot().queued).toBe(0);
-  });
+test("cancellation during purge rolls back publication instead of reviving a cancelled schedule", async () => {
+  const f = await setup(); await f.schedules.create(f.input); f.setNow(2000);
+  f.hooks.purge = async () => { await f.schedules.cancel({ ...f.mutation, expected_version: 1, preview_sha256: "d".repeat(64) }); };
+  expect(await f.schedules.dispatchDue()).toBe(0);
+  expect(f.schedules.status(f.input.schedule_id).schedule.state).toBe("cancelled");
+  expect(f.content.inspect("daily").show?.lifecycle).toBe("draft");
+});
 
-  test("the next schedule reserve is set when admission is open and skipped when paused", async () => {
-    const value = setup();
-    await value.schedules.create(createInput(value));
-    value.clearAlarm();
-    await value.schedules.scheduleNext();
-    expect(value.alarm()).toBe(2000);
-    value.queue.pause();
-    value.clearAlarm();
-    await value.schedules.scheduleNext();
-    expect(value.alarm()).toBeNull();
-  });
+test("next Alarm is scheduled only for open admission", async () => {
+  const f = await setup(); await f.schedules.create(f.input); f.clearAlarm();
+  await f.schedules.scheduleNext(); expect(f.alarm()).toBe(2000);
+  f.queue.pause(); f.clearAlarm(); await f.schedules.scheduleNext(); expect(f.alarm()).toBeNull();
 });

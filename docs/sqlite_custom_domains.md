@@ -17,9 +17,9 @@ Issue #68の開発版CLI/Worker向け。対応版でfresh initしたservice sche
 
 ## 接続前の停止
 
-未公開・未確定のローカルdraftは、domain変更前に元の設定で完了させる。staleな下書き・未知uploadを新しい設定へ引き継がず、原本・journalを消して回避しない。
+手元の未公開編集は公開状態と独立しており、domain変更のために公開する必要はない。原本・既存journalは保持する。旧設定で作った承認hash・計画は使い回さず、新設定で確認し直す。
 
-各Showで明示Pauseし、既受付jobの終了（drain）を待つ。Pauseは新規受付と配信を停止するが、受付済みjobを取り消さない。blockedが残る場合は進めない。サービス共通domainの切替なので、結果として全所属Showが停止する。全体Pauseコマンドや自動Resumeはない。
+各Showで明示Pauseし、paused・ready・drainedを確認する。パージ待機中の旧公開要求は確定直前にも受付状態を検査する。共有domainの切替なので全所属Showが停止する。全体Pauseコマンドや自動Resumeはない。
 
 ```sh
 castloop show-pause my-show PAUSE_UUID --workspace ./service
@@ -70,7 +70,7 @@ castloop domain continue ADD_UUID --workspace ./service --json
 | 接続/切断/設定/配備PUT自体の結果不明 | continueも再送・現在値からの採用を拒否。記録と停止状態を保持 |
 | Feed書込/purge/probeのblocked、部分prepare/activation/解除の未知結果 | 万能復旧はない。新IDでの置換・自動rollback・Resume・lock強制解除をしない |
 
-通常公開は明示publishだけ。完了済みdraftは、既知の完了domain変更と保存済み公開結果を照合した後、次の明示updateで元記録をそのままarchiveし、新configの別draftを作る。過去の要求を新configへ書き換えたり、未公開/不明draftを昇格したりしない。旧schemaの移行機能ではない。
+通常公開は明示publishだけ。domain完了後は新しい設定でpreviewして公開する。公開draftの作り直し・再束縛は不要。旧記録の変換・削除や旧schemaの移行は行わない。
 
 ## 切断
 

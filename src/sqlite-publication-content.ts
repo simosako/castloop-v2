@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { episodeDraftFromRevision, episodeRevisionSchema, parsePublicAssetPath, showMetadataSchema } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import {
@@ -5,8 +6,9 @@ import {
   sqliteShowRevisionRecordSchema, sqliteShowRevisionSummarySchema } from "../packages/shared/src/sqlite-revisions";
 import type { SqliteEpisodeRevisionRecord, SqliteEpisodeRevisionSummary,
   SqliteShowRevisionRecord, SqliteShowRevisionSummary } from "../packages/shared/src/sqlite-revisions";
-import { parseSqlitePublicationRequest, sqlitePublicationRequestSchema } from "../packages/shared/src/sqlite-publication";
-import type { SqlitePublicationRequest } from "../packages/shared/src/sqlite-publication";
+import { sqlitePublicationTargetSchema as targetSchema } from "../packages/shared/src/sqlite-publication";
+import type { SqliteContentMutation } from "../packages/shared/src/sqlite-direct-publication";
+import { sqliteMediaKey } from "../packages/shared/src/sqlite-media";
 import { assertPublicationInventoryBudget } from "../packages/shared/src/publication-budget";
 import { SITE_PAGE_SIZE } from "../packages/shared/src/website";
 import type { SitePage } from "../packages/shared/src/website";
@@ -35,8 +37,7 @@ type EpisodeRevisionRow = { show_id: string; episode_id: string; revision_sequen
   audio_revision_id: string; metadata_sha256: string; revision_json: string; restored_from_revision_id: string | null; updated_at: string };
 export type SqliteContentTarget = { show: ShowRow; metadata: ShowMetadata | null; coverExtension: "jpg" | "png" | null;
   cover: SqliteCoverIdentity | null; episode: EpisodeRow | null; base: EpisodeRevision | null };
-export type SqliteDeliveryDecision = { status: 200; key: string; content_type: string;
-  cache_props: { showGeneration: number; feedGeneration?: number; episodeGeneration?: number; coverGeneration?: number } } | { status: 404 | 410 | 503 };
+export type SqliteDeliveryDecision = { status: 200; key: string; content_type: string; cache_props: PublicCacheProps } | { status: 404 | 410 | 503 };
 
 export class SqlitePublicationContent {
   readonly siteIds: SqliteSiteIds;
@@ -84,8 +85,8 @@ export class SqlitePublicationContent {
   }
 
   registerShow(showId: string, reservationId: string, initializing = false): ShowRow {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
-    sqlitePublicationRequestSchema.shape.job_id.parse(reservationId);
+    targetSchema.shape.show_id.parse(showId);
+    z.uuid().parse(reservationId);
     return this.storage.transactionSync(() => {
       const existing = this.show(showId);
       if (existing) {
@@ -131,7 +132,7 @@ export class SqlitePublicationContent {
   }
 
   renderFeed(showId: string, baseUrl: string, props?: PublicCacheProps): { xml: string; updatedAt: string } | null {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    targetSchema.shape.show_id.parse(showId);
     return this.storage.transactionSync(() => {
       const show = this.show(showId);
       if (!show || show.lifecycle !== "published" || show.feed_generation < 1 || !this.cover(showId)) return null;
@@ -258,8 +259,8 @@ export class SqlitePublicationContent {
 
   inspect(showId: string, episodeId?: string): { show: ShowRow | null; episode: EpisodeRow | null; base: EpisodeRevision | null;
     showRevision?: ShowRevisionRow | null } {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
-    if (episodeId !== undefined) sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
+    targetSchema.shape.show_id.parse(showId);
+    if (episodeId !== undefined) targetSchema.shape.episode_id.unwrap().parse(episodeId);
     return this.storage.transactionSync(() => {
       const show = this.show(showId);
       const showRevision = show && ["published", "unpublished"].includes(show.lifecycle) ? this.latestShowRevisionRow(showId) : null;
@@ -276,8 +277,7 @@ export class SqlitePublicationContent {
     });
   }
 
-  matchesScheduledTarget(input: SqlitePublicationRequest): boolean {
-    const request = parseSqlitePublicationRequest(input);
+  matchesScheduledTarget(request: Omit<SqliteContentMutation, "revision_id">): boolean {
     if (request.action !== "publish") return false;
     const target = this.inspect(request.show_id, request.episode_id);
     if (!target.show || target.show.state_version !== request.expected_show_state_version) return false;
@@ -289,7 +289,7 @@ export class SqlitePublicationContent {
   }
 
   currentShowRevision(showId: string, baseUrl: string): SqliteShowRevisionRecord | null {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    targetSchema.shape.show_id.parse(showId);
     return this.storage.transactionSync(() => {
       const show = this.show(showId);
       if (!show || !["published", "unpublished"].includes(show.lifecycle)) return null;
@@ -307,8 +307,8 @@ export class SqlitePublicationContent {
   }
 
   showRevision(showId: string, revisionId: string, baseUrl: string): SqliteShowRevisionRecord | null {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
-    sqlitePublicationRequestSchema.shape.job_id.parse(revisionId);
+    targetSchema.shape.show_id.parse(showId);
+    z.uuid().parse(revisionId);
     return this.storage.transactionSync(() => {
       const row = this.storage.sql.exec<ShowRevisionRow>(
         "SELECT * FROM publication_show_revisions WHERE show_id = ? AND revision_id = ?", showId, revisionId).toArray()[0];
@@ -317,8 +317,8 @@ export class SqlitePublicationContent {
   }
 
   currentEpisodeRevision(showId: string, episodeId: string, baseUrl: string): SqliteEpisodeRevisionRecord | null {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
-    sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
+    targetSchema.shape.show_id.parse(showId);
+    targetSchema.shape.episode_id.unwrap().parse(episodeId);
     return this.storage.transactionSync(() => {
       const episode = this.storage.sql.exec<EpisodeRow>(
         "SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?", showId, episodeId).toArray()[0];
@@ -336,9 +336,9 @@ export class SqlitePublicationContent {
   }
 
   episodeRevision(showId: string, episodeId: string, revisionId: string, baseUrl: string): SqliteEpisodeRevisionRecord | null {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
-    sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
-    sqlitePublicationRequestSchema.shape.job_id.parse(revisionId);
+    targetSchema.shape.show_id.parse(showId);
+    targetSchema.shape.episode_id.unwrap().parse(episodeId);
+    z.uuid().parse(revisionId);
     return this.storage.transactionSync(() => {
       const row = this.storage.sql.exec<EpisodeRevisionRow>(
         "SELECT * FROM publication_episode_revisions WHERE show_id = ? AND episode_id = ? AND revision_id = ?",
@@ -349,7 +349,7 @@ export class SqlitePublicationContent {
 
   listShowRevisions(showId: string, baseUrl: string, afterSequence?: number): {
     currentRevisionId: string | null; items: SqliteShowRevisionSummary[]; nextCursor: number | null } {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    targetSchema.shape.show_id.parse(showId);
     if (afterSequence !== undefined && (!Number.isSafeInteger(afterSequence) || afterSequence < 1)) throw new Error("Invalid Show revision cursor");
     return this.storage.transactionSync(() => {
       const current = this.currentShowRevision(showId, baseUrl);
@@ -376,8 +376,8 @@ export class SqlitePublicationContent {
 
   listEpisodeRevisions(showId: string, episodeId: string, baseUrl: string, afterSequence?: number): {
     currentRevisionId: string | null; items: SqliteEpisodeRevisionSummary[]; nextCursor: number | null } {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
-    sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId);
+    targetSchema.shape.show_id.parse(showId);
+    targetSchema.shape.episode_id.unwrap().parse(episodeId);
     if (afterSequence !== undefined && (!Number.isSafeInteger(afterSequence) || afterSequence < 1)) throw new Error("Invalid Episode revision cursor");
     return this.storage.transactionSync(() => {
       const current = this.currentEpisodeRevision(showId, episodeId, baseUrl);
@@ -405,7 +405,7 @@ export class SqlitePublicationContent {
   }
 
   inventoryStats(showId: string): { count: number; chars: number } {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    targetSchema.shape.show_id.parse(showId);
     const row = this.storage.sql.exec<{ count: number; chars: number | null }>(`SELECT COUNT(*) AS count, SUM(length(c.revision_json)) AS chars
       FROM publication_episode_content c JOIN publication_episodes e USING (show_id, episode_id)
       WHERE e.show_id = ? AND e.lifecycle = 'published'`, showId).toArray()[0]!;
@@ -413,8 +413,8 @@ export class SqlitePublicationContent {
   }
 
   episodePage(showId: string, after = "") {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
-    if (after) sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(after);
+    targetSchema.shape.show_id.parse(showId);
+    if (after) targetSchema.shape.episode_id.unwrap().parse(after);
     const rows = this.storage.sql.exec<{ episode_id: string; revision_json: string }>(`SELECT e.episode_id, c.revision_json
       FROM publication_episodes e JOIN publication_episode_content c USING (show_id, episode_id)
       WHERE e.show_id = ? AND e.lifecycle = 'published' AND e.episode_id > ? ORDER BY e.episode_id LIMIT 21`, showId, after).toArray();
@@ -422,8 +422,8 @@ export class SqlitePublicationContent {
       nextCursor: rows.length > 20 ? rows[19]!.episode_id : null };
   }
 
-  target(input: SqlitePublicationRequest): SqliteContentTarget {
-    const request = parseSqlitePublicationRequest(input), show = this.show(request.show_id);
+  target(request: Omit<SqliteContentMutation, "revision_id">): SqliteContentTarget {
+    const show = this.show(request.show_id);
     const showStates = request.action === "publish" ? ["draft", "published"] :
       request.action === "restore_revision" ? (request.kind === "show" ? ["published", "unpublished"] : ["published"]) :
       request.kind === "episode" && request.action === "unpublish" ? ["published", "unpublished"] :
@@ -495,7 +495,7 @@ export class SqlitePublicationContent {
     return generation;
   }
 
-  commitShow(request: SqlitePublicationRequest, metadata: ShowMetadata, extension: "jpg" | "png", cover: SqliteCoverIdentity,
+  commitShow(request: SqliteContentMutation, metadata: ShowMetadata, extension: "jpg" | "png", cover: SqliteCoverIdentity,
     options: { metadataSha256: string; updatedAt: string; restoredFromRevisionId?: string }): void {
     const target = this.target(request);
     if (!["publish", "restore_revision"].includes(request.action) || request.kind !== "show" || metadata.show_id !== request.show_id) {
@@ -528,16 +528,16 @@ export class SqlitePublicationContent {
     this.storage.sql.exec(`INSERT INTO publication_show_revisions (show_id, revision_sequence, state_version, revision_id,
       metadata_json, metadata_sha256, cover_extension, cover_generation, cover_sha256, cover_length_bytes, restored_from_revision_id, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    request.show_id, nextSequence, nextStateVersion, request.job_id, canonicalMetadata,
+    request.show_id, nextSequence, nextStateVersion, request.revision_id, canonicalMetadata,
     options.metadataSha256, extension, cover.generation, cover.sha256, cover.lengthBytes,
     options.restoredFromRevisionId ?? null, options.updatedAt);
     this.advanceFeed(request);
   }
 
-  commitEpisode(request: SqlitePublicationRequest, revision: EpisodeRevision, audioRevisionId: string, newAudio: boolean,
+  commitEpisode(request: SqliteContentMutation, revision: EpisodeRevision, audioRevisionId: string, newAudio: boolean,
     options: { metadataSha256: string; restoredFromRevisionId?: string }): void {
     const target = this.target(request);
-    if (!["publish", "restore_revision"].includes(request.action) || request.kind !== "episode" || revision.episode_id !== request.episode_id || revision.revision_id !== request.job_id) {
+    if (!["publish", "restore_revision"].includes(request.action) || request.kind !== "episode" || revision.episode_id !== request.episode_id || revision.revision_id !== request.revision_id) {
       throw new Error("Episode commit differs from its running target");
     }
     if (request.action === "restore_revision") {
@@ -580,14 +580,14 @@ export class SqlitePublicationContent {
     this.advanceFeed(request);
   }
 
-  private advanceFeed(request: SqlitePublicationRequest): void {
+  private advanceFeed(request: SqliteContentMutation): void {
     const generation = this.nextFeedGeneration(request.show_id);
     sqliteFeedSnapshotKey(request.show_id, generation);
     this.storage.sql.exec("UPDATE publication_shows SET feed_generation = ? WHERE show_id = ?", generation, request.show_id);
   }
 
   domainSnapshot(showId: string) {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    targetSchema.shape.show_id.parse(showId);
     return this.storage.transactionSync(() => {
       const show = this.show(showId);
       if (!show) throw new Error("Domain target Show is missing");
@@ -614,7 +614,7 @@ export class SqlitePublicationContent {
     this.storage.sql.exec("UPDATE publication_shows SET feed_generation = ? WHERE show_id = ? AND lifecycle = 'published'", generation, showId);
   }
 
-  commitLifecycle(request: SqlitePublicationRequest): void {
+  commitLifecycle(request: SqliteContentMutation): void {
     const target = this.target(request);
     if (request.action !== "restore" && request.action !== "unpublish") throw new Error("A lifecycle commit cannot publish new content");
     const lifecycle = request.action === "restore" ? "published" : "unpublished";
@@ -640,18 +640,22 @@ export class SqlitePublicationContent {
         if (!asset.key.endsWith(`cover.${cover.extension}`)) return { status: 404 };
       }
       let episodeGeneration = 0;
+      let key = asset.key;
+      if (asset.kind === "cover") key = sqliteMediaKey(asset.showId, { sha256: cover.sha256, extension: cover.extension });
       if (asset.kind === "audio") {
         const episode = this.storage.sql.exec<EpisodeRow>("SELECT * FROM publication_episodes WHERE show_id = ? AND episode_id = ?", asset.showId, asset.episodeId).toArray()[0];
         if (!episode || episode.lifecycle === "unpublished") return { status: 404 };
         if (episode.lifecycle === "deleted") return { status: 410 };
         episodeGeneration = episode.lifecycle_version;
-        if (!this.storage.sql.exec<{ audio_revision_id: string }>(`SELECT audio_revision_id FROM publication_media
-          WHERE show_id = ? AND episode_id = ? AND audio_revision_id = ?`, asset.showId, asset.episodeId, asset.revisionId).toArray().length) return { status: 404 };
+        const media = this.storage.sql.exec<{ sha256: string; length_bytes: number }>(`SELECT sha256, length_bytes FROM publication_media
+          WHERE show_id = ? AND episode_id = ? AND audio_revision_id = ?`, asset.showId, asset.episodeId, asset.revisionId).toArray()[0];
+        if (!media) return { status: 404 };
+        key = sqliteMediaKey(asset.showId, media);
       }
       const cache_props = asset.kind === "feed" ? { showGeneration: show.state_version, feedGeneration: show.feed_generation } :
-        asset.kind === "audio" ? { showGeneration: show.state_version, episodeGeneration } :
-          { showGeneration: show.state_version, coverGeneration: cover.generation };
-      return { status: 200, key: asset.key, content_type: asset.contentType, cache_props };
+        asset.kind === "audio" ? { showGeneration: show.state_version, episodeGeneration, objectKey: key } :
+          { showGeneration: show.state_version, coverGeneration: cover.generation, objectKey: key };
+      return { status: 200, key, content_type: asset.contentType, cache_props };
     });
   }
 }

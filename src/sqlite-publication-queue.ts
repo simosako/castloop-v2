@@ -1,16 +1,14 @@
-import { parseSqlitePublicationRequest, sqlitePublicationFailureSchema,
-  sqlitePublicationProtocol, sqlitePublicationRequestHash, sqlitePublicationRequestSchema, sqlitePublicationRuntimeSchema,
-  sqlitePublicationStatusSchema } from "../packages/shared/src/sqlite-publication";
-import type { SqlitePublicationFailure, SqlitePublicationRequest,
-  SqlitePublicationRuntime, SqlitePublicationStatus } from "../packages/shared/src/sqlite-publication";
-import type { OperationClient } from "../packages/shared/src/sqlite-operations";
-import type { SqliteOperationRecords } from "./sqlite-operation-records";
+import { z } from "zod";
+import { sqlitePublicationFailureSchema, sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
+import type { SqlitePublicationFailure, SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
+import { parseSqliteDirectPublicationRequest } from "../packages/shared/src/sqlite-direct-publication";
+import type { SqliteDirectPublicationRequest, SqliteDirectPublicationResult } from "../packages/shared/src/sqlite-direct-publication";
 import { sqliteAvailabilityRequestSchema, sqliteAvailabilityRecordSchema } from "../packages/shared/src/sqlite-availability";
 import type { SqliteAvailabilityRequest, SqliteAvailabilityRecord, SqliteAvailabilityState } from "../packages/shared/src/sqlite-availability";
 import { sha256Hex } from "../packages/shared/src/sha256";
 
-export const SQLITE_QUEUE_SCHEMA_VERSION = 12;
-export const SQLITE_CONTENT_SCHEMA_VERSION = 12;
+export const SQLITE_QUEUE_SCHEMA_VERSION = 13;
+export const SQLITE_CONTENT_SCHEMA_VERSION = 13;
 
 type Binding = string | number | null;
 export type PublicationSql = {
@@ -26,10 +24,8 @@ export type PublicationQueueStorage = {
   sync: () => Promise<void>;
 };
 type ServiceRow = SqlitePublicationRuntime & { state: SqliteAvailabilityState; admission_window_id: string | null; availability_version: number };
-type JobRow = { sequence: number; request_id: string; job_id: string; show_id: string; request_sha256: string; request_json: string;
-  state: SqlitePublicationStatus["state"]; reason_code: string | null };
 export type PublicationQueueSnapshot = { state: SqliteAvailabilityState; admission_window_id: string | null; availability_version: number;
-  queued: number; active: SqlitePublicationStatus | null; drained: boolean };
+  queued: number; active: null; drained: boolean };
 
 export class SqlitePublicationInputError extends Error {
   readonly reason: SqlitePublicationFailure;
@@ -40,7 +36,8 @@ export class SqlitePublicationInputError extends Error {
 }
 
 export type SqlitePublicationExecutor = {
-  execute: (request: SqlitePublicationRequest) => Promise<() => void>;
+  current: (request: SqliteDirectPublicationRequest) => string | null;
+  execute: (request: SqliteDirectPublicationRequest) => Promise<{ revisionId: string; commit: () => void }>;
 };
 
 export class PublicationQueueConflict extends Error {
@@ -48,7 +45,6 @@ export class PublicationQueueConflict extends Error {
 }
 
 export class SqlitePublicationQueue {
-  operationRecords?: SqliteOperationRecords;
   executor?: SqlitePublicationExecutor;
   constructor(private readonly storage: PublicationQueueStorage, private runtime: SqlitePublicationRuntime,
     private readonly now: () => number = Date.now, private readonly scope?: { showId: string; ready: () => boolean }) {
@@ -64,19 +60,14 @@ export class SqlitePublicationQueue {
         availability_version INTEGER NOT NULL DEFAULT 0 CHECK(availability_version >= 0 AND availability_version <= 9007199254740991))`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_availability_controls (
         operation_id TEXT PRIMARY KEY, request_json TEXT NOT NULL, record_json TEXT NOT NULL, opened_window_id TEXT UNIQUE)`);
-      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_jobs (
-        sequence INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
-        show_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL,
-        state TEXT NOT NULL CHECK(state IN ('succeeded', 'failed')), reason_code TEXT)`);
-      storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_jobs_show_state ON publication_jobs (show_id, state)");
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedules (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL UNIQUE, show_id TEXT NOT NULL,
         kind TEXT NOT NULL CHECK(kind IN ('show', 'episode')), episode_id TEXT,
         version INTEGER NOT NULL CHECK(version > 0), state TEXT NOT NULL CHECK(state IN ('scheduled', 'needs_approval', 'dispatched', 'cancelled', 'failed', 'blocked')),
         reason_code TEXT, scheduled_at TEXT NOT NULL, scheduled_at_ms INTEGER NOT NULL, timezone TEXT NOT NULL, timezone_source TEXT NOT NULL,
         resolution_source TEXT NOT NULL, local_input TEXT NOT NULL, local_datetime TEXT NOT NULL, local_offset TEXT NOT NULL,
-        input_offset TEXT, preview_sha256 TEXT NOT NULL, request_id TEXT NOT NULL UNIQUE, job_id TEXT NOT NULL UNIQUE,
-        request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL, client_json TEXT,
+        input_offset TEXT, preview_sha256 TEXT NOT NULL,
+        request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL, revision_id TEXT,
         created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL, dispatched_at_ms INTEGER, cancelled_at_ms INTEGER,
         CHECK ((kind = 'show' AND episode_id IS NULL) OR (kind = 'episode' AND episode_id IS NOT NULL)),
         CHECK ((state = 'dispatched') = (dispatched_at_ms IS NOT NULL)),
@@ -111,137 +102,41 @@ export class SqlitePublicationQueue {
     return service;
   }
 
-  private statusRow(row: JobRow): SqlitePublicationStatus {
-    return sqlitePublicationStatusSchema.parse({ protocol: sqlitePublicationProtocol, service_id: this.runtime.service_id,
-      request_id: row.request_id, job_id: row.job_id, request_sha256: row.request_sha256, sequence: row.sequence,
-      state: row.state, ...(row.reason_code === null ? {} : { reason_code: row.reason_code }) });
-  }
-
-  private byJob(jobId: string): JobRow {
-    const row = this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE job_id = ?", jobId).toArray()[0];
-    if (!row) throw new Error("SQLite publication job is missing");
-    return row;
-  }
-
-  hasPendingTarget(_input: Pick<SqlitePublicationRequest, "show_id" | "kind" | "episode_id">): boolean {
-    return false;
-  }
-
-  scheduleAdmission(input: SqlitePublicationRequest): "open" | "paused" | "runtime_mismatch" | "stale_window" | "queue_blocked" | "target_busy" {
+  scheduleAdmission(input: SqliteDirectPublicationRequest): "open" | "paused" | "runtime_mismatch" | "stale_window" {
     const service = this.requireRuntime();
     if (service.state !== "open") return "paused";
-    if (input.worker_version_id !== service.worker_version_id || input.service_config_sha256 !== service.service_config_sha256) return "runtime_mismatch";
+    if (input.service_id !== service.service_id || input.worker_version_id !== service.worker_version_id || input.service_config_sha256 !== service.service_config_sha256) return "runtime_mismatch";
     if (input.admission_window_id !== service.admission_window_id) return "stale_window";
     return "open";
   }
 
-  async executeScheduled(input: SqlitePublicationRequest, hash: string, client: OperationClient | undefined,
-    invocation: string, applySchedule: () => void): Promise<SqlitePublicationStatus> {
-    const request = parseSqlitePublicationRequest(input);
-    const source = JSON.stringify(request);
-    this.storage.transactionSync(() => {
-      const service = this.requireRuntime();
-      if (this.scope && (request.show_id !== this.scope.showId || !this.scope.ready())) throw new Error("Show publication scope is unavailable");
-      if (service.state !== "open") throw new Error("SQLite publication admission is paused");
-      if (request.worker_version_id !== service.worker_version_id || request.service_config_sha256 !== service.service_config_sha256 ||
-        request.admission_window_id !== service.admission_window_id) throw new Error("Scheduled publication runtime or resume window is stale");
-      if (this.storage.sql.exec("SELECT job_id FROM publication_jobs WHERE request_id = ? OR job_id = ?",
-        request.request_id, request.job_id).toArray().length) throw new PublicationQueueConflict();
-      this.operationRecords?.validatePublicationAssets(request);
+  private requirePublication(request: SqliteDirectPublicationRequest, changing: boolean): void {
+    const service = this.requireRuntime();
+    if (this.scope && (request.show_id !== this.scope.showId || !this.scope.ready())) throw new SqlitePublicationInputError("target_unavailable");
+    if (request.service_id !== service.service_id || request.worker_version_id !== service.worker_version_id ||
+      request.service_config_sha256 !== service.service_config_sha256) throw new SqlitePublicationInputError("runtime_mismatch");
+    if (changing && (service.state !== "open" || request.admission_window_id !== service.admission_window_id)) throw new SqlitePublicationInputError("stale_window");
+  }
+
+  async publish(input: SqliteDirectPublicationRequest, applySchedule?: (result: SqliteDirectPublicationResult) => void): Promise<SqliteDirectPublicationResult> {
+    const request = parseSqliteDirectPublicationRequest(input), executor = this.executor;
+    if (!executor) throw new Error("Publication executor is unavailable");
+    this.requirePublication(request, false);
+    const current = executor.current(request);
+    const result = (revisionId: string, changed: boolean): SqliteDirectPublicationResult => ({ ...this.identity(), protocol: sqlitePublicationProtocol,
+      show_id: request.show_id, ...(request.episode_id ? { episode_id: request.episode_id } : {}), result: changed ? "changed" : "unchanged", revision_id: revisionId });
+    if (current) return this.storage.transactionSync(() => {
+      const reply = result(current, false); applySchedule?.(reply); return reply;
     });
-    let applyContent: (() => void) | undefined;
-    let failure: SqlitePublicationFailure | undefined;
-    if (this.executor) {
-      try {
-        applyContent = await this.executor.execute(request);
-      } catch (error) {
-        if (error instanceof SqlitePublicationInputError) {
-          if (error.reason === "base_conflict" || error.reason === "target_unavailable") throw error;
-          failure = error.reason;
-        } else {
-          throw error;
-        }
-      }
-    }
+    this.requirePublication(request, true);
+    const prepared = await executor.execute(request);
     return this.storage.transactionSync(() => {
-      const service = this.requireRuntime();
-      if (this.scope && (request.show_id !== this.scope.showId || !this.scope.ready())) throw new Error("Show publication scope is unavailable");
-      if (service.state !== "open") throw new Error("SQLite publication admission is paused");
-      if (request.worker_version_id !== service.worker_version_id || request.service_config_sha256 !== service.service_config_sha256 ||
-        request.admission_window_id !== service.admission_window_id) throw new Error("Scheduled publication runtime or resume window is stale");
-      if (this.storage.sql.exec("SELECT job_id FROM publication_jobs WHERE request_id = ? OR job_id = ?",
-        request.request_id, request.job_id).toArray().length) throw new PublicationQueueConflict();
-      this.operationRecords?.validatePublicationAssets(request);
-      if (client) this.operationRecords?.publicationAccepted(request, hash, client, invocation);
-      if (failure === undefined) {
-        applyContent?.();
-      }
-      const state = failure === undefined ? "succeeded" : "failed";
-      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, state, reason_code)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`, request.request_id, request.job_id, request.show_id, hash, source, state, failure ?? null);
-      this.operationRecords?.publicationChanged(request.job_id, state, failure, invocation);
-      applySchedule();
-      return this.statusRow(this.byJob(request.job_id));
+      this.requirePublication(request, true);
+      prepared.commit();
+      const reply = result(prepared.revisionId, true);
+      applySchedule?.(reply);
+      return reply;
     });
-  }
-
-  async enqueue(input: SqlitePublicationRequest, client?: OperationClient, invocation = crypto.randomUUID()): Promise<SqlitePublicationStatus> {
-    const request = parseSqlitePublicationRequest(input);
-    const source = JSON.stringify(request);
-    const hash = await sqlitePublicationRequestHash(request);
-    return this.storage.transaction(async () => {
-      const service = this.requireRuntime();
-      if (this.scope && (request.show_id !== this.scope.showId || !this.scope.ready())) throw new Error("Show publication scope is unavailable");
-      if (request.service_id !== service.service_id) throw new Error("Publication belongs to another service");
-      const existing = this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE request_id = ? OR job_id = ?",
-        request.request_id, request.job_id).toArray();
-      if (existing.length) {
-        if (existing.length !== 1 || existing[0].request_id !== request.request_id || existing[0].job_id !== request.job_id ||
-          existing[0].request_sha256 !== hash || existing[0].request_json !== source) throw new PublicationQueueConflict();
-        if (client) this.operationRecords?.requirePublicationClient(request, hash, client);
-        return this.statusRow(existing[0]);
-      }
-      if (service.state !== "open") throw new Error("SQLite publication admission is paused");
-      if (request.worker_version_id !== service.worker_version_id || request.service_config_sha256 !== service.service_config_sha256 ||
-        request.admission_window_id !== service.admission_window_id) throw new Error("Publication runtime or resume window is stale");
-      this.operationRecords?.validatePublicationAssets(request);
-      let apply: (() => void) | undefined;
-      let failure: SqlitePublicationFailure | undefined;
-      if (this.executor) {
-        try {
-          apply = await this.executor.execute(request);
-        } catch (error) {
-          if (error instanceof SqlitePublicationInputError) {
-            failure = error.reason;
-          } else {
-            throw error;
-          }
-        }
-      }
-      if (client) this.operationRecords?.publicationAccepted(request, hash, client, invocation);
-      if (failure === undefined) {
-        try {
-          apply?.();
-        } catch (error) {
-          if (error instanceof SqlitePublicationInputError) {
-            failure = error.reason;
-          } else {
-            throw error;
-          }
-        }
-      }
-      const state = failure === undefined ? "succeeded" : "failed";
-      this.storage.sql.exec(`INSERT INTO publication_jobs (request_id, job_id, show_id, request_sha256, request_json, state, reason_code)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`, request.request_id, request.job_id, request.show_id, hash, source, state, failure ?? null);
-      this.operationRecords?.publicationChanged(request.job_id, state, failure, invocation);
-      return this.statusRow(this.byJob(request.job_id));
-    });
-  }
-
-  status(requestId: string): SqlitePublicationStatus | null {
-    this.requireRuntime();
-    const row = this.storage.sql.exec<JobRow>("SELECT * FROM publication_jobs WHERE request_id = ?", requestId).toArray()[0];
-    return row ? this.statusRow(row) : null;
   }
 
   identity(): SqlitePublicationRuntime {
@@ -320,7 +215,7 @@ export class SqlitePublicationQueue {
   }
 
   resume(windowId: string): PublicationQueueSnapshot {
-    sqlitePublicationRequestSchema.shape.admission_window_id.parse(windowId);
+    z.uuid().parse(windowId);
     return this.storage.transactionSync(() => {
       if (this.scope && !this.scope.ready()) throw new Error("Show resume requires its verified runtime outside maintenance");
       const current = this.snapshot();

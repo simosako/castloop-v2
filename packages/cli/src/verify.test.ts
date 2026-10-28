@@ -56,13 +56,10 @@ async function publishedShowWithEpisode(value: Awaited<ReturnType<typeof fixture
   await value.command("show-resume", ["daily", crypto.randomUUID()]);
   const directory = join(value.root, "daily");
   writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
-  await value.command("update-show", ["daily"]);
   await value.command("publish-show", ["daily"]);
   await value.command("create-episode", ["daily", "first"]);
   writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-  await value.command("update-episode", ["daily", "first"]);
-  await value.command("update-episode-audio", ["daily", "first", "audio.mp3"]);
-  await value.command("publish-episode", ["daily", "first"]);
+  await value.command("publish-episode", ["daily", "first", "audio.mp3"]);
   const guid = parseEpisodeDraft(readFileSync(join(directory, "episode-first.toml"), "utf8")).guid;
   return { guid };
 }

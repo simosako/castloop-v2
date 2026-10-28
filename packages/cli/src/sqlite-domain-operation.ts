@@ -15,7 +15,6 @@ import type { SqliteDomainJournal } from "./sqlite-domain-journal";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import { loadWorkspaceConfig } from "./workspace-config";
-import { requireSettledSqliteDomainDrafts } from "./sqlite-draft-journal";
 import { pendingLocalDomainChanges } from "./sqlite-domain-local";
 import { sha256HexSync } from "./sha256";
 import type { R2RestOptions } from "./verified-r2-put";
@@ -31,7 +30,6 @@ export async function startSqliteDomainChange(root: string, config: SqliteServic
   target?: { hostname: string; zoneId: string }, wait = defaultWait): Promise<SqliteDomainJournal> {
   config = sqliteServiceConfigSchema.parse(config); z.uuid().parse(operationId);
   if (!source) throw new Error("Domain changes require the embedded Worker source");
-  requireSettledSqliteDomainDrafts(root, config);
   if (readSqliteDomainJournal(root, config, operationId)) throw new Error("Domain operation already exists; inspect or continue it explicitly without replay");
   if (pendingLocalDomainChanges(root, config).length) throw new Error("Preserve unfinished domain operations and client locks; inspect the same operation without replacement");
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);

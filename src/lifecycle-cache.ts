@@ -2,7 +2,6 @@ import { sha256Hex } from "../packages/shared/src/sha256";
 import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
 import { sqliteFeedSnapshotKey } from "./sqlite-feed";
-import { sqliteCoverSnapshotKey } from "./sqlite-cover";
 
 export type LifecycleFeedRenderer = (showId: string, props: PublicCacheProps) =>
   Promise<{ xml: string; updatedAt: string } | null> | { xml: string; updatedAt: string } | null;
@@ -25,11 +24,15 @@ function validProps(asset: PublicAsset, props: PublicCacheProps): boolean {
   if (!props || typeof props !== "object") return false;
   const keys = asset.kind === "feed" ? ["showGeneration", "feedGeneration"] :
     asset.kind === "audio" ? ["showGeneration", "episodeGeneration"] : ["showGeneration", "coverGeneration"];
-  const present = Object.keys(props);
+  const present = Object.keys(props).filter((key) => key !== "objectKey");
   if (present.length !== keys.length || present.some((key) => !keys.includes(key))) return false;
+  if (asset.kind !== "feed") {
+    const suffix = asset.kind === "audio" ? "audio/[a-f0-9]{64}\\.mp3" : `covers/[a-f0-9]{64}\\.${asset.key.endsWith(".png") ? "png" : "jpg"}`;
+    if (typeof props.objectKey !== "string" || !new RegExp(`^public/podcasts/${asset.showId}/${suffix}$`).test(props.objectKey)) return false;
+  } else if (props.objectKey !== undefined) return false;
   return keys.every((key) => {
     const value = props[key as keyof PublicCacheProps];
-    return value !== undefined && Number.isSafeInteger(value) && value >= (["feedGeneration", "coverGeneration"].includes(key) ? 1 : 0);
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= (["feedGeneration", "coverGeneration"].includes(key) ? 1 : 0);
   });
 }
 
@@ -107,8 +110,7 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
         status: range ? 206 : 200, headers,
       });
     }
-    const key = asset.kind === "feed" ? sqliteFeedSnapshotKey(asset.showId, props.feedGeneration!) :
-      asset.kind === "cover" ? sqliteCoverSnapshotKey(asset.showId, props.coverGeneration!, asset.key.endsWith(".png") ? "png" : "jpg") : asset.key;
+    const key = asset.kind === "feed" ? sqliteFeedSnapshotKey(asset.showId, props.feedGeneration!) : props.objectKey!;
     const object = await env.CASTLOOP_BUCKET.head(key);
     if (!object) return rejected(request, asset.kind === "audio" ? 404 : 503);
     if (object.key !== key || !Number.isSafeInteger(object.size) || object.size < 0 || !Number.isFinite(object.uploaded.getTime())) {

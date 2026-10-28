@@ -15,15 +15,12 @@ import { createSqlitePublicationHttp } from "./sqlite-publication-http";
 import { createSqliteScheduleHttp } from "./sqlite-schedule-http";
 import { SqlitePublicationSchedules } from "./sqlite-publication-schedules";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
-import { createSqliteOperationHttp } from "./sqlite-operation-http";
 import { SqliteDeliveryStats } from "./sqlite-delivery-stats";
 import { createSqliteStatsHttp } from "./sqlite-stats-http";
-import { createSqliteOperationRecords } from "./sqlite-operation-runtime";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { SqliteRuntimeCache } from "./sqlite-service-runtime";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
-import type { OperationCleanupBucket } from "./sqlite-operation-records";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
 import type { SqliteDomainRequest, SqliteDomainActivation } from "../packages/shared/src/sqlite-domain";
 import type { SitePage } from "../packages/shared/src/website";
@@ -43,32 +40,27 @@ export class SqliteShowService {
   private readonly publicationHttp: (request: Request) => Promise<Response>;
   private readonly scheduleHttp: (request: Request) => Promise<Response>;
   private readonly serviceHttp: (request: Request) => Promise<Response>;
-  private readonly operationHttp: (request: Request) => Promise<Response>;
   private readonly statsHttp: (request: Request) => Promise<Response>;
 
   constructor(private readonly storage: PublicationQueueStorage, readonly showId: string,
     private readonly actual: SqlitePublicationRuntime, private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache,
-    private readonly bucket: SqlitePublicationBucket & OperationCleanupBucket, private readonly key: string) {
+    private readonly bucket: SqlitePublicationBucket, private readonly key: string) {
     sqliteRegistrationSchema.shape.show_id.parse(showId);
     storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_show_binding (id INTEGER PRIMARY KEY CHECK(id = 1),
       show_id TEXT NOT NULL, reservation_id TEXT NOT NULL, registration_json TEXT NOT NULL, maintenance_id TEXT)`);
     if (this.binding()?.show_id && this.binding()!.show_id !== showId) throw new Error("Show storage identity differs");
     this.queue = new SqlitePublicationQueue(storage, selectSqliteRuntime(storage, actual), Date.now, { showId, ready: () => this.ready() });
     this.content = new SqlitePublicationContent(storage);
-    this.queue.executor = createSqlitePublicationExecutor(this.content, bucket, config, {
+    this.queue.executor = createSqlitePublicationExecutor(this.content, config, {
       purge: ({ showId: id, episodeId }) => cache.purgeMedia ? cache.purgeMedia({ showId: id, ...(episodeId ? { episodeId } : {}) }) : cache.purge(id),
       purgeSite: (target) => cache.purgeSite ? cache.purgeSite(target) : Promise.resolve(),
     });
     this.schedules = new SqlitePublicationSchedules(storage, this.queue, this.content, Date.now, { showId, ready: () => this.ready() });
     this.runtime = new SqliteServiceRuntime(storage, this.queue, this.content, bucket, config, cache, actual, showId);
     const ready = () => this.ready();
-    const records = createSqliteOperationRecords(storage, this.queue, this.content, ready, showId,
-      (jobId) => this.schedules.hasActiveJob(jobId));
-    this.schedules.operationRecords = records;
     this.publicationHttp = createSqlitePublicationHttp(this.queue, key, ready, showId);
     this.scheduleHttp = createSqliteScheduleHttp(this.schedules, key, showId);
     this.serviceHttp = createSqliteServiceHttp(this.runtime, key);
-    this.operationHttp = createSqliteOperationHttp(records, key, ready, bucket);
     this.stats = new SqliteDeliveryStats(storage, showId, actual, Date.now);
     this.statsHttp = createSqliteStatsHttp(this.stats, key, showId, () => this.health());
   }
@@ -211,7 +203,6 @@ export class SqliteShowService {
     }
     if (path.startsWith("/admin/sqlite-stats/")) return this.statsHttp(request);
     if (path === "/admin/sqlite-schedules" || path.startsWith("/admin/sqlite-schedules/")) return this.scheduleHttp(request);
-    return path.startsWith("/admin/sqlite-operations/") ? this.operationHttp(request) :
-      path.startsWith("/admin/sqlite-service/") ? this.serviceHttp(request) : this.publicationHttp(request);
+    return path.startsWith("/admin/sqlite-service/") ? this.serviceHttp(request) : this.publicationHttp(request);
   }
 }

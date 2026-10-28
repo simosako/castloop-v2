@@ -1,51 +1,38 @@
-# エピソード追加・更新と公開
+# 追加・更新・公開
 
-## 新規Episode
+この開発版は新規13/13環境向け。旧形式を変換・採用しない。実行前に対応CLIと対象workspaceを確認する。
 
-1. workspace、Show、未完了操作と`show-status`を確認する。既存Showが公開済み・openであることが前提。毎回Pause/Resume/deployしない。
-2. ID、タイトル、説明、日時・タイムゾーン、MP3、任意項目を管理者に確認する。
-3. `create-episode ID --workspace PATH --show SHOW --non-interactive --json`。生成済みGUIDを保持してTOMLを編集する。未来の`published_at`は予約配信ではない。予約する場合は下記のscheduleコマンドを使う。
-4. `validate episode ABSOLUTE_TOML --audio ABSOLUTE_MP3 --json`。MP3は300,000,000 bytes以下。
-5. `update-episode ID --workspace PATH --show SHOW --json`と`update-episode-audio ID ABSOLUTE_MP3 --workspace PATH --show SHOW --json`で同じdraftにstageする。まだ公開されない。
-6. `preview-episode ID --workspace PATH --show SHOW --json`で対象・metadata・素材hash・base・未stage変更を確認する。`input_fingerprint`と内容について管理者の承認を得る。未来の`published_at`は`warnings[]`の`future_published_at`に出る。
-7. `publish-episode ID --workspace PATH --show SHOW --expect-preview HASH --json`。承認後の変更は再preview・再確認する。同じjobの`succeeded`が公開完了。queued/runningは待機中。未来の`published_at`でも即時公開であり、非対話では`--allow-future-published-at`が必要。対話では`publish now`の入力が別途必要。予約するなら下記のscheduleコマンドを使う。
+## 通常公開
+
+1. 対象Showが公開済み・openか`show-status`で確認する。通常編集のたびにPause/Resume/deployしない。
+2. `create-episode ID --workspace PATH --show SHOW --non-interactive --json`で手元の雛形を作る。GUIDを保持し、管理者が確認した内容・日時でTOMLを編集する。
+3. `validate episode ABSOLUTE_TOML --audio ABSOLUTE_MP3 --json`で検証する。音声上限は300,000,000 bytes。
+4. `preview-episode ID MP3 --workspace PATH --show SHOW --remote --json`でmetadata・素材・更新元を確認し、内容と`input_fingerprint`の承認を得る。
+5. `publish-episode ID MP3 --workspace PATH --show SHOW --expect-preview HASH --non-interactive --json`で明示公開する。`changed`／`unchanged`とrevisionが確定結果。
+
+MP3省略時は公開済み音声を再利用する。初回は必須。metadata-onlyはTOML編集後にMP3を省略し、audio-onlyはTOMLを変えず新MP3を指定する。公開済みと同じ内容の画像・音源を指定した場合も再アップロードしない。事前`update-*`・ステージング・job照会はない。同じ内容は履歴・世代・パージを増やさない。
+
+Showは`preview-show SHOW`→承認→`publish-show SHOW --expect-preview HASH`。TOML・CSS・カバーを使い、公開済み画像の拡張子は変えない。GUID・日時・permalink意味を通常更新で変更しない。
+
+previewは通信による現在内容の確認だけでupload・journal・lockを作らない。`--local`ではremote未確認を明示する。入力・更新元が変わったら再確認するが、既に同じ内容が公開済みなら変更なしで返せる。hashそのものは承認を証明しない。
+
+`preview-* --rss-output NEW_FILE`は予定RSSをローカル生成し、既存ファイルを上書きしない。新しい音源URLは確認用の仮UUIDであり、実URLは公開時に発行される。素材は手元で確認し、一時公開URLを作らない。
+
+未来の`published_at`でも即時公開する。非対話では`--allow-future-published-at`が必要。予約は次の専用操作を使う。
 
 ## 予約公開
 
-1. `update-*`で対象metadata／音源を同じdraftへstageする。予約はcreate／uploadを暗黙に行わない。
-2. `preview-episode-schedule ID --workspace PATH --show SHOW --at DATETIME [--timezone ZONE] --json`（Showは`preview-show-schedule SHOW ...`）。対象、素材hash、公開済みbase、現地日時／UTC、`approval_sha256`を確認する。未来日時はサーバー時刻でも判定される。
-3. 管理者の承認後、`schedule-episode ID ... --at ... --expect-preview HASH --json`（Showは`schedule-show`）。`scheduled`は受付であり公開成功ではない。CLIは待機せずschedule IDを返す。
-4. `schedule-list SHOW --workspace PATH --json`と`schedule-status SHOW SCHEDULE_UUID --workspace PATH --json`で観測する。`state`と`publication_state`を分け、`dispatched`や`queued`を公開成功として扱わない。公開完了は`publication_state="succeeded"`。
-5. 日時変更は`preview-schedule-reschedule`→`schedule-reschedule`、取消は`preview-schedule-cancel`→`schedule-cancel`。どちらもFIFO投入前だけ。Pause／受付停止／保守／runtime/base変更で`needs_approval`になった場合は、`preview-schedule-reapprove ... --expect-version N`で現在条件を再確認し、`schedule-reapprove ... --expect-version N --expect-preview HASH`で再承認する。Resumeや保守解除だけで自動再開しない。
-6. 予約実行日時は`published_at`と別。予約公開はRSSの日時を書き換えない。隔離したfresh環境で予定前未配信・予定後配信、Pause→再承認→公開、日時変更→取消、未来予約中の即時公開、直リンクの404/200を確認済み。Alarm再配送・blocked・同時刻予約は未確認。未確認経路をローカル試験の成功から推測しない。
+- `preview-episode-schedule ID [MP3] --workspace PATH --show SHOW --at DATETIME [--timezone ZONE] --json`で確認し、`schedule-episode`に同じ引数と`--expect-preview APPROVAL_HASH`を渡す。Showには`preview-show-schedule`／`schedule-show`を使う。
+- CLIが素材を配置し、metadataと具体的な素材参照を予約へ保存する。`scheduled`は受付、`dispatched`とrevisionは公開確定。端末を待機させる必要はない。
+- `schedule-list SHOW`／`schedule-status SHOW UUID`で確認する。作成応答が不明なら一覧を読み、新規予約を無条件に再作成しない。
+- 日時変更は`preview-schedule-reschedule`→`schedule-reschedule`、取消は`preview-schedule-cancel`→`schedule-cancel`。未実行の予約だけを扱い、version・hashを照合する。
+- Pause等の`needs_approval`は、`preview-schedule-reapprove`→`schedule-reapprove`で明示再承認する。保存済みmetadata・素材を保持し、手元の未承認編集を採用しない。Resumeだけでは再開しない。
+- 予約日時とRSSの`published_at`は独立。日時変換だけなら`preview-schedule-time`を使う。任意の`castloop-admin.toml`のtimezoneはCLIの日時解釈に使い、未設定はUTC。
 
-## 通常更新
+## 履歴・統計
 
-- metadata-only: 元TOMLを編集、validate、`update-episode`、preview、明示publish。MP3 uploadは不要。
-- audio-only: 元metadataとGUID・日時を保持、MP3検証、`update-episode-audio`、preview、publish。既存音源・revisionは保持する。
-- 両方: 両方を同じdraftにstageし、一度publish。
-- Show metadata/cover: `update-show`はmetadataと画像を組でstageする。公開済み画像の拡張子変更は不可。`preview-show ID --workspace PATH --json`→承認→`publish-show ... --expect-preview HASH`。
+`list-show-revisions`／`list-episode-revisions`の`next_cursor`を追い、`preview-*-revision`で現在版と保存版を確認する。承認した計画を`revision-execute FILE HASH confirm`へ渡す。素材を再uploadせず採用し、同じ内容・状態なら変更なし。Show採用はEpisode履歴・個別非公開を巻き戻さない。手元TOMLも自動編集しない。
 
-既存GUID・日時・guid_is_permalinkの意味を通常更新で変更しない。identity不一致は確認だけで解除できない。previewが公開済み全文を取得できないと示した場合、差分を推測しない。ローカル原本と管理者のバックアップを使う。
+必要なら`sync-local-metadata --show SHOW [--episode ID] --expect-revision UUID --output NEW_FILE`で新規書出しする。原本を上書きしない。
 
-`input_fingerprint`は承認を証明する署名ではない。実行時のbase/lifecycle照合も必要。Issue #64対応版のpreviewは既定で認証付きremote読取を行い、公開中/local/stagedの差分と素材再利用を表示する。`--local`または未初期化workspaceでは公開済み内容を`not_checked`とし、取得失敗を差分なしへ変換しない。確認後のruntime/window/base/Feed世代変更でも再previewする。
-
-`preview-* --rss-output NEW_FILE`は同じrendererで予定RSSをローカル生成する。既存ファイルは上書きせず、R2へ保存しない。画像・音源は手元で確認し、未公開素材の一時公開URLを作らない。
-
-## 過去版の採用（Issue #64対応版）
-
-- `describe`/helpで対応を確認する。内部7/8の新規環境専用。旧形式の変換や履歴の事後採用を行わない。
-- `list-show-revisions SHOW` / `list-episode-revisions ID --show SHOW`で履歴を確認する。`next_cursor`を追い、一覧要約を全文へ逆変換しない。
-- `preview-show-revision SHOW REVISION_UUID` / `preview-episode-revision ID REVISION_UUID --show SHOW`で現在版と選択版の全文・差分・素材identityを確認する。`--workspace`を明示する。
-- 誤編集前へ戻す対象と内容・公開状態になることの承認を得た後だけ、保存したpreview JSONを`revision-execute PLAN_JSON REQUEST_SHA256 confirm`へ渡す。既存`lifecycle restore`は非公開からの最新snapshot復帰で、任意revision採用とは別である。
-- 選択した素材を再uploadせず、新しいrevisionを作る。Show採用でもEpisode履歴や個別非公開は巻き戻さない。未完了draftやblockedを削除して迂回しない。原本TOMLは自動編集されない。
-- 応答不明は同じjobのGET照会だけを行う。queuedや404を成功・未実行と推測しない。jobの`succeeded`を確認する。
-- 編集元が必要なら`sync-local-metadata --show SHOW [--episode ID] --expect-revision CURRENT_UUID --output NEW_FILE`で新規書出しする。既存TOML・画像・音源・journalを上書き・再構築しない。
-
-## 開発版の配信統計
-
-`stats SHOW [--episode ID] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--by-revision] [--json]`は読取専用の配信統計照会。内部7/9の新規環境専用。日別は31日、Episode一覧は20件ごとに`next_cursor`を追う。`unmeasured`（計測開始前）と`pruned`（保持期限切れ）は0と表示せず、`lifetime`が削除分を含む通算。カウンタはサーバー観測事実のみで聴取人数ではない。保持日数の変更は`stats-retention SHOW DAYS [--operation-id UUID]`。応答不明時は同じ操作IDでの照会のみで再送しない。
-
-## 開発版の日時preview
-
-`preview-schedule-time DATETIME --workspace PATH [--timezone IANA_ZONE] --json`はローカルの日時変換のみ。upload・予約・公開・サーバー時刻／readinessの検証は行わない。任意の`castloop-admin.toml`は`schema_version = 1`と`timezone`を受け付け、未指定ならサーバー基準UTCを使う。明示offsetが絶対時刻を決め、併用した`--timezone`はそのoffsetと一致する必要がある。存在しない／二重となるDST日時を勝手に解決しない。予約は`preview-episode-schedule`／`schedule-episode`等の別コマンドで行い、未来の`published_at`だけでは公開を遅らせない。この変換previewを予約受付・公開承認の証拠にしない。
+`stats SHOW [--episode ID] --json`は配信統計の読取。未計測・保持期限切れを0とせず、カウンタを聴取人数と解釈しない。`stats-retention`は別の変更操作として承認する。

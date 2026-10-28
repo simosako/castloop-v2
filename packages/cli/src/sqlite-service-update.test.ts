@@ -44,10 +44,10 @@ test("compatible REST updates preserve the namespace/content, finish paused afte
   const command = (name: string, args: string[] = []) => runSqliteCommand(value.root, value.config, name, args, { transport: value.transport, cloudflare: value.options });
   await command("create-show", ["daily", "https://example.com/podcast"]); await command("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(value.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
-  await command("update-show", ["daily"]); await command("publish-show", ["daily"]);
+  await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);
   writeFileSync(join(value.root, "daily", "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-  await command("update-episode", ["daily", "first"]); await command("update-episode-audio", ["daily", "first", "audio.mp3"]); await command("publish-episode", ["daily", "first"]);
+  await command("publish-episode", ["daily", "first", "audio.mp3"]);
   const preserved = new Map([...value.entries].map(([key, object]) => [key, object.etag]));
   await command("show-pause", ["daily", crypto.randomUUID()]); value.calls.length = 0;
   const result = await update(); expect(result.phase).toBe("ready"); expect(result.receipt!.worker_version_id).not.toBe(oldVersion);
@@ -61,7 +61,7 @@ test("compatible REST updates preserve the namespace/content, finish paused afte
   expect(value.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
   await command("show-resume", ["daily", crypto.randomUUID()]);
   const file = join(value.root, "daily", "episode-first.toml"); writeFileSync(file, readFileSync(file, "utf8").replace('title = "first"', 'title = "After compatible update"'));
-  await command("update-episode", ["daily", "first"]); expect(await command("publish-episode", ["daily", "first"])).toMatchObject({ state: "succeeded" });
+  expect(await command("publish-episode", ["daily", "first"])).toMatchObject({ result: "changed" });
   expect(value.content.episodes("daily")[0].title).toBe("After compatible update");
   const journal = readFileSync(join(value.root, ".castloop", "sqlite-service-updates", value.config.service_id, `${id}.json`), "utf8");
   expect(journal).not.toContain("new source"); expect(journal).not.toContain("private-token"); expect(journal).not.toContain("CASTLOOP_ADMIN_KEY");

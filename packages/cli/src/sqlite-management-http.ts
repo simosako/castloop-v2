@@ -1,6 +1,7 @@
 import type { R2RestTransport } from "./verified-r2-put";
 import { BoundedReadError, collectStreamBytes, retryAfterMilliseconds } from "./bounded-http-read";
 import { sha256HexSync } from "./sha256";
+import { MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
 
 type ReadFailureCode = "transport_error" | "observation_timeout" | "http_error" | "invalid_response" |
   "body_read_failed" | "length_mismatch" | "size_limit" | "invalid_utf8" | "invalid_json" | "cleanup_failed" | "deadline_exceeded";
@@ -58,9 +59,8 @@ function readPath(path: string): boolean {
   }
   if (new RegExp(`^/admin/sqlite-stats/retention/${uuid}$`, "i").test(path)) return true;
   if (/^\/admin\/sqlite-service\/registrations\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) && path.slice("/admin/sqlite-service/registrations/".length).length <= 32) return true;
-  if (path === "/admin/sqlite-operations/list" || new RegExp(`^/admin/sqlite-operations/(?:(?:cleanup|requests)/)?${uuid}$`, "i").test(path)) return true;
   if (path === "/admin/sqlite-schedules" || new RegExp(`^/admin/sqlite-schedules/${uuid}$`, "i").test(path)) return true;
-  if (new RegExp(`^/admin/(?:sqlite-publication/jobs|sqlite-service/update-status|sqlite-service/domain-status|sqlite-service/controls)/${uuid}$`, "i").test(path)) return true;
+  if (new RegExp(`^/admin/(?:sqlite-service/update-status|sqlite-service/domain-status|sqlite-service/controls)/${uuid}$`, "i").test(path)) return true;
   for (const prefix of ["/admin/sqlite-service/targets/", "/admin/sqlite-service/content/"]) {
     if (path.startsWith(prefix)) {
       const parts = path.slice(prefix.length).split("/");
@@ -97,10 +97,10 @@ export async function readSqliteManagementGet(url: URL, headers: HeadersInit, op
     ["from", "to", "cursor"].every((key) => url.searchParams.getAll(key).length <= 1);
   const scheduleQuery = url.pathname === "/admin/sqlite-schedules" && [...url.searchParams.keys()].every((key) => key === "after") &&
     url.searchParams.getAll("after").length <= 1;
-  if (url.protocol !== "https:" || url.username || url.password || url.search && !url.pathname.startsWith("/admin/sqlite-operations/") && !domainQuery && !statsQuery && !scheduleQuery || url.hash || !readPath(url.pathname) ||
+  if (url.protocol !== "https:" || url.username || url.password || url.search && !domainQuery && !statsQuery && !scheduleQuery || url.hash || !readPath(url.pathname) ||
     !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 ||
     maximum > (url.pathname.startsWith("/admin/sqlite-service/content/") || url.pathname.startsWith("/admin/sqlite-service/revisions/") ||
-      url.pathname.startsWith("/admin/sqlite-service/content-inventory/") ? 8_388_608 : 65536)) throw new Error("Invalid bounded SQLite management GET");
+      url.pathname.startsWith("/admin/sqlite-service/content-inventory/") ? 8_388_608 : url.pathname.startsWith("/admin/sqlite-schedules") ? MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768 : 65536)) throw new Error("Invalid bounded SQLite management GET");
   const now = options.now ?? (() => performance.now()), delay = options.delay ?? ((ms: number) => Bun.sleep(ms));
   const start = now(), deadline = start + timeout, target = sha256HexSync(url.href);
   for (let attempt = 1; attempt <= attempts; attempt++) {

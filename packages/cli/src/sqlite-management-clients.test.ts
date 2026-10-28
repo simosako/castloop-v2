@@ -1,22 +1,24 @@
 import { expect, test } from "bun:test";
-import { sqlitePublicationRequestHash, sqliteServiceConfigHash } from "@castloop/shared";
+import { sqliteServiceConfigHash } from "@castloop/shared";
 import type { SqliteServiceConfig } from "@castloop/shared";
-import { sqlitePublicationRequest } from "../../../src/test-support/sqlite-publication";
+import { directShow, directCover } from "../../../src/test-support/direct-publication";
+import { sqliteDirectPublishRequestSchema } from "../../shared/src/sqlite-direct-publication";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { SqliteServiceClient } from "./sqlite-service-client";
-import { classifySqliteInvocation, sanitizeSqliteInvocation, SqliteObservationGuard } from "../../../scripts/test-support/sqlite-observability";
 
 const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "trial", account_id: "a".repeat(32),
   bucket_name: "private-bucket", worker_name: "test-worker", public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
 const version = "11111111-1111-4111-8111-111111111111", window = "22222222-2222-4222-8222-222222222222";
 const runtime = { service_id: config.service_id, service_config_sha256: await sqliteServiceConfigHash(config), worker_version_id: version };
-const request = sqlitePublicationRequest(runtime, window), requestHash = await sqlitePublicationRequestHash(request);
-const status = { protocol: "sqlite-sequential-v1", service_id: config.service_id, request_id: request.request_id, job_id: request.job_id, request_sha256: requestHash, sequence: 1, state: "succeeded" } as const;
+const request = sqliteDirectPublishRequestSchema.parse({ ...runtime, schema_version: 1, protocol: "sqlite-sequential-v1", show_id: "daily",
+  admission_window_id: window, expected_show_state_version: 0, action: "publish", kind: "show", metadata: directShow, cover: directCover });
+const status = { ...runtime, protocol: "sqlite-sequential-v1", show_id: "daily", result: "changed", revision_id: crypto.randomUUID() } as const;
 const health = { ...runtime, protocol: "sqlite-sequential-v1", feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1", publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1", domain_changes: "sqlite-domain-change-v1", invocation_id: window, publication_ready: true, state: "open", admission_window_id: window,
   availability_controls: "show-admission-delivery-v1", revision_history: "sqlite-revisions-v1", website: "static-show-v2", delivery_statistics: "episode-daily-v1", availability_version: 0, admission_state: "open", delivery_policy: "enabled",
   queued: 0, active: null, drained: true, setup: { operation_id: window, state: "ready" }, runtime_update: null } as const;
 const json = (value: unknown, code = 200) => Response.json(value, { status: code, headers: { "Cache-Control": "no-store" } });
 const quiet = { delay: async () => {}, onDiagnostic: () => {} };
+const publicationStatus = { ...runtime, protocol: "sqlite-sequential-v1", state: "open", admission_window_id: window, publication_ready: true } as const;
 
 for (const [fault, response] of [
   ["malformed JSON", () => new Response("private-admin invalid JSON", { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })],
@@ -40,23 +42,15 @@ for (const [fault, response] of [
   });
 }
 
-test("publication status GET retries and binds redacted cancellation to the unchanged frozen request", async () => {
-  const calls: Request[] = [], guard = new SqliteObservationGuard();
+test("publication status GET retries without a publication job or status identity", async () => {
+  const calls: Request[] = [];
   const client = new SqlitePublicationClient(config, "private-admin", async (input, init) => {
     const call = new Request(input, init); calls.push(call);
-    if (calls.length === 1) {
-      const row = sanitizeSqliteInvocation(JSON.stringify({ outcome: "canceled", scriptVersion: { id: version }, event: {
-        request: { url: `${config.public_base_url}/admin/sqlite-publication/jobs/[REDACTED]`, method: call.method,
-          headers: { "X-Castloop-Status-Request": call.headers.get("X-Castloop-Status-Request") } }, response: { status: 200 } } }));
-      expect(classifySqliteInvocation(row)).toBe("reconcile"); guard.record(row); throw new Error("connection lost");
-    }
-    return json(status);
+    if (calls.length === 1) throw new Error("connection lost");
+    return json(publicationStatus);
   }, 30000, quiet);
-  expect(await client.observe(request)).toEqual(status); expect(calls.length).toBe(2);
-  expect(calls.every((call) => call.method === "GET" && call.url.endsWith(`/jobs/${request.request_id}`) && call.headers.get("X-Castloop-Status-Request") === request.request_id)).toBe(true);
-  guard.assertHealthy(); expect(() => guard.assertCanMutate()).toThrow("reconciliation");
-  guard.reconcile(guard.pendingReconciliation(), { ...runtime, admission_window_id: window }, health, [{ expected: { job_id: request.job_id, request_id: request.request_id, request_sha256: requestHash }, observed: status }]);
-  guard.assertCanMutate();
+  expect(await client.describe()).toEqual(publicationStatus); expect(calls.length).toBe(2);
+  expect(calls.every((call) => call.method === "GET" && call.url.endsWith("/status") && !call.headers.has("X-Castloop-Status-Request"))).toBe(true);
 });
 
 test("publication submit POST is never retried for unknown transport, HTTP or body failures", async () => {
@@ -88,23 +82,11 @@ test("service health GET retries, but pause/resume POST is never retried", async
   }
 });
 
-test("publication waiting counts retry requests against the shared 300-request limit", async () => {
-  let calls = 0, remaining = 300;
-  const client = new SqlitePublicationClient(config, "private-admin", async () => {
-    if (++calls % 2) throw new Error("transient disconnect");
-    return json({ ...status, state: "queued" });
-  }, 30000, quiet);
-  const budget = { beforeAttempt: () => { if (!remaining) return false; remaining--; return true; } };
-  for (let poll = 0; poll < 150; poll++) expect((await client.observe(request, budget))?.state).toBe("queued");
-  expect(calls).toBe(300); expect(remaining).toBe(0);
-  await expect(client.observe(request, budget)).rejects.toThrow("deadline_exceeded"); expect(calls).toBe(300);
-});
-
-test("valid JSON with the wrong service, request, hash or schema is not a transient transport failure", async () => {
-  for (const bad of [{ ...status, service_id: "other" }, { ...status, request_id: crypto.randomUUID() }, { ...status, request_sha256: "f".repeat(64) }, { state: "succeeded" }]) {
+test("valid JSON with the wrong publication target, runtime or schema is not retried", async () => {
+  for (const bad of [{ ...status, service_id: "other" }, { ...status, show_id: "other" }, { ...status, worker_version_id: crypto.randomUUID() }, { state: "succeeded" }]) {
     let reads = 0;
     const client = new SqlitePublicationClient(config, "private-admin", async () => { reads++; return json(bad); }, 30000, quiet);
-    await expect(client.observe(request)).rejects.toThrow();
+    await expect(client.submit(request)).rejects.toThrow();
     expect(reads).toBe(1);
   }
   let reads = 0;

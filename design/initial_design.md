@@ -1,5 +1,15 @@
 # castloop v2 デザインドキュメント
 
+## 現行開発版：フェーズ1・2
+
+2026-10-28の簡素化では、公開を同期アトミック処理にし、Feed/HTMLをSQLiteからオンデマンド生成する。CLIはローカル入力の検証とR2への素材直接配置・PUT応答確認を担当し、DOは素材の読取・コピーを行わない。metadata・素材参照・公開状態が同じなら変更せず、異なる内容だけ更新元を検証し、必要なパージ後に単一トランザクションで内容・履歴・世代を確定する。公開job台帳・操作追跡5表・公開用journal・ステージングを廃止した。
+
+内部queue/content形式は新規環境専用の**13/13**。配備は未実施で、旧形式からの変換・互換配備は提供しない。Show分離・GUID/日時・旧音源・履歴・配信ゲートを維持し、init・deploy・domain・Pause/Resumeの記録と保守手順は変更しない。予約は保存内容の公開と実行済み状態を同時確定し、RSSは一括進捗だけを保持する。
+
+具体契約は[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、オンデマンド配信は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、操作は[SQLiteガイド](../docs/sqlite_sequential_development.md)を優先する。以下は簡素化前の導入履歴・旧契約であり、FIFO・job・staging・事前生成に関する記述は現行経路へ適用しない。
+
+## 簡素化前の設計・導入履歴
+
 現在のIssue #65／#70統合版は内部queue/content形式**11/11**・`static-show-v2`の新規環境専用。予約表とサイト改善を両方含むため、旧9/9・10/11等への互換配備・変換はしない。以下は各機能の導入段階の記録であり、現在の操作・形式は[サイト利用ガイド](../docs/show_website.md)を優先する。本人によるサイト表示・再生・東京日付の確認は完了したが、統合版の実配備とnative Free性能は未確認である。
 
 Issue #70の自動短縮URL版は内部queue/content形式10/11の新規環境専用。EpisodeページはShow直下の自動ハッシュURL一つだけとし、長いページ入口・`e/`・互換転送・DB変換は提供しない。HTTP(S)リンク復元とcopyrightフッター削除も含む。[URL設計](show_website_site_slug_proposal.md)・[サイト利用ガイド](../docs/show_website.md)を優先する。

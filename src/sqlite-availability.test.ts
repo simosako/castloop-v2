@@ -3,6 +3,8 @@ import { sqliteAvailabilityRequestSchema } from "../packages/shared/src/sqlite-a
 import type { SqliteAvailabilityRequest } from "../packages/shared/src/sqlite-availability";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
 import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
+import { parseSqliteDirectPublicationRequest } from "../packages/shared/src/sqlite-direct-publication";
+import { directShow, directCover } from "./test-support/direct-publication";
 
 const fixtures: Array<ReturnType<typeof sqlitePublicationFixture>> = [];
 afterEach(() => { for (const value of fixtures.splice(0)) value.close(); });
@@ -14,7 +16,7 @@ function fixture() {
     sqliteAvailabilityRequestSchema.parse({ ...value.runtime, show_id: "daily", operation_id: crypto.randomUUID(), action,
       expected_availability_version: queue.snapshot().availability_version,
       ...(action === "resume" ? { admission_window_id: crypto.randomUUID() } : {}), ...overrides });
-  return { ...value, queue, request, publication: value.request, setReady: (next: boolean) => { ready = next; } };
+  return { ...value, queue, request, setReady: (next: boolean) => { ready = next; } };
 }
 
 test("controls preserve three states, immutable results, explicit windows and repeated stop observations", async () => {
@@ -43,10 +45,12 @@ test("controls preserve three states, immutable results, explicit windows and re
 test("stopped admission rejects new submissions without changing its window and unverified runtimes cannot resume", async () => {
   const value = fixture(); const opened = await value.queue.applyControl(value.request("resume"));
   const window = opened.result.admission_window_id!;
-  const publication = value.publication({ admission_window_id: window });
-  expect((await value.queue.enqueue(publication)).state).toBe("succeeded");
+  const publication = parseSqliteDirectPublicationRequest({ ...value.runtime, schema_version: 1, protocol: "sqlite-sequential-v1", action: "publish", kind: "show",
+    show_id: "daily", admission_window_id: window, expected_show_state_version: 0, metadata: directShow, cover: directCover });
+  value.queue.executor = { current: () => null, execute: async () => ({ revisionId: crypto.randomUUID(), commit: () => {} }) };
+  expect((await value.queue.publish(publication)).result).toBe("changed");
   await value.queue.applyControl(value.request("admission-pause"));
-  await expect(value.queue.enqueue(value.publication({ admission_window_id: window, episode_id: "second" }))).rejects.toThrow("paused");
+  await expect(value.queue.publish(publication)).rejects.toThrow("stale_window");
   await value.queue.applyControl(value.request("pause"));
   value.setReady(false);
   await expect(value.queue.applyControl(value.request("delivery-resume"))).rejects.toThrow("verified");

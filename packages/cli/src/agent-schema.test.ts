@@ -22,5 +22,6 @@ test("help and describe share options; unknown outcomes never advertise retry", 
   expect(resultEnvelopeSchema.safeParse(failed).success).toBe(true);
   expect(JSON.stringify(failed)).not.toContain("private-token");
   expect(failed.error?.outcome).toBe("unknown");
-  expect(agentEnvelope("job-status", {}, { job_id: "id", state: "queued" }).next_actions[0]?.action).toBe("observe_same_job");
+  const completed = agentEnvelope("publish-episode", {}, { result: "changed", revision_id: crypto.randomUUID() });
+  expect(completed.next_actions).toEqual([]); expect(completed.operation).toBeNull();
 });

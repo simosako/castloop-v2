@@ -10,4 +10,4 @@ Showはタイトル、説明、言語、著者、所有者名・メール、カ�
 
 `validate show ABSOLUTE_TOML --assets --json`で検証する。Resumeは別の明示操作。`show-resume`には管理者が用意・保持した新しいwindow UUIDを使い、応答不明で新IDを発行し直さない。登録・uploadだけでは公開しない。
 
-`update-show ID --workspace PATH --json`、公開内容のpreviewと承認、`publish-show ID --workspace PATH --expect-preview HASH --json`の順。同じjobの`succeeded`を確認してFeed URLを報告する。公開は[手順](publish.md)、中断は[復旧](recovery.md)を参照。
+`preview-show ID --workspace PATH --remote --json`で内容を確認・承認し、`publish-show ID --workspace PATH --expect-preview HASH --json`で公開する。`changed`／`unchanged`とrevisionを確認してFeed URLを報告する。公開は[手順](publish.md)、中断は[復旧](recovery.md)を参照。

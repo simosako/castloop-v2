@@ -16,7 +16,7 @@ async function fixture() {
   return Object.assign(value, { command });
 }
 
-test("formal SQLite command runners resume, register, stage, publish and inspect without legacy paths", async () => {
+test("formal SQLite commands publish local inputs directly without staging or legacy paths", async () => {
   const value = await fixture();
   const site = "https://example.com/my-podcast";
   await value.command("create-show", ["daily", site]);
@@ -24,25 +24,21 @@ test("formal SQLite command runners resume, register, stage, publish and inspect
   const directory = join(value.root, "daily"), showPath = join(directory, "show.toml");
   expect(parseShowMetadata(readFileSync(showPath, "utf8")).site_url).toBe(site);
   writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
-  expect(await value.command("update-show", ["daily"])).toMatchObject({ state: "staged" });
+  await value.command("preview-show", ["daily"]);
   expect(value.content.delivery("/podcasts/daily/feed.xml").status).toBe(404);
-  expect(await value.command("publish-show", ["daily"])).toMatchObject({ state: "succeeded" });
+  expect(await value.command("publish-show", ["daily"])).toMatchObject({ result: "changed" });
   await value.command("create-episode", ["daily", "first"]);
   const episodePath = join(directory, "episode-first.toml"), original = parseEpisodeDraft(readFileSync(episodePath, "utf8"));
   expect(original.published_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   expect(readFileSync(episodePath, "utf8")).toMatch(/published_at = "/);
   writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-  await value.command("update-episode", ["daily", "first"]);
-  await value.command("update-episode-audio", ["daily", "first", "audio.mp3"]);
-  const published = await value.command("publish-episode", ["daily", "first"]);
-  expect(published).toMatchObject({ state: "succeeded" });
+  const published = await value.command("publish-episode", ["daily", "first", "audio.mp3"]);
+  expect(published).toMatchObject({ result: "changed" });
   const base = value.content.episodes("daily")[0];
   expect(base.guid).toBe(original.guid); expect(base.published_at).toBe(original.published_at);
   writeFileSync(episodePath, readFileSync(episodePath, "utf8").replace('title = "first"', 'title = "Updated first"'));
   value.calls.length = 0;
-  await value.command("update-episode", ["daily", "first"]);
-  expect(await value.command("job-status", [base.revision_id])).toMatchObject({ status: { state: "succeeded" }, snapshot_only: true, authorizes_recovery: false });
-  expect(await value.command("publish-episode", ["daily", "first"])).toMatchObject({ state: "succeeded" });
+  expect(await value.command("publish-episode", ["daily", "first"])).toMatchObject({ result: "changed" });
   expect(value.content.episodes("daily")[0]).toMatchObject({ title: "Updated first", guid: base.guid, enclosure_url: base.enclosure_url });
   expect(value.calls.some((call) => call.method === "PUT" && call.path.endsWith("audio.mp3"))).toBe(false);
   expect(value.calls.some((call) => /queues|event_notifications|show-publications|system\/jobs/.test(call.path))).toBe(false);
@@ -56,24 +52,21 @@ test("publish-episode requires explicit future published_at approval through com
   await value.command("show-resume", ["daily", crypto.randomUUID()]);
   const directory = join(value.root, "daily");
   writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
-  await value.command("update-show", ["daily"]);
   await value.command("publish-show", ["daily"]);
   await value.command("create-episode", ["daily", "future"]);
   const episodePath = join(directory, "episode-future.toml"), draft = parseEpisodeDraft(readFileSync(episodePath, "utf8"));
   writeFileSync(episodePath, stringifyToml({ ...draft, published_at: "2099-01-01T00:00:00Z" }));
   writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-  await value.command("update-episode", ["daily", "future"]);
-  await value.command("update-episode-audio", ["daily", "future", "audio.mp3"]);
-  const preview = await value.command("preview-episode", ["daily", "future"]) as {
+  const preview = await value.command("preview-episode", ["daily", "future", "audio.mp3"]) as {
     warnings: Array<{ code: string; published_at: string }>; input_fingerprint: string };
   expect(preview.warnings).toMatchObject([{ code: "future_published_at", published_at: "2099-01-01T00:00:00Z" }]);
   const posts = value.calls.filter((call) => call.method === "POST").length;
-  await expect(value.command("publish-episode", ["daily", "future"])).rejects.toThrow("future");
+  await expect(value.command("publish-episode", ["daily", "future", "audio.mp3"])).rejects.toThrow("future");
   expect(value.calls.filter((call) => call.method === "POST").length).toBe(posts);
   expect(value.content.episodes("daily")).toHaveLength(0);
-  expect(await runSqliteCommand(value.root, value.config, "publish-episode", ["daily", "future"], {
+  expect(await runSqliteCommand(value.root, value.config, "publish-episode", ["daily", "future", "audio.mp3"], {
     transport: value.transport, cloudflare: value.options, allowFuturePublishedAt: true,
-    expectedPreview: preview.input_fingerprint })).toMatchObject({ state: "succeeded" });
+    expectedPreview: preview.input_fingerprint })).toMatchObject({ result: "changed" });
   expect(value.content.episodes("daily")[0]).toMatchObject({ title: "future", published_at: "2099-01-01T00:00:00Z" });
 });
 

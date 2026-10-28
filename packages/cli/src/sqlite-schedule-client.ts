@@ -1,9 +1,9 @@
-import { sqlitePublicationRequestHash, sqliteScheduleCancelSchema, sqliteScheduleCreateSchema, sqliteScheduleListSchema,
+import { sqliteScheduleCancelSchema, sqliteScheduleCreateSchema, sqliteScheduleListSchema,
   sqliteScheduleReapproveSchema, sqliteScheduleRescheduleSchema, sqliteScheduleStatusSchema, sqliteServiceConfigHash,
   sqliteServiceConfigSchema } from "@castloop/shared";
 import type { SqliteScheduleCancel, SqliteScheduleCreate, SqliteScheduleList, SqliteScheduleReapprove,
   SqliteScheduleReschedule, SqliteScheduleStatus, SqliteServiceConfig } from "@castloop/shared";
-import type { OperationClient } from "../../shared/src/sqlite-operations";
+import { sqliteDirectPublicationRequestHash, MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadBudget, SqliteManagementReadOptions } from "./sqlite-management-http";
 import type { R2RestTransport } from "./verified-r2-put";
@@ -27,17 +27,16 @@ export class SqliteScheduleClient {
   private async get(path: string, showId: string, budget: SqliteManagementReadBudget = {}): Promise<unknown> {
     return readSqliteManagementGet(new URL(`/admin/sqlite-schedules${path}`, this.config.workers_dev_base_url), {
       "X-Castloop-Key": this.administratorKey, "X-Castloop-Show-Id": showId, Accept: "application/json",
-    }, { ...this.readOptions, ...budget, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: 32768 });
+    }, { ...this.readOptions, ...budget, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768 });
   }
 
-  private async post(path: string, input: SqliteScheduleCreate | SqliteScheduleReschedule | SqliteScheduleCancel | SqliteScheduleReapprove,
-    trace?: OperationClient): Promise<unknown> {
+  private async post(path: string, input: SqliteScheduleCreate | SqliteScheduleReschedule | SqliteScheduleCancel | SqliteScheduleReapprove): Promise<unknown> {
     let response: Response;
     try {
       response = await this.transport(new URL(`/admin/sqlite-schedules${path}`, this.config.workers_dev_base_url), {
         method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(this.timeoutMs),
         headers: { "X-Castloop-Key": this.administratorKey, "X-Castloop-Show-Id": input.show_id, Accept: "application/json",
-          "Content-Type": "application/json", ...(trace ? { "X-Castloop-Client-Id": trace.client_id, "X-Castloop-Cli-Version": trace.cli_version } : {}) },
+          "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
     } catch { throw new Error("SQLite schedule response is unknown; preserve the request without automatic retry"); }
@@ -45,7 +44,7 @@ export class SqliteScheduleClient {
       await response.body?.cancel();
       throw new Error(`SQLite schedule request was not verified (HTTP ${response.status}); no automatic retry`);
     }
-    try { return await readSqliteManagementJson(response, 32768); }
+    try { return await readSqliteManagementJson(response, MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768); }
     catch { throw new Error("SQLite schedule response body was not verified; preserve the request without automatic retry"); }
   }
 
@@ -59,10 +58,10 @@ export class SqliteScheduleClient {
     return parsed.data;
   }
 
-  async create(input: SqliteScheduleCreate, trace?: OperationClient): Promise<SqliteScheduleStatus> {
+  async create(input: SqliteScheduleCreate): Promise<SqliteScheduleStatus> {
     const request = sqliteScheduleCreateSchema.parse(input);
-    const result = await this.checked(await this.post("", request, trace), request.schedule_id);
-    if (result.schedule.request_sha256 !== await sqlitePublicationRequestHash(request.publication) || result.schedule.preview_sha256 !== request.preview_sha256 ||
+    const result = await this.checked(await this.post("", request), request.schedule_id);
+    if (result.schedule.request_sha256 !== await sqliteDirectPublicationRequestHash(request.publication) || result.schedule.preview_sha256 !== request.preview_sha256 ||
       JSON.stringify(result.schedule.scheduled_at) !== JSON.stringify(request.scheduled_at)) {
       throw new Error("SQLite schedule result differs from its frozen request");
     }
@@ -104,7 +103,7 @@ export class SqliteScheduleClient {
   async reapprove(input: SqliteScheduleReapprove): Promise<SqliteScheduleStatus> {
     const request = sqliteScheduleReapproveSchema.parse(input);
     const result = await this.checked(await this.post(`/${request.schedule_id}/reapprove`, request), request.schedule_id);
-    if (result.schedule.request_sha256 !== await sqlitePublicationRequestHash(request.publication) ||
+    if (result.schedule.request_sha256 !== await sqliteDirectPublicationRequestHash(request.publication) ||
       JSON.stringify(result.schedule.scheduled_at) !== JSON.stringify(request.scheduled_at)) {
       throw new Error("SQLite schedule reapproval result differs from its frozen request");
     }

@@ -10,7 +10,7 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { administratorKey } from "./administrator-key";
 import { diagnoseLocal } from "./doctor";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,7 +24,7 @@ async function fixture() {
   await command("create-show", ["daily", "https://example.com"]);
   await command("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(value.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
-  await command("update-show", ["daily"]); await command("publish-show", ["daily"]);
+  await command("publish-show", ["daily"]);
   const node = () => value.nodes.get("daily")!;
   const client = new SqliteServiceClient(value.config, administratorKey(value.root), value.transport);
   const cacheEnv = {
@@ -44,8 +44,7 @@ test("admission stop serves approved Feed, cover and audio with HTTP conditions 
   const value = await fixture();
   await value.command("create-episode", ["daily", "first"]);
   writeFileSync(join(value.root, "daily", "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-  await value.command("update-episode", ["daily", "first"]); await value.command("update-episode-audio", ["daily", "first", "audio.mp3"]);
-  await value.command("publish-episode", ["daily", "first"]);
+  await value.command("publish-episode", ["daily", "first", "audio.mp3"]);
   const audioPath = new URL(value.content.episodes("daily")[0].enclosure_url).pathname;
   const paths = ["/podcasts/daily/feed.xml", "/podcasts/daily/cover.jpg", audioPath];
   const old = await Promise.all(paths.map(async (path) => { const response = await value.read(path); return new Uint8Array(await response.arrayBuffer()); }));
@@ -71,7 +70,9 @@ test("admission stop serves approved Feed, cover and audio with HTTP conditions 
     const redirected = await alternate(path, value.config.workers_dev_base_url);
     expect(redirected.status).toBe(path.endsWith("feed.xml") ? 301 : 307); expect(redirected.headers.get("Location")).toBe(`${publicOrigin}${path}`);
   }
-  await expect(value.command("update-show", ["daily"])).rejects.toThrow();
+  const showFile = join(value.root, "daily", "show.toml");
+  writeFileSync(showFile, readFileSync(showFile, "utf8").replace('title = "daily"', 'title = "Changed"'));
+  await expect(value.command("publish-show", ["daily"])).rejects.toThrow();
   expect(value.bucketCalls.filter((call) => call.method === "PUT")).toHaveLength(puts);
   expect((await value.read("/staging/uploads/daily/private.mp3")).status).toBe(404);
   const stop = crypto.randomUUID(); await value.command("show-pause", ["daily", stop]);
