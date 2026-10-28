@@ -1,5 +1,7 @@
 # 設計文書の案内
 
+v0.7.6はIssue #70の内蔵番組サイト、Issue #65の予約公開とfuture `published_at`警告、Issue #63のオフライン暗号化バックアップ/検証/復元を追加する。内部queue/content形式**11/11**と`website="static-show-v2"`の新規環境専用で、7/8以前のリリース環境・試験環境は変換・採用しない。[リリースノート](../docs/release-v0.7.6.md)を起点に、以下の旧形式・開発時点の記録と区別する。実CloudflareでのCPU・無料枠適合、モバイル/キーボード実機確認は未検証である。
+
 Issue #65の予約公開とIssue #70の改善を統合した現在の内部queue/content形式は**11/11**、必須サイト識別は`static-show-v2`。新規環境専用であり、予約公開版9/9・サイト試験版10/11等からの変換・互換配備は行わない。以下の番号は各段階の履歴として区別する。統合版は新規の本人限定環境へ実配備し、予約公開3件・取消1件・全コンテンツのAccess拒否を確認した。native Free性能、スマートフォン／キーボードの実機確認は未完了である。
 
 Issue #70の自動短縮URL版は内部queue/content形式**10/11**・サイト識別`static-show-v2`の新規環境専用。Show直下の自動16文字ハッシュだけをEpisodeページ入口とし、衝突時だけ延長する。HTTP(S)リンク表示とcopyrightフッター削除も実装した。[URL設計と実装](show_website_site_slug_proposal.md)・[利用ガイド](../docs/show_website.md)を参照する。旧9/10等のDBは変換・互換配備しない。
