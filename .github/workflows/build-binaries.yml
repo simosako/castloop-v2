@@ -127,7 +127,10 @@ jobs:
           actual_version="${actual_version%$'\r'}"
           test "$actual_version" = "$expected_version"
           "./${{ matrix.binary }}" --help | grep -F 'Usage: castloop'
-          for command in init create-show create-episode update-show publish-show update-episode update-episode-audio publish-episode job-status service-status show-status show-pause show-resume deploy domain init-continue-verification update-service-verify update-service-reconcile preview-show-lifecycle preview-episode-lifecycle lifecycle-execute list-shows list-episodes import-rss publish-rss-import; do
+          # Take the command list from the binary itself so this check cannot drift when
+          # commands are added, renamed or removed (the Phase 2-4 removals broke this step).
+          command_list="$("./${{ matrix.binary }}" describe | node -e "let source='';process.stdin.on('data',chunk=>source+=chunk).on('end',()=>console.log(JSON.parse(source).commands.map(c=>c.command).join(' ')))")"
+          for command in $command_list; do
             "./${{ matrix.binary }}" "$command" --help | grep -F "Usage: castloop $command"
           done
           "./${{ matrix.binary }}" init --help | grep -F 'no protocol option is required'
