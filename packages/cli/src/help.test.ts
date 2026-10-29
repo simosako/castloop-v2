@@ -32,14 +32,14 @@ test("help works after positional arguments, with -h, and with help COMMAND", ()
   expect(commandHelp("init")).toContain("schema_version=2");
 });
 
-test("security containment instructions name supported current commands and explicit Show pause arguments", () => {
+test("security containment instructions name supported current commands and reviewed lifecycle containment", () => {
   const policy = readFileSync(join(import.meta.dir, "../../..", "SECURITY.md"), "utf8");
   const commands = [...policy.matchAll(/`castloop ([a-z][a-z-]*)([^`]*)`/g)];
   expect(commands.length).toBeGreaterThan(0);
   for (const [, name] of commands) expect(Object.hasOwn(COMMAND_HELP, name)).toBe(true);
-  expect(policy).toContain("`castloop show-pause SHOW_ID PAUSE_UUID`");
-  expect(commandHelp("show-pause")).toContain("PAUSE_UUID");
+  expect(policy).toContain("`castloop preview-show-lifecycle SHOW_ID unpublish`");
   expect(policy).not.toContain("castloop service-pause");
+  expect(policy).not.toContain("castloop show-pause");
 });
 
 test("removed commands, unsupported families and malformed arguments fail before workspace access", () => {
@@ -87,7 +87,7 @@ globalThis.fetch = async (url, init) => {
   return Response.json(JSON.parse(process.env.CASTLOOP_TEST_RESPONSE), { headers: { "Cache-Control": "no-store" } });
 };`);
   const common = { protocol: "sqlite-sequential-v1", service_id: "service", worker_version_id: crypto.randomUUID(),
-    service_config_sha256: await sqliteServiceConfigHash(config), snapshot_only: true, authorizes_recovery: false, state: "open", next_cursor: null };
+    service_config_sha256: await sqliteServiceConfigHash(config), snapshot_only: true, authorizes_recovery: false, next_cursor: null };
   const show = { show_id: "daily", lifecycle: "published", unfinished_operation: false,
     title: "Title\n\u001b[31m", feed_url: `${config.public_base_url}/podcasts/daily/feed.xml` };
   const episode = { episode_id: "first", lifecycle: "published", title: "First Episode", published_at: "2026-10-04T12:00:00Z" };

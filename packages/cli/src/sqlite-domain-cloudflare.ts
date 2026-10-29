@@ -194,6 +194,10 @@ export class SqliteDomainCloudflare {
   }
   async attach(request: SqliteDomainRequest): Promise<SqliteDomainAttachment> {
     if (request.action !== "add") throw new Error("Only an add request can attach a domain");
+    const existing = (await this.list()).filter((domain) => domain.service === this.config.worker_name || domain.hostname.toLowerCase() === request.hostname);
+    if (existing.length === 1 && existing[0]!.service === this.config.worker_name && existing[0]!.hostname.toLowerCase() === request.hostname) {
+      return requireSqliteDomainAttachment(existing[0], request);
+    }
     const target = await this.preflightAdd(request.hostname, request.zone_id);
     if (target.zone_name !== request.zone_name) throw new Error("Frozen domain zone name differs");
     const input = (await this.call("domain_attach", "PUT", `${this.account}/workers/domains`, {
@@ -226,6 +230,8 @@ export class SqliteDomainCloudflare {
   }
   async detach(request: SqliteDomainRequest, connection: SqliteDomainConnection): Promise<void> {
     if (request.action !== "remove") throw new Error("Only a remove request can detach a domain");
+    const current = (await this.list()).filter((domain) => domain.service === this.config.worker_name || domain.hostname.toLowerCase() === request.hostname);
+    if (current.length === 0) return;
     await this.inspect(request, connection);
     const result = await this.call("domain_detach", "DELETE", `${this.account}/workers/domains/${encodeURIComponent(connection.id)}`);
     if (result?.result !== undefined && result.result !== null) throw new Error("Domain DELETE success response differs");

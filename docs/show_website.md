@@ -2,7 +2,7 @@
 
 Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を追加した開発版。合意した機能実装と本人の画面確認は完了した。Cloudflare Free性能の実証や全端末での確認を意味しない。
 
-フェーズ2開発版の新規13/13環境向け。healthとinspectionは`website="static-show-v2"`を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1。旧環境の変換・移行・資源採用は提供しない。Feed/HTMLはSQLiteからオンデマンド生成し、素材だけR2へ直接配置する。実環境には未配備。
+フェーズ3開発版の新規14/13環境向け。healthとinspectionは`website="static-show-v2"`を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1。旧環境の変換・移行・資源採用は提供しない。Feed/HTMLはSQLiteからオンデマンド生成し、素材だけR2へ直接配置する。実環境には未配備。
 
 ## サイト方式を選ぶ
 
@@ -10,7 +10,6 @@ Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイ�
 
 ```sh
 castloop create-show my-show --site-mode builtin
-castloop show-resume my-show NEW_WINDOW_UUID
 # Edit my-show/show.toml and provide the cover named in image_path.
 castloop publish-show my-show
 ```
@@ -120,8 +119,8 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 - 必要なpurge後、内容と世代を同じSQLiteトランザクションで切り替える。パージやDB失敗では現在内容を維持する。HTML事前生成batch・R2 HTML保存・公開jobは使わない。
 - 旧形式へのcode-only deploy・DB変換は行わない。現行形式同士のcode更新は通常の保守手順で行う。
 - 1 HTMLは1,000,000 bytes以下。公開件数・JSON・Feed予算も適用し、超過を切り詰めない。全件Feed生成などの負荷は残る。
-- `show-admission-pause`は新規受付を止め、確定済み内容の配信を続ける。`show-pause`はHTML・画像・音源も停止する。cache HIT、HEAD、304、旧workers.devからのredirectの前にも最新のShow判定を行う。
-- domain変更は[専用保守](sqlite_custom_domains.md)でHTMLのcanonical／OGPとFeedを新originへ生成する。全Showの保守完了後も自動Resumeしない。code-only deployでdomainを変更しない。
+- 配信停止には既存のlifecycle操作（`unpublish`／`restore`）を使う。cache HIT、HEAD、304、旧workers.devからのredirectの前にも最新のShow判定を行う。
+- domain変更は[専用保守](sqlite_custom_domains.md)でHTMLのcanonical／OGPとFeedを新originへ切り替える。code-only deployでdomainを変更しない。
 - 短い識別子は公開時に確定して索引へ保存する。閲覧時は内部Episode IDを解決し、公開・停止・readiness判定を通してHTML cacheへ進む。
 - RSS previewはサーバーから取得した予約を使い、新規Episodeには未予約の候補を表示する。previewで予約・公開はしない。候補の確定は明示公開の処理で行う。
 - 保存済みHTMLや再生buffer、検索・SNSの第三者コピーを遠隔消去することはできない。

@@ -93,8 +93,6 @@ export class SqlitePublicationContent {
         if (existing.reservation_id !== reservationId) throw new Error("Show ID already has a permanent reservation");
         return existing;
       }
-      const service = this.storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
-      if (service?.state !== (initializing ? "paused" : "open")) throw new Error("Show registration requires drained publication admission");
       this.storage.sql.exec("INSERT INTO publication_shows (show_id, reservation_id, state_version, feed_generation, lifecycle) VALUES (?, ?, 0, 0, 'draft')", showId, reservationId);
       return this.show(showId)!;
     });
@@ -627,8 +625,6 @@ export class SqlitePublicationContent {
     const asset = parsePublicAssetPath(path);
     if (!asset) return { status: 404 };
     return this.storage.transactionSync(() => {
-      const service = this.storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
-      if (service?.state !== "open" && service?.state !== "admission_paused") return { status: 503 };
       const show = this.show(asset.showId);
       if (!show) return { status: 404 };
       if (show.lifecycle === "draft" || show.lifecycle === "unpublished") return { status: 404 };

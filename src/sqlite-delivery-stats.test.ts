@@ -14,7 +14,7 @@ function observation(overrides: Partial<SqliteDeliveryObservation> = {}): Sqlite
 }
 
 function statsFixture(startedAtMs: number) {
-  const value = sqlitePublicationFixture({ resume: false });
+  const value = sqlitePublicationFixture();
   fixtures.push(value);
   const content = new SqlitePublicationContent(value.storage);
   let now = startedAtMs;
@@ -23,7 +23,7 @@ function statsFixture(startedAtMs: number) {
   value.storage.sql.exec("INSERT INTO publication_episodes (show_id, episode_id, lifecycle, lifecycle_version, revision_id) VALUES ('daily', 'first', 'published', 0, ?)", crypto.randomUUID());
   value.storage.sql.exec("INSERT INTO publication_media (show_id, episode_id, audio_revision_id, sha256, length_bytes) VALUES ('daily', 'first', ?, ?, ?)",
     audioRevision, "b".repeat(64), audioLength);
-  const stats = new SqliteDeliveryStats(value.storage, "daily", value.runtime, () => now);
+  const stats = new SqliteDeliveryStats(value.storage, "daily", value.identity, () => now);
   const advanceTo = (ms: number) => { now = ms; };
   const recordAt = (ms: number, entries: SqliteDeliveryObservation[]) => { now = ms; stats.record(entries); };
   return { ...value, content, stats, audioRevision, advanceTo, recordAt };
@@ -106,7 +106,7 @@ test("retention shortening advances the boundary immediately and merges pruned d
   const early = value.stats.dailyPage({ episode_id: "first", from_date_utc: "2026-09-01", to_date_utc: "2026-09-01" });
   expect(early.days[0]!.counters).not.toBeNull();
   const operationId = crypto.randomUUID();
-  const applied = await value.stats.applyRetention({ ...value.runtime, show_id: "daily", operation_id: operationId, retention_days: 30 }, value.runtime);
+  const applied = await value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: operationId, retention_days: 30 }, value.identity);
   expect(applied.retention_days).toBe(30);
   // One batch (at most 200 rows) per UTC day; the declaration moves first.
   const later = Date.UTC(2026, 9, 10, 1);
@@ -121,10 +121,10 @@ test("retention shortening advances the boundary immediately and merges pruned d
   expect(after.period).toMatchObject({ initial_downloads: 0, response_bytes: 0 });
   expect(after.coverage).toBe("partial");
   // Same operation id with the same content replays the stored record; different content is rejected.
-  expect((await value.stats.applyRetention({ ...value.runtime, show_id: "daily", operation_id: operationId, retention_days: 30 }, value.runtime)).applied_at_ms)
+  expect((await value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: operationId, retention_days: 30 }, value.identity)).applied_at_ms)
     .toBe(applied.applied_at_ms);
-  await expect(value.stats.applyRetention({ ...value.runtime, show_id: "daily", operation_id: operationId, retention_days: 60 }, value.runtime)).rejects.toThrow();
-  await expect(value.stats.applyRetention({ ...value.runtime, show_id: "daily", operation_id: crypto.randomUUID(), retention_days: 10 }, value.runtime)).rejects.toThrow();
+  await expect(value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: operationId, retention_days: 60 }, value.identity)).rejects.toThrow();
+  await expect(value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: crypto.randomUUID(), retention_days: 10 }, value.identity)).rejects.toThrow();
 });
 
 test("recording failures are counted, daily paging uses bounded pages and windows are range-checked", () => {
@@ -145,5 +145,5 @@ test("recording failures are counted, daily paging uses bounded pages and window
   expect(next.days[0]!.date_utc).toBe("2026-10-02");
   expect(next.days.at(-1)!.date_utc).toBe("2026-10-10");
   expect(next.nextCursor).toBeNull();
-  expect(() => value.stats.dailyPage({ episode_id: "first", cursor: btoa(JSON.stringify({ ...value.runtime, show_id: "other" })) } as never)).toThrow();
+  expect(() => value.stats.dailyPage({ episode_id: "first", cursor: btoa(JSON.stringify({ ...value.identity, show_id: "other" })) } as never)).toThrow();
 });

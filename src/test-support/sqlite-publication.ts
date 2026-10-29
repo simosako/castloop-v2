@@ -2,8 +2,10 @@ import { Database } from "bun:sqlite";
 import type { SqlitePublicationRuntime } from "../../packages/shared/src/sqlite-publication";
 import { SqlitePublicationQueue } from "../sqlite-publication-queue";
 import type { PublicationQueueStorage } from "../sqlite-publication-queue";
+import { initializeSqliteDomains, pendingSqliteDomain } from "../sqlite-domain-runtime";
 
-export function sqlitePublicationFixture(options: { path?: string; runtime?: SqlitePublicationRuntime; resume?: boolean } = {}) {
+export function sqlitePublicationFixture(options: { path?: string; runtime?: SqlitePublicationRuntime;
+  scope?: { showId: string; ready: () => boolean } } = {}) {
   const database = new Database(options.path ?? ":memory:", { strict: true });
   database.exec("PRAGMA foreign_keys = ON");
   const runtime = options.runtime ?? { service_id: "test-service", worker_version_id: crypto.randomUUID(), service_config_sha256: "a".repeat(64) };
@@ -46,10 +48,9 @@ export function sqlitePublicationFixture(options: { path?: string; runtime?: Sql
       if (syncFailures) { syncFailures--; throw new Error("Injected durability confirmation failure"); }
     },
   };
-  const queue = new SqlitePublicationQueue(storage, runtime, () => 1000);
-  const windowId = options.resume === false ? null : crypto.randomUUID();
-  if (windowId) queue.resume(windowId);
-  return { database, storage, runtime, queue, windowId,
+  const queue = new SqlitePublicationQueue(storage, runtime, () => 1000, options.scope);
+  const identity = { service_id: runtime.service_id, service_config_sha256: runtime.service_config_sha256 };
+  return { database, storage, runtime, identity, queue,
     alarm: () => alarm, clearAlarm: () => { alarm = null; },
     failAlarm: () => { alarmFailures++; }, failSync: () => { syncFailures++; },
     close: () => database.close(),

@@ -12,7 +12,7 @@ const fixtures: Array<ReturnType<typeof sqlitePublicationFixture>> = [];
 afterEach(() => { for (const value of fixtures.splice(0)) value.close(); });
 
 function httpFixture() {
-  const value = sqlitePublicationFixture({ resume: false });
+  const value = sqlitePublicationFixture();
   fixtures.push(value);
   new SqlitePublicationContent(value.storage);
   const audioRevision = crypto.randomUUID();
@@ -21,13 +21,9 @@ function httpFixture() {
   value.storage.sql.exec("INSERT INTO publication_media (show_id, episode_id, audio_revision_id, sha256, length_bytes) VALUES ('daily', 'first', ?, ?, 6000000)", audioRevision, "b".repeat(64));
   const stats = new SqliteDeliveryStats(value.storage, "daily", value.runtime, () => Date.UTC(2026, 9, 20, 12));
   const health = (): SqliteHealth => sqliteHealthSchema.parse({ ...value.runtime, protocol: "sqlite-sequential-v1",
-    feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1",
-    publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1",
-    domain_changes: "sqlite-domain-change-v1", availability_controls: "show-admission-delivery-v1",
+    domain_changes: "sqlite-domain-change-v1",
     revision_history: "sqlite-revisions-v1", delivery_statistics: "episode-daily-v1", website: "static-show-v2",
-    invocation_id: crypto.randomUUID(), publication_ready: true, state: "open", admission_window_id: null,
-    availability_version: 0, admission_state: "open", delivery_policy: "enabled", queued: 0, active: null,
-    drained: true, setup: null, runtime_update: null, scope: "show", show_id: "daily", maintenance_operation_id: null });
+    invocation_id: crypto.randomUUID(), publication_ready: true, scope: "show", show_id: "daily" });
   const handler = createSqliteStatsHttp(stats, "admin-key", "daily", health);
   const request = (path: string, init: RequestInit = {}) => new Request(`https://worker.example.workers.dev/admin/sqlite-stats/${path}`, {
     ...init, headers: { "X-Castloop-Key": "admin-key", "X-Castloop-Show-Id": "daily", ...(init.headers ?? {}) } });
@@ -64,7 +60,7 @@ test("statistics endpoints require authentication, return bounded pages and reje
 test("retention changes apply once, replay identically, conflict on divergence and answer lookups", async () => {
   const { handler, request, value } = httpFixture();
   const operationId = crypto.randomUUID();
-  const body = { ...value.runtime, show_id: "daily", operation_id: operationId, retention_days: 90 };
+  const body = { ...value.identity, show_id: "daily", operation_id: operationId, retention_days: 90 };
   const applied = await handler(request("retention", { method: "POST", body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }));
   expect(applied.status).toBe(200);
   const appliedJson = await applied.json() as { retention: { retention_days: number; applied_at_ms: number } };

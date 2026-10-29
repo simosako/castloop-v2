@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { episodeDraftInputSchema, showMetadataInputSchema } from "./metadata";
 import { sqliteAudioReferenceSchema, sqliteCoverReferenceSchema } from "./sqlite-media";
-import { MAX_SQLITE_PUBLICATION_BYTES, sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { MAX_SQLITE_PUBLICATION_BYTES, sqlitePublicationProtocol, sqlitePublicationRuntimeSchema, sqliteServiceIdentitySchema } from "./sqlite-publication";
 import { diffEpisodeDraftFields, diffShowMetadataFields } from "./sqlite-revisions";
 import type { SqliteContentSnapshot } from "./sqlite-revisions";
 import { sha256Hex } from "./sha256";
@@ -9,12 +9,12 @@ import { sha256Hex } from "./sha256";
 // Retain the existing 1 MB metadata allowance plus the management envelope.
 export const MAX_SQLITE_DIRECT_PUBLICATION_BYTES = 1_000_000 + MAX_SQLITE_PUBLICATION_BYTES;
 const counter = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-const common = sqlitePublicationRuntimeSchema.extend({
+const common = sqliteServiceIdentitySchema.extend({
   schema_version: z.literal(1), protocol: z.literal(sqlitePublicationProtocol),
   show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   episode_id: z.string().max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   base_revision_id: z.uuid().optional(), expected_episode_lifecycle_version: counter.optional(),
-  admission_window_id: z.uuid(), expected_show_state_version: counter,
+  expected_show_state_version: counter,
 });
 
 export const sqliteDirectPublishRequestSchema = z.discriminatedUnion("kind", [

@@ -15,7 +15,7 @@ async function fixture() {
   await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, { attempts: 2, delay: async () => {} });
   const command = (name: string, args: string[] = [], transport = value.transport) => runSqliteCommand(value.root, value.config, name, args,
     { transport, cloudflare: value.options });
-  await command("create-show", ["daily", "https://example.com/podcast"]); await command("show-resume", ["daily", crypto.randomUUID()]);
+  await command("create-show", ["daily", "https://example.com/podcast"]);
   writeFileSync(join(value.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
   await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);
@@ -57,16 +57,16 @@ test("lost lifecycle responses can be resubmitted as unchanged without a journal
   expect(value.calls.filter((call) => call.method === "POST")).toHaveLength(1);
 });
 
-test("lifecycle refuses changed hashes, deletion, unconfirmed requests and stale resume windows without replay", async () => {
+test("lifecycle refuses changed hashes, deletion and unconfirmed requests and replays idempotently", async () => {
   const value = await fixture(), plan = await value.preview("unpublish"); writeFileSync(value.file, JSON.stringify(plan)); value.calls.length = 0;
   await expect(value.command("lifecycle-execute", [value.file, "f".repeat(64), "confirm"])).rejects.toThrow("reviewed plan");
   await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm-delete-retain-records"])).rejects.toThrow("confirm");
   await expect(value.preview("delete")).rejects.toThrow("deletion");
   expect(value.calls).toEqual([]);
-  await value.command("show-pause", ["daily", crypto.randomUUID()]); await value.command("show-resume", ["daily", crypto.randomUUID()]);
-  await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).rejects.toThrow("HTTP 409");
+
+  expect(await value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).toMatchObject({ result: "changed" });
   value.calls.length = 0;
-  await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).rejects.toThrow("HTTP 409");
+  expect(await value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).toMatchObject({ result: "unchanged" });
 });
 
 test("catalog client accepts bounded pages of escaped Unicode titles above the publication body limit", async () => {

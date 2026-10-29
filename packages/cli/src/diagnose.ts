@@ -70,8 +70,8 @@ async function diagnoseShow(config: SqliteServiceConfig, showId: string, key: st
     if (registered) {
       try {
         const health = await client.health(showId);
-        checks.push(health.state === "open" && health.publication_ready ? check("admission", "remote", "pass", "admission_open", "Show admission is open and publication-ready") :
-          check("admission", "remote", "warn", health.state === "admission_paused" ? "admission_paused" : health.state === "paused" ? "show_paused" : "not_publication_ready", "Show admission or runtime readiness restricts publication"));
+        checks.push(health.publication_ready ? check("admission", "remote", "pass", "publication_ready", "The Show runtime is publication-ready") :
+          check("admission", "remote", "warn", "not_publication_ready", "Show runtime readiness restricts publication"));
       } catch { checks.push(check("admission", "remote", "fail", "observation_unavailable", "Show health was not observable")); }
       try {
         const content = await client.content(showId);
@@ -104,9 +104,9 @@ export async function diagnoseShows(root: string, input: SqliteServiceConfig, sh
     } catch { shared.push(check("remote-identity", "remote", "fail", "observation_unavailable", "Service health was not observable", ["inspect_service_status"])); }
   } else shared.push(check("remote-identity", "remote", "not_checked", "administrator_key_unavailable", "The administrator key is unavailable; remote checks were skipped"));
   if (health) {
-    const maintenance = health.maintenance ? "maintenance_active" : health.runtime_update ? "runtime_update_active" : health.setup && health.setup.state !== "ready" ? "setup_active" : null;
-    shared.push(check("maintenance", "remote", maintenance ? "warn" : "pass", maintenance ?? "no_maintenance", maintenance ? "Service maintenance is in progress" : "No shared maintenance, runtime update or setup is in progress"));
-  } else shared.push(check("maintenance", "remote", key ? "fail" : "not_checked", key ? "observation_unavailable" : "administrator_key_unavailable", "Shared maintenance state was not observable"));
+    shared.push(check("maintenance", "remote", health.publication_ready ? "pass" : "warn", health.publication_ready ? "no_maintenance" : "service_not_ready",
+      health.publication_ready ? "No domain change or runtime restriction is in progress" : "The service is not publication-ready; an unfinished domain change may be pending"));
+  } else shared.push(check("maintenance", "remote", key ? "fail" : "not_checked", key ? "observation_unavailable" : "administrator_key_unavailable", "Service readiness was not observable"));
   shared.push(await cfCredentialsCheck(config, options));
   const shows: DiagnoseShowResult[] = [];
   for (const showId of ids) shows.push(await diagnoseShow(config, showId, key, !!health, options));

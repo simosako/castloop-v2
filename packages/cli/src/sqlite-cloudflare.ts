@@ -55,6 +55,11 @@ export class SqliteCloudflareApi {
     if (new URL(this.config.workers_dev_base_url).hostname !== `${this.config.worker_name}.${subdomain.subdomain}.workers.dev`) throw new Error("Configured workers.dev subdomain differs from this account");
   }
   async createBucket(): Promise<void> {
+    const existing = await this.call("GET", `/r2/buckets/${encodeURIComponent(this.config.bucket_name)}`, undefined, undefined, true);
+    if (existing !== null) {
+      if (z.object({ name: z.string() }).parse(existing).name !== this.config.bucket_name) throw new Error("Existing R2 bucket differs");
+      return;
+    }
     const bucket = z.object({ name: z.string() }).parse(await this.json("POST", "/r2/buckets", { name: this.config.bucket_name }));
     if (bucket.name !== this.config.bucket_name) throw new Error("Created R2 bucket differs");
   }
@@ -67,6 +72,8 @@ export class SqliteCloudflareApi {
       () => { if (!consumed) throw new Error("Service config upload was not consumed"); }, this.options);
   }
   async createWorker(): Promise<void> {
+    const existing = await this.call("GET", `${this.path()}/settings`, undefined, undefined, true);
+    if (existing !== null) return;
     const worker = z.object({ name: z.string() }).parse(await this.json("POST", "/workers/workers", { name: this.config.worker_name }));
     if (worker.name !== this.config.worker_name) throw new Error("Created Worker differs");
   }

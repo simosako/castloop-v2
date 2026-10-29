@@ -40,7 +40,7 @@ export async function completedDomainConfiguration(root: string, input: SqliteSe
     const request = await parseSqliteDomainRequest(journal.request);
     const { public_base_url: __, ...previousFixed } = request.previous_config;
     if (JSON.stringify(fixed) !== JSON.stringify(previousFixed) || journal.request_sha256 !== await sqliteDomainRequestHash(request)) throw new Error("Completed domain configuration history differs");
-    edges.push({ from: request.previous_runtime.service_config_sha256, to: request.target_config_sha256, config: request.previous_config });
+    edges.push({ from: request.previous_config_sha256, to: request.target_config_sha256, config: request.previous_config });
   }
   const known = new Set([currentHash]); let changed = true;
   while (changed) {

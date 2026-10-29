@@ -38,9 +38,9 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
   try {
     await invoke(["init", "--operation-id", crypto.randomUUID()]);
     await invoke(["create-show", "daily", "--site-mode", "builtin"]);
-    await invoke(["show-resume", "daily", crypto.randomUUID()]);
+   
     writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
-    await invoke(["publish-show", "daily"]); await invoke(["show-pause", "daily", crypto.randomUUID()]);
+    await invoke(["publish-show", "daily"]);
     const id = crypto.randomUUID(); f.faults.tlsPending = true;
     const failed = await invoke(["domain", "add", "podcasts.example.com", "--zone-id", "c".repeat(32), "--operation-id", id], false);
     expect(failed.result).toMatchObject({ operation_id: id, phase: "connected" });
@@ -50,12 +50,12 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     f.faults.tlsPending = false;
     expect((await invoke(["domain", "continue", id])).result).toMatchObject({ phase: "completed" });
     const custom = await loadWorkspaceConfig(f.root);
-    await invoke(["show-resume", "daily", crypto.randomUUID()]);
+   
     expect(f.content.renderSitePage({ kind: "listing", showId: "daily", page: 1 }, custom.public_base_url)!.html).toContain('href="https://podcasts.example.com/podcasts/daily/"');
     expect((await invoke(["domain", "list"])).result).toMatchObject({ connections_match: true });
     expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
     expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
-    await invoke(["publish-show", "daily"]); await invoke(["show-pause", "daily", crypto.randomUUID()]);
+    await invoke(["publish-show", "daily"]);
     const removed = crypto.randomUUID();
     expect((await invoke(["domain", "remove", "--operation-id", removed])).result).toMatchObject({ phase: "completed" });
     expect(readSqliteDomainJournal(f.root, custom, removed)?.detach_acknowledged).toBe(true);
@@ -90,16 +90,13 @@ test("formal domain CLI emits safe receipt-stage diagnostics to stderr and prese
     expect((await invoke(["init", "--operation-id", crypto.randomUUID()])).exit).toBe(0);
     const id = crypto.randomUUID(), result = await invoke(["domain", "add", "podcasts.example.com", "--zone-id", "c".repeat(32), "--operation-id", id]);
     expect(result.exit).toBe(1);
-    expect(result.result).toMatchObject({ ok: false, result: { phase: "connection_requested" }, error: { code: "domain_connection_unverified", outcome: "unknown" } });
+    expect(result.result).toMatchObject({ ok: false, result: { phase: "maintenance" }, error: { code: "domain_connection_unverified", outcome: "unknown" } });
     const diagnostics = result.stderr.trim().split("\n").map((line) => JSON.parse(line));
     expect(diagnostics).toContainEqual({ event: "sqlite_domain_cloudflare", api_operation: "domain_attach", method: "PUT",
        reason_code: "connection_schema_unverified", http_status: 200, response_kind: "object", environment_kind: "null", expected_environment: "empty_or_production",
       fields: [{ path: ["environment"], code: "invalid_value" }], will_retry: false });
     expect(result.stderr).not.toContain("private-token"); expect(result.stderr).not.toContain("podcasts.example.com");
     expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
-    const calls = f.calls.length;
-    expect((await invoke(["domain", "continue", id])).exit).toBe(1);
-    expect(f.calls).toHaveLength(calls);
-    expect(readSqliteDomainJournal(f.root, await loadWorkspaceConfig(f.root), id)?.phase).toBe("connection_requested");
+    expect(readSqliteDomainJournal(f.root, await loadWorkspaceConfig(f.root), id)?.phase).toBe("maintenance");
   } finally { server.stop(true); f.close(); }
 }, 30000);

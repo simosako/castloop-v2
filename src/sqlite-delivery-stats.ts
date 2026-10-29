@@ -5,8 +5,8 @@ import { sqliteDeliveryObservationSchema, sqliteStatsCoverageSchema, sqliteStats
 import type { SqliteDeliveryObservation, SqliteStatsCoverage, SqliteStatsCounters,
   SqliteStatsDailyEntry, SqliteStatsEpisodeSummary, SqliteStatsRetentionRecord } from "../packages/shared/src/sqlite-stats";
 import { sha256Hex } from "../packages/shared/src/sha256";
-import { sqlitePublicationTargetSchema, sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
-import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
+import { sqlitePublicationTargetSchema } from "../packages/shared/src/sqlite-publication";
+import type { SqliteServiceIdentity } from "../packages/shared/src/sqlite-publication";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 
 export const SQLITE_DELIVERY_STATS_SCHEMA_VERSION = 1;
@@ -82,7 +82,7 @@ function round2(value: number): number {
 
 export class SqliteDeliveryStats {
   constructor(private readonly storage: PublicationQueueStorage, private readonly showId: string,
-    private readonly identity: SqlitePublicationRuntime, private readonly now: () => number = Date.now) {
+    private readonly identity: SqliteServiceIdentity, private readonly now: () => number = Date.now) {
     sqlitePublicationTargetSchema.shape.show_id.parse(showId);
     storage.transactionSync(() => {
       const queue = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
@@ -263,11 +263,11 @@ export class SqliteDeliveryStats {
     return record;
   }
 
-  async applyRetention(input: unknown, actual: SqlitePublicationRuntime): Promise<SqliteStatsRetentionRecord> {
+  async applyRetention(input: unknown, actual: SqliteServiceIdentity): Promise<SqliteStatsRetentionRecord> {
     const request = sqliteStatsRetentionRequestSchema.parse(input), source = JSON.stringify(request);
     const hash = await sha256Hex(source);
     const record = this.storage.transactionSync(() => {
-      if (request.service_id !== actual.service_id || request.worker_version_id !== actual.worker_version_id ||
+      if (request.service_id !== actual.service_id ||
         request.service_config_sha256 !== actual.service_config_sha256 || request.show_id !== this.showId) {
         throw new Error("Delivery stats retention target differs");
       }

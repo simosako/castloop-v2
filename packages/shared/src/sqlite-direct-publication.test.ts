@@ -3,9 +3,10 @@ import { parseSqliteDirectPublicationRequest, sameSqlitePublicationContent, sqli
 import { sqliteAudioReferenceSchema, sqliteCoverReferenceSchema, sqliteMediaKey } from "./sqlite-media";
 import { sqliteContentSnapshotSchema } from "./sqlite-revisions";
 
-const runtime = { service_id: "service", worker_version_id: crypto.randomUUID(), service_config_sha256: "a".repeat(64) };
-const common = { ...runtime, schema_version: 1, protocol: "sqlite-sequential-v1" as const, action: "publish", show_id: "daily",
-  admission_window_id: crypto.randomUUID(), expected_show_state_version: 1 };
+const identity = { service_id: "service", service_config_sha256: "a".repeat(64) };
+const runtime = { ...identity, worker_version_id: crypto.randomUUID() };
+const common = { ...identity, schema_version: 1, protocol: "sqlite-sequential-v1" as const, action: "publish", show_id: "daily",
+  expected_show_state_version: 1 };
 const metadata = { schema_version: 1 as const, show_id: "daily", title: "Title", description: "Description", language: "ja", author: "Author",
   owner_name: "Owner", owner_email: "owner@example.com", categories: ["Technology"], explicit: false,
   site_url: "https://example.com", image_path: "cover.jpg" };
@@ -27,8 +28,8 @@ const episodeRequest = () => {
 const current = () => {
   const revisionId = crypto.randomUUID(), audioId = crypto.randomUUID();
   const updatedAt = "2026-10-28T01:00:00Z", enclosureUrl = `https://example.com/podcasts/daily/episodes/first/${audioId}.mp3`;
-  return sqliteContentSnapshotSchema.parse({ ...runtime, protocol: common.protocol, publication_ready: true, state: "open",
-    admission_window_id: common.admission_window_id, show_id: "daily", episode_id: "first", show_lifecycle: "published",
+  return sqliteContentSnapshotSchema.parse({ ...runtime, protocol: common.protocol, publication_ready: true,
+    show_id: "daily", episode_id: "first", show_lifecycle: "published",
     reservation_id: crypto.randomUUID(), expected_show_state_version: 9, feed_generation: 20, published_episode_count: 1,
     published_inventory_chars: 1000, show_content: { show_id: "daily", revision_sequence: 4, state_version: 9,
       revision_id: crypto.randomUUID(), metadata, metadata_sha256: "d".repeat(64),

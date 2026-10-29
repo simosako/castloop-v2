@@ -4,7 +4,7 @@
 - 調査基準commit: `602bff1`（Issue #65/#70統合版、内部queue/content形式 `11/11`、およびIssue #62の初期設計案を含む状態）
 - 関連Issue: [#62](https://github.com/simosako/castloop-v2/issues/62)
 
-具体設計は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)と[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)を参照する。両フェーズはローカル実装済み・未配備で、以下の調査基準時点の問題記述とは区別する。
+具体設計は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)を参照する。以下の調査基準時点の問題記述とは区別する。
 
 ## 1. 背景と問題意識
 

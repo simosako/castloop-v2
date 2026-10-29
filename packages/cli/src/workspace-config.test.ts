@@ -58,7 +58,7 @@ test("workspace config refuses symbolic links without following or modifying the
 
 test("formal CLI rejects old service settings before network, build or local state changes", () => {
   const allCommands = [["init"], ["init", "--publication-protocol", "sqlite-sequential-v1"], ["init", "--service-id", "different"],
-    ["service-status"], ["show-pause", "daily", crypto.randomUUID()], ["show-resume", "daily", crypto.randomUUID()],
+    ["service-status"], ["preview-show-lifecycle", "daily", "unpublish"],
     ["deploy"], ["create-show", "daily", "--site-url", "https://example.com"], ["preview-show", "daily"], ["publish-show", "daily"],
     ["list-shows"], ["target-show", "daily"], ["publish-rss-import", "missing-import"]];
   const entrypointCommands = [["init"], ["service-status"], ["publish-rss-import", "missing-import"]];
@@ -107,7 +107,7 @@ test("legacy SQLite layouts fail before network, bundle building or local journa
   writeFileSync(preload, `globalThis.fetch = async () => { throw new Error("UNEXPECTED_IO"); };
 Bun.build = async () => { throw new Error("UNEXPECTED_BUILD"); };`);
   const before = readdirSync(setup.root).sort(), source = readFileSync(setup.file);
-  for (const args of [["init"], ["service-status"], ["show-pause", "daily", crypto.randomUUID()], ["deploy"]]) {
+  for (const args of [["init"], ["service-status"], ["preview-show-lifecycle", "daily", "unpublish"], ["deploy"]]) {
     const result = Bun.spawnSync([process.execPath, "--preload", preload, join(import.meta.dir, "index.ts"), ...args], { cwd: setup.root, timeout: 5000 });
     expect(result.exitCode).toBe(1);
     expect(result.stderr.toString()).toContain("Legacy service layouts cannot be updated or migrated");

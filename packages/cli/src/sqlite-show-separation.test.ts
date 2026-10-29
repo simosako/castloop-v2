@@ -1,11 +1,10 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { runSqliteCommand } from "./sqlite-commands";
 import { initializeSqliteService } from "./sqlite-initialization";
-import { continueSqliteServiceUpdateVerification, readSqliteServiceUpdate, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
+import { deploySqliteService } from "./sqlite-service-deploy";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { parseSqliteDirectPublicationRequest } from "../../shared/src/sqlite-direct-publication";
 import { directShow, directCover } from "../../../src/test-support/direct-publication";
-import { SqliteServiceClient } from "./sqlite-service-client";
 import { administratorKey } from "./administrator-key";
 import { formatSqliteCatalog } from "./sqlite-catalog";
 import { sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
@@ -22,16 +21,14 @@ async function fixture() {
   const run = (command: string, args: string[] = []) => runSqliteCommand(f.root, f.config, command, args, { transport: f.transport, cloudflare: f.options });
   const create = async (id: string) => {
     await run("create-show", [id, "https://example.com"]);
-    expect(await run("show-status", [id])).toMatchObject({ scope: "show", show_id: id, state: "paused", publication_ready: true });
-    await run("show-resume", [id, crypto.randomUUID()]);
+    expect(await run("show-status", [id])).toMatchObject({ scope: "show", show_id: id, publication_ready: true });
     writeFileSync(join(f.root, id, "cover.jpg"), Uint8Array.of(255, 216, 255));
   };
-  const pause = async (id: string) => { await run("show-pause", [id, crypto.randomUUID()]); };
-  const update = (id = crypto.randomUUID()) => updateSqliteService(f.root, f.config, id, "updated", f.options, wait);
-  return Object.assign(f, { run, create, pause, update });
+  const deploy = () => deploySqliteService(f.root, f.config, "updated", f.options, wait);
+  return Object.assign(f, { run, create, deploy });
 }
 
-test("a failed Show publication does not stop another Show's publication, independent Resume, delivery or new registration", async () => {
+test("a failed Show publication does not stop another Show's publication, delivery or new registration", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
   f.hooks.afterPut = async (key) => { if (key.startsWith("public/podcasts/a/covers/")) throw new Error("Unknown publication write response"); };
   await expect(f.run("publish-show", ["a"])).rejects.toThrow();
@@ -43,29 +40,18 @@ test("a failed Show publication does not stop another Show's publication, indepe
   expect(a.fixture.storage).not.toBe(b.fixture.storage);
   expect(a.fixture.storage.sql.exec("SELECT show_id FROM publication_shows").toArray()).toEqual([{ show_id: "a" }]);
   expect(b.fixture.storage.sql.exec("SELECT show_id FROM publication_shows").toArray()).toEqual([{ show_id: "b" }]);
-  await f.pause("a"); await f.pause("b");
-  expect(b.service.delivery("/podcasts/b/feed.xml").status).toBe(503);
-  await f.run("show-resume", ["b", crypto.randomUUID()]);
-  expect(b.service.delivery("/podcasts/b/feed.xml").status).toBe(200);
   await f.create("c");
   expect(await f.run("publish-show", ["c"])).toMatchObject({ result: "changed" });
-  expect(a.service.queue.snapshot()).toMatchObject({ state: "paused", active: null, drained: true });
 });
 
-test("the service Show catalog never claims an aggregated pause state for open, mixed or paused Shows", async () => {
+test("the service Show catalog lists Shows without any aggregated availability state", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
-  for (const paused of [0, 1, 2]) {
-    if (paused) await f.pause(paused === 1 ? "a" : "b");
-    expect(await f.run("service-status")).toMatchObject({ state: paused === 2 ? "paused" : "open", paused_shows: paused });
-    const result = sqliteCatalogResponseSchema.parse(await f.run("list-shows"));
-    expect(result.state).toBeNull(); expect(result.shows).toHaveLength(2);
-    expect(formatSqliteCatalog(result)).toStartWith(`Service: ${f.config.service_id}\n`);
-    expect(formatSqliteCatalog(result)).not.toContain("(paused)");
-    expect(formatSqliteCatalog(result)).not.toContain("(open)");
-  }
+  expect(await f.run("service-status")).toMatchObject({ scope: "service", show_count: 2, publication_ready: true });
+  const result = sqliteCatalogResponseSchema.parse(await f.run("list-shows"));
+  expect(result.shows).toHaveLength(2);
+  expect(formatSqliteCatalog(result)).toStartWith(`Service: ${f.config.service_id}\n`);
   const episodes = sqliteCatalogResponseSchema.parse(await f.run("list-episodes", ["a"]));
-  expect(episodes.state).toBe("paused"); expect(formatSqliteCatalog(episodes)).toContain("Show admission: paused");
-  expect(sqliteCatalogResponseSchema.safeParse({ ...episodes, state: null }).success).toBe(false);
+  expect(formatSqliteCatalog(episodes)).not.toContain("Show admission");
 });
 
 for (const kind of ["health", "catalog"] as const) for (const failure of [false, true])
@@ -85,9 +71,9 @@ for (const kind of ["health", "catalog"] as const) for (const failure of [false,
     };
     const unexpected = async (): Promise<never> => { throw new Error("Read must not mutate Shows"); };
     const control = new SqliteServiceControl(f.controlStorage, f.runtime, (id) => ({
-      initialize: unexpected, prepare: unexpected, activate: unexpected, release: unexpected,
-      prepareDomain: unexpected, activateDomain: unexpected, domainStatus: unexpected, releaseDomain: unexpected,
-      async health() { await read(id); return f.nodes.get(id)!.service.maintenanceHealth(); },
+      initialize: unexpected,
+      prepareDomain: unexpected, commitDomain: unexpected, domainStatus: unexpected,
+      async health() { await read(id); return f.nodes.get(id)!.service.health(); },
       async catalog(request) { await read(id); return f.nodes.get(id)!.service.runtime.catalog(request); },
     }));
     const ownHealth = spyOn(f.runtime, "health");
@@ -121,114 +107,53 @@ test("separate Shows progress concurrently while one Show awaits external IO and
   expect(f.nodes.get("a")!.service.delivery("/podcasts/a/feed.xml").status).toBe(200);
 });
 
-test("Show identity, admission windows and operation targets cannot cross independent storages", async () => {
+test("Show identities and operation targets cannot cross independent storages", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
   const a = f.nodes.get("a")!.service, b = f.nodes.get("b")!.service;
-  const request = parseSqliteDirectPublicationRequest({ ...a.queue.identity(), schema_version: 1, protocol: "sqlite-sequential-v1", action: "publish", kind: "show",
-    show_id: "b", metadata: { ...directShow, show_id: "b" }, cover: directCover, expected_show_state_version: 0, admission_window_id: a.queue.snapshot().admission_window_id });
+  const identity = a.queue.identity();
+  const request = parseSqliteDirectPublicationRequest({ service_id: identity.service_id, service_config_sha256: identity.service_config_sha256,
+    schema_version: 1, protocol: "sqlite-sequential-v1", action: "publish", kind: "show",
+    show_id: "b", metadata: { ...directShow, show_id: "b" }, cover: directCover, expected_show_state_version: 0 });
   await expect(a.queue.publish(request)).rejects.toThrow("target_unavailable");
-  await expect(b.queue.publish(request)).rejects.toThrow("stale_window");
   expect(a.delivery("/podcasts/b/feed.xml").status).toBe(404);
   expect(a.content.inspect("b").show).toBe(null);
-  const response = await a.fetch(new Request(`${f.config.workers_dev_base_url}/admin/sqlite-service/resume`, {
+  const response = await a.fetch(new Request(`${f.config.workers_dev_base_url}/admin/sqlite-service/pause`, {
     method: "POST", headers: { "X-Castloop-Key": administratorKey(f.root), "X-Castloop-Show-Id": "b", "Content-Type": "application/json" }, body: "{}" }));
   expect(response.status).toBe(400);
-  expect(await f.run("service-status")).toMatchObject({ scope: "service", admission_window_id: null, show_count: 2, paused_shows: 0 });
-  await expect(f.run("service-pause", [crypto.randomUUID()])).rejects.toThrow("no legacy fallback");
+  expect(await f.run("service-status")).toMatchObject({ scope: "service", show_count: 2, publication_ready: true });
 });
 
-test("a shared update pins both Shows, preserves content and releases Resume only after every probe", async () => {
+test("a code-only deploy keeps Shows serving, publishing and scheduling without any pause ritual", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
   await f.run("publish-show", ["a"]); await f.run("publish-show", ["b"]);
   const before = new Map([...f.entries].map(([key, entry]) => [key, entry.etag]));
-  await f.pause("a"); await f.pause("b");
-  f.faults.deferUpdateProbe = true;
-  const id = crypto.randomUUID();
-  await expect(f.update(id)).rejects.toThrow("remains unconfirmed");
-  const a = f.nodes.get("a")!.service, b = f.nodes.get("b")!.service;
-  await f.runtime.alarm(); await a.alarmRuntime().alarm(); await f.control.progress();
-  expect((await f.control.health()).publication_ready).toBe(false);
-  expect(a.health().publication_ready).toBe(false);
-  expect(f.showCalls.filter((call) => call.action === "release")).toEqual([]);
-  await expect(f.run("show-resume", ["a", crypto.randomUUID()])).rejects.toThrow();
-  await expect(f.run("create-show", ["c", "https://example.com"])).rejects.toThrow();
-  await b.alarmRuntime().alarm(); await f.control.progress();
-  expect(await f.control.health()).toMatchObject({ publication_ready: true, state: "paused", show_count: 2, paused_shows: 2 });
-  expect(f.showCalls.filter((call) => call.action === "release")).toHaveLength(2);
+  const previousVersion = f.runtime.queue.identity().worker_version_id;
+  const result = await f.deploy();
+  expect(result).toMatchObject({ previous_worker_version_id: previousVersion, publication_ready: true });
+  for (const id of ["a", "b"]) {
+    const node = f.nodes.get(id)!;
+    expect(node.service.delivery(`/podcasts/${id}/feed.xml`).status).toBe(200);
+    expect(node.service.health()).toMatchObject({ publication_ready: true });
+  }
+  expect(await f.run("publish-show", ["a"])).toMatchObject({ result: "unchanged" });
   for (const [key, etag] of before) expect(f.entries.get(key)!.etag).toBe(etag);
-  expect((await reconcileSqliteServiceUpdate(f.root, f.config, id, f.options)).phase).toBe("ready");
-  await f.run("show-resume", ["b", crypto.randomUUID()]);
-  expect(b.delivery("/podcasts/b/feed.xml").status).toBe(200);
-  expect(a.delivery("/podcasts/a/feed.xml").status).toBe(503);
+  await f.create("c");
+  expect(await f.run("publish-show", ["c"])).toMatchObject({ result: "changed" });
 });
 
-test("Resume racing shared preparation cannot slip between the paused check and the durable Show lock", async () => {
-  const f = await fixture(); await f.create("a"); await f.create("b");
-  await f.pause("a"); await f.pause("b");
-  const reached = Promise.withResolvers<void>(), proceed = Promise.withResolvers<void>();
-  const puts = f.calls.filter((call) => call.method === "PUT").length;
-  f.faults.beforeShowPrepare = async (id) => { if (id === "b") { reached.resolve(); await proceed.promise; } };
-  const pending = f.update();
-  try {
-    await reached.promise;
-    await expect(f.run("show-resume", ["a", crypto.randomUUID()])).rejects.toThrow();
-    await f.run("show-resume", ["b", crypto.randomUUID()]);
-  } finally { proceed.resolve(); }
-  await expect(pending).rejects.toThrow();
-  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
-  expect(f.controlStorage.sql.exec("SELECT phase FROM service_show_maintenance").toArray()).toEqual([{ phase: "preparing" }]);
+test("a deploy with a changed configuration is refused and belongs to the domain procedure", async () => {
+  const f = await fixture(); await f.create("a"); await f.run("publish-show", ["a"]);
+  const changed = { ...f.config, public_base_url: "https://podcasts.example.com" };
+  await expect(deploySqliteService(f.root, changed, "updated", f.options, wait)).rejects.toThrow("domain change procedure");
+  expect(f.nodes.get("a")!.service.delivery("/podcasts/a/feed.xml").status).toBe(200);
 });
 
-for (const action of ["prepare", "activate", "release"] as const) {
-  test(`unknown Show ${action} outcomes retain the exact target record and are never replayed`, async () => {
-    const f = await fixture(); await f.create("a"); await f.create("b");
-    await f.pause("a"); await f.pause("b");
-    f.faults.lostShow = { action, showId: "a" };
-    const id = crypto.randomUUID(); await expect(f.update(id)).rejects.toThrow();
-    const count = f.showCalls.filter((call) => call.action === action).length;
-    expect(count).toBe(1);
-    f.faults.lostShow = undefined;
-    await f.control.progress(); await f.control.progress();
-    await expect(f.update(id)).rejects.toThrow("already started");
-    expect(f.showCalls.filter((call) => call.action === action)).toHaveLength(count);
-    const column = action === "prepare" ? "prepare_state" : action === "activate" ? "activate_state" : "release_state";
-    expect(f.controlStorage.sql.exec(`SELECT ${column} AS state FROM service_show_update_targets WHERE show_id = 'a'`).toArray()).toEqual([{ state: "requested" }]);
-    expect((await new SqliteServiceClient(f.config, administratorKey(f.root), f.transport).registrationHealth()).publication_ready).toBe(false);
-  });
-}
-
-test("an unknown Show initialization keeps its reservation and does not block a different new Show", async () => {
+test("an interrupted Show initialization does not block another Show and completes idempotently on retry", async () => {
   const f = await fixture(); f.faults.lostShow = { action: "initialize", showId: "a" };
   await expect(f.run("create-show", ["a", "https://example.com"])).rejects.toThrow();
-  f.faults.lostShow = undefined;
-  await expect(f.run("create-show", ["a", "https://example.com"])).rejects.toThrow("uncertain");
-  expect(f.showCalls.filter((call) => call.action === "initialize" && call.showId === "a")).toHaveLength(1);
   expect(f.control.registrationStatus("a").state).toBe("requested");
+  f.faults.lostShow = undefined;
   await f.create("b"); expect(await f.run("publish-show", ["b"])).toMatchObject({ result: "changed" });
-  await f.pause("b"); await expect(f.update()).rejects.toThrow("pause and drain");
-  expect(f.showCalls.filter((call) => call.action === "prepare")).toEqual([]);
-});
-
-test("durability failure before shared fan-out prevents all Show mutations and deployment", async () => {
-  const f = await fixture(); await f.create("a"); await f.pause("a");
-  const puts = f.calls.filter((call) => call.method === "PUT").length;
-  f.failSync(); await expect(f.update()).rejects.toThrow();
-  expect(f.showCalls.filter((call) => call.action === "prepare")).toEqual([]);
-  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
-  expect(f.controlStorage.sql.exec("SELECT phase FROM service_show_maintenance").toArray()).toEqual([{ phase: "preparing" }]);
-  await f.control.progress();
-  expect(f.showCalls.filter((call) => call.action === "prepare")).toEqual([]);
-});
-
-test("a new control runtime waits for every prepared Show's native version before first activation", async () => {
-  const f = await fixture(); await f.create("a"); await f.create("b"); await f.pause("a"); await f.pause("b");
-  const id = crypto.randomUUID(); f.faults.staleShowVersion = "b";
-  await expect(f.update(id)).rejects.toThrow("continue verification");
-  expect(readSqliteServiceUpdate(f.root, f.config, id)!.phase).toBe("verified");
-  expect(f.showCalls.filter((call) => call.action === "activate")).toEqual([]);
-  const puts = f.calls.filter((call) => call.method === "PUT").length;
-  f.faults.staleShowVersion = undefined;
-  expect((await continueSqliteServiceUpdateVerification(f.root, f.config, id, "updated", f.options, wait)).phase).toBe("ready");
-  expect(f.showCalls.filter((call) => call.action === "activate")).toHaveLength(2);
-  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
+  await f.create("a"); expect(await f.run("publish-show", ["a"])).toMatchObject({ result: "changed" });
+  expect(f.control.registrationStatus("a").state).toBe("registered");
 });

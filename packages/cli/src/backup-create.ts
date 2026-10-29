@@ -4,7 +4,6 @@ import { backupEntryFramedBytes, emitBackupEntry, sealBackupArchive } from "./ba
 import type { BackupExcludedReason, BackupManifest, BackupPending } from "./backup-archive";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { pendingLocalDomainChanges } from "./sqlite-domain-local";
-import { pendingSqliteControls } from "./sqlite-control-journal";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { JOURNAL_FAMILIES } from "./local-journal-path";
 import { closeSync, constants, existsSync, lstatSync, openSync, readSync, readdirSync } from "node:fs";
@@ -132,7 +131,6 @@ function scanLocalOperations(root: string, config: SqliteServiceConfig):
   { pending: BackupPending; sourcePaths: string[]; scanErrors: string[] } {
   const pending: BackupPending = { drafts_staged: [], drafts_unresolved: [], show_controls: 0, domain_changes: [], service_updates: [] };
   const scanErrors: string[] = [];
-  try { pending.show_controls = pendingSqliteControls(root, config); } catch { scanErrors.push("show_controls"); }
   try { pending.domain_changes = pendingLocalDomainChanges(root, config); } catch { scanErrors.push("domain_changes"); }
   try {
     for (const { value } of readJsonDirectory(join(root, ".castloop", "sqlite-drafts", config.service_id))) {

@@ -30,9 +30,9 @@ export const sqliteDomainRequestSchema = z.object({
   schema_version: z.literal(1), protocol: z.literal(SQLITE_DOMAIN_PROTOCOL), operation_id: z.uuid(),
   action: z.enum(["add", "remove"]), hostname: sqliteDomainHostnameSchema,
   zone_id: cloudflareId, zone_name: sqliteDomainHostnameSchema,
-  namespace_id: cloudflareId, previous_runtime: sqlitePublicationRuntimeSchema,
-  previous_config: sqliteServiceConfigSchema, target_config: sqliteServiceConfigSchema,
-  target_config_sha256: hash, worker_source_sha256: hash, worker_metadata_sha256: hash,
+  namespace_id: cloudflareId, previous_config: sqliteServiceConfigSchema, previous_config_sha256: hash,
+  target_config: sqliteServiceConfigSchema, target_config_sha256: hash,
+  worker_source_sha256: hash, worker_metadata_sha256: hash,
   connection: sqliteDomainConnectionSchema.optional(),
 }).strict().superRefine((value, context) => {
   const previous = value.previous_config, target = value.target_config;
@@ -40,8 +40,7 @@ export const sqliteDomainRequestSchema = z.object({
   const { public_base_url: targetPublic, ...targetFixed } = target;
   const management = previous.workers_dev_base_url, custom = `https://${value.hostname}`;
   if (JSON.stringify(previousFixed) !== JSON.stringify(targetFixed) ||
-    value.previous_runtime.service_id !== previous.service_id ||
-    value.previous_runtime.service_config_sha256 === value.target_config_sha256 ||
+    value.previous_config_sha256 === value.target_config_sha256 ||
     !value.hostname.endsWith(`.${value.zone_name}`) ||
     (value.action === "add" ? previousPublic !== management || targetPublic !== custom :
       previousPublic !== custom || targetPublic !== management) ||
@@ -54,48 +53,40 @@ export const sqliteDomainRequestSchema = z.object({
 
 export type SqliteDomainRequest = z.infer<typeof sqliteDomainRequestSchema>;
 
-export const sqliteDomainActivationSchema = z.object({ operation_id: z.uuid(), request_sha256: hash,
+export const sqliteDomainCommitSchema = z.object({ operation_id: z.uuid(), request_sha256: hash,
   worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256),
   connection: sqliteDomainConnectionSchema }).strict();
-export type SqliteDomainActivation = z.infer<typeof sqliteDomainActivationSchema>;
-export const sqliteDomainPhaseSchema = z.enum(["prepared", "activated", "running", "feed_ready", "completed", "blocked"]);
+export type SqliteDomainCommit = z.infer<typeof sqliteDomainCommitSchema>;
+export const sqliteDomainPhaseSchema = z.enum(["prepared", "completed"]);
 export const sqliteDomainStatusSchema = z.object({ request: sqliteDomainRequestSchema, request_sha256: hash,
-  actual_runtime: sqlitePublicationRuntimeSchema, saved_runtime: sqlitePublicationRuntimeSchema,
-  phase: sqliteDomainPhaseSchema, feed_generation: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
-  activation: sqliteDomainActivationSchema.nullable(), paused: z.boolean(), drained: z.boolean(),
-  reason_code: z.enum(["execution_interrupted", "domain_effect_unverified"]).nullable(),
+  phase: sqliteDomainPhaseSchema, commit: sqliteDomainCommitSchema.nullable(),
   show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
 }).strict();
 export type SqliteDomainStatus = z.infer<typeof sqliteDomainStatusSchema>;
 export const sqliteDomainFinalizeSchema = z.object({ operation_id: z.uuid(), request_sha256: hash,
   connection: sqliteDomainConnectionSchema, detached: z.boolean() }).strict();
 export type SqliteDomainFinalize = z.infer<typeof sqliteDomainFinalizeSchema>;
-const stepState = z.enum(["pending", "requested", "confirmed"]);
-export const sqliteDomainServiceStatusSchema = z.object({ own: sqliteDomainStatusSchema,
-  phase: z.enum(["preparing", "prepared", "activating", "probing", "releasing", "completed"]),
-  targets_native_ready: z.boolean(), all_completed: z.boolean(),
-  target_count: z.number().int().nonnegative(), prepared_count: z.number().int().nonnegative(),
-  completed_count: z.number().int().nonnegative(), released_count: z.number().int().nonnegative(),
-  blocked_count: z.number().int().nonnegative(),
-  targets: z.array(z.object({ show_id: z.string(), prepare_state: stepState, activate_state: stepState,
-    release_state: stepState, phase: sqliteDomainPhaseSchema.nullable() }).strict()).max(20),
-  next_cursor: z.string().nullable(),
+export const SQLITE_DOMAIN_TARGET_PAGE_SIZE = 20;
+export const sqliteDomainServiceStatusSchema = z.object({ request: sqliteDomainRequestSchema, request_sha256: hash,
+  phase: sqliteDomainPhaseSchema,
+  targets: z.array(z.object({ show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    phase: sqliteDomainPhaseSchema }).strict()).max(SQLITE_DOMAIN_TARGET_PAGE_SIZE),
+  target_count: z.number().int().nonnegative(), next_cursor: z.string().nullable(),
+  all_completed: z.boolean(),
 }).strict().superRefine((value, context) => {
-  if ([value.prepared_count, value.completed_count, value.released_count, value.blocked_count, value.targets.length]
-    .some((count) => count > value.target_count) || value.completed_count + value.blocked_count > value.target_count ||
-    value.all_completed && (value.own.phase !== "completed" || value.completed_count !== value.target_count || value.blocked_count !== 0) ||
-    value.phase === "completed" && (!value.all_completed || value.released_count !== value.target_count)) {
-    context.addIssue({ code: "custom", message: "Domain service status completion counts differ" });
+  if (value.targets.length > value.target_count ||
+    value.all_completed && (value.phase !== "completed" || !value.targets.every((target) => target.phase === "completed"))) {
+    context.addIssue({ code: "custom", message: "Domain service status completion differs" });
   }
 });
 export type SqliteDomainServiceStatus = z.infer<typeof sqliteDomainServiceStatusSchema>;
 export const sqliteDomainStateSchema = z.object({ runtime: sqlitePublicationRuntimeSchema,
-  connection: sqliteDomainConnectionSchema.nullable(), maintenance: z.object({ operation_id: z.uuid(),
-    phase: z.enum(["preparing", "prepared", "activating", "probing", "releasing"]) }).strict().nullable() }).strict();
+  connection: sqliteDomainConnectionSchema.nullable(),
+  pending: z.object({ operation_id: z.uuid() }).strict().nullable() }).strict();
 
 export async function parseSqliteDomainRequest(input: unknown): Promise<SqliteDomainRequest> {
   const request = sqliteDomainRequestSchema.parse(input);
-  if (await sqliteServiceConfigHash(request.previous_config) !== request.previous_runtime.service_config_sha256 ||
+  if (await sqliteServiceConfigHash(request.previous_config) !== request.previous_config_sha256 ||
     await sqliteServiceConfigHash(request.target_config) !== request.target_config_sha256) {
     throw new Error("Domain change configuration hashes differ from the frozen input");
   }

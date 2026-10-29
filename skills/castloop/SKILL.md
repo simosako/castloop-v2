@@ -5,13 +5,13 @@ description: castloop CLIでPodcastサービス・番組・エピソードを準
 
 # castloopによるPodcast管理
 
-管理者のcastloop単一バイナリを使う。Bun、Node.js、Wrangler、ffprobe、Git、curl、jqは不要。録音・変換、移行、物理削除は提供しない。この開発版は新規13/13環境向けで、直接素材配置と同期アトミック公開を使う。独自ドメインは同accountのCloudflare DNS専用subdomainを1サービス1つだけ扱う。MCPは使わない。
+管理者のcastloop単一バイナリを使う。Bun、Node.js、Wrangler、ffprobe、Git、curl、jqは不要。録音・変換、移行、物理削除は提供しない。この開発版は新規14/13環境向けで、直接素材配置、同期アトミック公開、単発deployを使う。独自ドメインは同accountのCloudflare DNS専用subdomainを1サービス1つだけ扱う。MCPは使わない。
 
 ## 最初に確認
 
 1. `castloop version`、`castloop describe --json`を実行する。このSkillは`contract_version=1`と`show-v1`に対応する。未対応版へ未知のflagを試さず、管理者に対応版を確認する。
 2. 絶対パスのworkspaceと対象Showを特定する。複数候補を推測で選ばない。`doctor --local --workspace PATH --json`は通信せず状態を変更しない。
-3. 許可された段階が「準備だけ／公開まで」のどれか確認する。init・登録・Resume・deploy・domain接続/切断/continue・非公開化・復元・取消は副作用ごとに対象と範囲を確認する。具体的な内容と公開まで委任済みなら同じ確認を繰り返さない。
+3. 許可された段階が「準備だけ／公開まで」のどれか確認する。init・登録・deploy・domain接続/切断/continue・非公開化・復元・取消は副作用ごとに対象と範囲を確認する。具体的な内容と公開まで委任済みなら同じ確認を繰り返さない。
 4. `describe COMMAND --json`と`schema show-input|episode-input|service-config`を必要に応じて取得する。schemaや構文を記憶だけで作らない。
 
 ## 不足情報を推測しない
@@ -31,8 +31,8 @@ description: castloop CLIでPodcastサービス・番組・エピソードを準
 - `validate`は通信・書き込みなし。成功しても公開可否、remote base、purge成功を証明しない。省略検査も確認する。
 - 一覧は20件ごとに`next_cursor`を追う。要約タイトルを編集元の全文へ逆変換しない。原本がなければバックアップを管理者に求める。
 - `--json`の`ok`はCLI要求の成否。uploadの完了、公開受付、公開完了は別。`next_actions`は承認ではない。
-- `show-admission-pause SHOW UUID`で公開変更を止め、`show-pause SHOW UUID`で配信も止める。`show-delivery-resume`は動作確認済み・保守外のShowの配信だけ、`show-resume`は受付も戻す。素材配置だけでは公開しない。Worker更新・domain変更には引き続き各Showの配信停止が必要。
-- domain操作は`help domain`で条件を確認し、全Showを個別Pauseして専用保守を使う。完了しても自動Resumeしない。list/statusは読取、continueは変更を含み得る。同じadd/removeの再実行で回復を試さず、未知PUT/POST/DELETEの記録は保全する。同じhostname/DNS/接続を他ツールから並行変更しない。workers.devの管理APIは転送せず、公開Feed 301保存後の切断は購読先自動復帰を保証しない。証明書や元journalを削除しない。
+- 配信の停止・再開は既存のlifecycle操作（`unpublish`／`restore`）を使う。独立した`show-pause`／`show-resume`コマンドはない。素材配置だけでは公開しない。通常のWorkerコード更新は`castloop deploy`で稼働を維持したまま行う。
+- domain操作は`help domain`で条件を確認し、専用手順を使う。list/statusは読取、continueは変更前後の保存設定をもとに未完了ステップを進める。同じhostname/DNS/接続を他ツールから並行変更しない。workers.devの管理APIは転送せず、公開Feed 301保存後の切断は購読先自動復帰を保証しない。証明書や元journalを削除しない。
 
 ## 用途別
 

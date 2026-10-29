@@ -19,9 +19,8 @@ export function createSqlitePublicationHttp(queue: SqlitePublicationQueue, admin
     if (!publicationReady()) return reply({ error: "publication_not_ready" }, 503);
     if (path === "status") {
       try {
-        const snapshot = queue.snapshot();
         return reply(sqliteServiceStatusSchema.parse({ ...queue.identity(), protocol: "sqlite-sequential-v1", ...(showId ? { show_id: showId } : {}),
-          state: snapshot.state, admission_window_id: snapshot.admission_window_id, publication_ready: true }));
+          publication_ready: true }));
       } catch { return reply({ error: "runtime_unavailable" }, 503); }
     }
     let input;

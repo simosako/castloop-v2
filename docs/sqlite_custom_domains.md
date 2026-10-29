@@ -1,92 +1,57 @@
 # SQLiteサービスの独自ドメイン
 
-Issue #68の開発版CLI/Worker向け。対応版でfresh initしたservice schema 2 / `show-v1`、内部queue/content schema **6/7**とhealth識別`feed_generation_allocator="reservation-v1"`・`domain_changes="sqlite-domain-change-v1"`を必要とする。旧版のDB・journal・資源・外部で作った接続の移行や採用は行わない。
-
-**Cloudflare実機の2 Show小規模総合機能試験は合格。** [確認記録](../design/sqlite_custom_domain_two_show_verification_20261024.md)で公開・独自origin配信・301/307転送・個別Pause・通常更新/非公開化/復元・接続維持deploy・切断とworkers.dev復帰・履歴保持を確認し、両Show paused/ready/drained・保守なしで終了した。RSS、故障注入、cache hit/miss、性能/全Free適合等は未実証。先行[反復試験](../design/sqlite_custom_domain_iterative_verification_20261024.md)の元PUT/DELETE応答修正後、今回の製品コード変更はない。この文書自体は実環境操作の承認ではない。
-
-[Show 0件の第3試験](../design/sqlite_custom_domain_environment_review.md)までの元応答は欠測のまま。[ログ調査と診断追加](../design/sqlite_domain_response_logging.md)後の新規実測を根拠に修正し、既存unknownの再送・採用・補完はしない。
+フェーズ3開発版（新規環境のservice schema 2 / `show-v1`、内部queue/content形式 **14/13**、health識別`domain_changes="sqlite-domain-change-v1"`）向け。旧版のDB・journal・資源・外部で作った接続の移行や採用は行わない。
 
 ## 前提と制約
 
 - 1サービス1専用subdomainで全Show共通。apex・wildcard・Show別domain・複数domain・外部権威DNS・Cloudflare for SaaSは非対応。
 - Workerと同じaccountのactive/full Cloudflare Zoneが必要。**Cloudflareで管理する必要があるのは権威DNSであり、購入・更新先のRegistrar移管は不要**。nameserver/Zoneの設定はcastloopが自動変更しない。
 - 未使用のhostnameだけを指定する。既存DNS、委任、干渉するWorker Route、同hostnameの接続、同Workerの出所不明な接続は上書き・採用しない。
-- **domain add/removeおよび未完了操作のcontinue中に、同じhostnameのDNSや対象Workerのdomain接続をdashboard/Terraform/別CLIから並行して変更するケースは想定外**。事前照会はCloudflare側のCASではない。無関係なDNSの管理や読取照会まで禁止する意味ではない。未知IOが残る場合も、CLI終了を根拠に別ツールで接続を変更・解放しない。
-- `CLOUDFLARE_ACCOUNT_ID`・`CLOUDFLARE_API_TOKEN`と元workspaceの管理鍵を使う。通常のWorker/R2管理権限に加え、対象ZoneのZone Read・DNS Read・Workers Routesの権限が必要。Cloudflareの現行routing権限案内は変更対象ZoneのWorkers Routes Writeを要求する。権限は管理者が確認し、自動拡張しない。Paid移行や証明書削除権限は要求しない。
+- **domain add/removeおよび未完了操作のcontinue中に、同じhostnameのDNSや対象Workerのdomain接続をdashboard/Terraform/別CLIから並行して変更するケースは想定外**。
+- `CLOUDFLARE_ACCOUNT_ID`・`CLOUDFLARE_API_TOKEN`と元workspaceの管理鍵を使う。通常のWorker/R2管理権限に加え、対象ZoneのZone Read・DNS Read・Workers Routesの権限が必要。権限は管理者が確認し、自動拡張しない。Paid移行や証明書削除権限は要求しない。
 - workers.devは管理originとして維持する。管理鍵を独自domainへ、Cloudflare tokenをCloudflare API以外へ送らない。Wrangler/Node.js/別R2 credentialは不要。
 
-## 接続前の停止
+## 独自ドメインの追加
 
-手元の未公開編集は公開状態と独立しており、domain変更のために公開する必要はない。原本・既存journalは保持する。旧設定で作った承認hash・計画は使い回さず、新設定で確認し直す。
-
-各Showで明示Pauseし、paused・ready・drainedを確認する。パージ待機中の旧公開要求は確定直前にも受付状態を検査する。共有domainの切替なので全所属Showが停止する。全体Pauseコマンドや自動Resumeはない。
+手元の未公開編集は公開状態と独立しており、domain変更のために公開する必要はない。事前のShow Pauseや手動Resumeは不要であり、変更前の設定（`previous_config`）と変更後の設定（`target_config`）をローカルjournalに保存した上で実行する。
 
 ```sh
-castloop show-pause my-show PAUSE_UUID --workspace ./service
 castloop service-status --workspace ./service --json
 castloop domain add podcasts.example.com --zone-id ZONE_ID --operation-id ADD_UUID --workspace ./service --json
 ```
 
-Showが複数ある場合は、それぞれ別UUIDでPauseする。`ADD_UUID`等は実際のUUID、`ZONE_ID`は対象Zone IDへ置き換える。
+`ADD_UUID`は実際のUUID、`ZONE_ID`は対象Zone IDへ置き換える。
 
-addは所属固定とShow別保守拘束、Custom Domain接続・DNS/TLS確認、R2設定保存、**新しい公開URLを埋め込んだWorker再配備**、全DOのnative確認、Feed再生成/purge・readiness、ローカル設定同期、保守解除を行う。音源・cover・revision履歴・GUID・日時・Showのsite_urlは変更しない。完了しても各Showはpausedのまま。
+`domain add`は次の手順を一連で進める。
+1. **準備**: 制御DOと全Show DOに要求を記録し、未実行の予約公開を`needs_approval`へ移す。準備から確定までの間、各DOは`publication_ready: false`となり公開配信はHTTP 503を返す。
+2. **接続・設定・配備**: Custom Domain接続とDNS/TLS到達確認を行い、`system/service.toml`の更新と新しい公開URLを組んだWorkerの配備・反映確認を行う。
+3. **確定・同期・完了**: 各DOで必要なキャッシュパージ後に設定hashとFeed世代を更新して配信を再開し、ローカルの`castloop.toml`を更新して制御DOにドメイン接続を記録する。音源・cover・revision履歴・GUID・日時・Showの`site_url`は変更しない。
 
-## 照会と明示再開
+## 照会と中断後の継続
 
 ```sh
 castloop domain list --workspace ./service --json
 castloop domain status ADD_UUID --workspace ./service --json
-castloop show-resume my-show NEW_WINDOW_UUID --workspace ./service
-```
-
-list/statusは読取専用。listは既知の接続とCloudflareの同Worker接続全件、設定・接続不一致、未完了ローカル操作と残存lockを表示し、想定外の複数接続を隠さない。statusはローカルphaseとremoteの固定要求、部分状態、全対象の集計を返す。Show一覧は20件ずつで、`next_cursor`を`--cursor SHOW_ID`へ渡す。一覧は非原子的snapshotで、復旧・再送の権限ではない。`doctor --local`も未完了domain記録・残存lockを警告するが修復しない。
-
-Resume後の旧workers.dev公開URLは、同じパスの独自domainへ**Feed 301、cover/audio 307**で転送する。転送前にも対象Showの最新gateを確認し、Pause/readiness/保守/非公開/未承認パスでは転送しない。管理APIはworkers.devだけで、独自domainの管理経路は404。queryや資格情報を転送先へ含めない。正規domainでは従来のGET/HEAD/単一Range/ETag/日付条件を扱う。
-
-## 中断後
-
-```sh
-castloop domain status ADD_UUID --workspace ./service --json
 castloop domain continue ADD_UUID --workspace ./service --json
 ```
 
-同じadd/removeを再実行しても暗黙再開しない。continueは**変更を含み得る明示操作**で、同じCLIの組み込みsource、旧/目標設定hash、操作、namespace、成功receipt等を照合して、未開始部分だけを進める。
+`list`／`status`は読取専用。切替完了後の旧workers.dev公開URLは、同じパスの独自domainへ**Feed 301、cover/audio 307**で転送する。管理APIはworkers.devだけで、独自domainの管理経路は404。
 
-外部接続receiptの検証失敗は`domain_connection_unverified`を返し、JSON errorの`fields`は既知のfield名と検証codeだけを最大20件示す。応答値・未知field名・本文・任意例外文は出さない。この診断は成功証拠や再送/採用の許可ではない。
+通信断やDNS/TLS待機（`domain_tls_pending`）、Worker反映待ち（`domain_rollout_pending`）で中断した場合は、保存された変更前後の設定とjournalをもとに `castloop domain continue ADD_UUID` を実行すれば、現在の状態をAPIで確認して未完了ステップから完了まで進められる。
 
-失敗時のstderrには1行JSONの`event="sqlite_domain_cloudflare"`を出す。固定の`api_operation`・`method`・`reason_code`でHTTP/本文/JSON/envelope/接続照合のどこで止まったかを区別し、接続receiptでは`environment_kind`で欠落/null/空文字/production/別文字列/不正型を区別する。任意の値・例外・本文・URL・鍵は記録しない。詳細とローカル検証は[応答検証ログ](../design/sqlite_domain_response_logging.md)を参照する。過去PUTをログ取得のために再送せず、既存journalも変更しない。
-
-資格情報なしのTLS HEAD待ちは`domain_tls_pending`と`api_operation=tls_probe`で区別する。接続がconnectedとして保存済みでも、TLS成功前は設定書込・配備へ進まない。
-
-成功配備後の有限native待機は`domain_rollout_pending`として停止する。同じ配備receiptから明示continueし、再配備しない。CLI全体の実行時間は有限待機120回に加え各HTTP/照合時間も含むため、外部runnerの120秒制限で強制終了しない。残ったlockは強制解除しない。
-
-| 停止位置 | 対応 |
-| --- | --- |
-| attachment_acknowledged保存済み、完全接続GET待ち | 同じIDへGETしproduction・全fieldの一致を検証。PUTは再送せず、connected保存前は設定書込・配備しない |
-| 接続成功receipt保存済み、DNS/TLS待ち | continueで到達を観測する。接続PUTを繰り返さない |
-| 配備PUT成功checkpoint保存済み、REST/native確認が停止 | continueで同じ配備を検証し、未開始activationだけを行う。再配備しない |
-| 管理POSTの応答喪失、同じ要求の耐久完了証拠あり | continueで読取照合。元のPOSTを再送しない |
-| remote完了・ローカル未同期 | 元/目標configだけを許容して同期する。無関係な編集を上書きしない |
-| 接続/切断/設定/配備PUT自体の結果不明 | continueも再送・現在値からの採用を拒否。記録と停止状態を保持 |
-| Feed書込/purge/probeのblocked、部分prepare/activation/解除の未知結果 | 万能復旧はない。新IDでの置換・自動rollback・Resume・lock強制解除をしない |
-
-通常公開は明示publishだけ。domain完了後は新しい設定でpreviewして公開する。公開draftの作り直し・再束縛は不要。旧記録の変換・削除や旧schemaの移行は行わない。
+通常公開は明示publishだけ。domain完了後は新しい設定でpreviewして公開する。停止した予約公開は`preview-schedule-reapprove`→`schedule-reapprove`で再承認する。
 
 ## 切断
 
 **301を記憶したpodcast appは独自domainへ直接アクセスし続ける可能性がある。切断だけで購読先がworkers.devへ戻ることは保証しない。** directory登録や利用者への移行案内は管理者の責任で、`itunes:new-feed-url`や購読者の自動移行は提供しない。
 
 ```sh
-castloop show-pause my-show REMOVE_PAUSE_UUID --workspace ./service
-castloop service-status --workspace ./service --json
 castloop domain remove --operation-id REMOVE_UUID --workspace ./service --json
 castloop domain list --workspace ./service --json
 ```
 
-全Showの停止後、先にFeed/R2/Worker/DO/ローカル設定をworkers.devへ復帰・検証してから、正確な既知domain IDだけを切断する。成功後もpausedで、個別Resume後はworkers.devから本文を返す。旧独自originは配信allowlistから外れ、恒久的な転送維持はしない。音源・cover・revision・Feed履歴と共有証明書は削除しない。証明書がCloudflareに残る場合も自動整理しない。
-
-切断DELETEは、正常なJSON成功envelope、またはHTTP 200・Content-Length 0・完全な0バイト本文を検証してから成功保存する。空応答の許容はこのDELETEだけで、HTTP statusだけの推測や後の不在GETから未知操作を成功へ昇格するものではない。
+先にR2設定・Worker・全DO・ローカル設定をworkers.devへ復帰・確定してから、既知のdomain接続を切断して完了する。完了後は即座にworkers.devから配信を再開する。音源・cover・revision履歴と共有証明書は削除しない。
 
 同configの通常`deploy`はdomain変更とは別操作で、既知接続を照合・保持するだけで接続/切断しない。
 
-関連: [設計](../design/sqlite_custom_domains_plan.md)、[P0のAPI根拠・制約](../design/sqlite_custom_domains_p0.md)、[実機確認案](sqlite_custom_domain_live_acceptance.md)。旧Queueの操作は[v0.5.2固定文書](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/custom_domains.md)を使う。
+関連: [フェーズ3設計](../design/phase3_deploy_and_runtime_control_simplification_plan.md)、[P0のAPI根拠・制約](../design/sqlite_custom_domains_p0.md)。

@@ -1,6 +1,6 @@
-import { parseSqliteDomainRequest, sqliteDomainActivationSchema, sqliteDomainFinalizeSchema,
+import { parseSqliteDomainRequest, sqliteDomainCommitSchema, sqliteDomainFinalizeSchema,
   sqliteDomainRequestHash, sqliteDomainServiceStatusSchema, sqliteDomainStateSchema } from "../../shared/src/sqlite-domain";
-import type { SqliteDomainActivation, SqliteDomainFinalize, SqliteDomainRequest } from "../../shared/src/sqlite-domain";
+import type { SqliteDomainCommit, SqliteDomainFinalize, SqliteDomainRequest } from "../../shared/src/sqlite-domain";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
@@ -40,29 +40,27 @@ export class SqliteDomainClient {
   }
   private async verify(input: unknown, expected: SqliteDomainRequest) {
     const result = sqliteDomainServiceStatusSchema.parse(input);
-    if (JSON.stringify(result.own.request) !== JSON.stringify(expected) || result.own.request_sha256 !== await sqliteDomainRequestHash(expected) ||
-      result.own.actual_runtime.service_id !== expected.previous_runtime.service_id ||
-      result.phase !== "completed" && ![expected.previous_runtime.service_config_sha256, expected.target_config_sha256].includes(result.own.actual_runtime.service_config_sha256)) throw new Error("Domain response differs from its frozen request");
-    if (result.phase !== "completed" && (!result.own.paused || !result.own.drained)) throw new Error("Domain maintenance is not paused and drained");
+    if (JSON.stringify(result.request) !== JSON.stringify(expected) || result.request_sha256 !== await sqliteDomainRequestHash(expected)) {
+      throw new Error("Domain response differs from its frozen request");
+    }
     return result;
   }
   async prepare(input: SqliteDomainRequest) {
     const request = await parseSqliteDomainRequest(input);
     const result = await this.verify(await this.call("domain-prepare", request), request);
-    if (result.phase !== "prepared" || result.own.phase !== "prepared" || result.prepared_count !== result.target_count ||
-      JSON.stringify(result.own.actual_runtime) !== JSON.stringify(request.previous_runtime)) throw new Error("Domain preparation result differs");
+    if (result.phase !== "prepared") throw new Error("Domain preparation result differs");
     return result;
   }
-  async activate(input: SqliteDomainActivation, request: SqliteDomainRequest) {
-    const activation = sqliteDomainActivationSchema.parse(input);
-    const result = await this.verify(await this.call("domain-activate", activation), request);
-    if (JSON.stringify(result.own.activation) !== JSON.stringify(activation)) throw new Error("Domain activation receipt differs");
+  async commit(input: SqliteDomainCommit, request: SqliteDomainRequest) {
+    const commit = sqliteDomainCommitSchema.parse(input);
+    const result = await this.verify(await this.call("domain-commit", commit), request);
+    if (result.phase !== "completed" || !result.all_completed) throw new Error("Domain commit was not verified");
     return result;
   }
   async finalize(input: SqliteDomainFinalize, request: SqliteDomainRequest) {
     const finalized = sqliteDomainFinalizeSchema.parse(input);
     const result = await this.verify(await this.call("domain-finalize", finalized), request);
-    if (result.phase !== "completed" || !result.all_completed || result.released_count !== result.target_count) throw new Error("Domain finalization was not verified");
+    if (result.phase !== "completed" || !result.all_completed) throw new Error("Domain finalization was not verified");
     return result;
   }
 }

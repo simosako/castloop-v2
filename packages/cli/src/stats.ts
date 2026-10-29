@@ -53,7 +53,7 @@ export async function setSqliteStatsRetention(root: string, config: SqliteServic
   const health = await client.health(showId);
   const request = prior?.request ?? sqliteStatsRetentionRequestSchema.parse({
     service_id: config.service_id, service_config_sha256: health.service_config_sha256,
-    worker_version_id: health.worker_version_id, operation_id: operationId, show_id: showId, retention_days: days });
+    operation_id: operationId, show_id: showId, retention_days: days });
   journal.initialize({ schema_version: 1, request, phase: "prepared" });
   return journal.exclusively(async () => {
     const state = retentionJournalSchema.parse(journal.read());

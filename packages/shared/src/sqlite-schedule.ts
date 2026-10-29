@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { adminTimezoneSchema } from "./admin-config";
 import { sha256Hex } from "./sha256";
-import { sqlitePublicationTargetSchema, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { sqlitePublicationTargetSchema, sqlitePublicationRuntimeSchema, sqliteServiceIdentitySchema } from "./sqlite-publication";
 import { sqliteDirectPublishRequestSchema } from "./sqlite-direct-publication";
 
 export const sqliteScheduleProtocol = "sqlite-schedule-v1" as const;
@@ -32,17 +32,16 @@ export const sqliteScheduleTimeSchema = z.object({
   }
 });
 
-export const sqliteScheduleReasonSchema = z.enum(["show_paused", "show_admission_paused", "maintenance", "runtime_mismatch",
-  "stale_window", "base_conflict", "target_unavailable",
+export const sqliteScheduleReasonSchema = z.enum(["domain_change", "runtime_mismatch",
+  "base_conflict", "target_unavailable",
   "cancelled_by_administrator"]);
 export type SqliteScheduleReason = z.infer<typeof sqliteScheduleReasonSchema>;
 
-const runtime = sqlitePublicationRuntimeSchema.shape;
+const runtime = sqliteServiceIdentitySchema.shape;
 const showCreateFields = {
   schema_version: z.literal(1),
   protocol: z.literal(sqliteScheduleProtocol),
   service_id: runtime.service_id,
-  worker_version_id: runtime.worker_version_id,
   service_config_sha256: runtime.service_config_sha256,
   show_id: showId,
 };
@@ -57,7 +56,7 @@ export const sqliteScheduleCreateSchema = z.object({
 }).strict().superRefine((value, context) => {
   const publication = value.publication;
   if (publication.action !== "publish" || publication.service_id !== value.service_id ||
-    publication.worker_version_id !== value.worker_version_id || publication.service_config_sha256 !== value.service_config_sha256 ||
+    publication.service_config_sha256 !== value.service_config_sha256 ||
     publication.show_id !== value.show_id ||
     (publication.kind === "show" ? publication.episode_id !== undefined : publication.episode_id === undefined)) {
     context.addIssue({ code: "custom", message: "Schedule creation differs from its frozen publication request" });
@@ -89,7 +88,7 @@ export const sqliteScheduleReapproveSchema = z.object({
 }).strict().superRefine((value, context) => {
   const publication = value.publication;
   if (publication.action !== "publish" || publication.service_id !== value.service_id ||
-    publication.worker_version_id !== value.worker_version_id || publication.service_config_sha256 !== value.service_config_sha256 ||
+    publication.service_config_sha256 !== value.service_config_sha256 ||
     publication.show_id !== value.show_id ||
     (publication.kind === "show" ? publication.episode_id !== undefined : publication.episode_id === undefined)) {
     context.addIssue({ code: "custom", message: "Schedule reapproval differs from its frozen publication request" });

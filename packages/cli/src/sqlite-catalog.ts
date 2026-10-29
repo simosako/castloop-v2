@@ -6,7 +6,6 @@ export function formatSqliteCatalog(result: SqliteCatalogResponse): string {
   if (result.shows) {
     lines.push(...formatShowTable(result.shows));
   } else {
-    lines.push(`Show admission: ${result.state}`);
     lines.push(`Show: ${result.show!.show_id} (${result.show!.lifecycle}); unfinished operation: ${result.show!.unfinished_operation}`);
     lines.push(...formatEpisodeTable(result.episodes!));
   }

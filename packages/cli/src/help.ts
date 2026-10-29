@@ -5,7 +5,7 @@ type CommandHelp = { usage: string; description: string };
 export const COMMAND_HELP: Record<string, CommandHelp> = {
   domain: { usage: "domain add HOSTNAME --zone-id ZONE_ID [--operation-id UUID] | remove [--operation-id UUID] | list | status UUID [--cursor SHOW_ID] | continue UUID",
     description: "Manage one dedicated custom subdomain in the same account's active/full Cloudflare DNS zone. Registrar transfer is not required.\n" +
-      "add/remove require every Show explicitly paused and drained. They redeploy the same Worker with a new canonical origin, regenerate Feeds and purge caches; finish paused.\n" +
+      "add/remove redeploy the same Worker with a new canonical origin, bump Feed generations and purge caches in one committed step per Durable Object.\n" +
       "Public workers.dev URLs redirect to the custom domain (Feed 301, cover/audio 307) only after explicit Show Resume. Administration remains on workers.dev.\n" +
       "list/status are read-only. continue may perform unstarted mutations using exact acknowledged evidence; unknown PUT/POST/DELETE outcomes are never replayed or adopted.\n" +
       "Do not change this hostname's DNS or Worker domain connections with other tools during a domain operation. Certificates are retained on remove.\n" +
@@ -49,14 +49,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "--publication-protocol sqlite-sequential-v1 remains optional for existing scripts; no other protocol is supported.\n" +
       "Missing values are prompted on a terminal. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
       "Creates a private R2 bucket, Worker and SQLite-backed Durable Object without Queues.\n" +
-      "Verifies Alarm/R2/cache/purge readiness. New Shows start paused; use show-resume SHOW NEW_WINDOW_UUID.\n" +
+      "Verifies each step from the current state; an interrupted initialization is completed by running init again.\n" +
       "Existing resources are never adopted. Service schema_version=1 requires v0.5.x; migration is not provided.",
   },
   "create-show": {
     usage: "create-show ID [--site-mode builtin|external] [--site-url URL]",
     description: "Run from the service workspace. Reserve a Show ID and create its local show.toml.\n" +
       "Use --site-mode builtin for an automatically generated website (no --site-url). Otherwise a real external website URL is required (prompted if omitted).\n" +
-      "Creates a paused Show DO; explicitly show-resume before uploads. Does not publish.",
+      "Registers the Show DO; it is immediately ready for publication. Does not publish.",
   },
   "create-episode": {
     usage: "create-episode ID",
@@ -101,60 +101,19 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "before submission and an unknown outcome is only re-checked by its operation ID, never replayed blindly.",
   },
   deploy: {
-    usage: "deploy [--operation-id UUID]",
+    usage: "deploy",
     description: "Run from the service workspace. Perform a code-only update of the same config/schema/namespace.\n" +
-      "Explicitly pause and drain every Show first. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
-      "Probes the new runtime and finishes paused. Never adopts resources, converts data or replays an unknown deployment.",
-  },
-  "init-reconcile": {
-    usage: "init-reconcile OPERATION_UUID",
-    description: "Read-only reconciliation of an exact retained initialization already completed ready/paused/drained on the server.\n" +
-      "Never redeploys, adopts an unknown deployment or replays initialization.",
-  },
-  "init-continue-verification": {
-    usage: "init-continue-verification OPERATION_UUID",
-    description: "Continue verification after acknowledged deployment/access configuration, before any setup request.\n" +
-      "Requires unchanged frozen source/configuration and a fresh paused runtime.\n" +
-      "Never recreates resources, uploads configuration, redeploys, or resends setup.",
-  },
-  "update-service-verify": {
-    usage: "update-service-verify OPERATION_UUID",
-    description: "Continue a retained deploy_acknowledged/deployed/verified update with no prior activation request.\n" +
-      "Rechecks frozen source/configuration, acknowledged script ETag, pinned deployment, namespace and server prepared state.\n" +
-      "Waits for the recorded native version, then requests its first activation/probe and finishes paused.\n" +
-      "Never re-uploads, repeats preparation, adopts unknown PUTs or resends activation.",
-  },
-  "update-service-reconcile": {
-    usage: "update-service-reconcile OPERATION_UUID",
-    description: "Reconcile an exact already-completed paused update using retained evidence without remote mutations.",
+      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. No Show pause, probe or resume is needed; publication and\n" +
+      "delivery continue and schedules are kept. An interrupted deployment is completed by running deploy again.\n" +
+      "Configuration changes belong to the dedicated domain-change procedure.",
   },
   "service-status": {
     usage: "service-status",
-    description: "Read service runtime and aggregated Show readiness/availability. The aggregate is not an atomic snapshot or an update lock; it does not authorize cleanup.",
+    description: "Read service runtime and aggregated Show readiness. The aggregate is not an atomic snapshot; it does not authorize cleanup.",
   },
   "show-status": {
     usage: "show-status SHOW_ID",
-    description: "Read this Show's runtime, availability and admission window without consulting other Shows.",
-  },
-  "show-pause": {
-    usage: "show-pause SHOW_ID PAUSE_UUID",
-    description: "Pause this Show's delivery and publication changes. Pending publication commits recheck admission; other Shows are unaffected.",
-  },
-  "show-admission-pause": {
-    usage: "show-admission-pause SHOW_ID OPERATION_UUID",
-    description: "Stop publication changes for this Show while keeping approved content delivery enabled. Maintenance and delivery checks still apply; media placement alone does not publish.",
-  },
-  "show-delivery-resume": {
-    usage: "show-delivery-resume SHOW_ID OPERATION_UUID",
-    description: "Enable only approved content delivery for a verified Show outside maintenance. Publication admission stays closed.",
-  },
-  "show-control-status": {
-    usage: "show-control-status SHOW_ID OPERATION_UUID",
-    description: "Read the saved result of a Show stop/resume operation and its current status. Does not replay requests or change local records. Missing results do not prove a request was never applied.",
-  },
-  "show-resume": {
-    usage: "show-resume SHOW_ID NEW_WINDOW_UUID",
-    description: "Resume this verified Show with a NEW admission window outside shared maintenance. Other Shows are unaffected; suspended schedules still need explicit reapproval.",
+    description: "Read this Show's runtime readiness, lifecycle summary and schedules without consulting other Shows.",
   },
   "target-show": {
     usage: "target-show SHOW_ID",
@@ -290,7 +249,7 @@ export function describeCommand(command: string) {
     "backup-create", "backup-verify", "backup-restore-preview", "backup-restore"].includes(command);
   const preview = ["preview-show", "preview-episode", "preview-episode-schedule", "preview-show-schedule",
     "preview-schedule-reschedule", "preview-schedule-cancel", "preview-schedule-reapprove"].includes(command);
-  const read = offline || preview || ["schedule-list", "schedule-status", "list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "verify", "stats"].includes(command);
+  const read = offline || preview || ["schedule-list", "schedule-status", "list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "target-show", "target-episode", "list-shows", "list-episodes", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "verify", "stats"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1],

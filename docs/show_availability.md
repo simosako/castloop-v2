@@ -1,80 +1,32 @@
-# Showの公開受付とリスナーへの配信を別々に停止する
+# ShowとEpisodeの公開状態制御（非公開化・復元）
 
-フェーズ2開発版の新規**13/13**環境向け。対応機能表示は`availability_controls="show-admission-delivery-v1"`。旧形式は変換・移行しない。停止・再開の操作ID・変更番号・結果照会は維持する。
+フェーズ3開発版の新規**14/13**環境向け。旧版の独立したruntime停止コマンド（`show-pause`、`show-resume`、`show-admission-pause`、`show-delivery-resume`、`show-control-status`）は廃止し、配信の停止・再開はすべて既存のlifecycle操作（`unpublish`／`restore`）に統合した。
 
-CLIのインストールやローカル試験の成功だけでは、実環境の変更は許可されない。以下は、対象Showへの操作が承認されている場合の使い方である。
+## 基本方針
 
-## 3つの状態
+- 登録したShow（`create-show`）は即座に公開操作を受け付ける状態（`publication_ready: true`）になる。初回の`show-resume`は不要。
+- 公開は管理者の明示操作（`publish-show`、`publish-episode`）でのみ行われる。R2への素材配置やローカル編集だけでは公開されない。
+- リスナーへの配信を止めたい場合は、対象ShowまたはEpisodeを `unpublish`（非公開化）する。再開したい場合は `restore`（復元）する。
+- 通常のWorkerコード更新（`castloop deploy`）では、事前のShow停止や手動再開は不要であり、配信と予約公開を維持したまま更新できる。
+- 独自ドメインの変更中（`domain add`／`remove`の準備から確定までの間）は、対象のDOが自動的にHTTP 503を返して配信を保護し、確定完了とともに通常配信へ復帰する。
 
-| `state` | 新しい公開変更 | リスナーへの配信 |
-| --- | --- | --- |
-| `open` | 受け付ける | 公開済みの内容を配信する |
-| `admission_paused` | 受け付けない | 公開済みの内容を配信する |
-| `paused` | 受け付けない | 配信しない |
-
-非公開の対象、サーバーの動作確認が済んでいない場合、Workerやドメインの保守中などは、配信有効でも内容を返さない。配信有効という設定だけで、現在の取得成功を保証しない。
-
-公開は同期アトミック処理であり、パージ待機中に停止した要求は確定直前の受付条件で拒否する。R2への素材配置だけでは公開されない。手元の編集や状態照会は引き続き可能である。
-
-## 停止・再開
-
-`STOP_UUID`などは、操作ごとに未使用のUUIDへ置き換える。公開受付や配信の再開は自動では行わない。
-
-### 受付だけを止める
+## 非公開化と復元
 
 ```sh
-castloop show-admission-pause daily STOP_UUID --workspace /path/to/service --json
-castloop show-status daily --workspace /path/to/service --json
+# Episodeの非公開化と復元
+castloop preview-episode-lifecycle daily first unpublish --workspace /path/to/service > plan.json
+castloop lifecycle-execute plan.json REQUEST_SHA256 confirm --workspace /path/to/service
+
+castloop preview-episode-lifecycle daily first restore --workspace /path/to/service > restore-plan.json
+castloop lifecycle-execute restore-plan.json REQUEST_SHA256 confirm --workspace /path/to/service
+
+# Show全体の非公開化と復元
+castloop preview-show-lifecycle daily unpublish --workspace /path/to/service > show-plan.json
+castloop lifecycle-execute show-plan.json REQUEST_SHA256 confirm --workspace /path/to/service
 ```
 
-既に配信も停止している場合は、その停止を維持する。このコマンドで配信が勝手に再開されることはない。
+- `unpublish`は必要なキャッシュパージ後にSQLiteトランザクションで公開状態を切り替え、Feed・HTML・画像・音源の配信を停止する。保存済みの音源・画像・revision履歴は削除しない。
+- `restore`は保存済みの確定内容を使って配信を復元し、GUID・公開日時・音源identityを保持する。手元の未公開編集を暗黙に採用しない。また、Show全体の`restore`で個別に非公開化したEpisodeが勝手に復活することはない。
+- 既に同じ状態になっている対象への再実行は、`unchanged`として安全に完了する。物理削除は未実装。
 
-### 受付と配信を両方止める
-
-```sh
-castloop show-pause daily PAUSE_UUID --workspace /path/to/service --json
-```
-
-既存コマンドの意味は変わらない。Feed・画像・音声、独自ドメイン、旧workers.devからの転送も、新しい配信判断では拒否する。キャッシュに内容が残っていても迂回できない。ただし、停止前に許可して送信中のデータや、リスナーが保存済みのファイルは取り消せない。
-
-### 配信だけを再開する
-
-```sh
-castloop show-delivery-resume daily DELIVERY_UUID --workspace /path/to/service --json
-```
-
-新しい公開変更は受け付けないままにする。サーバーの動作確認が済み、保守中でないことが必要。公開job待ち行列はなく、古い受付期間の要求は確定できない。
-
-### 受付と配信を両方有効にする
-
-```sh
-castloop show-resume daily NEW_WINDOW_UUID --workspace /path/to/service --json
-```
-
-配信だけの再開と同じ確認を行い、新しい受付期間IDも設定する。過去の受付期間IDは使えない。非公開にしたShow/Episodeや、旧期間の公開依頼を自動的に復活させることはない。
-
-## 通信断や操作の行き違い
-
-CLIは、確認した停止・再開の変更番号を要求に含める。確認後に別の停止・再開が先に適用された場合、古い要求を拒否する。すでに停止中でも、新しい操作IDで改めて停止した場合は変更番号を進める。CLIは勝手に最新番号へ変更して再送しない。
-
-操作の応答を失った場合は、その操作IDを使って結果を照会する。
-
-```sh
-castloop show-control-status daily PAUSE_UUID --workspace /path/to/service --json
-```
-
-- `result.control.request`は元の依頼、`result.control.result`はその操作を適用した時の状態である。
-- `result.state`などの外側の項目は照会時点の状態である。後から別の操作があれば、適用時の結果とは異なる。
-- 元と同じ停止・再開コマンドを同じ操作IDで再実行した場合も、送信開始済みならGETで照会するだけで、POSTを再送しない。保存済み結果が元の要求と一致した場合だけ、手元の記録を完了にできる。
-- 結果が見つからない場合、未実行と判断して再送したり、別IDでやり直したりしない。元の要求が遅れて届く可能性がある。
-- 再開操作の過去の結果を確認しても、その後の配信停止は取り消さない。
-
-`doctor --local`は未完了・読取不能・旧形式の手元の停止・再開記録を報告するが、リモート照会や記録の変換・削除はしない。鍵、元の記録、残存する所有者のロックを削除しない。
-
-## Worker更新・ドメイン変更
-
-受付だけの停止では更新準備に進めない。各Showの既受付処理が終わってから、`show-pause`で配信も停止し、[既存の更新手順](sqlite_sequential_development.md#互換worker更新)に従う。更新後も各Showはpausedのままなので、配信だけ、または受付と配信の両方を明示的に再開する。
-
-Worker更新中も配信し続ける機能、異常停止の強制解除、不明な操作の再送は提供しない。別のShowが停止しているだけなら、健全なShowの通常操作は妨げない。
-
-詳細は[採用設計](../design/show_admission_delivery_separation_plan.md)を参照する。機械出力の外枠は従来の`schema result`と同じで、help/describeには追加の3コマンドを表示する。
+詳細は[フェーズ3設計](../design/phase3_deploy_and_runtime_control_simplification_plan.md)および[SQLiteガイド](sqlite_sequential_development.md)を参照する。

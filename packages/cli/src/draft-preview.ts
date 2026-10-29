@@ -52,16 +52,16 @@ export async function draftPreview(root: string, config: SqliteServiceConfig, ta
   const identity = !snapshot ? "not_checked" : !published ? "initial" : target.kind === "episode" ?
     sameEpisodeIdentity(metadata as EpisodeDraft, published as EpisodeDraft) ? "preserved" : "changed_invalid" :
     snapshot.show_content?.cover.extension === cover?.extension ? "preserved" : "changed_invalid";
-  const base = snapshot ? { worker_version_id: snapshot.worker_version_id, service_config_sha256: snapshot.service_config_sha256,
-    admission_window_id: snapshot.admission_window_id, state: snapshot.state, show_lifecycle: snapshot.show_lifecycle,
+  const base = snapshot ? { service_config_sha256: snapshot.service_config_sha256,
+    show_lifecycle: snapshot.show_lifecycle,
     show_state_version: snapshot.expected_show_state_version, show_revision_id: snapshot.show_content?.revision_id ?? null,
     episode_lifecycle: snapshot.episode_lifecycle, episode_lifecycle_version: snapshot.expected_episode_lifecycle_version,
     base_revision_id: snapshot.episode_content?.revision_id ?? null, feed_generation: snapshot.feed_generation } : null;
   let request: SqliteDirectPublishRequest | null = null;
-  if (snapshot?.admission_window_id && snapshot.expected_show_state_version !== null && (target.kind === "show" ? cover : effectiveAudio)) {
+  if (snapshot && snapshot.expected_show_state_version !== null && (target.kind === "show" ? cover : effectiveAudio)) {
     const parsed = parseSqliteDirectPublicationRequest({ schema_version: 1, protocol: "sqlite-sequential-v1", action: "publish",
-      service_id: config.service_id, worker_version_id: snapshot.worker_version_id, service_config_sha256: snapshot.service_config_sha256,
-      admission_window_id: snapshot.admission_window_id, show_id: target.show_id, expected_show_state_version: snapshot.expected_show_state_version,
+      service_id: config.service_id, service_config_sha256: snapshot.service_config_sha256,
+      show_id: target.show_id, expected_show_state_version: snapshot.expected_show_state_version,
       kind: target.kind, metadata, ...(target.kind === "show" ? { cover } : { episode_id: target.episode_id, audio: effectiveAudio,
         expected_episode_lifecycle_version: snapshot.expected_episode_lifecycle_version, base_revision_id: snapshot.episode_content?.revision_id }) });
     if (parsed.action !== "publish") throw new Error("Unexpected publication action");
@@ -78,7 +78,7 @@ export async function draftPreview(root: string, config: SqliteServiceConfig, ta
       audio: { mode: target.kind === "show" ? "not_applicable" : audio ? "replace_audio" : effectiveAudio ? "reuse_published" : "missing_required",
         published: snapshot?.episode_content?.audio ?? null, candidate: effectiveAudio },
       cover: { candidate: cover, published: snapshot?.show_content?.cover ?? null } },
-    request, unchanged, publishable: !!request && !!snapshot && identity !== "changed_invalid" && (unchanged || snapshot.state === "open" &&
+    request, unchanged, publishable: !!request && !!snapshot && identity !== "changed_invalid" && (unchanged ||
       (target.kind === "show" ? ["draft", "published"].includes(snapshot.show_lifecycle) : snapshot.show_lifecycle === "published" &&
         ["missing", "published"].includes(snapshot.episode_lifecycle!))),
     local_fingerprint: localFingerprint, input_fingerprint: sha256(JSON.stringify({ config, target, local_fingerprint: localFingerprint, base })),

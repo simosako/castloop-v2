@@ -17,7 +17,7 @@ const counters = { get_200_requests: 3, get_206_requests: 5, audio_get_requests:
 const episodesResponse: SqliteStatsEpisodesResponse = { ...runtime, protocol: "sqlite-sequential-v1", show_id: "daily",
   measurement_started_at_ms: Date.UTC(2026, 9, 10, 4), measurement_started_date_utc: "2026-10-10",
   retained_from_date_utc: "2026-10-10", retention_days: 400, current_date_utc: "2026-10-25",
-  recording_error_count: 0, collection_mode: "best_effort_non_blocking", state: "open",
+  recording_error_count: 0, collection_mode: "best_effort_non_blocking",
   from_date_utc: "2026-10-10", to_date_utc: "2026-10-25",
   episodes: [{ episode_id: "first", lifecycle: "published", coverage: "partial", period: counters, lifetime: counters }],
   next_cursor: null };
@@ -26,7 +26,7 @@ const dailyResponse: SqliteStatsEpisodeDailyResponse = { ...runtime, protocol: "
   episode_id: "first", episode_lifecycle: "published", measurement_started_at_ms: Date.UTC(2026, 9, 10, 4),
   measurement_started_date_utc: "2026-10-10", retained_from_date_utc: "2026-10-10", retention_days: 400,
   current_date_utc: "2026-10-25", recording_error_count: 0, collection_mode: "best_effort_non_blocking",
-  state: "open", from_date_utc: "2026-10-24", to_date_utc: "2026-10-25", coverage: "partial", period: counters, lifetime: counters,
+  from_date_utc: "2026-10-24", to_date_utc: "2026-10-25", coverage: "partial", period: counters, lifetime: counters,
   revisions: [{ audio_revision_id: crypto.randomUUID(), length_bytes: 800_000, is_current_enclosure: true, period: counters, lifetime: counters }],
   days: [{ date_utc: "2026-10-24", coverage: "measured", counters },
     { date_utc: "2026-10-25", coverage: "partial", counters: null },
@@ -52,35 +52,29 @@ test("retention journal replays by operation id and refuses divergent repeats", 
   fixtures.push(setup);
   administratorKey(setup.root, true);
   const config = await loadWorkspaceConfig(setup.root);
-  const window = crypto.randomUUID();
   const serviceHealth = { service_id: config.service_id, worker_version_id: crypto.randomUUID(),
     service_config_sha256: await sqliteServiceConfigHash(config), protocol: "sqlite-sequential-v1",
-    feed_storage: "immutable-generation-v1", cover_storage: "immutable-generation-v1",
-    publication_read_boundary: "show-episode-v1", feed_generation_allocator: "reservation-v1",
-    domain_changes: "sqlite-domain-change-v1", invocation_id: window, publication_ready: true,
-    state: "open", admission_window_id: window, availability_controls: "show-admission-delivery-v1",
-    revision_history: "sqlite-revisions-v1", delivery_statistics: "episode-daily-v1", website: "static-show-v2",
-    availability_version: 0, admission_state: "open", delivery_policy: "enabled",
-    queued: 0, active: null, drained: true, setup: { operation_id: window, state: "ready" }, runtime_update: null };
+    domain_changes: "sqlite-domain-change-v1", invocation_id: crypto.randomUUID(), publication_ready: true,
+    revision_history: "sqlite-revisions-v1", delivery_statistics: "episode-daily-v1", website: "static-show-v2" };
   const requests: string[] = [];
   const transport = async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const request = new Request(input, init), path = new URL(request.url).pathname;
     requests.push(`${request.method} ${path}`);
     const respond = (value: unknown) => Response.json(value, { status: 200, headers: { "Cache-Control": "no-store" } });
     if (request.method === "GET" && path === "/admin/sqlite-service/health") {
-      return respond({ ...serviceHealth, scope: "show", show_id: "daily", maintenance_operation_id: null });
+      return respond({ ...serviceHealth, scope: "show", show_id: "daily" });
     }
     if (request.method === "POST" && path === "/admin/sqlite-stats/retention") {
-      const body = JSON.parse(await request.text()) as { operation_id: string; retention_days: number; show_id: string; service_id: string; worker_version_id: string; service_config_sha256: string };
-      return respond({ ...serviceHealth, scope: "show", show_id: "daily", maintenance_operation_id: null,
+      const body = JSON.parse(await request.text()) as { operation_id: string; retention_days: number; show_id: string; service_id: string; service_config_sha256: string };
+      return respond({ ...serviceHealth, scope: "show", show_id: "daily",
         retention: { request: body, request_sha256: await sha256Hex(JSON.stringify(body)),
           retention_days: body.retention_days, applied_at_ms: 1_000 } });
     }
     if (request.method === "GET" && path.startsWith("/admin/sqlite-stats/retention/")) {
       const operationId = path.slice("/admin/sqlite-stats/retention/".length);
-      const body = { service_id: config.service_id, worker_version_id: serviceHealth.worker_version_id,
+      const body = { service_id: config.service_id,
         service_config_sha256: serviceHealth.service_config_sha256, operation_id: operationId, show_id: "daily", retention_days: 120 };
-      return respond({ ...serviceHealth, scope: "show", show_id: "daily", maintenance_operation_id: null,
+      return respond({ ...serviceHealth, scope: "show", show_id: "daily",
         retention: { request: body, request_sha256: await sha256Hex(JSON.stringify(body)),
           retention_days: 120, applied_at_ms: 1_000 } });
     }

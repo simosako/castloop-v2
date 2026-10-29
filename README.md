@@ -5,9 +5,9 @@
 
 Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one private R2 bucket and one Worker per service, multiple Shows.
 
-**Early beta.** Commands and persisted formats can change incompatibly. This development branch implements [Phase 2](design/phase2_direct_media_and_cli_simplification_plan.md): direct media uploads, synchronous atomic publication, and SQLite-generated feeds/websites. It requires fresh internal queue/content formats **13/13**. Older environments are not migrated or updated to this format. This branch has not been deployed or measured on native Cloudflare; historical trials in the [design index](design/README.md) and [release notes](CHANGELOG.md) describe earlier versions.
+**Early beta.** Commands and persisted formats can change incompatibly. This development branch implements [Phase 1](design/phase1_atomic_publication_and_ondemand_delivery_plan.md), [Phase 2](design/phase2_direct_media_and_cli_simplification_plan.md), and [Phase 3](design/phase3_deploy_and_runtime_control_simplification_plan.md): direct media uploads, synchronous atomic publication, SQLite-generated feeds/websites, single-step code-only deployments, and lifecycle-only availability controls. It requires fresh internal queue/content formats **14/13**. Older environments are not migrated or updated to this format. This branch has not been deployed or measured on native Cloudflare; historical trials in the [design index](design/README.md) and [release notes](CHANGELOG.md) describe earlier versions.
 
-The CLI validates local TOML/media, places content-addressed media in private R2, and explicitly sends metadata plus media references to the target Show DO. After validation and required cache purges, one SQLite transaction commits content, revisions and delivery generations. Each Show has independent state and Pause/Resume controls; a small control DO tracks membership and shared maintenance. No Cloudflare Queues or D1 are used.
+The CLI validates local TOML/media, places content-addressed media in private R2, and explicitly sends metadata plus media references to the target Show DO. After validation and required cache purges, one SQLite transaction commits content, revisions and delivery generations. Each Show has independent SQLite state; a small control DO tracks Show registration, catalog listing and custom domain state. No Cloudflare Queues or D1 are used.
 
 ## Install and build
 
@@ -49,14 +49,13 @@ castloop service-status
 
 Only fresh `schema_version = 2`, `publication_protocol = "sqlite-sequential-v1"`, `storage_layout = "show-v1"` services with matching internal formats are supported. Shared content metadata independently uses schema version 1. Old layouts and service schema version 1 are rejected; do not edit old settings to bypass this boundary. Existing Queue services require the [v0.5.x CLI/Worker](docs/queue_service.md).
 
-Initialization verifies the deployed Worker, namespace and runtime readiness. A newly registered Show starts paused and requires explicit Resume. Existing resources are never adopted.
+Initialization verifies the deployed Worker, namespace and runtime readiness. A newly registered Show is immediately ready for publication. Existing resources are never adopted.
 
 ## Publish a Show and Episode
 
 ```sh
 castloop create-show my-show --site-url https://your-real-site.example/podcast
 # Alternatively: create-show my-show --site-mode builtin
-castloop show-resume my-show NEW_WINDOW_UUID
 # Edit my-show/show.toml and provide the JPEG/PNG named in image_path.
 castloop preview-show my-show --remote --json
 castloop publish-show my-show --expect-preview REVIEWED_HASH
@@ -84,7 +83,7 @@ castloop schedule-list my-show
 castloop schedule-status my-show SCHEDULE_UUID
 ```
 
-Schedules freeze metadata and concrete media references, not local drafts. `scheduled` means accepted, not published. The Show Alarm commits publication and `dispatched` with its `revision_id` in the same transaction. Pause, admission stop, maintenance and changed runtime/base suspend schedules as `needs_approval`; Resume alone does not reactivate them. Existing cancel/reschedule/reapprove commands require reviewed hashes and versions. An unknown creation response must be checked with `schedule-list`, not blindly recreated.
+Schedules freeze metadata and concrete media references, not local drafts. `scheduled` means accepted, not published. The Show Alarm commits publication and `dispatched` with its `revision_id` in the same transaction. Base revision conflicts and custom domain changes suspend schedules as `needs_approval`; ordinary code-only `deploy` preserves schedules. Existing cancel/reschedule/reapprove commands require reviewed hashes and versions. An unknown creation response must be checked with `schedule-list`, not blindly recreated.
 
 Scheduled time is separate from `published_at`. Future `published_at` does not delay immediate publication; non-interactive immediate publication needs `--allow-future-published-at`. Optional `castloop-admin.toml` sets the CLI timezone. See [configuration and scheduling](docs/admin_configuration.md).
 
@@ -113,25 +112,22 @@ castloop publish-rss-import /path/to/import
 castloop stats imported-show --json
 ```
 
-Imports create a new Show and preserve GUIDs/dates. A retained batch record tracks sequential Show/Episode publication; already-committed identical content is unchanged on rerun. Unknown registration/Resume outcomes are not replayed. Recurring sync, existing-Show adoption and subscriber migration are not provided. See [RSS usage](docs/rss_migration.md).
+Imports create a new Show and preserve GUIDs/dates. A retained batch record tracks sequential Show/Episode publication; already-committed identical content is unchanged on rerun. Recurring sync, existing-Show adoption and subscriber migration are not provided. See [RSS usage](docs/rss_migration.md).
 
 `stats` reports server-observed audio requests, bytes and Range/HEAD/bot classifications, not listener counts. `unmeasured` and `pruned` are not zero. `stats-retention SHOW DAYS` adjusts daily retention while preserving lifetime totals. See [statistics](docs/delivery_statistics.md).
 
-## Controls, domains and Worker updates
+## Availability, domains and Worker updates
 
-`show-admission-pause SHOW UUID` stops new publication admission while retaining delivery. `show-pause` stops both; `show-delivery-resume` restores only delivery; `show-resume` opens admission too. `show-control-status SHOW UUID` reads a saved control result. Media placement alone never publishes. See [availability controls](docs/show_availability.md).
+To stop public delivery of a Show or Episode, use lifecycle `unpublish` and `restore`. Separate runtime Pause/Resume commands (`show-pause`, `show-resume`, etc.) have been removed. Media placement alone never publishes. See [availability controls](docs/show_availability.md).
 
-Worker updates and custom-domain changes still require explicit full Pause of every Show. This phase does not simplify their maintenance protocols:
+Ordinary Worker code updates are a single-step deployment without pausing Shows or writing a local journal:
 
 ```sh
-castloop show-pause my-show PAUSE_UUID
-# Repeat for every Show and confirm paused, drained, ready status.
-castloop deploy --operation-id UPDATE_UUID
+castloop deploy
 castloop service-status
-castloop show-resume my-show NEW_WINDOW_UUID
 ```
 
-Use code-only deploy only with matching configuration, namespace and persisted formats. Dedicated domain add/list/status/continue/remove operations support one subdomain in an active/full Cloudflare DNS zone; use the [domain guide](docs/sqlite_custom_domains.md), not ordinary deploy. Never replay uncertain infrastructure mutations or adopt unknown resources. Exact acknowledged deployment verification can continue through the [existing recovery procedure](docs/sqlite_sequential_development.md#互換worker更新).
+Use code-only `deploy` only with matching configuration, namespace and persisted formats; R2 media objects are never modified or deleted during deployment, and an interrupted `deploy` can simply be run again. Dedicated domain `add`/`list`/`status`/`continue`/`remove` operations support one subdomain in an active/full Cloudflare DNS zone and save the previous and target configurations so interrupted domain changes can be continued cleanly; use the [domain guide](docs/sqlite_custom_domains.md), not ordinary deploy.
 
 ## Backup, agents and failures
 
@@ -139,7 +135,7 @@ Keep `castloop.toml`, local originals and private git-ignored `.castloop/` state
 
 Agents can use `describe`, `schema`, `template`, `validate`, `doctor --local` and the bundled Skill (`skill export castloop --output DIR`). Specify `--workspace`, Episode `--show`, `--non-interactive --json`, review inputs and bind publication to `--expect-preview`. See [agent usage](docs/agent_usage.md).
 
-For an unknown content-publication response, inspect current content and rerun the same approved inputs: identical content is unchanged; different content with a stale base returns 409. The CLI does not automatically rebase or resend mutations. This does **not** authorize replay of init/deploy/domain/Resume operations; preserve their journals and inspect their recorded outcomes. Management GETs retain bounded transient retries. No install, build, test or historical approval authorizes deployment, publication, cleanup or deletion.
+For an unknown content-publication response, inspect current content and rerun the same approved inputs: identical content is unchanged; different content with a stale base returns 409. Interrupted `init`, `deploy`, `create-show`, and `domain continue` operations check current state via API and can be re-run to completion. Management GETs retain bounded transient retries. No install, build, test or historical approval authorizes deployment, publication, cleanup or deletion.
 
 ## Disclaimer and contribution
 

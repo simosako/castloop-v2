@@ -20,7 +20,7 @@ test("formal SQLite commands publish local inputs directly without staging or le
   const value = await fixture();
   const site = "https://example.com/my-podcast";
   await value.command("create-show", ["daily", site]);
-  await value.command("show-resume", ["daily", crypto.randomUUID()]);
+ 
   const directory = join(value.root, "daily"), showPath = join(directory, "show.toml");
   expect(parseShowMetadata(readFileSync(showPath, "utf8")).site_url).toBe(site);
   writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
@@ -42,14 +42,14 @@ test("formal SQLite commands publish local inputs directly without staging or le
   expect(value.content.episodes("daily")[0]).toMatchObject({ title: "Updated first", guid: base.guid, enclosure_url: base.enclosure_url });
   expect(value.calls.some((call) => call.method === "PUT" && call.path.endsWith("audio.mp3"))).toBe(false);
   expect(value.calls.some((call) => /queues|event_notifications|show-publications|system\/jobs/.test(call.path))).toBe(false);
-  await value.command("show-pause", ["daily", crypto.randomUUID()]);
-  expect(value.runtime.health()).toMatchObject({ state: "paused", drained: true });
+ 
+  expect(value.runtime.health()).toMatchObject({ publication_ready: true });
 });
 
 test("publish-episode requires explicit future published_at approval through command options", async () => {
   const value = await fixture();
   await value.command("create-show", ["daily", "https://example.com"]);
-  await value.command("show-resume", ["daily", crypto.randomUUID()]);
+ 
   const directory = join(value.root, "daily");
   writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
   await value.command("publish-show", ["daily"]);
@@ -81,24 +81,10 @@ test("a lost registration response is inspected without resending and advanced S
   await expect(value.command("create-show", ["daily", "https://example.com"])).rejects.toThrow("advanced/deleted");
 });
 
-test("acknowledged server controls reconcile lost responses using only GET without reopening later pauses", async () => {
-  const value = await fixture(), window = crypto.randomUUID();
-  await value.command("create-show", ["daily", "https://example.com"]);
-  value.faults.lost = "control";
-  await expect(value.command("show-resume", ["daily", window])).rejects.toThrow();
-  value.faults.lost = undefined; value.calls.length = 0;
-  expect(await value.command("show-resume", ["daily", window])).toMatchObject({ state: "open", admission_window_id: window,
-    control: { result: { state: "open" } } });
-  expect(value.calls.every((call) => call.method === "GET")).toBe(true);
-  await value.command("show-pause", ["daily", crypto.randomUUID()]); value.calls.length = 0;
-  expect(await value.command("show-resume", ["daily", window])).toMatchObject({ state: "paused", control: { result: { state: "open" } } });
-  expect(value.calls.every((call) => call.method === "GET")).toBe(true);
-});
-
 test("unsupported SQLite commands fail explicitly without legacy fallback or remote mutations", async () => {
   const value = await fixture(); value.calls.length = 0;
-  for (const command of ["deploy", "release-job", "retry-job", "lifecycle-execute", "import-rss"]) {
-    await expect(value.command(command, [])).rejects.toThrow("no legacy fallback");
+  for (const command of ["deploy", "release-job", "retry-job", "lifecycle-execute", "import-rss", "show-pause", "show-resume"]) {
+    await expect(value.command(command, [])).rejects.toThrow();
   }
   expect(value.calls).toEqual([]);
 });

@@ -38,8 +38,8 @@ export class SqlitePublicationClient {
       throw new Error(`Publication failed or its outcome is unknown (HTTP ${response.status}); review the current content before retrying`);
     }
     const result = sqliteDirectPublicationResultSchema.parse(await readSqliteManagementJson(response));
-    if (result.service_id !== request.service_id || result.worker_version_id !== request.worker_version_id ||
-      result.service_config_sha256 !== request.service_config_sha256 || result.show_id !== request.show_id || result.episode_id !== request.episode_id) throw new Error("Publication response target differs");
+    if (result.service_id !== request.service_id || result.service_config_sha256 !== request.service_config_sha256 ||
+      result.show_id !== request.show_id || result.episode_id !== request.episode_id) throw new Error("Publication response target differs");
     return result;
   }
 }

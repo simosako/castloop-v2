@@ -149,14 +149,13 @@ test("RSS retries a lost Episode publication as unchanged and re-PUTs the identi
   expect(value.calls.some((call) => /sqlite-operations|\/jobs/.test(call.path))).toBe(false);
 });
 
-test("unknown Show creation is not replayed and changed import inputs cannot replace a retained batch", async () => {
+test("an interrupted Show creation is completed by re-running and changed import inputs cannot replace a retained batch", async () => {
   const value = await fixture();
   await expect(value.execute({ ...value.effects, async command(name, args) {
     const result = await value.effects.command(name, args); if (name === "create-show") throw new Error("lost creation"); return result;
   } })).rejects.toThrow("lost creation");
+  expect(await value.execute()).toMatchObject({ episode_count: 2 });
   const count = value.commands.length;
-  await expect(value.execute()).rejects.toThrow("without replaying");
-  expect(value.commands).toHaveLength(count);
   const path = join(value.output, "show.toml"); writeFileSync(path, readFileSync(path, "utf8").replace('title = "Imported"', 'title = "Changed"'));
   await expect(value.execute()).rejects.toThrow("inputs changed"); expect(value.commands).toHaveLength(count);
 });

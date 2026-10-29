@@ -24,11 +24,11 @@ export async function previewRevision(config: SqliteServiceConfig, key: string, 
   const current = episodeId === undefined ? detail.current_show : detail.current_episode!;
   const target = episodeId === undefined ? detail.target_show_revision! : detail.target_episode_revision!;
   const identityPreserved = episodeId === undefined || sameEpisodeIdentity(detail.current_episode!.metadata, detail.target_episode_revision!.metadata);
-  const allowed = detail.state === "open" && !!detail.admission_window_id && identityPreserved &&
+  const allowed = identityPreserved &&
     (episodeId === undefined ? detail.current_show.cover.extension === detail.target_show_revision!.cover.extension : detail.show_lifecycle === "published");
   const request = allowed ? sqliteContentActionRequestSchema.parse({ schema_version: 1, protocol: "sqlite-sequential-v1", action: "restore_revision",
-    kind: detail.kind, show_id: showId, service_id: config.service_id, worker_version_id: detail.worker_version_id,
-    service_config_sha256: detail.service_config_sha256, admission_window_id: detail.admission_window_id,
+    kind: detail.kind, show_id: showId, service_id: config.service_id,
+    service_config_sha256: detail.service_config_sha256,
     expected_show_state_version: detail.expected_show_state_version, target_revision_id: revisionId,
     ...(episodeId === undefined ? {} : { episode_id: episodeId, base_revision_id: detail.current_episode!.revision_id,
       expected_episode_lifecycle_version: detail.expected_episode_lifecycle_version }) }) : null;

@@ -53,7 +53,7 @@ async function fixture() {
 
 async function publishedShowWithEpisode(value: Awaited<ReturnType<typeof fixture>>) {
   await value.command("create-show", ["daily", "https://example.com/my-podcast"]);
-  await value.command("show-resume", ["daily", crypto.randomUUID()]);
+ 
   const directory = join(value.root, "daily");
   writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
   await value.command("publish-show", ["daily"]);

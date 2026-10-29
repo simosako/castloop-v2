@@ -245,10 +245,9 @@ async function main(context: Invocation): Promise<unknown> {
       if (flags["site-url"] !== undefined) throw new Error("Builtin sites do not accept --site-url");
     } else positional.push(await ask(flags["site-url"], "site-url", "Show website URL"));
   } else if (command === "deploy") {
-    allowedFlags(flags, ["operation-id"]);
+    allowedFlags(flags, []);
     if (positional.length) throw new Error(commandHelp(command));
     command = "update-service";
-    positional.push(flags["operation-id"] ?? randomUUID());
   } else if (command === "domain") {
     const [action] = positional;
     allowedFlags(flags, action === "add" ? ["zone-id", "operation-id"] : action === "remove" ? ["operation-id"] : action === "status" ? ["cursor"] : []);
@@ -313,7 +312,7 @@ async function main(context: Invocation): Promise<unknown> {
   if (command === "sync-local-metadata") positional.push(explicitShow!);
   context.target.workspace = root;
   const workspace = await loadWorkspaceConfig(root);
-  if (["show-status", "show-pause", "show-resume", "show-admission-pause", "show-delivery-resume", "show-control-status"].includes(command)) {
+  if (command === "show-status") {
     context.target.show_id = validateId(positional[0], "show");
   }
   if (command === "domain" && !["list", "status"].includes(positional[0])) {

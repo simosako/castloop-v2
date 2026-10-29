@@ -229,12 +229,12 @@ describe("backup create, verify and restore", () => {
     const root = backupWorkspace();
     const directory = mkdtempSync("/tmp/opencode/castloop-backup-e2e-");
     try {
-      mkdirSync(join(root, ".castloop", "sqlite-controls", "service"), { recursive: true });
-      writeFileSync(join(root, ".castloop", "sqlite-controls", "service", "22222222-2222-4222-8222-222222222222.json"), "{invalid");
+      mkdirSync(join(root, ".castloop", "sqlite-drafts", "service"), { recursive: true });
+      writeFileSync(join(root, ".castloop", "sqlite-drafts", "service", "22222222-2222-4222-8222-222222222222.json"), "{invalid");
       const output = join(directory, "backup.clbk");
       const created = await createLocalBackup(root, output, { includeAudio: false, passphrase: PASSPHRASE });
-      expect(created.scan_errors).toContain("show_controls");
-      expect(verifyLocalBackup(output, PASSPHRASE).scan_errors).toEqual(["show_controls"]);
+      expect(created.scan_errors).toContain("drafts");
+      expect(verifyLocalBackup(output, PASSPHRASE).scan_errors).toEqual(["drafts", "source_paths"]);
     } finally { rmSync(directory, { recursive: true }); rmSync(root, { recursive: true }); }
   });
 

@@ -29,7 +29,7 @@ test("SQLite catalog pages use bounded keyset reads, hide tombstones and bind cu
   expect(second.shows![0].show_id > first.shows!.at(-1)!.show_id).toBe(true);
   expect(() => value.catalog({ kind: "show", include_deleted: true, cursor: first.next_cursor })).toThrow("another query");
   expect(() => readSqliteCatalog(value.storage, { kind: "show", include_deleted: false, cursor: first.next_cursor! },
-    { ...value.runtime, worker_version_id: crypto.randomUUID() }, "https://public.example.com")).toThrow("another query");
+    { ...value.runtime, service_config_sha256: "f".repeat(64) }, "https://public.example.com")).toThrow("another query");
   expect(value.catalog({ kind: "show", include_deleted: true }).shows!.some((row) => row.lifecycle === "deleted")).toBe(true);
 });
 
@@ -42,9 +42,8 @@ test("Episode catalog includes saved unpublished snapshots and parent state with
     value.storage.sql.exec("INSERT INTO publication_episode_content VALUES ('daily', ?, ?, ?)", id, crypto.randomUUID(),
       JSON.stringify({ title: `Title ${id}`, published_at: "2026-10-16T12:00:00Z" }));
   }
-  value.queue.pause();
   const first = value.catalog({ kind: "episode", show_id: "daily", include_deleted: false });
-  expect(first).toMatchObject({ state: "paused", show: { lifecycle: "unpublished" }, snapshot_only: true, authorizes_recovery: false });
+  expect(first).toMatchObject({ show: { lifecycle: "unpublished" }, snapshot_only: true, authorizes_recovery: false });
   expect(first.episodes).toHaveLength(20); expect(first.episodes![1]).toMatchObject({ lifecycle: "unpublished", title: "Title ep-02" });
   expect(value.catalog({ kind: "episode", show_id: "daily", include_deleted: false, cursor: first.next_cursor }).episodes).toHaveLength(2);
   expect(() => value.catalog({ kind: "show", include_deleted: false, cursor: first.next_cursor })).toThrow();

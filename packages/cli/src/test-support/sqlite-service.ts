@@ -7,7 +7,7 @@ import type { SqliteCachePurgeConfirmation } from "../../../../src/sqlite-servic
 import { sqlitePublicationFixture } from "../../../../src/test-support/sqlite-publication";
 import { sqlitePublicationBucket } from "../../../../src/test-support/sqlite-publication-bucket";
 import { SqlitePublicationQueue } from "../../../../src/sqlite-publication-queue";
-import { selectSqliteRuntime } from "../../../../src/sqlite-runtime-update";
+import { resolveSqliteRuntime } from "../../../../src/sqlite-runtime-identity";
 import { SqliteShowService } from "../../../../src/sqlite-show-service";
 import { SqliteServiceControl } from "../../../../src/sqlite-service-control";
 import { createSqliteControlHttp } from "../../../../src/sqlite-control-http";
@@ -24,16 +24,16 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
     bucket_name: "private-bucket", worker_name: "test-worker", public_base_url: "https://test-worker.example.workers.dev", workers_dev_base_url: "https://test-worker.example.workers.dev" };
   let activeConfig = config;
   writeFileSync(join(root, "castloop.toml"), stringifyToml(config));
-  const queue = sqlitePublicationFixture({ resume: false, runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
+  const queue = sqlitePublicationFixture({ runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
   const objects = sqlitePublicationBucket(), content = new SqlitePublicationContent(queue.storage), purges: string[] = [];
   let actual = queue.runtime, previousVersion = actual.worker_version_id, nativeQueue = queue.queue;
   const nodes = new Map<string, { fixture: ReturnType<typeof sqlitePublicationFixture>; service: SqliteShowService }>();
   const showCalls: Array<{ action: string; showId: string }> = [];
-  const faultShow = (action: "initialize" | "prepare" | "activate" | "release" | "domain-prepare" | "domain-activate" | "domain-release", showId: string) => {
+  const faultShow = (action: "initialize" | "domain-prepare" | "domain-commit", showId: string) => {
     if (faults.lostShow?.action === action && faults.lostShow.showId === showId) throw new Error("Unconfirmed Show RPC");
   };
   let control!: SqliteServiceControl;
-  const cache = () => ({ describe: async () => ({ ...actual, cache_enabled: true }), purge: async (id: string, confirmed?: SqliteCachePurgeConfirmation) => {
+  const cache = () => ({ purge: async (id: string, confirmed?: SqliteCachePurgeConfirmation) => {
     purges.push(id); confirmed?.("media");
     if (faults.failDomainPurge === id) throw new Error("Domain purge unavailable");
     confirmed?.("site");
@@ -42,45 +42,28 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
   const openShow = (id: string) => {
     let node = nodes.get(id);
     if (!node) {
-      const fixture = sqlitePublicationFixture({ resume: false, runtime: actual });
+      const fixture = sqlitePublicationFixture({ runtime: actual });
       node = { fixture, service: new SqliteShowService(fixture.storage, id, actual, activeConfig, cache(), objects.bucket, administratorKey(keyRoot ?? root)) };
       nodes.set(id, node);
     }
     return node;
   };
   const boot = () => {
-    nativeQueue = new SqlitePublicationQueue(queue.storage, selectSqliteRuntime(queue.storage, actual));
-    const runtime = new SqliteServiceRuntime(queue.storage, nativeQueue, content, objects.bucket, activeConfig, {
-      describe: async () => ({ ...actual, cache_enabled: true }), purge: async (id) => { purges.push(id); } }, actual);
+    nativeQueue = new SqlitePublicationQueue(queue.storage, resolveSqliteRuntime(queue.storage, actual));
+    const runtime = new SqliteServiceRuntime(queue.storage, nativeQueue, content, activeConfig, {
+      purge: async (id) => { purges.push(id); } }, actual);
     for (const [id, node] of nodes) node.service = new SqliteShowService(node.fixture.storage, id, actual, activeConfig, cache(), objects.bucket, administratorKey(keyRoot ?? root));
     control = new SqliteServiceControl(queue.storage, runtime, (id) => ({
       initialize: async (request) => {
         showCalls.push({ action: "initialize", showId: id });
         const node = openShow(id); await node.service.initialize(request);
-        node.fixture.clearAlarm(); await node.service.alarmRuntime().alarm(); faultShow("initialize", id); return node.service.health();
+        faultShow("initialize", id); return node.service.health();
       },
-      health: async () => ({ ...openShow(id).service.maintenanceHealth(),
-        ...(faults.staleShowVersion === id ? { worker_version_id: previousVersion } : {}) }),
+      health: async () => openShow(id).service.health(),
       catalog: async (request) => openShow(id).service.runtime.catalog(request),
-      prepare: async (request) => {
-        showCalls.push({ action: "prepare", showId: id }); await faults.beforeShowPrepare?.(id);
-        const result = openShow(id).service.prepareUpdate(request); faultShow("prepare", id); return result;
-      },
-      activate: async (request) => {
-        showCalls.push({ action: "activate", showId: id });
-        const node = openShow(id), result = await node.service.activateUpdate(request);
-        if (!faults.deferUpdateProbe) { node.fixture.clearAlarm(); await node.service.alarmRuntime().alarm(); }
-        faultShow("activate", id);
-        return result;
-      },
-      release: async (operationId) => {
-        showCalls.push({ action: "release", showId: id });
-        const result = openShow(id).service.releaseUpdate(operationId); faultShow("release", id); return result;
-      },
       prepareDomain: async (request) => { showCalls.push({ action: "domain-prepare", showId: id }); const result = await openShow(id).service.prepareDomain(request); faultShow("domain-prepare", id); return result; },
-      activateDomain: async (request) => { showCalls.push({ action: "domain-activate", showId: id }); const result = await openShow(id).service.activateDomain(request); faultShow("domain-activate", id); return result; },
+      commitDomain: async (request) => { showCalls.push({ action: "domain-commit", showId: id }); const result = await openShow(id).service.commitDomain(request); faultShow("domain-commit", id); return result; },
       domainStatus: (operationId) => openShow(id).service.domainStatus(operationId),
-      releaseDomain: async (operationId) => { showCalls.push({ action: "domain-release", showId: id }); const result = await openShow(id).service.releaseDomain(operationId); faultShow("domain-release", id); return result; },
     }));
     return runtime;
   };
@@ -92,13 +75,12 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
   const domains: SqliteDomainConnection[] = [];
   const zoneDns: Array<{ name: string; type: string }> = [];
   const routes: Array<{ pattern: string }> = [];
-  const faults: { lost?: "bucket" | "config" | "worker" | "deploy" | "access" | "setup" | "register" | "control" | "update-prepare" | "activation" | "domain-prepare" | "domain-activate" | "domain-finalize";
-    lostShow?: { action: "initialize" | "prepare" | "activate" | "release" | "domain-prepare" | "domain-activate" | "domain-release"; showId: string }; beforeShowPrepare?: (showId: string) => Promise<void>;
-    staleShowVersion?: string;
+  const faults: { lost?: "bucket" | "config" | "worker" | "deploy" | "access" | "register" | "control" | "domain-prepare" | "domain-commit" | "domain-finalize";
+    lostShow?: { action: "initialize" | "domain-prepare" | "domain-commit"; showId: string };
     failDomainPurge?: string;
     tlsPending?: boolean; lostDomain?: "attach" | "detach"; malformedDetach?: boolean; zoneAccount?: string; zoneStatus?: string;
     namespace?: boolean; settings?: boolean; existing?: "bucket" | "worker" | "empty"; failPurge?: boolean; afterPublish?: () => Promise<void>;
-    afterDeploy?: () => void; deferUpdateProbe?: boolean; missingVersionExports?: boolean; failFirstInspection?: boolean } = {};
+    afterDeploy?: () => void; missingVersionExports?: boolean; failFirstInspection?: boolean } = {};
   const json = (result: unknown) => Response.json({ success: true, errors: [], result });
   const settings = (): Record<string, unknown> & { bindings: Array<Record<string, unknown>> } => {
     if (!metadata) throw new Error("Missing deployed settings");
@@ -136,23 +118,8 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
       }
       if (path.startsWith("/admin/sqlite-service/")) {
         const response = await createSqliteControlHttp(control, key)(request);
-        if (path.endsWith("/prepare") && response.status === 202) {
-          if (faults.failPurge) objects.hooks.beforeGet = async () => { throw new Error("probe unavailable"); };
-          queue.clearAlarm(); await runtime.alarm(); lost("setup");
-        }
         if (path.endsWith("/register-show")) lost("register");
-        if (path.endsWith("/resume") || path.endsWith("/pause")) lost("control");
-        if (path.endsWith("/update-prepare")) lost("update-prepare");
-        if (path.endsWith("/update-activate") && response.ok) {
-          if (faults.failPurge) objects.hooks.beforeGet = async () => { throw new Error("probe unavailable"); };
-          if (!faults.deferUpdateProbe) { queue.clearAlarm(); await runtime.alarm(); await control.progress(); }
-          lost("activation");
-        }
-        if (path.endsWith("/domain-activate") && response.ok) {
-          for (const node of nodes.values()) { await node.service.runtime.domains.alarm(); await node.service.alarmRuntime().alarm(); }
-          await runtime.domains.alarm(); await runtime.alarm();
-        }
-        for (const phase of ["domain-prepare", "domain-activate", "domain-finalize"] as const) if (path.endsWith(`/${phase}`)) lost(phase);
+        for (const phase of ["domain-prepare", "domain-commit", "domain-finalize"] as const) if (path.endsWith(`/${phase}`)) lost(phase);
         return response;
       }
       return new Response(null, { status: 400 });
@@ -242,9 +209,5 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
       return actual;
     },
     restart() { runtime = boot(); },
-    async progressDomains() {
-      for (const node of nodes.values()) { await node.service.runtime.domains.alarm(); await node.service.alarmRuntime().alarm(); }
-      await runtime.domains.alarm(); await runtime.alarm();
-    },
     close() { for (const node of nodes.values()) node.fixture.close(); queue.close(); rmSync(root, { recursive: true, force: true }); } };
 }
