@@ -82,7 +82,7 @@ site_timezone = "Asia/Tokyo"
 
 変えるのはHTMLの表示だけであり、保存済み`published_at`、RSSの`pubDate`、新しい順の並び、GUID、短いURL、音源は変えない。[管理用設定](admin_configuration.md)の`castloop-admin.toml timezone`はCLIの日時入力・確認用で、サイト表示へは流用しない。PCや閲覧者のタイムゾーンからも推測しない。
 
-変換にはWorker標準の`Intl.DateTimeFormat`を使い、1回のHTML生成batch内で使い回す。閲覧時の変換・追加JavaScript・新しい依存やサービスはない。生成数・既存batch予算は変えず、native Free性能の実測結果は未取得。[採用設計](../design/show_website_timezone_plan.md)も参照する。
+変換にはWorker標準の`Intl.DateTimeFormat`を使い、1回のHTML生成内で使い回す。閲覧時の変換・追加JavaScript・新しい依存やサービスはない。[採用設計](../design/archive/show_website_timezone_plan.md)も参照する。
 
 ## URLとプレイヤー
 
@@ -135,8 +135,6 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 
 無料で無制限のhostingではない。CDN HITでも外側Worker・内側cache entrypointとShow DOの判定を使うため、要求数・DO duration・SQL・R2 operation・履歴容量を**同一アカウントのFree枠へ合算**する。Feed/HTMLのキャッシュミス時には生成CPUも使う。
 
-ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。詳しい比較・予算・受け入れ条件は[設計](../design/show_website_plan.md)参照。
+ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。詳しい比較・予算・受け入れ条件は[フェーズ1設計](../design/phase1_atomic_publication_and_ondemand_delivery_plan.md)および[初期設計](../design/archive/show_website_plan.md)参照。
 
-別途承認された[非公開の実機試験](../design/show_website_private_trial_verification_20261025.md)では、新規環境でShowと3 Episodeを公開し、本人からブラウザでのアクセス・3件再生成功の報告を得た。閲覧後の未認証要求もAccessで拒否された。個別ページ・シーク・スマートフォン・CPU性能等の未確認範囲は同記録で区別する。
-
-2026-10-26には明示承認を受け、上記の短尺試験環境を削除して、[標準デザインと通常音源3件の別環境](../design/show_website_css_large_trial_verification_20261026.md)を作成し、本人から再生成功の報告を得た。その後の説明表示版のレビューを経て、同環境を退避・削除し、[自動短縮URL・リンク表示版の新規非公開環境](../design/show_website_short_url_trial_verification_20261026.md)を作成した。約53.7〜62.9 MBのMP3の全量hash、短いページURL、元のリンク復元、フッター非表示、公開前後の未認証30要求拒否を確認し、本人からも当該変更の画面更新確認を得た。2026-10-27には別承認で[同環境をタイムゾーン版へ更新](../design/show_website_timezone_trial_verification_20261027.md)し、一覧・個別ページの東京設定と更新前後の未認証拒否を確認した。本人もブラウザで東京の日付表示を確認した。カスタムCSSの実機公開、native CPU性能、スマートフォン／キーボードの実機確認等は未完了である。これらの実機結果は統合前10/11環境のものであり、予約公開統合後11/11版は未配備。試験環境をそのまま保持し、互換更新はしない。
+別途承認された過去の非公開実機試験（[初回記録](../design/archive/show_website_private_trial_verification_20261025.md)、[標準デザイン・通常音源3件](../design/archive/show_website_css_large_trial_verification_20261026.md)、[自動短縮URL・リンク表示版](../design/archive/show_website_short_url_trial_verification_20261026.md)、[タイムゾーン版](../design/archive/show_website_timezone_trial_verification_20261027.md)）では、ブラウザでの表示・再生・短いURL・東京日付表示および未認証要求のAccess拒否を確認した。現行のオンデマンド生成版（14/13）の実機性能測定は未実施である。

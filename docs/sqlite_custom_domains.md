@@ -54,4 +54,4 @@ castloop domain list --workspace ./service --json
 
 同configの通常`deploy`はdomain変更とは別操作で、既知接続を照合・保持するだけで接続/切断しない。
 
-関連: [フェーズ3設計](../design/phase3_deploy_and_runtime_control_simplification_plan.md)、[P0のAPI根拠・制約](../design/sqlite_custom_domains_p0.md)。
+関連: [フェーズ3設計](../design/phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4設計](../design/phase4_code_and_test_cleanup_plan.md)、[P0のAPI根拠・制約](../design/archive/sqlite_custom_domains_p0.md)。
