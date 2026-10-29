@@ -7,7 +7,7 @@
 4. Local code, test and documentation changes within the requested scope need no mid-task confirmation. Only live Cloudflare operations require explicit authorization (see "Safety boundaries").
 5. Never add any of these without an explicit request:
    - new dependencies or tooling
-   - retries, timeouts, fallbacks or recovery mechanisms
+   - speculative retry, backoff, fallback or recovery machinery; network timeouts and bounded retries for idempotent reads (as in the shared HTTP helpers) are established conventions, and never retry mutating calls automatically
    - compatibility or migration paths for unsupported versions or layouts
    - fine-grained multi-phase state machines, `blocked` states or lockouts
    - configuration options, flags or extension points with no current use
