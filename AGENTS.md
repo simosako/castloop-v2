@@ -1,7 +1,7 @@
 # Agent Guide for castloop
 
 ## Hard rules (read first)
-1. Implement exactly the requested behavior. The reasoning behind this rule is in "Engineering principles" below.
+1. Implement exactly the requested behavior. See "Scope and complexity" below.
 2. Finish the entire requested task before replying. See "Completion contract".
 3. For any non-trivial change, state the scope before coding. See "Task protocol".
 4. Local code, test and documentation changes within the requested scope need no mid-task confirmation. Only live Cloudflare operations require explicit authorization (see "Safety boundaries").
@@ -13,13 +13,13 @@
    - configuration options, flags or extension points with no current use
    - wrappers, factories or interfaces around existing direct code
    - validation of values already guaranteed by types, contracts or trusted internal callers
-   - edge-case handling without evidence (principle 2 lists the acceptable evidence)
+   - edge-case handling without evidence ("Scope and complexity" defines the acceptable evidence)
 
 ## Task protocol
 Before writing code for a non-trivial change, state in five lines or fewer:
 - the requested behavior in your own words (1–2 sentences),
 - the files you expect to touch,
-- each edge case you considered with one line of evidence (a requirement, an observed bug, or a documented invariant) — no evidence means do not implement it,
+- any additional defensive behavior you intend to implement and its evidence; do not enumerate hypothetical edge cases,
 - an explicit out-of-scope list.
 
 If the change grows clearly beyond this during work, stop and ask instead of expanding silently.
@@ -32,81 +32,36 @@ If the change grows clearly beyond this during work, stop and ask instead of exp
 5. If blocked, report the exact error and what was tried. That is a failure report, not a partial success.
 6. If the task is too large to finish in one pass, ask to split it before starting — not midway.
 
-## Engineering principles: evidence-driven simplicity
+## Scope and complexity
 
-Prefer the simplest correct implementation that satisfies the actual requirements. Optimize for correctness, clarity, maintainability, and minimal complexity, not hypothetical robustness or speculative future needs. Every added abstraction, defensive check, dependency, or layer of indirection must justify its complexity.
+- Implement only the requested behavior and existing approved contracts.
+  Do not turn possible failures into new requirements.
 
-**Complexity is a cost, not a sign of engineering quality.** These principles do not override the project-specific safety boundaries, documented invariants, or required checks below.
+- Before adding defensive logic, identify either an explicit requirement
+  or a concrete failure path in supported operation.
+  For a failure path, name the real entry point, supported preconditions,
+  existing protections, and resulting failure.
 
-### 1. Implement only what is required
-- Implement the requested behavior, not imagined future requirements.
-- Follow existing codebase conventions and reuse existing mechanisms.
-- Prefer small, focused changes and direct, readable code over broad refactoring or unnecessarily abstract designs.
-- Do not introduce frameworks, architectural layers, wrappers, factories, interfaces, configuration options, or dependencies without a concrete need.
-- Do not generalize code for hypothetical reuse or create helpers or classes merely to make short, straightforward code appear more structured.
+- Artificial reproducibility alone is not evidence of production relevance.
+  A failing test must be tied to a requirement or a supported execution path.
+  Do not create tests or specifications merely to justify extra machinery.
 
-### 2. Evidence-based defensive programming
-Add defensive logic only when justified by at least one of:
-- An explicit requirement or documented invariant.
-- A realistic failure mode supported by the current architecture.
-- An observed bug or test failure.
-- A concrete security threat crossing a trust boundary.
-- A well-established correctness requirement of the language, runtime, or API.
+- Fault injection is useful when it represents an evidenced runtime,
+  dependency, or external-input failure. Bypassing trusted internal guarantees
+  does not by itself justify additional production handling.
 
-A theoretically possible failure alone is not sufficient justification. In particular:
-- Do not add redundant validation for values already guaranteed by types, contracts, or trusted internal callers, or multiple validation layers for the same invariant without justification.
-- Do not add speculative fallbacks, retries, timeouts, or recovery mechanisms.
-- Do not swallow exceptions or turn unexpected failures into apparent success.
-- Do not add compatibility logic for unsupported or imaginary environments.
-- Do not add concurrency controls without a credible concurrent execution path and a concrete shared-state risk.
-- Do not add defensive branches for impossible states unless the invariant is genuinely untrusted or externally controlled.
+- Check existing validation and runtime guarantees before adding protection.
+  Prefer existing mechanisms or a clear error over new recovery machinery.
 
-Mention an unjustified hypothetical edge case briefly only when materially relevant; do not implement code for it.
+- If relevance is unsupported, omit the additional mechanism and continue
+  with the requested work. Ask only when the ambiguity materially affects
+  required behavior, security, data integrity, or authorization.
 
-### 3. Concurrency and security
-Assess concurrency and security risks using the actual execution model and trust boundaries.
+- Generic best practices do not expand the requested scope.
+  Preserve established security controls and data-integrity guarantees.
 
-Before adding concurrency protection, identify:
-- Which operations can execute concurrently.
-- Which mutable state or resource they share.
-- What concrete failure could occur.
-- Why existing mechanisms are insufficient.
-
-Before adding security-specific complexity, identify:
-- The trust boundary.
-- The attacker-controlled input or capability.
-- The plausible exploit or failure.
-- The smallest effective mitigation.
-
-Never remove or bypass established security controls, required authorization, input validation at trust boundaries, or essential data-integrity guarantees merely to simplify code.
-
-### 4. Scope and change discipline
-- Make the smallest coherent change that fully resolves the task.
-- Preserve existing behavior unless a change is explicitly requested; do not refactor unrelated code.
-- Do not add dependencies without a clear benefit.
-- Do not create speculative extension points or implement unrequested features.
-- Prioritize tests for realistic behavior, regressions, and documented requirements, not imaginary scenarios.
-- If a broader change is genuinely necessary, explain why before expanding the scope.
-
-### 5. Implementation decision rule
-For each proposed abstraction, defensive mechanism, or architectural addition, ask:
-1. What concrete requirement or realistic failure does this address?
-2. What evidence shows the problem is relevant here?
-3. Can the same goal be achieved with less code or fewer moving parts?
-4. Would removing this mechanism compromise correctness, security, or a documented requirement?
-
-If there is no convincing justification, omit the mechanism. Prefer proven simplicity over speculative completeness.
-
-### 6. Verification
-- Run the relevant existing checks as specified in "Repository and checks" below.
-- Verify the requested behavior and realistic failure paths; do not expand the implementation merely to satisfy hypothetical test cases.
-- Before finishing, review the diff for unnecessary abstractions, defensive branches, dependencies, and unrelated changes. Remove unjustified complexity discovered during that review.
-
-### 7. Communication
-- Clearly distinguish observed facts from assumptions and hypothetical concerns; do not present speculative risks as established problems.
-- Explain significant implementation trade-offs concisely.
-- Mention an unaddressed, low-probability edge case outside the requirements only when materially relevant.
-- Prefer working, straightforward code over elaborate explanations or defensive implementations.
+- Once acceptance criteria and required checks pass, finish.
+  Expand investigation only for relevant failures or new evidence.
 
 ## Repository and checks
 - `packages/cli/src/`: the Bun single-executable CLI; `packages/shared/src/`: shared utilities; `src/`: Cloudflare Worker services.
