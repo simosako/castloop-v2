@@ -16,7 +16,6 @@ import { createSqliteStatsHttp } from "./sqlite-stats-http";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { SqliteRuntimeCache } from "./sqlite-service-runtime";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
-import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
 import { resolveSqliteRuntime } from "./sqlite-runtime-identity";
 import type { SqliteDomainCommit, SqliteDomainRequest } from "../packages/shared/src/sqlite-domain";
 import type { SitePage } from "../packages/shared/src/website";
@@ -40,7 +39,7 @@ export class SqliteShowService {
 
   constructor(private readonly storage: PublicationQueueStorage, readonly showId: string,
     private readonly actual: SqlitePublicationRuntime, private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache,
-    private readonly bucket: SqlitePublicationBucket, private readonly key: string) {
+    private readonly key: string) {
     sqliteRegistrationSchema.shape.show_id.parse(showId);
     storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_show_binding (id INTEGER PRIMARY KEY CHECK(id = 1),
       show_id TEXT NOT NULL, reservation_id TEXT NOT NULL, registration_json TEXT NOT NULL)`);
@@ -54,7 +53,7 @@ export class SqliteShowService {
     this.schedules = new SqlitePublicationSchedules(storage, this.queue, this.content, Date.now, { showId, ready: () => this.ready() });
     this.runtime = new SqliteServiceRuntime(storage, this.queue, this.content, config, cache, actual, showId);
     const ready = () => this.ready();
-    this.publicationHttp = createSqlitePublicationHttp(this.queue, key, ready, showId);
+    this.publicationHttp = createSqlitePublicationHttp(this.queue, key, ready);
     this.scheduleHttp = createSqliteScheduleHttp(this.schedules, key, showId);
     this.serviceHttp = createSqliteServiceHttp(this.runtime, key);
     this.stats = new SqliteDeliveryStats(storage, showId,

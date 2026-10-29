@@ -9,12 +9,10 @@ export { sqliteScheduleProtocol, SQLITE_SCHEDULE_PAGE_SIZE, sqliteScheduleTimeSc
 export type { SqliteScheduleTime, SqliteScheduleReason, SqliteScheduleCreate, SqliteScheduleReschedule,
   SqliteScheduleCancel, SqliteScheduleReapprove, SqliteScheduleRecord, SqliteScheduleStatus, SqliteScheduleList,
   SqliteSchedulePlan } from "./sqlite-schedule";
-export { sqliteServiceConfigSchema, sqliteServiceStatusSchema, parseSqliteServiceConfig, sqliteServiceConfigHash } from "./sqlite-service";
-export type { SqliteServiceConfig, SqliteServiceStatus } from "./sqlite-service";
+export { sqliteServiceConfigSchema, parseSqliteServiceConfig, sqliteServiceConfigHash } from "./sqlite-service";
+export type { SqliteServiceConfig } from "./sqlite-service";
 export { diagnosticCheckSchema, diagnosticScopeSchema, diagnosticStatusSchema, diagnosticSummarySchema } from "./diagnostics";
 export type { DiagnosticCheck, DiagnosticScope, DiagnosticStatus, DiagnosticSummary } from "./diagnostics";
-export { stageAssetSchema, stagePayloadSchema, stageReadbackReceiptSchema } from "./upload";
-export type { StageAsset, StagePayload, StageReadbackReceipt } from "./upload";
 export { validateId } from "./ids";
 export { assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength, PUBLICATION_RENDER_BUDGET_BYTES } from "./publication-budget";
 export { sha256Hex, toHex } from "./sha256";

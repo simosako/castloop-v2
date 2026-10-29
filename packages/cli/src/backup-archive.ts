@@ -35,12 +35,8 @@ const manifestSchema = z.object({
   excluded: z.array(z.object({ path: z.string(), reason: z.enum(["lock", "temporary", "regenerated", "audio_default_excluded", "unknown"]) }).strict()),
   retained_locks: z.array(z.string()),
   pending: z.object({
-    drafts_staged: z.array(z.string()), drafts_unresolved: z.array(z.string()),
-    show_controls: z.number().int().min(0),
     domain_changes: z.array(z.object({ operation_id: z.string(), phase: z.string().nullable(), lock_present: z.boolean() }).strict()),
-    service_updates: z.array(z.string()),
   }).strict(),
-  source_paths: z.array(z.string()),
   scan_errors: z.array(z.string()),
 }).strict();
 

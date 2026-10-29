@@ -133,12 +133,6 @@ export class SqliteDeliveryStats {
         updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= 0),
         PRIMARY KEY (episode_id, audio_revision_id)
       ) WITHOUT ROWID`);
-      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_delivery_stats_controls (
-        operation_id TEXT PRIMARY KEY NOT NULL,
-        request_json TEXT NOT NULL,
-        record_json TEXT NOT NULL,
-        created_at_ms INTEGER NOT NULL CHECK (created_at_ms >= 0)
-      )`);
       const started = this.now();
       storage.sql.exec(`INSERT OR IGNORE INTO publication_delivery_stats_meta
         (id, measurement_started_at_ms, measurement_started_date_utc, retained_from_date_utc, retention_days)
@@ -253,16 +247,6 @@ export class SqliteDeliveryStats {
     this.storage.sql.exec("UPDATE publication_delivery_stats_meta SET last_pruned_date_utc = ? WHERE id = 1", today);
   }
 
-  retentionRecord(operationId: string): SqliteStatsRetentionRecord | null {
-    sqliteStatsRetentionRequestSchema.shape.operation_id.parse(operationId);
-    const row = this.storage.sql.exec<{ request_json: string; record_json: string }>(
-      "SELECT request_json, record_json FROM publication_delivery_stats_controls WHERE operation_id = ?", operationId).toArray()[0];
-    if (!row) return null;
-    const record = sqliteStatsRetentionRecordSchema.parse(JSON.parse(row.record_json));
-    if (record.request.operation_id !== operationId || row.request_json !== JSON.stringify(record.request)) throw new Error("Stored delivery stats control differs");
-    return record;
-  }
-
   async applyRetention(input: unknown, actual: SqliteServiceIdentity): Promise<SqliteStatsRetentionRecord> {
     const request = sqliteStatsRetentionRequestSchema.parse(input), source = JSON.stringify(request);
     const hash = await sha256Hex(source);
@@ -271,15 +255,8 @@ export class SqliteDeliveryStats {
         request.service_config_sha256 !== actual.service_config_sha256 || request.show_id !== this.showId) {
         throw new Error("Delivery stats retention target differs");
       }
-      const previous = this.retentionRecord(request.operation_id);
-      if (previous) {
-        if (JSON.stringify(previous.request) !== source || previous.request_sha256 !== hash) throw new Error("Delivery stats control conflicts with its stored request");
-        return previous;
-      }
       const result = sqliteStatsRetentionRecordSchema.parse({ request, request_sha256: hash,
         retention_days: request.retention_days, applied_at_ms: this.now() });
-      this.storage.sql.exec("INSERT INTO publication_delivery_stats_controls (operation_id, request_json, record_json, created_at_ms) VALUES (?, ?, ?, ?)",
-        request.operation_id, source, JSON.stringify(result), result.applied_at_ms);
       this.storage.sql.exec("UPDATE publication_delivery_stats_meta SET retention_days = ? WHERE id = 1", result.retention_days);
       return result;
     });

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { EpisodeRevision } from "../packages/shared/src/index";
 import { showMetadataSchema } from "../packages/shared/src/index";
-import { parseSitePagePath, sitePagePath, siteSnapshotKey } from "../packages/shared/src/website";
+import { parseSitePagePath, sitePagePath } from "../packages/shared/src/website";
 import { SITE_CSS, renderSiteEpisode, renderSiteListing, renderSiteListingPage, siteContentSecurityPolicy, siteCssHash } from "./site-renderer";
 import { serveSiteGateway } from "./site-gateway";
 import { serveCachedSitePage } from "./site-cache";
@@ -86,7 +86,6 @@ test("site paths allow only canonical Show pages, numbered listings and stable E
   for (const page of [{ kind: "listing" as const, showId: "daily", page: 1 }, { kind: "listing" as const, showId: "daily", page: 2 },
     ...[16, 20, 64].map((length) => ({ kind: "episode" as const, showId: "daily", siteId: "a".repeat(length) }))]) {
     expect(parseSitePagePath(sitePagePath(page))).toEqual(page);
-    expect(siteSnapshotKey(page, 3)).toStartWith("public/podcasts/daily/sites/3/");
   }
   for (const path of ["/", "/admin/", "/system/x", "/staging/x", "/podcasts/daily", "/podcasts/daily/page/1/",
     "/podcasts/daily/page/0/", "/podcasts/daily/page/02/", "/podcasts/daily/page/9007199254740992/",
@@ -95,8 +94,8 @@ test("site paths allow only canonical Show pages, numbered listings and stable E
     ...[15, 17, 19, 65].map((length) => `/podcasts/daily/${"a".repeat(length)}/`),
     "/podcasts/daily/0123456789abcdeF/", "/podcasts/daily/%610123456789abcde/"])
     expect(parseSitePagePath(path)).toBeNull();
-  expect(() => siteSnapshotKey({ kind: "listing", showId: "../private", page: 1 }, 1)).toThrow();
-  expect(() => siteSnapshotKey({ kind: "listing", showId: "daily", page: 1 }, 0)).toThrow();
+  expect(() => sitePagePath({ kind: "listing", showId: "../private", page: 1 })).toThrow();
+  expect(() => sitePagePath({ kind: "listing", showId: "daily", page: 0 })).toThrow();
 });
 
 test("listings render zero, one, twenty and twenty-one Episodes with in-place native players", () => {

@@ -3,21 +3,21 @@ import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
 import { administratorKey } from "./administrator-key";
+import { createLocalJournalStorage } from "./local-journal-storage";
+import { sha256HexSync as digest } from "./sha256";
 import { SqliteCloudflareApi } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
-import { createLocalJournalStorage } from "./local-journal-storage";
+import type { R2RestOptions } from "./bounded-http-read";
 import { protectLocalState } from "./workspace-protection";
-import type { R2RestOptions } from "./verified-r2-put";
-import { sha256HexSync as digest } from "./sha256";
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const receiptSchema = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
 const stateSchema = z.object({ protocol: z.literal("sqlite-sequential-v1"), operation_id: z.uuid(), service_config_sha256: hash,
   worker_source_sha256: hash, worker_metadata_sha256: hash,
-  phase: z.enum(["fresh", "prepared", "bucket_created", "config_uploaded", "worker_created", "deployed", "access_enabled", "verified", "ready"]),
+  phase: z.enum(["fresh", "prepared", "deployed", "ready"]),
   receipt: receiptSchema.optional(), namespace_id: z.string().regex(/^[a-f0-9]{32}$/).optional() }).strict().superRefine((value, context) => {
-  if (["deployed", "access_enabled", "verified", "ready"].includes(value.phase) !== (value.receipt !== undefined) ||
-    ["verified", "ready"].includes(value.phase) !== (value.namespace_id !== undefined)) {
+  if (["deployed", "ready"].includes(value.phase) !== (value.receipt !== undefined) ||
+    (value.phase === "ready") !== (value.namespace_id !== undefined)) {
     context.addIssue({ code: "custom", message: "Initialization phase and deployment evidence differ" });
   }
 });
@@ -55,19 +55,16 @@ export async function initializeSqliteService(root: string, configInput: SqliteS
       await api.preflight();
       save("prepared");
     }
-    if (state.phase === "prepared") { await api.createBucket(); save("bucket_created"); }
-    if (state.phase === "bucket_created") { await api.uploadConfig(); save("config_uploaded"); }
-    if (state.phase === "config_uploaded") { await api.createWorker(); save("worker_created"); }
-    if (state.phase === "worker_created") {
+    if (state.phase === "prepared") {
+      await api.createBucket();
+      await api.uploadConfig();
+      await api.createWorker();
       const upload = await api.uploadWorker(source, key);
       save("deployed", { receipt: await api.deploymentReceipt(upload) });
     }
-    if (state.phase === "deployed") { await api.enableAccess(state.receipt!.worker_version_id); save("access_enabled"); }
-    if (state.phase === "access_enabled") {
+    if (state.phase === "deployed") {
+      await api.enableAccess(state.receipt!.worker_version_id);
       const evidence = await api.inspect(state.receipt!);
-      save("verified", { namespace_id: evidence.namespace_id });
-    }
-    if (state.phase === "verified") {
       let ready = false;
       for (let index = 0; index < wait.attempts; index++) {
         try {
@@ -78,7 +75,7 @@ export async function initializeSqliteService(root: string, configInput: SqliteS
         } catch { if (index + 1 < wait.attempts) await wait.delay(); }
       }
       if (!ready) throw new Error("SQLite service readiness remains unconfirmed; run init again");
-      save("ready");
+      save("ready", { namespace_id: evidence.namespace_id });
     }
     return state;
   });

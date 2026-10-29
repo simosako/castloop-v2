@@ -1,3 +1,14 @@
+export type R2RestTransport = (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => Promise<Response>;
+export type R2RestOptions = { accountId: string; apiToken: string; transport?: R2RestTransport; timeoutMs?: number };
+
+export function requireR2RestOptions(accountId: string, options: R2RestOptions): void {
+  if (options.accountId !== accountId || !options.apiToken || /[\r\n]/.test(options.apiToken)) {
+    throw new Error("Cloudflare REST credentials do not match the service account");
+  }
+  const timeoutMs = options.timeoutMs ?? 300000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 300000) throw new Error("Invalid Cloudflare REST timeout");
+}
+
 export type BoundedReadCode = "size_limit" | "body_read_failed" | "cleanup_failed";
 
 export class BoundedReadError extends Error {

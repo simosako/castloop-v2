@@ -47,7 +47,7 @@ test("human-readable statistics tables keep unmeasured and pruned days distinct 
   expect(daily).toContain("lifetime(initial=2");
 });
 
-test("retention journal replays by operation id and refuses divergent repeats", async () => {
+test("retention updates apply idempotently without writing local control journals", async () => {
   const setup = await sqliteServiceFixture();
   fixtures.push(setup);
   administratorKey(setup.root, true);
@@ -70,26 +70,12 @@ test("retention journal replays by operation id and refuses divergent repeats", 
         retention: { request: body, request_sha256: await sha256Hex(JSON.stringify(body)),
           retention_days: body.retention_days, applied_at_ms: 1_000 } });
     }
-    if (request.method === "GET" && path.startsWith("/admin/sqlite-stats/retention/")) {
-      const operationId = path.slice("/admin/sqlite-stats/retention/".length);
-      const body = { service_id: config.service_id,
-        service_config_sha256: serviceHealth.service_config_sha256, operation_id: operationId, show_id: "daily", retention_days: 120 };
-      return respond({ ...serviceHealth, scope: "show", show_id: "daily",
-        retention: { request: body, request_sha256: await sha256Hex(JSON.stringify(body)),
-          retention_days: 120, applied_at_ms: 1_000 } });
-    }
     throw new Error(`Unexpected transport call: ${request.method} ${path}`);
   };
   const operationId = crypto.randomUUID();
   const first = await setSqliteStatsRetention(setup.root, config, "daily", 120, operationId, transport);
   expect(first).toMatchObject({ retention: { retention_days: 120 } });
-  expect(requests[0]).toBe("GET /admin/sqlite-service/health");
-  expect(requests.filter((entry) => entry === "POST /admin/sqlite-stats/retention")).toHaveLength(1);
-  // The same operation id re-checks its stored outcome instead of resubmitting the POST.
-  const replayed = await setSqliteStatsRetention(setup.root, config, "daily", 120, operationId, transport);
-  expect((replayed as { retention: { applied_at_ms: number } }).retention.applied_at_ms)
-    .toBe((first as { retention: { applied_at_ms: number } }).retention.applied_at_ms);
-  expect(requests.filter((entry) => entry === "POST /admin/sqlite-stats/retention")).toHaveLength(1);
-  expect(requests.some((entry) => entry.startsWith("GET /admin/sqlite-stats/retention/"))).toBe(true);
-  await expect(setSqliteStatsRetention(setup.root, config, "daily", 130, operationId, transport)).rejects.toThrow("Retained retention control differs");
+  expect(requests).toEqual(["GET /admin/sqlite-service/health", "POST /admin/sqlite-stats/retention"]);
+  const second = await setSqliteStatsRetention(setup.root, config, "daily", 130, operationId, transport);
+  expect(second).toMatchObject({ retention: { retention_days: 130 } });
 });

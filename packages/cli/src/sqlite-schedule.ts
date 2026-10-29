@@ -3,7 +3,7 @@ import type { SqliteScheduleStatus, SqliteServiceConfig } from "@castloop/shared
 import { loadAdminConfig } from "./admin-config";
 import { resolveScheduleTime } from "./schedule-time";
 import { SqliteScheduleClient } from "./sqlite-schedule-client";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { administratorKey } from "./administrator-key";
 import { prepareSqlitePublication, placeSqlitePublicationMedia } from "./sqlite-publish";
 import type { PreviewTarget } from "./draft-preview";

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadDiagnostic } from "./sqlite-management-http";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 
 const id = "11111111-1111-4111-8111-111111111111";
 const url = new URL(`https://test-worker.example.workers.dev/admin/sqlite-schedules/${id}`);

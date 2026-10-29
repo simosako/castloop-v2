@@ -15,7 +15,6 @@ import type { SitePage } from "../packages/shared/src/website";
 import {
   SQLITE_CONTENT_SCHEMA_VERSION, SQLITE_QUEUE_SCHEMA_VERSION, SqlitePublicationInputError } from "./sqlite-publication-queue";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
-import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 import { validSqliteCoverIdentity } from "./sqlite-cover";
 import type { SqliteCoverIdentity } from "./sqlite-cover";
 import { canonicalEnclosureUrl } from "./media-url";
@@ -580,36 +579,7 @@ export class SqlitePublicationContent {
 
   private advanceFeed(request: SqliteContentMutation): void {
     const generation = this.nextFeedGeneration(request.show_id);
-    sqliteFeedSnapshotKey(request.show_id, generation);
     this.storage.sql.exec("UPDATE publication_shows SET feed_generation = ? WHERE show_id = ?", generation, request.show_id);
-  }
-
-  domainSnapshot(showId: string) {
-    targetSchema.shape.show_id.parse(showId);
-    return this.storage.transactionSync(() => {
-      const show = this.show(showId);
-      if (!show) throw new Error("Domain target Show is missing");
-      if (show.lifecycle !== "published") return { show, metadata: null, cover: null, episodes: [] };
-      const content = this.storage.sql.exec<{ metadata_json: string }>(
-        "SELECT metadata_json FROM publication_show_content WHERE show_id = ?", showId).toArray()[0];
-      const cover = this.cover(showId);
-      if (!content || !cover) throw new Error("Domain target content is inconsistent");
-      const metadata = showMetadataSchema.parse(JSON.parse(content.metadata_json));
-      if (metadata.show_id !== showId) throw new Error("Domain target metadata differs");
-      const episodes = this.episodes(showId);
-      for (const episode of episodes) {
-        const asset = parsePublicAssetPath(new URL(episode.enclosure_url).pathname);
-        if (!asset || asset.kind !== "audio" || asset.showId !== showId || asset.episodeId !== episode.episode_id) throw new Error("Domain target media differs");
-        this.requireMedia(showId, episode, asset.revisionId);
-      }
-      return { show, metadata, cover, episodes };
-    });
-  }
-
-  commitDomainFeed(showId: string, previousSnapshot: string, generation: number): void {
-    if (JSON.stringify(this.domainSnapshot(showId)) !== previousSnapshot) throw new Error("Domain target changed during its frozen execution");
-    sqliteFeedSnapshotKey(showId, generation);
-    this.storage.sql.exec("UPDATE publication_shows SET feed_generation = ? WHERE show_id = ? AND lifecycle = 'published'", generation, showId);
   }
 
   commitLifecycle(request: SqliteContentMutation): void {

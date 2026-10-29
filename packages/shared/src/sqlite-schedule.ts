@@ -32,7 +32,7 @@ export const sqliteScheduleTimeSchema = z.object({
   }
 });
 
-export const sqliteScheduleReasonSchema = z.enum(["domain_change", "runtime_mismatch",
+export const sqliteScheduleReasonSchema = z.enum(["domain_change",
   "base_conflict", "target_unavailable",
   "cancelled_by_administrator"]);
 export type SqliteScheduleReason = z.infer<typeof sqliteScheduleReasonSchema>;

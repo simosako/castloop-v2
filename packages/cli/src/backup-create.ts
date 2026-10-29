@@ -4,7 +4,6 @@ import { backupEntryFramedBytes, emitBackupEntry, sealBackupArchive } from "./ba
 import type { BackupExcludedReason, BackupManifest, BackupPending } from "./backup-archive";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { pendingLocalDomainChanges } from "./sqlite-domain-local";
-import { readBoundedLocalJournal } from "./local-journal-read";
 import { JOURNAL_FAMILIES } from "./local-journal-path";
 import { closeSync, constants, existsSync, lstatSync, openSync, readSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -20,7 +19,7 @@ export type BackupCreateResult = {
   archive: string; service_id: string; created_at: string; include_audio: boolean;
   entry_count: number; entry_bytes: number;
   excluded_counts: Record<BackupExcludedReason, number>;
-  pending: BackupPending; scan_errors: string[]; source_path_count: number;
+  pending: BackupPending; scan_errors: string[];
 };
 
 function planRegularFile(entries: PlannedEntry[], path: string, absolute: string, kind: string): void {
@@ -101,61 +100,12 @@ function enumerateBackupTargets(root: string, includeAudio: boolean): PlannedBac
   return { entries: [...configs, ...rest], excluded: excluded.sort((left, right) => left.path.localeCompare(right.path)) };
 }
 
-function readJsonDirectory(directory: string): { name: string; value: unknown }[] {
-  let names: string[];
-  try { names = readdirSync(directory); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
-  if (names.length > 10000) throw new Error("Local backup journal inventory exceeds its budget");
-  const records: { name: string; value: unknown }[] = [];
-  for (const name of names) {
-    if (!name.endsWith(".json") || name.endsWith(".lock")) continue;
-    records.push({ name, value: readBoundedLocalJournal(join(directory, name)) });
-  }
-  return records;
-}
-
-function collectSourcePaths(value: unknown, paths: Set<string>): void {
-  if (Array.isArray(value)) { for (const item of value) collectSourcePaths(item, paths); return; }
-  if (value && typeof value === "object") {
-    for (const [key, item] of Object.entries(value)) {
-      if (key === "source_path" && typeof item === "string" && item) paths.add(item);
-      else collectSourcePaths(item, paths);
-    }
-  }
-}
-
 function scanLocalOperations(root: string, config: SqliteServiceConfig):
-  { pending: BackupPending; sourcePaths: string[]; scanErrors: string[] } {
-  const pending: BackupPending = { drafts_staged: [], drafts_unresolved: [], show_controls: 0, domain_changes: [], service_updates: [] };
+  { pending: BackupPending; scanErrors: string[] } {
+  const pending: BackupPending = { domain_changes: [] };
   const scanErrors: string[] = [];
   try { pending.domain_changes = pendingLocalDomainChanges(root, config); } catch { scanErrors.push("domain_changes"); }
-  try {
-    for (const { value } of readJsonDirectory(join(root, ".castloop", "sqlite-drafts", config.service_id))) {
-      const record = value as { target?: { job_id?: unknown }; publication?: { status?: { state?: unknown } } };
-      const jobId = record.target?.job_id;
-      if (typeof jobId !== "string" || !jobId) throw new Error("Local draft journal lacks its job identity");
-      if (!record.publication) pending.drafts_staged.push(jobId);
-      else if (record.publication.status?.state !== "succeeded" && record.publication.status?.state !== "failed") pending.drafts_unresolved.push(jobId);
-    }
-  } catch { scanErrors.push("drafts"); }
-  try {
-    for (const { name, value } of readJsonDirectory(join(root, ".castloop", "sqlite-service-updates", config.service_id))) {
-      const record = value as { phase?: unknown; request?: { operation_id?: unknown } };
-      if (record.phase !== "ready") {
-        pending.service_updates.push(typeof record.request?.operation_id === "string" ? record.request.operation_id : name.replace(/\.json$/, ""));
-      }
-    }
-  } catch { scanErrors.push("service_updates"); }
-  const sourcePaths = new Set<string>();
-  try {
-    for (const family of ["sqlite-drafts", "sqlite-uploads"] as const) {
-      for (const { value } of readJsonDirectory(join(root, ".castloop", family, config.service_id))) collectSourcePaths(value, sourcePaths);
-    }
-  } catch { scanErrors.push("source_paths"); }
-  return { pending, sourcePaths: [...sourcePaths].sort(), scanErrors };
+  return { pending, scanErrors };
 }
 
 function emitFileContent(absolute: string, emit: (chunk: Buffer) => void): void {
@@ -181,7 +131,7 @@ export async function createLocalBackup(root: string, output: string,
   const config = await loadWorkspaceConfig(root);
   const { entries, excluded } = enumerateBackupTargets(root, options.includeAudio);
   const entryBytes = entries.reduce((total, entry) => total + backupEntryFramedBytes(entry), 0);
-  const { pending, sourcePaths, scanErrors } = scanLocalOperations(root, config);
+  const { pending, scanErrors } = scanLocalOperations(root, config);
   const manifest = sealBackupArchive(output, options.passphrase,
     { serviceId: config.service_id, includeAudio: options.includeAudio, entryCount: entries.length, entryBytes },
     (emit, createdAt) => {
@@ -193,22 +143,16 @@ export async function createLocalBackup(root: string, output: string,
       return { schema_version: 1 as const, cli_version: version, created_at: createdAt, service_id: config.service_id,
         include_audio: options.includeAudio, entries: summaries, excluded,
         retained_locks: excluded.filter((entry) => entry.reason === "lock").map((entry) => entry.path),
-        pending, source_paths: sourcePaths, scan_errors: scanErrors };
+        pending, scan_errors: scanErrors };
     });
   return { archive: output, service_id: manifest.service_id, created_at: manifest.created_at, include_audio: manifest.include_audio,
     entry_count: manifest.entries.length, entry_bytes: entryBytes, excluded_counts: excludedCounts(manifest.excluded),
-    pending: manifest.pending, scan_errors: manifest.scan_errors, source_path_count: manifest.source_paths.length };
+    pending: manifest.pending, scan_errors: manifest.scan_errors };
 }
 
 export function formatBackupCreate(result: BackupCreateResult): string {
   const excluded = Object.entries(result.excluded_counts).filter(([, count]) => count > 0).map(([reason, count]) => `${count} ${reason}`).join(", ") || "none";
-  const pendingParts = [
-    result.pending.drafts_staged.length ? `${result.pending.drafts_staged.length} staged draft(s)` : "",
-    result.pending.drafts_unresolved.length ? `${result.pending.drafts_unresolved.length} unresolved publication(s)` : "",
-    result.pending.show_controls ? `${result.pending.show_controls} show control(s)` : "",
-    result.pending.domain_changes.length ? `${result.pending.domain_changes.length} domain change(s)` : "",
-    result.pending.service_updates.length ? `${result.pending.service_updates.length} service update(s)` : "",
-  ].filter(Boolean).join(", ") || "none";
+  const pendingParts = result.pending.domain_changes.length ? `${result.pending.domain_changes.length} domain change(s)` : "none";
   const lines = [
     `Archive: ${result.archive}`,
     `Service: ${result.service_id}  Created: ${result.created_at}`,
@@ -218,7 +162,6 @@ export function formatBackupCreate(result: BackupCreateResult): string {
     `Unfinished local operations: ${pendingParts}`,
   ];
   if (result.scan_errors.length) lines.push(`Scan errors (archived without inspection): ${result.scan_errors.join(", ")}`);
-  if (result.pending.drafts_unresolved.length) lines.push("Unresolved publications: after restore, observe them only (operation-status); never replay requests.");
   lines.push("The archive is a point-in-time snapshot; run backups while no other castloop command edits the workspace.");
   return lines.join("\n");
 }

@@ -23,7 +23,7 @@ test("new-format process locks reject concurrent writers and are released after 
 test("new format never bypasses or removes a retained legacy lock", async () => {
   const root = mkdtempSync("/tmp/opencode/castloop-legacy-lock-");
   try {
-    const journal = createLocalJournalStorage(root, "sqlite-uploads", "service", "operation.json");
+    const journal = createLocalJournalStorage(root, "sqlite-rss-imports", "service", "operation.json");
     journal.initialize({ schema_version: 2 }); writeFileSync(`${journal.path}.lock`, "");
     await expect(journal.exclusively(async () => { throw new Error("must not run"); })).rejects.toThrow("legacy client lock");
   } finally { rmSync(root, { recursive: true, force: true }); }

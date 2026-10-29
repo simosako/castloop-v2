@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { sqliteRequestObjectName, sqliteShowObjectName } from "./sqlite-show-routing";
 
-test("publication, operation, target and Show control requests route directly to the explicit Show", () => {
-  for (const path of ["/admin/sqlite-publication/status", "/admin/sqlite-publication/jobs", "/admin/sqlite-operations/commands",
-    "/admin/sqlite-service/targets/daily", "/admin/sqlite-service/pause", "/admin/sqlite-service/resume"]) {
+test("publication, schedule, stats and Show target requests route directly to the explicit Show", () => {
+  for (const path of ["/admin/sqlite-publication/publish", "/admin/sqlite-schedules",
+    "/admin/sqlite-service/targets/daily", "/admin/sqlite-stats/episodes"]) {
     expect(sqliteRequestObjectName(new Request(`https://example.com${path}`, { headers: { "X-Castloop-Show-Id": "daily" } }), "service")).toBe("show/service/daily");
   }
   expect(sqliteRequestObjectName(new Request("https://example.com/admin/sqlite-service/health"), "service")).toBe("service/service");

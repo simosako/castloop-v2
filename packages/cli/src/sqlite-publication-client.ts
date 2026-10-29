@@ -1,28 +1,19 @@
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema, sqliteServiceStatusSchema } from "@castloop/shared";
-import type { SqliteServiceConfig, SqliteServiceStatus } from "@castloop/shared";
+import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "@castloop/shared";
+import type { SqliteServiceConfig } from "@castloop/shared";
 import { parseSqliteDirectPublicationRequest, sqliteDirectPublicationResultSchema } from "../../shared/src/sqlite-direct-publication";
 import type { SqliteDirectPublicationRequest, SqliteDirectPublicationResult } from "../../shared/src/sqlite-direct-publication";
-import type { R2RestTransport } from "./verified-r2-put";
-import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
-import type { SqliteManagementReadOptions } from "./sqlite-management-http";
+import type { R2RestTransport } from "./bounded-http-read";
+import { readSqliteManagementJson } from "./sqlite-management-http";
 
 export { readSqliteManagementJson } from "./sqlite-management-http";
 
 export class SqlitePublicationClient {
   readonly config: SqliteServiceConfig;
   constructor(input: SqliteServiceConfig, private readonly administratorKey: string,
-    private readonly transport: R2RestTransport = fetch, private readonly timeoutMs = 30000,
-    private readonly readOptions: SqliteManagementReadOptions = {}) {
+    private readonly transport: R2RestTransport = fetch, private readonly timeoutMs = 30000) {
     this.config = sqliteServiceConfigSchema.parse(input);
     if (!administratorKey || administratorKey.length > 1024 || /[^\x21-\x7e]/.test(administratorKey) ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid SQLite management credentials or timeout");
-  }
-  async describe(showId?: string): Promise<SqliteServiceStatus> {
-    const status = sqliteServiceStatusSchema.parse(await readSqliteManagementGet(new URL("/admin/sqlite-publication/status", this.config.workers_dev_base_url), {
-      "X-Castloop-Key": this.administratorKey, ...(showId ? { "X-Castloop-Show-Id": showId } : {}),
-    }, { ...this.readOptions, transport: this.transport, timeoutMs: this.timeoutMs }));
-    if (status.show_id !== showId || status.service_id !== this.config.service_id || status.service_config_sha256 !== await sqliteServiceConfigHash(this.config)) throw new Error("Publication status target differs");
-    return status;
   }
   async submit(input: SqliteDirectPublicationRequest): Promise<SqliteDirectPublicationResult> {
     const request = parseSqliteDirectPublicationRequest(input);

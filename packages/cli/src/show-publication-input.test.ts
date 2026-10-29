@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { parseShowMetadata, stringifyToml } from "@castloop/shared";
 import { readShowPublicationInput } from "./show-publication-input";
-import { assertLocalStagingSource, freezePayloadSources, inspectLocalStagingSource } from "./staging-sources";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -22,16 +21,6 @@ test("Show publication freezes normalized CSS without editing the local TOML", a
   const bytes = await readShowPublicationInput(f.path);
   expect(parseShowMetadata(bytes.toString()).site_css).toBe(":root{--cl-accent:red}\n");
   expect(readFileSync(f.path)).toEqual(original);
-  const { payload } = await inspectLocalStagingSource(f.path, "show_metadata");
-  const sources = await freezePayloadSources(f.root, [payload], [f.path]);
-  try {
-    await sources.withPayload(0, async (body, consumed) => {
-      expect(Buffer.from(await new Response(body).arrayBuffer()).equals(bytes)).toBe(true); consumed();
-    });
-    writeFileSync(f.css, "body{color:blue}");
-    await expect(sources.assertCurrent()).rejects.toThrow("differs");
-    await expect(assertLocalStagingSource(f.path, payload)).rejects.toThrow("differs");
-  } finally { await sources.dispose(); }
 });
 
 test("CSS input rejects missing, symlink, invalid, oversized and unsafe files; empty CSS is allowed", async () => {

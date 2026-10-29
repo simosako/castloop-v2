@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { sha256Hex, stringifyToml } from "@castloop/shared";
+import { stringifyToml } from "@castloop/shared";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata, SQLITE_WORKER_COMPATIBILITY_DATE } from "../../shared/src/sqlite-worker-deployment";
-import { putVerifiedR2Object, requireR2RestOptions } from "./verified-r2-put";
-import type { R2RestOptions } from "./verified-r2-put";
-import { collectStreamBytes } from "./bounded-http-read";
+import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
+import type { R2RestOptions } from "./bounded-http-read";
 
 const uuid = z.uuid(), hash = z.string().min(1).max(256);
 export const sqliteScriptUploadReceiptSchema = z.object({ script_etag: hash }).strict();
@@ -65,11 +64,10 @@ export class SqliteCloudflareApi {
   }
   async uploadConfig(): Promise<void> {
     const bytes = new TextEncoder().encode(stringifyToml(this.config));
-    const digest = await sha256Hex(bytes);
-    let consumed = false;
-    const body = new ReadableStream<Uint8Array>({ pull(controller) { controller.enqueue(bytes); controller.close(); consumed = true; } });
-    await putVerifiedR2Object(this.config, { key: "system/service.toml", length: bytes.length, sha256: digest, contentType: "application/toml" }, body,
-      () => { if (!consumed) throw new Error("Service config upload was not consumed"); }, this.options);
+    const receipt = z.object({ key: z.literal("system/service.toml"),
+      size: z.union([z.number().int().nonnegative(), z.string().regex(/^\d+$/).transform(Number)]) }).parse(
+      await this.call("PUT", `/r2/buckets/${encodeURIComponent(this.config.bucket_name)}/objects/system/service.toml`, bytes, "application/toml"));
+    if (receipt.size !== bytes.length) throw new Error("Uploaded service config size differs");
   }
   async createWorker(): Promise<void> {
     const existing = await this.call("GET", `${this.path()}/settings`, undefined, undefined, true);

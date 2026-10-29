@@ -4,7 +4,7 @@ import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteContentActionRequestSchema, sqliteDirectPublicationRequestHash } from "../../shared/src/sqlite-direct-publication";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { SqliteServiceClient } from "./sqlite-service-client";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 
 export const sqliteLifecyclePlanSchema = z.object({ request: sqliteContentActionRequestSchema.refine((value) => value.action !== "restore_revision"),
   request_sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict();

@@ -6,8 +6,7 @@ import type { SqliteAudioReference, SqliteCoverReference } from "../../shared/sr
 import { diffEpisodeDraftFields, diffShowMetadataFields } from "../../shared/src/sqlite-revisions";
 import { administratorKey } from "./administrator-key";
 import { AgentError } from "./agent-output";
-import { inspectCover, loadLocalInput } from "./local-input";
-import { inspectLocalStagingSource } from "./staging-sources";
+import { inspectCover, inspectLocalAsset, loadLocalInput } from "./local-input";
 import { analyzeAudio } from "./audio";
 import { sha256HexSync as sha256 } from "./sha256";
 import { SqliteServiceClient } from "./sqlite-service-client";
@@ -28,13 +27,12 @@ export async function draftPreview(root: string, config: SqliteServiceConfig, ta
   let cover: SqliteCoverReference | null = null, audio: SqliteAudioReference | null = null, mediaPath: string | null = null;
   if (target.kind === "show") {
     mediaPath = join(root, target.show_id, (metadata as ShowMetadata).image_path);
-    const payload = await inspectCover(mediaPath);
-    cover = { sha256: payload.sha256, length_bytes: payload.length_bytes, extension: payload.asset === "cover_png" ? "png" : "jpg" };
+    cover = await inspectCover(mediaPath);
   } else if (target.audio_path) {
     mediaPath = resolve(root, target.show_id, target.audio_path);
-    const inspected = await inspectLocalStagingSource(mediaPath, "audio"), analysis = await analyzeAudio(mediaPath);
-    if (analysis.length !== inspected.payload.length_bytes) throw new Error("Local MP3 changed during analysis");
-    audio = { sha256: inspected.payload.sha256, length_bytes: inspected.payload.length_bytes, duration_seconds: analysis.duration };
+    const inspected = await inspectLocalAsset(mediaPath, 300_000_000), analysis = await analyzeAudio(mediaPath);
+    if (analysis.length !== inspected.length_bytes) throw new Error("Local MP3 changed during analysis");
+    audio = { sha256: inspected.sha256, length_bytes: inspected.length_bytes, duration_seconds: analysis.duration };
   }
   let client = options.client;
   if (options.mode !== "local" && !client) {

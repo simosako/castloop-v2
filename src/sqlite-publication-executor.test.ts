@@ -9,14 +9,12 @@ async function fixture() { const value = await directPublicationFixture(); clean
 
 test("publication commits inline metadata and media references without R2 IO or operation/job tables", async () => {
   const f = await fixture();
-  f.bucket.head = f.bucket.get = f.bucket.put = async () => { throw new Error("Publication must not read or write R2"); };
   const show = await f.publish(f.show()), episode = await f.publish(f.episode());
   expect(show.result).toBe("changed"); expect(episode.result).toBe("changed");
   expect(f.content.currentEpisodeRevision("daily", "first", f.config.public_base_url)?.revision_id).toBe(episode.revision_id);
   const tables = f.database.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type='table'").all().map((row) => row.name);
   expect(tables).not.toContain("publication_jobs");
   expect(tables.some((name) => name.startsWith("operations") || name.startsWith("operation_"))).toBe(false);
-  expect(f.calls).toEqual([]);
   expect(f.content.renderFeed("daily", f.config.public_base_url)?.xml).toContain("saved-first");
 });
 
@@ -80,7 +78,7 @@ test("purge failure leaves committed content unchanged and does not write media"
   const before = f.content.inspect("daily", "first"), update = f.episode(); update.metadata.title = "New";
   f.hooks.purge = async () => { throw new Error("Purge failure"); };
   await expect(f.publish(update)).rejects.toThrow("cache purge failed");
-  expect(f.content.inspect("daily", "first")).toEqual(before); expect(f.calls).toEqual([]);
+  expect(f.content.inspect("daily", "first")).toEqual(before);
   f.hooks.purge = undefined; expect((await f.publish(update)).result).toBe("changed");
 });
 

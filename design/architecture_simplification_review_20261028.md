@@ -4,7 +4,7 @@
 - 調査基準commit: `602bff1`（Issue #65/#70統合版、内部queue/content形式 `11/11`、およびIssue #62の初期設計案を含む状態）
 - 関連Issue: [#62](https://github.com/simosako/castloop-v2/issues/62)
 
-具体設計は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)を参照する。以下の調査基準時点の問題記述とは区別する。
+具体設計は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)、およびフェーズ3完了後の全体監査に基づく[フェーズ4（残存複雑性と不要コード・テストの削減計画）](phase4_code_and_test_cleanup_plan.md)を参照する。以下の調査基準時点の問題記述とは区別する。
 
 ## 1. 背景と問題意識
 
@@ -263,3 +263,5 @@ Issue #62では、公開処理（publication job）が途中で停止して `blo
 3. **フェーズ3（デプロイ・稼働制御の簡素化とスキーマ確定：改善案D＋Eの仕上げ）**:
    - `worker_version_id` 拘束、2相コミット更新、起動時Probe Alarm、`admission_window_id` を整理し、シンプルなテーブル構成（改善案E）へ仕上げる。
    - 不要になった旧コード・旧テスト・旧設計記述を整理し、ドキュメントを更新する。
+4. **フェーズ4（全体コード・テスト見直しと残存複雑性の削減）**:
+   - フェーズ1〜3完了後のコードベース全体を監査し、残存していた旧ステージング一時コピー（`staging-sources.ts`）、全量Readback検証（`verified-r2-put.ts`）、R2スナップショット残骸、統計保持設定の操作台帳、ドメイン変更の細分化ジャーナル、旧世代トライアル監視スクリプト（`scripts/test-support/*`）を整理・削除する。詳細は[フェーズ4設計書](phase4_code_and_test_cleanup_plan.md)を参照。

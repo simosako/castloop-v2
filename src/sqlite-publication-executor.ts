@@ -2,7 +2,6 @@ import { episodeDraftFromRevision, episodeRevisionSchema, parsePublicAssetPath, 
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import { sameSqlitePublicationContent } from "../packages/shared/src/sqlite-direct-publication";
 import type { SqliteContentMutation, SqliteDirectPublicationRequest } from "../packages/shared/src/sqlite-direct-publication";
-import { sqliteMediaKey } from "../packages/shared/src/sqlite-media";
 import { sqliteServiceConfigSchema } from "../packages/shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../packages/shared/src/sqlite-service";
 import { SITE_PAGE_SIZE } from "../packages/shared/src/website";
@@ -10,19 +9,11 @@ import { SqlitePublicationInputError } from "./sqlite-publication-queue";
 import type { SqlitePublicationExecutor } from "./sqlite-publication-queue";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { publicationChecksum, renderPublicationFeed } from "./publication-inputs";
-import type { SqliteCoverIdentity } from "./sqlite-cover";
 import { canonicalEnclosureUrl } from "./media-url";
 import { SITE_HTML_LIMIT_BYTES, orderedSiteEpisodes, renderSiteEpisode, renderSiteListingPage, siteCssHash, siteDateFormatter } from "./site-renderer";
 import type { SiteRenderInput } from "./site-renderer";
 import type { SitePurgeTarget } from "./site-storage";
 
-type ObjectHead = Pick<R2Object, "key" | "size" | "etag" | "version" | "customMetadata"> & { checksums: Pick<R2Checksums, "sha256"> };
-export type SqlitePublicationBucket = {
-  head: (key: string) => Promise<ObjectHead | null>;
-  get: (key: string, options?: R2GetOptions) => Promise<(ObjectHead & { body?: ReadableStream<Uint8Array> }) | null>;
-  put: (key: string, body: string | Uint8Array | ReadableStream<Uint8Array>, options?: R2PutOptions) => Promise<ObjectHead | null>;
-  list?: (options: { prefix: string; limit: number }) => Promise<{ objects: Array<{ key: string }>; truncated: boolean }>;
-};
 export type SqlitePublicationEffectFailure = { event: "sqlite_publication_effect_failed"; phase: "cache_purge";
   reason_code: "publication_effect_unverified" };
 export type SqlitePublicationEffects = {
@@ -41,13 +32,6 @@ function audioRevisionId(revision: EpisodeRevision, showId: string): string {
     throw new Error("Episode enclosure URL does not match its Show and Episode");
   }
   return asset.revisionId;
-}
-
-// Dedicated domain maintenance uses this check; ordinary publication does not read R2.
-export async function verifyCover(bucket: SqlitePublicationBucket, showId: string, extension: "jpg" | "png", cover: SqliteCoverIdentity): Promise<void> {
-  const key = sqliteMediaKey(showId, { sha256: cover.sha256, extension });
-  const object = await bucket.head(key);
-  if (!object || object.key !== key || object.size !== cover.lengthBytes) throw new SqlitePublicationInputError("validation_failed");
 }
 
 async function validateSiteRender(show: ShowMetadata, episodes: EpisodeRevision[], extension: "jpg" | "png",

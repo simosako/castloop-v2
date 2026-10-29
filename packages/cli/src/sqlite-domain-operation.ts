@@ -17,7 +17,7 @@ import { syncLocalJournalDirectory } from "./local-journal-path";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { pendingLocalDomainChanges } from "./sqlite-domain-local";
 import { sha256HexSync } from "./sha256";
-import type { R2RestOptions } from "./verified-r2-put";
+import type { R2RestOptions } from "./bounded-http-read";
 import { renameSync } from "node:fs";
 import { join } from "node:path";
 
@@ -73,7 +73,7 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
       ![request.previous_config_sha256, request.target_config_sha256].includes(localHash) ||
       sha256HexSync(sourceFor(source, id)) !== request.worker_source_sha256 ||
        sha256HexSync(JSON.stringify(buildSqliteWorkerMetadata(request.target_config, key))) !== request.worker_metadata_sha256) throw new Error("Domain continuation differs from its frozen input; preserve the journal");
-    if (["local_synced", "detached", "completed"].includes(state.phase) && localHash !== request.target_config_sha256) {
+    if (["local_synced", "completed"].includes(state.phase) && localHash !== request.target_config_sha256) {
       throw new Error("Local configuration differs from the acknowledged domain synchronization; preserve the journal");
     }
     const client = new SqliteDomainClient(request.previous_config, key, options.transport);
@@ -84,18 +84,9 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
     };
     if (state.phase === "completed") return state;
     if (state.phase === "prepared") {
-      await previousApi.inspect(state.previous); await client.prepare(request); save("maintenance");
-    }
-    if (state.phase === "maintenance") {
       await previousApi.inspect(state.previous);
-      if (request.action === "add") {
-        const acknowledgement = await domains.attach(request);
-        save("attachment_acknowledged", { attachment_acknowledgement: acknowledgement });
-      } else save("connected", { connection: request.connection! });
-    }
-    if (state.phase === "attachment_acknowledged") {
-      await previousApi.inspect(state.previous);
-      const connection = await domains.confirmAttachment(request, state.attachment_acknowledgement!);
+      await client.prepare(request);
+      const connection = request.action === "add" ? await domains.attach(request) : request.connection!;
       save("connected", { connection });
     }
     if (state.connection) requireSqliteDomainConnection(state.connection, request);
@@ -103,16 +94,14 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
       await domains.inspect(request, state.connection!);
       await domains.verifyTls(request.action === "add" ? request.target_config.public_base_url : request.previous_config.workers_dev_base_url);
       await previousApi.inspect(state.previous);
-      await api.uploadConfig(); save("configured");
+      await api.uploadConfig();
+      const upload = await api.uploadWorker(sourceFor(source, id), key);
+      const receipt = await api.deploymentReceipt(upload);
+      save("deployed", { receipt });
     }
-    if (state.phase === "configured") {
-      await previousApi.inspect(state.previous); await domains.inspect(request, state.connection!);
-      const upload = await api.uploadWorker(sourceFor(source, id), key); save("deploy_acknowledged", { upload_receipt: upload });
-    }
-    if (state.phase === "deploy_acknowledged") save("deployed", { receipt: await api.deploymentReceipt(state.upload_receipt!) });
-    if (["deployed", "verified"].includes(state.phase)) {
+    if (state.phase === "deployed") {
       if ((await api.inspect(state.receipt!)).namespace_id !== request.namespace_id) throw new Error("Domain deployment changed its namespace");
-      save("verified"); let ready = false;
+      let ready = false;
       for (let attempt = 0; attempt < wait.attempts; attempt++) {
         const health = await client.nativeHealth();
         const current = health.worker_version_id === state.receipt!.worker_version_id && health.service_config_sha256 === request.target_config_sha256;
@@ -121,18 +110,10 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
         if (attempt + 1 < wait.attempts) await wait.delay();
       }
       if (!ready) throw new AgentError("domain_rollout_pending", "Domain native rollout remains pending; continue observation explicitly without redeploying");
-      if ((await api.inspect(state.receipt!)).namespace_id !== request.namespace_id) throw new Error("Domain namespace changed before commit");
       await domains.inspect(request, state.connection!);
-      const commit = { operation_id: id, request_sha256: state.request_sha256,
+      await client.commit({ operation_id: id, request_sha256: state.request_sha256,
         worker_version_id: state.receipt!.worker_version_id, deployment_id: state.receipt!.deployment_id,
-        script_etag: state.receipt!.script_etag, connection: state.connection! };
-      save("commit_requested", { commit });
-      await client.commit(state.commit!, request); save("remote_ready");
-    }
-    if (state.phase === "commit_requested") {
-      // The commit is idempotent: read the current state first and only resend the exact frozen receipt.
-      const result = await client.status(request);
-      if (result.phase !== "completed" || !result.all_completed) await client.commit(state.commit!, request);
+        script_etag: state.receipt!.script_etag, connection: state.connection! }, request);
       save("remote_ready");
     }
     if (state.phase === "remote_ready") {
@@ -148,14 +129,14 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
       }
       save("local_synced");
     }
-    if (state.phase === "local_synced" && request.action === "remove") {
-      if (!(await client.status(request)).all_completed) throw new Error("Domain restoration is incomplete");
-      await domains.verifyTls(request.target_config.workers_dev_base_url);
-      await domains.detach(request, state.connection!); save("detached", { detach_acknowledged: true });
-    }
-    if (state.phase === "local_synced" || state.phase === "detached") {
+    if (state.phase === "local_synced") {
       if (!(await client.status(request)).all_completed) throw new Error("Domain commits are not all complete");
-      if (request.action === "add") await domains.inspect(request, state.connection!);
+      if (request.action === "remove") {
+        await domains.verifyTls(request.target_config.workers_dev_base_url);
+        await domains.detach(request, state.connection!);
+      } else {
+        await domains.inspect(request, state.connection!);
+      }
       await client.finalize({ operation_id: id, request_sha256: state.request_sha256, connection: state.connection!, detached: request.action === "remove" }, request);
       save("completed");
     }

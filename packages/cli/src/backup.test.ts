@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { join } from "node:path";
 
 const PASSPHRASE = "correct horse battery staple";
-const emptyPending = { drafts_staged: [], drafts_unresolved: [], show_controls: 0, domain_changes: [], service_updates: [] };
+const emptyPending = { domain_changes: [] };
 
 function serviceToml(): string {
   return stringifyToml({ schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
@@ -25,15 +25,13 @@ function backupWorkspace(): string {
   writeFileSync(join(root, "castloop.toml"), serviceToml());
   writeFileSync(join(root, "castloop-admin.toml"), 'schema_version = 1\ntimezone = "Asia/Tokyo"\n');
   writeFileSync(join(root, ".gitignore"), "*.mp3\n");
-  mkdirSync(join(root, ".castloop", "sqlite-drafts", "service"), { recursive: true });
-  writeFileSync(join(root, ".castloop", "sqlite-drafts", "service", "show-daily.json"),
-    JSON.stringify({ target: { job_id: "11111111-1111-4111-8111-111111111111", kind: "show", show_id: "daily", expected_show_state_version: 0 }, assets: [] }));
-  mkdirSync(join(root, ".castloop", "sqlite-uploads", "service"), { recursive: true });
-  writeFileSync(join(root, ".castloop", "sqlite-uploads", "service", "upload.json"),
-    JSON.stringify({ intents: [{ asset: "audio", source_path: "/abs/daily/ep.mp3" }] }));
+  mkdirSync(join(root, ".castloop", "sqlite-registrations", "service"), { recursive: true });
+  writeFileSync(join(root, ".castloop", "sqlite-registrations", "service", "daily.json"),
+    JSON.stringify({ service_config_sha256: "a".repeat(64), show_id: "daily", reservation_id: "11111111-1111-4111-8111-111111111111", phase: "registered" }));
+  mkdirSync(join(root, ".castloop", "sqlite-domain-changes", "service"), { recursive: true });
   writeFileSync(join(root, ".castloop", "secrets.json"), JSON.stringify({ CASTLOOP_ADMIN_KEY: "ab".repeat(32) }));
-  writeFileSync(join(root, ".castloop", "sqlite-uploads", "service", "upload.json.lock"), "");
-  writeFileSync(join(root, ".castloop", "sqlite-uploads", "service", "pending.json.tmp"), "{}");
+  writeFileSync(join(root, ".castloop", "sqlite-domain-changes", "service", "11111111-1111-4111-8111-111111111111.json.lock"), "");
+  writeFileSync(join(root, ".castloop", "sqlite-domain-changes", "service", "pending.json.tmp"), "{}");
   mkdirSync(join(root, ".castloop", "mystery"), { recursive: true });
   writeFileSync(join(root, ".castloop", "mystery", "data.json"), "{}");
   mkdirSync(join(root, "daily"), { recursive: true });
@@ -60,7 +58,7 @@ function craftArchive(output: string, files: Array<{ path: string; kind: string;
         summaries.push({ path: file.path, size: file.content.length, sha256, kind: file.kind });
       }
       return { schema_version: 1, cli_version: version, created_at: createdAt, service_id: serviceId, include_audio: includeAudio,
-        entries: summaries, excluded: [], retained_locks: [], pending: emptyPending, source_paths: [], scan_errors: [], ...manifestExtra };
+        entries: summaries, excluded: [], retained_locks: [], pending: emptyPending, scan_errors: [], ...manifestExtra };
     });
 }
 
@@ -140,7 +138,7 @@ describe("backup archive container", () => {
           for (const chunk of captured) emit(chunk);
           return { schema_version: 1, cli_version: version, created_at: createdAt, service_id: "service", include_audio: false,
             entries: [{ path: "castloop.toml", size: config.length, sha256: createHash("sha256").update(config).digest("hex"), kind: "config" }],
-            excluded: [], retained_locks: [], pending: emptyPending, source_paths: [], scan_errors: [] };
+            excluded: [], retained_locks: [], pending: emptyPending, scan_errors: [] };
         });
       expect(() => readBackupArchive(join(directory, "digest.clbk"), PASSPHRASE)).toThrow("Backup entry digest differs");
     } finally { rmSync(directory, { recursive: true }); }
@@ -171,14 +169,13 @@ describe("backup create, verify and restore", () => {
       expect(created.excluded_counts.temporary).toBe(1);
       expect(created.excluded_counts.regenerated).toBe(1);
       expect(created.excluded_counts.unknown).toBeGreaterThanOrEqual(2);
-      expect(created.pending.drafts_staged).toEqual(["11111111-1111-4111-8111-111111111111"]);
-      expect(created.source_path_count).toBe(1);
+      expect(created.pending.domain_changes).toEqual([{ operation_id: "11111111-1111-4111-8111-111111111111", phase: null, lock_present: true }]);
 
       const verified = verifyLocalBackup(output, PASSPHRASE);
       expect(verified.ok).toBe(true);
       expect(verified.config_valid).toBe(true);
       expect(verified.include_audio).toBe(false);
-      expect(verified.retained_locks).toEqual([".castloop/sqlite-uploads/service/upload.json.lock"]);
+      expect(verified.retained_locks).toEqual([".castloop/sqlite-domain-changes/service/11111111-1111-4111-8111-111111111111.json.lock"]);
 
       const destination = join(directory, "restored");
       const preview = previewBackupRestore(output, destination, PASSPHRASE);
@@ -229,12 +226,12 @@ describe("backup create, verify and restore", () => {
     const root = backupWorkspace();
     const directory = mkdtempSync("/tmp/opencode/castloop-backup-e2e-");
     try {
-      mkdirSync(join(root, ".castloop", "sqlite-drafts", "service"), { recursive: true });
-      writeFileSync(join(root, ".castloop", "sqlite-drafts", "service", "22222222-2222-4222-8222-222222222222.json"), "{invalid");
+      mkdirSync(join(root, ".castloop", "sqlite-domain-changes", "service"), { recursive: true });
+      writeFileSync(join(root, ".castloop", "sqlite-domain-changes", "service", "22222222-2222-4222-8222-222222222222.json"), "{invalid");
       const output = join(directory, "backup.clbk");
       const created = await createLocalBackup(root, output, { includeAudio: false, passphrase: PASSPHRASE });
-      expect(created.scan_errors).toContain("drafts");
-      expect(verifyLocalBackup(output, PASSPHRASE).scan_errors).toEqual(["drafts", "source_paths"]);
+      expect(created.scan_errors).toContain("domain_changes");
+      expect(verifyLocalBackup(output, PASSPHRASE).scan_errors).toEqual(["domain_changes"]);
     } finally { rmSync(directory, { recursive: true }); rmSync(root, { recursive: true }); }
   });
 
@@ -271,7 +268,7 @@ describe("backup create, verify and restore", () => {
             entries: [
               { path: "castloop.toml", size: config.length, sha256: createHash("sha256").update(config).digest("hex"), kind: "config" },
               { path: ".castloop/secrets.json", size: secret.length, sha256: createHash("sha256").update(secret).digest("hex"), kind: "secret" },
-            ], excluded: [], retained_locks: [], pending: emptyPending, source_paths: [], scan_errors: [] };
+            ], excluded: [], retained_locks: [], pending: emptyPending, scan_errors: [] };
         });
       const destination = join(directory, "partial");
       expect(() => restoreLocalBackup(output, destination, PASSPHRASE)).toThrow("Backup entry digest differs");

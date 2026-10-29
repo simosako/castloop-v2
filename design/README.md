@@ -1,6 +1,6 @@
 # 設計文書の案内
 
-`refactor1028`では[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)を`794341f`で実装し、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)で素材直接配置・metadata直接送信・内容による冪等公開へ切り替えた。公開job・操作追跡表・個別公開journalを廃止し、予約・RSS・診断も切り替えた。[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)でデプロイ・稼働制御を簡素化し、現行の内部queue/content形式は新規環境専用の**14/13**。Cloudflareへの配備・実機性能確認は未実施で、以下の配布済み版・実機検証の記録とは区別する。
+`refactor1028`では[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)を`794341f`で実装し、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)（`cfc5715`）で素材直接配置・metadata直接送信・内容による冪等公開へ切り替えた。公開job・操作追跡表・個別公開journalを廃止し、予約・RSS・診断も切り替えた。[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)（`3bc24bd`）でデプロイ・稼働制御を簡素化し、さらに[フェーズ4](phase4_code_and_test_cleanup_plan.md)で残存していたステージング一時複製・全量Readback・R2スナップショット残骸・`stats-retention`台帳・過剰な中間journalと旧トライアル補助スクリプトを撤去した。現行の内部queue/content形式は新規環境専用の**14/13**。Cloudflareへの配備・実機性能確認は未実施で、以下の配布済み版・実機検証の記録とは区別する。
 
 この見直し前のv0.7.6（Issue #65／#70／#63統合版、[リリースノート](../docs/release-v0.7.6.md)）は内部queue/content形式**11/11**、必須サイト識別は`static-show-v2`。新規環境専用であり、予約公開版9/9・サイト試験版10/11等からの変換・互換配備は行わない。以下の番号は各段階の履歴として区別する。統合版は新規の本人限定環境へ実配備し、予約公開3件・取消1件・全コンテンツのAccess拒否を確認した。native Free性能、スマートフォン／キーボードの実機確認は未完了である。
 
@@ -64,7 +64,8 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [全体設計の見直しとシンプル化の提案（2026-10-28）](architecture_simplification_review_20261028.md) | Issue #62を契機とした複雑性の原因分析と、アトミック更新（成功/失敗の二択・blocked廃止）・オンデマンド生成・ジャーナル/操作表削減・deploy簡素化の段階的改善案 |
 | [フェーズ1設計書：公開処理の同期アトミック化とオンデマンド配信（2026-10-28）](phase1_atomic_publication_and_ondemand_delivery_plan.md) | 改善案A＋Bの具体設計。3ステップ同期公開（冪等メディア配置→パージ→単一SQLiteトランザクション）、`blocked`/`read_*`廃止、RSS/WebサイトHTMLのSQLiteオンデマンド生成と6テーブル削除 |
 | [フェーズ2：直接アップロードと冪等な公開](phase2_direct_media_and_cli_simplification_plan.md) | **実装済み・未配備**。CLI直接配置・JSON同期公開、同一内容no-op、予約/RSS/診断の切替、操作5表・job台帳・個別公開journal/lockと旧コマンドの削除。新規13/13環境専用 |
-| [フェーズ3：デプロイと稼働制御の簡素化](phase3_deploy_and_runtime_control_simplification_plan.md) | 改善案D＋Eの具体設計。単発deploy、runtime識別の環境導出、稼働3状態・Pause/Resume・起動Probe・admission windowの廃止、ドメイン変更の専用手順、Alarmを予約のみへ縮小。**実装中・未配備**。新規14/13環境専用 |
+| [フェーズ3：デプロイと稼働制御の簡素化](phase3_deploy_and_runtime_control_simplification_plan.md) | **実装済み・未配備**。改善案D＋Eの具体設計。単発deploy、runtime識別の環境導出、稼働3状態・Pause/Resume・起動Probe・admission windowの廃止、ドメイン変更の専用手順、Alarmを予約のみへ縮小。新規14/13環境専用 |
+| [フェーズ4：全体コード・テスト見直しと残存複雑性の削減計画](phase4_code_and_test_cleanup_plan.md) | **実装済み・未配備**。`3bc24bd`時点の全体監査に基づくクリーンアップ。ステージング一時コピー・全量Readbackの撤去、R2スナップショット残骸削除、`stats-retention`台帳廃止、ドメイン・初期化ジャーナル圧縮、旧トライアルスクリプト（`scripts/test-support/*`）と過剰テストの削除 |
 | [Episode別・日別の配信統計の設計案](episode_delivery_statistics_plan.md) | Issue #71。観測点、指標定義、Range/HEAD/bot/revisionの扱い、未計測と0の区別、PII非保持、Show DO SQLite集計、保持日数設定（`stats-retention`）と通算累計保持（案8-α-2＋案8-A）。実装済み。[実機確認記録](episode_delivery_statistics_live_20261025.md) |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |

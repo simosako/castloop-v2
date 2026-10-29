@@ -9,7 +9,7 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { syncLocalJournalDirectory } from "./local-journal-path";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { lstatSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 

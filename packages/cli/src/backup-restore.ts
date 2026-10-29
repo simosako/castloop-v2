@@ -32,21 +32,14 @@ function excludedCounts(excluded: Array<{ reason: BackupExcludedReason }>): Reco
 }
 
 function pendingSummary(pending: BackupPending): string {
-  const parts = [
-    pending.drafts_staged.length ? `${pending.drafts_staged.length} staged draft(s)` : "",
-    pending.drafts_unresolved.length ? `${pending.drafts_unresolved.length} unresolved publication(s)` : "",
-    pending.show_controls ? `${pending.show_controls} show control(s)` : "",
-    pending.domain_changes.length ? `${pending.domain_changes.length} domain change(s)` : "",
-    pending.service_updates.length ? `${pending.service_updates.length} service update(s)` : "",
-  ].filter(Boolean);
-  return parts.length ? parts.join(", ") : "none";
+  return pending.domain_changes.length ? `${pending.domain_changes.length} domain change(s)` : "none";
 }
 
 export type BackupVerifyResult = {
   archive: string; ok: true; service_id: string; created_at: string; cli_version: string; include_audio: boolean;
   entry_count: number; entry_bytes: number; config_valid: boolean;
   excluded_counts: Record<BackupExcludedReason, number>; retained_locks: string[];
-  pending: BackupPending; scan_errors: string[]; source_paths: string[];
+  pending: BackupPending; scan_errors: string[];
 };
 
 export type BackupRestorePreviewResult = {
@@ -54,13 +47,13 @@ export type BackupRestorePreviewResult = {
   service_id: string; created_at: string; include_audio: boolean; config_valid: boolean;
   entries: Array<{ path: string; size: number; kind: string }>; entry_bytes: number;
   excluded_counts: Record<BackupExcludedReason, number>; retained_locks: string[];
-  pending: BackupPending; scan_errors: string[]; source_paths: string[]; next_steps: string[];
+  pending: BackupPending; scan_errors: string[]; next_steps: string[];
 };
 
 export type BackupRestoreResult = {
   archive: string; restored_to: string; service_id: string; created_at: string;
   entry_count: number; entry_bytes: number;
-  pending: BackupPending; scan_errors: string[]; source_paths: string[]; next_steps: string[];
+  pending: BackupPending; scan_errors: string[]; next_steps: string[];
 };
 
 export function verifyLocalBackup(file: string, passphrase: string): BackupVerifyResult {
@@ -71,7 +64,7 @@ export function verifyLocalBackup(file: string, passphrase: string): BackupVerif
     entry_count: manifest.entries.length, entry_bytes: header.entry_bytes,
     config_valid: parseConfigText(configText) !== null,
     excluded_counts: excludedCounts(manifest.excluded), retained_locks: manifest.retained_locks,
-    pending: manifest.pending, scan_errors: manifest.scan_errors, source_paths: manifest.source_paths };
+    pending: manifest.pending, scan_errors: manifest.scan_errors };
 }
 
 export function previewBackupRestore(file: string, destination: string, passphrase: string): BackupRestorePreviewResult {
@@ -84,14 +77,12 @@ export function previewBackupRestore(file: string, destination: string, passphra
     ? "Choose a different destination: backup-restore requires a path that does not exist yet."
     : `Restore with: castloop backup-restore ${file} ${target} confirm`);
   nextSteps.push("After restoration, run castloop doctor --local in the restored workspace.");
-  if (manifest.pending.drafts_unresolved.length) nextSteps.push("Unresolved publications: observe them only (operation-status); never replay requests.");
-  if (manifest.source_paths.length) nextSteps.push("Unfinished drafts need their original absolute source paths to continue; otherwise observe only and restage.");
   return { archive: file, destination: target, destination_exists: exists,
     service_id: manifest.service_id, created_at: manifest.created_at, include_audio: manifest.include_audio,
     config_valid: parseConfigText(configText) !== null,
     entries: manifest.entries.map(({ path, size, kind }) => ({ path, size, kind })), entry_bytes: header.entry_bytes,
     excluded_counts: excludedCounts(manifest.excluded), retained_locks: manifest.retained_locks,
-    pending: manifest.pending, scan_errors: manifest.scan_errors, source_paths: manifest.source_paths, next_steps: nextSteps };
+    pending: manifest.pending, scan_errors: manifest.scan_errors, next_steps: nextSteps };
 }
 
 export function restoreLocalBackup(file: string, destination: string, passphrase: string): BackupRestoreResult {
@@ -131,13 +122,11 @@ export function restoreLocalBackup(file: string, destination: string, passphrase
     });
     if (!started) throw new Error("Backup archive does not contain castloop.toml");
     protectLocalState(target);
-    const nextSteps = ["Run castloop doctor --local in the restored workspace to confirm the administrator key is readable."];
-    if (manifest.pending.drafts_unresolved.length) nextSteps.push("Unresolved publications: observe them only (operation-status); never replay requests.");
-    if (manifest.source_paths.length) nextSteps.push("Unfinished drafts need their original absolute source paths to continue; otherwise observe only and restage.");
-    nextSteps.push("Verification success does not prove server-side recovery, unresolved requests or publication results.");
+    const nextSteps = ["Run castloop doctor --local in the restored workspace to confirm the administrator key is readable.",
+      "Verification success does not prove server-side recovery, unresolved requests or publication results."];
     return { archive: file, restored_to: target, service_id: manifest.service_id, created_at: manifest.created_at,
       entry_count: manifest.entries.length, entry_bytes: header.entry_bytes,
-      pending: manifest.pending, scan_errors: manifest.scan_errors, source_paths: manifest.source_paths, next_steps: nextSteps };
+      pending: manifest.pending, scan_errors: manifest.scan_errors, next_steps: nextSteps };
   } catch (error) {
     for (const fd of openFiles.splice(0)) { try { closeSync(fd); } catch { /* the partial file is discarded with the destination */ } }
     if (started) rmSync(target, { recursive: true, force: true });
@@ -168,7 +157,6 @@ export function formatBackupVerify(result: BackupVerifyResult): string {
     `Unfinished local operations: ${pendingSummary(result.pending)}`,
   ];
   if (result.scan_errors.length) lines.push(`Scan errors (archived without inspection): ${result.scan_errors.join(", ")}`);
-  if (result.source_paths.length) lines.push(`Frozen source paths: ${result.source_paths.length}`);
   return lines.join("\n");
 }
 
@@ -184,7 +172,6 @@ export function formatBackupRestorePreview(result: BackupRestorePreviewResult): 
     `Excluded at creation: ${Object.entries(result.excluded_counts).filter(([, count]) => count > 0).map(([reason, count]) => `${count} ${reason}`).join(", ") || "none"}`,
     `Unfinished local operations: ${pendingSummary(result.pending)}`,
   ];
-  if (result.source_paths.length) lines.push(`Frozen source paths: ${result.source_paths.length}`);
   lines.push(...result.next_steps.map((step) => `Next: ${step}`));
   return lines.join("\n");
 }
@@ -198,7 +185,6 @@ export function formatBackupRestore(result: BackupRestoreResult): string {
     `Unfinished local operations: ${pendingSummary(result.pending)}`,
   ];
   if (result.scan_errors.length) lines.push(`Scan errors (archived without inspection): ${result.scan_errors.join(", ")}`);
-  if (result.source_paths.length) lines.push(`Frozen source paths: ${result.source_paths.length}`);
   lines.push(...result.next_steps.map((step) => `Next: ${step}`));
   return lines.join("\n");
 }

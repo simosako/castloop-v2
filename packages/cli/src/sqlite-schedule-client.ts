@@ -6,7 +6,7 @@ import type { SqliteScheduleCancel, SqliteScheduleCreate, SqliteScheduleList, Sq
 import { sqliteDirectPublicationRequestHash, MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadBudget, SqliteManagementReadOptions } from "./sqlite-management-http";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 
 export class SqliteScheduleClient {
   readonly config: SqliteServiceConfig;

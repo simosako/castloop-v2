@@ -13,7 +13,7 @@ import { SqliteServiceControl } from "../../../../src/sqlite-service-control";
 import { createSqliteControlHttp } from "../../../../src/sqlite-control-http";
 import { administratorKey } from "../administrator-key";
 import { sha256HexSync } from "../sha256";
-import type { R2RestTransport } from "../verified-r2-put";
+import type { R2RestTransport } from "../bounded-http-read";
 import type { SqliteDomainConnection } from "../../../shared/src/sqlite-domain";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -43,7 +43,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
     let node = nodes.get(id);
     if (!node) {
       const fixture = sqlitePublicationFixture({ runtime: actual });
-      node = { fixture, service: new SqliteShowService(fixture.storage, id, actual, activeConfig, cache(), objects.bucket, administratorKey(keyRoot ?? root)) };
+      node = { fixture, service: new SqliteShowService(fixture.storage, id, actual, activeConfig, cache(), administratorKey(keyRoot ?? root)) };
       nodes.set(id, node);
     }
     return node;
@@ -52,7 +52,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
     nativeQueue = new SqlitePublicationQueue(queue.storage, resolveSqliteRuntime(queue.storage, actual));
     const runtime = new SqliteServiceRuntime(queue.storage, nativeQueue, content, activeConfig, {
       purge: async (id) => { purges.push(id); } }, actual);
-    for (const [id, node] of nodes) node.service = new SqliteShowService(node.fixture.storage, id, actual, activeConfig, cache(), objects.bucket, administratorKey(keyRoot ?? root));
+    for (const [id, node] of nodes) node.service = new SqliteShowService(node.fixture.storage, id, actual, activeConfig, cache(), administratorKey(keyRoot ?? root));
     control = new SqliteServiceControl(queue.storage, runtime, (id) => ({
       initialize: async (request) => {
         showCalls.push({ action: "initialize", showId: id });
