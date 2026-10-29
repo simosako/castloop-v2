@@ -37,11 +37,11 @@ test("formal lifecycle previews are read-only and execution restores only the sa
   expect(value.calls.every((call) => call.method === "GET")).toBe(true);
   expect(JSON.stringify(stop)).not.toContain("Unpublished local edit");
   writeFileSync(value.file, JSON.stringify(stop));
-  expect(await value.command("lifecycle-execute", [value.file, stop.request_sha256, "confirm"])).toMatchObject({ state: "queued" });
+  expect(await value.command("lifecycle-execute", [value.file, stop.request_sha256, "confirm"])).toMatchObject({ state: "succeeded" });
   expect(await value.command("job-status", [stop.request.job_id])).toMatchObject({ snapshot_only: true, authorizes_recovery: false, status: { state: "succeeded" } });
   expect(await value.command("operation-status", ["lifecycle", stop.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
   const restore = await value.preview("restore"); writeFileSync(value.file, JSON.stringify(restore));
-  expect(await value.command("lifecycle-execute", [value.file, restore.request_sha256, "confirm"])).toMatchObject({ state: "queued" });
+  expect(await value.command("lifecycle-execute", [value.file, restore.request_sha256, "confirm"])).toMatchObject({ state: "succeeded" });
   expect(await value.command("job-status", [restore.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
   expect(value.content.inspect("daily", "first").base).toEqual(base);
   expect(value.content.delivery(new URL(base.enclosure_url).pathname).status).toBe(200);

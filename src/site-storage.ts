@@ -1,27 +1,6 @@
-import { sha256Hex, toHex } from "../packages/shared/src/sha256";
 import { validateId } from "../packages/shared/src/ids";
-import { siteSnapshotKey, SITE_ID_PATTERN } from "../packages/shared/src/website";
-import type { SitePage } from "../packages/shared/src/website";
-import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
-import { SITE_HTML_LIMIT_BYTES, siteContentSecurityPolicy } from "./site-renderer";
-import type { SiteCacheProps } from "./site-cache";
+import { SITE_ID_PATTERN } from "../packages/shared/src/website";
 import { purgeCacheTarget } from "./sqlite-cache-purge";
-
-export type SiteCandidatePage = { page: SitePage; props: SiteCacheProps };
-
-export async function persistSitePage(bucket: Pick<SqlitePublicationBucket, "put">, page: SitePage,
-  generation: number, html: string, identity: Omit<SiteCacheProps, "generation" | "sha256" | "lengthBytes">): Promise<SiteCandidatePage> {
-  siteContentSecurityPolicy(identity.cssHash);
-  const bytes = new TextEncoder().encode(html);
-  if (!bytes.length || bytes.length > SITE_HTML_LIMIT_BYTES) throw new Error("Site HTML exceeds its rendering budget");
-  const key = siteSnapshotKey(page, generation), sha256 = await sha256Hex(bytes);
-  const object = await bucket.put(key, bytes, { onlyIf: new Headers({ "If-None-Match": "*" }), sha256,
-    httpMetadata: { contentType: "text/html; charset=utf-8" } });
-  if (!object || object.key !== key || object.size !== bytes.length || !object.checksums.sha256 || toHex(object.checksums.sha256) !== sha256) {
-    throw new Error("Immutable site page write was not verified");
-  }
-  return { page, props: { ...identity, generation, sha256, lengthBytes: bytes.length } };
-}
 
 export type SitePurgeTarget = { showId: string; siteId?: string };
 export function sitePurgeTags(target: SitePurgeTarget): string[] {

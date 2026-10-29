@@ -7,7 +7,6 @@ import { SqliteDraft } from "../packages/cli/src/sqlite-draft";
 import { SqliteScheduleClient } from "../packages/cli/src/sqlite-schedule-client";
 import type { SqliteDraftTarget } from "../packages/cli/src/sqlite-draft-journal";
 import type { R2RestTransport } from "../packages/cli/src/verified-r2-put";
-import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import { createSqlitePublicationHttp } from "./sqlite-publication-http";
@@ -43,6 +42,10 @@ async function fixture() {
   const objects = sqlitePublicationBucket(), content = new SqlitePublicationContent(queue.storage);
   content.registerShow("daily", crypto.randomUUID());
   let ready = true;
+  const purges: Array<{ showId: string; cover: boolean }> = [];
+  const executor = createSqlitePublicationExecutor(content, objects.bucket, config, { purge: async (target) => { purges.push(target); },
+    now: () => "2026-10-16T15:00:00Z" });
+  queue.queue.executor = executor;
   const http = createSqlitePublicationHttp(queue.queue, "private-admin", () => ready, "daily");
   let scheduleNow = Date.now();
   const schedules = new SqlitePublicationSchedules(queue.storage, queue.queue, content, () => scheduleNow,
@@ -75,10 +78,6 @@ async function fixture() {
     const object = await objects.bucket.get(key);
     return new Response(object!.body, { headers: { ETag: `"${object!.etag}"` } });
   };
-  const purges: Array<{ showId: string; cover: boolean }> = [];
-  const executor = createSqlitePublicationExecutor(content, objects.bucket, config, { purge: async (target) => { purges.push(target); },
-    now: () => "2026-10-16T15:00:00Z" });
-  const alarm = new SqlitePublicationAlarm(queue.queue, executor, () => {});
   const options = { administratorKey: "private-admin", managementTransport: transport,
     r2: { accountId: config.account_id, apiToken: "private-token", transport } };
   const directory = join(root, "daily"); mkdirSync(directory, { mode: 0o700 });
@@ -90,19 +89,17 @@ async function fixture() {
   const target = (kind: "show" | "episode", episodeId = "first"): SqliteDraftTarget => ({ job_id: crypto.randomUUID(), kind, show_id: "daily",
     expected_show_state_version: kind === "show" ? 0 : 1, ...(kind === "episode" ? { episode_id: episodeId } : {}) });
   const open = (value: SqliteDraftTarget) => SqliteDraft.open(root, config, value, options);
-  const run = async () => { queue.clearAlarm(); return alarm.alarm(); };
-  return { ...queue, ...objects, root, config, directory, content, http, schedules, requests, options, open, target, run, purges,
+  return { ...queue, ...objects, root, config, directory, content, http, schedules, requests, options, open, target, purges,
     advanceSchedule: (milliseconds: number) => { scheduleNow += milliseconds; },
     notReady: () => { ready = false; } };
 }
 
-test("CLI upload → authenticated submit → FIFO Alarm → real publication → observation completes without Queue or R2 control records", async () => {
+test("CLI upload → authenticated submit → synchronous atomic publication → observation completes without Queue or R2 control records", async () => {
   const setup = await fixture();
   const show = await setup.open(setup.target("show"));
   await show.stage({ asset: "show" });
   expect(setup.queue.snapshot().drained).toBe(true);
-  expect((await show.publish())?.state).toBe("queued");
-  expect((await setup.run()).state).toBe("succeeded");
+  expect((await show.publish())?.state).toBe("succeeded");
   await show.wait();
   for (const id of ["first", "second"]) {
     writeFileSync(join(setup.directory, `episode-${id}.toml`), stringifyToml({ schema_version: 1, episode_id: id, guid: `guid-${id}`,
@@ -112,14 +109,9 @@ test("CLI upload → authenticated submit → FIFO Alarm → real publication �
   for (const draft of [first, second]) {
     await draft.stage({ asset: "episode_metadata" });
     await draft.stage({ asset: "audio", audio_path: "audio.mp3" });
-    expect((await draft.publish())?.state).toBe("queued");
+    expect((await draft.publish())?.state).toBe("succeeded");
+    expect((await draft.wait()).state).toBe("succeeded");
   }
-  expect(setup.queue.snapshot().queued).toBe(2);
-  expect((await setup.run()).state).toBe("succeeded");
-  expect((await first.wait()).state).toBe("succeeded");
-  expect((await second.observe())?.state).toBe("queued");
-  expect((await setup.run()).state).toBe("succeeded");
-  await second.wait();
   const base = setup.content.episodes("daily").find((revision) => revision.episode_id === "first")!;
   const update = await setup.open({ ...setup.target("episode"), base_revision_id: base.revision_id,
     base_metadata_sha256: createHash("sha256").update(JSON.stringify(episodeDraftFromRevision(base))).digest("hex") });
@@ -127,14 +119,14 @@ test("CLI upload → authenticated submit → FIFO Alarm → real publication �
   writeFileSync(metadataPath, readFileSync(metadataPath, "utf8").replace("Local first", "Updated first"));
   setup.calls.length = 0;
   await update.stage({ asset: "episode_metadata" });
-  await update.publish(); await setup.run(); await update.wait();
+  await update.publish(); await update.wait();
   expect(setup.content.episodes("daily").find((revision) => revision.episode_id === "first")).toMatchObject({
     title: "Updated first", guid: base.guid, published_at: base.published_at, enclosure_url: base.enclosure_url });
   expect(setup.calls.some((call) => call.method === "PUT" && call.key.endsWith(".mp3"))).toBe(false);
-  expect(setup.calls.some((call) => /^system\/(?:jobs|show-publications|management-requests|lifecycle-service)/.test(call.key))).toBe(false);
+  expect(setup.calls.some((call) => /^system\/(?:jobs|show-publications|management-requests|lifecycle-service|shows)/.test(call.key))).toBe(false);
   expect(setup.requests.filter((request) => request.method === "POST" && new URL(request.url).pathname === "/admin/sqlite-publication/jobs")).toHaveLength(4);
   expect(setup.requests.some((request) => new URL(request.url).pathname.includes("queues"))).toBe(false);
-  expect(setup.text(`public/podcasts/daily/feeds/${setup.content.inspect("daily").show!.feed_generation}.xml`)).toContain("Updated first");
+  expect(setup.content.renderFeed("daily", setup.config.public_base_url)!.xml).toContain("Updated first");
   expect(setup.purges).toHaveLength(4);
 });
 
@@ -158,11 +150,11 @@ test("HTTP authentication, protocol, bounded body, readiness and method gates ca
   expect(setup.queue.snapshot().drained).toBe(true);
 });
 
-test("CLI schedule freezes an Episode, stays outside the FIFO, then dispatches and publishes after its due time", async () => {
+test("CLI schedule freezes an Episode, then dispatches and publishes synchronously after its due time", async () => {
   const setup = await fixture();
   const show = await setup.open(setup.target("show"));
   await show.stage({ asset: "show" });
-  await show.publish(); await setup.run(); await show.wait();
+  await show.publish(); await show.wait();
   writeFileSync(join(setup.directory, "episode-first.toml"), stringifyToml({ schema_version: 1, episode_id: "first",
     guid: "guid-first", title: "Scheduled first", description: "Description", published_at: "2026-10-16T12:00:00+09:00" }));
   const episode = await setup.open(setup.target("episode", "first"));
@@ -174,22 +166,19 @@ test("CLI schedule freezes an Episode, stays outside the FIFO, then dispatches a
   const scheduled = await episode.schedule({ at, expectedPreview: plan.approval_sha256 });
   expect(scheduled.schedule).toMatchObject({ state: "scheduled", publication_state: null });
   expect(setup.queue.snapshot().queued).toBe(0);
-  expect(setup.text(`public/podcasts/daily/feeds/${setup.content.inspect("daily").show!.feed_generation}.xml`))
-    .not.toContain("Scheduled first");
+  expect(setup.content.renderFeed("daily", setup.config.public_base_url)!.xml).not.toContain("Scheduled first");
   setup.advanceSchedule(61000);
   expect(await setup.schedules.dispatchDue()).toBe(1);
-  expect(setup.queue.snapshot().queued).toBe(1);
-  expect((await setup.run()).state).toBe("succeeded");
+  expect(setup.queue.snapshot().queued).toBe(0);
   expect((await episode.observeSchedule()).schedule).toMatchObject({ state: "dispatched", publication_state: "succeeded" });
-  expect(setup.text(`public/podcasts/daily/feeds/${setup.content.inspect("daily").show!.feed_generation}.xml`))
-    .toContain("Scheduled first");
+  expect(setup.content.renderFeed("daily", setup.config.public_base_url)!.xml).toContain("Scheduled first");
 });
 
 test("CLI schedule client reschedules and cancels an undispatched schedule and local status follows", async () => {
   const setup = await fixture();
   const show = await setup.open(setup.target("show"));
   await show.stage({ asset: "show" });
-  await show.publish(); await setup.run(); await show.wait();
+  await show.publish(); await show.wait();
   writeFileSync(join(setup.directory, "episode-first.toml"), stringifyToml({ schema_version: 1, episode_id: "first",
     guid: "guid-first", title: "Scheduled first", description: "Description", published_at: "2026-10-16T12:00:00+09:00" }));
   const episode = await setup.open(setup.target("episode", "first"));
@@ -221,7 +210,7 @@ test("CLI schedule client reschedules and cancels an undispatched schedule and l
 
 test("CLI stages metadata/cover/both Show edits without publication and commits independent cover snapshots", async () => {
   const setup = await fixture(), initial = await setup.open(setup.target("show"));
-  await initial.stage({ asset: "show" }); await initial.publish(); await setup.run(); await initial.wait();
+  await initial.stage({ asset: "show" }); await initial.publish(); await initial.wait();
   let generation = 1;
   for (const selection of ["metadata", "cover", "both"] as const) {
     const path = join(setup.directory, "show.toml"), before = setup.content.delivery("/podcasts/daily/cover.jpg");
@@ -231,8 +220,8 @@ test("CLI stages metadata/cover/both Show edits without publication and commits 
     await draft.stage({ asset: "show" });
     expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toEqual(before);
     expect(setup.queue.snapshot().drained).toBe(true);
-    expect((await draft.publish())?.state).toBe("queued");
-    expect((await setup.run()).state).toBe("succeeded"); await draft.wait(); generation++;
+    expect((await draft.publish())?.state).toBe("succeeded");
+    await draft.wait(); generation++;
     expect(setup.content.delivery("/podcasts/daily/cover.jpg")).toMatchObject({ cache_props: { coverGeneration: generation } });
     expect(setup.entries.has(`public/podcasts/daily/covers/${generation}.jpg`)).toBe(true);
     expect(setup.entries.has(`public/podcasts/daily/covers/${generation - 1}.jpg`)).toBe(true);

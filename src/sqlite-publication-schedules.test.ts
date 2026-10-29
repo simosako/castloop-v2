@@ -56,11 +56,11 @@ describe("SQLite publication schedules", () => {
     await value.schedules.create(input);
     value.setNow(2000);
     expect(await value.schedules.dispatchDue()).toBe(1);
-    expect(value.queue.snapshot().queued).toBe(1);
+    expect(value.queue.snapshot().queued).toBe(0);
     expect(value.schedules.status(input.schedule_id).schedule).toMatchObject({ state: "dispatched", version: 2,
-      publication_state: "queued" });
+      publication_state: "succeeded" });
     expect(await value.schedules.dispatchDue()).toBe(0);
-    expect(value.queue.snapshot().queued).toBe(1);
+    expect(value.queue.snapshot().queued).toBe(0);
   });
 
   test("pause and maintenance suspend open schedules for explicit reapproval", async () => {
@@ -119,13 +119,13 @@ describe("SQLite publication schedules", () => {
       preview_sha256: "f".repeat(64) })).schedule.state).toBe("cancelled");
   });
 
-  test("Alarm reservation failure rolls back dispatch and leaves no queued job", async () => {
+  test("transient executor failure rolls back dispatch and leaves no job", async () => {
     const value = setup();
     const input = createInput(value);
     await value.schedules.create(input);
     value.setNow(2000);
-    value.failAlarm();
-    await expect(value.schedules.dispatchDue()).rejects.toThrow();
+    value.queue.executor = { execute: async () => { throw new Error("transient failure"); } };
+    await expect(value.schedules.dispatchDue()).rejects.toThrow("transient failure");
     expect(value.schedules.status(input.schedule_id).schedule.state).toBe("scheduled");
     expect(value.queue.snapshot().queued).toBe(0);
   });
@@ -142,14 +142,13 @@ describe("SQLite publication schedules", () => {
     expect(value.queue.snapshot().queued).toBe(0);
   });
 
-  test("the next schedule reserve is cleared only after the queue is idle", async () => {
+  test("the next schedule reserve is set when admission is open and skipped when paused", async () => {
     const value = setup();
     await value.schedules.create(createInput(value));
     value.clearAlarm();
     await value.schedules.scheduleNext();
     expect(value.alarm()).toBe(2000);
-    const pending = createInput(value, { publication: value.request({ kind: "show", episode_id: undefined }) });
-    await value.queue.enqueue(pending.publication);
+    value.queue.pause();
     value.clearAlarm();
     await value.schedules.scheduleNext();
     expect(value.alarm()).toBeNull();

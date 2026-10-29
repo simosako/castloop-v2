@@ -51,12 +51,12 @@ test("Episode catalog includes saved unpublished snapshots and parent state with
   expect(() => value.catalog({ kind: "episode", show_id: "missing", include_deleted: false })).toThrow("missing");
 });
 
-test("catalog hides metadata during unfinished work and escapes titles only at presentation", async () => {
+test("catalog preserves raw titles for presentation-layer escaping", async () => {
   const value = fixture(); value.show("daily", "published", "Private\tTitle\nLine");
   await value.queue.enqueue(value.request({ kind: "show", show_id: "daily" }));
-  expect(value.catalog({ kind: "show", include_deleted: false }).shows![0]).toMatchObject({ unfinished_operation: true, title: null, feed_url: null });
-  value.queue.claim(); await value.queue.block(value.queue.snapshot().active!.job_id, "execution_interrupted");
-  expect(value.catalog({ kind: "show", include_deleted: false }).shows![0].title).toBe(null);
+  expect(value.catalog({ kind: "show", include_deleted: false }).shows![0]).toMatchObject({
+    unfinished_operation: false, title: "Private\tTitle\nLine", feed_url: "https://public.example.com/podcasts/daily/feed.xml",
+  });
 });
 
 test("strict catalog request and response reject unknown fields, target changes, duplicates and repeated cursors", () => {

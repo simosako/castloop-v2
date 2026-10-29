@@ -65,10 +65,11 @@ test("unprepared versions, changed configuration and earlier content schemas can
   expect(value.old.queue.identity().worker_version_id).toBe(value.runtime.worker_version_id);
 });
 
-test("open or unfinished services cannot prepare code updates and frozen request changes are rejected", async () => {
+test("open or admission-paused services cannot prepare code updates and frozen request changes are rejected", async () => {
   const value = await fixture(), window = crypto.randomUUID(); value.old.queue.resume(window);
   expect(() => value.old.updates.prepare(value.request)).toThrow("paused");
-  await value.old.queue.enqueue(sqlitePublicationRequest(value.runtime, window)); value.old.queue.pause();
+  await value.old.queue.applyControl({ ...value.runtime, operation_id: crypto.randomUUID(), action: "admission-pause",
+    show_id: "daily", expected_availability_version: value.old.queue.snapshot().availability_version });
   expect(() => value.old.updates.prepare(value.request)).toThrow("paused");
   const fresh = await fixture(); fresh.old.updates.prepare(fresh.request);
   expect(() => fresh.old.updates.prepare({ ...fresh.request, worker_source_sha256: "e".repeat(64) })).toThrow("evidence differs");

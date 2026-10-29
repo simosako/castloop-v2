@@ -60,6 +60,9 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [エージェントによるPodcast管理の改善案](agent_integration_plan.md) | Issue #5。単一バイナリでのschema・雛形・Skill配布、明示対象指定、オフライン検証、doctor、承認と中断対応。MCPは不採用 |
 | [管理workspaceのバックアップ・整合性検証・復元支援の計画](workspace_backup_restore_plan.md) | Issue #63。**採択(2026-10-26実装承認・実装済み)**。暗号化単一アーカイブ、1回読み取りでのhash記録、復元preview/confirm、v0.7.5既存機能との役割分担 |
 | [リモート診断・監視の設計案](remote_diagnostics_and_monitoring_plan.md) | Issue #67。diagnose/progress/verify/watchの4コマンド提案、scope付き検査分類、CLI完結の終端報告、段階実装。レビュー済み、段階A〜D実装済み。[利用方法](../docs/observability.md)。[実機確認記録](remote_diagnostics_live_verification_20261025.md) |
+| [公開jobのblocked診断・復旧の設計案](publication_blocked_recovery_plan.md) | Issue #62。blocked理由別の3分類(観測のみ/明示継続/保全)、continuation_ready経路の再利用、immutable書込のchecksumによる継続検証、`abandoned`終端状態と`prepared_at`決定性、内部形式12/12。**設計案・レビュー待ち(未実装)** |
+| [全体設計の見直しとシンプル化の提案（2026-10-28）](architecture_simplification_review_20261028.md) | Issue #62を契機とした複雑性の原因分析と、アトミック更新（成功/失敗の二択・blocked廃止）・オンデマンド生成・ジャーナル/操作表削減・deploy簡素化の段階的改善案 |
+| [フェーズ1設計書：公開処理の同期アトミック化とオンデマンド配信（2026-10-28）](phase1_atomic_publication_and_ondemand_delivery_plan.md) | 改善案A＋Bの具体設計。3ステップ同期公開（冪等メディア配置→パージ→単一SQLiteトランザクション）、`blocked`/`read_*`廃止、RSS/WebサイトHTMLのSQLiteオンデマンド生成と6テーブル削除 |
 | [Episode別・日別の配信統計の設計案](episode_delivery_statistics_plan.md) | Issue #71。観測点、指標定義、Range/HEAD/bot/revisionの扱い、未計測と0の区別、PII非保持、Show DO SQLite集計、保持日数設定（`stats-retention`）と通算累計保持（案8-α-2＋案8-A）。実装済み。[実機確認記録](episode_delivery_statistics_live_20261025.md) |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |

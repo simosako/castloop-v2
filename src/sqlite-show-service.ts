@@ -21,12 +21,15 @@ import { createSqliteStatsHttp } from "./sqlite-stats-http";
 import { createSqliteOperationRecords } from "./sqlite-operation-runtime";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { SqliteRuntimeCache } from "./sqlite-service-runtime";
+import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
 import type { OperationCleanupBucket } from "./sqlite-operation-records";
 import { selectSqliteRuntime } from "./sqlite-runtime-update";
 import type { SqliteDomainRequest, SqliteDomainActivation } from "../packages/shared/src/sqlite-domain";
 import type { SitePage } from "../packages/shared/src/website";
 import type { SiteDeliveryDecision } from "./site-gateway";
+import type { PublicCacheProps } from "./public-assets";
+import type { SiteCacheProps } from "./site-cache";
 
 export type ShowRegistration = ReturnType<typeof sqliteRegistrationSchema.parse>;
 type Binding = { show_id: string; maintenance_id: string | null };
@@ -52,6 +55,10 @@ export class SqliteShowService {
     if (this.binding()?.show_id && this.binding()!.show_id !== showId) throw new Error("Show storage identity differs");
     this.queue = new SqlitePublicationQueue(storage, selectSqliteRuntime(storage, actual), Date.now, { showId, ready: () => this.ready() });
     this.content = new SqlitePublicationContent(storage);
+    this.queue.executor = createSqlitePublicationExecutor(this.content, bucket, config, {
+      purge: ({ showId: id, episodeId }) => cache.purgeMedia ? cache.purgeMedia({ showId: id, ...(episodeId ? { episodeId } : {}) }) : cache.purge(id),
+      purgeSite: (target) => cache.purgeSite ? cache.purgeSite(target) : Promise.resolve(),
+    });
     this.schedules = new SqlitePublicationSchedules(storage, this.queue, this.content, Date.now, { showId, ready: () => this.ready() });
     this.runtime = new SqliteServiceRuntime(storage, this.queue, this.content, bucket, config, cache, actual, showId);
     const ready = () => this.ready();
@@ -150,6 +157,15 @@ export class SqliteShowService {
   siteDelivery(page: SitePage): SiteDeliveryDecision {
     if (page.showId !== this.showId) return { status: 404 };
     return this.storage.transactionSync(() => this.ready() ? this.content.siteDelivery(page) : { status: 503 });
+  }
+  renderFeed(props?: PublicCacheProps) {
+    return this.storage.transactionSync(() =>
+      this.ready() ? this.content.renderFeed(this.showId, this.config.public_base_url, props) : null);
+  }
+  renderSitePage(page: SitePage, props?: SiteCacheProps) {
+    if (page.showId !== this.showId) return null;
+    return this.storage.transactionSync(() =>
+      this.ready() ? this.content.renderSitePage(page, this.config.public_base_url, props) : null);
   }
   private async controlHttp(request: Request): Promise<Response> {
     if (!await authenticated(request, this.key)) return adminReply({ error: "unauthorized" }, 401);

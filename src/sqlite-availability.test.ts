@@ -40,35 +40,22 @@ test("controls preserve three states, immutable results, explicit windows and re
   await expect(queue.applyControl({ ...stop, action: "admission-pause" })).rejects.toThrow("frozen");
 });
 
-test("stopped admission drains accepted FIFO without changing its window and both resumes wait for completion", async () => {
+test("stopped admission rejects new submissions without changing its window and unverified runtimes cannot resume", async () => {
   const value = fixture(); const opened = await value.queue.applyControl(value.request("resume"));
   const window = opened.result.admission_window_id!;
   const publication = value.publication({ admission_window_id: window });
-  await value.queue.enqueue(publication);
+  expect((await value.queue.enqueue(publication)).state).toBe("succeeded");
   await value.queue.applyControl(value.request("admission-pause"));
   await expect(value.queue.enqueue(value.publication({ admission_window_id: window, episode_id: "second" }))).rejects.toThrow("paused");
-  await expect(value.queue.applyControl(value.request("resume"))).rejects.toThrow("drained");
-  const claim = value.queue.claim(); expect(claim.state).toBe("claimed");
   await value.queue.applyControl(value.request("pause"));
-  await expect(value.queue.applyControl(value.request("delivery-resume"))).rejects.toThrow("drained");
-  await value.queue.finish(publication.job_id, "validation_failed");
-  await value.queue.applyControl(value.request("delivery-resume"));
-  expect(value.queue.snapshot()).toMatchObject({ state: "admission_paused", drained: true, admission_window_id: window });
-});
-
-test("blocked work and unverified runtimes cannot resume, while explicit pause remains available", async () => {
-  const value = fixture(); const opened = await value.queue.applyControl(value.request("resume"));
-  const publication = value.publication({ admission_window_id: opened.result.admission_window_id! });
-  await value.queue.enqueue(publication); value.queue.claim();
-  await value.queue.block(publication.job_id, "execution_interrupted");
-  await value.queue.applyControl(value.request("pause"));
-  await expect(value.queue.applyControl(value.request("resume"))).rejects.toThrow("drained");
-  await expect(value.queue.applyControl(value.request("delivery-resume"))).rejects.toThrow("drained");
   value.setReady(false);
   await expect(value.queue.applyControl(value.request("delivery-resume"))).rejects.toThrow("verified");
   const before = value.queue.snapshot().availability_version;
   await value.queue.applyControl(value.request("pause"));
   expect(value.queue.snapshot().availability_version).toBe(before + 1);
+  value.setReady(true);
+  await value.queue.applyControl(value.request("delivery-resume"));
+  expect(value.queue.snapshot()).toMatchObject({ state: "admission_paused", drained: true, admission_window_id: window });
 });
 
 test("runtime, config, Show and old window mismatches do not write control results", async () => {

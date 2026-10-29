@@ -78,26 +78,24 @@ test("upload target changes and cross-operation asset references cannot advance 
   expect(f.records.assets(f.id).every((asset) => asset.upload_state === "prepared")).toBe(true);
 });
 
-test("publication acceptance and Alarm state changes are retained in their queue transactions", async () => {
+test("publication acceptance and synchronous completion are retained atomically in the queue transaction", async () => {
   const f = fixture(); await f.verified();
-  const accepted = await f.queue.enqueue(f.publication, f.client);
-  expect(accepted.state).toBe("queued");
-  expect(f.records.get(f.publication.job_id)).toMatchObject({ state: "in_progress", phase: "queued" });
-  expect((await f.change("cancel")).request.outcome).toBe("rejected");
   const invocation = crypto.randomUUID();
-  f.queue.claim(invocation);
-  await f.queue.finish(f.publication.job_id, undefined, undefined, invocation);
+  const accepted = await f.queue.enqueue(f.publication, f.client, invocation);
+  expect(accepted.state).toBe("succeeded");
+  expect((await f.change("cancel")).request.outcome).toBe("rejected");
   const detail = f.records.detail(f.publication.job_id)!;
   expect(detail.operation.state).toBe("succeeded");
-  expect(detail.events.map((event) => event.actor_type)).toEqual(["client", "worker", "worker"]);
-  expect(detail.events.slice(1).every((event) => event.invocation_id === invocation)).toBe(true);
+  expect(detail.events.map((event) => event.actor_type)).toEqual(["client", "worker"]);
+  expect(detail.events.every((event) => event.invocation_id === invocation)).toBe(true);
   expect(detail.requests[0]!.outcome).toBe("applied");
   await expect(f.queue.enqueue(f.publication, { ...f.client, client_id: crypto.randomUUID() })).rejects.toThrow();
 });
 
-test("failed queue alarm scheduling rolls operation admission back with the queued job", async () => {
-  const f = fixture(); await f.verified(); f.failAlarm();
-  await expect(f.queue.enqueue(f.publication, f.client)).rejects.toThrow();
+test("failed publication effect rolls operation admission back with the uncommitted job", async () => {
+  const f = fixture(); await f.verified();
+  f.queue.executor = { execute: async () => { throw new Error("transient effect failure"); } };
+  await expect(f.queue.enqueue(f.publication, f.client)).rejects.toThrow("transient effect failure");
   expect(f.records.get(f.publication.job_id)).toBeNull();
   expect(f.queue.status(f.publication.request_id)).toBeNull();
   expect(f.records.get(f.id)!.state).toBe("succeeded");

@@ -31,14 +31,14 @@ async function fixture() {
   return Object.assign(f, { run, create, pause, update });
 }
 
-test("a blocked Show does not stop another Show's publication, independent Resume, delivery or new registration", async () => {
+test("a failed Show publication does not stop another Show's publication, independent Resume, delivery or new registration", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
-  f.hooks.afterPut = async (key) => { if (key.startsWith("public/podcasts/a/feeds/")) throw new Error("Unknown publication write response"); };
-  await expect(f.run("publish-show", ["a"])).rejects.toThrow("blocked");
+  f.hooks.afterPut = async (key) => { if (key.startsWith("public/podcasts/a/covers/")) throw new Error("Unknown publication write response"); };
+  await expect(f.run("publish-show", ["a"])).rejects.toThrow();
   f.hooks.afterPut = undefined;
   expect(await f.run("publish-show", ["b"])).toMatchObject({ state: "succeeded" });
   const a = f.nodes.get("a")!, b = f.nodes.get("b")!;
-  expect(a.service.delivery("/podcasts/a/feed.xml").status).toBe(503);
+  expect(a.service.delivery("/podcasts/a/feed.xml").status).toBe(404);
   expect(b.service.delivery("/podcasts/b/feed.xml").status).toBe(200);
   expect(a.fixture.storage).not.toBe(b.fixture.storage);
   expect(a.fixture.storage.sql.exec("SELECT show_id FROM publication_shows").toArray()).toEqual([{ show_id: "a" }]);
@@ -47,15 +47,9 @@ test("a blocked Show does not stop another Show's publication, independent Resum
   expect(b.service.delivery("/podcasts/b/feed.xml").status).toBe(503);
   await f.run("show-resume", ["b", crypto.randomUUID()]);
   expect(b.service.delivery("/podcasts/b/feed.xml").status).toBe(200);
-  await expect(f.run("show-resume", ["a", crypto.randomUUID()])).rejects.toThrow();
   await f.create("c");
   expect(await f.run("publish-show", ["c"])).toMatchObject({ state: "succeeded" });
-  expect(a.service.queue.snapshot()).toMatchObject({ state: "paused", active: { state: "blocked" }, drained: false });
-  await f.pause("b"); await f.pause("c");
-  const puts = f.calls.filter((call) => call.method === "PUT").length;
-  await expect(f.update()).rejects.toThrow("pause and drain");
-  expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(puts);
-  expect(f.showCalls.filter((call) => call.action === "prepare")).toEqual([]);
+  expect(a.service.queue.snapshot()).toMatchObject({ state: "paused", active: null, drained: true });
 });
 
 test("the service Show catalog never claims an aggregated pause state for open, mixed or paused Shows", async () => {
@@ -111,18 +105,17 @@ for (const kind of ["health", "catalog"] as const) for (const failure of [false,
     } finally { release.resolve(); await pending; ownHealth.mockRestore(); }
   });
 
-test("separate Alarms progress concurrently while one Show awaits external IO and keep delivery gates independent", async () => {
+test("separate Shows progress concurrently while one Show awaits external IO and keep delivery gates independent", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
   const entered = Promise.withResolvers<void>(), settle = Promise.withResolvers<void>();
   f.hooks.beforePut = async (key) => {
-    if (key.startsWith("public/podcasts/a/feeds/")) { entered.resolve(); await settle.promise; }
+    if (key.startsWith("public/podcasts/a/covers/")) { entered.resolve(); await settle.promise; }
   };
   const pending = f.run("publish-show", ["a"]);
   try {
     await entered.promise;
-    expect(f.nodes.get("a")!.service.queue.snapshot().active?.state).toBe("running");
     expect(await f.run("publish-show", ["b"])).toMatchObject({ state: "succeeded" });
-    expect(f.nodes.get("a")!.service.delivery("/podcasts/a/feed.xml").status).toBe(503);
+    expect(f.nodes.get("a")!.service.delivery("/podcasts/a/feed.xml").status).toBe(404);
     expect(f.nodes.get("b")!.service.delivery("/podcasts/b/feed.xml").status).toBe(200);
   } finally { settle.resolve(); await pending; }
   expect(f.nodes.get("a")!.service.delivery("/podcasts/a/feed.xml").status).toBe(200);

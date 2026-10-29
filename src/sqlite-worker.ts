@@ -5,10 +5,6 @@ import type { PublicCacheProps } from "./public-assets";
 import { serveCachedLifecycleAsset } from "./lifecycle-cache";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
 import { purgeSqliteCache } from "./sqlite-cache-purge";
-import { SqlitePublicationAlarm } from "./sqlite-publication-alarm";
-import type { SqlitePublicationExecutor } from "./sqlite-publication-alarm";
-import { withSitePublication } from "./site-publication";
-import type { SitePublication } from "./site-publication";
 import { serveSiteGateway } from "./site-gateway";
 import { serveCachedSitePage } from "./site-cache";
 import type { SiteCacheProps } from "./site-cache";
@@ -16,7 +12,6 @@ import { purgeSitePages } from "./site-storage";
 import type { SitePurgeTarget } from "./site-storage";
 import { parseSitePagePath } from "../packages/shared/src/website";
 import type { SitePage } from "../packages/shared/src/website";
-import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import type { SqliteDeliveryDecision } from "./sqlite-publication-content";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
@@ -49,7 +44,13 @@ export type SqliteWorkerEnv = { CASTLOOP_BUCKET: R2Bucket; CASTLOOP_ADMIN_KEY: s
   CASTLOOP_SQLITE: DurableObjectNamespace<SqlitePublicationService> };
 
 export class SqliteCachedAssets extends WorkerEntrypoint<SqliteWorkerEnv, PublicCacheProps> {
-  fetch(request: Request): Promise<Response> { return serveCachedLifecycleAsset(request, this.env, this.ctx.props); }
+  fetch(request: Request): Promise<Response> {
+    return serveCachedLifecycleAsset(request, {
+      CASTLOOP_BUCKET: this.env.CASTLOOP_BUCKET,
+      renderFeed: (showId, props) =>
+        this.env.CASTLOOP_SQLITE.getByName(sqliteShowObjectName(this.env.CASTLOOP_SERVICE_ID, showId)).renderFeed(props),
+    }, this.ctx.props);
+  }
   async describeRuntime(): Promise<SqliteCacheRuntime> {
     return { worker_version_id: this.env.CASTLOOP_VERSION_METADATA.id,
       service_config_sha256: await sqliteServiceConfigHash(sqliteServiceConfigSchema.parse(JSON.parse(this.env.CASTLOOP_SQLITE_CONFIG))),
@@ -59,7 +60,11 @@ export class SqliteCachedAssets extends WorkerEntrypoint<SqliteWorkerEnv, Public
 }
 
 export class SiteCachedPages extends WorkerEntrypoint<SqliteWorkerEnv, SiteCacheProps> {
-  fetch(request: Request): Promise<Response> { return serveCachedSitePage(request, this.env.CASTLOOP_BUCKET, this.ctx.props); }
+  fetch(request: Request): Promise<Response> {
+    return serveCachedSitePage(request,
+      (page, props) => this.env.CASTLOOP_SQLITE.getByName(sqliteShowObjectName(this.env.CASTLOOP_SERVICE_ID, page.showId)).renderSitePage(page, props),
+      this.ctx.props);
+  }
   async describeRuntime(): Promise<SqliteCacheRuntime> {
     return { worker_version_id: this.env.CASTLOOP_VERSION_METADATA.id,
       service_config_sha256: await sqliteServiceConfigHash(sqliteServiceConfigSchema.parse(JSON.parse(this.env.CASTLOOP_SQLITE_CONFIG))),
@@ -74,7 +79,6 @@ export class SiteCachedPages extends WorkerEntrypoint<SqliteWorkerEnv, SiteCache
 export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
   private readonly initialized: Promise<void>;
   private runtime!: SqliteServiceRuntime;
-  private executor!: SqlitePublicationExecutor<SitePublication>;
   private alarmRuntime!: () => SqliteServiceRuntime;
   private serviceHttp!: (request: Request) => Promise<Response>;
   private control?: SqliteServiceControl;
@@ -127,6 +131,14 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     await this.initialized;
     return this.show ? this.show.siteDelivery(page) : { status: 404 as const };
   }
+  async renderFeed(props?: PublicCacheProps) {
+    await this.initialized;
+    return this.show ? this.show.renderFeed(props) : null;
+  }
+  async renderSitePage(page: SitePage, props?: SiteCacheProps) {
+    await this.initialized;
+    return this.show ? this.show.renderSitePage(page, props) : null;
+  }
   async recordDeliveryStats(observations: SqliteDeliveryObservation[]): Promise<void> {
     await this.initialized;
     if (!this.show) throw new Error("Show is not initialized");
@@ -155,7 +167,6 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
       await this.show.runtime.domains.alarm();
       if (!await this.show.alarmRuntime().alarm()) {
         await this.show.schedules.dispatchDue();
-        await new SqlitePublicationAlarm(this.show.queue, this.executor).alarm();
         await this.show.schedules.scheduleNext();
       }
     }
@@ -165,11 +176,11 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     if (!this.ctx.id.equals(this.env.CASTLOOP_SQLITE.idFromName(sqliteShowObjectName(this.config.service_id, showId)))) throw new Error("Show namespace identity differs");
     if (this.show) { if (this.show.showId !== showId) throw new Error("Show scope differs"); return this.show; }
     this.show = new SqliteShowService(this.ctx.storage, showId, this.identity, this.config, {
-      describe: () => this.describeCaches(), purge: (id, confirmed) => this.purgeCaches(id, confirmed),
+      describe: () => this.describeCaches(),
+      purge: (id, confirmed) => this.purgeCaches(id, confirmed),
+      purgeMedia: ({ showId: id, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId: id, ...(episodeId ? { episodeId } : {}) }),
+      purgeSite: (target) => this.ctx.exports.SiteCachedPages.invalidate(target),
     }, this.env.CASTLOOP_BUCKET, this.env.CASTLOOP_ADMIN_KEY);
-    this.executor = withSitePublication(createSqlitePublicationExecutor(this.show.content, this.env.CASTLOOP_BUCKET, this.config,
-      { purge: ({ showId, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId, ...(episodeId ? { episodeId } : {}) }) }),
-      this.show.content, this.env.CASTLOOP_BUCKET, this.config, (target) => this.ctx.exports.SiteCachedPages.invalidate(target));
     return this.show;
   }
   async initializeShow(request: ShowRegistration) { await this.initialized; return this.openShow(request.show_id).initialize(request); }
@@ -227,4 +238,4 @@ export default {
         }));
       });
   },
-} satisfies ExportedHandler<SqliteWorkerEnv>;
+};

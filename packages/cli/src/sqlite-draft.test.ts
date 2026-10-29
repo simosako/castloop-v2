@@ -5,7 +5,6 @@ import { SqliteDraft } from "./sqlite-draft";
 import { draftPreview } from "./draft-preview";
 import type { SqliteDraftTarget } from "./sqlite-draft-journal";
 import type { R2RestTransport } from "./verified-r2-put";
-import { SqlitePublicationAlarm } from "../../../src/sqlite-publication-alarm";
 import { sqlitePublicationFixture } from "../../../src/test-support/sqlite-publication";
 import { SqliteOperationRecords } from "../../../src/sqlite-operation-records";
 import { createSqliteOperationHttp, operationClient } from "../../../src/sqlite-operation-http";
@@ -82,12 +81,12 @@ test("a future published_at warns in preview and requires explicit immediate-pub
   await expect(denied.publish(preview.input_fingerprint)).rejects.toThrow("in the future");
   expect((await f.draft.read()).publication).toBeUndefined();
   const confirmed = await SqliteDraft.open(f.root, f.config, f.target, { ...f.options, confirmFuturePublishedAt: async () => true });
-  expect(await confirmed.publish(preview.input_fingerprint)).toMatchObject({ state: "queued" });
+  expect(await confirmed.publish(preview.input_fingerprint)).toMatchObject({ state: "succeeded" });
   expect((await f.draft.read()).publication).toBeDefined();
   let asked = false;
   const observed = await SqliteDraft.open(f.root, f.config, f.target, { ...f.options,
     confirmFuturePublishedAt: async () => { asked = true; return false; } });
-  expect(await observed.publish()).toMatchObject({ state: "queued" });
+  expect(await observed.publish()).toMatchObject({ state: "succeeded" });
   expect(asked).toBe(false);
 });
 
@@ -217,7 +216,6 @@ async function fixture(kind: "show" | "episode" = "episode", updating = false, p
       if (kind === "show") await draft.stage({ asset: "show" });
       else { await draft.stage({ asset: "episode_metadata" }); await draft.stage({ asset: "audio", audio_path: "audio.mp3" }); }
     },
-    alarm: () => new SqlitePublicationAlarm(setup.queue, { validate: async (request) => request, publish: async () => {} }, () => {}),
   };
 }
 
@@ -304,10 +302,8 @@ for (const kind of ["show", "episode"] as const) {
       expect(frozen.publication?.request.payloads).toEqual(staged.assets.map((entry) => entry.upload));
       expect(frozen.publication?.request_sha256).toHaveLength(64);
     };
-    expect((await setup.draft.publish())?.state).toBe("queued");
-    expect(setup.queue.snapshot().queued).toBe(1);
-    const runner = setup.alarm();
-    expect((await runner.alarm()).state).toBe("succeeded");
+    expect((await setup.draft.publish())?.state).toBe("succeeded");
+    expect(setup.queue.snapshot().queued).toBe(0);
     expect((await setup.draft.wait()).state).toBe("succeeded");
     expect((await setup.draft.publish())?.state).toBe("succeeded");
     expect(setup.management.filter((call) => call.startsWith("POST"))).toHaveLength(1);
@@ -320,7 +316,7 @@ test("metadata-only update reuses published audio without an MP3 PUT or server s
   writeFileSync(setup.episodePath, readFileSync(setup.episodePath, "utf8").replace("Private title", "Updated title"));
   await setup.draft.stage({ asset: "episode_metadata" });
   expect(setup.management).toEqual([]);
-  expect((await setup.draft.publish())?.state).toBe("queued");
+  expect((await setup.draft.publish())?.state).toBe("succeeded");
   expect(setup.calls.map((call) => call.method)).toEqual(["PUT", "GET"]);
   expect(setup.calls.some((call) => call.key.endsWith("audio.mp3"))).toBe(false);
   expect((await setup.draft.read()).publication?.request.base_revision_id).toBe(setup.target.base_revision_id);
@@ -329,7 +325,7 @@ test("metadata-only update reuses published audio without an MP3 PUT or server s
 test("audio-only update verifies local metadata against the frozen published base", async () => {
   const setup = await fixture("episode", true);
   await setup.draft.stage({ asset: "audio", audio_path: "audio.mp3" });
-  expect((await setup.draft.publish())?.state).toBe("queued");
+  expect((await setup.draft.publish())?.state).toBe("succeeded");
   const request = (await setup.draft.read()).publication!.request;
   expect(request.payloads.map((payload) => payload.asset)).toEqual(["audio"]);
   expect(request.payloads[0].duration_seconds).toBe(1);
@@ -342,7 +338,7 @@ test("audio-only cannot silently ignore local metadata edits", async () => {
   expect(setup.calls).toEqual([]);
   await setup.draft.stage({ asset: "episode_metadata" });
   await setup.draft.stage({ asset: "audio", audio_path: "audio.mp3" });
-  expect((await setup.draft.publish())?.state).toBe("queued");
+  expect((await setup.draft.publish())?.state).toBe("succeeded");
 });
 
 for (const fault of ["lost", "bad_hash", "etag", "partial", "receipt", "early", "http"] as const) {
@@ -430,11 +426,13 @@ for (const fault of ["lost_before", "lost_after", "http"] as const) {
     const frozen = (await setup.draft.read()).publication!;
     expect(frozen.status).toBeUndefined();
     setup.faults.submit = undefined;
-    expect((await setup.draft.publish())?.state ?? null).toBe(fault === "lost_after" ? "queued" : null);
+    expect((await setup.draft.publish())?.state ?? null).toBe(fault === "lost_after" ? "succeeded" : null);
     expect((await setup.draft.read()).publication?.request).toEqual(frozen.request);
     expect(setup.management.filter((call) => call.startsWith("POST"))).toHaveLength(1);
     await expect(setup.draft.stage({ asset: "episode_metadata" })).rejects.toThrow("frozen");
-    await expect(SqliteDraft.open(setup.root, setup.config, { ...setup.target, job_id: crypto.randomUUID() }, setup.options)).rejects.toThrow("uncertain");
+    if (fault !== "lost_after") {
+      await expect(SqliteDraft.open(setup.root, setup.config, { ...setup.target, job_id: crypto.randomUUID() }, setup.options)).rejects.toThrow("uncertain");
+    }
   });
 }
 
@@ -470,7 +468,6 @@ test("the same target cannot acquire a new draft ID until its known terminal res
   await expect(SqliteDraft.open(setup.root, setup.config, { ...setup.target, expected_show_state_version: 1 }, setup.options)).rejects.toThrow("original target");
   await setup.draft.stage({ asset: "episode_metadata" });
   await setup.draft.publish();
-  await setup.alarm().alarm();
   await setup.draft.observe();
   const next = await SqliteDraft.open(setup.root, setup.config, { ...setup.target, job_id: crypto.randomUUID(),
     base_revision_id: crypto.randomUUID() }, setup.options);
@@ -483,14 +480,13 @@ test("the same target cannot acquire a new draft ID until its known terminal res
 test("status rollback, body substitution and missing acknowledged jobs never erase retained results", async () => {
   const setup = await fixture("episode", true);
   await setup.draft.stage({ asset: "episode_metadata" });
-  const queued = (await setup.draft.publish())!;
-  setup.queue.claim();
-  expect((await setup.draft.observe())?.state).toBe("running");
-  for (const reply of [{ ...queued }, { ...queued, state: "running", sequence: queued.sequence + 1 },
-    { ...queued, state: "running", request_sha256: "f".repeat(64) }]) {
+  const succeeded = (await setup.draft.publish())!;
+  expect((await setup.draft.observe())?.state).toBe("succeeded");
+  for (const reply of [{ ...succeeded, state: "queued" }, { ...succeeded, sequence: succeeded.sequence + 1 },
+    { ...succeeded, request_sha256: "f".repeat(64) }]) {
     setup.faults.response = () => Response.json(reply, { headers: { "Cache-Control": "no-store" } });
     await expect(setup.draft.observe()).rejects.toThrow();
-    expect((await setup.draft.read()).publication?.status?.state).toBe("running");
+    expect((await setup.draft.read()).publication?.status?.state).toBe("succeeded");
   }
   setup.faults.response = () => new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
   await expect(setup.draft.observe()).rejects.toThrow("Previously acknowledged");

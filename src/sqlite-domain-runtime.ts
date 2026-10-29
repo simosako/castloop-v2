@@ -7,10 +7,9 @@ import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-pub
 import type { PublicationQueueStorage, SqlitePublicationQueue } from "./sqlite-publication-queue";
 import type { SqlitePublicationContent } from "./sqlite-publication-content";
 import type { SqlitePublicationBucket } from "./sqlite-publication-executor";
-import { persistSqliteFeedSnapshot, verifyCover } from "./sqlite-publication-executor";
+import { verifyCover } from "./sqlite-publication-executor";
 import type { SqliteRuntimeCache } from "./sqlite-service-runtime";
 import { publicationChecksum, renderPublicationFeed } from "./publication-inputs";
-import { reserveSqliteFeedGeneration } from "./sqlite-feed-generations";
 
 type DomainRow = { operation_id: string; request_json: string; request_sha256: string; activation_json: string | null; continuation_ready: number;
   state: SqliteDomainStatus["phase"]; snapshot_sha256: string; feed_generation: number | null; reason_code: string | null };
@@ -31,10 +30,9 @@ export function selectPreparedDomainRuntime(storage: PublicationQueueStorage, sa
   if (!row) return false;
   const request = sqliteDomainRequestSchema.parse(JSON.parse(row.request_json));
   const service = storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
-  const unfinished = storage.sql.exec("SELECT job_id FROM publication_jobs WHERE state IN ('queued', 'running', 'blocked') LIMIT 1").toArray();
   return JSON.stringify(saved) === JSON.stringify(request.previous_runtime) && actual.service_id === saved.service_id &&
     actual.service_config_sha256 === request.target_config_sha256 && actual.worker_version_id !== saved.worker_version_id &&
-    service?.state === "paused" && !unfinished.length;
+    service?.state === "paused";
 }
 
 export class SqliteDomainRuntime {
@@ -78,8 +76,7 @@ export class SqliteDomainRuntime {
         this.snapshot() !== snapshot || pendingSqliteDomain(this.storage)) throw new Error("Domain preparation requires exact ready paused maintenance");
       bindMaintenance();
       const target = this.showId ? this.content.domainSnapshot(this.showId) : null;
-      const generation = target?.metadata ? reserveSqliteFeedGeneration(this.storage,
-        { kind: "domain", id: request.operation_id, showId: this.showId!, requestSha256: digest }) : null;
+      const generation = target?.metadata ? this.content.nextFeedGeneration(this.showId!) : null;
       this.storage.sql.exec(`INSERT INTO publication_domain_changes (operation_id, request_json, request_sha256,
         state, snapshot_sha256, feed_generation) VALUES (?, ?, ?, 'prepared', ?, ?)`,
       request.operation_id, JSON.stringify(request), digest, snapshotHash, generation);
@@ -115,45 +112,21 @@ export class SqliteDomainRuntime {
       if (!status.activation ||
         status.saved_runtime.worker_version_id !== status.activation.worker_version_id ||
         status.saved_runtime.service_config_sha256 !== status.request.target_config_sha256) throw new Error("Domain execution evidence differs");
-      const retained = this.content.sites.build(row.operation_id);
-      if (retained) {
-        if (retained.show_id !== this.showId || retained.generation !== row.feed_generation) throw new Error("Retained domain site identity differs");
-        if (!await this.content.sites.batch(row.operation_id, this.bucket)) {
-          await this.continueAfterBatch(row.operation_id); return true;
-        }
-      }
       const snapshot = this.snapshot();
       if (await publicationChecksum(new TextEncoder().encode(snapshot)) !== row.snapshot_sha256) throw new Error("Domain content snapshot differs");
       if (this.showId) {
         const target = this.content.domainSnapshot(this.showId);
         if (target.metadata && target.cover && row.feed_generation !== null) {
-          if (!this.content.sites.build(row.operation_id)) {
-            const metadata = target.metadata;
-            this.content.sites.prepare(row.operation_id, row.feed_generation, this.showId,
-              metadata.site_mode === "builtin" ? { origin: this.config.public_base_url, coverExtension: target.cover.extension,
-                episodeSiteIds: this.content.sites.ids.all(this.showId),
-                show: { show_id: metadata.show_id, title: metadata.title, description: metadata.description,
-                  language: metadata.language, author: metadata.author,
-                  ...(metadata.site_timezone !== undefined ? { site_timezone: metadata.site_timezone } : {}),
-                  ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
-                  ...(metadata.copyright ? { copyright: metadata.copyright } : {}) } } : null,
-              target.episodes);
-          }
-          if (!await this.content.sites.batch(row.operation_id, this.bucket)) {
-            await this.continueAfterBatch(row.operation_id); return true;
-          }
           await verifyCover(this.bucket, this.showId, target.cover.extension, target.cover);
-          const feed = renderPublicationFeed(target.metadata, target.episodes, this.config.public_base_url, target.cover.extension,
+          renderPublicationFeed(target.metadata, target.episodes, this.config.public_base_url, target.cover.extension,
             this.content.sites.ids.all(this.showId));
-          await persistSqliteFeedSnapshot(this.bucket, this.showId, row.feed_generation, feed);
-          await this.cache.purge(this.showId, (entrypoint) => this.content.sites.confirmPurge(row.operation_id, entrypoint));
+          await this.cache.purge(this.showId);
         } else if (row.feed_generation !== null || target.metadata) throw new Error("Domain Feed reservation differs");
       }
       await this.storage.transaction(async () => {
         if (this.row(row.operation_id).state !== "running" || this.snapshot() !== snapshot) throw new Error("Domain execution changed before commit");
         if (this.showId && row.feed_generation !== null) {
           this.content.commitDomainFeed(this.showId, snapshot, row.feed_generation);
-          this.content.sites.commit(row.operation_id);
         }
         this.storage.sql.exec("UPDATE publication_domain_changes SET state = 'feed_ready' WHERE operation_id = ?", row.operation_id);
         this.storage.sql.exec("UPDATE publication_runtime_setup SET operation_id = ?, state = 'scheduled', request_json = ? WHERE id = 1",
@@ -165,13 +138,6 @@ export class SqliteDomainRuntime {
       console.error(JSON.stringify({ event: "sqlite_domain_change", operation_id: row.operation_id, reason_code: "domain_effect_unverified" }));
     } finally { this.executing = false; }
     return true;
-  }
-  private async continueAfterBatch(id: string): Promise<void> {
-    await this.storage.transaction(async () => {
-      this.storage.sql.exec("UPDATE publication_domain_changes SET continuation_ready = 1 WHERE operation_id = ? AND state = 'running'", id);
-      await this.storage.setAlarm(Date.now());
-    });
-    await this.storage.sync();
   }
   private block(id: string, reason: "execution_interrupted" | "domain_effect_unverified"): void {
     this.storage.sql.exec("UPDATE publication_domain_changes SET state = 'blocked', reason_code = ? WHERE operation_id = ?", reason, id);
