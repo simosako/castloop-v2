@@ -4,6 +4,14 @@ All notable changes are documented in per-version release notes. This file is an
 
 Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x and earlier were **removed in v0.6.0**. Entries below describe the release that introduced a feature and do not imply it exists in the current release. There is no migration feature from schema version 1.
 
+## v0.8.0 — [release note](docs/release-v0.8.0.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.0)
+
+- Completes the Phase 1–4 architecture simplification: direct content-addressed media placement, synchronous atomic publication, on-demand RSS/site rendering, and simpler CLI/runtime control. Requires fresh internal queue/content formats **14/13**; there is no migration from earlier formats.
+- A private, Access-protected Cloudflare smoke test verified a fresh service, a Show, three Episodes and builtin-site audio playback. Native performance and full Free-plan compatibility remain unverified. See the [release notes](docs/release-v0.8.0.md).
+
+## Unreleased
+- None.
+
 ## v0.7.6 — [release note](docs/release-v0.7.6.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.6)
 
 - Issue #70: builtin Show websites with a default design, optional single-file CSS, newest-first paginated Episode lists, native audio players, safe full descriptions and HTTP(S) links, stable automatic short URLs, and optional Show-level publication-date timezone. Reviewer-only native trials confirmed playback, full descriptions, short URLs and Tokyo date display. Requires fresh internal queue/content formats **11/11** and `website="static-show-v2"`; no migration or update of earlier trial environments. See the [website guide](docs/show_website.md). Native Free performance and mobile/keyboard acceptance remain unverified.
@@ -27,9 +35,6 @@ Service configuration `schema_version = 1` (Queue/R2) features shipped in v0.5.x
 - Issue #65: optional workspace administrator timezone (display only) and offline `preview-schedule-time` conversion rejecting ambiguous DST times. See the [administrator configuration guide](docs/admin_configuration.md).
 - Issue #73: the release distribution adds `castloop-macos-arm64` (macOS Apple Silicon) and `castloop-windows-x64.exe` alongside `castloop-linux-x64`, built and smoke-checked natively per platform on matching GitHub-hosted runners and covered by the combined `SHA256SUMS`. The binaries remain unsigned; see the [distribution guide](docs/cli_binary_distribution.md) for verified and unverified per-OS scope.
 - Issue #78: Zod updated to a patched version (resolved 4.6.7) for CVE-2023-54404/GHSA-mrhx-c7xc-m3w5; no castloop-specific exploitation reported and persisted formats unchanged. See the [update record](docs/zod_security_update_20261025.md).
-
-## Unreleased
-- None.
 
 ## v0.7.2 — [release note](docs/release-v0.7.2.md) · [release](https://github.com/simosako/castloop-v2/releases/tag/v0.7.2)
 
