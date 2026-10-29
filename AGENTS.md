@@ -1,5 +1,37 @@
 # Agent Guide for castloop
 
+## Hard rules (read first)
+1. Implement exactly the requested behavior. The reasoning behind this rule is in "Engineering principles" below.
+2. Finish the entire requested task before replying. See "Completion contract".
+3. For any non-trivial change, state the scope before coding. See "Task protocol".
+4. Local code, test and documentation changes within the requested scope need no mid-task confirmation. Only live Cloudflare operations require explicit authorization (see "Safety boundaries").
+5. Never add any of these without an explicit request:
+   - new dependencies or tooling
+   - retries, timeouts, fallbacks or recovery mechanisms
+   - compatibility or migration paths for unsupported versions or layouts
+   - fine-grained multi-phase state machines, `blocked` states or lockouts
+   - configuration options, flags or extension points with no current use
+   - wrappers, factories or interfaces around existing direct code
+   - validation of values already guaranteed by types, contracts or trusted internal callers
+   - edge-case handling without evidence (principle 2 lists the acceptable evidence)
+
+## Task protocol
+Before writing code for a non-trivial change, state in five lines or fewer:
+- the requested behavior in your own words (1–2 sentences),
+- the files you expect to touch,
+- each edge case you considered with one line of evidence (a requirement, an observed bug, or a documented invariant) — no evidence means do not implement it,
+- an explicit out-of-scope list.
+
+If the change grows clearly beyond this during work, stop and ask instead of expanding silently.
+
+## Completion contract (Definition of Done)
+1. Complete the entire requested task before replying. A progress report is not a deliverable.
+2. Before starting, restate the request's acceptance criteria as a short list. Before finishing, verify every item and list any unchecked item as INCOMPLETE with the reason.
+3. The final report states the changed files, the `bun test` and `npm run check` results (skipped only for documentation-only changes), and anything intentionally left undone.
+4. Never end with "next steps" that belong to the original request.
+5. If blocked, report the exact error and what was tried. That is a failure report, not a partial success.
+6. If the task is too large to finish in one pass, ask to split it before starting — not midway.
+
 ## Engineering principles: evidence-driven simplicity
 
 Prefer the simplest correct implementation that satisfies the actual requirements. Optimize for correctness, clarity, maintainability, and minimal complexity, not hypothetical robustness or speculative future needs. Every added abstraction, defensive check, dependency, or layer of indirection must justify its complexity.
@@ -86,6 +118,7 @@ If there is no convincing justification, omit the mechanism. Prefer proven simpl
 
 ## Read documentation by task
 - Use [design/README.md](design/README.md) to locate relevant documents; do not read all design docs or historical records on every task.
+- For implementation tasks, read only the contract documents listed for the task below, and only the sections relevant to the change. Verification records, release notes and `design/archive/` are history, not implementation inputs: do not justify new defensive code with failure modes recorded there.
 - Current architecture: [design/initial_design.md](design/initial_design.md). Usage: [README.md](README.md).
 - Development supports only fresh SQLite service configs (`schema_version=2`, `sqlite-sequential-v1`, required `storage_layout="show-v1"`); `init` uses this by default. Reject service schema version 1 and legacy layouts before IO or local state changes. Never add migration, legacy layout support, resource adoption or fallback. Shared content/request schema version 1 is independent and remains supported.
 - The production Worker entrypoint is `src/sqlite-worker.ts`; embed only that Worker. Preserve existing DO/cache class names, bindings, compatibility date and persisted SQLite formats during code-only cleanup.
