@@ -69,26 +69,24 @@ async function registeredShow(root: string, config: SqliteServiceConfig, showId:
   if (health.scope !== "service" || !health.publication_ready) throw new Error("Show registration requires a ready service outside shared maintenance");
   const reservationId = existing?.reservation_id ?? crypto.randomUUID();
   journal.initialize({ service_config_sha256: configHash, show_id: showId, reservation_id: reservationId, phase: "prepared" });
-  return journal.exclusively(async () => {
-    const state = registrationSchema.parse(journal.read());
-    if (state.reservation_id !== reservationId || state.show_id !== showId || state.service_config_sha256 !== configHash) throw new Error("Show registration changed concurrently");
-    let registered = state.phase === "registered";
-    if (!registered) {
-      const current = await client.registration(showId);
-      if (current.state === "registered" && current.reservation_id === reservationId) registered = true;
-    }
-    const target = registered ? await client.inspect(showId) : await client.register({ service_id: config.service_id, service_config_sha256: configHash,
-      operation_id: crypto.randomUUID() }, showId, reservationId);
-    if (state.reservation_id !== target.reservation_id || target.show_lifecycle !== "draft" || target.expected_show_state_version !== 0) {
-      throw new Error("Registration is unknown or the Show has advanced/deleted; never recreate it or resend its request");
-    }
-    journal.replace({ ...state, phase: "registered" });
-    const directory = join(root, showId), file = join(directory, "show.toml");
-    if (!existsSync(directory)) { mkdirSync(directory, { mode: 0o700 }); syncLocalJournalDirectory(root); }
-    if (!lstatSync(directory).isDirectory()) throw new Error("Show directory must not be a symlink");
-    if (existsSync(file)) { if (parseShowMetadata((await readLocalMetadata(file)).toString("utf8")).show_id !== showId) throw new Error("Local Show identity differs"); return file; }
-    writeSyncedLocalFile(file, () => stringifyToml(metadata)); syncLocalJournalDirectory(directory); return file;
-  });
+  const state = registrationSchema.parse(journal.read());
+  if (state.reservation_id !== reservationId || state.show_id !== showId || state.service_config_sha256 !== configHash) throw new Error("Show registration identity differs");
+  let registered = state.phase === "registered";
+  if (!registered) {
+    const current = await client.registration(showId);
+    if (current.state === "registered" && current.reservation_id === reservationId) registered = true;
+  }
+  const target = registered ? await client.inspect(showId) : await client.register({ service_id: config.service_id, service_config_sha256: configHash,
+    operation_id: crypto.randomUUID() }, showId, reservationId);
+  if (state.reservation_id !== target.reservation_id || target.show_lifecycle !== "draft" || target.expected_show_state_version !== 0) {
+    throw new Error("Registration is unknown or the Show has advanced/deleted; never recreate it or resend its request");
+  }
+  journal.replace({ ...state, phase: "registered" });
+  const directory = join(root, showId), file = join(directory, "show.toml");
+  if (!existsSync(directory)) { mkdirSync(directory, { mode: 0o700 }); syncLocalJournalDirectory(root); }
+  if (!lstatSync(directory).isDirectory()) throw new Error("Show directory must not be a symlink");
+  if (existsSync(file)) { if (parseShowMetadata((await readLocalMetadata(file)).toString("utf8")).show_id !== showId) throw new Error("Local Show identity differs"); return file; }
+  writeSyncedLocalFile(file, () => stringifyToml(metadata)); syncLocalJournalDirectory(directory); return file;
 }
 
 export async function runSqliteCommand(root: string, config: SqliteServiceConfig, command: string, args: string[],

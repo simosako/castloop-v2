@@ -1,6 +1,6 @@
 # castloop v2 全体設計（現行アーキテクチャ）
 
-最終更新: 2026-10-29（フェーズ1〜4 簡素化完了版、内部queue/content形式 `14/13`）
+最終更新: 2026-10-30（フェーズ1〜4 簡素化完了版、内部queue/content形式 `14/13`）
 
 - 関連設計: [全体設計の見直し](architecture_simplification_review_20261028.md)、[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4](phase4_code_and_test_cleanup_plan.md)、[Show単位のDO分離](do_show_separation_options.md)
 - 利用ガイド: [README](../README.md)、[SQLite開発・運用ガイド](../docs/sqlite_sequential_development.md)、[番組サイト](../docs/show_website.md)、[予約公開・管理設定](../docs/admin_configuration.md)、[独自ドメイン](../docs/sqlite_custom_domains.md)、[配信統計](../docs/delivery_statistics.md)、[バックアップ](../docs/workspace_backup.md)
@@ -50,7 +50,7 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 1. **明示的な公開**: `create-show` や `create-episode`、`preview-*` だけでは公開されない。`publish-show` / `publish-episode` を実行したときだけ公開される。
 2. **直接メディア配置（`sqlite-media-upload.ts`）**:
    - MP3 は最大 **300,000,000 bytes（300MB）**、JPEG/PNG カバー画像は最大 **5,000,000 bytes（5MB）**。
-   - ローカルファイルを直接ストリーム検査してサイズ・SHA-256・形式（MP3 フレーム長または画像シグネチャ）を検証する。
+   - 通常の`publish-show`／`publish-episode`では素材のSHA-256を1回、MP3解析を1回行い、サイズ・形式も検証する。SHA-256は保存先キーと同一素材の再利用判定に使う。PUT前後の再ハッシュやPUT後の再解析は行わず、実行中は入力ファイルを編集しない。
    - 公開済みリビジョンと SHA-256・サイズが同一のメディアは R2 への通信を行わずそのまま再利用する。新規または変更されたメディアのみ、R2 のコンテンツハッシュキーへ単一 PUT で配置する。
    - アップロード済みの公開音源やカバー画像は、デプロイや更新失敗時を含め削除しない。
 3. **同期公開リクエスト（`POST /admin/sqlite-publication/publish`）**:
@@ -80,6 +80,7 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 
 - Show が未公開の場合は `404 Not Found`、非公開化（`unpublished`）された場合は `410 Gone`、独自ドメイン変更の進行中（`publication_ready: false`）は `503 Service Unavailable`（`Cache-Control: no-store`）を返す。
 - 独自ドメイン運用時、管理用オリジン（`workers.dev`）の公開パスへのアクセスは独自ドメインの正規 URL へリダイレクトする（Feed は `301`、メディア・サイト HTML は `307`）。逆に、独自ドメイン上の `/admin/*` パスはすべて `404` で拒否する。
+- 生成したFeed/HTMLは本文のETagで条件付き応答を判定し、`Last-Modified`を送らない。音声・画像にはR2の更新時刻も使う。サイト一覧は対象ページの最大20件、個別ページは対象1件の公開内容と短縮IDだけをSQLiteから読み出す。
 
 ---
 
@@ -107,4 +108,5 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 
 ### 5.4 RSS インポートとワークスペースバックアップ
 - **RSS インポート**: [RSS取り込み設計](m7_rss_import_plan.md) および [利用ガイド](../docs/rss_migration.md) を参照。既存フィードからローカルへメタデータとメディアをダウンロードして検証・プレビューした後、新規 Show として GUID と公開日時を維持したまま順次公開する。
+- **ローカル操作**: workspaceまたは取り込みディレクトリごとに、変更するCLIは一度に1プロセスだけ実行する。記録は一時ファイルから原子的に置換し、ロックファイルは使わない。RSS公開記録はversion 3のみ対応し、旧version 2用の処理は保持しない。ローカル配置の完了記録がない場合は、確認済み取り込み元から生成ファイルをすべて作り直す。取り込み元や公開済み内容は削除しない。
 - **暗号化バックアップ**: [バックアップ設計](workspace_backup_restore_plan.md) および [利用ガイド](../docs/workspace_backup.md) を参照。`backup-create` / `backup-verify` / `backup-restore` により、`castloop.toml`、各 Show/Episode の TOML、`.castloop/` 内の管理者キー・ジャーナル、カバー画像（および任意で MP3 原本）をパスフレーズ暗号化された単一アーカイブ（`.clbk`）として保存・検証・復元できる。

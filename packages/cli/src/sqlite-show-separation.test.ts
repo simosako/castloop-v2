@@ -109,7 +109,7 @@ test("separate Shows progress concurrently while one Show awaits external IO and
 
 test("Show identities and operation targets cannot cross independent storages", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
-  const a = f.nodes.get("a")!.service, b = f.nodes.get("b")!.service;
+  const a = f.nodes.get("a")!.service;
   const identity = a.queue.identity();
   const request = parseSqliteDirectPublicationRequest({ service_id: identity.service_id, service_config_sha256: identity.service_config_sha256,
     schema_version: 1, protocol: "sqlite-sequential-v1", action: "publish", kind: "show",

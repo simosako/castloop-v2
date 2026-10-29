@@ -3,13 +3,13 @@ import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
 
 export type LifecycleFeedRenderer = (showId: string, props: PublicCacheProps) =>
-  Promise<{ xml: string; updatedAt: string } | null> | { xml: string; updatedAt: string } | null;
+  Promise<{ xml: string } | null> | { xml: string } | null;
 export type LifecycleCacheEnv = {
   CASTLOOP_BUCKET: Pick<R2Bucket, "head" | "get">;
   renderFeed: LifecycleFeedRenderer;
 };
 export type LifecyclePurgeTarget = { showId: string; episodeId?: string };
-type AssetMetadata = { size: number; httpEtag: string; uploaded: Date };
+type AssetMetadata = { size: number; httpEtag: string; uploaded?: Date };
 
 function rejected(request: Request, status: 404 | 405 | 412 | 416 | 503, size?: number): Response {
   return new Response(request.method === "HEAD" ? null : JSON.stringify({ error: status === 404 ? "not found" :
@@ -49,11 +49,11 @@ function preconditionStatus(request: Request, object: AssetMetadata): 304 | 412 
   const match = request.headers.get("If-Match");
   if (match !== null && !matchesEtag(match, object.httpEtag, false)) return 412;
   const unmodified = request.headers.get("If-Unmodified-Since");
-  if (match === null && unmodified !== null && modifiedAfter(object.uploaded, unmodified) === true) return 412;
+  if (match === null && unmodified !== null && object.uploaded && modifiedAfter(object.uploaded, unmodified) === true) return 412;
   const none = request.headers.get("If-None-Match");
   if (none !== null) return matchesEtag(none, object.httpEtag, true) ? 304 : null;
   const since = request.headers.get("If-Modified-Since");
-  return since !== null && modifiedAfter(object.uploaded, since) === false ? 304 : null;
+  return since !== null && object.uploaded && modifiedAfter(object.uploaded, since) === false ? 304 : null;
 }
 
 function requestedRange(request: Request, object: AssetMetadata): { offset: number; length: number } | "unsatisfiable" | null {
@@ -61,7 +61,8 @@ function requestedRange(request: Request, object: AssetMetadata): { offset: numb
   const value = request.headers.get("Range");
   if (!value || value.length > 256) return null;
   const condition = request.headers.get("If-Range");
-  if (condition !== null && condition !== object.httpEtag && modifiedAfter(object.uploaded, condition) !== false) return null;
+  if (condition !== null && condition !== object.httpEtag &&
+    (!object.uploaded || modifiedAfter(object.uploaded, condition) !== false)) return null;
   const range = /^bytes=(\d*)-(\d*)$/.exec(value.trim());
   if (!range || (!range[1] && !range[2])) return null;
   const size = object.size;
@@ -88,14 +89,13 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
       const rendered = await env.renderFeed(asset.showId, props);
       if (!rendered) return rejected(request, 503);
       const bytes = new TextEncoder().encode(rendered.xml);
-      const uploaded = new Date(rendered.updatedAt);
-      if (!bytes.byteLength || bytes.byteLength > 52_428_800 || !Number.isFinite(uploaded.getTime())) {
+      if (!bytes.byteLength || bytes.byteLength > 52_428_800) {
         throw new Error("Invalid rendered Feed metadata");
       }
       const httpEtag = `"${await sha256Hex(bytes)}"`;
-      const meta: AssetMetadata = { size: bytes.byteLength, httpEtag, uploaded };
+      const meta: AssetMetadata = { size: bytes.byteLength, httpEtag };
       const headers = new Headers({ "Content-Type": asset.contentType, "ETag": httpEtag,
-        "Last-Modified": uploaded.toUTCString(), "Accept-Ranges": "bytes",
+        "Accept-Ranges": "bytes",
         "Cache-Control": "public, max-age=300", "Cache-Tag": publicAssetCacheTags(asset).join(",") });
       const condition = preconditionStatus(request, meta);
       if (condition === 412) return rejected(request, 412);

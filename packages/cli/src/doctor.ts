@@ -45,10 +45,10 @@ export async function diagnoseLocal(root: string,
     try {
       const pending = pendingLocalDomainChanges(root, config).length > 0;
       checks.push({ id: "domain-records", scope: "local", status: pending ? "warn" : "pass", code: pending ? "domain_operation_pending" : "domain_records_checked",
-        message: pending ? "Unfinished domain records or client locks exist; inspect the same operation without replay or cleanup" : "Local domain records inspected; remote state not checked",
+        message: pending ? "Unfinished domain records exist; inspect the same operation" : "Local domain records inspected; remote state not checked",
         next_actions: pending ? ["inspect_domain_operation_status"] : [] });
     } catch {
-      checks.push({ id: "domain-records", scope: "local", status: "fail", code: "domain_records_unverified", message: "Local domain records could not be verified; preserve records and locks", next_actions: ["inspect_original_domain_records"] });
+      checks.push({ id: "domain-records", scope: "local", status: "fail", code: "domain_records_unverified", message: "Local domain records could not be verified; preserve the records", next_actions: ["inspect_original_domain_records"] });
     }
   }
   const summary = { pass: 0, warn: 0, fail: 0, not_checked: 0 };

@@ -4,7 +4,7 @@ import type { SitePage } from "../packages/shared/src/website";
 import { SITE_HTML_LIMIT_BYTES, siteContentSecurityPolicy, siteCssHash } from "./site-renderer";
 
 export type SiteCacheProps = { generation: number; showGeneration: number; episodeGeneration?: number };
-export type SitePageRenderResult = { html: string; css?: string; updatedAt?: string };
+export type SitePageRenderResult = { html: string; css?: string };
 export type SitePageRenderer = (page: SitePage, props: SiteCacheProps) =>
   Promise<SitePageRenderResult | null> | SitePageRenderResult | null;
 
@@ -29,22 +29,16 @@ export async function serveCachedSitePage(request: Request, render: SitePageRend
     if (!bytes.byteLength || bytes.byteLength > SITE_HTML_LIMIT_BYTES) return reject(503);
     const csp = siteContentSecurityPolicy(await siteCssHash(rendered.css ?? ""));
     const etag = `"${await sha256Hex(bytes)}"`;
-    const uploaded = rendered.updatedAt ? new Date(rendered.updatedAt) : new Date(0);
-    if (!Number.isFinite(uploaded.getTime())) throw new Error("Invalid site page timestamp");
     const headers = new Headers({ "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": csp,
       "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", ETag: etag,
-      "Last-Modified": uploaded.toUTCString(), "Cache-Control": "public, max-age=300",
+      "Cache-Control": "public, max-age=300",
       "Cache-Tag": `site-${page.showId},${page.kind === "episode" ? `site-episode-${page.showId}/${page.siteId}` : `site-list-${page.showId}`}` });
     const matches = (value: string, weak: boolean) => value.trim() === "*" || value.split(",").some((item) =>
       (weak ? item.trim().replace(/^W\//, "") : item.trim()) === etag);
-    const modified = (value: string) => {
-      const time = Date.parse(value);
-      return Number.isFinite(time) ? Math.floor(uploaded.getTime() / 1000) > Math.floor(time / 1000) : null;
-    };
-    const match = request.headers.get("If-Match"), unmodified = request.headers.get("If-Unmodified-Since");
-    if (match !== null ? !matches(match, false) : unmodified !== null && modified(unmodified) === true) return reject(412);
-    const none = request.headers.get("If-None-Match"), since = request.headers.get("If-Modified-Since");
-    if (none !== null ? matches(none, true) : since !== null && modified(since) === false) return new Response(null, { status: 304, headers });
+    const match = request.headers.get("If-Match");
+    if (match !== null && !matches(match, false)) return reject(412);
+    const none = request.headers.get("If-None-Match");
+    if (none !== null && matches(none, true)) return new Response(null, { status: 304, headers });
     headers.set("Content-Length", String(bytes.byteLength));
     if (request.method === "HEAD") return new Response(null, { headers });
     return new Response(bytes, { headers });

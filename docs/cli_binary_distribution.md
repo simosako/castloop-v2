@@ -18,7 +18,7 @@ Issue #73により、releaseには従来のLinux x86-64に加えて、macOS（Ap
 
 `.github/workflows/build-binaries.yml`（PR・`v*` tag push・手動起動）:
 
-1. **build**（matrix）: `ubuntu-24.04` / `macos-15`（Apple Silicon） / `windows-2025`（x64）のGitHub-hosted runnerで、それぞれ**同一OS・同一architecture上でnative build**する。Bun 1.4.4で`npm run build:cli -- <target>`を実行し、`src/sqlite-worker.ts`のみを埋め込む。ビルドした実行ファイルのSHA-256を`scripts/release-sha256.mjs`で計算し、`<binary>.sha256`としてartifactに含める。Skill tarはLinux jobで1回だけ作成する。`npm run check`と`bun test`（模擬Cloudflareを使う公開・upload回復・排他・不正設定拒否の回帰を含む）はLinux参照環境で実行する。
+1. **build**（matrix）: `ubuntu-24.04` / `macos-15`（Apple Silicon） / `windows-2025`（x64）のGitHub-hosted runnerで、それぞれ**同一OS・同一architecture上でnative build**する。Bun 1.4.4で`npm run build:cli -- <target>`を実行し、`src/sqlite-worker.ts`のみを埋め込む。ビルドした実行ファイルのSHA-256を`scripts/release-sha256.mjs`で計算し、`<binary>.sha256`としてartifactに含める。Skill tarはLinux jobで1回だけ作成する。`npm run check`と`bun test`（模擬Cloudflareを使う公開・upload再実行・不正設定拒否の回帰を含む）はLinux参照環境で実行する。
 2. **smoke**（matrix）: 各OSのrunnerでartifactをダウンロードし、checksum再計算との照合、`--version`が`package.json`と一致、全コマンドの`--help`、`describe`/`schema`/`template`/`validate`/`doctor`/`preview-show`/`skill export`を含む空PATH standalone smoke（`scripts/smoke-agent-cli.mjs`）、`schema_version = 1`拒否、削除済みコマンド拒否をnative実行する。cross compileの成功を動作保証としない。
 3. **release**（`v*` tag pushのみ）: 3プラットフォームのartifactとSkill artifactを統合し、`<binary>.sha256`を連結して`SHA256SUMS`を生成、`sha256sum --check`で全バイナリとSkill tarを検証してから`gh release create`で公開する。tag名と`package.json`のversionの一致はbuild jobで確認済みである。
 
@@ -26,9 +26,9 @@ Issue #73により、releaseには従来のLinux x86-64に加えて、macOS（Ap
 
 **各OSで検証（CI runner上）:** checksum整合、version/tag一致、help・usage一式、埋め込みschema/template/validate、offline doctor、preview-show、Skill export、不正設定（schema version 1・未知コマンド・不足引数）の拒否、空PATH・ソース不在での単体動作。
 
-**Linux参照環境のみ:** `npm run check`、`bun test`一式（`bun:sqlite`のprocess排他、journal lock、模擬Cloudflare originを使う公開・upload回復・復旧上限、RSS取込みの回帰を含む）。
+**Linux参照環境のみ:** `npm run check`、`bun test`一式（模擬Cloudflare originを使う公開・upload再実行、RSS取込みの強制終了後の再実行を含む）。ローカルのロック機構は使わず、同じworkspaceまたは取り込みディレクトリで変更するCLIは1プロセスだけ実行する。
 
-**macOS・Windowsで未確認（本配布時点）:** 模擬Cloudflareを使う結合試験、同一workspaceへの同時実行と強制終了時のlock解放、日本語・空白を含むpathやsymlink/junctionを絡めた回帰、実機・実ネットワークでのTLS/DNS経路とRSS download、実Cloudflareでの管理操作全般。これらを実施する場合は、対象と範囲を別途承認の上で行い、結果を文書化すること。`O_NOFOLLOW`等のfile検査はWindowsではOS非対応のためno-opになる可能性があり、実効性はOSごとに異なる。
+**macOS・Windowsで未確認（本配布時点）:** 模擬Cloudflareを使う結合試験、強制終了後のRSS再実行、日本語・空白を含むpathやsymlink/junctionを絡めた回帰、実機・実ネットワークでのTLS/DNS経路とRSS download、実Cloudflareでの管理操作全般。これらを実施する場合は、対象と範囲を別途承認の上で行い、結果を文書化すること。`O_NOFOLLOW`等のfile検査はWindowsではOS非対応のためno-opになる可能性があり、実効性はOSごとに異なる。
 
 native検証で判明した挙動: macOS runnerの初回smokeで、`os.tmpdir()`配下（`/var`→`/private/var`という祖先symlink経由のpath）への`skill export`が`unsafe_destination`で拒否されることを確認した。これはsymlink化されたpath構成要素への書込みを拒否する**設計どおりの安全検査**であり、実際の利用では実パスのworkspace配下へexportするため影響はない。smoke側は実パスへ解決した作業ディレクトリを使って検証する。
 

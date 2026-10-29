@@ -1,4 +1,4 @@
-import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, unlinkSync } from "node:fs";
+import { closeSync, constants, fsyncSync, lstatSync, mkdirSync, openSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export const JOURNAL_FAMILIES = ["rss-import-downloads",
@@ -34,17 +34,4 @@ export function ensureLocalJournalParents(root: string, family: JournalFamily, s
     if (!lstatSync(directory).isDirectory()) throw new Error("Local journal parents must be real directories, not symlinks");
     if (create) syncLocalJournalDirectory(directory);
   }
-}
-
-export function releaseLocalJournalLock(root: string, family: JournalFamily, serviceId: string | undefined, path: string, fd: number): void {
-  try {
-    ensureLocalJournalParents(root, family, serviceId);
-    const owned = fstatSync(fd, { bigint: true });
-    const current = lstatSync(path, { bigint: true });
-    if (!current.isFile() || current.dev !== owned.dev || current.ino !== owned.ino || current.size !== 0n) {
-      throw new Error("Preserve the changed client lock; it is not this invocation's empty lock file");
-    }
-    unlinkSync(path);
-    syncLocalJournalDirectory(dirname(path));
-  } finally { closeSync(fd); }
 }

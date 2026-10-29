@@ -85,110 +85,108 @@ export async function importRssLocally(showId: string, sourceUrl: string, output
   const storage = createLocalJournalStorage(root, "rss-import-downloads", undefined, "control.json");
   if (!present(storage.path) && readdirSync(root).length) throw new Error("Use an empty directory for a new RSS import");
   storage.initialize(rssImportControlSchema.parse({ schema_version: 1, import_id: randomUUID(), show_id: showId, source_url: sourceUrl }));
-  return storage.exclusively(async () => {
-    let state = rssImportControlSchema.parse(storage.read());
-    if (state.show_id !== showId || state.source_url !== sourceUrl) throw new Error("Import belongs to another Show or RSS URL");
-    const snapshot = join(root, "source.xml");
-    if (!present(snapshot)) {
-      const fetched = await fetchFeed(sourceUrl, transport);
-      parseRssImportFeed(fetched.source, showId, fetched.url);
-      const sha256 = sha256HexSync(fetched.source);
-      if (state.feed_sha256 && (state.feed_sha256 !== sha256 || state.final_url !== fetched.url)) {
-        throw new Error("RSS changed after import preparation; keep the original import and use a new directory");
+  let state = rssImportControlSchema.parse(storage.read());
+  if (state.show_id !== showId || state.source_url !== sourceUrl) throw new Error("Import belongs to another Show or RSS URL");
+  const snapshot = join(root, "source.xml");
+  if (!present(snapshot)) {
+    const fetched = await fetchFeed(sourceUrl, transport);
+    parseRssImportFeed(fetched.source, showId, fetched.url);
+    const sha256 = sha256HexSync(fetched.source);
+    if (state.feed_sha256 && (state.feed_sha256 !== sha256 || state.final_url !== fetched.url)) {
+      throw new Error("RSS changed after import preparation; keep the original import and use a new directory");
+    }
+    state = rssImportControlSchema.parse({ ...state, feed_sha256: sha256, final_url: fetched.url });
+    storage.replace(state);
+    const temporary = `${snapshot}.${randomUUID()}.part`;
+    writeSyncedLocalFile(temporary, () => fetched.source);
+    await link(temporary, snapshot);
+    await unlink(temporary);
+    syncLocalJournalDirectory(root);
+  }
+  const source = await readRssImportSnapshot(snapshot);
+  if (!state.feed_sha256 || !state.final_url || sha256HexSync(source) !== state.feed_sha256) {
+    throw new Error("RSS snapshot does not match its retained import record");
+  }
+  const feed = parseRssImportFeed(source, showId, state.final_url);
+  if (!present(join(root, ".gitignore"))) writeSyncedLocalFile(join(root, ".gitignore"), () => "*\n");
+
+  async function asset(name: string, url: string, maximum: number): Promise<string> {
+    const record = createLocalJournalStorage(root, "rss-import-downloads", undefined, `${name}.json`);
+    const file = join(root, name === "cover" ? "cover.bin" : `${name}.mp3`);
+    let expected: z.infer<typeof rssImportAssetSchema> | undefined;
+    if (present(record.path)) {
+      const retained = rssImportAssetSchema.parse(record.read());
+      if (retained.file !== file) throw new Error("Import asset belongs to another output path");
+      expected = retained;
+      if (present(file)) {
+        const actual = await hashRssImportFile(file, maximum);
+        if (retained.length !== actual.length || retained.sha256 !== actual.sha256) throw new Error("Completed import asset was changed");
+        return file;
       }
-      state = rssImportControlSchema.parse({ ...state, feed_sha256: sha256, final_url: fetched.url });
-      storage.replace(state);
-      const temporary = `${snapshot}.${randomUUID()}.part`;
-      writeSyncedLocalFile(temporary, () => fetched.source);
-      await link(temporary, snapshot);
+    }
+    if (present(file)) throw new Error("Import asset exists without its completion record; preserve it for inspection");
+    const temporary = `${file}.${randomUUID()}.part`;
+    const target = await open(temporary, "wx", 0o600);
+    const hash = createHash("sha256");
+    let length = 0;
+    try {
+      const result = await receiveRssAsset(url, maximum, async (bytes) => {
+        let offset = 0;
+        while (offset < bytes.length) {
+          const written = await target.write(bytes, offset, bytes.length - offset, null);
+          if (!written.bytesWritten) throw new Error("Import asset write made no progress");
+          offset += written.bytesWritten;
+        }
+        hash.update(bytes);
+      }, transport);
+      length = result.length;
+      await target.sync();
+      await target.close();
+      const completed = { schema_version: 1 as const, file, length, sha256: hash.digest("hex") };
+      if (expected && (expected.length !== completed.length || expected.sha256 !== completed.sha256)) {
+        throw new Error("Source asset changed after import preparation; retain the original import");
+      }
+      record.initialize(completed);
+      await link(temporary, file);
       await unlink(temporary);
       syncLocalJournalDirectory(root);
+      return file;
+    } catch (error) {
+      await target.close().catch(() => undefined);
+      await unlink(temporary).catch(() => undefined);
+      throw error;
     }
-    const source = await readRssImportSnapshot(snapshot);
-    if (!state.feed_sha256 || !state.final_url || sha256HexSync(source) !== state.feed_sha256) {
-      throw new Error("RSS snapshot does not match its retained import record");
-    }
-    const feed = parseRssImportFeed(source, showId, state.final_url);
-    if (!present(join(root, ".gitignore"))) writeSyncedLocalFile(join(root, ".gitignore"), () => "*\n");
+  }
 
-    async function asset(name: string, url: string, maximum: number): Promise<string> {
-      const record = createLocalJournalStorage(root, "rss-import-downloads", undefined, `${name}.json`);
-      const file = join(root, name === "cover" ? "cover.bin" : `${name}.mp3`);
-      let expected: z.infer<typeof rssImportAssetSchema> | undefined;
-      if (present(record.path)) {
-        const retained = rssImportAssetSchema.parse(record.read());
-        if (retained.file !== file) throw new Error("Import asset belongs to another output path");
-        expected = retained;
-        if (present(file)) {
-          const actual = await hashRssImportFile(file, maximum);
-          if (retained.length !== actual.length || retained.sha256 !== actual.sha256) throw new Error("Completed import asset was changed");
-          return file;
-        }
-      }
-      if (present(file)) throw new Error("Import asset exists without its completion record; preserve it for inspection");
-      const temporary = `${file}.${randomUUID()}.part`;
-      const target = await open(temporary, "wx", 0o600);
-      const hash = createHash("sha256");
-      let length = 0;
-      try {
-        const result = await receiveRssAsset(url, maximum, async (bytes) => {
-          let offset = 0;
-          while (offset < bytes.length) {
-            const written = await target.write(bytes, offset, bytes.length - offset, null);
-            if (!written.bytesWritten) throw new Error("Import asset write made no progress");
-            offset += written.bytesWritten;
-          }
-          hash.update(bytes);
-        }, transport);
-        length = result.length;
-        await target.sync();
-        await target.close();
-        const completed = { schema_version: 1 as const, file, length, sha256: hash.digest("hex") };
-        if (expected && (expected.length !== completed.length || expected.sha256 !== completed.sha256)) {
-          throw new Error("Source asset changed after import preparation; retain the original import");
-        }
-        record.initialize(completed);
-        await link(temporary, file);
-        await unlink(temporary);
-        syncLocalJournalDirectory(root);
-        return file;
-      } catch (error) {
-        await target.close().catch(() => undefined);
-        await unlink(temporary).catch(() => undefined);
-        throw error;
-      }
+  let coverName: string | undefined;
+  if (feed.cover_url) {
+    const file = await asset("cover", feed.cover_url, 5_000_000);
+    coverName = `cover.${await rssImportCoverExtension(file)}`;
+    if (!present(join(root, coverName))) { await link(file, join(root, coverName)); syncLocalJournalDirectory(root); }
+    else if (JSON.stringify(await hashRssImportFile(file, 5_000_000)) !== JSON.stringify(await hashRssImportFile(join(root, coverName), 5_000_000))) {
+      throw new Error("Imported cover alias was changed");
     }
-
-    let coverName: string | undefined;
-    if (feed.cover_url) {
-      const file = await asset("cover", feed.cover_url, 5_000_000);
-      coverName = `cover.${await rssImportCoverExtension(file)}`;
-      if (!present(join(root, coverName))) { await link(file, join(root, coverName)); syncLocalJournalDirectory(root); }
-      else if (JSON.stringify(await hashRssImportFile(file, 5_000_000)) !== JSON.stringify(await hashRssImportFile(join(root, coverName), 5_000_000))) {
-        throw new Error("Imported cover alias was changed");
-      }
+  }
+  const writeMetadata = (name: string, metadata: object) => {
+    const file = join(root, name);
+    if (present(file)) {
+      if (!lstatSync(file).isFile()) throw new Error("Import metadata must be a regular file, not a symlink");
+      return;
     }
-    const writeMetadata = (name: string, metadata: object) => {
-      const file = join(root, name);
-      if (present(file)) {
-        if (!lstatSync(file).isFile()) throw new Error("Import metadata must be a regular file, not a symlink");
-        return;
-      }
-      writeSyncedLocalFile(file, () => TOML.stringify(metadata as TOML.JsonMap));
-      syncLocalJournalDirectory(root);
-    };
-    writeMetadata("show.toml", { ...feed.show, ...(coverName ? { image_path: coverName } : {}) });
-    for (const episode of feed.episodes) {
-      const file = await asset(episode.metadata.episode_id, episode.audio_url, 300_000_000);
-      await analyzeAudio(file);
-      writeMetadata(`episode-${episode.metadata.episode_id}.toml`, episode.metadata);
-    }
-    if (!present(join(root, "import.json"))) {
-      writeSyncedLocalFile(join(root, "import.json"), () => JSON.stringify({ schema_version: 1, import_id: state.import_id,
-        source_url: state.source_url, feed_sha256: state.feed_sha256, ...feed }, null, 2));
-      syncLocalJournalDirectory(root);
-    }
-    return { result: "rss-import-downloaded", import_id: state.import_id, directory: root, episode_count: feed.episodes.length,
-      missing_fields: feed.missing_fields, warnings: feed.warnings, cloudflare_changed: false };
-  });
+    writeSyncedLocalFile(file, () => TOML.stringify(metadata as TOML.JsonMap));
+    syncLocalJournalDirectory(root);
+  };
+  writeMetadata("show.toml", { ...feed.show, ...(coverName ? { image_path: coverName } : {}) });
+  for (const episode of feed.episodes) {
+    const file = await asset(episode.metadata.episode_id, episode.audio_url, 300_000_000);
+    await analyzeAudio(file);
+    writeMetadata(`episode-${episode.metadata.episode_id}.toml`, episode.metadata);
+  }
+  if (!present(join(root, "import.json"))) {
+    writeSyncedLocalFile(join(root, "import.json"), () => JSON.stringify({ schema_version: 1, import_id: state.import_id,
+      source_url: state.source_url, feed_sha256: state.feed_sha256, ...feed }, null, 2));
+    syncLocalJournalDirectory(root);
+  }
+  return { result: "rss-import-downloaded", import_id: state.import_id, directory: root, episode_count: feed.episodes.length,
+    missing_fields: feed.missing_fields, warnings: feed.warnings, cloudflare_changed: false };
 }

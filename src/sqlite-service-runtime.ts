@@ -25,7 +25,7 @@ export class SqliteServiceRuntime {
   readonly domains: SqliteDomainRuntime;
   constructor(private readonly storage: PublicationQueueStorage, readonly queue: SqlitePublicationQueue,
     readonly content: SqlitePublicationContent, private readonly config: SqliteServiceConfig,
-    private readonly cache: SqliteRuntimeCache, private readonly actual: SqlitePublicationRuntime = queue.identity(), showId?: string) {
+    cache: SqliteRuntimeCache, private readonly actual: SqlitePublicationRuntime = queue.identity(), showId?: string) {
     this.domains = new SqliteDomainRuntime(storage, queue, content, config, cache, actual, showId);
   }
   ready(): boolean { return !pendingSqliteDomain(this.storage); }

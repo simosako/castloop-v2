@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
+import * as publicationContent from "./rss-publication-content";
 import { importRssLocally } from "./rss-import-local";
 import { createSqliteRssEffects, publishSqliteRssImport } from "./sqlite-rss-publication";
 import type { SqliteRssEffects } from "./sqlite-rss-publication";
@@ -9,8 +10,9 @@ import { startSqliteDomainChange } from "./sqlite-domain-operation";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { parseShowMetadata, stringifyToml } from "@castloop/shared";
 import { RSS_IMPORT_AUDIO, RSS_IMPORT_SOURCE, rssImportTransport } from "./test-support/rss-import";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
@@ -131,6 +133,81 @@ test("RSS imports freeze and install the reviewed Show CSS and timezone and use 
     expect(html).toContain("(UTC+09:00)</time>");
   }
 });
+
+test("an unfinished installation rewrites generated files from the reviewed import on rerun", async () => {
+  const value = await fixture(), path = join(value.output, "show.toml");
+  const { site_url, ...metadata } = parseShowMetadata(readFileSync(path, "utf8"));
+  writeFileSync(path, stringifyToml({ ...metadata, site_mode: "builtin", site_css_path: "site.css" }));
+  writeFileSync(join(value.output, "site.css"), "body{color:blue}");
+  const source = readFileSync(path), writeMetadata = publicationContent.writeImportedMetadata;
+  const install = spyOn(publicationContent, "writeImportedMetadata").mockImplementation(async (...args) => {
+    await writeMetadata(...args);
+    if (args[1].includes("episode-")) throw new Error("Injected installation failure");
+  });
+  try { await expect(value.execute()).rejects.toThrow("installation failure"); }
+  finally { install.mockRestore(); }
+  expect(JSON.parse(readFileSync(value.cursor, "utf8"))).toMatchObject({ schema_version: 3, installed: false, step: 0 });
+  expect(value.content.episodes("imported")).toEqual([]);
+  writeFileSync(join(value.root, "imported", "site.css"), "partial output");
+  expect(await value.execute()).toMatchObject({ episode_count: 2 });
+  expect(readFileSync(join(value.root, "imported", "site.css"), "utf8")).toBe("body{color:blue}");
+  expect(readFileSync(path)).toEqual(source);
+  expect(value.commands).not.toContain("create-episode");
+});
+
+test("the current RSS batch resumes after SIGKILL with no lock files or duplicate publication", async () => {
+  const value = await fixture(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+  let hold = true;
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
+    const target = request.headers.get("X-Castloop-Test-Target");
+    if (!target || !["api.cloudflare.com", "test-worker.example.workers.dev"].includes(new URL(target).hostname)) return new Response(null, { status: 400 });
+    if (new URL(target).pathname === "/podcasts/imported/feed.xml") {
+      return new Response(value.nodes.get("imported")!.service.renderFeed()!.xml);
+    }
+    const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
+    const response = await value.transport(target, { method: request.method, headers,
+      ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+    if (hold && new URL(target).pathname.endsWith("/publish")) {
+      hold = false; entered.resolve(); await release.promise;
+    }
+    return response;
+  } });
+  const module = import.meta.resolve("./sqlite-rss-publication.ts");
+  const source = `import { createSqliteRssEffects, publishSqliteRssImport } from ${JSON.stringify(module)};
+    const root = ${JSON.stringify(value.root)}, config = ${JSON.stringify(value.config)};
+    const options = { cloudflare: { accountId: config.account_id, apiToken: "private-token" } };
+    const effects = createSqliteRssEffects(root, config, options);
+    const result = await publishSqliteRssImport(root, config, ${JSON.stringify(value.output)}, options,
+      { ...effects, readFeed: async (url) => (await fetch(url)).text() });
+    console.log(JSON.stringify(result));`;
+  const preload = fileURLToPath(new URL("./test-support/sqlite-cli-preload.ts", import.meta.url).href);
+  const spawn = () => Bun.spawn([process.execPath, "--preload", preload, "-e", source], {
+    cwd: value.root, env: { ...process.env, CASTLOOP_TEST_LOOPBACK_ORIGIN: `http://127.0.0.1:${server.port}` },
+    stdin: "ignore", stdout: "pipe", stderr: "pipe",
+  });
+  const first = spawn();
+  let second: ReturnType<typeof spawn> | undefined;
+  try {
+    await Promise.race([entered.promise, first.exited.then(async () => {
+      throw new Error(`RSS process exited before publication: ${await new Response(first.stderr).text()}`);
+    })]);
+    expect(JSON.parse(readFileSync(value.cursor, "utf8"))).toMatchObject({ schema_version: 3, installed: true, phase: "publishing", step: 0 });
+    first.kill("SIGKILL"); await first.exited; release.resolve();
+    expect(readdirSync(dirname(value.cursor))).toEqual([basename(value.cursor)]);
+    second = spawn();
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(second.stdout).text(), new Response(second.stderr).text(), second.exited,
+    ]);
+    expect(code, stderr).toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({ result: "rss-import-published", episode_count: 2 });
+    expect(value.content.listShowRevisions("imported", value.config.public_base_url).items).toHaveLength(1);
+    expect(readdirSync(dirname(value.cursor))).toEqual([basename(value.cursor)]);
+  } finally {
+    release.resolve();
+    for (const child of [first, second]) if (child && child.exitCode === null) { child.kill("SIGKILL"); await child.exited; }
+    server.stop(true);
+  }
+}, 15000);
 
 test("RSS retries a lost Episode publication as unchanged and re-PUTs the identical MP3 key", async () => {
   const value = await fixture(2); let lose = true;

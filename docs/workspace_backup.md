@@ -13,7 +13,7 @@ castloop backup-restore /abs/backup.clbk /abs/new-workspace confirm --passphrase
 
 **対象**: `castloop.toml`・`castloop-admin.toml`(存在時)、`.castloop/`配下の既知journal family全15種(`sqlite-client`のclient ID、`secrets.json`の管理キー、draft・upload・publication等の操作記録)、Showディレクトリ(`show.toml`・Episode TOML・カバー等の素材)。
 
-**除外**(manifestと実行結果に記録され、黙って落とすことはない): `*.lock`と`*.lock.sqlite`(`-journal`/`-wal`/`-shm` sidecar含む)は再生成されるため対象外。`*.tmp`も対象外。`.gitignore`は復元時に再生成するため対象外。**`*.mp3`音源原本は既定で対象外**で、`backup-create --include-audio`を明示指定したときだけ含まれる。
+**除外**(manifestと実行結果に記録され、黙って落とすことはない): 旧版が残した`*.lock`と`*.lock.sqlite`(`-journal`/`-wal`/`-shm` sidecar含む)は対象外。現行CLIはロックファイルを作らない。`*.tmp`も対象外。`.gitignore`は復元時に再生成するため対象外。**`*.mp3`音源原本は既定で対象外**で、`backup-create --include-audio`を明示指定したときだけ含まれる。
 
 未知のトップレベルエントリ(workspace直下の関係ないファイル・ディレクトリ、`.castloop/`内の未知family)は`unknown`として記録し対象外にする。対象内のsymlinkはエラーとして作成を拒否する。
 

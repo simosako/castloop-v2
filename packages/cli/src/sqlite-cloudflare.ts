@@ -75,11 +75,6 @@ export class SqliteCloudflareApi {
     const worker = z.object({ name: z.string() }).parse(await this.json("POST", "/workers/workers", { name: this.config.worker_name }));
     if (worker.name !== this.config.worker_name) throw new Error("Created Worker differs");
   }
-  async deploy(source: string, adminKey: string): Promise<{ script_etag: string; worker_version_id: string; deployment_id: string }> {
-    const receipt = await this.uploadWorker(source, adminKey);
-    const deployment = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`));
-    return { ...receipt, worker_version_id: deployment.versions[0].version_id, deployment_id: deployment.id };
-  }
   async uploadWorker(source: string, adminKey: string): Promise<SqliteScriptUploadReceipt> {
     if (!source) throw new Error("SQLite Worker source is missing");
     const form = new FormData(); form.set("metadata", JSON.stringify(buildSqliteWorkerMetadata(this.config, adminKey)));

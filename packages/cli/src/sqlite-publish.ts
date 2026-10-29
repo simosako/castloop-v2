@@ -7,6 +7,9 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { uploadSqliteMedia } from "./sqlite-media-upload";
 import type { SqliteCommandOptions } from "./sqlite-commands";
+import { loadLocalInput } from "./local-input";
+import { sha256HexSync } from "./sha256";
+import { join } from "node:path";
 
 export async function prepareSqlitePublication(root: string, config: SqliteServiceConfig, target: PreviewTarget, options: SqliteCommandOptions) {
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);
@@ -33,8 +36,10 @@ export async function placeSqlitePublicationMedia(root: string, config: SqliteSe
     await uploadSqliteMedia(root, config, preview.target.show_id, preview.local.media_path!, media!,
       options.cloudflare ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" });
   }
-  const current = await draftPreview(root, config, preview.target, { mode: "local" });
-  if (current.local_fingerprint !== preview.local_fingerprint) throw new Error("Local publication inputs changed during media placement; preview again");
+  const target = preview.target;
+  const file = join(root, target.show_id, target.kind === "show" ? "show.toml" : `episode-${target.episode_id}.toml`);
+  const current = await loadLocalInput(target.kind, file);
+  if (sha256HexSync(current.bytes) !== preview.local.sha256) throw new Error("Local publication metadata changed during media placement; preview again");
 }
 
 export async function publishSqliteContent(root: string, config: SqliteServiceConfig, target: PreviewTarget, options: SqliteCommandOptions) {

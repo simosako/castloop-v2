@@ -1,7 +1,7 @@
 import { episodeDraftFromRevision, episodeRevisionSchema, parsePublicAssetPath, sameEpisodeIdentity } from "../packages/shared/src/index";
 import type { EpisodeRevision, ShowMetadata } from "../packages/shared/src/index";
 import { sameSqlitePublicationContent } from "../packages/shared/src/sqlite-direct-publication";
-import type { SqliteContentMutation, SqliteDirectPublicationRequest } from "../packages/shared/src/sqlite-direct-publication";
+import type { SqliteContentMutation } from "../packages/shared/src/sqlite-direct-publication";
 import { sqliteServiceConfigSchema } from "../packages/shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../packages/shared/src/sqlite-service";
 import { SITE_PAGE_SIZE } from "../packages/shared/src/website";

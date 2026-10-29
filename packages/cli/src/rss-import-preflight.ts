@@ -2,7 +2,6 @@ import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits, assertPub
   parseEpisodeDraft, parseShowMetadata, sameEpisodeIdentity, validateId } from "@castloop/shared";
 import type { EpisodeDraft, ShowMetadata } from "@castloop/shared";
 import { analyzeAudio } from "./audio";
-import { localJournalEntryExists as present } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
 import { readLocalMetadata } from "./local-metadata-read";
 import { readShowPublicationInput } from "./show-publication-input";
@@ -21,7 +20,6 @@ export async function prepareRssImportPublication(output: string, publicBaseUrl 
   const root = resolve(output);
   if (!lstatSync(root).isDirectory() || realpathSync(root) !== root) throw new Error("Import directory must not use symlinks");
   const control = createLocalJournalStorage(root, "rss-import-downloads", undefined, "control.json");
-  if (present(`${control.path}.lock`)) throw new Error("Import download is unfinished or locked; do not publish");
   const state = rssImportControlSchema.parse(control.read());
   validateId(state.show_id, "show");
   const source = await readRssImportSnapshot(join(root, "source.xml"));
@@ -75,7 +73,7 @@ export async function prepareRssImportPublication(output: string, publicBaseUrl 
   if (metadataBytes > 8_000_000) {
     throw new Error("RSS import exceeds the existing feed inventory or rendering budget");
   }
-  if (present(`${control.path}.lock`) || JSON.stringify(rssImportControlSchema.parse(control.read())) !== JSON.stringify(state)) {
+  if (JSON.stringify(rssImportControlSchema.parse(control.read())) !== JSON.stringify(state)) {
     throw new Error("Import record changed during publication preparation");
   }
   episodes.sort((left, right) => Date.parse(left.metadata.published_at) - Date.parse(right.metadata.published_at) ||

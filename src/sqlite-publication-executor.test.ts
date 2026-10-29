@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
 import { directPublicationFixture, directAudio } from "./test-support/direct-publication";
-import { SqlitePublicationInputError } from "./sqlite-publication-queue";
 import { createSqlitePublicationHttp } from "./sqlite-publication-http";
 
 const cleanups: Array<() => void> = [];

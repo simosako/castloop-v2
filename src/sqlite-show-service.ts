@@ -38,13 +38,13 @@ export class SqliteShowService {
   private readonly statsHttp: (request: Request) => Promise<Response>;
 
   constructor(private readonly storage: PublicationQueueStorage, readonly showId: string,
-    private readonly actual: SqlitePublicationRuntime, private readonly config: SqliteServiceConfig, private readonly cache: SqliteRuntimeCache,
-    private readonly key: string) {
+    actual: SqlitePublicationRuntime, private readonly config: SqliteServiceConfig, cache: SqliteRuntimeCache,
+    key: string) {
     sqliteRegistrationSchema.shape.show_id.parse(showId);
     storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_show_binding (id INTEGER PRIMARY KEY CHECK(id = 1),
       show_id TEXT NOT NULL, reservation_id TEXT NOT NULL, registration_json TEXT NOT NULL)`);
     if (this.binding()?.show_id && this.binding()!.show_id !== showId) throw new Error("Show storage identity differs");
-    this.queue = new SqlitePublicationQueue(storage, resolveSqliteRuntime(storage, actual), Date.now, { showId, ready: () => this.ready() });
+    this.queue = new SqlitePublicationQueue(storage, resolveSqliteRuntime(storage, actual), { showId, ready: () => this.ready() });
     this.content = new SqlitePublicationContent(storage);
     this.queue.executor = createSqlitePublicationExecutor(this.content, config, {
       purge: ({ showId: id, episodeId }) => cache.purgeMedia ? cache.purgeMedia({ showId: id, ...(episodeId ? { episodeId } : {}) }) : cache.purge(id),
@@ -82,7 +82,7 @@ export class SqliteShowService {
         return;
       }
       this.storage.sql.exec("INSERT INTO publication_show_binding (id, show_id, reservation_id, registration_json) VALUES (1, ?, ?, ?)", this.showId, request.reservation_id, JSON.stringify(request));
-      this.content.registerShow(this.showId, request.reservation_id, true);
+      this.content.registerShow(this.showId, request.reservation_id);
     });
     await this.storage.sync();
     return this.health();

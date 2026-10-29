@@ -41,42 +41,40 @@ export async function initializeSqliteService(root: string, configInput: SqliteS
     worker_metadata_sha256: digest(JSON.stringify(buildSqliteWorkerMetadata(config, key))) });
   const journal = local(root, config);
   if (!readSqliteInitialization(root, config)) journal.initialize(initial);
-  return journal.exclusively(async () => {
-    let state = stateSchema.parse(journal.read());
-    for (const field of ["operation_id", "service_config_sha256", "worker_source_sha256", "worker_metadata_sha256"] as const) {
-      if (state[field] !== initial[field]) throw new Error("SQLite initialization differs from its frozen identity; preserve the journal");
+  let state = stateSchema.parse(journal.read());
+  for (const field of ["operation_id", "service_config_sha256", "worker_source_sha256", "worker_metadata_sha256"] as const) {
+    if (state[field] !== initial[field]) throw new Error("SQLite initialization differs from its frozen identity; preserve the journal");
+  }
+  if (state.phase === "ready") return state;
+  const api = new SqliteCloudflareApi(config, options), client = new SqliteServiceClient(config, key, options.transport);
+  const save = (phase: SqliteInitializationState["phase"], fields: Partial<SqliteInitializationState> = {}) => {
+    state = stateSchema.parse({ ...state, ...fields, phase }); journal.replace(state);
+  };
+  if (state.phase === "fresh") {
+    await api.preflight();
+    save("prepared");
+  }
+  if (state.phase === "prepared") {
+    await api.createBucket();
+    await api.uploadConfig();
+    await api.createWorker();
+    const upload = await api.uploadWorker(source, key);
+    save("deployed", { receipt: await api.deploymentReceipt(upload) });
+  }
+  if (state.phase === "deployed") {
+    await api.enableAccess(state.receipt!.worker_version_id);
+    const evidence = await api.inspect(state.receipt!);
+    let ready = false;
+    for (let index = 0; index < wait.attempts; index++) {
+      try {
+        const health = await client.health();
+        if (health.worker_version_id !== state.receipt!.worker_version_id) throw new Error("Unexpected runtime version");
+        if (!health.publication_ready) throw new Error("Service is not ready");
+        ready = true; break;
+      } catch { if (index + 1 < wait.attempts) await wait.delay(); }
     }
-    if (state.phase === "ready") return state;
-    const api = new SqliteCloudflareApi(config, options), client = new SqliteServiceClient(config, key, options.transport);
-    const save = (phase: SqliteInitializationState["phase"], fields: Partial<SqliteInitializationState> = {}) => {
-      state = stateSchema.parse({ ...state, ...fields, phase }); journal.replace(state);
-    };
-    if (state.phase === "fresh") {
-      await api.preflight();
-      save("prepared");
-    }
-    if (state.phase === "prepared") {
-      await api.createBucket();
-      await api.uploadConfig();
-      await api.createWorker();
-      const upload = await api.uploadWorker(source, key);
-      save("deployed", { receipt: await api.deploymentReceipt(upload) });
-    }
-    if (state.phase === "deployed") {
-      await api.enableAccess(state.receipt!.worker_version_id);
-      const evidence = await api.inspect(state.receipt!);
-      let ready = false;
-      for (let index = 0; index < wait.attempts; index++) {
-        try {
-          const health = await client.health();
-          if (health.worker_version_id !== state.receipt!.worker_version_id) throw new Error("Unexpected runtime version");
-          if (!health.publication_ready) throw new Error("Service is not ready");
-          ready = true; break;
-        } catch { if (index + 1 < wait.attempts) await wait.delay(); }
-      }
-      if (!ready) throw new Error("SQLite service readiness remains unconfirmed; run init again");
-      save("ready", { namespace_id: evidence.namespace_id });
-    }
-    return state;
-  });
+    if (!ready) throw new Error("SQLite service readiness remains unconfirmed; run init again");
+    save("ready", { namespace_id: evidence.namespace_id });
+  }
+  return state;
 }
