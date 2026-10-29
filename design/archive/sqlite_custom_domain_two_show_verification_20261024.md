@@ -19,7 +19,7 @@
 
 同じCloudflare account、active/fullな`otftalk.com` Zoneの未使用専用subdomainを使用した。許可範囲は新規資源作成・初期配備、指定済み短尺素材の公開、個別Pause/Resume、接続と設定/Feed切替、通常更新・review済み非公開化/復元、接続を維持するcode-only deploy、既知接続の切断とworkers.dev復帰。全ShowをPauseして終了する。
 
-`/home/sim/project/castloop-v2/.local-test-data/minimal/`のMP3とJPEGだけをコピーし、新しい試験用metadataを作った。元素材は書き換えず、終了時にhashの一致を確認した。Cloudflareの権限・課金・CPU上限・nameserver、既存環境、非テストDNS、共有証明書は変更対象外。削除/cleanupや旧unknown/残存lockの修復は許可範囲に含めない。
+`.local-test-data/minimal/`のMP3とJPEGだけをコピーし、新しい試験用metadataを作った。元素材は書き換えず、終了時にhashの一致を確認した。Cloudflareの権限・課金・CPU上限・nameserver、既存環境、非テストDNS、共有証明書は変更対象外。削除/cleanupや旧unknown/残存lockの修復は許可範囲に含めない。
 
 ## 結果
 

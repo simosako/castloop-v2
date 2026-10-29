@@ -48,7 +48,7 @@ R2の全32 object、5,990,016 bytesを非公開で退避し、size・ETagに対�
 
 ## 3. サンプルと公開
 
-原本は`/home/sim/project/castloop-v2/.local-test-data/normal/`。36件からMP3サイズの大きい順に3件だけを選び、専用workspaceへコピーした。音源を短縮・再encodeしていない。元の`.castloop/`・`import.json`はコピー・変更せず、RSS取り込み履歴の改変もしていない。
+原本は`.local-test-data/normal/`。36件からMP3サイズの大きい順に3件だけを選び、専用workspaceへコピーした。音源を短縮・再encodeしていない。元の`.castloop/`・`import.json`はコピー・変更せず、RSS取り込み履歴の改変もしていない。
 
 | Episode | MP3 bytes | 約MB（10進） | CLI解析による長さ |
 | --- | ---: | ---: | --- |

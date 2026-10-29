@@ -30,7 +30,7 @@
 
 2026-10-18、管理者が既存ローカルPodcastデータを用いた計画作成と順次実施を指示した。新規隔離サービス1件のWorker・private R2・SQLite DOを作成し、workers.devで試験する。対象はservice `i24-20261018`、bucket `castloop-i24-20261018`。既存`sq16r-6ec01dc6`、DNS・独自ドメイン・証明書・権限・課金・CPU上限は変更しない。終了時はpauseして保持し、削除しない。
 
-製品commitは`1171b2a`。Linux単体CLIを使用する。元データ`/home/sim/project/castloop-v2/.local-test-data/`を変更せず、新規の非公開試験workspaceに素材とTOML・import.jsonだけをコピーする。旧`.castloop/`や公開journalは採用しない。証跡・秘密・job IDは新workspaceのgit-ignored領域に保存し、本文やメールアドレスを本書へ転載しない。
+製品commitは`1171b2a`。Linux単体CLIを使用する。元データ`.local-test-data/`を変更せず、新規の非公開試験workspaceに素材とTOML・import.jsonだけをコピーする。旧`.castloop/`や公開journalは採用しない。証跡・秘密・job IDは新workspaceのgit-ignored領域に保存し、本文やメールアドレスを本書へ転載しない。
 
 ## 順序と合格条件
 
