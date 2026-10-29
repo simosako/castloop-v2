@@ -80,7 +80,7 @@ CLIは検証した素材をハッシュ由来キーへ直接配置し、metadata
 - Show登録・Resume・ローカルinstallの結果が不明なら、推測で再実行せず停止する。個別uploadのjournalやoperation RPCは使わない。
 - SQLite管理GETの一時障害は最大3試行。POST/PUTを自動再送しない。
 - `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、journal/lockを削除したりしない。
-- 状態は`show-status`、現在内容はpreview・履歴、配信は`verify`で確認する。[中断後の手順](sqlite_operation_recovery.md)を参照する。
+- 状態は`show-status`、現在内容はpreview・履歴、配信は`verify`で確認する。
 
 新しい版は既存UUID Episodeも読めるが、任意GUIDを取り込んだ後の旧版へのdowngradeは非対応。
 

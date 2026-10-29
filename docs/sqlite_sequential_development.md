@@ -43,7 +43,7 @@ castloop publish-episode first audio.mp3 --expect-preview REVIEWED_HASH
 
 - 予約はローカルmetadataと配置済み素材参照を予約表へ凍結する。時刻到来時の公開と実行済み状態は同じトランザクションで確定する。更新元（base revision）の競合や独自ドメイン変更では`needs_approval`となるが、通常のコード配備（`deploy`）では予約はそのまま維持される。[予約操作](admin_configuration.md)を参照。
 - `publish-rss-import`はShow→各Episodeの順に公開する。取得・新Show登録・一括進捗記録は維持し、個別upload/job追跡は行わない。[RSSガイド](rss_migration.md)を参照。
-- 非公開化は`preview-episode-lifecycle SHOW EPISODE unpublish`→計画確認→`lifecycle-execute FILE HASH confirm`（番組全体は`preview-show-lifecycle SHOW unpublish`）。`restore`は保存済み内容を使い、Showの復元で個別非公開Episodeを復活させない。同じ状態は変更なし。物理削除は未実装。独立したruntime停止コマンド（`show-pause`／`show-resume`等）は廃止し、配信制御はこのlifecycle操作に一本化した。[利用ガイド](show_availability.md)を参照。
+- 非公開化は`preview-episode-lifecycle SHOW EPISODE unpublish`→計画確認→`lifecycle-execute FILE HASH confirm`（番組全体は`preview-show-lifecycle SHOW unpublish`）。`restore`は保存済み内容を使い、Showの復元で個別非公開Episodeを復活させない。同じ状態は変更なし。物理削除は未実装。独立したruntime停止コマンド（`show-pause`／`show-resume`等）は廃止し、配信制御はこのlifecycle操作に一本化した。
 
 ## 互換Worker更新
 

@@ -52,7 +52,7 @@ JSON Schemaはparse後のTOML値を記述する。裸のTOML日時ではなく�
 
 取得できる出力schemaは現段階では共通外枠の`result`であり、コマンドごとの詳細payloadはJSON値として扱う。全管理コマンドの詳細result型・flagの条件付き必須性までを個別JSON Schema化する補強は残る。入力schemaの取得・strict検証とは区別する。
 
-`show-admission-pause`は公開変更を止め、`show-pause`は配信も止める。素材配置だけでは公開しない。`show-delivery-resume`は配信だけを戻す。制御記録・変更番号・結果照会は維持し、適用時の結果を新しい再開許可にしない。詳しくは[停止・再開ガイド](show_availability.md)を参照する。
+公開可否の切り替えは `preview-show-lifecycle` / `preview-episode-lifecycle` と `lifecycle-execute`（`unpublish` / `restore`）で行う。詳しくは[SQLite開発・運用ガイド](sqlite_sequential_development.md)を参照する。
 
 doctorは人向け1項目1行とJSONの`result.checks`を同じ検査から生成する。pass/warn/fail/not_checkedを区別し、failは終了1、warnだけは終了0。認証情報の存在は有効性・権限を証明しない。remote検査・自動修復は行わない。
 
