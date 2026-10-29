@@ -16,10 +16,7 @@ test("journal storage creates private records and atomically replaces them witho
     expect(lstatSync(storage.path).mode & 0o777).toBe(0o600);
     const fd = openSync(storage.path, "r");
     try {
-      await storage.exclusively(async () => {
-        expect(lstatSync(`${storage.path}.lock`).mode & 0o777).toBe(0o600);
-        storage.replace({ phase: "requested" });
-      });
+      storage.replace({ phase: "requested" });
       expect(storage.read()).toEqual({ phase: "requested" });
       expect(JSON.parse(readFileSync(fd, "utf8"))).toEqual({ phase: "prepared" });
       expect(lstatSync(storage.path).ino).not.toBe(fstatSync(fd).ino);
@@ -29,32 +26,12 @@ test("journal storage creates private records and atomically replaces them witho
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("journal lock scopes survive rejected nesting and release after callback failure", async () => {
-  const root = mkdtempSync("/tmp/opencode/castloop-journal-storage-lock-");
-  try {
-    const storage = createLocalJournalStorage(root, "rss-import-downloads", undefined, "operation.json");
-    const other = createLocalJournalStorage(root, "rss-import-downloads", undefined, "operation.json");
-    storage.initialize({ phase: "prepared" });
-    expect(() => storage.replace({})).toThrow("exclusive client lock");
-    await expect(storage.exclusively(async () => {
-      await expect(storage.exclusively(async () => {})).rejects.toThrow();
-      await expect(other.exclusively(async () => {})).rejects.toThrow();
-      expect(() => other.replace({})).toThrow("exclusive client lock");
-      storage.replace({ phase: "requested" });
-      throw new Error("Callback failed");
-    })).rejects.toThrow("Callback failed");
-    expect(existsSync(`${storage.path}.lock`)).toBe(false);
-    expect(() => storage.requireLock()).toThrow("exclusive client lock");
-    expect(await other.exclusively(async () => other.read())).toEqual({ phase: "requested" });
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
 test("failed record serialization preserves the predecessor and leaves its private temporary file for inspection", async () => {
   const root = mkdtempSync("/tmp/opencode/castloop-journal-storage-failure-");
   try {
     const storage = createLocalJournalStorage(root, "rss-import-downloads", undefined, "operation.json");
     storage.initialize({ phase: "prepared" });
-    await expect(storage.exclusively(async () => storage.replace({ invalid: 1n }))).rejects.toThrow();
+    expect(() => storage.replace({ invalid: 1n })).toThrow();
     expect(storage.read()).toEqual({ phase: "prepared" });
     expect(existsSync(`${storage.path}.lock`)).toBe(false);
     const temporary = readdirSync(dirname(storage.path)).filter((name) => name.endsWith(".tmp"));

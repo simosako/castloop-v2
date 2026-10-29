@@ -31,7 +31,7 @@ export async function startSqliteDomainChange(root: string, config: SqliteServic
   config = sqliteServiceConfigSchema.parse(config); z.uuid().parse(operationId);
   if (!source) throw new Error("Domain changes require the embedded Worker source");
   if (readSqliteDomainJournal(root, config, operationId)) throw new Error("Domain operation already exists; inspect or continue it explicitly without replay");
-  if (pendingLocalDomainChanges(root, config).length) throw new Error("Preserve unfinished domain operations and client locks; inspect the same operation without replacement");
+  if (pendingLocalDomainChanges(root, config).length) throw new Error("An unfinished domain operation exists; inspect or continue that operation");
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);
   const domain = new SqliteDomainClient(config, key, options.transport), cloudflare = new SqliteDomainCloudflare(config, options);
   const health = await client.health(), known = await domain.state();
@@ -65,83 +65,81 @@ export async function continueSqliteDomainChange(root: string, config: SqliteSer
   config = sqliteServiceConfigSchema.parse(config);
   if (!Number.isSafeInteger(wait.attempts) || wait.attempts < 1 || wait.attempts > 120) throw new Error("Invalid finite domain observation budget");
   const journal = sqliteDomainJournal(root, config, id), key = administratorKey(root);
-  return journal.exclusively(async () => {
-    let state = sqliteDomainJournalSchema.parse(journal.read());
-    const request = await parseSqliteDomainRequest(state.request), localHash = await sqliteServiceConfigHash(await loadWorkspaceConfig(root));
-    if (request.operation_id !== id || request.previous_config.service_id !== config.service_id ||
-      state.request_sha256 !== await sqliteDomainRequestHash(request) ||
-      ![request.previous_config_sha256, request.target_config_sha256].includes(localHash) ||
-      sha256HexSync(sourceFor(source, id)) !== request.worker_source_sha256 ||
-       sha256HexSync(JSON.stringify(buildSqliteWorkerMetadata(request.target_config, key))) !== request.worker_metadata_sha256) throw new Error("Domain continuation differs from its frozen input; preserve the journal");
-    if (["local_synced", "completed"].includes(state.phase) && localHash !== request.target_config_sha256) {
-      throw new Error("Local configuration differs from the acknowledged domain synchronization; preserve the journal");
+  let state = sqliteDomainJournalSchema.parse(journal.read());
+  const request = await parseSqliteDomainRequest(state.request), localHash = await sqliteServiceConfigHash(await loadWorkspaceConfig(root));
+  if (request.operation_id !== id || request.previous_config.service_id !== config.service_id ||
+    state.request_sha256 !== await sqliteDomainRequestHash(request) ||
+    ![request.previous_config_sha256, request.target_config_sha256].includes(localHash) ||
+    sha256HexSync(sourceFor(source, id)) !== request.worker_source_sha256 ||
+    sha256HexSync(JSON.stringify(buildSqliteWorkerMetadata(request.target_config, key))) !== request.worker_metadata_sha256) throw new Error("Domain continuation differs from its frozen input; preserve the journal");
+  if (["local_synced", "completed"].includes(state.phase) && localHash !== request.target_config_sha256) {
+    throw new Error("Local configuration differs from the acknowledged domain synchronization; preserve the journal");
+  }
+  const client = new SqliteDomainClient(request.previous_config, key, options.transport);
+  const previousApi = new SqliteCloudflareApi(request.previous_config, options), api = new SqliteCloudflareApi(request.target_config, options);
+  const domains = new SqliteDomainCloudflare(request.previous_config, options);
+  const save = (phase: SqliteDomainJournal["phase"], fields: Partial<SqliteDomainJournal> = {}) => {
+    state = sqliteDomainJournalSchema.parse({ ...state, ...fields, phase }); journal.replace(state);
+  };
+  if (state.phase === "completed") return state;
+  if (state.phase === "prepared") {
+    await previousApi.inspect(state.previous);
+    await client.prepare(request);
+    const connection = request.action === "add" ? await domains.attach(request) : request.connection!;
+    save("connected", { connection });
+  }
+  if (state.connection) requireSqliteDomainConnection(state.connection, request);
+  if (state.phase === "connected") {
+    await domains.inspect(request, state.connection!);
+    await domains.verifyTls(request.action === "add" ? request.target_config.public_base_url : request.previous_config.workers_dev_base_url);
+    await previousApi.inspect(state.previous);
+    await api.uploadConfig();
+    const upload = await api.uploadWorker(sourceFor(source, id), key);
+    const receipt = await api.deploymentReceipt(upload);
+    save("deployed", { receipt });
+  }
+  if (state.phase === "deployed") {
+    if ((await api.inspect(state.receipt!)).namespace_id !== request.namespace_id) throw new Error("Domain deployment changed its namespace");
+    let ready = false;
+    for (let attempt = 0; attempt < wait.attempts; attempt++) {
+      const health = await client.nativeHealth();
+      const current = health.worker_version_id === state.receipt!.worker_version_id && health.service_config_sha256 === request.target_config_sha256;
+      if (current) { ready = true; break; }
+      if (health.service_config_sha256 !== request.previous_config_sha256) throw new Error("Domain native runtime differs from its exact old/new deployment");
+      if (attempt + 1 < wait.attempts) await wait.delay();
     }
-    const client = new SqliteDomainClient(request.previous_config, key, options.transport);
-    const previousApi = new SqliteCloudflareApi(request.previous_config, options), api = new SqliteCloudflareApi(request.target_config, options);
-    const domains = new SqliteDomainCloudflare(request.previous_config, options);
-    const save = (phase: SqliteDomainJournal["phase"], fields: Partial<SqliteDomainJournal> = {}) => {
-      state = sqliteDomainJournalSchema.parse({ ...state, ...fields, phase }); journal.replace(state);
-    };
-    if (state.phase === "completed") return state;
-    if (state.phase === "prepared") {
-      await previousApi.inspect(state.previous);
-      await client.prepare(request);
-      const connection = request.action === "add" ? await domains.attach(request) : request.connection!;
-      save("connected", { connection });
+    if (!ready) throw new AgentError("domain_rollout_pending", "Domain native rollout remains pending; continue observation explicitly without redeploying");
+    await domains.inspect(request, state.connection!);
+    await client.commit({ operation_id: id, request_sha256: state.request_sha256,
+      worker_version_id: state.receipt!.worker_version_id, deployment_id: state.receipt!.deployment_id,
+      script_etag: state.receipt!.script_etag, connection: state.connection! }, request);
+    save("remote_ready");
+  }
+  if (state.phase === "remote_ready") {
+    if (!(await client.status(request)).all_completed || (await api.inspect(state.receipt!)).namespace_id !== request.namespace_id) throw new Error("Domain completion differs before local synchronization");
+    await domains.inspect(request, state.connection!);
+    const currentHash = await sqliteServiceConfigHash(await loadWorkspaceConfig(root));
+    if (currentHash !== request.target_config_sha256) {
+      if (currentHash !== request.previous_config_sha256) throw new Error("Local configuration changed; never overwrite unrelated edits");
+      const file = join(root, "castloop.toml"), temporary = join(root, `.castloop-domain-${id}-${crypto.randomUUID()}.tmp`);
+      writeSyncedLocalFile(temporary, () => stringifyToml(request.target_config));
+      if (await sqliteServiceConfigHash(await loadWorkspaceConfig(root)) !== currentHash) throw new Error("Local configuration changed during synchronization");
+      renameSync(temporary, file); syncLocalJournalDirectory(root);
     }
-    if (state.connection) requireSqliteDomainConnection(state.connection, request);
-    if (state.phase === "connected") {
+    save("local_synced");
+  }
+  if (state.phase === "local_synced") {
+    if (!(await client.status(request)).all_completed) throw new Error("Domain commits are not all complete");
+    if (request.action === "remove") {
+      await domains.verifyTls(request.target_config.workers_dev_base_url);
+      await domains.detach(request, state.connection!);
+    } else {
       await domains.inspect(request, state.connection!);
-      await domains.verifyTls(request.action === "add" ? request.target_config.public_base_url : request.previous_config.workers_dev_base_url);
-      await previousApi.inspect(state.previous);
-      await api.uploadConfig();
-      const upload = await api.uploadWorker(sourceFor(source, id), key);
-      const receipt = await api.deploymentReceipt(upload);
-      save("deployed", { receipt });
     }
-    if (state.phase === "deployed") {
-      if ((await api.inspect(state.receipt!)).namespace_id !== request.namespace_id) throw new Error("Domain deployment changed its namespace");
-      let ready = false;
-      for (let attempt = 0; attempt < wait.attempts; attempt++) {
-        const health = await client.nativeHealth();
-        const current = health.worker_version_id === state.receipt!.worker_version_id && health.service_config_sha256 === request.target_config_sha256;
-        if (current) { ready = true; break; }
-        if (health.service_config_sha256 !== request.previous_config_sha256) throw new Error("Domain native runtime differs from its exact old/new deployment");
-        if (attempt + 1 < wait.attempts) await wait.delay();
-      }
-      if (!ready) throw new AgentError("domain_rollout_pending", "Domain native rollout remains pending; continue observation explicitly without redeploying");
-      await domains.inspect(request, state.connection!);
-      await client.commit({ operation_id: id, request_sha256: state.request_sha256,
-        worker_version_id: state.receipt!.worker_version_id, deployment_id: state.receipt!.deployment_id,
-        script_etag: state.receipt!.script_etag, connection: state.connection! }, request);
-      save("remote_ready");
-    }
-    if (state.phase === "remote_ready") {
-      if (!(await client.status(request)).all_completed || (await api.inspect(state.receipt!)).namespace_id !== request.namespace_id) throw new Error("Domain completion differs before local synchronization");
-      await domains.inspect(request, state.connection!);
-      const currentHash = await sqliteServiceConfigHash(await loadWorkspaceConfig(root));
-      if (currentHash !== request.target_config_sha256) {
-        if (currentHash !== request.previous_config_sha256) throw new Error("Local configuration changed; never overwrite unrelated edits");
-        const file = join(root, "castloop.toml"), temporary = join(root, `.castloop-domain-${id}-${crypto.randomUUID()}.tmp`);
-        writeSyncedLocalFile(temporary, () => stringifyToml(request.target_config));
-        if (await sqliteServiceConfigHash(await loadWorkspaceConfig(root)) !== currentHash) throw new Error("Local configuration changed during synchronization");
-        renameSync(temporary, file); syncLocalJournalDirectory(root);
-      }
-      save("local_synced");
-    }
-    if (state.phase === "local_synced") {
-      if (!(await client.status(request)).all_completed) throw new Error("Domain commits are not all complete");
-      if (request.action === "remove") {
-        await domains.verifyTls(request.target_config.workers_dev_base_url);
-        await domains.detach(request, state.connection!);
-      } else {
-        await domains.inspect(request, state.connection!);
-      }
-      await client.finalize({ operation_id: id, request_sha256: state.request_sha256, connection: state.connection!, detached: request.action === "remove" }, request);
-      save("completed");
-    }
-    return state;
-  });
+    await client.finalize({ operation_id: id, request_sha256: state.request_sha256, connection: state.connection!, detached: request.action === "remove" }, request);
+    save("completed");
+  }
+  return state;
 }
 
 export async function listSqliteDomains(root: string, config: SqliteServiceConfig, options: R2RestOptions) {

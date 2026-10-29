@@ -70,17 +70,6 @@ test("PUT requires HTTP 200, success, matching key and size, and a consumed sour
   });
 });
 
-test("changed local input fails before network IO", async () => {
-  await fixture(async (root) => {
-    await writeFile(join(root, "audio.mp3"), "changed");
-    let calls = 0;
-    await expect(uploadSqliteMedia(root, config, "daily", "audio.mp3", media, options(async () => {
-      calls++; throw new Error("Unexpected IO");
-    }))).rejects.toThrow();
-    expect(calls).toBe(0);
-  });
-});
-
 test("oversized media and invalid references fail before local or network IO", async () => {
   for (const invalid of [{ ...media, length_bytes: 300_000_001 }, { ...media, sha256: "invalid" }]) {
     let calls = 0;

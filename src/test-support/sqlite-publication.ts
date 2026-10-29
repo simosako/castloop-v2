@@ -2,7 +2,6 @@ import { Database } from "bun:sqlite";
 import type { SqlitePublicationRuntime } from "../../packages/shared/src/sqlite-publication";
 import { SqlitePublicationQueue } from "../sqlite-publication-queue";
 import type { PublicationQueueStorage } from "../sqlite-publication-queue";
-import { initializeSqliteDomains, pendingSqliteDomain } from "../sqlite-domain-runtime";
 
 export function sqlitePublicationFixture(options: { path?: string; runtime?: SqlitePublicationRuntime;
   scope?: { showId: string; ready: () => boolean } } = {}) {
@@ -48,7 +47,7 @@ export function sqlitePublicationFixture(options: { path?: string; runtime?: Sql
       if (syncFailures) { syncFailures--; throw new Error("Injected durability confirmation failure"); }
     },
   };
-  const queue = new SqlitePublicationQueue(storage, runtime, () => 1000, options.scope);
+  const queue = new SqlitePublicationQueue(storage, runtime, options.scope);
   const identity = { service_id: runtime.service_id, service_config_sha256: runtime.service_config_sha256 };
   return { database, storage, runtime, identity, queue,
     alarm: () => alarm, clearAlarm: () => { alarm = null; },

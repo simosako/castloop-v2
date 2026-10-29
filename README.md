@@ -34,6 +34,8 @@ npm run build:cli -- linux-x64
 
 The executable is `dist/castloop-linux-x64` and embeds only `src/sqlite-worker.ts`. Source mode is `bun packages/cli/src/index.ts`. See `castloop help COMMAND` for syntax.
 
+Run only one modifying CLI process at a time in a workspace or RSS import directory. Local records are saved with atomic file replacement, without lock files. After an interrupted process has exited, rerun the same operation with the same inputs.
+
 ## Initialize a new service
 
 Use a new workspace and unused resource names:
@@ -70,9 +72,11 @@ castloop publish-episode first audio.mp3 --expect-preview REVIEWED_HASH
 
 For metadata-only updates, edit TOML and run `publish-episode ID` without MP3. To change audio, supply `publish-episode ID new.mp3`; first publication requires MP3. Preserve GUID and publication date. Published audio and revision history remain available across normal updates.
 
-MP3s are limited to **300,000,000 bytes**, covers to **5,000,000 bytes**. The CLI freezes/validates local media and compares it with the published reference: unchanged media is reused without any R2 request, while changed or initial media is PUT once with source consumption plus the PUT HTTP 200/`success`/key/size acknowledgement. It does not download the uploaded body again; the DO does not read or copy media during publication. If a publication is interrupted after a successful PUT, rerunning the same inputs simply PUTs the same content to the same content-hash key again. Unreferenced media is not automatically deleted.
+MP3s are limited to **300,000,000 bytes**, covers to **5,000,000 bytes**. Each ordinary `publish-show` / `publish-episode` execution hashes the supplied media once and analyzes a supplied MP3 once. SHA-256 identifies the R2 object and determines whether published media can be reused; do not edit input files while the command runs. Unchanged media is reused without any R2 request, while changed or initial media is PUT once with source consumption plus the PUT HTTP 200/`success`/key/size acknowledgement. The CLI does not rescan media after PUT or download the uploaded body again; the DO does not read or copy media during publication. If a publication is interrupted after a successful PUT, rerunning the same inputs simply PUTs the same content to the same content-hash key again. Unreferenced media is not automatically deleted.
 
 The feed is `<public_base_url>/podcasts/my-show/feed.xml`. Cover URLs remain stable; changing a published cover's extension is unsupported. Builtin websites have 20-Episode listing pages, short Episode URLs, optional CSS and `site_timezone`; feeds/HTML are generated on demand from committed SQLite content. See the [website guide](docs/show_website.md).
+
+Generated feeds and HTML use content ETags for conditional responses and do not send `Last-Modified`. Audio and images retain R2 modification-time checks as well as ETags.
 
 ## Scheduled publication
 

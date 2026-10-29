@@ -1,4 +1,6 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
+import * as localInput from "./local-input";
+import * as audio from "./audio";
 import { parseEpisodeDraft, stringifyToml } from "@castloop/shared";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
@@ -33,6 +35,16 @@ test("one command publishes metadata and media with no staging, journal, operati
   expect([...f.entries.keys()].some((key) => key.startsWith("staging/") || /episode\.toml$|show\.toml$/.test(key))).toBe(false);
   const names = readdirSync(join(f.root, ".castloop"));
   expect(names).not.toContain("sqlite-drafts"); expect(names).not.toContain("sqlite-uploads"); expect(names.some((name) => name.startsWith("upload-inputs-"))).toBe(false);
+});
+
+test("Episode publication hashes and analyzes its MP3 once before PUT", async () => {
+  const f = await fixture();
+  const inspect = spyOn(localInput, "inspectLocalAsset"), analyze = spyOn(audio, "analyzeAudio");
+  try {
+    expect(await f.command("publish-episode", ["daily", "first", "audio.mp3"])).toMatchObject({ result: "changed" });
+    expect(inspect).toHaveBeenCalledTimes(1);
+    expect(analyze).toHaveBeenCalledTimes(1);
+  } finally { inspect.mockRestore(); analyze.mockRestore(); }
 });
 
 test("initial Episode requires MP3 while metadata-only updates reuse the saved audio", async () => {

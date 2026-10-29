@@ -6,7 +6,7 @@ import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 import type { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { ShowRegistration } from "./sqlite-show-service";
 import { parseSqliteDomainRequest, requireSqliteDomainConnection, sqliteDomainCommitSchema,
-  sqliteDomainFinalizeSchema, sqliteDomainRequestSchema, sqliteDomainServiceStatusSchema,
+  sqliteDomainFinalizeSchema, sqliteDomainServiceStatusSchema,
   sqliteDomainStatusSchema, sqliteDomainConnectionSchema, SQLITE_DOMAIN_TARGET_PAGE_SIZE } from "../packages/shared/src/sqlite-domain";
 import type { SqliteDomainCommit, SqliteDomainRequest, SqliteDomainStatus, SqliteDomainFinalize } from "../packages/shared/src/sqlite-domain";
 

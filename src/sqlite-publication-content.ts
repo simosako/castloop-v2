@@ -20,7 +20,7 @@ import type { SqliteCoverIdentity } from "./sqlite-cover";
 import { canonicalEnclosureUrl } from "./media-url";
 import { SqliteSiteIds } from "./sqlite-site-ids";
 import { renderPublicationFeed } from "./publication-inputs";
-import { orderedSiteEpisodes, renderSiteEpisode, renderSiteListingPage, siteDateFormatter } from "./site-renderer";
+import { renderSiteEpisode, renderSiteListingPage, siteDateFormatter } from "./site-renderer";
 import type { SiteRenderInput } from "./site-renderer";
 import type { PublicCacheProps } from "./public-assets";
 import type { SiteCacheProps, SitePageRenderResult } from "./site-cache";
@@ -83,7 +83,7 @@ export class SqlitePublicationContent {
     this.sites = { ids: this.siteIds };
   }
 
-  registerShow(showId: string, reservationId: string, initializing = false): ShowRow {
+  registerShow(showId: string, reservationId: string): ShowRow {
     targetSchema.shape.show_id.parse(showId);
     z.uuid().parse(reservationId);
     return this.storage.transactionSync(() => {
@@ -128,7 +128,7 @@ export class SqlitePublicationContent {
     });
   }
 
-  renderFeed(showId: string, baseUrl: string, props?: PublicCacheProps): { xml: string; updatedAt: string } | null {
+  renderFeed(showId: string, baseUrl: string, props?: PublicCacheProps): { xml: string } | null {
     targetSchema.shape.show_id.parse(showId);
     return this.storage.transactionSync(() => {
       const show = this.show(showId);
@@ -144,9 +144,7 @@ export class SqlitePublicationContent {
       }));
       const siteIds = this.siteIds.all(showId);
       const xml = renderPublicationFeed(metadata, episodes, baseUrl, content.cover_extension, siteIds);
-      const latestShow = this.latestShowRevisionRow(showId)?.updated_at ?? "1970-01-01T00:00:00Z";
-      const updatedAt = episodes.reduce((max, ep) => ep.updated_at > max ? ep.updated_at : max, latestShow);
-      return { xml, updatedAt };
+      return { xml };
     });
   }
 
@@ -162,7 +160,27 @@ export class SqlitePublicationContent {
       if (!content) return null;
       const metadata = showMetadataSchema.parse(JSON.parse(content.metadata_json));
       if (metadata.site_mode !== "builtin") return null;
-      const episodeSiteIds = this.siteIds.all(page.showId);
+      const rows = page.kind === "listing" ? this.storage.sql.exec<{ revision_json: string; episode_id: string; site_id: string }>(`
+        SELECT c.revision_json, c.episode_id, s.site_id FROM publication_episode_content c
+        JOIN publication_episodes e USING (show_id, episode_id)
+        JOIN publication_site_ids s USING (show_id, episode_id)
+        WHERE e.show_id = ? AND e.lifecycle = 'published'
+        ORDER BY unixepoch(substr(json_extract(c.revision_json, '$.published_at'), 1, 19)) -
+          CASE substr(json_extract(c.revision_json, '$.published_at'), 20, 1)
+            WHEN '+' THEN 1 WHEN '-' THEN -1 ELSE 0 END *
+          (CAST(substr(json_extract(c.revision_json, '$.published_at'), 21, 2) AS INTEGER) * 3600 +
+           CAST(substr(json_extract(c.revision_json, '$.published_at'), 24, 2) AS INTEGER) * 60) DESC,
+          c.episode_id
+        LIMIT ? OFFSET ?`, page.showId, SITE_PAGE_SIZE, (page.page - 1) * SITE_PAGE_SIZE).toArray() :
+        this.storage.sql.exec<{ revision_json: string; episode_id: string; site_id: string }>(`
+          SELECT c.revision_json, c.episode_id, s.site_id FROM publication_episode_content c
+          JOIN publication_site_ids s USING (show_id, episode_id)
+          WHERE c.show_id = ? AND s.site_id = ?`, page.showId, page.siteId).toArray();
+      const episodes = rows.map((row) => {
+        const revision = episodeRevisionSchema.parse(JSON.parse(row.revision_json));
+        return { ...revision, enclosure_url: canonicalEnclosureUrl(revision, page.showId, baseUrl) };
+      });
+      const episodeSiteIds = Object.fromEntries(rows.map((row) => [row.episode_id, row.site_id]));
       const input: SiteRenderInput = {
         origin: baseUrl,
         coverExtension: content.cover_extension,
@@ -179,29 +197,13 @@ export class SqlitePublicationContent {
         },
       };
       const formatDate = siteDateFormatter(metadata.site_timezone);
-      const latestShow = this.latestShowRevisionRow(page.showId)?.updated_at ?? "1970-01-01T00:00:00Z";
       if (page.kind === "listing") {
-        const episodes = orderedSiteEpisodes(this.episodes(page.showId).map((episode) => ({
-          ...episode,
-          enclosure_url: canonicalEnclosureUrl(episode, page.showId, baseUrl),
-        })));
-        const pages = Math.max(1, Math.ceil(episodes.length / SITE_PAGE_SIZE));
-        if (page.page > pages) return null;
-        const slice = episodes.slice((page.page - 1) * SITE_PAGE_SIZE, page.page * SITE_PAGE_SIZE);
-        const html = renderSiteListingPage(input, slice, page.page, pages, formatDate);
-        const updatedAt = episodes.reduce((max, ep) => ep.updated_at > max ? ep.updated_at : max, latestShow);
-        return { html, css: metadata.site_css, updatedAt };
+        const count = this.storage.sql.exec<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM publication_episodes WHERE show_id = ? AND lifecycle = 'published'", page.showId).toArray()[0]!.count;
+        const pages = Math.max(1, Math.ceil(count / SITE_PAGE_SIZE));
+        return { html: renderSiteListingPage(input, episodes, page.page, pages, formatDate), css: metadata.site_css };
       }
-      const episodeId = this.siteIds.episode(page.showId, page.siteId);
-      if (!episodeId) return null;
-      const row = this.storage.sql.exec<{ revision_json: string }>(
-        "SELECT revision_json FROM publication_episode_content WHERE show_id = ? AND episode_id = ?",
-        page.showId, episodeId).toArray()[0];
-      if (!row) return null;
-      const raw = episodeRevisionSchema.parse(JSON.parse(row.revision_json));
-      const episode = { ...raw, enclosure_url: canonicalEnclosureUrl(raw, page.showId, baseUrl) };
-      const html = renderSiteEpisode(input, episode, formatDate);
-      return { html, css: metadata.site_css, updatedAt: episode.updated_at };
+      return episodes[0] ? { html: renderSiteEpisode(input, episodes[0], formatDate), css: metadata.site_css } : null;
     });
   }
 

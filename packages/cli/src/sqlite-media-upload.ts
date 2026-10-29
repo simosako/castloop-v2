@@ -3,7 +3,6 @@ import { sqliteMediaKey, sqliteAudioReferenceSchema, sqliteCoverReferenceSchema 
 import type { SqliteAudioReference, SqliteCoverReference } from "../../shared/src/sqlite-media";
 import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
 import type { R2RestOptions } from "./bounded-http-read";
-import { inspectLocalAsset } from "./local-input";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -27,14 +26,6 @@ export async function uploadSqliteMedia(root: string, config: { account_id: stri
   const extension = "extension" in media ? media.extension : null;
   const cover = extension !== null;
   const sourcePath = resolve(root, path);
-  const maximumBytes = cover ? 5_000_000 : 300_000_000;
-  const checkSource = async () => {
-    const inspected = await inspectLocalAsset(sourcePath, maximumBytes);
-    if (inspected.length_bytes !== media.length_bytes || inspected.sha256 !== media.sha256) {
-      throw new Error("Local media source changed or differs from its expected checksum");
-    }
-  };
-  await checkSource();
   const handle = await open(sourcePath, constants.O_RDONLY | constants.O_NOFOLLOW);
   const stream = handle.createReadStream();
   const settled = finished(stream, { cleanup: true }).catch(() => undefined);
@@ -73,7 +64,6 @@ export async function uploadSqliteMedia(root: string, config: { account_id: stri
     const receipt = receiptSchema.parse(await readJson(response)).result;
     if (receipt.key !== key || receipt.size !== media.length_bytes) throw new Error("R2 media PUT key or size differs from the local input");
     if (!completed) throw new Error("PUT responded before its source stream finished");
-    await checkSource();
   } finally {
     controller.abort();
     clearTimeout(timer);

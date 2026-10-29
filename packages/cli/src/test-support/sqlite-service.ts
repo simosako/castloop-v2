@@ -26,7 +26,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
   writeFileSync(join(root, "castloop.toml"), stringifyToml(config));
   const queue = sqlitePublicationFixture({ runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
   const objects = sqlitePublicationBucket(), content = new SqlitePublicationContent(queue.storage), purges: string[] = [];
-  let actual = queue.runtime, previousVersion = actual.worker_version_id, nativeQueue = queue.queue;
+  let actual = queue.runtime, nativeQueue = queue.queue;
   const nodes = new Map<string, { fixture: ReturnType<typeof sqlitePublicationFixture>; service: SqliteShowService }>();
   const showCalls: Array<{ action: string; showId: string }> = [];
   const faultShow = (action: "initialize" | "domain-prepare" | "domain-commit", showId: string) => {
@@ -178,7 +178,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
       etag = sha256HexSync(await (form.get("index.js") as File).text());
       if (updating) {
         activeConfig = JSON.parse(String((metadata!.bindings as Array<{ name: string; text?: string }>).find((binding) => binding.name === "CASTLOOP_SQLITE_CONFIG")!.text));
-        previousVersion = actual.worker_version_id; actual = { ...actual, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(activeConfig) }; deploymentId = crypto.randomUUID(); runtime = boot();
+        actual = { ...actual, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(activeConfig) }; deploymentId = crypto.randomUUID(); runtime = boot();
         faults.afterDeploy?.();
       }
       lost("deploy"); return json({ etag });
@@ -204,7 +204,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
     get runtime() { return runtime; }, get queue() { return first()?.service.queue ?? nativeQueue; }, purges, calls, faults, metadata: () => metadata,
     options: { accountId: config.account_id, apiToken: "private-token", transport }, transport,
     async deployConfiguration(next: SqliteServiceConfig) {
-      activeConfig = next; previousVersion = actual.worker_version_id;
+      activeConfig = next;
       actual = { ...actual, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(next) }; runtime = boot();
       return actual;
     },

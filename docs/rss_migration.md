@@ -1,6 +1,6 @@
 # RSSからのPodcast取り込み
 
-v0.7.0は`storage_layout="show-v1"`の新規サービス専用。`publish-rss-import`は新Showの作成・初期probe・そのShowだけのResumeも含む。全体Pause/Resumeはなく、remote操作記録は`--show SHOW_ID`で対象を指定する。以下の過去の実機結果は新layoutの検証ではない。
+現行版はサービス設定version 2・`storage_layout="show-v1"`、内部queue/content形式14/13の新規サービス専用。`publish-rss-import`は新Showを登録して順番に公開する。Pause/Resumeは不要。RSS公開のローカル記録はversion 3のみ対応し、旧version 2の記録は変換しない。以下の過去の実機結果は現行版の検証ではない。
 
 v0.6.0ではSQLiteサービス（サービス設定version 2）だけに公開する。公開には対応するCLI・検証済みWorker・private workspaceが必要。旧サービス設定version 1からのマイグレーション機能やjournal変換は提供しない。
 旧版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。v0.6.0の検証は[新規隔離環境の回帰試験](../design/archive/schema_v1_removal_live_test.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)、v0.7.0の変更は[リリースノート](release-v0.7.0.md)に記録した。超過した取込は切り詰めず、TOML編集後に再審査する。
@@ -49,13 +49,13 @@ download中に失敗したら、同じコマンド・同じ出力先で続行す
 
 ## 2. 確認した内容を公開する
 
-サービスworkspaceで実行する。新規サービスは方式指定なしの`castloop init`で作成する。[SQLiteガイド](sqlite_sequential_development.md)に従い、制御DOの稼働を確認する。公開コマンドが新Showだけを作成・再開し、他Showは変更しない。既存layoutは採用・移行しない。
+サービスworkspaceで実行する。新規サービスは方式指定なしの`castloop init`で作成する。[SQLiteガイド](sqlite_sequential_development.md)に従い、サービスの稼働を確認する。公開コマンドが新Showを登録し、他Showは変更しない。既存layoutは採用・移行しない。
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...
 cd /path/to/service-workspace
 castloop service-status
-# Confirm the ready SQLite service outside shared maintenance.
+# Confirm publication_ready on the SQLite service.
 castloop publish-rss-import /path/to/import
 ```
 
@@ -67,19 +67,19 @@ Episodeは古い公開日時から同期公開し、各応答を確認して次�
 
 | 公開先 | 必要な稼働状態 | 完了証拠 |
 | --- | --- | --- |
-| SQLite | 同じconfig/runtimeの`publication_ready: true`、`state: "open"`と受付window | `changed`／`unchanged`と現在revision |
+| SQLite | 同じサービス設定の`publication_ready: true` | `changed`／`unchanged`と現在revision |
 
-CLIは検証した素材をハッシュ由来キーへ直接配置し、metadataと素材参照をDOへ送る。DOはパージ後にSQLiteで一括確定する。個別upload/jobの操作追跡や全量readbackは行わず、一括進捗記録を保持する。既存／削除済みShowは採用しない。現行版は新規13/13環境専用で、旧形式から変換しない。
+CLIは検証した素材をハッシュ由来キーへ直接配置し、metadataと素材参照をDOへ送る。DOはパージ後にSQLiteで一括確定する。個別upload/jobの操作追跡や全量readbackは行わず、一括進捗記録を保持する。既存／削除済みShowは採用しない。現行版は新規14/13環境専用で、旧形式から変換しない。
 
 完了時に新RSSの番組情報、Episode件数、GUID・公開日時・説明、音源URLを照合し、`feed_url`を返す。`subscriber_migration_completed: false`は、購読者の移行は別途必要という意味。
 
 ### 停止した場合
 
-- 複数Episodeは逐次処理のため、import全体は数分以上かかり得る。元processの終了を確認せず二重起動しない。
+- 複数Episodeは逐次処理のため、import全体は数分以上かかり得る。同じworkspaceまたは取り込みディレクトリで変更するCLIは1プロセスだけ実行する。ロックファイルは使わないため、元processの終了を確認してから再実行する。
 - 公開応答を失った場合も、同じ取り込み入力で`publish-rss-import`を再実行できる。完了済みの同じ内容は変更なしとなり、進捗を続ける。更新元を自動で取り直す通常公開retryは行わない。
-- Show登録・Resume・ローカルinstallの結果が不明なら、推測で再実行せず停止する。個別uploadのjournalやoperation RPCは使わない。
+- Show登録の応答が不明なら、同じ登録操作の状態を確認して続行する。ローカル配置の完了記録前に中断した場合は、確認済み取り込み元からShow/EpisodeのTOML・カバー・CSSをすべて作り直す。配置済みファイルの個別照合やEpisodeひな形の再作成は行わない。取り込み元や登録済みShow、公開済みEpisodeは削除しない。
 - SQLite管理GETの一時障害は最大3試行。POST/PUTを自動再送しない。
-- `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、journal/lockを削除したりしない。
+- `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、進捗記録を削除したりしない。
 - 状態は`show-status`、現在内容はpreview・履歴、配信は`verify`で確認する。
 
 新しい版は既存UUID Episodeも読めるが、任意GUIDを取り込んだ後の旧版へのdowngradeは非対応。

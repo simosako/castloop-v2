@@ -1,4 +1,4 @@
-import { sqliteDeliveryObservationSchema, sqliteStatsCoverageSchema, sqliteStatsDailyCursorSchema,
+import { sqliteDeliveryObservationSchema, sqliteStatsDailyCursorSchema,
   sqliteStatsEpisodesCursorSchema, sqliteStatsRetentionRecordSchema, sqliteStatsRetentionRequestSchema,
   SQLITE_STATS_DAILY_PAGE_SIZE, SQLITE_STATS_DEFAULT_WINDOW_DAYS, SQLITE_STATS_EPISODE_PAGE_SIZE,
   SQLITE_STATS_INITIAL_RANGE_BYTES, SQLITE_STATS_MAX_WINDOW_DAYS, SQLITE_STATS_RETENTION_DEFAULT_DAYS } from "../packages/shared/src/sqlite-stats";

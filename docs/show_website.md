@@ -116,6 +116,7 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 ## 更新・停止・保守
 
 - HTMLは確定済みSQLite内容からオンデマンド生成し、HTML専用Gatewayと`SiteCachedPages`のCDN cacheで配信する。Feed／画像／音源の`SqliteCachedAssets`とはcache・purgeを分ける。
+- 一覧は対象ページの最大20件、個別ページは対象1件の公開内容と短縮IDだけをSQLiteから読み出す。条件付き応答は生成した本文のETagで判定し、`Last-Modified`は送らない。`If-Modified-Since`だけの要求には本文を返す。
 - 必要なpurge後、内容と世代を同じSQLiteトランザクションで切り替える。パージやDB失敗では現在内容を維持する。HTML事前生成batch・R2 HTML保存・公開jobは使わない。
 - 旧形式へのcode-only deploy・DB変換は行わない。現行形式同士のcode更新は通常の保守手順で行う。
 - 1 HTMLは1,000,000 bytes以下。公開件数・JSON・Feed予算も適用し、超過を切り詰めない。全件Feed生成などの負荷は残る。

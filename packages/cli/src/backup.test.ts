@@ -169,7 +169,7 @@ describe("backup create, verify and restore", () => {
       expect(created.excluded_counts.temporary).toBe(1);
       expect(created.excluded_counts.regenerated).toBe(1);
       expect(created.excluded_counts.unknown).toBeGreaterThanOrEqual(2);
-      expect(created.pending.domain_changes).toEqual([{ operation_id: "11111111-1111-4111-8111-111111111111", phase: null, lock_present: true }]);
+      expect(created.pending.domain_changes).toEqual([]);
 
       const verified = verifyLocalBackup(output, PASSPHRASE);
       expect(verified.ok).toBe(true);

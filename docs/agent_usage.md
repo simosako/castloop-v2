@@ -2,7 +2,7 @@
 
 Issue #64の開発版は、認証付き全文取得・公開中/local/stagedの項目別差分、revision履歴、素材再uploadなしの過去版採用に対応する。`preview-*`は管理鍵のあるworkspaceでは既定でremote読取を行い、`--local`は通信なし。内部形式7/8の新規環境専用。構文・確認hash・原本保全は[公開内容の確認ガイド](published_content_review.md)を優先する。
 
-未リリースのIssue #68対応版では[独自ドメイン管理](sqlite_custom_domains.md)を追加する。`describe domain --json`と`help domain`で対応を確認し、接続/切断/continueは管理者が明示した対象と範囲でだけ実行する。list/statusは読取専用、continueは変更を含み得る。doctorは未完了domain journalやlockも読取検査するが修復しない。旧versionの環境への移行は提供しない。
+未リリースのIssue #68対応版では[独自ドメイン管理](sqlite_custom_domains.md)を追加する。`describe domain --json`と`help domain`で対応を確認し、追加・削除・continueは管理者が明示した対象と範囲でだけ実行する。list/statusは読取専用、continueは変更を含み得る。doctorは未完了domain記録も読取検査するが修復しない。旧versionの環境への移行は提供しない。
 
 v0.7.2で追加したIssue #5のCLI機能。管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。既存のCloudflare環境・永続形式・公開プロトコルは変更しない。[リリースノート](release-v0.7.2.md)を参照する。
 
@@ -45,6 +45,8 @@ castloop doctor --local --workspace /absolute/workspace --json
 ```
 
 describe/schema/template/validate/doctorは通信しない。検証・診断は鍵、journal、lockを生成せず、入力を書き換えない。Skill exportだけは指定先に書き込む。雛形の値は例であり、所有者情報・URL・言語・explicit・日時等は管理者に確認する。offline Episode GUID/dateを実登録identityへ使わず、`create-episode`の保存済み値を保持する。
+
+同じworkspaceまたはRSS取り込みディレクトリで、変更するCLIを同時に複数起動しない。ローカル記録にロックファイルは使わない。中断後は元プロセスの終了を確認してから同じ操作を再実行する。
 
 任意の`castloop-admin.toml`は管理用timezoneを設定する。`preview-schedule-time`はオフライン日時変換だけであり、予約には`preview-episode-schedule ID [MP3]`／`schedule-episode ID [MP3]`（Showは`*-show-schedule`／`schedule-show`）を使う。承認hashを`--expect-preview`へ渡し、予約の`dispatched`とrevisionで確定を確認する。停止後は明示再承認が必要。未来の`published_at`は予約ではなく、即時公開には`--allow-future-published-at`が必要。[管理用設定ガイド](admin_configuration.md)を参照する。
 

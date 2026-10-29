@@ -37,7 +37,7 @@ export type SqlitePublicationExecutor = {
 export class SqlitePublicationQueue {
   executor?: SqlitePublicationExecutor;
   constructor(private readonly storage: PublicationQueueStorage, private runtime: SqlitePublicationRuntime,
-    private readonly now: () => number = Date.now, private readonly scope?: { showId: string; ready: () => boolean }) {
+    private readonly scope?: { showId: string; ready: () => boolean }) {
     this.runtime = sqlitePublicationRuntimeSchema.parse(runtime);
     storage.transactionSync(() => {
       storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_queue_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");

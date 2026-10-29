@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { ensureLocalJournalParents } from "./local-journal-path";
 import type { JournalFamily } from "./local-journal-path";
 import { createLocalJournalStorage } from "./local-journal-storage";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const familyServices = {
@@ -23,7 +23,7 @@ test("all journal families use their exact service-scoped or flat directory and 
       expect(journal.path).toBe(join(root, ".castloop", family, ...(service === undefined ? [] : [service]), "operation.json"));
       journal.initialize({ family, phase: "prepared" });
       expect(journal.read()).toEqual({ family, phase: "prepared" });
-      await journal.exclusively(async () => journal.replace({ family, phase: "updated" }));
+      journal.replace({ family, phase: "updated" });
       expect(journal.read()).toEqual({ family, phase: "updated" });
       expect(readdirSync(join(root, ".castloop"))).toEqual([family]);
       expect(readdirSync(join(root, ".castloop", family))).toEqual(service === undefined ? ["operation.json"] : [service]);
@@ -55,31 +55,18 @@ for (const family of ["sqlite-domain-changes", "rss-import-downloads"] as const)
     }
   });
 
-  test(`${family} preserves dangling locks and cannot recreate a missing journal`, () => {
-    const root = mkdtempSync("/tmp/opencode/castloop-journal-dangling-");
-    try {
-      const journal = storage(root); journal.initialize({}); rmSync(journal.path);
-      symlinkSync(join(root, "missing-target"), `${journal.path}.lock`);
-      expect(() => journal.initialize({})).toThrow("retained");
-      expect(existsSync(journal.path)).toBe(false);
-      expect(lstatSync(`${journal.path}.lock`).isSymbolicLink()).toBe(true);
-    } finally { rmSync(root, { recursive: true, force: true }); }
-  });
-
-  test(`${family} rechecks parents and refuses to remove another owner's replacement lock`, async () => {
+  test(`${family} rechecks parents before reading or replacing a record`, () => {
     const root = mkdtempSync("/tmp/opencode/castloop-journal-replaced-");
     try {
       const journal = storage(root); journal.initialize({});
       const directory = dirname(journal.path), outside = join(root, "outside");
       renameSync(directory, `${directory}-saved`); mkdirSync(outside); symlinkSync(outside, directory);
       expect(() => journal.read()).toThrow("real directories");
-      await expect(journal.exclusively(async () => {})).rejects.toThrow("real directories");
+      expect(() => journal.replace({ phase: "updated" })).toThrow("real directories");
       expect(readdirSync(outside)).toEqual([]);
       rmSync(directory); renameSync(`${directory}-saved`, directory);
-      await expect(journal.exclusively(async () => {
-        rmSync(`${journal.path}.lock`); writeFileSync(`${journal.path}.lock`, "another-owner");
-      })).rejects.toThrow("changed client lock");
-      expect(readFileSync(`${journal.path}.lock`, "utf8")).toBe("another-owner");
+      journal.replace({ phase: "updated" });
+      expect(journal.read()).toEqual({ phase: "updated" });
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 }
