@@ -77,8 +77,9 @@ try {
   assert.equal(readdirSync(work).includes(".castloop"), false);
   const showDirectory = join(work, "samplepodcast"); mkdirSync(showDirectory);
   copyFileSync(join(work, "show.toml"), join(showDirectory, "show.toml"));
+  copyFileSync(join(work, "cover.jpg"), join(showDirectory, "cover.jpg"));
   const preview = JSON.parse(run(["preview-show", "samplepodcast", "--workspace", work, "--json"]));
-  assert.equal(preview.result.state, "local_only");
+  assert.equal(preview.result.remote_readiness, "not_checked");
   assert.equal(preview.result.published.status, "not_checked");
   assert.equal(readdirSync(work).includes(".castloop"), false);
   const skill = join(work, "skill"); run(["skill", "export", "castloop", "--output", skill, "--json"]);

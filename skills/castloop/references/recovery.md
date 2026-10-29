@@ -1,14 +1,17 @@
 # 中断・エラー・結果不明
 
-同じworkspaceのjournalが正本。会話履歴からIDを再生成しない。
+## コンテンツ公開
 
-1. 同じShow/job/operationを記録から特定する。`operation-list --local --workspace PATH --json`、`operation-status KIND ID --show SHOW --workspace PATH --json`、`job-status JOB --workspace PATH --json`を使う。
-2. `queued`/`running`: 同じjobを観測する。待機切断・timeoutを公開失敗扱いしてpublishを再送しない。
-3. publicationの`succeeded`: その操作の公開完了。uploadの`succeeded`: stage完了のみ。空queueや終端jobは全IOのsettlement証明ではない。
-4. `failed`: 理由と確定した入力/base失敗を確認してから、新しい編集として扱う。
-5. `blocked`、未知PUT/POST、未確認配備: 記録を保持して停止。新IDで再送、lock/journal削除、owner token奪取、強制解除、prefix削除は禁止。
-6. `operation-resume upload ID --show SHOW --workspace PATH --json`は変更操作。元の対象・入力が一致し、既知の未着手または保存済み成功receipt等のCLI条件を満たす場合だけ、別途許可された限定続行を行う。名前だけで安全と判断しない。
+`preview-*`と履歴で現在内容を確認する。同じ承認済み入力で`publish-*`や同じlifecycle／revision計画を再実行でき、既に反映済みなら`unchanged`になる。異なる内容と古い更新元は409。自動再送や勝手な更新元の取り直しはしない。
 
-停止・再開の返答を失った対応開発版では、`show-control-status SHOW OPERATION_UUID --workspace PATH --json`でその操作の保存結果を読む。同じ制御コマンドを同じIDで再実行しても、送信開始済みなら照会だけでPOSTを再送しない。`result.control.result`は適用時、`result.state`は照会時の状態なので区別する。結果が見つからなくても未実行と推測せず、別IDでやり直さない。旧形式の記録や残存lockを変換・削除しない。
+素材配置だけでは公開しない。PUT失敗時は公開へ進まず、原本や未参照素材を推測で削除しない。公開用job・operation追跡・progress/watchは廃止した。配信確認は`verify`、状態診断は`diagnose`を使う。
 
-Resume、deploy、取消、cleanup、非公開化、復元は通常編集の許可から推測しない。時間経過・HEAD不在・Feedが読めることを復旧根拠にしない。他Showの障害を理由に健全なShowを停止しない。診断に秘密や未公開本文を載せない。
+予約作成の応答不明は`schedule-list`で確認し、新規予約を無条件に再作成しない。RSSは同じ入力と一括進捗記録から続けるが、登録・Resume・ローカル配置の結果が不明なら停止する。
+
+## インフラ・制御操作
+
+公開の冪等性をinit・登録・Resume・deploy・domainへ一般化しない。これらは同じworkspaceの保存済みjournalと操作IDを使う。未知PUT/POST/DELETEや未確認配備を新IDで再送しない。lock・journal・証跡の削除、owner token奪取、prefix削除は禁止。
+
+停止・再開の応答不明は`show-control-status SHOW UUID --workspace PATH --json`を読む。適用時の結果と現在状態を区別し、見つからなくても未実行と推測しない。deploy/domainは対応helpの限定続行だけを、別途許可された範囲で行う。
+
+Resume、deploy、domain、取消、非公開化、復元を通常編集の許可から推測しない。他Showの障害を理由に健全なShowを停止せず、診断へ秘密や未公開本文を載せない。

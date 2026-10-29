@@ -35,9 +35,8 @@ export function selectSqliteRuntime(storage: PublicationQueueStorage, actual: Sq
     const pending = storage.sql.exec<UpdateRow>("SELECT * FROM publication_runtime_updates WHERE state = 'prepared'").toArray()[0];
     const request = pending ? sqliteUpdatePrepareSchema.parse(JSON.parse(pending.request_json)) : null;
     const service = storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
-    const unfinished = storage.sql.exec("SELECT job_id FROM publication_jobs WHERE state IN ('queued', 'running', 'blocked') LIMIT 1").toArray();
     if (!request || request.worker_version_id !== saved.worker_version_id || request.service_id !== saved.service_id ||
-      request.service_config_sha256 !== saved.service_config_sha256 || service.state !== "paused" || unfinished.length) throw new Error("New SQLite runtime has no exact drained maintenance preparation");
+      request.service_config_sha256 !== saved.service_config_sha256 || service.state !== "paused") throw new Error("New SQLite runtime has no exact drained maintenance preparation");
   }
   return saved;
 }

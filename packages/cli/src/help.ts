@@ -14,31 +14,31 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   diagnose: { usage: "diagnose SHOW_ID [SHOW_ID...] [--max-shows N] [--external]",
     description: "Read-only local and remote diagnosis for explicitly listed Shows (serial; at most 5 by default, --max-shows up to 20).\n" +
       "Performs management API GETs plus one Cloudflare account GET; never mutates, repairs, purges, resumes or replays anything.\n" +
-      "Checks workspace, key and credentials, service runtime identity, shared maintenance, admission, FIFO queue, registration, target lifecycle, unfinished operations and local/remote consistency,\n" +
+      "Checks workspace, key and credentials, service runtime identity, shared maintenance, admission, registration and published content,\n" +
       "classifying every check with a scope (local/remote/cross/external) and pass/warn/fail/not_checked. Any failed check exits 1; warnings alone exit 0.\n" +
       "queued or a CLI ok is never reported as publication success; --external adds public-path delivery checks via the verify family." },
   template: { usage: "template service-config|admin-config|show|episode", description: "Print an embedded example TOML without IO or registration. admin-config is optional workspace CLI preferences, not service identity. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
-  "preview-show": { usage: "preview-show ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged content with immutable cover identity. Defaults to authenticated remote reads when local state exists; --local never networks. Remote errors never become unchanged results. RSS is generated locally only into a new file. Bind approval to publish-show --expect-preview HASH." },
-  "preview-episode": { usage: "preview-episode ID [--local|--remote] [--rss-output FILE]", description: "Compare published, local and staged metadata/audio and preserved GUID/date. Requires --show with explicit --workspace. --local reports not_checked; remote failures stop. A future published_at appears in warnings as future_published_at: immediate publish still starts now. RSS export is local and never overwrites. Use publish-episode --expect-preview HASH after approval." },
+  "preview-show": { usage: "preview-show ID [--local|--remote] [--rss-output FILE]", description: "Compare local TOML/CSS/cover with published content. No staging or upload. --local never networks; remote failures stop. Bind approval to publish-show --expect-preview HASH." },
+  "preview-episode": { usage: "preview-episode ID [MP3] [--local|--remote] [--rss-output FILE]", description: "Compare local TOML and optional MP3 with published content. Omitted MP3 reuses published audio; initial publication needs MP3. --local reports remote not_checked. Future published_at is a warning, not a schedule. Bind approval to publish-episode --expect-preview HASH." },
   "list-show-revisions": { usage: "list-show-revisions SHOW [--cursor SEQUENCE]", description: "Read committed Show revision history, newest first, 20 per page. Snapshots are not publication approval." },
   "list-episode-revisions": { usage: "list-episode-revisions ID [--cursor SEQUENCE]", description: "Read committed Episode revision history with --show, newest first, 20 per page. Does not expose private media publicly." },
   "preview-show-revision": { usage: "preview-show-revision SHOW REVISION_UUID", description: "Read current and selected saved Show content and a plan. Does not write journals or publish. Execution republishes saved content without rolling back Episodes." },
   "preview-episode-revision": { usage: "preview-episode-revision ID REVISION_UUID", description: "Read current and selected saved Episode content with --show. Preview preserves GUID/date and selects saved immutable audio without upload. Execution is explicit." },
-  "revision-execute": { usage: "revision-execute PLAN_JSON REQUEST_SHA256 confirm", description: "Adopt the exact reviewed saved revision as a NEW revision, retaining all history and media. Requires open admission. Waits for the same job; unknown requests are never replayed. Unpublished targets become published. Does not edit local originals." },
-  "sync-local-metadata": { usage: "sync-local-metadata --show SHOW [--episode ID] --expect-revision UUID [--output FILE]", description: "Export exact current metadata to the standard TOML path or a new output file. Refuses existing files and unfinished drafts; never overwrites originals or downloads assets. Output paths use caller cwd." },
+  "revision-execute": { usage: "revision-execute PLAN_JSON REQUEST_SHA256 confirm", description: "Adopt the reviewed saved content synchronously, retaining history and media. Identical current content returns unchanged. Unpublished targets become published. Does not edit local originals." },
+  "sync-local-metadata": { usage: "sync-local-metadata --show SHOW [--episode ID] --expect-revision UUID [--output FILE]", description: "Export exact current metadata to a new file. Never overwrites originals or downloads assets. Output paths use caller cwd." },
   "preview-schedule-time": { usage: "preview-schedule-time DATETIME [--timezone IANA_ZONE]", description: "Offline date/time conversion only: this command does NOT create a reservation or publish. An explicit offset determines the instant; otherwise --timezone overrides optional workspace castloop-admin.toml timezone, then server basis UTC. Prints local time, offset, UTC and sources. Rejects ambiguous/nonexistent DST times and explicit offset/--timezone disagreement. Does not check server time or readiness." },
-  "preview-episode-schedule": { usage: "preview-episode-schedule ID --at DATETIME [--timezone IANA_ZONE] [--show SHOW]", description: "Read-only remote review of a staged Episode draft plus its intended UTC schedule time. Prints the draft preview, local/UTC time, timezone source and approval_sha256. Does not create a schedule or publish. Bind approval to schedule-episode --expect-preview HASH." },
-  "schedule-episode": { usage: "schedule-episode ID --at DATETIME [--timezone IANA_ZONE] --expect-preview HASH [--show SHOW]", description: "Freeze the reviewed Episode inputs and submit a future single-Episode publication schedule. Returns scheduled, not published; the server keeps it outside the FIFO until due. Requires open admission and staged assets. Use schedule-status to observe it." },
-  "preview-show-schedule": { usage: "preview-show-schedule SHOW --at DATETIME [--timezone IANA_ZONE]", description: "Read-only remote review of a staged Show draft plus its intended UTC schedule time. Prints approval_sha256; does not schedule or publish." },
+  "preview-episode-schedule": { usage: "preview-episode-schedule ID [MP3] --at DATETIME [--timezone IANA_ZONE] [--show SHOW]", description: "Read-only remote review of local Episode inputs and schedule time. Prints approval_sha256; does not upload or publish." },
+  "schedule-episode": { usage: "schedule-episode ID [MP3] --at DATETIME [--timezone IANA_ZONE] --expect-preview HASH [--show SHOW]", description: "Place reviewed media and save frozen metadata, audio reference and base for future publication. Returns scheduled, not published. If the response is lost, inspect schedule-list." },
+  "preview-show-schedule": { usage: "preview-show-schedule SHOW --at DATETIME [--timezone IANA_ZONE]", description: "Read-only remote review of local Show inputs and schedule time. Prints approval_sha256; does not upload or publish." },
   "schedule-show": { usage: "schedule-show SHOW --at DATETIME [--timezone IANA_ZONE] --expect-preview HASH", description: "Freeze reviewed Show metadata/cover and submit a future Show publication schedule. Returns scheduled, not published." },
-  "schedule-list": { usage: "schedule-list SHOW [--cursor UUID]", description: "List up to 20 publication schedules for this Show, newest first. Schedule state is separate from publication_state; follow next_cursor." },
-  "schedule-status": { usage: "schedule-status SHOW SCHEDULE_UUID", description: "Read one schedule, its current version, scheduled UTC/local time, approval hash, dispatch time and the resulting publication job state. dispatched is not publication success." },
+  "schedule-list": { usage: "schedule-list SHOW [--cursor UUID]", description: "List up to 20 schedules for this Show, newest first; follow next_cursor." },
+  "schedule-status": { usage: "schedule-status SHOW SCHEDULE_UUID", description: "Read a schedule, its frozen content, version, time and resulting revision. dispatched means publication and schedule completion committed together." },
   "preview-schedule-reschedule": { usage: "preview-schedule-reschedule SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE]", description: "Read-only preview of moving an undispatched schedule to a new future UTC time. Prints the current schedule, resolved time and approval_sha256; bind it to schedule-reschedule --expect-preview HASH." },
   "preview-schedule-cancel": { usage: "preview-schedule-cancel SHOW SCHEDULE_UUID", description: "Read-only preview of cancelling the current schedule version. Prints approval_sha256; bind it to schedule-cancel --expect-preview HASH." },
-  "preview-schedule-reapprove": { usage: "preview-schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N", description: "Read-only preview of reapproving a needs_approval schedule with the current runtime/base and frozen local draft. Prints approval_sha256; bind it to schedule-reapprove --expect-preview HASH." },
+  "preview-schedule-reapprove": { usage: "preview-schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N", description: "Review saved schedule content against the current runtime/base. Prints approval_sha256; no local draft journal is needed." },
   "schedule-reschedule": { usage: "schedule-reschedule SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Move an undispatched schedule to a new future UTC time without changing its frozen content. Rejects a stale version or dispatched/cancelled schedule. Obtain the hash from preview-schedule-reschedule first." },
-  "schedule-cancel": { usage: "schedule-cancel SHOW SCHEDULE_UUID --expect-version N --expect-preview HASH", description: "Cancel a schedule only before FIFO dispatch. Never cancels an already queued/running publication job and never deletes referenced uploads." },
-  "schedule-reapprove": { usage: "schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Reapprove a needs_approval schedule using the current runtime, admission window and unchanged local draft. Freshly freezes the publication request; never silently resumes paused Shows or rebases changed content." },
+  "schedule-cancel": { usage: "schedule-cancel SHOW SCHEDULE_UUID --expect-version N --expect-preview HASH", description: "Cancel an undispatched schedule. Does not delete media or undo publication." },
+  "schedule-reapprove": { usage: "schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Explicitly reapprove saved schedule content with the reviewed current runtime/base and new time. Does not resume Shows or change saved metadata/media." },
   skill: { usage: "skill export castloop --output DIRECTORY", description: "Export the embedded administrator Skill without networking or external tools. The destination must not exist; existing Skills and AGENTS.md are never overwritten." },
   validate: { usage: "validate service|admin-config|show|episode FILE [--assets] [--audio MP3] [--json]", description: "Read-only offline validation using publication input rules. admin-config validates optional CLI preferences (UTC or an IANA timezone, not abbreviations). File/audio paths use caller cwd; cover uses the TOML directory. Does not prove remote readiness or publication success." },
   describe: { usage: "describe [COMMAND] [--json]", description: "Read offline command specifications, effects and recovery rules. No credentials or workspace required." },
@@ -63,45 +63,18 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Run from the Show directory. Create a local Episode TOML draft with a GUID and published_at.\n" +
       "This does not upload or publish the Episode.",
   },
-  "update-show": {
-    usage: "update-show ID",
-    description: "Run from the service workspace. Upload verified Show metadata and JPEG/PNG cover to unique private R2 keys.\n" +
-      "Requires Cloudflare credentials. Does not publish; use publish-show explicitly.",
-  },
   "publish-show": {
     usage: "publish-show ID",
-    description: "Run from the service workspace after update-show. Freeze and submit the current draft to the SQLite FIFO.\n" +
-      "Waits for the exact job's succeeded status after writes and cache purge. Queued is not publication success.",
-  },
-  "update-episode": {
-    usage: "update-episode ID",
-    description: "Run from the Show directory. Upload verified Episode metadata without uploading audio or publishing.\n" +
-      "Requires Cloudflare credentials. Old or frozen inputs cannot be silently replaced.",
-  },
-  "update-episode-audio": {
-    usage: "update-episode-audio ID MP3",
-    description: "Run from the Show directory. Validate and upload MP3 audio (at most 300,000,000 bytes) to a unique R2 key.\n" +
-      "Requires Cloudflare credentials; verifies full readback/hash/size/object identity. Does not publish.",
+    description: "Publish local Show TOML/CSS/cover in one command. Place media directly in R2 and commit synchronously after cache purge.\n" +
+      "Returns changed or unchanged and the current revision. Repeating identical content adds no history or media objects.",
   },
   "publish-episode": {
     usage: "publish-episode ID [MP3] [--allow-future-published-at]",
-    description: "Run from the Show directory. Freeze and submit staged changes, then wait for succeeded.\n" +
+    description: "Publish local Episode TOML and optional MP3 directly, without staging. Returns changed or unchanged and the current revision.\n" +
       "Initial publication requires metadata and audio. Metadata-only updates reuse immutable published audio.\n" +
       "A future published_at does NOT delay publication: this command starts now. Non-interactive runs require\n" +
       "--allow-future-published-at; interactive runs ask to type \"publish now\". Use schedule-episode for scheduled publication.\n" +
-      "An MP3 argument is optional; if supplied it must match the staged source. Unknown submissions are never resent.",
-  },
-  "job-status": {
-    usage: "job-status JOB",
-    description: "Run from the service workspace. Read the retained publication/lifecycle job's status.\n" +
-      "status.state succeeded proves this operation completed, not global quiescence or recovery authorization.",
-  },
-  progress: {
-    usage: "progress JOB",
-    description: "Run from the service workspace. Read-only merged progress view for one retained publication/lifecycle job:\n" +
-      "frozen inputs, per-asset upload states, submission, FIFO waiting (with reason), execution and terminal state.\n" +
-      "Unobservable steps (queue position, internal execution, cache purge) stay unknown and are never shown as done.\n" +
-      "queued is not publication success. Observational only; exits 0 and never authorizes recovery.",
+      "MP3 is required initially, otherwise omitted MP3 reuses published audio. If a response is lost, review current content and rerun the same inputs.",
   },
   verify: {
     usage: "verify SHOW_ID [--episode EPISODE_ID]",
@@ -126,14 +99,6 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "The new limit applies from the next UTC-day pruning; already pruned daily rows never come back, and shortening prunes\n" +
       "older rows into lifetime totals instead of losing them. Idempotent per operation ID: the request is journaled locally\n" +
       "before submission and an unknown outcome is only re-checked by its operation ID, never replayed blindly.",
-  },
-  watch: {
-    usage: "watch JOB [--timeout SECONDS] [--interval SECONDS]",
-    description: "Run from the service workspace. Bounded read-only observation of one retained job until its terminal state.\n" +
-      "Default timeout 600s (max 3600), interval 5s (1-60), at most 720 polls; each poll is a bounded management GET.\n" +
-      "Progress goes to stderr as JSON lines; the final report is stdout (use --json for one envelope document).\n" +
-      "Exit codes: 0 succeeded observed, 1 failed/blocked observed, 2 unobservable (budget exhausted or job missing); SIGINT exits 130.\n" +
-      "No notifications are sent; on success the report points to castloop verify for external delivery checks.",
   },
   deploy: {
     usage: "deploy [--operation-id UUID]",
@@ -165,24 +130,23 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "service-status": {
     usage: "service-status",
-    description: "Read service runtime and aggregated Show readiness/paused/queued/drained status. No service-wide Pause or admission window exists.\n" +
-      "The aggregate is not an atomic snapshot or an update lock; an empty FIFO does not prove unregistered uploads settled.",
+    description: "Read service runtime and aggregated Show readiness/availability. The aggregate is not an atomic snapshot or an update lock; it does not authorize cleanup.",
   },
   "show-status": {
     usage: "show-status SHOW_ID",
-    description: "Read this Show's runtime, Pause state, admission window and FIFO without consulting other Shows.",
+    description: "Read this Show's runtime, availability and admission window without consulting other Shows.",
   },
   "show-pause": {
     usage: "show-pause SHOW_ID PAUSE_UUID",
-    description: "Pause this Show's delivery and new admission. Already accepted jobs drain; other Shows are unaffected.",
+    description: "Pause this Show's delivery and publication changes. Pending publication commits recheck admission; other Shows are unaffected.",
   },
   "show-admission-pause": {
     usage: "show-admission-pause SHOW_ID OPERATION_UUID",
-    description: "Stop new publication and upload admission for this Show while keeping approved content delivery enabled. Accepted jobs continue; maintenance and other delivery checks still apply.",
+    description: "Stop publication changes for this Show while keeping approved content delivery enabled. Maintenance and delivery checks still apply; media placement alone does not publish.",
   },
   "show-delivery-resume": {
     usage: "show-delivery-resume SHOW_ID OPERATION_UUID",
-    description: "Enable only approved content delivery for a verified, drained Show outside maintenance. Publication and upload admission stay closed.",
+    description: "Enable only approved content delivery for a verified Show outside maintenance. Publication admission stays closed.",
   },
   "show-control-status": {
     usage: "show-control-status SHOW_ID OPERATION_UUID",
@@ -190,8 +154,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "show-resume": {
     usage: "show-resume SHOW_ID NEW_WINDOW_UUID",
-    description: "Resume this verified, drained Show with a NEW admission window outside shared maintenance.\n" +
-      "Other Shows' blocked jobs do not prevent this. Never releases unknown IO or blocked jobs.",
+    description: "Resume this verified Show with a NEW admission window outside shared maintenance. Other Shows are unaffected; suspended schedules still need explicit reapproval.",
   },
   "target-show": {
     usage: "target-show SHOW_ID",
@@ -226,31 +189,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "lifecycle-execute": {
     usage: "lifecycle-execute PLAN_JSON REQUEST_SHA256 confirm",
     description: "Submit the exact reviewed unpublish/restore plan with its hash and explicit confirmation.\n" +
-      "Queued is not completed; use job-status or operation-status lifecycle JOB until succeeded.",
-  },
-  "operation-status": {
-    usage: "operation-status upload|rss-import|publication|draft|show-registration|lifecycle|cleanup ID [--show SHOW_ID] [--local|--remote] [--after-version N] [--request-cursor UUID]",
-    description: "Read operation, client, request and checkpoint records without changing journals or locks. Remote is the default.",
-  },
-  "operation-list": {
-    usage: "operation-list [--show SHOW_ID] [--incomplete] [--local|--remote] [--cursor UUID] [--parent UUID]",
-    description: "List operations and server SQLite capacity. Remote pages contain up to 20 entries; follow next_cursor.",
-  },
-  "operation-resume": {
-    usage: "operation-resume upload ID --show SHOW_ID",
-    description: "Resume an unchanged upload from a durable successful PUT receipt, verification or draft attachment. Unknown PUTs are retained.",
-  },
-  "operation-cancel": {
-    usage: "operation-cancel upload|rss-import ID --show SHOW_ID",
-    description: "Cancel a settled, unused operation. Files remain stored; preview cleanup separately.",
-  },
-  "operation-cleanup-preview": {
-    usage: "operation-cleanup-preview upload ID --show SHOW_ID",
-    description: "Preview eligible staging files from a cancelled operation and their confirmation hash. Read-only.",
-  },
-  "operation-cleanup": {
-    usage: "operation-cleanup upload ID PLAN_SHA256 confirm --show SHOW_ID",
-    description: "Delete only the reviewed, settled, unused staging objects. Retain receipts and uncertain deletion results for inspection.",
+      "Returns synchronously after publication commit, or unchanged if the requested state is already current.",
   },
   "import-rss": {
     usage: "import-rss SHOW_ID FEED_URL (--dry-run | --output DIRECTORY)",
@@ -265,7 +204,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Requires a ready SQLite service, administrator key and Cloudflare credentials; creates and explicitly opens only the new Show.\n" +
       "Validates inputs, preserves GUIDs/dates, then publishes the Show and Episodes sequentially. Not an atomic batch.\n" +
       "If any imported Episode has a future published_at, publication starts immediately and requires --allow-future-published-at.\n" +
-      "Re-running observes acknowledged pending jobs and continues without republishing completed inputs.\n" +
+      "Re-running continues batch progress; identical publication content is unchanged.\n" +
       "Unknown mutations stay blocked. Does not adopt existing Shows, convert services or remove the old host.",
   },
   "backup-create": {
@@ -289,7 +228,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "backup-restore FILE DEST confirm [--passphrase-file FILE] [--json]",
     description: "Restore an archive into DEST, which must not exist; any failure removes the partial destination.\n" +
       "Restores the same service identity (configuration hash, administrator key, client IDs) and regenerates .gitignore.\n" +
-      "After restoration run doctor --local; unfinished operations may only be observed (operation-status), never replayed.\n" +
+      "After restoration run doctor --local; preserve old operation records and never replay their unknown outcomes.\n" +
       "Does not network, publish, resume or authorize anything remotely.",
   },
 };
@@ -308,10 +247,8 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "create-show": { "site-url": "string", "site-mode": "string" }, deploy: { "operation-id": "string" }, schema: { format: "string" },
     domain: { "zone-id": "string", "operation-id": "string", cursor: "string" },
     "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
-    "operation-list": { show: "string", local: "boolean", remote: "boolean", incomplete: "boolean", cursor: "string", parent: "string" },
-    "operation-status": { show: "string", local: "boolean", remote: "boolean", "after-version": "string", "request-cursor": "string" },
     diagnose: { "max-shows": "string", external: "boolean" },
-    verify: { episode: "string" }, watch: { timeout: "string", interval: "string" },
+    verify: { episode: "string" },
     stats: { episode: "string", from: "string", to: "string", "by-revision": "boolean", cursor: "string" },
     "stats-retention": { "operation-id": "string" },
     "import-rss": { "dry-run": "boolean", output: "string" },
@@ -340,8 +277,8 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "backup-restore-preview": { dest: "string", "passphrase-file": "string" },
     "backup-restore": { "passphrase-file": "string" },
   };
-  if (["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode",
-    "preview-episode-schedule", "schedule-episode", "list-episode-revisions", "preview-episode-revision"].includes(command) || command.startsWith("operation-")) options.show = "string";
+  if (["create-episode", "publish-episode", "preview-episode",
+    "preview-episode-schedule", "schedule-episode", "list-episode-revisions", "preview-episode-revision"].includes(command)) options.show = "string";
   if (["publish-show", "publish-episode"].includes(command)) options["expect-preview"] = "string";
   return { ...options, ...byCommand[command] };
 }
@@ -353,7 +290,7 @@ export function describeCommand(command: string) {
     "backup-create", "backup-verify", "backup-restore-preview", "backup-restore"].includes(command);
   const preview = ["preview-show", "preview-episode", "preview-episode-schedule", "preview-show-schedule",
     "preview-schedule-reschedule", "preview-schedule-cancel", "preview-schedule-reapprove"].includes(command);
-  const read = offline || preview || ["schedule-list", "schedule-status", "list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "job-status", "operation-status", "operation-list", "operation-cleanup-preview", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "progress", "verify", "watch", "stats"].includes(command);
+  const read = offline || preview || ["schedule-list", "schedule-status", "list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "show-control-status", "target-show", "target-episode", "list-shows", "list-episodes", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "verify", "stats"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1],
@@ -363,6 +300,6 @@ export function describeCommand(command: string) {
     effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? ["skill", "backup-create", "backup-restore"].includes(command) ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command.startsWith("schedule-") && !["schedule-list", "schedule-status"].includes(command) ||
       command === "lifecycle-execute" || command === "revision-execute" },
     output_schema: "result", input_schemas: ["service-config", "admin-config", "show-input", "episode-input"],
-    recovery: read ? "Bounded observation only; snapshots do not authorize mutations." : "Preserve exact workspace, Show, input and records. Unknown PUT/POST outcomes must not be replayed. Observe the recorded job/operation; upload continuation requires the retained receipt and unchanged input.",
+    recovery: read ? "Read-only observation; snapshots do not authorize mutations." : command === "publish-rss-import" ? "Resume only the same retained batch and inputs. Identical content is unchanged; unknown Show registration, Resume or local installation outcomes stop without replay." : ["publish-show", "publish-episode", "lifecycle-execute", "revision-execute"].includes(command) ? "Review current content after a lost response. Repeating the same desired content is unchanged; changed bases require a new review." : "Preserve the exact workspace, target and records. Unknown resource, deployment and control outcomes must not be replayed.",
     paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };
 }

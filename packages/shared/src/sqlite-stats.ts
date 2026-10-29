@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sqlitePublicationProtocol, sqlitePublicationRequestSchema, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { sqlitePublicationProtocol, sqlitePublicationTargetSchema, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
 import { sqliteAvailabilityStateSchema } from "./sqlite-availability";
 
 export const SQLITE_STATS_EPISODE_PAGE_SIZE = 20;
@@ -11,8 +11,8 @@ export const SQLITE_STATS_RETENTION_MAX_DAYS = 3650;
 export const SQLITE_STATS_RETENTION_DEFAULT_DAYS = 400;
 export const SQLITE_STATS_INITIAL_RANGE_BYTES = 65536;
 
-const showId = sqlitePublicationRequestSchema.shape.show_id;
-const episodeId = sqlitePublicationRequestSchema.shape.episode_id.unwrap();
+const showId = sqlitePublicationTargetSchema.shape.show_id;
+const episodeId = sqlitePublicationTargetSchema.shape.episode_id.unwrap();
 const dateUtc = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a YYYY-MM-DD UTC date");
 const counter = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);

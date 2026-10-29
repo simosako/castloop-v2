@@ -4,13 +4,13 @@ import type { SqliteDeliveryDecision } from "./sqlite-publication-content";
 
 const management = "https://worker.example.workers.dev";
 const feed = "/podcasts/daily/feed.xml";
-const allowed = (generation: number): SqliteDeliveryDecision => ({ status: 200, key: `public${feed}`,
+const allowed = (generation: number): Extract<SqliteDeliveryDecision, { status: 200 }> => ({ status: 200, key: `public${feed}`,
   content_type: "application/rss+xml; charset=utf-8", cache_props: { showGeneration: 1, feedGeneration: generation } });
 
 test("cover warm hits, purge misses and late fills cannot cross committed generations or bypass stopping gates", async () => {
   const path = "/podcasts/daily/cover.jpg";
   let decision: SqliteDeliveryDecision = { status: 200, key: `public${path}`, content_type: "image/jpeg",
-    cache_props: { showGeneration: 1, coverGeneration: 1 } };
+    cache_props: { showGeneration: 1, coverGeneration: 1, objectKey: `public${path}` } };
   const service = { fetch: async () => new Response(null), delivery: async () => decision };
   const cache = new Map<number, string>(); let reads = 0;
   const cached = async (_: Request, props: { coverGeneration?: number }) => {
@@ -21,14 +21,14 @@ test("cover warm hits, purge misses and late fills cannot cross committed genera
   const read = () => serveSqliteGateway(new Request(`${management}${path}`), management, service, cached);
   expect(await (await read()).text()).toBe("cover-1"); expect(await (await read()).text()).toBe("cover-1");
   cache.clear(); expect(await (await read()).text()).toBe("cover-1");
-  decision = { status: 200, key: `public${path}`, content_type: "image/jpeg", cache_props: { showGeneration: 2, coverGeneration: 3 } };
+  decision = { status: 200, key: `public${path}`, content_type: "image/jpeg", cache_props: { showGeneration: 2, coverGeneration: 3, objectKey: `public${path}` } };
   cache.set(1, "late-old-cover-fill"); expect(await (await read()).text()).toBe("cover-3");
   decision = { status: 503 }; const stopped = await read(); expect(stopped.status).toBe(503);
   expect(stopped.headers.get("Cache-Control")).toBe("no-store"); expect(reads).toBe(4);
 });
 
 test("gateway rechecks current DO visibility even on cache hits and partitions late fills by committed feed generation", async () => {
-  let decision = allowed(1), reads = 0, cacheReads = 0;
+  let decision: SqliteDeliveryDecision = allowed(1), reads = 0, cacheReads = 0;
   const cache = new Map<string, string>();
   const service = { fetch: async () => new Response(null), delivery: async () => { reads++; return decision; } };
   const cached = async (_: Request, props: { feedGeneration?: number }) => {
@@ -89,7 +89,8 @@ test("old public URLs redirect only after current delivery approval and never en
     for (const method of ["GET", "HEAD"]) {
       let decisions = 0;
       const service = { fetch: async () => { throw new Error("Unexpected administration"); },
-        delivery: async (input: string) => { decisions++; expect(input).toBe(path); return { ...allowed(1), key: `public${path}` }; } };
+        delivery: async (input: string) => { decisions++; expect(input).toBe(path); return { ...allowed(1), key: `public${path}`,
+          cache_props: path === feed ? allowed(1).cache_props : { showGeneration: 1, objectKey: `public${path}` } }; } };
       const response = await serveSqliteGateway(new Request(`${management}${path}?private=not-forwarded`, { method,
         headers: { Authorization: "secret", Cookie: "private", "X-Castloop-Key": "key", Range: "bytes=0-1", "If-None-Match": '"old"' } }),
       management, service, async () => { throw new Error("Redirect cannot read cached bodies"); }, publicOrigin);
@@ -161,7 +162,7 @@ test("removing the canonical custom origin restores workers.dev bodies and rejec
 test("gateway observations cover audio responses once after finalization and skip failures, redirects and unclassifiable ranges", async () => {
   const audio = `/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`;
   const decision = (path: string): SqliteDeliveryDecision => ({ status: 200, key: `public${path}`, content_type: "audio/mpeg",
-    cache_props: { showGeneration: 1, episodeGeneration: 0 } });
+    cache_props: { showGeneration: 1, episodeGeneration: 0, objectKey: `public${path}` } });
   const observed: unknown[] = [];
   const sink = (entry: unknown) => { observed.push(entry); };
   const serve = async (method: "GET" | "HEAD", headers: Record<string, string>, respond: () => Response, path = audio) =>
@@ -196,7 +197,7 @@ test("gateway observations cover audio responses once after finalization and ski
 test("gateway observations are isolated from delivery failures and never change responses", async () => {
   const audio = `/podcasts/daily/episodes/first/${crypto.randomUUID()}.mp3`;
   const decision: SqliteDeliveryDecision = { status: 200, key: `public${audio}`, content_type: "audio/mpeg",
-    cache_props: { showGeneration: 1, episodeGeneration: 0 } };
+    cache_props: { showGeneration: 1, episodeGeneration: 0, objectKey: `public${audio}` } };
   const exploding = (entry: unknown) => { throw new Error(`statistics sink failed for ${JSON.stringify(entry)}`); };
   const response = await serveSqliteGateway(new Request(`https://podcasts.example.com${audio}`), "https://worker.example.workers.dev",
     { fetch: async () => new Response(null), delivery: async () => decision },

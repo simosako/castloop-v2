@@ -2,7 +2,7 @@
 
 Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を追加した開発版。合意した機能実装と本人の画面確認は完了した。Cloudflare Free性能の実証や全端末での確認を意味しない。
 
-新規環境向けの内蔵サイト機能。配布済みv0.7.5ではなく、この開発版のCLIとWorkerを組み合わせる。Issue #65の予約表を統合した内部queue/content形式は**11/11**、healthとinspectionの必須識別は`website="static-show-v2"`。サービス設定は引き続きversion 2・`storage_layout="show-v1"`、Show/Episode metadataはversion 1である。第1段8/9・CSS版9/10・短縮URL試験版10/11・予約公開版9/9を含め、既存環境のDB変換・移行・資源採用は提供しない。旧`static-show-v1`環境はCLIの能力照会で拒否する。
+フェーズ2開発版の新規13/13環境向け。healthとinspectionは`website="static-show-v2"`を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1。旧環境の変換・移行・資源採用は提供しない。Feed/HTMLはSQLiteからオンデマンド生成し、素材だけR2へ直接配置する。実環境には未配備。
 
 ## サイト方式を選ぶ
 
@@ -12,11 +12,10 @@ Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイ�
 castloop create-show my-show --site-mode builtin
 castloop show-resume my-show NEW_WINDOW_UUID
 # Edit my-show/show.toml and provide the cover named in image_path.
-castloop update-show my-show
 castloop publish-show my-show
 ```
 
-`create-show`はShow登録とローカル雛形作成、`update-show`は検証済み素材の保存だけを行う。どちらも公開しない。`publish-show`の同じjobが`succeeded`になるまで公開完了とは扱わない。
+`create-show`はShow登録とローカル雛形作成だけで、公開しない。`publish-show`がローカル入力を検証・素材配置し、同期公開結果`changed`／`unchanged`とrevisionを返す。
 
 内蔵方式の`show.toml`には次を指定する。他の番組情報・カバーは従来どおり必要である。
 
@@ -33,7 +32,7 @@ castloop create-show my-show --site-mode external --site-url https://your-site.e
 
 TOMLでは`site_mode = "external"`と実在するHTTP(S)の`site_url`を指定する。`site_mode`省略時も外部方式として扱い、URLを必須にする。外部方式ではHTMLを生成せず、RSSの紹介先は指定URLのまま。内蔵方式と`site_url`の同時指定は拒否する。
 
-方式の変更は`show.toml`を編集し、`update-show`→`publish-show`で明示的に行う。内蔵から外部に変えると内蔵ページは404になり、逆の場合は公開済みEpisodeから全ページを生成する。旧HTML・音源・revisionは削除しない。
+方式変更は`show.toml`を編集し、preview後に`publish-show`で明示する。内蔵から外部に変えると内蔵ページは404、逆では公開済みEpisodeのページを配信する。旧音源・revisionは削除しない。
 
 ## 見た目の変更
 
@@ -46,7 +45,7 @@ site_css_path = "site.css"
 
 `site.css`は`show.toml`と同じdirectoryへ置く。[変更例](../examples/show-site.css)を利用できる。通常のUTF-8 CSSだけを受け付け、上限は65,536 bytes（64 KiB）。空ファイルは追加CSSなし、指定ファイルの欠落はエラー。URL・directory指定・symlink・不正UTF-8・NUL・`</style`（大小文字不問）は拒否する。CRLF／CRはLFへ正規化する。CSS本文の`site_css`はCLIが生成する保存用fieldなので、ローカルTOMLに直接書かない。
 
-編集後に`update-show SHOW`→`publish-show SHOW`で全一覧・Episodeページを一緒に更新する。ファイル変更やuploadだけでは公開しない。CSSを編集したら再度`update-show`が必要で、古いステージ内容での公開は拒否する。標準へ戻す場合は`site_css_path`を削除して明示公開する。Workerの再配備は不要である。
+編集後にpreviewし、`publish-show SHOW`で一覧・Episodeページの表示内容を一緒に更新する。標準へ戻す場合は`site_css_path`を削除して明示公開する。ファイル編集だけでは公開せず、Worker再配備も不要。
 
 標準CSSの後にカスタムCSSを埋め込む。よく使う変数は`--cl-accent`、`--cl-background`、`--cl-text`、`--cl-muted`、`--cl-content-width`、`--cl-radius`。指定先のclassは次のとおり。
 
@@ -80,7 +79,7 @@ site_timezone = "Asia/Tokyo"
 
 `UTC`またはruntimeが対応するIANA名（`Asia/Tokyo`、`America/New_York`等）を指定する。`JST`・`EST`等の略称、数値offsetだけの指定、未知の地域名はエラーとし、UTCへ自動で戻さない。外部サイト方式ではこの設定を指定しない。
 
-変更後は`update-show SHOW`→`publish-show SHOW`で**全一覧・全公開Episodeページ**を再生成する。設定ファイルの編集やuploadだけでは表示は変わらない。設定を削除して明示公開すればUTCへ戻る。Show revisionに設定を保存するため、Showの過去版採用ではその版の設定、Episodeの更新・復元では現在のShow設定を使う。domain変更時の再生成にも適用する。
+変更後は`publish-show SHOW`で**全一覧・全公開Episodeページ**の表示を更新する。設定を削除して明示公開すればUTCへ戻る。Show revisionに設定を保存するため、Showの過去版採用ではその版、Episode更新・復元では現在のShow設定を使う。
 
 変えるのはHTMLの表示だけであり、保存済み`published_at`、RSSの`pubDate`、新しい順の並び、GUID、短いURL、音源は変えない。[管理用設定](admin_configuration.md)の`castloop-admin.toml timezone`はCLIの日時入力・確認用で、サイト表示へは流用しない。PCや閲覧者のタイムゾーンからも推測しない。
 
@@ -117,15 +116,13 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 
 ## 更新・停止・保守
 
-- HTMLは既存Show DOのAlarmで事前生成し、private R2へ不変保存する。閲覧時には生成せず、HTML専用Gatewayと`SiteCachedPages`のCDN cacheで配信する。Feed／画像／音源の`SqliteCachedAssets`とはcache・purgeを分ける。
-- Episode追加・更新では全一覧と対象個別ページを生成し、他の個別ページは再利用する。Show情報・CSS・タイムゾーン更新では全ページを生成する。全件入力のSQL保存とRSS全文生成は分割されておらず、件数・更新頻度に応じた負荷は残る。[生成範囲とFree枠の制約](../design/show_website_description_display_plan.md#61-episode追加時の生成範囲現行実装)を参照する。
-- 予約公開との統合版は保存形式11/11の新規環境専用。既存10/11・9/9等へのcode-only deploy・DB変換は行わない。同じ保存形式での後続の表示変更も、Worker更新だけでは保存済みHTMLは変わらず、通常の更新保守手順と対象Showの明示公開が必要である。
-- 1 batch（1回のAlarmで処理する生成単位）は最大20 HTML・合計4,000,000 UTF-8 bytes、1 HTMLは1,000,000 bytes以下。全入力には既存の公開件数・JSON容量予算も適用する。超過を切り詰めて公開しない。
-- 正常なbatch完了と次回Alarm予約を保存した場合だけ次のbatchへ進む。実行中断・未知のPUTやpurgeは`blocked`として保全し、再送しない。
-- HTML、Feed、必要な音源・metadataの保存確認と両方の必要なpurgeが完了してから、公開参照を同じSQL transactionで切り替える。通常更新中は検証済みの旧内容だけを配信する。
+- HTMLは確定済みSQLite内容からオンデマンド生成し、HTML専用Gatewayと`SiteCachedPages`のCDN cacheで配信する。Feed／画像／音源の`SqliteCachedAssets`とはcache・purgeを分ける。
+- 必要なpurge後、内容と世代を同じSQLiteトランザクションで切り替える。パージやDB失敗では現在内容を維持する。HTML事前生成batch・R2 HTML保存・公開jobは使わない。
+- 旧形式へのcode-only deploy・DB変換は行わない。現行形式同士のcode更新は通常の保守手順で行う。
+- 1 HTMLは1,000,000 bytes以下。公開件数・JSON・Feed予算も適用し、超過を切り詰めない。全件Feed生成などの負荷は残る。
 - `show-admission-pause`は新規受付を止め、確定済み内容の配信を続ける。`show-pause`はHTML・画像・音源も停止する。cache HIT、HEAD、304、旧workers.devからのredirectの前にも最新のShow判定を行う。
 - domain変更は[専用保守](sqlite_custom_domains.md)でHTMLのcanonical／OGPとFeedを新originへ生成する。全Showの保守完了後も自動Resumeしない。code-only deployでdomainを変更しない。
-- 短い識別子のハッシュ計算は新しい予約の作成時だけ。閲覧時は索引で内部Episode IDを解決し、既存の公開・停止・readiness判定を通してHTML cacheへ進む。SQL参照と予約の保存量は増えるが、全件走査や閲覧時生成は追加しない。
+- 短い識別子は公開時に確定して索引へ保存する。閲覧時は内部Episode IDを解決し、公開・停止・readiness判定を通してHTML cacheへ進む。
 - RSS previewはサーバーから取得した予約を使い、新規Episodeには未予約の候補を表示する。previewで予約・公開はしない。候補の確定は明示公開の処理で行う。
 - 保存済みHTMLや再生buffer、検索・SNSの第三者コピーを遠隔消去することはできない。
 
@@ -137,7 +134,7 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 
 有料機能・CPU上限拡張・別Worker／生成用DOを追加しない。画像・音声の解析とupload検証は従来どおりCLI、HTML生成だけをShow DOに置く。管理者にWrangler・Node.js・別R2資格情報は不要。
 
-無料で無制限の静的hostingではない。HTMLがCDN HITでも外側Worker・内側cache entrypointとShow DOの判定を使うため、それらの要求数、DO duration・SQL、R2 operation・履歴容量を**同一アカウントのFree枠へ合算**する。HTML履歴は自動削除しない。大量のRSS逐次公開では一覧の再生成が累積する。
+無料で無制限のhostingではない。CDN HITでも外側Worker・内側cache entrypointとShow DOの判定を使うため、要求数・DO duration・SQL・R2 operation・履歴容量を**同一アカウントのFree枠へ合算**する。Feed/HTMLのキャッシュミス時には生成CPUも使う。
 
 ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。詳しい比較・予算・受け入れ条件は[設計](../design/show_website_plan.md)参照。
 

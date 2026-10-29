@@ -17,11 +17,10 @@ async function fixture() {
     { transport, cloudflare: value.options });
   await command("create-show", ["daily", "https://example.com/podcast"]); await command("show-resume", ["daily", crypto.randomUUID()]);
   writeFileSync(join(value.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
-  await command("update-show", ["daily"]); await command("publish-show", ["daily"]);
+  await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);
   writeFileSync(join(value.root, "daily", "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
-  await command("update-episode", ["daily", "first"]); await command("update-episode-audio", ["daily", "first", "audio.mp3"]);
-  await command("publish-episode", ["daily", "first"]);
+  await command("publish-episode", ["daily", "first", "audio.mp3"]);
   const preview = async (action: string, episode = true) => sqliteLifecyclePlanSchema.parse(await command(episode ? "preview-episode-lifecycle" : "preview-show-lifecycle",
     episode ? ["daily", "first", action] : ["daily", action]));
   const file = join(value.root, "reviewed-plan.json");
@@ -37,41 +36,37 @@ test("formal lifecycle previews are read-only and execution restores only the sa
   expect(value.calls.every((call) => call.method === "GET")).toBe(true);
   expect(JSON.stringify(stop)).not.toContain("Unpublished local edit");
   writeFileSync(value.file, JSON.stringify(stop));
-  expect(await value.command("lifecycle-execute", [value.file, stop.request_sha256, "confirm"])).toMatchObject({ state: "succeeded" });
-  expect(await value.command("job-status", [stop.request.job_id])).toMatchObject({ snapshot_only: true, authorizes_recovery: false, status: { state: "succeeded" } });
-  expect(await value.command("operation-status", ["lifecycle", stop.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
+  expect(await value.command("lifecycle-execute", [value.file, stop.request_sha256, "confirm"])).toMatchObject({ result: "changed" });
   const restore = await value.preview("restore"); writeFileSync(value.file, JSON.stringify(restore));
-  expect(await value.command("lifecycle-execute", [value.file, restore.request_sha256, "confirm"])).toMatchObject({ state: "succeeded" });
-  expect(await value.command("job-status", [restore.request.job_id])).toMatchObject({ status: { state: "succeeded" } });
+  expect(await value.command("lifecycle-execute", [value.file, restore.request_sha256, "confirm"])).toMatchObject({ result: "changed" });
   expect(value.content.inspect("daily", "first").base).toEqual(base);
   expect(value.content.delivery(new URL(base.enclosure_url).pathname).status).toBe(200);
   expect(readFileSync(path, "utf8")).toContain("Unpublished local edit");
 });
 
-test("lost lifecycle submit responses retain one identity and repeated execution only reads status", async () => {
+test("lost lifecycle responses can be resubmitted as unchanged without a journal", async () => {
   const value = await fixture(), plan = await value.preview("unpublish"); writeFileSync(value.file, JSON.stringify(plan));
   const lost: typeof value.transport = async (input, init) => {
     const response = await value.transport(input, init);
-    if (init?.method === "POST" && String(input).endsWith("/jobs")) throw new Error("unconfirmed response");
+    if (init?.method === "POST" && String(input).endsWith("/publish")) throw new Error("unconfirmed response");
     return response;
   };
   await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"], lost)).rejects.toThrow("unknown");
   value.calls.length = 0;
-  expect(await value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).toMatchObject({ state: "succeeded" });
-  expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+  expect(await value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).toMatchObject({ result: "unchanged" });
+  expect(value.calls.filter((call) => call.method === "POST")).toHaveLength(1);
 });
 
 test("lifecycle refuses changed hashes, deletion, unconfirmed requests and stale resume windows without replay", async () => {
   const value = await fixture(), plan = await value.preview("unpublish"); writeFileSync(value.file, JSON.stringify(plan)); value.calls.length = 0;
-  await expect(value.command("lifecycle-execute", [value.file, "f".repeat(64), "confirm"])).rejects.toThrow("reviewed hash");
+  await expect(value.command("lifecycle-execute", [value.file, "f".repeat(64), "confirm"])).rejects.toThrow("reviewed plan");
   await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm-delete-retain-records"])).rejects.toThrow("confirm");
-  await expect(value.preview("delete")).rejects.toThrow("unregistered upload");
+  await expect(value.preview("delete")).rejects.toThrow("deletion");
   expect(value.calls).toEqual([]);
   await value.command("show-pause", ["daily", crypto.randomUUID()]); await value.command("show-resume", ["daily", crypto.randomUUID()]);
-  await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).rejects.toThrow("HTTP 503");
+  await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).rejects.toThrow("HTTP 409");
   value.calls.length = 0;
-  expect(await value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).toBe(null);
-  expect(value.calls.every((call) => call.method === "GET")).toBe(true);
+  await expect(value.command("lifecycle-execute", [value.file, plan.request_sha256, "confirm"])).rejects.toThrow("HTTP 409");
 });
 
 test("catalog client accepts bounded pages of escaped Unicode titles above the publication body limit", async () => {

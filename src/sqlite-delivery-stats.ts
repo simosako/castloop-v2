@@ -5,7 +5,7 @@ import { sqliteDeliveryObservationSchema, sqliteStatsCoverageSchema, sqliteStats
 import type { SqliteDeliveryObservation, SqliteStatsCoverage, SqliteStatsCounters,
   SqliteStatsDailyEntry, SqliteStatsEpisodeSummary, SqliteStatsRetentionRecord } from "../packages/shared/src/sqlite-stats";
 import { sha256Hex } from "../packages/shared/src/sha256";
-import { sqlitePublicationRequestSchema, sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
+import { sqlitePublicationTargetSchema, sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
 import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 
@@ -83,7 +83,7 @@ function round2(value: number): number {
 export class SqliteDeliveryStats {
   constructor(private readonly storage: PublicationQueueStorage, private readonly showId: string,
     private readonly identity: SqlitePublicationRuntime, private readonly now: () => number = Date.now) {
-    sqlitePublicationRequestSchema.shape.show_id.parse(showId);
+    sqlitePublicationTargetSchema.shape.show_id.parse(showId);
     storage.transactionSync(() => {
       const queue = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
       const content = storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0];
@@ -156,7 +156,7 @@ export class SqliteDeliveryStats {
   episodeExists(episodeId: string): boolean {
     return this.storage.sql.exec<{ episode_id: string }>(
       "SELECT episode_id FROM publication_episodes WHERE show_id = ? AND episode_id = ?", this.showId,
-      sqlitePublicationRequestSchema.shape.episode_id.unwrap().parse(episodeId)).toArray().length > 0;
+      sqlitePublicationTargetSchema.shape.episode_id.unwrap().parse(episodeId)).toArray().length > 0;
   }
 
   record(observations: readonly unknown[]): void {

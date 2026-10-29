@@ -23,13 +23,12 @@ async function fixture(shows = ["a", "b"], builtin = false, episodes = 0) {
       writeFileSync(path, stringifyToml({ ...parseShowMetadata(readFileSync(path, "utf8")), site_css_path: "site.css", site_timezone: "Asia/Tokyo" }));
       writeFileSync(join(f.root, id, "site.css"), ":root{--cl-accent:purple}");
     }
-    await run("update-show", [id]); await run("publish-show", [id]);
+    await run("publish-show", [id]);
     for (let index = 0; index < episodes; index++) {
       const episodeId = `ep-${index}`;
       await run("create-episode", [id, episodeId]);
       writeFileSync(join(f.root, id, "audio.mp3"), RSS_IMPORT_AUDIO);
-      await run("update-episode", [id, episodeId]); await run("update-episode-audio", [id, episodeId, "audio.mp3"]);
-      await run("publish-episode", [id, episodeId]);
+      await run("publish-episode", [id, episodeId, "audio.mp3"]);
     }
     await run("show-pause", [id, crypto.randomUUID()]);
   }

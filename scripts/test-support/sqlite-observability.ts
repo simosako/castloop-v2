@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { sqliteHealthSchema } from "../../packages/shared/src/sqlite-service-api";
-import { sqlitePublicationStatusSchema } from "../../packages/shared/src/sqlite-publication";
-import { operationPhaseSchema, operationReasonSchema, operationStateSchema } from "../../packages/shared/src/sqlite-operations";
+import { sqlitePublicationStatusSchema } from "./legacy-sqlite-publication";
+import { operationPhaseSchema, operationReasonSchema, operationStateSchema } from "./legacy-sqlite-operations";
 
 const diagnosticSchema = z.union([
   z.object({ event: z.literal("sqlite_publication"), phase: z.enum(["started", "succeeded", "failed", "blocked"]), job_id: z.uuid(),

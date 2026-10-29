@@ -3,7 +3,8 @@ import { runSqliteCommand } from "./sqlite-commands";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { continueSqliteServiceUpdateVerification, readSqliteServiceUpdate, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
-import { sqlitePublicationRequest } from "../../../src/test-support/sqlite-publication";
+import { parseSqliteDirectPublicationRequest } from "../../shared/src/sqlite-direct-publication";
+import { directShow, directCover } from "../../../src/test-support/direct-publication";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { administratorKey } from "./administrator-key";
 import { formatSqliteCatalog } from "./sqlite-catalog";
@@ -24,7 +25,6 @@ async function fixture() {
     expect(await run("show-status", [id])).toMatchObject({ scope: "show", show_id: id, state: "paused", publication_ready: true });
     await run("show-resume", [id, crypto.randomUUID()]);
     writeFileSync(join(f.root, id, "cover.jpg"), Uint8Array.of(255, 216, 255));
-    await run("update-show", [id]);
   };
   const pause = async (id: string) => { await run("show-pause", [id, crypto.randomUUID()]); };
   const update = (id = crypto.randomUUID()) => updateSqliteService(f.root, f.config, id, "updated", f.options, wait);
@@ -36,7 +36,7 @@ test("a failed Show publication does not stop another Show's publication, indepe
   f.hooks.afterPut = async (key) => { if (key.startsWith("public/podcasts/a/covers/")) throw new Error("Unknown publication write response"); };
   await expect(f.run("publish-show", ["a"])).rejects.toThrow();
   f.hooks.afterPut = undefined;
-  expect(await f.run("publish-show", ["b"])).toMatchObject({ state: "succeeded" });
+  expect(await f.run("publish-show", ["b"])).toMatchObject({ result: "changed" });
   const a = f.nodes.get("a")!, b = f.nodes.get("b")!;
   expect(a.service.delivery("/podcasts/a/feed.xml").status).toBe(404);
   expect(b.service.delivery("/podcasts/b/feed.xml").status).toBe(200);
@@ -48,7 +48,7 @@ test("a failed Show publication does not stop another Show's publication, indepe
   await f.run("show-resume", ["b", crypto.randomUUID()]);
   expect(b.service.delivery("/podcasts/b/feed.xml").status).toBe(200);
   await f.create("c");
-  expect(await f.run("publish-show", ["c"])).toMatchObject({ state: "succeeded" });
+  expect(await f.run("publish-show", ["c"])).toMatchObject({ result: "changed" });
   expect(a.service.queue.snapshot()).toMatchObject({ state: "paused", active: null, drained: true });
 });
 
@@ -114,7 +114,7 @@ test("separate Shows progress concurrently while one Show awaits external IO and
   const pending = f.run("publish-show", ["a"]);
   try {
     await entered.promise;
-    expect(await f.run("publish-show", ["b"])).toMatchObject({ state: "succeeded" });
+    expect(await f.run("publish-show", ["b"])).toMatchObject({ result: "changed" });
     expect(f.nodes.get("a")!.service.delivery("/podcasts/a/feed.xml").status).toBe(404);
     expect(f.nodes.get("b")!.service.delivery("/podcasts/b/feed.xml").status).toBe(200);
   } finally { settle.resolve(); await pending; }
@@ -124,9 +124,10 @@ test("separate Shows progress concurrently while one Show awaits external IO and
 test("Show identity, admission windows and operation targets cannot cross independent storages", async () => {
   const f = await fixture(); await f.create("a"); await f.create("b");
   const a = f.nodes.get("a")!.service, b = f.nodes.get("b")!.service;
-  const request = sqlitePublicationRequest(a.queue.identity(), a.queue.snapshot().admission_window_id!, { show_id: "b", kind: "show" });
-  await expect(a.queue.enqueue(request)).rejects.toThrow("scope");
-  await expect(b.queue.enqueue(request)).rejects.toThrow("window");
+  const request = parseSqliteDirectPublicationRequest({ ...a.queue.identity(), schema_version: 1, protocol: "sqlite-sequential-v1", action: "publish", kind: "show",
+    show_id: "b", metadata: { ...directShow, show_id: "b" }, cover: directCover, expected_show_state_version: 0, admission_window_id: a.queue.snapshot().admission_window_id });
+  await expect(a.queue.publish(request)).rejects.toThrow("target_unavailable");
+  await expect(b.queue.publish(request)).rejects.toThrow("stale_window");
   expect(a.delivery("/podcasts/b/feed.xml").status).toBe(404);
   expect(a.content.inspect("b").show).toBe(null);
   const response = await a.fetch(new Request(`${f.config.workers_dev_base_url}/admin/sqlite-service/resume`, {
@@ -203,7 +204,7 @@ test("an unknown Show initialization keeps its reservation and does not block a 
   await expect(f.run("create-show", ["a", "https://example.com"])).rejects.toThrow("uncertain");
   expect(f.showCalls.filter((call) => call.action === "initialize" && call.showId === "a")).toHaveLength(1);
   expect(f.control.registrationStatus("a").state).toBe("requested");
-  await f.create("b"); expect(await f.run("publish-show", ["b"])).toMatchObject({ state: "succeeded" });
+  await f.create("b"); expect(await f.run("publish-show", ["b"])).toMatchObject({ result: "changed" });
   await f.pause("b"); await expect(f.update()).rejects.toThrow("pause and drain");
   expect(f.showCalls.filter((call) => call.action === "prepare")).toEqual([]);
 });

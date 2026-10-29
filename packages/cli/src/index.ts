@@ -110,7 +110,6 @@ async function main(context: Invocation): Promise<unknown> {
   if (["version", "--version"].includes(command) && !rest.length) return CLI_VERSION;
   if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`Unknown command: ${command}`);
   const listing = command === "list-shows" || command === "list-episodes";
-  const operationRead = command === "operation-list" || command === "operation-status";
   const options = commandOptions(command);
   const { positional, flags } = argsOf(rest, Object.keys(options).filter((name) => options[name] === "boolean"));
   allowedFlags(flags, Object.keys(options));
@@ -203,12 +202,12 @@ async function main(context: Invocation): Promise<unknown> {
   const explicitRoot = flags.workspace === undefined ? undefined : resolve(flags.workspace);
   const explicitShow = flags.show;
   delete flags.workspace;
-  const episodeCommand = ["create-episode", "update-episode", "update-episode-audio", "publish-episode", "preview-episode",
+  const episodeCommand = ["create-episode", "publish-episode", "preview-episode",
     "preview-episode-schedule", "schedule-episode", "list-episode-revisions", "preview-episode-revision"].includes(command);
   if (episodeCommand && explicitRoot && !explicitShow) throw new AgentError("missing_show", "Explicit --workspace requires --show for Episode commands.");
   if (explicitShow) {
     validateId(explicitShow, "show");
-    if (!episodeCommand && !command.startsWith("operation-") && command !== "sync-local-metadata") throw new AgentError("invalid_options", "This command does not accept --show; use its Show positional argument.");
+    if (!episodeCommand && command !== "sync-local-metadata") throw new AgentError("invalid_options", "This command does not accept --show; use its Show positional argument.");
   }
   if (episodeCommand) delete flags.show;
   const expectedPreview = flags["expect-preview"];
@@ -238,8 +237,6 @@ async function main(context: Invocation): Promise<unknown> {
     return init(context.target.workspace, flags, () => { context.mutationStarted = true; });
   }
   let root = explicitRoot ?? process.cwd();
-  const watchSignal = command === "watch" ? new AbortController() : undefined;
-  if (watchSignal) process.once("SIGINT", () => watchSignal.abort());
   if (command === "create-show") {
     allowedFlags(flags, ["site-url", "site-mode"]);
     if (positional.length !== 1) throw new Error(commandHelp(command));
@@ -271,23 +268,14 @@ async function main(context: Invocation): Promise<unknown> {
     if (flags.episode) validateId(flags.episode, "episode");
   } else if (listing) {
     allowedFlags(flags, ["json", "include-deleted", "cursor"]);
-  } else if (operationRead) {
-    allowedFlags(flags, command === "operation-list" ? ["show", "local", "remote", "incomplete", "cursor", "parent", "json"] : ["show", "local", "remote", "after-version", "request-cursor", "json"]);
-    if (flags.local && flags.remote) throw new Error("Choose --local or --remote");
-  } else if (command.startsWith("operation-")) {
-    allowedFlags(flags, ["show"]);
   } else if (command === "diagnose") {
     allowedFlags(flags, ["max-shows", "external"]);
-  } else if (command === "progress") {
-    allowedFlags(flags, []);
   } else if (command === "verify") {
     allowedFlags(flags, ["episode"]);
   } else if (command === "stats") {
     allowedFlags(flags, ["episode", "from", "to", "by-revision", "cursor"]);
   } else if (command === "stats-retention") {
     allowedFlags(flags, ["operation-id"]);
-  } else if (command === "watch") {
-    allowedFlags(flags, ["timeout", "interval"]);
   } else if (["preview-episode-schedule", "schedule-episode", "preview-show-schedule", "schedule-show"].includes(command)) {
     allowedFlags(flags, ["at", "timezone"]);
     if (!flags.at) throw new Error("Scheduled commands require --at DATETIME");
@@ -336,23 +324,7 @@ async function main(context: Invocation): Promise<unknown> {
       return record ? { operation_id: operationId, phase: record.phase, last_known_only: true } : null;
     };
   }
-  if (["update-show", "publish-show", "update-episode", "update-episode-audio", "publish-episode"].includes(command)) {
-    const showId = validateId(positional[0], "show"); context.target.show_id = showId;
-    const target = { kind: episodeCommand ? "episode" as const : "show" as const, show_id: showId,
-      ...(episodeCommand ? { episode_id: validateId(positional[1], "episode") } : {}) };
-    context.failureResult = async () => {
-      const { readSqliteDraftRecord } = await import("./sqlite-draft-journal");
-      const record = await readSqliteDraftRecord(root, workspace, target);
-      return record ? { job_id: record.target.job_id, state: record.publication?.status?.state ?? (record.publication ? "unknown" : "draft"),
-        last_known_only: true, publication_requested: !!record.publication } : null;
-    };
-  }
-  if (command === "revision-execute") {
-    context.failureResult = async () => {
-      const { revisionProgress } = await import("./sqlite-revision-commands");
-      return revisionProgress(root, workspace, resolve(root, positional[0]!));
-    };
-  }
+  if (["publish-show", "publish-episode"].includes(command)) context.target.show_id = validateId(positional[0], "show");
   const { runSqliteCommand } = await import("./sqlite-commands");
   const effects = describeCommand(command === "update-service" ? "deploy" : command).effects;
   context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
@@ -360,15 +332,11 @@ async function main(context: Invocation): Promise<unknown> {
     previewOptions: { mode: flags.local ? "local" : flags.remote ? "remote" : "auto", rssOutput: flags["rss-output"] },
     revisionOptions: { cursor: flags.cursor, episodeId: flags.episode, expectedRevision: flags["expect-revision"], output: flags.output },
     ...(command === "domain" ? { domainOptions: { zoneId: flags["zone-id"], operationId: flags["operation-id"], cursor: flags.cursor } } : {}),
-    ...(command.startsWith("operation-") ? { operationOptions: { showId: flags.show, local: !!flags.local, incomplete: !!flags.incomplete, cursor: flags.cursor, parent: flags.parent,
-      afterVersion: flags["after-version"] === undefined ? undefined : Number(flags["after-version"]), requestCursor: flags["request-cursor"] } } : {}),
     ...(command === "diagnose" ? { diagnoseOptions: { maxShows: flags["max-shows"] === undefined ? undefined : Number(flags["max-shows"]),
       external: !!flags.external, environment: undefined } } : {}),
     ...(command === "verify" ? { verifyOptions: { episodeId: flags.episode } } : {}),
     ...(command === "stats" ? { statsOptions: { episodeId: flags.episode, from: flags.from, to: flags.to, cursor: flags.cursor } } : {}),
     ...(command === "stats-retention" ? { statsOptions: { retentionOperationId: flags["operation-id"] ?? randomUUID() } } : {}),
-    ...(command === "watch" ? { watchOptions: { timeoutSeconds: flags.timeout === undefined ? undefined : Number(flags.timeout),
-      intervalSeconds: flags.interval === undefined ? undefined : Number(flags.interval), signal: watchSignal?.signal } } : {}),
     ...(command.includes("schedule") ? { scheduleOptions: { at: flags.at, timezone: flags.timezone,
       expectVersion: flags["expect-version"], cursor: flags.cursor } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview,
@@ -386,10 +354,6 @@ async function main(context: Invocation): Promise<unknown> {
     if (diagnosed.summary.fail) process.exitCode = 1;
     if (!process.argv.includes("--json")) return formatDiagnose(diagnosed);
   }
-  if (command === "progress" && !process.argv.includes("--json")) {
-    const { formatProgress, progressResultSchema } = await import("./progress");
-    return formatProgress(progressResultSchema.parse(result));
-  }
   if (command === "verify") {
     const { verifyResultSchema, formatVerify } = await import("./verify");
     const verified = verifyResultSchema.parse(result);
@@ -404,13 +368,6 @@ async function main(context: Invocation): Promise<unknown> {
     }
     const { sqliteStatsEpisodesResponseSchema } = await import("../../shared/src/sqlite-stats");
     return formatSqliteStatsEpisodes(sqliteStatsEpisodesResponseSchema.parse(result));
-  }
-  if (command === "watch") {
-    if (watchSignal?.signal.aborted) process.exit(130);
-    const { watchResultSchema, formatWatch, watchExitCode } = await import("./watch");
-    const watched = watchResultSchema.parse(result);
-    process.exitCode = watchExitCode(watched);
-    if (!process.argv.includes("--json")) return formatWatch(watched);
   }
   return result;
 }

@@ -114,7 +114,7 @@ test("both SQLite HTTP handlers await authentication before runtime access or bo
   const publication = createSqlitePublicationHttp(new Proxy(value.queue, forbidden), "private-key", () => {
     throw new Error("Authentication must precede readiness inspection");
   });
-  for (const [path, http] of [["sqlite-service/prepare", service], ["sqlite-publication/jobs", publication]] as const) {
+  for (const [path, http] of [["sqlite-service/prepare", service], ["sqlite-publication/publish", publication]] as const) {
     for (const key of [undefined, "wrong-key"]) {
       const input = new Request(`https://service.example/admin/${path}`, { method: "POST", body: "{",
         headers: { "Content-Type": "application/json", ...(key ? { "X-Castloop-Key": key } : {}) } });

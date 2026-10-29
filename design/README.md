@@ -1,8 +1,8 @@
 # 設計文書の案内
 
-v0.7.6はIssue #70の内蔵番組サイト、Issue #65の予約公開とfuture `published_at`警告、Issue #63のオフライン暗号化バックアップ/検証/復元を追加する。内部queue/content形式**11/11**と`website="static-show-v2"`の新規環境専用で、7/8以前のリリース環境・試験環境は変換・採用しない。[リリースノート](../docs/release-v0.7.6.md)を起点に、以下の旧形式・開発時点の記録と区別する。実CloudflareでのCPU・無料枠適合、モバイル/キーボード実機確認は未検証である。
+`refactor1028`では[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)を`794341f`で実装し、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)で素材直接配置・metadata直接送信・内容による冪等公開へ切り替えた。公開job・操作追跡表・個別公開journalを廃止し、予約・RSS・診断も切り替えた。現行の内部queue/content形式は新規環境専用の**13/13**。Cloudflareへの配備・実機性能確認は未実施で、以下の配布済み版・実機検証の記録とは区別する。
 
-Issue #65の予約公開とIssue #70の改善を統合した現在の内部queue/content形式は**11/11**、必須サイト識別は`static-show-v2`。新規環境専用であり、予約公開版9/9・サイト試験版10/11等からの変換・互換配備は行わない。以下の番号は各段階の履歴として区別する。統合版は新規の本人限定環境へ実配備し、予約公開3件・取消1件・全コンテンツのAccess拒否を確認した。native Free性能、スマートフォン／キーボードの実機確認は未完了である。
+この見直し前のv0.7.6（Issue #65／#70／#63統合版、[リリースノート](../docs/release-v0.7.6.md)）は内部queue/content形式**11/11**、必須サイト識別は`static-show-v2`。新規環境専用であり、予約公開版9/9・サイト試験版10/11等からの変換・互換配備は行わない。以下の番号は各段階の履歴として区別する。統合版は新規の本人限定環境へ実配備し、予約公開3件・取消1件・全コンテンツのAccess拒否を確認した。native Free性能、スマートフォン／キーボードの実機確認は未完了である。
 
 Issue #70の自動短縮URL版は内部queue/content形式**10/11**・サイト識別`static-show-v2`の新規環境専用。Show直下の自動16文字ハッシュだけをEpisodeページ入口とし、衝突時だけ延長する。HTTP(S)リンク表示とcopyrightフッター削除も実装した。[URL設計と実装](show_website_site_slug_proposal.md)・[利用ガイド](../docs/show_website.md)を参照する。旧9/10等のDBは変換・互換配備しない。
 
@@ -63,6 +63,7 @@ v0.6.0はサービス設定version 2（SQLite）のみを扱い、`init`も既�
 | [公開jobのblocked診断・復旧の設計案](publication_blocked_recovery_plan.md) | Issue #62。blocked理由別の3分類(観測のみ/明示継続/保全)、continuation_ready経路の再利用、immutable書込のchecksumによる継続検証、`abandoned`終端状態と`prepared_at`決定性、内部形式12/12。**設計案・レビュー待ち(未実装)** |
 | [全体設計の見直しとシンプル化の提案（2026-10-28）](architecture_simplification_review_20261028.md) | Issue #62を契機とした複雑性の原因分析と、アトミック更新（成功/失敗の二択・blocked廃止）・オンデマンド生成・ジャーナル/操作表削減・deploy簡素化の段階的改善案 |
 | [フェーズ1設計書：公開処理の同期アトミック化とオンデマンド配信（2026-10-28）](phase1_atomic_publication_and_ondemand_delivery_plan.md) | 改善案A＋Bの具体設計。3ステップ同期公開（冪等メディア配置→パージ→単一SQLiteトランザクション）、`blocked`/`read_*`廃止、RSS/WebサイトHTMLのSQLiteオンデマンド生成と6テーブル削除 |
+| [フェーズ2：直接アップロードと冪等な公開](phase2_direct_media_and_cli_simplification_plan.md) | **実装済み・未配備**。CLI直接配置・JSON同期公開、同一内容no-op、予約/RSS/診断の切替、操作5表・job台帳・個別公開journal/lockと旧コマンドの削除。新規13/13環境専用 |
 | [Episode別・日別の配信統計の設計案](episode_delivery_statistics_plan.md) | Issue #71。観測点、指標定義、Range/HEAD/bot/revisionの扱い、未計測と0の区別、PII非保持、Show DO SQLite集計、保持日数設定（`stats-retention`）と通算累計保持（案8-α-2＋案8-A）。実装済み。[実機確認記録](episode_delivery_statistics_live_20261025.md) |
 | [エージェント向けCLIの利用方法](../docs/agent_usage.md) | v0.7.2。Skill export、JSON外枠、明示対象、ローカルpreviewと入力照合、診断・検証範囲 |
 | [コード全体レビュー（2026-10-21）](code_review_20261021.md) | セキュリティ・容量境界・重複・効率・テストの評価。再現済みの不具合と改善候補、検証範囲 |

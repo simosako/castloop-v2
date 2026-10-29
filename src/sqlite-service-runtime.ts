@@ -67,7 +67,7 @@ export class SqliteServiceRuntime {
       delivery_statistics: "episode-daily-v1",
       admission_state: snapshot.state === "open" ? "open" : "closed", delivery_policy: snapshot.state === "paused" ? "stopped" : "enabled",
       publication_ready: this.ready(), state: snapshot.state, admission_window_id: snapshot.admission_window_id,
-      queued: snapshot.queued, active: snapshot.active?.state ?? null, drained: snapshot.drained,
+      queued: snapshot.queued, active: null, drained: snapshot.drained,
       setup: setup ? { operation_id: setup.operation_id, state: setup.state } : null, runtime_update: this.updates.summary() });
   }
   async prepare(input: SqliteRuntimeRequest): Promise<SqliteHealth> {

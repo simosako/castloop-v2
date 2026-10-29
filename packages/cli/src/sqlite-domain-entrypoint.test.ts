@@ -40,7 +40,7 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     await invoke(["create-show", "daily", "--site-mode", "builtin"]);
     await invoke(["show-resume", "daily", crypto.randomUUID()]);
     writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
-    await invoke(["update-show", "daily"]); await invoke(["publish-show", "daily"]); await invoke(["show-pause", "daily", crypto.randomUUID()]);
+    await invoke(["publish-show", "daily"]); await invoke(["show-pause", "daily", crypto.randomUUID()]);
     const id = crypto.randomUUID(); f.faults.tlsPending = true;
     const failed = await invoke(["domain", "add", "podcasts.example.com", "--zone-id", "c".repeat(32), "--operation-id", id], false);
     expect(failed.result).toMatchObject({ operation_id: id, phase: "connected" });
@@ -55,7 +55,7 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     expect((await invoke(["domain", "list"])).result).toMatchObject({ connections_match: true });
     expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
     expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
-    await invoke(["update-show", "daily"]); await invoke(["publish-show", "daily"]); await invoke(["show-pause", "daily", crypto.randomUUID()]);
+    await invoke(["publish-show", "daily"]); await invoke(["show-pause", "daily", crypto.randomUUID()]);
     const removed = crypto.randomUUID();
     expect((await invoke(["domain", "remove", "--operation-id", removed])).result).toMatchObject({ phase: "completed" });
     expect(readSqliteDomainJournal(f.root, custom, removed)?.detach_acknowledged).toBe(true);

@@ -5,65 +5,55 @@ import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteAvailabilityActionSchema, sqliteAvailabilityRequestSchema } from "../../shared/src/sqlite-availability";
 import { sqliteControlJournalSchema as controlSchema } from "./sqlite-control-journal";
 import { administratorKey } from "./administrator-key";
-import { SqliteDraft } from "./sqlite-draft";
-import { readSqliteArchivedDraft, readSqliteDraftBySchedule, readSqliteDraftRecord, requireSqliteStatus,
-  sqliteScheduleSettled } from "./sqlite-draft-journal";
-import type { SqliteDraftTarget } from "./sqlite-draft-journal";
 import { SqliteServiceClient } from "./sqlite-service-client";
-import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { createLocalJournalStorage, writeSyncedLocalFile } from "./local-journal-storage";
-import { ensureLocalJournalParents, syncLocalJournalDirectory } from "./local-journal-path";
+import { syncLocalJournalDirectory } from "./local-journal-path";
 import { continueSqliteInitialization, initializeSqliteService, reconcileSqliteInitialization, readSqliteInitialization } from "./sqlite-initialization";
 import { readLocalMetadata } from "./local-metadata-read";
-import { executeSqliteLifecycle, previewSqliteLifecycle, readSqliteLifecycleStatus } from "./sqlite-lifecycle";
+import { executeSqliteLifecycle, previewSqliteLifecycle } from "./sqlite-lifecycle";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { continueSqliteServiceUpdateVerification, reconcileSqliteServiceUpdate, updateSqliteService } from "./sqlite-service-update";
 import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
-import { runSqliteOperationCommand } from "./sqlite-operation-commands";
-import type { OperationReadOptions } from "./sqlite-operation-commands";
 import { diagnoseShows } from "./diagnose";
 import { draftPreview } from "./draft-preview";
 import { showTemplate, episodeTemplate } from "./input-templates";
 import { continueSqliteDomainChange, listSqliteDomains, sqliteDomainOperationStatus, startSqliteDomainChange } from "./sqlite-domain-operation";
 import { sqliteDomainHostnameSchema } from "../../shared/src/sqlite-domain";
-import { completedDomainConfiguration } from "./sqlite-domain-local";
-import { executeRevision, previewRevision, readRevisionPlanFile, readRevisionStatus, syncLocalMetadata } from "./sqlite-revision-commands";
+import { executeRevision, previewRevision, readRevisionPlanFile, syncLocalMetadata } from "./sqlite-revision-commands";
 import { exportPreviewRss } from "./preview-rss";
 import { SqliteScheduleClient } from "./sqlite-schedule-client";
 import { cancelSqliteSchedule, previewCancelSqliteSchedule, previewRescheduleSqliteSchedule,
-  rescheduleSqliteSchedule } from "./sqlite-schedule";
-import { existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs";
+  rescheduleSqliteSchedule, publicationSchedule, reapproveSqliteSchedule } from "./sqlite-schedule";
+import { publishSqliteContent } from "./sqlite-publish";
+import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export type SqliteCommandOptions = { workerSource?: () => Promise<string>; transport?: R2RestTransport; cloudflare?: R2RestOptions;
   previewOptions?: { mode?: "auto" | "local" | "remote"; rssOutput?: string };
   revisionOptions?: { cursor?: string; episodeId?: string; expectedRevision?: string; output?: string };
   domainOptions?: { zoneId?: string; operationId?: string; cursor?: string };
-  listOptions?: { includeDeleted?: boolean; cursor?: string }; operationOptions?: OperationReadOptions;
+  listOptions?: { includeDeleted?: boolean; cursor?: string };
   diagnoseOptions?: { maxShows?: number; external?: boolean; environment?: Readonly<Record<string, string | undefined>> };
   verifyOptions?: { episodeId?: string };
-  watchOptions?: { timeoutSeconds?: number; intervalSeconds?: number; signal?: AbortSignal };
   statsOptions?: { episodeId?: string; from?: string; to?: string; cursor?: string; retentionOperationId?: string };
   scheduleOptions?: { at?: string; timezone?: string; expectVersion?: string; cursor?: string };
-  parentOperationId?: string; importId?: string; onUploadPrepared?: (id: string) => void; expectedPreview?: string;
+  expectedPreview?: string;
   allowFuturePublishedAt?: boolean; confirmFuturePublishedAt?: (publishedAt: string) => Promise<boolean> };
 export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
-  "preview-show": [1], "preview-episode": [1],
+  "preview-show": [1], "preview-episode": [1, 2],
   "list-show-revisions": [1], "list-episode-revisions": [1], "preview-show-revision": [2], "preview-episode-revision": [2],
   "revision-execute": [3], "sync-local-metadata": [0],
-  "create-show": [1, 2], "create-episode": [1], "update-show": [1], "publish-show": [1],
-  "update-episode": [1], "update-episode-audio": [2], "publish-episode": [1, 2], "job-status": [1],
+  "create-show": [1, 2], "create-episode": [1], "publish-show": [1], "publish-episode": [1, 2],
   "service-status": [0], "show-status": [1], "show-pause": [2], "show-resume": [2], "target-show": [1], "target-episode": [2],
   "show-admission-pause": [2], "show-delivery-resume": [2], "show-control-status": [2],
   "list-shows": [0], "list-episodes": [1], "preview-show-lifecycle": [2], "preview-episode-lifecycle": [3],
-  "lifecycle-execute": [3], "operation-status": [2], "init-reconcile": [1], "init-continue-verification": [1],
+  "lifecycle-execute": [3], "init-reconcile": [1], "init-continue-verification": [1],
   "update-service": [1], "update-service-verify": [1], "update-service-reconcile": [1],
-  "operation-list": [0], "operation-resume": [2], "operation-cancel": [2], "operation-cleanup-preview": [2], "operation-cleanup": [4],
   diagnose: Array.from({ length: 20 }, (_, index) => index + 1),
-  progress: [1], verify: [1], watch: [1],
+  verify: [1],
   domain: [1, 2],
   stats: [1], "stats-retention": [2],
-  "preview-episode-schedule": [1], "schedule-episode": [1],
+  "preview-episode-schedule": [1, 2], "schedule-episode": [1, 2],
   "preview-show-schedule": [1], "schedule-show": [1],
   "schedule-list": [1], "schedule-status": [2],
   "preview-schedule-reschedule": [2], "preview-schedule-cancel": [2], "preview-schedule-reapprove": [2],
@@ -110,11 +100,11 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   config = sqliteServiceConfigSchema.parse(config);
   if (command === "preview-show" || command === "preview-episode") {
     const episode = command === "preview-episode";
-    if (args.length !== (episode ? 2 : 1)) throw new Error("Invalid preview arguments");
+    if (episode ? args.length < 2 || args.length > 3 : args.length !== 1) throw new Error("Invalid preview arguments");
     const mode = options.previewOptions?.mode ?? "auto";
     const client = mode === "local" || !options.transport ? undefined : new SqliteServiceClient(config, administratorKey(root), options.transport);
     const result = await draftPreview(root, config, { kind: episode ? "episode" : "show", show_id: validateId(args[0], "show"),
-      ...(episode ? { episode_id: validateId(args[1], "episode") } : {}) }, undefined, { mode, client });
+      ...(episode ? { episode_id: validateId(args[1], "episode"), audio_path: args[2] } : {}) }, { mode, client });
     const rss = options.previewOptions?.rssOutput ? await exportPreviewRss(root, config, result,
       client ?? new SqliteServiceClient(config, administratorKey(root), options.transport), options.previewOptions.rssOutput) : { status: "not_checked" };
     return { ...result, rss_preview: rss };
@@ -131,9 +121,6 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
       return startSqliteDomainChange(root, config, action, id, await options.workerSource(), cf, target);
     }
     throw new Error("Expected domain add HOST --zone-id ID, remove, list, status UUID or continue UUID with only supported options");
-  }
-  if (command.startsWith("operation-") && !(command === "operation-status" && args[0] === "lifecycle" && !options.operationOptions?.local)) {
-    return runSqliteOperationCommand(root, config, command, args, options.operationOptions, options.transport, cf);
   }
   if (command === "init") {
     if (args.length > 1 || !options.workerSource) throw new Error("Invalid SQLite initialization arguments");
@@ -169,9 +156,6 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     return syncLocalMetadata(root, config, key, validateId(args[0], "show"), options.revisionOptions.expectedRevision,
       options.revisionOptions.episodeId, options.revisionOptions.output, options.transport);
   }
-  const draftOptions = { administratorKey: key, managementTransport: options.transport, r2: cf,
-    parentOperationId: options.parentOperationId, importId: options.importId, onUploadPrepared: options.onUploadPrepared,
-    allowFuturePublishedAt: options.allowFuturePublishedAt, confirmFuturePublishedAt: options.confirmFuturePublishedAt };
   if (command === "schedule-list" && args.length === 1) {
     return new SqliteScheduleClient(config, key, options.transport).list(validateId(args[0], "show"), options.scheduleOptions?.cursor);
   }
@@ -186,12 +170,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
       options.scheduleOptions?.at ?? "", options.scheduleOptions?.timezone, options.transport);
   }
   if (command === "preview-schedule-reapprove" && args.length === 2) {
-    const showId = validateId(args[0], "show"), scheduleId = z.uuid().parse(args[1]);
-    const retained = await readSqliteDraftBySchedule(root, config, scheduleId);
-    if (!retained || retained.target.show_id !== showId) throw new Error("Schedule reapproval preview requires the frozen local draft and uploaded assets");
-    const draft = await SqliteDraft.open(root, config, retained.target, draftOptions);
-    return draft.reapproveSchedulePlan({ at: options.scheduleOptions?.at ?? "", timezone: options.scheduleOptions?.timezone,
-      expectedVersion: z.number().int().positive().parse(Number(options.scheduleOptions?.expectVersion)) });
+    return reapproveSqliteSchedule(root, config, validateId(args[0], "show"), z.uuid().parse(args[1]), options, false);
   }
   if (command === "schedule-cancel" && args.length === 2) {
     return cancelSqliteSchedule(config, key, validateId(args[0], "show"), z.uuid().parse(args[1]),
@@ -203,13 +182,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
       z.number().int().positive().parse(Number(options.scheduleOptions?.expectVersion)), options.expectedPreview, options.transport);
   }
   if (command === "schedule-reapprove" && args.length === 2) {
-    const showId = validateId(args[0], "show"), scheduleId = z.uuid().parse(args[1]);
-    const retained = await readSqliteDraftBySchedule(root, config, scheduleId);
-    if (!retained || retained.target.show_id !== showId) throw new Error("Schedule reapproval requires the frozen local draft and uploaded assets");
-    const draft = await SqliteDraft.open(root, config, retained.target, draftOptions);
-    return draft.reapproveSchedule({ at: options.scheduleOptions?.at ?? "", timezone: options.scheduleOptions?.timezone,
-      expectedVersion: z.number().int().positive().parse(Number(options.scheduleOptions?.expectVersion)),
-      expectedPreview: options.expectedPreview });
+    return reapproveSqliteSchedule(root, config, validateId(args[0], "show"), z.uuid().parse(args[1]), options, true);
   }
   if (command === "init-reconcile" && args.length === 1) return reconcileSqliteInitialization(root, config, args[0], cf);
   if (command === "init-continue-verification" && args.length === 1 && options.workerSource) return continueSqliteInitialization(root, config, args[0], await options.workerSource(), cf);
@@ -222,16 +195,6 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     return diagnoseShows(root, config, args.map((id) => validateId(id, "show")),
       { transport: options.transport, cloudflare: cf, maxShows: options.diagnoseOptions?.maxShows,
         external: options.diagnoseOptions?.external, environment: options.diagnoseOptions?.environment });
-  }
-  if (command === "progress" && args.length === 1) {
-    const { readSqliteJobProgress } = await import("./progress");
-    return readSqliteJobProgress(root, config, z.uuid().parse(args[0]), options.transport);
-  }
-  if (command === "watch" && args.length === 1) {
-    const { watchSqliteJob } = await import("./watch");
-    return watchSqliteJob(root, config, z.uuid().parse(args[0]),
-      { timeoutSeconds: options.watchOptions?.timeoutSeconds, intervalSeconds: options.watchOptions?.intervalSeconds,
-        transport: options.transport, signal: options.watchOptions?.signal });
   }
   if (command === "list-shows" && !args.length || command === "list-episodes" && args.length === 1) {
     return client.catalog({ kind: command === "list-shows" ? "show" : "episode", ...(command === "list-episodes" ? { show_id: validateId(args[0], "show") } : {}),
@@ -278,123 +241,18 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (command === "preview-show-lifecycle" && args.length === 2) return previewSqliteLifecycle(config, key, validateId(args[0], "show"), args[1], undefined, options.transport);
   if (command === "preview-episode-lifecycle" && args.length === 3) return previewSqliteLifecycle(config, key, validateId(args[0], "show"), args[2], validateId(args[1], "episode"), options.transport);
   if (command === "lifecycle-execute" && args.length === 3) return executeSqliteLifecycle(root, config, key, readBoundedLocalJournal(resolve(root, args[0])), args[1], args[2], options.transport);
-  if (command === "operation-status" && args.length === 2 && args[0] === "lifecycle") {
-    const status = await readSqliteLifecycleStatus(root, config, key, args[1], options.transport);
-    if (status === undefined) throw new Error("No matching SQLite lifecycle journal");
-    return { job_id: args[1], status, snapshot_only: true, authorizes_recovery: false };
-  }
-  if (command === "job-status" && args.length === 1) {
-    const jobId = z.uuid().parse(args[0]);
-    const revision = await readRevisionStatus(root, config, key, jobId, options.transport);
-    if (revision !== undefined) return { job_id: jobId, status: revision, snapshot_only: true, authorizes_recovery: false };
-    const lifecycleStatus = await readSqliteLifecycleStatus(root, config, key, jobId, options.transport);
-    if (lifecycleStatus !== undefined) return { job_id: jobId, status: lifecycleStatus, snapshot_only: true, authorizes_recovery: false };
-    const archived = await readSqliteArchivedDraft(root, config, jobId);
-    if (archived?.publication) {
-      const historical = await completedDomainConfiguration(root, config, archived.service_config_sha256);
-      if (!historical) throw new Error("No exact completed domain transition permits this historical job lookup");
-      const status = await new SqlitePublicationClient(historical, key, options.transport).observe(archived.publication.request);
-      if (!status) throw new Error("Archived SQLite job is missing remotely; preserve its result");
-      requireSqliteStatus(archived.publication.request, archived.publication.request_sha256, status, archived.publication.status);
-      return { job_id: jobId, status, snapshot_only: true, authorizes_recovery: false };
-    }
-    for (const family of ["sqlite-drafts"] as const) {
-      ensureLocalJournalParents(root, family, config.service_id);
-      const folder = join(root, ".castloop", family, config.service_id);
-      let names: string[] = [];
-      try { names = readdirSync(folder).filter((name) => name.endsWith(".json")); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-      if (names.length > 10000) throw new Error("Local job lookup exceeds its record budget");
-      for (const name of names) {
-        const raw = z.object({ target: z.object({ job_id: z.uuid(), kind: z.enum(["show", "episode"]), show_id: z.string(), episode_id: z.string().optional() }) }).parse(
-          createLocalJournalStorage(root, family, config.service_id, name).read());
-        if (raw.target.job_id !== jobId) continue;
-        const record = await readSqliteDraftRecord(root, config, raw.target, true);
-        if (!record?.publication) return { job_id: jobId, state: "draft" };
-        const historical = await completedDomainConfiguration(root, config, record.service_config_sha256);
-        if (!historical) throw new Error("No exact completed domain transition permits this historical job lookup");
-        const status = await new SqlitePublicationClient(historical, key, options.transport).observe(record.publication.request);
-        if (!status && record.publication.status) throw new Error("Previously acknowledged SQLite job is missing remotely; preserve its result");
-        if (status) requireSqliteStatus(record.publication.request, record.publication.request_sha256, status, record.publication.status);
-        return { job_id: jobId, status, snapshot_only: true, authorizes_recovery: false };
-      }
-    }
-    throw new Error("No matching SQLite job journal");
-  }
   const schedulePreview = ["preview-episode-schedule", "preview-show-schedule"].includes(command);
   const scheduleCreate = ["schedule-episode", "schedule-show"].includes(command);
   if (schedulePreview || scheduleCreate) {
     const showKind = ["preview-show-schedule", "schedule-show"].includes(command);
     const targetId = { kind: showKind ? "show" as const : "episode" as const, show_id: validateId(args[0], "show"),
-      ...(showKind ? {} : { episode_id: validateId(args[1], "episode") }) };
-    const retained = await readSqliteDraftRecord(root, config, targetId);
-    if (!retained) throw new Error("Stage the current local inputs explicitly before scheduling");
-    if (retained.publication) throw new Error("SQLite publication request is already frozen");
-    if (retained.schedule) {
-      const previous = await (await SqliteDraft.open(root, config, retained.target, draftOptions)).observeSchedule();
-      if (sqliteScheduleSettled(previous.schedule)) throw new Error("This draft's schedule finished; prepare a new draft before scheduling again");
-    }
-    const draft = await SqliteDraft.open(root, config, retained.target, draftOptions);
-    if (schedulePreview) return draft.schedulePlan(options.scheduleOptions?.at ?? "", options.scheduleOptions?.timezone);
-    return draft.schedule({ at: options.scheduleOptions?.at ?? "", timezone: options.scheduleOptions?.timezone,
-      expectedPreview: options.expectedPreview });
+      ...(showKind ? {} : { episode_id: validateId(args[1], "episode"), audio_path: args[2] }) };
+    return publicationSchedule(root, config, targetId, options, scheduleCreate);
   }
-  const showCommand = ["update-show", "publish-show"].includes(command), episodeCommand = ["update-episode", "update-episode-audio", "publish-episode"].includes(command);
+  const showCommand = command === "publish-show", episodeCommand = command === "publish-episode";
   if (!showCommand && !episodeCommand) throw new Error(`Command ${command} is not implemented for sqlite-sequential-v1; no legacy fallback`);
-  if (args.length !== (showCommand ? 1 : command === "update-episode-audio" ? 3 : 2) && !(command === "publish-episode" && args.length === 3)) throw new Error("Invalid SQLite content command arguments");
+  if (showCommand ? args.length !== 1 : args.length !== 2 && args.length !== 3) throw new Error("Invalid SQLite content command arguments");
   const targetId = { kind: showCommand ? "show" as const : "episode" as const, show_id: validateId(args[0], "show"),
-    ...(episodeCommand ? { episode_id: validateId(args[1], "episode") } : {}) };
-  const publishing = command.startsWith("publish-");
-  let retained = await readSqliteDraftRecord(root, config, targetId, !publishing);
-  if (retained?.schedule) {
-    const schedule = retained.schedule;
-    let status;
-    if (retained.service_config_sha256 !== await sqliteServiceConfigHash(config)) {
-      const historical = await completedDomainConfiguration(root, config, retained.service_config_sha256);
-      if (!historical) throw new Error("No exact completed domain transition permits archiving the old schedule");
-      status = await new SqliteScheduleClient(historical, key, options.transport).status(retained.target.show_id, schedule.schedule_id);
-    } else {
-      status = await (await SqliteDraft.open(root, config, retained.target, draftOptions)).observeSchedule();
-    }
-    if (!sqliteScheduleSettled(status.schedule)) {
-      throw new Error("Schedule remains open or uncertain; inspect it without replacing the draft");
-    }
-    retained = null;
-  }
-  if (retained?.publication && !publishing) {
-    let status;
-    if (retained.service_config_sha256 !== await sqliteServiceConfigHash(config)) {
-      const historical = await completedDomainConfiguration(root, config, retained.service_config_sha256);
-      if (!historical) throw new Error("No exact completed domain transition permits archiving the old draft");
-      status = await new SqlitePublicationClient(historical, key, options.transport).observe(retained.publication.request);
-      if (status) requireSqliteStatus(retained.publication.request, retained.publication.request_sha256, status, retained.publication.status);
-    } else {
-      const previous = await SqliteDraft.open(root, config, retained.target, draftOptions);
-      status = await previous.observe();
-    }
-    if (!status || !["succeeded", "failed"].includes(status.state)) throw new Error("Publication remains frozen or uncertain; inspect its job without replacing it");
-    retained = null;
-  }
-  let target: SqliteDraftTarget;
-  if (retained) target = retained.target;
-  else {
-    if (publishing) throw new Error("Stage the current local inputs explicitly before publication");
-    const inspected = await client.inspect(targetId.show_id, targetId.episode_id);
-    if (inspected.state !== "open" || !["draft", "published"].includes(inspected.show_lifecycle) || inspected.expected_show_state_version === null ||
-      episodeCommand && (inspected.show_lifecycle !== "published" || !["missing", "published"].includes(inspected.episode_lifecycle!))) throw new Error("SQLite target is not available for this draft");
-    target = { ...targetId, job_id: crypto.randomUUID(), expected_show_state_version: inspected.expected_show_state_version,
-      ...(inspected.base_show_metadata_sha256 ? { base_show_metadata_sha256: inspected.base_show_metadata_sha256,
-        base_cover_sha256: inspected.base_cover_sha256 } : {}),
-      ...(episodeCommand ? { expected_episode_lifecycle_version: inspected.expected_episode_lifecycle_version } : {}),
-      ...(inspected.base_revision_id ? { base_revision_id: inspected.base_revision_id, base_metadata_sha256: inspected.base_metadata_sha256 } : {}) };
-  }
-  const draft = await SqliteDraft.open(root, config, target, draftOptions);
-  if (publishing) {
-    if (args[2]) {
-      const audio = (await draft.read()).assets.find((entry) => entry.upload.asset === "audio");
-      if (!audio || audio.source_path !== resolve(root, targetId.show_id, args[2])) throw new Error("MP3 argument differs from its staged source");
-    }
-    await draft.publish(options.expectedPreview); return draft.wait();
-  }
-  const staged = await draft.stage(showCommand ? { asset: "show" } : command === "update-episode-audio" ? { asset: "audio", audio_path: args[2] } : { asset: "episode_metadata" });
-  return { job_id: staged.target.job_id, state: "staged", assets: staged.assets.map((entry) => entry.upload.asset) };
+    ...(episodeCommand ? { episode_id: validateId(args[1], "episode"), audio_path: args[2] } : {}) };
+  return publishSqliteContent(root, config, targetId, options);
 }

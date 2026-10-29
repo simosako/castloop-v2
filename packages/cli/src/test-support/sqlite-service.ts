@@ -128,7 +128,7 @@ export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?
         if (!node) return new Response(null, { status: 404 });
         const response = await node.service.fetch(request);
         if (path.endsWith("/resume") || path.endsWith("/pause")) lost("control");
-        if (path.endsWith("/jobs") && request.method === "POST" && response.status === 202) {
+        if (path.endsWith("/publish") && request.method === "POST" && response.status === 200) {
           node.fixture.clearAlarm();
           await faults.afterPublish?.();
         }

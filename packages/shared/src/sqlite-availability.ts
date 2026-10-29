@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sqlitePublicationRuntimeSchema, sqlitePublicationRequestSchema } from "./sqlite-publication";
+import { sqlitePublicationRuntimeSchema, sqlitePublicationTargetSchema } from "./sqlite-publication";
 
 export const sqliteAvailabilityStateSchema = z.enum(["open", "admission_paused", "paused"]);
 export const sqliteAvailabilityActionSchema = z.enum(["pause", "resume", "admission-pause", "delivery-resume"]);
@@ -9,7 +9,7 @@ export const sqliteAvailabilitySnapshotSchema = z.object({
   admission_window_id: z.uuid().nullable(),
 }).strict();
 export const sqliteAvailabilityRequestSchema = sqlitePublicationRuntimeSchema.extend({
-  show_id: sqlitePublicationRequestSchema.shape.show_id,
+  show_id: sqlitePublicationTargetSchema.shape.show_id,
   operation_id: z.uuid(),
   action: sqliteAvailabilityActionSchema,
   expected_availability_version: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER - 1),

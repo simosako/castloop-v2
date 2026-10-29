@@ -4,8 +4,8 @@ import { diagnosticCheckSchema, diagnosticSummarySchema, parseEpisodeDraft, PUBL
 import type { DiagnosticCheck, DiagnosticSummary, SqliteServiceConfig } from "@castloop/shared";
 import { publicRequest, PublicHttpError } from "./public-http";
 import type { PublicRequestOptions } from "./public-http";
-import { createLocalJournalStorage } from "./local-journal-storage";
-import { ensureLocalJournalParents } from "./local-journal-path";
+import { administratorKey } from "./administrator-key";
+import { SqliteServiceClient } from "./sqlite-service-client";
 import { readLocalMetadata } from "./local-metadata-read";
 import type { R2RestTransport } from "./verified-r2-put";
 import { existsSync, readdirSync } from "node:fs";
@@ -23,46 +23,24 @@ export type VerifyResult = z.infer<typeof verifyResultSchema>;
 
 type EpisodeEvidence = { episodeId: string; guid: string | null; published: boolean; audioLength: number | null; audioEtag: string | null };
 
-const journalBrief = z.object({
-  target: z.object({ job_id: z.uuid(), kind: z.enum(["show", "episode"]), show_id: z.string(), episode_id: z.string().optional() }),
-  assets: z.array(z.object({ upload: z.object({ asset: z.string(), length_bytes: z.number() }) })).max(2),
-  publication: z.object({ status: z.object({ state: z.string() }).optional() }).optional(),
-});
-
 function summarize(checks: DiagnosticCheck[]): DiagnosticSummary {
   const summary = { pass: 0, warn: 0, fail: 0, not_checked: 0 };
   for (const entry of checks) summary[entry.status] += 1;
   return summary;
 }
 
-function localEvidence(root: string, config: SqliteServiceConfig, showId: string): { showPublished: boolean; episodes: Map<string, EpisodeEvidence> } {
+async function publishedEvidence(root: string, config: SqliteServiceConfig, showId: string, transport?: R2RestTransport) {
   const episodes = new Map<string, EpisodeEvidence>();
-  let showPublished = false;
-  for (const family of ["sqlite-drafts", "sqlite-publications"] as const) {
-    ensureLocalJournalParents(root, family, config.service_id);
-    let names: string[] = [];
-    try {
-      names = readdirSync(join(root, ".castloop", family, config.service_id)).filter((name) => name.endsWith(".json"));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
-    if (names.length > 10000) throw new Error("Local journal lookup exceeds its record budget");
-    for (const name of names) {
-      const parsed = journalBrief.safeParse(createLocalJournalStorage(root, family, config.service_id, name).read());
-      if (!parsed.success || parsed.data.target.show_id !== showId) continue;
-      const brief = parsed.data;
-      const succeeded = brief.publication?.status?.state === "succeeded";
-      if (brief.target.kind === "show" && succeeded) showPublished = true;
-      if (brief.target.kind === "episode" && brief.target.episode_id !== undefined) {
-        const existing = episodes.get(brief.target.episode_id) ?? { episodeId: brief.target.episode_id, guid: null, published: false, audioLength: null, audioEtag: null };
-        if (succeeded) existing.published = true;
-        const audio = brief.assets.find((asset) => asset.upload.asset === "audio");
-        if (succeeded && audio && existing.audioLength === null) existing.audioLength = audio.upload.length_bytes;
-        episodes.set(brief.target.episode_id, existing);
-      }
-    }
-  }
-  return { showPublished, episodes };
+  const client = new SqliteServiceClient(config, administratorKey(root), transport), content = await client.content(showId);
+  let after: string | undefined;
+  if (content.show_lifecycle === "published") do {
+    const page = await client.previewInventory(showId, content.feed_generation!, after);
+    for (const episode of page.episodes) episodes.set(episode.episode_id, { episodeId: episode.episode_id, guid: episode.guid,
+      published: true, audioLength: episode.length_bytes, audioEtag: null });
+    if (episodes.size > 10000) throw new Error("Publication inventory exceeds its read budget");
+    after = page.next_cursor ?? undefined;
+  } while (after);
+  return { showPublished: content.show_lifecycle === "published", episodes, observed: true };
 }
 
 async function localEpisodeGuids(root: string, showId: string): Promise<Map<string, string>> {
@@ -112,15 +90,20 @@ async function rangeTotal(url: URL, options: PublicRequestOptions, redirects: st
 export async function collectDeliveryChecks(root: string, config: SqliteServiceConfig, showId: string,
   episodeId: string | undefined, transport?: R2RestTransport): Promise<{ checks: DiagnosticCheck[]; processing: VerifyResult["processing"] }> {
   const options: PublicRequestOptions = { transport };
-  const evidence = localEvidence(root, config, showId);
+  const checks: DiagnosticCheck[] = [];
+  let evidence: { showPublished: boolean; episodes: Map<string, EpisodeEvidence>; observed: boolean };
+  try { evidence = await publishedEvidence(root, config, showId, transport); }
+  catch {
+    evidence = { showPublished: false, episodes: new Map(), observed: false };
+    checks.push({ id: "published-content", scope: "remote", status: "not_checked", code: "observation_unavailable",
+      message: "Committed content was not observable; delivery comparisons are incomplete", next_actions: [] });
+  }
   const guids = await localEpisodeGuids(root, showId);
   for (const [episode, guid] of guids) {
     const existing = evidence.episodes.get(episode);
-    if (existing) existing.guid = guid;
-    else evidence.episodes.set(episode, { episodeId: episode, guid, published: false, audioLength: null, audioEtag: null });
+    if (!existing && evidence.observed) evidence.episodes.set(episode, { episodeId: episode, guid, published: false, audioLength: null, audioEtag: null });
   }
   const feedUrl = new URL(`/podcasts/${showId}/feed.xml`, config.public_base_url);
-  const checks: DiagnosticCheck[] = [];
   let feedXml: string | null = null;
   try {
     const response = await publicRequest(feedUrl, "GET", { ...options, maximumBytes: PUBLICATION_RENDER_BUDGET_BYTES });
@@ -134,9 +117,9 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
     } else if (response.status === 404) {
       checks.push(evidence.showPublished
         ? { id: "feed-status", scope: "external", status: "fail", code: "published_feed_missing",
-          message: "The Show has a local succeeded publication but the feed is absent", next_actions: [] }
+          message: "The Show is published but the feed is absent", next_actions: [] }
         : { id: "feed-status", scope: "external", status: "warn", code: "feed_absent_no_publication_evidence",
-          message: "The feed is absent and no local succeeded publication exists for the Show", next_actions: [] });
+          message: "The feed is absent and no committed publication was confirmed", next_actions: [] });
     } else {
       checks.push({ id: "feed-status", scope: "external", status: "fail", code: "unexpected_status",
         message: `The feed returned HTTP ${response.status}`, next_actions: [] });
@@ -156,13 +139,13 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
       message: feedXml === null ? "The feed was not fetched; content checks were skipped" : "The feed body did not parse as RSS", next_actions: [] });
   } else if (!publishedEpisodes.length) {
     checks.push({ id: "feed-content", scope: "external", status: "not_checked", code: "no_local_expectations",
-      message: "The feed parsed but no local succeeded episode publications exist for comparison", next_actions: [] });
+      message: "No committed Episode publications were confirmed for comparison", next_actions: [] });
   } else {
     const missing = publishedEpisodes.filter((episode) => !feed.items.some((item) => item.guid === episode.guid));
     const originMismatch = feed.items.some((item) => item.enclosure !== null && new URL(item.enclosure).origin !== publishedOrigin);
     if (missing.length) {
       checks.push({ id: "feed-content", scope: "external", status: "fail", code: "guid_missing",
-        message: `Feed is missing GUIDs of locally succeeded episodes: ${missing.map((episode) => episode.episodeId).join(", ")}`, next_actions: [] });
+        message: `Feed is missing GUIDs of committed Episodes: ${missing.map((episode) => episode.episodeId).join(", ")}`, next_actions: [] });
     } else if (originMismatch) {
       checks.push({ id: "feed-content", scope: "external", status: "fail", code: "enclosure_origin_mismatch",
         message: "Feed enclosure URLs do not use the configured public origin", next_actions: [] });
@@ -198,7 +181,7 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
     if (!enclosure) {
       checks.push({ id: "audio", scope: "external", status: target?.published ? "fail" : "not_checked",
         code: target?.published ? "audio_url_missing" : "audio_no_local_expectation",
-        message: target?.published ? "The published episode has no enclosure URL in the feed" : "No local succeeded publication exists for the Episode", next_actions: [] });
+        message: target?.published ? "The published episode has no enclosure URL in the feed" : "No committed publication was confirmed for the Episode", next_actions: [] });
     } else {
       try {
         const audio = await headWithRangeFallback(new URL(enclosure), options);
@@ -207,7 +190,7 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
             message: `The published audio returned HTTP ${audio.status}`, next_actions: [] });
         } else if (target?.audioLength !== null && target !== undefined && audio.contentLength !== null && audio.contentLength !== target.audioLength) {
           checks.push({ id: "audio", scope: "external", status: "fail", code: "audio_content_mismatch",
-            message: `Published audio length ${audio.contentLength} differs from the staged ${target.audioLength}`, next_actions: [] });
+            message: `Published audio length ${audio.contentLength} differs from the committed ${target.audioLength}`, next_actions: [] });
         } else {
           checks.push({ id: "audio", scope: "external", status: "pass", code: "audio_served",
             message: `The published audio is served${target?.audioLength === null ? " (length comparison not checked)" : ""}`, next_actions: [] });
@@ -220,7 +203,7 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
   }
 
   const unpublished = [...evidence.episodes.values()].filter((episode) => !episode.published && episode.guid !== null);
-  if (feed === null) {
+  if (feed === null || !evidence.observed) {
     checks.push({ id: "unpublished-episodes", scope: "external", status: "not_checked", code: "feed_not_fetched",
       message: "The feed was not fetched; unpublished episode linkage was not checked", next_actions: [] });
   } else if (!unpublished.length) {
@@ -230,15 +213,15 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
     const linked = unpublished.filter((episode) => feed.items.some((item) => item.guid === episode.guid));
     checks.push(linked.length
       ? { id: "unpublished-episodes", scope: "external", status: "warn", code: "linked_without_publication_evidence",
-        message: `Episodes without local succeeded publication appear in the feed: ${linked.map((episode) => episode.episodeId).join(", ")}`, next_actions: [] }
+        message: `Locally known Episodes without committed publication appear in the feed: ${linked.map((episode) => episode.episodeId).join(", ")}`, next_actions: [] }
       : { id: "unpublished-episodes", scope: "external", status: "pass", code: "unpublished_not_linked",
         message: `${unpublished.length} unpublished episode(s) are correctly absent from the feed`, next_actions: [] });
   }
 
   const processingTarget = episodeId === undefined ? evidence.showPublished : evidence.episodes.get(episodeId)?.published ?? false;
   return { checks, processing: processingTarget
-    ? { state: "succeeded", detail: "local journals record a succeeded publication for this target" }
-    : { state: "not_checked", detail: "no local succeeded publication exists for this target" } };
+    ? { state: "succeeded", detail: "Committed publication was confirmed; delivery is checked separately" }
+    : { state: "not_checked", detail: "No committed publication was confirmed for this target" } };
 }
 
 export async function verifyShowDelivery(root: string, input: SqliteServiceConfig, showId: string,

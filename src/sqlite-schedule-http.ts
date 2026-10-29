@@ -2,7 +2,7 @@ import { sqliteScheduleCancelSchema, sqliteScheduleCreateSchema, sqliteScheduleR
 import { authenticated } from "./admin-auth";
 import { readBoundedAdminJson } from "./admin-body";
 import { adminReply as reply } from "./admin-reply";
-import { operationClient } from "./sqlite-operation-http";
+import { MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../packages/shared/src/sqlite-direct-publication";
 import { SqlitePublicationSchedules } from "./sqlite-publication-schedules";
 
 const prefix = "/admin/sqlite-schedules";
@@ -25,9 +25,9 @@ export function createSqliteScheduleHttp(schedules: SqlitePublicationSchedules, 
         if (request.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json" || request.headers.has("Content-Encoding")) {
           return reply({ error: "invalid_input" }, 400);
         }
-        const input = sqliteScheduleCreateSchema.parse(await readBoundedAdminJson(request, 32768));
+        const input = sqliteScheduleCreateSchema.parse(await readBoundedAdminJson(request, MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 16384));
         if (input.show_id !== showId) return reply({ error: "target_differs" }, 409);
-        return reply(await schedules.create(input, request.headers.has("X-Castloop-Client-Id") ? operationClient(request) : undefined), 202);
+        return reply(await schedules.create(input), 202);
       }
       const parts = path.slice(1).split("/");
       if (parts.length > 2 || parts.some((part) => !part)) return reply({ error: "invalid_route" }, 400);
@@ -44,7 +44,7 @@ export function createSqliteScheduleHttp(schedules: SqlitePublicationSchedules, 
       if (request.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json" || request.headers.has("Content-Encoding")) {
         return reply({ error: "invalid_input" }, 400);
       }
-      const input = await readBoundedAdminJson(request, 32768);
+      const input = await readBoundedAdminJson(request, MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 16384);
       if (action === "cancel") {
         const parsed = sqliteScheduleCancelSchema.parse(input);
         if (parsed.show_id !== showId || parsed.schedule_id !== scheduleId) return reply({ error: "target_differs" }, 409);

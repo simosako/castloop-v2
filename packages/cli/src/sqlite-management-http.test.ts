@@ -4,7 +4,7 @@ import type { SqliteManagementReadDiagnostic } from "./sqlite-management-http";
 import type { R2RestTransport } from "./verified-r2-put";
 
 const id = "11111111-1111-4111-8111-111111111111";
-const url = new URL(`https://test-worker.example.workers.dev/admin/sqlite-publication/jobs/${id}`);
+const url = new URL(`https://test-worker.example.workers.dev/admin/sqlite-schedules/${id}`);
 const headers = { "X-Castloop-Key": "private-administrator-key" };
 const json = (value: unknown = { state: "running" }) => Response.json(value, { headers: { "Cache-Control": "no-store" } });
 function fixture(transport: R2RestTransport) {

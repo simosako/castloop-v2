@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { episodeDraftSchema, episodeDraftFromRevision, episodeRevisionSchema, showMetadataSchema } from "./index";
+import { episodeDraftSchema, episodeDraftFromRevision, episodeRevisionSchema, showMetadataSchema } from "./metadata";
 import type { EpisodeDraft, ShowMetadata } from "./index";
 import { sqliteAvailabilityStateSchema } from "./sqlite-availability";
-import { sqlitePublicationProtocol, sqlitePublicationRequestSchema, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
+import { sqliteContentActionRequestSchema } from "./sqlite-direct-publication";
 import { SITE_ID_PATTERN } from "./website";
 
 export const SQLITE_REVISION_PAGE_SIZE = 20;
@@ -228,11 +229,11 @@ export function diffEpisodeDraftFields(published: EpisodeDraft | null, candidate
   });
 }
 
-const revisionRequestSchema = sqlitePublicationRequestSchema.refine((value) => value.action === "restore_revision",
-  "Revision restoration plans require restore_revision action");
+const revisionRequestSchema = z.lazy(() => sqliteContentActionRequestSchema.refine((value) => value.action === "restore_revision",
+  "Revision restoration plans require restore_revision action"));
 export const sqliteRevisionPlanSchema = z.object({
   request: revisionRequestSchema,
-  request_sha256: sqlitePublicationRequestSchema.shape.service_config_sha256,
+  request_sha256: sqlitePublicationRuntimeSchema.shape.service_config_sha256,
 }).strict();
 export type SqliteRevisionPlan = z.infer<typeof sqliteRevisionPlanSchema>;
 

@@ -1,6 +1,6 @@
 # 管理用設定と予約公開
 
-Issue #65の開発版。任意の管理用タイムゾーン設定、オフライン日時変換、future UTCの予約登録・実行を提供する。予約実行日時は`published_at`とは別で、既存の`published_at`に未来日時を書いただけでは公開を遅らせない。予約にはstage済みdraft、明示承認hash、openなShowが必要。Issue #70との統合版はfresh環境専用の内部queue/content形式**11/11**を使う。旧9/9・10/11等のDBは変換しない。
+フェーズ2開発版。任意の管理用タイムゾーン設定、オフライン日時変換、UTCでの予約登録・実行を提供する。予約実行日時は`published_at`とは別。予約にはローカル入力、明示承認hash、openなShowが必要。新規環境専用の内部queue/content形式**13/13**を使い、旧形式は変換しない。
 
 ## 任意の管理用設定
 
@@ -55,13 +55,13 @@ castloop preview-schedule-time 2026-11-01T09:00:00 \
 
 ## 予約公開
 
-予約はstage済みのShow／Episode draftを対象にする。先に通常の`update-show`／`update-episode`／`update-episode-audio`で素材を保存し、予約previewで対象・素材hash・公開済みbase・現地日時・UTC・承認hashを確認する。
+予約previewでローカルTOML・素材hash・公開済みbase・現地日時・UTC・承認hashを確認する。実行時にCLIが素材を直接配置し、metadata・具体的な素材参照を予約へ保存する。MP3指定で音声更新、省略で公開済み音声を使い、初回はMP3が必要。
 
 ```sh
-# Episode（--showが必要）
-castloop preview-episode-schedule first --workspace /path/to/workspace --show daily \
+# Episode requires --show.
+castloop preview-episode-schedule first audio.mp3 --workspace /path/to/workspace --show daily \
   --at 2026-11-01T09:00:00 --timezone Asia/Tokyo --json
-castloop schedule-episode first --workspace /path/to/workspace --show daily \
+castloop schedule-episode first audio.mp3 --workspace /path/to/workspace --show daily \
   --at 2026-11-01T09:00:00 --timezone Asia/Tokyo \
   --expect-preview REVIEWED_HASH --json
 
@@ -71,20 +71,20 @@ castloop schedule-show daily --workspace /path/to/workspace --at 2026-11-01T09:0
   --expect-preview REVIEWED_HASH --json
 ```
 
-予約受付は`accepted`／`scheduled`であり、公開成功ではない。CLIはschedule IDを返して終了し、端末を起動したままにする必要はない。サーバーはShow内の予約表へ保存し、時刻到来までFIFOへ入れない。遠い未来の予約が通常公開を待たせない。
+`scheduled`は受付であり公開成功ではない。CLIはschedule IDを返して終了し、端末を起動したままにする必要はない。Show内の予約表と既存Alarmで実行し、遠い未来の予約が通常公開を待たせない。作成応答が不明なら一覧で確認し、無条件に再作成しない。
 
 ```sh
 castloop schedule-list daily --workspace /path/to/workspace --json
 castloop schedule-status daily SCHEDULE_UUID --workspace /path/to/workspace --json
 ```
 
-`state`は予約の状態、`publication_state`は対応する公開jobの状態を表す。`scheduled`は未投入、`dispatched`はFIFO投入済みで公開成功ではない。公開完了は`publication_state="succeeded"`で確認する。
+`scheduled`は未実行、`dispatched`は公開確定済みで、その`revision_id`を返す。公開内容と予約の実行済み状態は同じトランザクションで確定する。job台帳や`publication_state`は使わない。
 
-- `preview-schedule-reschedule SHOW SCHEDULE_ID --at DATETIME`で新しい日時の承認hashを得て、`schedule-reschedule SHOW SCHEDULE_ID --at DATETIME --expect-version N --expect-preview HASH`でFIFO投入前だけ日時を変更する。内容は変えない。
-- `preview-schedule-cancel SHOW SCHEDULE_ID`で承認hashを得て、`schedule-cancel SHOW SCHEDULE_ID --expect-version N --expect-preview HASH`でFIFO投入前だけ取消す。投入済みjobは取消さず、素材も自動削除しない。
-- `preview-schedule-reapprove SHOW SCHEDULE_ID --at DATETIME --expect-version N`で現在のdraft・runtime・baseを再確認し、`schedule-reapprove SHOW SCHEDULE_ID --at DATETIME --expect-version N --expect-preview HASH`で再承認する。
-- Pause、受付停止、保守準備、runtime／config変更、Show／Episode base変更では未投入予約を`needs_approval`へ移す。Resumeや保守解除だけでは再開しない。現在の条件でdraftを再度previewし、`schedule-reapprove SHOW SCHEDULE_ID --at DATETIME --expect-version N --expect-preview HASH`で明示再承認する。
-- 予約中は同じdraftの再upload、即時publish、upload取消・cleanupを拒否する。取消後も素材は自動削除しない。
+- `preview-schedule-reschedule SHOW SCHEDULE_ID --at DATETIME`→`schedule-reschedule SHOW SCHEDULE_ID --at DATETIME --expect-version N --expect-preview HASH`で未実行予約の日時だけ変更する。
+- `preview-schedule-cancel SHOW SCHEDULE_ID`→`schedule-cancel SHOW SCHEDULE_ID --expect-version N --expect-preview HASH`で未実行予約を取消す。素材は自動削除しない。
+- `preview-schedule-reapprove SHOW SCHEDULE_ID --at DATETIME --expect-version N`→`schedule-reapprove ... --expect-preview HASH`で再承認する。予約済みmetadata・素材を保持し、現在のruntime・baseと日時だけ再確認する。手元の編集を暗黙に採用しない。
+- Pause、受付停止、保守準備、runtime／config変更、Show／Episode base変更では予約を`needs_approval`へ移す。Resumeや保守解除だけでは再開しない。
+- 対象ごとに未実行予約は1件。即時公開は別の明示操作であり、予約と競合すれば古い予約には再承認が必要になる。
 - 予約実行が遅延しても`published_at`を書き換えない。予定時刻は「実行を開始してよい最早時刻」であり、その瞬間の公開完了や最大遅延を保証しない。
 
 ## 未来の`published_at`で即時公開する場合
@@ -94,8 +94,8 @@ castloop schedule-status daily SCHEDULE_UUID --workspace /path/to/workspace --js
 - `preview-episode`は`warnings`に`code=future_published_at`を返す。予約previewにも同じ警告が含まれるが、予約の実行時刻は`schedule`の値で決まる。
 - 非対話（`--json`または`--non-interactive`）の`publish-episode`は、`--allow-future-published-at`がなければ送信前に`future_published_at`で失敗する。JSONの`outcome`は`not_started`。
 - 対話時は`publish now`の入力を求める。通常の承認hashや`--expect-preview`をこの確認の代用にしない。
-- 既に公開要求を凍結したjobのstatus読取は、この確認を要求しない。
+- 既に同じ内容が公開済みの場合は、即時公開確認を繰り返さず変更なしで返す。
 - `publish-rss-import`はfuture日時のEpisodeを1件でも含む場合、同じ`--allow-future-published-at`を要求する。一括公開の途中で止まらないよう、開始前に拒否する。
 - 予約公開を使う場合は`preview-episode-schedule`／`schedule-episode`を使う。予約実行日時は`published_at`と独立で、予約は`published_at`を書き換えない。
 
-隔離したfresh Cloudflare環境で3 Episodeを予約し、各予定前のFeed未配信と予定後の配信、`publication_state=succeeded`を確認した。同じ9/9環境でPause→`needs_approval`→Resume→再承認→公開、日時変更→取消、約3時間後の予約を残したまま別Episodeの即時公開、予定前の直リンク404と公開後の200/206・SHA-256一致も確認した。11/11統合版は新規の本人限定環境で予約3件・取消1件を実行し、予定前後のFeed、Pause/再承認、builtinサイト、Access 129要求拒否、音源hashを確認した。Alarm再配送・blocked・同時刻予約・実Cache purge・性能は未確認である。ローカル試験とmemory R2の成功を、未確認経路の実機証拠にしない。採用設計と未確認範囲は[予約公開計画](../design/episode_scheduled_publication_plan.md)、[9/9実機検証](../design/issue65_scheduled_publication_live_20261026.md)、[11/11非公開実機検証](../design/issue65_scheduled_publication_11_live_20261027.md)を参照。
+現行経路はローカルで予約・停止・再承認・取消・Alarm再配送・公開との原子的確定を検証する。実Cloudflareへの配備・性能は未確認。旧形式の実機記録は[設計索引](../design/README.md)で区別する。

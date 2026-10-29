@@ -34,7 +34,7 @@ export async function serveSqliteGateway(request: Request, managementOrigin: str
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { "Cache-Control": "no-store" } });
     const decision = await service.delivery(url.pathname);
     if (decision.status !== 200) return new Response(null, { status: decision.status, headers: { "Cache-Control": "no-store" } });
-    if (decision.key !== asset.key) throw new Error("Public delivery target differs");
+    if (asset.kind === "feed" ? decision.key !== asset.key : decision.key !== decision.cache_props.objectKey) throw new Error("Public delivery target differs");
     if (url.origin !== publicOrigin) {
       return new Response(null, { status: asset.kind === "feed" ? 301 : 307,
         headers: { Location: `${publicOrigin}${url.pathname}`, "Cache-Control": "no-store" } });
