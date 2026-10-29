@@ -127,15 +127,10 @@ jobs:
           actual_version="${actual_version%$'\r'}"
           test "$actual_version" = "$expected_version"
           "./${{ matrix.binary }}" --help | grep -F 'Usage: castloop'
-          for command in \
-            domain doctor diagnose template preview-show preview-episode list-show-revisions list-episode-revisions \
-            preview-show-revision preview-episode-revision revision-execute sync-local-metadata preview-schedule-time \
-            preview-episode-schedule schedule-episode preview-show-schedule schedule-show schedule-list schedule-status \
-            preview-schedule-reschedule preview-schedule-cancel preview-schedule-reapprove schedule-reschedule \
-            schedule-cancel schedule-reapprove skill validate describe schema init create-show create-episode publish-show \
-            publish-episode verify stats stats-retention deploy service-status show-status target-show target-episode \
-            list-shows list-episodes preview-show-lifecycle preview-episode-lifecycle lifecycle-execute import-rss \
-            publish-rss-import backup-create backup-verify backup-restore-preview backup-restore; do
+          # Take the command list from the binary itself so this check cannot drift when
+          # commands are added, renamed or removed (the Phase 2-4 removals broke this step).
+          command_list="$("./${{ matrix.binary }}" describe | node -e "let source='';process.stdin.on('data',chunk=>source+=chunk).on('end',()=>console.log(JSON.parse(source).commands.map(c=>c.command).join(' ')))")"
+          for command in $command_list; do
             "./${{ matrix.binary }}" "$command" --help | grep -F "Usage: castloop $command"
           done
           "./${{ matrix.binary }}" init --help | grep -F 'no protocol option is required'
