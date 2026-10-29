@@ -20,7 +20,7 @@ async function fixture() {
   const run = (name: string, args: string[], transport = f.transport) =>
     runSqliteCommand(f.root, f.config, name, args, { cloudflare: f.options, transport });
   await run("create-show", ["daily", "https://example.com/podcast"]);
-  await run("show-resume", ["daily", crypto.randomUUID()]);
+ 
   const showFile = join(f.root, "daily", "show.toml"), file = join(f.root, "daily", "episode-first.toml");
   const coverFile = join(f.root, "daily", "cover.jpg"), audioFile = join(f.root, "daily", "audio.mp3");
   writeFileSync(coverFile, Buffer.from([255, 216, 255, 2]));
@@ -120,15 +120,18 @@ test("Show revision restores only its saved cover, not Episodes, without uploadi
   expect((await f.client.content("daily")).show_content!.cover.sha256).toBe(old.cover.sha256); expect(f.node.service.content.episodes("daily")).toEqual(episodes);
 });
 
-test("history pages newest first and remains private/read-only while paused", async () => {
+test("history pages newest first and stay private while revision previews stay read-only", async () => {
   const f = await fixture();
   for (let i = 0; i < 21; i++) { f.edit(`Revision ${i}`); await f.run("publish-episode", ["daily", "first"]); }
-  await f.run("show-pause", ["daily", crypto.randomUUID()]);
+
   const first = await f.client.revisions("daily", "first"), second = await f.client.revisions("daily", "first", String(first.next_cursor));
   expect(first.episode_revisions).toHaveLength(20); expect(second.episode_revisions).toHaveLength(2); expect(second.next_cursor).toBeNull();
   const http = f.node.service.fetch.bind(f.node.service);
   expect((await http(new Request(`${f.config.workers_dev_base_url}/admin/sqlite-service/content/daily/first`, { headers: { "X-Castloop-Show-Id": "daily" } }))).status).toBe(401);
-  expect((await previewRevision(f.config, f.key, "daily", second.episode_revisions![0]!.revision_id, "first", f.transport)).plan).toBeNull();
+  const plan = await previewRevision(f.config, f.key, "daily", second.episode_revisions![0]!.revision_id, "first", f.transport);
+  expect(plan.plan).not.toBeNull();
+  expect(plan.plan!.request.base_revision_id).toBe(first.episode_revisions![0]!.revision_id);
+  expect(plan.resulting_lifecycle).toBe("published");
 });
 
 test("RSS export renders local changes without publishing or overwriting", async () => {

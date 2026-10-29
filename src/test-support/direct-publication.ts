@@ -4,6 +4,7 @@ import { sqliteServiceConfigHash } from "../../packages/shared/src/sqlite-servic
 import type { SqliteServiceConfig } from "../../packages/shared/src/sqlite-service";
 import { sqlitePublicationFixture } from "./sqlite-publication";
 import { sqlitePublicationBucket } from "./sqlite-publication-bucket";
+import { initializeSqliteDomains, pendingSqliteDomain } from "../sqlite-domain-runtime";
 import { SqlitePublicationContent } from "../sqlite-publication-content";
 import { createSqlitePublicationExecutor } from "../sqlite-publication-executor";
 
@@ -17,14 +18,18 @@ export const directAudio = { sha256: "c".repeat(64), length_bytes: 7, duration_s
 export async function directPublicationFixture() {
   const config: SqliteServiceConfig = { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service",
     account_id: "a".repeat(32), bucket_name: "test-bucket", worker_name: "test-worker", public_base_url: "https://public.example.com", workers_dev_base_url: "https://test-worker.example.workers.dev" };
-  const fixture = sqlitePublicationFixture({ runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) } });
+  let domainStorage: ReturnType<typeof sqlitePublicationFixture>["storage"];
+  const fixture = sqlitePublicationFixture({ runtime: { service_id: config.service_id, worker_version_id: crypto.randomUUID(), service_config_sha256: await sqliteServiceConfigHash(config) },
+    scope: { showId: "daily", ready: () => !pendingSqliteDomain(domainStorage) } });
+  domainStorage = fixture.storage;
+  initializeSqliteDomains(domainStorage);
   const content = new SqlitePublicationContent(fixture.storage), objects = sqlitePublicationBucket();
   const purges: string[] = [], hooks: { purge?: () => Promise<void> } = {};
   fixture.queue.executor = createSqlitePublicationExecutor(content, config, {
     async purge() { purges.push("media"); await hooks.purge?.(); }, async purgeSite() { purges.push("site"); },
   });
   content.registerShow("daily", crypto.randomUUID());
-  const common = () => ({ schema_version: 1, protocol: "sqlite-sequential-v1", ...fixture.runtime, admission_window_id: fixture.queue.snapshot().admission_window_id,
+  const common = () => ({ schema_version: 1, protocol: "sqlite-sequential-v1", ...fixture.identity,
     show_id: "daily", expected_show_state_version: content.inspect("daily").show!.state_version });
   const show = () => {
     const request = parseSqliteDirectPublicationRequest({ ...common(), action: "publish", kind: "show", metadata: directShow, cover: directCover });

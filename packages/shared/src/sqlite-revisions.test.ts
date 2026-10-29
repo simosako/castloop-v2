@@ -3,8 +3,7 @@ import { sqliteContentActionRequestSchema as sqlitePublicationRequestSchema } fr
 import { diffEpisodeDraftFields, diffShowMetadataFields } from "./sqlite-revisions";
 
 const request = { schema_version: 1, protocol: "sqlite-sequential-v1", service_id: "service", kind: "episode", show_id: "daily", episode_id: "first",
-  action: "restore_revision", worker_version_id: crypto.randomUUID(),
-  service_config_sha256: "a".repeat(64), admission_window_id: crypto.randomUUID(), expected_show_state_version: 1,
+  action: "restore_revision", service_config_sha256: "a".repeat(64), expected_show_state_version: 1,
   expected_episode_lifecycle_version: 0, base_revision_id: crypto.randomUUID(), target_revision_id: crypto.randomUUID() };
 
 test("revision requests require an exact current base, target revision, valid scope and no uploads", () => {

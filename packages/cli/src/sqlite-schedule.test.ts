@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { parseEpisodeDraft, stringifyToml } from "@castloop/shared";
 import { sqliteScheduleStatusSchema } from "../../shared/src/sqlite-schedule";
+import { SQLITE_DOMAIN_PROTOCOL, sqliteDomainRequestHash } from "../../shared/src/sqlite-domain";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { initializeSqliteService } from "./sqlite-initialization";
@@ -16,13 +18,13 @@ async function fixture() {
   await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "source", f.options, { attempts: 2, delay: async () => {} });
   const run = (name: string, args: string[], extra: SqliteCommandOptions = {}) => runSqliteCommand(f.root, f.config, name, args,
     { transport: f.transport, cloudflare: f.options, ...extra });
-  await run("create-show", ["daily", "https://example.com"]); await run("show-resume", ["daily", crypto.randomUUID()]);
+  await run("create-show", ["daily", "https://example.com"]);
   writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255)); await run("publish-show", ["daily"]);
   await run("create-episode", ["daily", "first"]); writeFileSync(join(f.root, "daily", "audio.mp3"), RSS_IMPORT_AUDIO);
   const at = new Date(Date.now() + 3600000).toISOString().replace(/\.\d{3}Z$/, "Z");
   const scheduleOptions = { at }, args = ["daily", "first", "audio.mp3"];
   const preview = await run("preview-episode-schedule", args, { scheduleOptions }) as { approval_sha256: string };
-  return { ...f, run, args, scheduleOptions, preview };
+  return Object.assign(f, { run, args, scheduleOptions, preview });
 }
 
 test("schedule creation places local media only after exact approval and freezes inline content without a publication journal", async () => {
@@ -41,14 +43,32 @@ test("reapproval keeps server-frozen metadata and media rather than edited local
   const f = await fixture();
   const status = sqliteScheduleStatusSchema.parse(await f.run("schedule-episode", f.args,
     { scheduleOptions: f.scheduleOptions, expectedPreview: f.preview.approval_sha256 }));
-  await f.run("show-pause", ["daily", crypto.randomUUID()]); await f.run("show-resume", ["daily", crypto.randomUUID()]);
-  const current = sqliteScheduleStatusSchema.parse(await f.run("schedule-status", ["daily", status.schedule.schedule_id]));
+
+  // A completed domain change suspends future schedules and requires explicit reapproval afterwards.
+  const target = { ...f.config, public_base_url: "https://podcasts.example.com" };
+  const request = { schema_version: 1 as const, protocol: SQLITE_DOMAIN_PROTOCOL, operation_id: crypto.randomUUID(), action: "add" as const,
+    hostname: "podcasts.example.com", zone_id: "c".repeat(32), zone_name: "example.com", namespace_id: "b".repeat(32),
+    previous_config: f.config, previous_config_sha256: await sqliteServiceConfigHash(f.config), target_config: target,
+    target_config_sha256: await sqliteServiceConfigHash(target), worker_source_sha256: "d".repeat(64), worker_metadata_sha256: "e".repeat(64) };
+  const connection = { id: "f".repeat(32), cert_id: crypto.randomUUID(), hostname: request.hostname, zone_id: request.zone_id,
+    zone_name: request.zone_name, service: f.config.worker_name, environment: "production" as const, enabled: true as const, previews_enabled: false as const };
+  await f.control.prepareDomain(request);
+  await f.bucket.put("system/service.toml", stringifyToml(target));
+  const deployed = await f.deployConfiguration(target);
+  const commit = { operation_id: request.operation_id, request_sha256: await sqliteDomainRequestHash(request),
+    worker_version_id: deployed.worker_version_id, deployment_id: crypto.randomUUID(), script_etag: "acknowledged", connection };
+  await f.control.commitDomain(commit);
+  await f.control.finalizeDomain({ operation_id: request.operation_id, request_sha256: commit.request_sha256, connection, detached: false });
+  const run = (name: string, args: string[], extra: SqliteCommandOptions = {}) => runSqliteCommand(f.root, target, name, args,
+    { transport: f.transport, cloudflare: f.options, ...extra });
+  const current = sqliteScheduleStatusSchema.parse(await run("schedule-status", ["daily", status.schedule.schedule_id]));
+  expect(current.schedule.state).toBe("needs_approval");
   const file = join(f.root, "daily", "episode-first.toml");
   writeFileSync(file, stringifyToml({ ...parseEpisodeDraft(readFileSync(file, "utf8")), title: "Unapproved edit" }));
   const args = ["daily", status.schedule.schedule_id], scheduleOptions = { ...f.scheduleOptions, expectVersion: String(current.schedule.version) };
-  const preview = await f.run("preview-schedule-reapprove", args, { scheduleOptions }) as { approval_sha256: string };
+  const preview = await run("preview-schedule-reapprove", args, { scheduleOptions }) as { approval_sha256: string };
   f.calls.length = 0;
-  const reapproved = sqliteScheduleStatusSchema.parse(await f.run("schedule-reapprove", args, { scheduleOptions, expectedPreview: preview.approval_sha256 }));
+  const reapproved = sqliteScheduleStatusSchema.parse(await run("schedule-reapprove", args, { scheduleOptions, expectedPreview: preview.approval_sha256 }));
   expect(reapproved.publication.metadata).toEqual(status.publication.metadata);
   expect(reapproved.schedule.state).toBe("scheduled"); expect(f.calls.some((call) => call.method === "PUT")).toBe(false);
 });

@@ -1,12 +1,15 @@
 # castloop v2 デザインドキュメント
 
-## 現行開発版：フェーズ1・2
+## 現行開発版：フェーズ1・2・3（簡素化アーキテクチャ）
 
-2026-10-28の簡素化では、公開を同期アトミック処理にし、Feed/HTMLをSQLiteからオンデマンド生成する。CLIはローカル入力の検証とR2への素材直接配置・PUT応答確認を担当し、DOは素材の読取・コピーを行わない。metadata・素材参照・公開状態が同じなら変更せず、異なる内容だけ更新元を検証し、必要なパージ後に単一トランザクションで内容・履歴・世代を確定する。公開job台帳・操作追跡5表・公開用journal・ステージングを廃止した。
+2026-10-28〜10-29の簡素化（[全体見直し](architecture_simplification_review_20261028.md)・[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)）では、Podcast配信の本来の目的に合わせて全体を以下のシンプルな構造に刷新した。
 
-内部queue/content形式は新規環境専用の**13/13**。配備は未実施で、旧形式からの変換・互換配備は提供しない。Show分離・GUID/日時・旧音源・履歴・配信ゲートを維持し、init・deploy・domain・Pause/Resumeの記録と保守手順は変更しない。予約は保存内容の公開と実行済み状態を同時確定し、RSSは一括進捗だけを保持する。
+- **同期アトミックな公開と直接素材配置**: CLIはローカル入力を検証し、変更された音源・画像だけを内容ハッシュ（SHA-256）のR2キーへ直接配置して、metadataと素材参照をJSONでShow DOへ送る。DOは素材の読取・コピーを行わず、必要なキャッシュパージ後に単一SQLiteトランザクションで公開内容・履歴・短縮ID・世代を一括確定する（同一内容なら`unchanged`）。失敗時は副作用を残さず、そのまま同じコマンドを再実行できる。
+- **RSSフィード・番組サイトのオンデマンド生成**: Feed XMLと番組サイトHTMLはR2へ事前バッチ生成せず、配信リクエスト時にShow DOのSQLiteからオンデマンド描画してEdgeキャッシュに乗せる。
+- **単発deployと稼働制御の簡素化**: `worker_version_id` のDB保存・一致強制、起動Probe Alarm、`admission_window_id`、および `show-pause` / `show-resume` 系コマンドを廃止した。登録したShowは即座に稼働し、配信を止めたい場合は既存のlifecycle操作（非公開化・復元）を使う。`castloop deploy` は事前停止やjournalなしの単発スクリプト更新であり、予約公開もそのまま維持される。DOのAlarmは予約公開（`dispatchDue`）のみに使用する。
+- **変更前設定の保存と再実行可能な管理操作**: 初期化（`init`）や独自ドメイン変更（`domain`）は、途中の通信失敗で永久ロックするのではなく、変更前後の設定を保持し、APIで現状を確認しながら同じ目標状態へ再実行・継続できる設計とする。
 
-具体契約は[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、オンデマンド配信は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、操作は[SQLiteガイド](../docs/sqlite_sequential_development.md)を優先する。以下は簡素化前の導入履歴・旧契約であり、FIFO・job・staging・事前生成に関する記述は現行経路へ適用しない。
+内部queue/content形式は新規環境専用の**14/13**。配備は未実施で、旧形式からの変換・互換配備は提供しない。具体契約は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)、操作は[SQLiteガイド](../docs/sqlite_sequential_development.md)を優先する。以下は簡素化前の導入履歴・旧契約であり、FIFO・job・staging・事前生成・Pause/Resume・2相更新・未知IOロックに関する記述は現行経路へ適用しない。
 
 ## 簡素化前の設計・導入履歴
 

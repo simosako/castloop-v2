@@ -15,6 +15,6 @@ test("Skill export embeds canonical files and refuses overwrites and symlink par
     symlinkSync(root, join(root, "link"));
     expect(() => exportAdminSkill(join(root, "link", "other"))).toThrow("real directory");
     expect(ADMIN_SKILL_FILES["SKILL.md"]).toContain("推測しない");
-    expect(ADMIN_SKILL_FILES["references/recovery.md"]).toContain("未知PUT/POST");
+    expect(ADMIN_SKILL_FILES["references/recovery.md"]).toContain("unchanged");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

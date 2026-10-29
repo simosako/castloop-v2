@@ -31,7 +31,7 @@ export function createSqliteStatsHttp(stats: SqliteDeliveryStats, administratorK
       const meta = stats.meta();
       const identity = health();
       const runtimeFields = { service_id: identity.service_id, worker_version_id: identity.worker_version_id,
-        service_config_sha256: identity.service_config_sha256, state: identity.state as typeof identity.state | null,
+        service_config_sha256: identity.service_config_sha256,
         protocol: "sqlite-sequential-v1" as const };
       const common = { ...runtimeFields, measurement_started_at_ms: meta.measurement_started_at_ms,
         measurement_started_date_utc: meta.measurement_started_date_utc,
@@ -59,9 +59,8 @@ export function createSqliteStatsHttp(stats: SqliteDeliveryStats, administratorK
         }
         const input = await readBoundedAdminJson(request);
         const snapshot = health();
-        const retention = await stats.applyRetention(input, {
-          service_id: snapshot.service_id, worker_version_id: snapshot.worker_version_id,
-          service_config_sha256: snapshot.service_config_sha256 });
+        const retention = await stats.applyRetention(input,
+          { service_id: snapshot.service_id, service_config_sha256: snapshot.service_config_sha256 });
         return adminReply(sqliteStatsRetentionResponseSchema.parse({ ...snapshot, retention }));
       }
       if (path.startsWith("retention/") && request.method === "GET") {

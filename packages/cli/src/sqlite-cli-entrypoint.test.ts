@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-test("formal CLI entrypoint initializes paused and publishes through the SQLite route under a local-only transport", async () => {
+test("formal CLI entrypoint initializes ready and publishes through the SQLite route under a local-only transport", async () => {
   const setup = await sqliteServiceFixture();
   const preload = fileURLToPath(new URL("./test-support/sqlite-cli-preload.ts", import.meta.url).href);
   const cli = fileURLToPath(new URL("./index.ts", import.meta.url).href);
@@ -30,12 +30,11 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
   }
   try {
     expect(await command(["init", ".", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
-    expect(setup.runtime.health().state).toBe("paused");
+    expect(setup.runtime.health().publication_ready).toBe(true);
     const show = Bun.spawn([process.execPath, "--preload", preload, cli, "create-show", "daily", "--site-url", "https://example.com/podcast"], {
       cwd: setup.root, env: environment, stdout: "pipe", stderr: "pipe" });
     const [showOutput, showError, showCode] = await Promise.all([new Response(show.stdout).text(), new Response(show.stderr).text(), show.exited]);
     expect(showCode, showError).toBe(0); expect(showOutput).toContain("show.toml");
-    await command(["show-resume", "daily", crypto.randomUUID()]);
     const directory = join(setup.root, "daily");
     writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
     expect(await command(["publish-show", "daily"])).toMatchObject({ result: "changed" });
@@ -83,15 +82,9 @@ test("formal CLI entrypoint initializes paused and publishes through the SQLite 
     expect(await command(["stats-retention", "daily", "90", "--operation-id", retentionOperation, "--json"])).toMatchObject({ retention: { retention_days: 90 } });
     const afterRetention = await command(["stats", "daily", "--json"]);
     expect(afterRetention).toMatchObject({ retention_days: 90 });
-    const admissionStop = crypto.randomUUID();
-    expect(await command(["show-admission-pause", "daily", admissionStop, "--json"])).toMatchObject({ state: "admission_paused", admission_state: "closed" });
-    expect(await command(["show-control-status", "daily", admissionStop, "--json"])).toMatchObject({ control: { result: { state: "admission_paused" } } });
-    await command(["show-pause", "daily", crypto.randomUUID()]);
-    expect(await command(["show-delivery-resume", "daily", crypto.randomUUID(), "--json"])).toMatchObject({ state: "admission_paused", delivery_policy: "enabled" });
-    await command(["show-pause", "daily", crypto.randomUUID()]);
-    expect(await command(["service-status"])).toMatchObject({ state: "paused", drained: true });
-    expect(await command(["deploy", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
-    expect(await command(["service-status"])).toMatchObject({ publication_ready: true, state: "paused", runtime_update: { state: "completed" } });
+    expect(await command(["service-status"])).toMatchObject({ publication_ready: true });
+    expect(await command(["deploy", "--json"])).toMatchObject({ publication_ready: true });
+    expect(await command(["service-status"])).toMatchObject({ publication_ready: true });
     expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
   } finally { server.stop(true); setup.close(); }
 }, 45000);
@@ -131,7 +124,7 @@ globalThis.fetch = Object.assign(async (input, init) => {
       expect(code, stderr).toBe(0); expect(JSON.parse(stdout)).toMatchObject({ phase: "ready" });
       expect(await loadWorkspaceConfig(workspace)).toMatchObject({ schema_version: 2, publication_protocol: "sqlite-sequential-v1" });
       const setup = await fixture!;
-      expect(setup.runtime.health()).toMatchObject({ state: "paused", drained: true, publication_ready: true });
+      expect(setup.runtime.health()).toMatchObject({ publication_ready: true });
       expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
     } finally { server.stop(true); (await fixture)?.close(); rmSync(root, { recursive: true, force: true }); }
   }, 30000);

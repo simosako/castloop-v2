@@ -15,7 +15,7 @@ async function fixture(publishShow = true) {
   await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "worker source", f.options, { attempts: 2, delay: async () => {} });
   const options = { transport: f.transport, cloudflare: f.options };
   const command = (name: string, args: string[] = [], extra: SqliteCommandOptions = {}) => runSqliteCommand(f.root, f.config, name, args, { ...options, ...extra });
-  await command("create-show", ["daily", "https://example.com"]); await command("show-resume", ["daily", crypto.randomUUID()]);
+  await command("create-show", ["daily", "https://example.com"]);
   const directory = join(f.root, "daily"); writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
   if (publishShow) await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);

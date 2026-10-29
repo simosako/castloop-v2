@@ -24,9 +24,8 @@ import { join, resolve } from "node:path";
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 export const sqliteRssStateSchema = z.object({ schema_version: z.literal(3), protocol: z.literal("sqlite-sequential-v1"),
   service_id: z.string(), service_config_sha256: hash, import_id: z.uuid(), source_directory: z.string().max(4096), input_sha256: hash,
-  step: z.number().int().nonnegative(), phase: z.enum(["ready", "install_requested", "publishing", "completed"]), installed: z.boolean(),
-  created_show_sha256: hash.optional(), bootstrap_state: z.enum(["prepared", "create_requested", "created", "resume_requested", "opened"]),
-  bootstrap_window: z.uuid() }).strict();
+  step: z.number().int().nonnegative(), phase: z.enum(["ready", "publishing", "completed"]), installed: z.boolean(),
+  created_show_sha256: hash.optional() }).strict();
 export type SqliteRssEffects = { command: (name: string, args: string[]) => Promise<unknown>; readFeed: (url: string) => Promise<string> };
 export type SqliteRssResult = { result: "rss-import-published"; protocol: "sqlite-sequential-v1"; import_id: string;
   show_id: string; episode_count: number; feed_url: string; subscriber_migration_completed: false };
@@ -49,7 +48,7 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
   const client = new SqliteServiceClient(config, key, options.transport), showId = prepared.show.show_id, directory = join(root, showId);
   const initial = sqliteRssStateSchema.parse({ schema_version: 3, protocol: "sqlite-sequential-v1", service_id: config.service_id,
     service_config_sha256: await sqliteServiceConfigHash(config), import_id: prepared.importId, source_directory: prepared.root,
-    input_sha256: prepared.inputSha256, step: 0, phase: "ready", installed: false, bootstrap_state: "prepared", bootstrap_window: crypto.randomUUID() });
+    input_sha256: prepared.inputSha256, step: 0, phase: "ready", installed: false });
   const journal = createLocalJournalStorage(root, "sqlite-rss-imports", config.service_id, `${prepared.importId}.json`);
   if (!present(journal.path)) {
     if (present(directory) || (await client.registration(showId)).state !== "missing") throw new Error("RSS import requires a new Show; existing identities are not adopted");
@@ -61,27 +60,16 @@ export async function publishSqliteRssImport(root: string, config: SqliteService
       if (state[field] !== initial[field]) throw new Error("RSS import inputs changed; preserve the retained batch record");
     }
     const save = () => journal.replace(sqliteRssStateSchema.parse(state));
-    if (state.bootstrap_state === "create_requested" || state.bootstrap_state === "resume_requested" || state.phase === "install_requested") {
-      throw new Error("RSS initialization or local installation outcome is unknown; inspect without replaying it");
-    }
-    if (state.bootstrap_state === "prepared") {
+    if (!state.created_show_sha256) {
       if (!(await client.registrationHealth()).publication_ready) throw new Error("RSS import requires a ready service");
-      state = { ...state, bootstrap_state: "create_requested" }; save();
       await effects.command("create-show", prepared.show.site_url === undefined ? [showId] : [showId, prepared.show.site_url]);
-      state = { ...state, bootstrap_state: "created", created_show_sha256: digest(await readLocalMetadata(join(directory, "show.toml"))) }; save();
-    }
-    if (state.bootstrap_state === "created") {
-      state = { ...state, bootstrap_state: "resume_requested" }; save();
-      await effects.command("show-resume", [showId, state.bootstrap_window]);
-      state = { ...state, bootstrap_state: "opened" }; save();
+      state = { ...state, created_show_sha256: digest(await readLocalMetadata(join(directory, "show.toml"))) }; save();
     }
     const health = await client.health(showId);
-    if (!health.publication_ready || health.state !== "open") throw new Error("RSS target Show is not ready and open");
+    if (!health.publication_ready) throw new Error("RSS target Show is not ready");
     if (!state.installed) {
-      if (digest(await readLocalMetadata(join(directory, "show.toml"))) !== state.created_show_sha256) throw new Error("Created Show input changed before RSS installation");
-      state = { ...state, phase: "install_requested" }; save();
       const destination = join(directory, prepared.show.image_path);
-      await copyFile(prepared.coverPath, destination, constants.COPYFILE_EXCL);
+      if (!present(destination)) await copyFile(prepared.coverPath, destination, constants.COPYFILE_EXCL);
       const file = await open(destination, constants.O_RDONLY | constants.O_NOFOLLOW);
       try { await file.sync(); } finally { await file.close(); }
       syncLocalJournalDirectory(directory);

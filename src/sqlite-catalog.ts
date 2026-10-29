@@ -6,7 +6,8 @@ import type { PublicationQueueStorage } from "./sqlite-publication-queue";
 export function readSqliteCatalog(storage: PublicationQueueStorage, input: SqliteCatalogRequest,
   identity: SqlitePublicationRuntime, origin: string): SqliteCatalogResponse {
   const request = sqliteCatalogRequestSchema.parse(input), { cursor, ...options } = request;
-  const scope = { ...identity, ...options };
+  // Cursors bind to the service identity only, so a code-only deploy never invalidates pagination.
+  const scope = { service_id: identity.service_id, service_config_sha256: identity.service_config_sha256, ...options };
   let after = "";
   if (cursor) {
     const decoded = sqliteCatalogCursorSchema.parse(JSON.parse(atob(cursor)));
@@ -15,8 +16,7 @@ export function readSqliteCatalog(storage: PublicationQueueStorage, input: Sqlit
     after = last_id;
   }
   return storage.transactionSync(() => {
-    const service = storage.sql.exec<{ state: string }>("SELECT state FROM publication_service WHERE id = 1").toArray()[0];
-    const fields = { ...identity, protocol: "sqlite-sequential-v1", request, state: service?.state, snapshot_only: true, authorizes_recovery: false };
+    const fields = { ...identity, protocol: "sqlite-sequential-v1", request, snapshot_only: true, authorizes_recovery: false };
     const showRows = storage.sql.exec<{ show_id: string; lifecycle: string; title: string | null }>(`
       SELECT s.show_id, s.lifecycle,
         CASE WHEN s.lifecycle IN ('published', 'unpublished') THEN substr(json_extract(c.metadata_json, '$.title'), 1, 200) END AS title

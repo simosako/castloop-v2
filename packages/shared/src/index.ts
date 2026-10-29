@@ -1,7 +1,7 @@
 export * from "./metadata";
 export { sqlitePublicationProtocol, MAX_SQLITE_PUBLICATION_BYTES, sqlitePublicationRuntimeSchema,
-  sqlitePublicationTargetSchema, sqlitePublicationFailureSchema } from "./sqlite-publication";
-export type { SqlitePublicationRuntime, SqlitePublicationFailure } from "./sqlite-publication";
+  sqliteServiceIdentitySchema, sqlitePublicationTargetSchema, sqlitePublicationFailureSchema } from "./sqlite-publication";
+export type { SqlitePublicationRuntime, SqliteServiceIdentity, SqlitePublicationFailure } from "./sqlite-publication";
 export { sqliteScheduleProtocol, SQLITE_SCHEDULE_PAGE_SIZE, sqliteScheduleTimeSchema, sqliteScheduleReasonSchema,
   sqliteScheduleCreateSchema, sqliteScheduleRescheduleSchema, sqliteScheduleCancelSchema, sqliteScheduleReapproveSchema,
   sqliteScheduleStateSchema, sqliteScheduleRecordSchema, sqliteScheduleStatusSchema, sqliteScheduleListSchema,

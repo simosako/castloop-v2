@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import { continueSqliteInitialization, initializeSqliteService, readSqliteInitialization, reconcileSqliteInitialization } from "./sqlite-initialization";
+import { initializeSqliteService, readSqliteInitialization } from "./sqlite-initialization";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
-import { existsSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
@@ -18,11 +18,11 @@ test("resource path checks distinguish D1 endpoints from deployment UUIDs", () =
   }
 });
 
-test("fresh initialization provisions only R2/Worker/SQLite, verifies native runtime probes and finishes paused", async () => {
+test("fresh initialization provisions only R2/Worker/SQLite and finishes immediately ready", async () => {
   const value = await fixture(), id = crypto.randomUUID();
   const state = await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait);
   expect(state.phase).toBe("ready"); expect(state.namespace_id).toBe("b".repeat(32));
-  expect(value.runtime.health()).toMatchObject({ publication_ready: true, state: "paused", drained: true });
+  expect(value.runtime.health()).toMatchObject({ publication_ready: true });
   expect(value.calls.some((call) => unrelatedResourcePath.test(call.path))).toBe(false);
   expect(value.calls).toContainEqual({ method: "GET", path: `/r2/buckets/${value.config.bucket_name}` });
   expect(value.calls).toContainEqual({ method: "PUT", path: `/workers/scripts/${value.config.worker_name}?bindings_inherit=strict` });
@@ -40,45 +40,23 @@ test("fresh initialization provisions only R2/Worker/SQLite, verifies native run
 });
 
 for (const phase of ["bucket", "config", "worker", "deploy", "access"] as const) {
-  test(`unknown ${phase} outcome is retained and initialization never replays it`, async () => {
+  test(`interrupted ${phase} step completes idempotently on re-running init`, async () => {
     const value = await fixture(), id = crypto.randomUUID(); value.faults.lost = phase;
     await expect(initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait)).rejects.toThrow();
-    const state = readSqliteInitialization(value.root, value.config)!;
-    expect(state.phase).toBe(`${phase}_requested`);
-    const calls = value.calls.length; value.faults.lost = undefined;
-    await expect(initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait)).rejects.toThrow("already started");
-    expect(value.calls.length).toBe(calls);
+    value.faults.lost = undefined;
     await expect(initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, wait)).rejects.toThrow("frozen identity");
-    expect(readdirSync(join(value.root, ".castloop", "sqlite-initializations", value.config.service_id))).toEqual(["initialize.json"]);
+    const completed = await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait);
+    expect(completed.phase).toBe("ready");
   });
 }
-
-test("a lost setup response is reconciled by exact read-only status, never by another POST", async () => {
-  const value = await fixture(), id = crypto.randomUUID(); value.faults.lost = "setup";
-  expect((await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait)).phase).toBe("ready");
-  expect(value.calls.filter((call) => call.method === "POST" && call.path.endsWith("/prepare"))).toHaveLength(1);
-  value.calls.length = 0;
-  expect((await reconcileSqliteInitialization(value.root, value.config, id, value.options)).phase).toBe("ready");
-  expect(value.calls.every((call) => call.method === "GET")).toBe(true);
-});
 
 for (const fault of ["namespace", "settings"] as const) {
-  test(`mismatched ${fault} prevents runtime readiness submission`, async () => {
+  test(`mismatched ${fault} prevents initialization`, async () => {
     const value = await fixture(); value.faults[fault] = true;
     await expect(initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, wait)).rejects.toThrow();
-    expect(value.calls.some((call) => call.path.endsWith("/prepare"))).toBe(false);
-    expect(value.runtime.ready()).toBe(false);
+    expect(readSqliteInitialization(value.root, value.config)?.phase).not.toBe("ready");
   });
 }
-
-test("runtime probe failure never becomes ready and is not bypassed by reconcile", async () => {
-  const value = await fixture(), id = crypto.randomUUID(); value.faults.failPurge = true;
-  await expect(initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait)).rejects.toThrow("blocked");
-  expect(readSqliteInitialization(value.root, value.config)?.phase).toBe("setup_requested");
-  const count = value.calls.length;
-  await expect(reconcileSqliteInitialization(value.root, value.config, id, value.options)).rejects.toThrow("completion");
-  expect(value.calls.slice(count).every((call) => call.method === "GET")).toBe(true);
-});
 
 test("deployment metadata does not introduce migrations, Queue resources, secrets in config or paid limits", async () => {
   const value = await fixture(), metadata = buildSqliteWorkerMetadata(value.config, "private-key");
@@ -92,7 +70,7 @@ for (const existing of ["bucket", "worker", "empty"] as const) {
     const value = await fixture(); value.faults.existing = existing;
     await expect(initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, wait)).rejects.toThrow();
     expect(value.calls.every((call) => call.method === "GET")).toBe(true);
-    expect(readSqliteInitialization(value.root, value.config)?.phase).toBe("prepared");
+    expect(readSqliteInitialization(value.root, value.config)?.phase).toBe("fresh");
   });
 }
 
@@ -103,6 +81,15 @@ test("a forged ready phase without deployment and namespace evidence is never ac
   const record = JSON.parse(readFileSync(file, "utf8"));
   writeFileSync(file, JSON.stringify({ ...record, phase: "ready" }));
   expect(() => readSqliteInitialization(value.root, value.config)).toThrow("deployment evidence");
+});
+
+test("a changed worker source is refused before any remote mutation of a retained initialization", async () => {
+  const value = await fixture(), id = crypto.randomUUID(); value.faults.lost = "access";
+  await expect(initializeSqliteService(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow();
+  const calls = value.calls.length; value.faults.lost = undefined;
+  await expect(initializeSqliteService(value.root, value.config, id, "changed", value.options, wait)).rejects.toThrow("frozen identity");
+  expect(value.calls.length).toBe(calls);
+  expect((await initializeSqliteService(value.root, value.config, id, "source", value.options, wait)).phase).toBe("ready");
 });
 
 test("a symlink gitignore is never followed and prevents secret creation or remote provisioning", async () => {
@@ -133,35 +120,5 @@ test("real-shaped settings without exports are verified against mandatory pinned
   expect((await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, wait)).phase).toBe("ready");
   const missing = await fixture(); missing.faults.missingVersionExports = true;
   await expect(initializeSqliteService(missing.root, missing.config, crypto.randomUUID(), "source", missing.options, wait)).rejects.toThrow();
-  expect(missing.calls.some((call) => call.path.endsWith("/prepare"))).toBe(false);
-  expect(missing.runtime.ready()).toBe(false);
-});
-
-test("explicit verification continuation submits setup once without replaying acknowledged resource or deployment mutations", async () => {
-  const value = await fixture(), id = crypto.randomUUID(); value.faults.failFirstInspection = true;
-  await expect(initializeSqliteService(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow();
-  expect(readSqliteInitialization(value.root, value.config)!.phase).toBe("access_enabled");
-  value.calls.length = 0;
-  await expect(continueSqliteInitialization(value.root, value.config, id, "changed", value.options, wait)).rejects.toThrow("exact acknowledged");
-  expect(value.calls).toEqual([]);
-  expect((await continueSqliteInitialization(value.root, value.config, id, "source", value.options, wait)).phase).toBe("ready");
-  expect(value.calls.filter((call) => call.method !== "GET")).toEqual([{ method: "POST", path: "/admin/sqlite-service/prepare" }]);
-  const count = value.calls.length;
-  await expect(continueSqliteInitialization(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow("exact acknowledged");
-  expect(value.calls).toHaveLength(count);
-});
-
-test("continuation rejects unknown deployment/access and already-submitted blocked setup before any remote call", async () => {
-  for (const lost of ["deploy", "access"] as const) {
-    const value = await fixture(), id = crypto.randomUUID(); value.faults.lost = lost;
-    await expect(initializeSqliteService(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow();
-    value.calls.length = 0;
-    await expect(continueSqliteInitialization(value.root, value.config, id, "source", value.options, wait)).rejects.toThrow("unknown mutations");
-    expect(value.calls).toEqual([]);
-  }
-  const blocked = await fixture(), id = crypto.randomUUID(); blocked.faults.failPurge = true;
-  await expect(initializeSqliteService(blocked.root, blocked.config, id, "source", blocked.options, wait)).rejects.toThrow("blocked");
-  blocked.calls.length = 0;
-  await expect(continueSqliteInitialization(blocked.root, blocked.config, id, "source", blocked.options, wait)).rejects.toThrow("unknown mutations");
-  expect(blocked.calls).toEqual([]);
+  expect(readSqliteInitialization(missing.root, missing.config)?.phase).not.toBe("ready");
 });

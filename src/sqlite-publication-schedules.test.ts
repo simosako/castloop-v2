@@ -14,9 +14,9 @@ async function setup() {
   const f = await directPublicationFixture(); cleanups.push(f.close);
   let now = 1000;
   const schedules = new SqlitePublicationSchedules(f.storage, f.queue, f.content, () => now, { showId: "daily", ready: () => true });
-  const input = { schema_version: 1 as const, protocol: "sqlite-schedule-v1" as const, ...f.runtime, show_id: "daily",
+  const input = { schema_version: 1 as const, protocol: "sqlite-schedule-v1" as const, ...f.identity, show_id: "daily",
     schedule_id: crypto.randomUUID(), expected_version: 0 as const, preview_sha256: "c".repeat(64), scheduled_at: time(2000), publication: f.show() };
-  const mutation = { schema_version: 1 as const, protocol: "sqlite-schedule-v1" as const, ...f.runtime, show_id: "daily", schedule_id: input.schedule_id };
+  const mutation = { schema_version: 1 as const, protocol: "sqlite-schedule-v1" as const, ...f.identity, show_id: "daily", schedule_id: input.schedule_id };
   return { ...f, schedules, input, mutation, setNow: (value: number) => { now = value; } };
 }
 
@@ -45,19 +45,18 @@ test("one undispatched schedule per target is enforced", async () => {
   await expect(f.schedules.create({ ...f.input, schedule_id: crypto.randomUUID() })).rejects.toThrow("open publication schedule");
 });
 
-test("Show pause suspends schedules atomically and Resume does not reapprove them", async () => {
+test("a domain change suspends schedules and they need explicit reapproval", async () => {
   const f = await setup(); await f.schedules.create(f.input);
-  await f.queue.applyControl({ ...f.runtime, operation_id: crypto.randomUUID(), action: "pause", show_id: "daily", expected_availability_version: 0 },
-    f.runtime, (reason) => f.schedules.suspendOpen(reason));
-  expect(f.schedules.status(f.input.schedule_id).schedule).toMatchObject({ state: "needs_approval", reason_code: "show_paused" });
-  f.queue.resume(crypto.randomUUID()); f.setNow(2000);
+  f.schedules.suspendOpen("domain_change");
+  expect(f.schedules.status(f.input.schedule_id).schedule).toMatchObject({ state: "needs_approval", reason_code: "domain_change" });
+  f.setNow(2000);
   expect(await f.schedules.dispatchDue()).toBe(0);
 });
 
 test("reschedule, reapprove and cancel require the exact current version", async () => {
   const f = await setup(); await f.schedules.create(f.input);
   await f.schedules.reschedule({ ...f.mutation, expected_version: 1, preview_sha256: "d".repeat(64), scheduled_at: time(3000) });
-  f.schedules.suspendOpen("maintenance");
+  f.schedules.suspendOpen("domain_change");
   const needs = f.schedules.status(f.input.schedule_id).schedule;
   const reapproved = await f.schedules.reapprove({ ...f.mutation, expected_version: needs.version, preview_sha256: "e".repeat(64), scheduled_at: time(4000), publication: f.show() });
   expect(reapproved.schedule.state).toBe("scheduled");
@@ -92,8 +91,7 @@ test("cancellation during purge rolls back publication instead of reviving a can
   expect(f.content.inspect("daily").show?.lifecycle).toBe("draft");
 });
 
-test("next Alarm is scheduled only for open admission", async () => {
+test("next Alarm is scheduled for the earliest pending schedule", async () => {
   const f = await setup(); await f.schedules.create(f.input); f.clearAlarm();
   await f.schedules.scheduleNext(); expect(f.alarm()).toBe(2000);
-  f.queue.pause(); f.clearAlarm(); await f.schedules.scheduleNext(); expect(f.alarm()).toBeNull();
 });

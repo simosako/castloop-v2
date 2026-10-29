@@ -14,12 +14,11 @@ export async function previewSqliteLifecycle(config: SqliteServiceConfig, key: s
   episodeId?: string, transport?: R2RestTransport): Promise<SqliteLifecyclePlan> {
   if (action !== "unpublish" && action !== "restore") throw new Error("SQLite deletion is not implemented");
   const target = await new SqliteServiceClient(config, key, transport).inspect(showId, episodeId);
-  if (!target.admission_window_id || target.expected_show_state_version === null || !["published", "unpublished"].includes(target.show_lifecycle) ||
+  if (target.expected_show_state_version === null || !["published", "unpublished"].includes(target.show_lifecycle) ||
     episodeId !== undefined && (!target.base_revision_id || !["published", "unpublished"].includes(target.episode_lifecycle!))) throw new Error("Lifecycle target is unavailable");
   const request = sqliteContentActionRequestSchema.parse({ schema_version: 1, protocol: "sqlite-sequential-v1", action,
     kind: episodeId === undefined ? "show" : "episode", show_id: showId, service_id: config.service_id,
-    worker_version_id: target.worker_version_id, service_config_sha256: target.service_config_sha256,
-    admission_window_id: target.admission_window_id, expected_show_state_version: target.expected_show_state_version,
+    service_config_sha256: target.service_config_sha256, expected_show_state_version: target.expected_show_state_version,
     ...(episodeId !== undefined ? { episode_id: episodeId, base_revision_id: target.base_revision_id, expected_episode_lifecycle_version: target.expected_episode_lifecycle_version } : {}) });
   return { request, request_sha256: await sqliteDirectPublicationRequestHash(request) };
 }

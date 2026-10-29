@@ -11,8 +11,7 @@ async function fixture(action: "add" | "remove" = "add") {
   const target = { ...previous, public_base_url: action === "add" ? custom : management };
   return { schema_version: 1 as const, protocol: SQLITE_DOMAIN_PROTOCOL, operation_id: crypto.randomUUID(), action,
     hostname: "podcasts.example.com", zone_id: "b".repeat(32), zone_name: "example.com", namespace_id: "c".repeat(32),
-    previous_runtime: { service_id: previous.service_id, worker_version_id: crypto.randomUUID(),
-      service_config_sha256: await sqliteServiceConfigHash(previous) }, previous_config: previous, target_config: target,
+    previous_config: previous, previous_config_sha256: await sqliteServiceConfigHash(previous), target_config: target,
     target_config_sha256: await sqliteServiceConfigHash(target), worker_source_sha256: "d".repeat(64), worker_metadata_sha256: "e".repeat(64),
     ...(action === "remove" ? { connection: { id: "f".repeat(32), cert_id: crypto.randomUUID(), hostname: "podcasts.example.com",
       zone_id: "b".repeat(32), zone_name: "example.com", service: previous.worker_name, environment: "production" as const,
@@ -63,7 +62,7 @@ test("domain requests reject changed resources, management origins, schemas and 
   for (const change of [{ protocol: "sqlite-sequential-v1" }, { schema_version: 2 }, { zone_name: "example.net" },
     { zone_name: "podcasts.example.com" }, { hostname: "notexample.com" }, { hostname: "other.example.com" },
     { owner_token: "unknown" }, { target_config: request.previous_config },
-    { previous_runtime: { ...request.previous_runtime, service_id: "other" } }]) {
+    { previous_config: { ...request.previous_config, service_id: "other" } }]) {
     expect(sqliteDomainRequestSchema.safeParse({ ...request, ...change }).success).toBe(false);
   }
 });
@@ -71,7 +70,7 @@ test("domain requests reject changed resources, management origins, schemas and 
 test("hash validation is required even when the structural request is valid", async () => {
   const request = await fixture();
   for (const change of [{ target_config_sha256: "f".repeat(64) },
-    { previous_runtime: { ...request.previous_runtime, service_config_sha256: "f".repeat(64) } }]) {
+    { previous_config_sha256: "f".repeat(64) }]) {
     const input = { ...request, ...change };
     expect(sqliteDomainRequestSchema.safeParse(input).success).toBe(true);
     await expect(parseSqliteDomainRequest(input)).rejects.toThrow("hashes");
@@ -113,15 +112,15 @@ test("remove freezes a known connection ID and certificate receipt instead of ad
   expect(sqliteDomainRequestSchema.safeParse({ ...request, connection: { ...connection, hostname: "other.example.com" } }).success).toBe(false);
 });
 
-test("service completion requires consistent aggregate counts rather than only the displayed target page", async () => {
+test("service completion requires the displayed targets to be completed and within the declared count", async () => {
   const request = await fixture();
-  const status = { own: { request, request_sha256: await sqliteDomainRequestHash(request), actual_runtime: request.previous_runtime,
-    saved_runtime: request.previous_runtime, phase: "completed", feed_generation: null, activation: null, paused: true, drained: true, reason_code: null },
-    phase: "probing", targets_native_ready: true, all_completed: false, target_count: 21, prepared_count: 21,
-    completed_count: 20, released_count: 0, blocked_count: 0, targets: [], next_cursor: null };
+  const status = { request, request_sha256: await sqliteDomainRequestHash(request), phase: "completed" as const,
+    all_completed: false, target_count: 21, targets: [], next_cursor: null };
   expect(sqliteDomainServiceStatusSchema.safeParse(status).success).toBe(true);
-  for (const change of [{ all_completed: true }, { completed_count: 22 }, { blocked_count: 2 }, { released_count: 22 }, { phase: "completed" }]) {
-    expect(sqliteDomainServiceStatusSchema.safeParse({ ...status, ...change }).success).toBe(false);
+  const page = Array.from({ length: 20 }, (_, index) => ({ show_id: `show-${index}`, phase: "completed" as const }));
+  expect(sqliteDomainServiceStatusSchema.safeParse({ ...status, targets: page, all_completed: true }).success).toBe(true);
+  for (const change of [{ all_completed: true, phase: "prepared" as const }, { target_count: 0 },
+    { all_completed: true, targets: [...page.slice(1), { show_id: "x", phase: "prepared" as const }] }]) {
+    expect(sqliteDomainServiceStatusSchema.safeParse({ ...status, targets: page, ...change }).success).toBe(false);
   }
-  expect(sqliteDomainServiceStatusSchema.safeParse({ ...status, all_completed: true, completed_count: 21 }).success).toBe(true);
 });

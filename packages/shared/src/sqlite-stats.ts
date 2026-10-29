@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { sqlitePublicationProtocol, sqlitePublicationTargetSchema, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
-import { sqliteAvailabilityStateSchema } from "./sqlite-availability";
+import { sqlitePublicationProtocol, sqlitePublicationTargetSchema, sqlitePublicationRuntimeSchema, sqliteServiceIdentitySchema } from "./sqlite-publication";
 
 export const SQLITE_STATS_EPISODE_PAGE_SIZE = 20;
 export const SQLITE_STATS_DAILY_PAGE_SIZE = 31;
@@ -101,7 +100,6 @@ export const sqliteStatsEpisodesResponseSchema = sqlitePublicationRuntimeSchema.
   protocol: z.literal(sqlitePublicationProtocol),
   show_id: showId,
   ...statsFields,
-  state: sqliteAvailabilityStateSchema.nullable(),
   from_date_utc: dateUtc,
   to_date_utc: dateUtc,
   episodes: z.array(sqliteStatsEpisodeSummarySchema).max(SQLITE_STATS_EPISODE_PAGE_SIZE),
@@ -141,7 +139,6 @@ export const sqliteStatsEpisodeDailyResponseSchema = sqlitePublicationRuntimeSch
   episode_id: episodeId,
   episode_lifecycle: z.enum(["published", "unpublished", "deleted"]),
   ...statsFields,
-  state: sqliteAvailabilityStateSchema.nullable(),
   from_date_utc: dateUtc,
   to_date_utc: dateUtc,
   coverage: sqliteStatsCoverageSchema,
@@ -153,16 +150,16 @@ export const sqliteStatsEpisodeDailyResponseSchema = sqlitePublicationRuntimeSch
 }).strict();
 export type SqliteStatsEpisodeDailyResponse = z.infer<typeof sqliteStatsEpisodeDailyResponseSchema>;
 
-export const sqliteStatsEpisodesCursorSchema = sqlitePublicationRuntimeSchema.extend({
+export const sqliteStatsEpisodesCursorSchema = sqliteServiceIdentitySchema.extend({
   show_id: showId, from_date_utc: dateUtc, to_date_utc: dateUtc, last_episode_id: episodeId,
 }).strict();
 
-export const sqliteStatsDailyCursorSchema = sqlitePublicationRuntimeSchema.extend({
+export const sqliteStatsDailyCursorSchema = sqliteServiceIdentitySchema.extend({
   show_id: showId, episode_id: episodeId, from_date_utc: dateUtc, to_date_utc: dateUtc,
   after_date_utc: dateUtc,
 }).strict();
 
-export const sqliteStatsRetentionRequestSchema = sqlitePublicationRuntimeSchema.extend({
+export const sqliteStatsRetentionRequestSchema = sqliteServiceIdentitySchema.extend({
   show_id: showId,
   operation_id: z.uuid(),
   retention_days: z.number().int().min(SQLITE_STATS_RETENTION_MIN_DAYS).max(SQLITE_STATS_RETENTION_MAX_DAYS),

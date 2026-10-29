@@ -1,6 +1,12 @@
 import { z } from "zod";
-import { sqliteHealthSchema } from "../../packages/shared/src/sqlite-service-api";
 import { sqlitePublicationStatusSchema } from "./legacy-sqlite-publication";
+
+// Historical health shape from the pre-simplization runtime; kept frozen for reading retained evidence.
+const sqliteHealthSchema = z.object({ service_id: z.string(), worker_version_id: z.uuid(), service_config_sha256: z.string(),
+  admission_window_id: z.uuid().nullable(), publication_ready: z.boolean(), drained: z.boolean(),
+  queued: z.number().int().nonnegative(), active: z.enum(["running", "blocked"]).nullable(),
+  runtime_update: z.object({ operation_id: z.uuid(), state: z.enum(["prepared", "activated", "completed", "blocked"]),
+    previous_worker_version_id: z.uuid(), new_worker_version_id: z.uuid().nullable() }).strict().nullable() }).strict();
 import { operationPhaseSchema, operationReasonSchema, operationStateSchema } from "./legacy-sqlite-operations";
 
 const diagnosticSchema = z.union([

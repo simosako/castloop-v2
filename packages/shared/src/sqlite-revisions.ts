@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { episodeDraftSchema, episodeDraftFromRevision, episodeRevisionSchema, showMetadataSchema } from "./metadata";
 import type { EpisodeDraft, ShowMetadata } from "./index";
-import { sqliteAvailabilityStateSchema } from "./sqlite-availability";
 import { sqlitePublicationProtocol, sqlitePublicationRuntimeSchema } from "./sqlite-publication";
 import { sqliteContentActionRequestSchema } from "./sqlite-direct-publication";
 import { SITE_ID_PATTERN } from "./website";
@@ -97,8 +96,6 @@ const siteIdSchema = z.string().regex(SITE_ID_PATTERN);
 export const sqliteContentSnapshotSchema = sqlitePublicationRuntimeSchema.extend({
   protocol: z.literal(sqlitePublicationProtocol),
   publication_ready: z.literal(true),
-  state: sqliteAvailabilityStateSchema,
-  admission_window_id: z.uuid().nullable(),
   show_id: slug(32),
   episode_id: slug(80).optional(),
   show_lifecycle: z.enum(["missing", "draft", "published", "unpublished", "deleted"]),
@@ -131,7 +128,6 @@ export const sqliteContentSnapshotSchema = sqlitePublicationRuntimeSchema.extend
 export const sqliteRevisionListResponseSchema = sqlitePublicationRuntimeSchema.extend({
   protocol: z.literal(sqlitePublicationProtocol),
   publication_ready: z.literal(true),
-  state: sqliteAvailabilityStateSchema,
   kind: z.enum(["show", "episode"]),
   show_id: slug(32),
   episode_id: slug(80).optional(),
@@ -161,8 +157,6 @@ export const sqliteRevisionListResponseSchema = sqlitePublicationRuntimeSchema.e
 export const sqliteRevisionDetailResponseSchema = sqlitePublicationRuntimeSchema.extend({
   protocol: z.literal(sqlitePublicationProtocol),
   publication_ready: z.literal(true),
-  state: sqliteAvailabilityStateSchema,
-  admission_window_id: z.uuid().nullable(),
   kind: z.enum(["show", "episode"]),
   show_id: slug(32),
   episode_id: slug(80).optional(),

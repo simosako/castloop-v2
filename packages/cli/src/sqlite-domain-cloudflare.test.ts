@@ -72,7 +72,7 @@ async function attachmentRequest(f: Awaited<ReturnType<typeof sqliteServiceFixtu
   const target = { ...f.config, public_base_url: "https://podcasts.example.com" };
   return parseSqliteDomainRequest({ schema_version: 1, protocol: SQLITE_DOMAIN_PROTOCOL, operation_id: crypto.randomUUID(), action: "add",
     hostname: "podcasts.example.com", zone_id: "c".repeat(32), zone_name: "example.com", namespace_id: "b".repeat(32),
-    previous_runtime: f.runtime.queue.identity(), previous_config: f.config, target_config: target,
+    previous_config: f.config, previous_config_sha256: await sqliteServiceConfigHash(f.config), target_config: target,
     target_config_sha256: await sqliteServiceConfigHash(target), worker_source_sha256: "d".repeat(64), worker_metadata_sha256: "e".repeat(64) });
 }
 

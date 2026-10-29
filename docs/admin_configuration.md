@@ -1,6 +1,6 @@
 # 管理用設定と予約公開
 
-フェーズ2開発版。任意の管理用タイムゾーン設定、オフライン日時変換、UTCでの予約登録・実行を提供する。予約実行日時は`published_at`とは別。予約にはローカル入力、明示承認hash、openなShowが必要。新規環境専用の内部queue/content形式**13/13**を使い、旧形式は変換しない。
+フェーズ3開発版。任意の管理用タイムゾーン設定、オフライン日時変換、UTCでの予約登録・実行を提供する。予約実行日時は`published_at`とは別。予約にはローカル入力、明示承認hash、稼働準備完了（`publication_ready`）のShowが必要。新規環境専用の内部queue/content形式**14/13**を使い、旧形式は変換しない。
 
 ## 任意の管理用設定
 
@@ -82,8 +82,8 @@ castloop schedule-status daily SCHEDULE_UUID --workspace /path/to/workspace --js
 
 - `preview-schedule-reschedule SHOW SCHEDULE_ID --at DATETIME`→`schedule-reschedule SHOW SCHEDULE_ID --at DATETIME --expect-version N --expect-preview HASH`で未実行予約の日時だけ変更する。
 - `preview-schedule-cancel SHOW SCHEDULE_ID`→`schedule-cancel SHOW SCHEDULE_ID --expect-version N --expect-preview HASH`で未実行予約を取消す。素材は自動削除しない。
-- `preview-schedule-reapprove SHOW SCHEDULE_ID --at DATETIME --expect-version N`→`schedule-reapprove ... --expect-preview HASH`で再承認する。予約済みmetadata・素材を保持し、現在のruntime・baseと日時だけ再確認する。手元の編集を暗黙に採用しない。
-- Pause、受付停止、保守準備、runtime／config変更、Show／Episode base変更では予約を`needs_approval`へ移す。Resumeや保守解除だけでは再開しない。
+- `preview-schedule-reapprove SHOW SCHEDULE_ID --at DATETIME --expect-version N`→`schedule-reapprove ... --expect-preview HASH`で再承認する。予約済みmetadata・素材を保持し、現在の設定・baseと日時だけ再確認する。手元の編集を暗黙に採用しない。
+- 独自ドメイン変更（`domain_change`）およびShow／Episodeの更新元競合（`base_conflict`）では予約を`needs_approval`へ移す。通常のWorkerコード更新（`deploy`）では予約はそのまま維持される。
 - 対象ごとに未実行予約は1件。即時公開は別の明示操作であり、予約と競合すれば古い予約には再承認が必要になる。
 - 予約実行が遅延しても`published_at`を書き換えない。予定時刻は「実行を開始してよい最早時刻」であり、その瞬間の公開完了や最大遅延を保証しない。
 

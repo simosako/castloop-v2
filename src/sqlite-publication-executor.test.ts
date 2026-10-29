@@ -106,11 +106,14 @@ test("overlapping publication during purge rejects the obsolete rendered Feed", 
   expect(f.content.inspect("daily", "second").episode?.lifecycle).toBe("published");
 });
 
-test("Pause during purge prevents publication commit", async () => {
+test("a pending domain change during purge prevents publication commit", async () => {
   const f = await fixture(); await f.publish(f.show());
-  f.hooks.purge = async () => { f.queue.pause(); };
-  await expect(f.publish(f.episode())).rejects.toThrow("stale_window");
-  expect(f.content.inspect("daily", "first").episode).toBeNull(); expect(f.content.delivery("/podcasts/daily/feed.xml").status).toBe(503);
+  f.hooks.purge = async () => {
+    f.storage.sql.exec(`INSERT INTO publication_domain_changes (operation_id, request_json, request_sha256, state)
+      VALUES ('${crypto.randomUUID()}', '{}', '${"a".repeat(64)}', 'prepared')`);
+  };
+  await expect(f.publish(f.episode())).rejects.toThrow("target_unavailable");
+  expect(f.content.inspect("daily", "first").episode).toBeNull();
 });
 
 test("unpublish, restore and revision adoption are idempotent and retain saved audio", async () => {

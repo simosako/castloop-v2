@@ -4,7 +4,6 @@ import { administratorKey } from "./administrator-key";
 import type { DiagnosticCheck, SqliteServiceConfig } from "@castloop/shared";
 import { pendingLocalDomainChanges } from "./sqlite-domain-local";
 import { loadAdminConfig } from "./admin-config";
-import { pendingSqliteControls } from "./sqlite-control-journal";
 
 type Check = DiagnosticCheck;
 export type DoctorResult = { cli_version: string; checks: Check[]; summary: Record<Check["status"], number> };
@@ -43,15 +42,6 @@ export async function diagnoseLocal(root: string,
     next_actions: accountMismatch ? ["confirm_workspace_and_environment"] : [] });
   checks.push({ id: "remote", scope: "local", status: "not_checked", code: "local_only", message: "Remote readiness, operations and publication were not checked", next_actions: [] });
   if (config) {
-    try {
-      const pending = pendingSqliteControls(root, config);
-      checks.push({ id: "show-controls", scope: "local", status: pending ? "warn" : "pass", code: pending ? "show_control_pending" : "show_controls_checked",
-        message: pending ? "Unfinished Show controls exist; observe their operation IDs without replay" : "Local Show control records checked; remote results not checked",
-        next_actions: pending ? ["inspect_show_control_status"] : [] });
-    } catch {
-      checks.push({ id: "show-controls", scope: "local", status: "fail", code: "show_controls_unverified",
-        message: "Local Show control records are unreadable, invalid or unsupported; preserve them without conversion", next_actions: ["inspect_original_show_control_records"] });
-    }
     try {
       const pending = pendingLocalDomainChanges(root, config).length > 0;
       checks.push({ id: "domain-records", scope: "local", status: pending ? "warn" : "pass", code: pending ? "domain_operation_pending" : "domain_records_checked",

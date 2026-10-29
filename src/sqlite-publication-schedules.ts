@@ -93,10 +93,7 @@ export class SqlitePublicationSchedules {
 
   private checkAdmission(publication: SqliteDirectPublicationRequest, reasonPrefix: "create" | "reapprove"): void {
     if (!this.scope?.ready()) throw new Error(`SQLite schedule ${reasonPrefix} requires a ready Show`);
-    const admission = this.queue.scheduleAdmission(publication);
-    if (admission === "paused") throw new Error(`SQLite schedule ${reasonPrefix} requires open admission`);
-    if (admission === "runtime_mismatch") throw new Error("SQLite schedule runtime differs");
-    if (admission === "stale_window") throw new Error("SQLite schedule admission window is stale");
+    if (!this.queue.admits(publication)) throw new Error("SQLite schedule runtime differs");
     if (!this.content.matchesScheduledTarget(publication)) throw new Error("SQLite schedule target or base is unavailable");
   }
 
@@ -257,7 +254,7 @@ export class SqlitePublicationSchedules {
       next_scheduled_at_ms: next?.scheduled_at_ms ?? null };
   }
 
-  suspendOpen(reason: "show_paused" | "show_admission_paused" | "maintenance"): void {
+  suspendOpen(reason: "domain_change"): void {
     const rows = this.storage.sql.exec<ScheduleRow>("SELECT * FROM publication_schedules WHERE state = 'scheduled'").toArray();
     const time = this.now();
     for (const row of rows) {
@@ -294,17 +291,11 @@ export class SqlitePublicationSchedules {
       WHERE state = 'scheduled' AND scheduled_at_ms <= ? ORDER BY scheduled_at_ms, sequence LIMIT 10`, this.now()).toArray();
     let dispatched = 0;
     for (const row of rows) {
-      if (!this.scope?.ready()) { this.suspendOne(row.schedule_id, "maintenance"); continue; }
+      if (!this.scope?.ready()) { this.suspendOne(row.schedule_id, "domain_change"); continue; }
       let request: SqliteDirectPublicationRequest;
       try { request = parseSqliteDirectPublicationRequest(JSON.parse(row.request_json)); }
       catch { this.failOne(row.schedule_id, "target_unavailable"); continue; }
-      const admission = this.queue.scheduleAdmission(request);
-      if (admission !== "open") {
-        const state = this.queue.snapshot().state;
-        this.suspendOne(row.schedule_id, admission === "paused" ? state === "paused" ? "show_paused" : "show_admission_paused" :
-          admission === "runtime_mismatch" ? "runtime_mismatch" : "stale_window");
-        continue;
-      }
+      if (!this.queue.admits(request)) { this.suspendOne(row.schedule_id, "runtime_mismatch"); continue; }
       try {
         if (!this.content.matchesScheduledTarget(request)) { this.suspendOne(row.schedule_id, "base_conflict"); continue; }
       } catch { this.failOne(row.schedule_id, "target_unavailable"); continue; }
@@ -312,10 +303,8 @@ export class SqlitePublicationSchedules {
         await this.queue.publish(request, (result) => {
           const current = this.requireRow(row.schedule_id);
           if (current.state !== "scheduled" || current.version !== row.version) throw new ScheduleSkipped();
-          if (!this.scope?.ready()) throw new ScheduleDeferred("maintenance");
-          const rechecked = this.queue.scheduleAdmission(request);
-          if (rechecked !== "open") throw new ScheduleDeferred(rechecked === "paused" ? (this.queue.snapshot().state === "paused" ? "show_paused" : "show_admission_paused") :
-            rechecked === "runtime_mismatch" ? "runtime_mismatch" : "stale_window");
+          if (!this.scope?.ready()) throw new ScheduleDeferred("domain_change");
+          if (!this.queue.admits(request)) throw new ScheduleDeferred("runtime_mismatch");
           const time = this.now();
           this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, state = 'dispatched', reason_code = NULL, revision_id = ?,
             dispatched_at_ms = ?, updated_at_ms = ? WHERE schedule_id = ? AND state = 'scheduled' AND version = ?`,
@@ -339,8 +328,6 @@ export class SqlitePublicationSchedules {
 
   async scheduleNext(): Promise<void> {
     if (!this.scope?.ready()) return;
-    const snapshot = this.queue.snapshot();
-    if (snapshot.state !== "open") return;
     const next = this.storage.sql.exec<{ scheduled_at_ms: number }>(`SELECT scheduled_at_ms FROM publication_schedules
       WHERE state = 'scheduled' ORDER BY scheduled_at_ms, sequence LIMIT 1`).toArray()[0];
     if (!next) return;

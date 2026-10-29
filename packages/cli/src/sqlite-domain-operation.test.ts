@@ -8,7 +8,7 @@ import { loadWorkspaceConfig } from "./workspace-config";
 import { SqliteDomainCloudflare } from "./sqlite-domain-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { administratorKey } from "./administrator-key";
-import { updateSqliteService } from "./sqlite-service-update";
+import { deploySqliteService } from "./sqlite-service-deploy";
 import { runSqliteCommand } from "./sqlite-commands";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { sqliteFeedSnapshotKey } from "../../../src/sqlite-feed";
@@ -36,12 +36,12 @@ test("public REST and journals drive add, normal code-only deploy, status and re
   expect(await listSqliteDomains(f.root, custom, f.options)).toMatchObject({ connections_match: true, configuration_matches: true });
   expect((await sqliteDomainOperationStatus(f.root, custom, id, f.options)).remote.phase).toBe("completed");
   const attached = f.domains[0];
-  await updateSqliteService(f.root, custom, crypto.randomUUID(), "updated", f.options, wait);
+  await deploySqliteService(f.root, custom, "updated", f.options, wait);
   expect(f.domains).toEqual([attached]);
   const removeId = crypto.randomUUID();
   expect((await startSqliteDomainChange(f.root, custom, "remove", removeId, "updated", f.options, undefined, wait)).phase).toBe("completed");
   expect(f.domains).toEqual([]); expect(await loadWorkspaceConfig(f.root)).toEqual(f.config);
-  expect(f.runtime.health()).toMatchObject({ state: "paused", publication_ready: true });
+  expect(f.runtime.health()).toMatchObject({ publication_ready: true });
   expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
   expect(f.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
 });
@@ -116,43 +116,45 @@ for (const fault of ["transport", "environment", "cert_id", "id", "enabled", "pr
   });
 }
 
-test("failure to durably save an attachment acknowledgement never starts its GET or replays its PUT", async () => {
+test("failure to durably save an attachment acknowledgement completes via current API state on continuation without a second PUT", async () => {
   const f = await fixture(), id = crypto.randomUUID(), original = journalStorage.createLocalJournalStorage;
+  let failSave = true;
   const replacement = spyOn(journalStorage, "createLocalJournalStorage").mockImplementation((...args) => {
     const storage = original(...args);
     return { ...storage, replace(value) {
-      if ((value as { phase?: string }).phase === "attachment_acknowledged") throw new Error("simulated receipt storage failure");
+      if (failSave && (value as { phase?: string }).phase === "attachment_acknowledged") throw new Error("simulated receipt storage failure");
       storage.replace(value);
     } };
   });
   try {
     await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", f.options, target, wait)).rejects.toThrow("storage failure");
-    expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("connection_requested");
+    expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("maintenance");
     expect(f.calls.filter((call) => /\/workers\/domains\/.+$/.test(call.path))).toEqual([]);
-    const calls = f.calls.length;
-    await expect(continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).rejects.toThrow("unknown outcome");
-    expect(f.calls).toHaveLength(calls);
+    failSave = false;
+    expect((await continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).phase).toBe("completed");
+    expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
   } finally { replacement.mockRestore(); }
 });
 
-for (const failure of ["attach", "detach"] as const) test(`unknown ${failure} outcome is never adopted or replayed even when current API state shows the result`, async () => {
+for (const failure of ["attach", "detach"] as const) test(`interrupted ${failure} response completes idempotently on continuation via current API state`, async () => {
   const f = await fixture();
   if (failure === "detach") await startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait);
   const config = await loadWorkspaceConfig(f.root), id = crypto.randomUUID(); f.faults.lostDomain = failure;
   await expect(startSqliteDomainChange(f.root, config, failure === "attach" ? "add" : "remove", id, "worker", f.options, failure === "attach" ? target : undefined, wait)).rejects.toThrow("unknown");
-  const phase = failure === "attach" ? "connection_requested" : "detach_requested";
+  const phase = failure === "attach" ? "maintenance" : "local_synced";
   expect(readSqliteDomainJournal(f.root, config, id)?.phase).toBe(phase);
   expect(f.domains).toHaveLength(failure === "attach" ? 1 : 0);
-  const mutations = f.calls.filter((call) => call.method !== "GET" && call.method !== "HEAD").length;
-  await expect(continueSqliteDomainChange(f.root, await loadWorkspaceConfig(f.root), id, "worker", f.options, wait)).rejects.toThrow("unknown");
-  expect(f.calls.filter((call) => call.method !== "GET" && call.method !== "HEAD")).toHaveLength(mutations);
+  f.faults.lostDomain = undefined;
+  expect((await continueSqliteDomainChange(f.root, await loadWorkspaceConfig(f.root), id, "worker", f.options, wait)).phase).toBe("completed");
+  expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
+  if (failure === "detach") expect(f.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
 });
 
-test("malformed DELETE success bodies remain uncertain rather than throwing on null or resending", async () => {
+test("malformed DELETE success bodies fail verification cleanly", async () => {
   const f = await fixture(); await startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait);
   const config = await loadWorkspaceConfig(f.root), id = crypto.randomUUID(); f.faults.malformedDetach = true;
   await expect(startSqliteDomainChange(f.root, config, "remove", id, "worker", f.options, undefined, wait)).rejects.toThrow("not verified");
-  expect(readSqliteDomainJournal(f.root, config, id)?.phase).toBe("detach_requested");
+  expect(readSqliteDomainJournal(f.root, config, id)?.phase).toBe("local_synced");
   expect(f.domains).toHaveLength(0);
 });
 
@@ -172,7 +174,7 @@ for (const body of ["stream", "null"] as const) test(`DELETE HTTP 200 with Conte
 });
 
 for (const kind of ["missing_length", "whitespace", "nonempty", "status", "partial", "truncated", "json_error"] as const) {
-  test(`DELETE ${kind} is not accepted as an empty acknowledgement and is never resent`, async () => {
+  test(`DELETE ${kind} is not accepted as an empty acknowledgement`, async () => {
     const f = await fixture();
     await startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait);
     const config = await loadWorkspaceConfig(f.root), id = crypto.randomUUID();
@@ -188,14 +190,12 @@ for (const kind of ["missing_length", "whitespace", "nonempty", "status", "parti
     } };
     await expect(startSqliteDomainChange(f.root, config, "remove", id, "worker", options, undefined, wait)).rejects.toThrow();
     const state = readSqliteDomainJournal(f.root, config, id);
-    expect(state?.phase).toBe("detach_requested"); expect(state?.detach_acknowledged).toBeUndefined();
-    const calls = f.calls.length;
-    await expect(continueSqliteDomainChange(f.root, await loadWorkspaceConfig(f.root), id, "worker", options, wait)).rejects.toThrow("unknown outcome");
-    expect(f.calls).toHaveLength(calls); expect(f.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
+    expect(state?.phase).toBe("local_synced"); expect(state?.detach_acknowledged).toBeUndefined();
+    expect(f.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
   });
 }
 
-test("an unverified attachment receipt is not reconstructed from a later valid domain listing", async () => {
+test("an unverified attachment receipt leaves the journal in maintenance without saving a connection", async () => {
   const f = await fixture(), id = crypto.randomUUID();
   const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
     const response = await f.transport(input, init);
@@ -207,11 +207,7 @@ test("an unverified attachment receipt is not reconstructed from a later valid d
   } };
   await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", options, target, wait)).rejects.toThrow();
   const journal = readSqliteDomainJournal(f.root, f.config, id);
-  expect(journal?.phase).toBe("connection_requested"); expect(journal?.connection).toBeUndefined();
-  expect((await new SqliteDomainCloudflare(f.config, f.options).list())[0]?.id).toHaveLength(40);
-  const calls = f.calls.length;
-  await expect(continueSqliteDomainChange(f.root, f.config, id, "worker", options, wait)).rejects.toThrow("unknown outcome");
-  expect(f.calls).toHaveLength(calls);
+  expect(journal?.phase).toBe("maintenance"); expect(journal?.connection).toBeUndefined();
   expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
 });
 
@@ -229,12 +225,12 @@ test("attachment validation diagnostics expose only allowlisted field names and 
   try { await startSqliteDomainChange(f.root, f.config, "add", id, "worker", options, target, wait); }
   catch (error) { failure = error; }
   expect(failure).toBeInstanceOf(AgentError);
-  const output = agentEnvelope("domain", { workspace: f.root }, { operation_id: id, phase: "connection_requested" }, failure, true);
+  const output = agentEnvelope("domain", { workspace: f.root }, { operation_id: id, phase: "maintenance" }, failure, true);
   expect(output.error).toMatchObject({ code: "domain_connection_unverified", outcome: "unknown",
     fields: [{ path: ["cert_id"], code: "invalid_format" }, { path: [], code: "unrecognized_keys" }] });
   expect(JSON.stringify(output)).not.toContain(secret);
   expect(output.next_actions).not.toContainEqual(expect.objectContaining({ args: ["continue", id] }));
-  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("connection_requested");
+  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("maintenance");
   expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
 });
 
@@ -287,13 +283,12 @@ test("connection listing compares the full known receipt, not only its domain ID
 test("ordinary direct publication remains usable after domain changes without draft rebinding", async () => {
   const f = await fixture();
   const run = (command: string, args: string[], config = f.config) => runSqliteCommand(f.root, config, command, args, { transport: f.transport, cloudflare: f.options });
-  await run("create-show", ["daily", "https://example.com"]); await run("show-resume", ["daily", crypto.randomUUID()]);
+  await run("create-show", ["daily", "https://example.com"]);
   writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
-  await run("publish-show", ["daily"]); await run("show-pause", ["daily", crypto.randomUUID()]);
+  await run("publish-show", ["daily"]);
   const id = crypto.randomUUID();
   await startSqliteDomainChange(f.root, f.config, "add", id, "worker", f.options, target, wait);
   const config = await loadWorkspaceConfig(f.root);
-  await run("show-resume", ["daily", crypto.randomUUID()], config);
   expect(await run("publish-show", ["daily"], config)).toMatchObject({ result: "unchanged" });
 });
 
@@ -325,24 +320,21 @@ test("native rollout waiting is diagnosed explicitly and continues the saved dep
   expect(f.calls.filter((call) => call.method === "PUT")).toHaveLength(uploads);
 });
 
-test("lost activation and finalization acknowledgements are reconciled from exact durable completion without POST replay", async () => {
-  for (const lost of ["domain-prepare", "domain-activate", "domain-finalize"] as const) {
+test("interrupted prepare, commit and finalize steps complete idempotently on continuation", async () => {
+  for (const lost of ["domain-prepare", "domain-commit", "domain-finalize"] as const) {
     const f = await fixture(), id = crypto.randomUUID(); f.faults.lost = lost;
     await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", f.options, target, wait)).rejects.toThrow();
     f.faults.lost = undefined;
-    const posts = f.calls.filter((call) => call.method === "POST" && call.path.endsWith(`/${lost}`)).length;
     expect((await continueSqliteDomainChange(f.root, await loadWorkspaceConfig(f.root), id, "worker", f.options, wait)).phase).toBe("completed");
-    expect(f.calls.filter((call) => call.method === "POST" && call.path.endsWith(`/${lost}`))).toHaveLength(posts);
   }
 });
 
-test("unknown config PUT acknowledgements remain blocked instead of being inferred from R2 contents", async () => {
+test("interrupted config PUT completes idempotently on continuation", async () => {
   const f = await fixture(), id = crypto.randomUUID(); f.faults.lost = "config";
   await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", f.options, target, wait)).rejects.toThrow();
-  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("config_requested");
-  const calls = f.calls.length;
-  await expect(continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).rejects.toThrow("unknown");
-  expect(f.calls).toHaveLength(calls);
+  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("connected");
+  f.faults.lost = undefined;
+  expect((await continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).phase).toBe("completed");
 });
 
 test("partial local configuration sync preserves unrelated edits and resumes only after restoring the exact original", async () => {
@@ -360,22 +352,22 @@ test("partial local configuration sync preserves unrelated edits and resumes onl
 test("continuation never finalizes an acknowledged local synchronization after the local configuration was reverted", async () => {
   const f = await fixture(), id = crypto.randomUUID(); f.faults.lost = "domain-finalize";
   await expect(startSqliteDomainChange(f.root, f.config, "add", id, "worker", f.options, target, wait)).rejects.toThrow();
-  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("finalize_requested");
+  expect(readSqliteDomainJournal(f.root, f.config, id)?.phase).toBe("local_synced");
+  f.faults.lost = undefined;
   const targetConfig = await loadWorkspaceConfig(f.root);
   writeFileSync(join(f.root, "castloop.toml"), stringifyToml(f.config)); f.calls.length = 0;
   await expect(continueSqliteDomainChange(f.root, f.config, id, "worker", f.options, wait)).rejects.toThrow("acknowledged domain synchronization");
   expect(f.calls).toEqual([]);
   writeFileSync(join(f.root, "castloop.toml"), stringifyToml(targetConfig));
   expect((await continueSqliteDomainChange(f.root, targetConfig, id, "worker", f.options, wait)).phase).toBe("completed");
-  expect(f.calls.every((call) => call.method === "GET")).toBe(true);
 });
 
 test("unpublished local inputs do not impose a draft lock on dedicated domain maintenance", async () => {
   const f = await fixture();
   const run = (command: string, args: string[]) => runSqliteCommand(f.root, f.config, command, args, { transport: f.transport, cloudflare: f.options });
-  await run("create-show", ["daily", "https://example.com"]); await run("show-resume", ["daily", crypto.randomUUID()]);
+  await run("create-show", ["daily", "https://example.com"]);
   writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
-  await run("show-pause", ["daily", crypto.randomUUID()]); f.calls.length = 0;
+  f.calls.length = 0;
   expect(await startSqliteDomainChange(f.root, f.config, "add", crypto.randomUUID(), "worker", f.options, target, wait)).toMatchObject({ phase: "completed" });
   expect(readFileSync(join(f.root, "daily", "cover.jpg"))).toEqual(Buffer.from([255, 216, 255]));
 });
@@ -384,7 +376,7 @@ test("domain switching preserves saved Episode identities, unpublished media and
   const f = await fixture();
   let config = f.config;
   const run = (name: string, args: string[]) => runSqliteCommand(f.root, config, name, args, { transport: f.transport, cloudflare: f.options });
-  await run("create-show", ["daily", "https://example.com"]); await run("show-resume", ["daily", crypto.randomUUID()]);
+  await run("create-show", ["daily", "https://example.com"]);
   writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
   await run("publish-show", ["daily"]);
   await run("create-episode", ["daily", "first"]);
@@ -399,10 +391,9 @@ test("domain switching preserves saved Episode identities, unpublished media and
     const file = join(f.root, "reviewed-domain-lifecycle.json"); writeFileSync(file, JSON.stringify(plan));
     expect(await run("lifecycle-execute", [file, plan.request_sha256, "confirm"])).toMatchObject({ result: "changed" });
   };
-  await lifecycle("unpublish"); await run("show-pause", ["daily", crypto.randomUUID()]);
+  await lifecycle("unpublish");
   await startSqliteDomainChange(f.root, config, "add", crypto.randomUUID(), "worker", f.options, target, wait);
   config = await loadWorkspaceConfig(f.root);
-  await run("show-resume", ["daily", crypto.randomUUID()]);
   expect(node.service.content.delivery(new URL(base.enclosure_url).pathname).status).toBe(404);
   await lifecycle("restore");
   expect(node.service.content.inspect("daily", "first").base).toEqual(base);
@@ -413,5 +404,5 @@ test("domain switching preserves saved Episode identities, unpublished media and
   for (const [key, etag] of preserved) expect(f.entries.get(key)?.etag).toBe(etag);
   expect(readFileSync(local, "utf8")).toContain("Unpublished local edit");
   await run("create-show", ["new-show", "https://example.com/new"]);
-  expect(f.nodes.get("new-show")!.service.health()).toMatchObject({ publication_ready: true, state: "paused" });
+  expect(f.nodes.get("new-show")!.service.health()).toMatchObject({ publication_ready: true });
 });

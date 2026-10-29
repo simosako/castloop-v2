@@ -40,11 +40,11 @@ test("config hashes bind the complete canonical new config", async () => {
   expect(await sqliteServiceConfigHash(config)).not.toBe(await sqliteServiceConfigHash({ ...config, bucket_name: "another-bucket" }));
 });
 
-test("ready status requires the new protocol and a real admission window", () => {
+test("ready status reports the runtime identity and protocol without admission vocabulary", () => {
   const status = { protocol: "sqlite-sequential-v1", service_id: "service", worker_version_id: crypto.randomUUID(),
-    service_config_sha256: "a".repeat(64), state: "paused", admission_window_id: null, publication_ready: true };
+    service_config_sha256: "a".repeat(64), publication_ready: true };
   expect(sqliteServiceStatusSchema.safeParse(status).success).toBe(true);
-  expect(sqliteServiceStatusSchema.safeParse({ ...status, state: "open" }).success).toBe(false);
-  expect(sqliteServiceStatusSchema.safeParse({ ...status, state: "open", admission_window_id: crypto.randomUUID() }).success).toBe(true);
   expect(sqliteServiceStatusSchema.safeParse({ ...status, publication_ready: false }).success).toBe(false);
+  expect(sqliteServiceStatusSchema.safeParse({ ...status, state: "open" }).success).toBe(false);
+  expect(sqliteServiceStatusSchema.safeParse({ ...status, admission_window_id: crypto.randomUUID() }).success).toBe(false);
 });
