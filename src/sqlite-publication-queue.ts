@@ -34,10 +34,6 @@ export type SqlitePublicationExecutor = {
   execute: (request: SqliteDirectPublicationRequest) => Promise<{ revisionId: string; commit: () => void }>;
 };
 
-export class PublicationQueueConflict extends Error {
-  constructor() { super("SQLite publication identity already has another frozen request"); }
-}
-
 export class SqlitePublicationQueue {
   executor?: SqlitePublicationExecutor;
   constructor(private readonly storage: PublicationQueueStorage, private runtime: SqlitePublicationRuntime,
@@ -53,7 +49,7 @@ export class SqlitePublicationQueue {
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedules (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL UNIQUE, show_id TEXT NOT NULL,
         kind TEXT NOT NULL CHECK(kind IN ('show', 'episode')), episode_id TEXT,
-        version INTEGER NOT NULL CHECK(version > 0), state TEXT NOT NULL CHECK(state IN ('scheduled', 'needs_approval', 'dispatched', 'cancelled', 'failed', 'blocked')),
+        version INTEGER NOT NULL CHECK(version > 0), state TEXT NOT NULL CHECK(state IN ('scheduled', 'needs_approval', 'dispatched', 'cancelled', 'failed')),
         reason_code TEXT, scheduled_at TEXT NOT NULL, scheduled_at_ms INTEGER NOT NULL, timezone TEXT NOT NULL, timezone_source TEXT NOT NULL,
         resolution_source TEXT NOT NULL, local_input TEXT NOT NULL, local_datetime TEXT NOT NULL, local_offset TEXT NOT NULL,
         input_offset TEXT, preview_sha256 TEXT NOT NULL,
@@ -67,7 +63,7 @@ export class SqlitePublicationQueue {
       storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_schedules_due ON publication_schedules (state, scheduled_at_ms, sequence)");
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedule_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL, version INTEGER NOT NULL,
-        action TEXT NOT NULL CHECK(action IN ('create', 'reschedule', 'cancel', 'reapprove', 'dispatch', 'suspend', 'fail', 'block')),
+        action TEXT NOT NULL CHECK(action IN ('create', 'reschedule', 'cancel', 'reapprove', 'dispatch', 'suspend', 'fail')),
         state TEXT NOT NULL, reason_code TEXT, request_sha256 TEXT NOT NULL, recorded_at_ms INTEGER NOT NULL)`);
       storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_schedule_events_schedule ON publication_schedule_events (schedule_id, sequence)");
       storage.sql.exec("INSERT OR IGNORE INTO publication_service (id, service_id, service_config_sha256) VALUES (1, ?, ?)",
@@ -128,8 +124,6 @@ export class SqlitePublicationQueue {
     this.requireRuntime();
     return { ...this.runtime };
   }
-
-  async confirm(): Promise<void> { await this.storage.sync(); }
 
   async changeConfiguration(input: SqlitePublicationRuntime, apply: () => undefined): Promise<void> {
     const next = sqlitePublicationRuntimeSchema.parse(input);

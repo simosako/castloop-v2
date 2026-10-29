@@ -6,13 +6,10 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { dirname, join } from "node:path";
 
 const familyServices = {
-  "sqlite-drafts": "service", "sqlite-uploads": "service", "sqlite-publications": "service",
-  "sqlite-initializations": "service", "sqlite-registrations": "service", "sqlite-controls": "service",
-  "sqlite-stats-controls": "service",
-  "sqlite-lifecycle": "service", "sqlite-rss-imports": "service", "sqlite-service-updates": "service", "sqlite-domain-changes": "service",
-  "sqlite-revisions": "service",
+  "sqlite-initializations": "service", "sqlite-registrations": "service",
+  "sqlite-rss-imports": "service", "sqlite-domain-changes": "service",
   "rss-import-downloads": undefined,
-  "sqlite-client": "service", "sqlite-operation-requests": "service",
+  "sqlite-client": "service",
 } satisfies Record<JournalFamily, string | undefined>;
 
 test("all journal families use their exact service-scoped or flat directory and reject the opposite scope", async () => {
@@ -35,7 +32,7 @@ test("all journal families use their exact service-scoped or flat directory and 
   }
 });
 
-for (const family of ["sqlite-uploads", "rss-import-downloads"] as const) {
+for (const family of ["sqlite-domain-changes", "rss-import-downloads"] as const) {
   const service = family === "rss-import-downloads" ? undefined : "service";
   const storage = (root: string) => createLocalJournalStorage(root, family, service, "operation.json");
   test(`${family} rejects symlink parents without reads or writes outside the workspace`, () => {
@@ -91,10 +88,10 @@ test("read-only checks do not create parents and invalid directory identities ca
   const root = mkdtempSync("/tmp/opencode/castloop-journal-missing-");
   try {
     const missing = join(root, "missing");
-    ensureLocalJournalParents(missing, "sqlite-uploads", "service");
+    ensureLocalJournalParents(missing, "sqlite-domain-changes", "service");
     expect(existsSync(missing)).toBe(false);
-    expect(() => ensureLocalJournalParents(missing, "sqlite-uploads", "service", true)).toThrow("already exist");
-    expect(() => ensureLocalJournalParents(root, "sqlite-uploads", "../outside", true)).toThrow("identity");
+    expect(() => ensureLocalJournalParents(missing, "sqlite-domain-changes", "service", true)).toThrow("already exist");
+    expect(() => ensureLocalJournalParents(root, "sqlite-domain-changes", "../outside", true)).toThrow("identity");
     expect(() => ensureLocalJournalParents(root, "unknown-family" as JournalFamily, "service", true)).toThrow("identity");
     expect(readdirSync(root)).toEqual([]);
   } finally { rmSync(root, { recursive: true, force: true }); }

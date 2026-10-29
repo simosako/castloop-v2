@@ -6,7 +6,7 @@ import { SqliteCloudflareApi } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { SqliteDomainClient } from "./sqlite-domain-client";
 import { SqliteDomainCloudflare } from "./sqlite-domain-cloudflare";
-import type { R2RestOptions } from "./verified-r2-put";
+import type { R2RestOptions } from "./bounded-http-read";
 
 const receiptSchema = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
 export type SqliteDeployResult = z.infer<typeof deployResultSchema>;

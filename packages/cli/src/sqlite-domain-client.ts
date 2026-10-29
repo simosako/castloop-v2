@@ -5,7 +5,7 @@ import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 
 export class SqliteDomainClient {
   readonly config: SqliteServiceConfig;

@@ -8,7 +8,6 @@ import type { SqliteDeliveryStats } from "./sqlite-delivery-stats";
 
 const prefix = "/admin/sqlite-stats/";
 const episodeIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const allowedQueries = ["from", "to", "cursor"];
 
@@ -62,13 +61,6 @@ export function createSqliteStatsHttp(stats: SqliteDeliveryStats, administratorK
         const retention = await stats.applyRetention(input,
           { service_id: snapshot.service_id, service_config_sha256: snapshot.service_config_sha256 });
         return adminReply(sqliteStatsRetentionResponseSchema.parse({ ...snapshot, retention }));
-      }
-      if (path.startsWith("retention/") && request.method === "GET") {
-        const operationId = path.slice("retention/".length);
-        if (!uuidPattern.test(operationId)) return adminReply({ error: "not_found" }, 404);
-        const retention = stats.retentionRecord(operationId);
-        return retention ? adminReply(sqliteStatsRetentionResponseSchema.parse({ ...health(), retention })) :
-          adminReply({ error: "not_found" }, 404);
       }
       return adminReply({ error: "method_not_allowed" }, 405);
     } catch {

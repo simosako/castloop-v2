@@ -4,7 +4,7 @@ import { diagnoseResultSchema, diagnoseShows, formatDiagnose } from "./diagnose"
 import type { DiagnoseResult } from "./diagnose";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 

@@ -9,7 +9,8 @@ const AUDIO_PROPS = { showGeneration: 0, episodeGeneration: 0, objectKey: AUDIO_
 
 function fixture(path = AUDIO_PATH) {
   const calls: Array<{ method: string; key: string; options?: object }> = [];
-  const metadata = { key: path.endsWith("feed.xml") ? "public/podcasts/daily/feeds/1.xml" : path.endsWith("cover.png") ? COVER_KEY : AUDIO_KEY, size: DATA.length, etag: "revision-etag", httpEtag: '"revision-etag"',
+  const feedCalls: Array<{ showId: string; props: object }> = [];
+  const metadata = { key: path.endsWith("cover.png") ? COVER_KEY : AUDIO_KEY, size: DATA.length, etag: "revision-etag", httpEtag: '"revision-etag"',
     uploaded: new Date("2026-10-01T12:00:00.123Z") };
   const bucket = {
     async head(key: string) { calls.push({ method: "head", key }); return metadata; },
@@ -20,8 +21,14 @@ function fixture(path = AUDIO_PATH) {
       return { ...metadata, body: new Blob([bytes]).stream(), async arrayBuffer() { throw new Error("Body must be streamed"); } };
     },
   };
-  const env = { CASTLOOP_BUCKET: bucket } as never;
-  return { env, bucket, calls, metadata, request: (headers: HeadersInit = {}, method = "GET") =>
+  const env = {
+    CASTLOOP_BUCKET: bucket,
+    renderFeed: (showId: string, props: object) => {
+      feedCalls.push({ showId, props });
+      return { xml: "0123456789abcdefghij", updatedAt: "2026-10-01T12:00:00.123Z" };
+    },
+  } as never;
+  return { env, bucket, calls, feedCalls, metadata, request: (headers: HeadersInit = {}, method = "GET") =>
     new Request(`https://castloop-cache.invalid${path}`, { method, headers }) };
 }
 
@@ -46,18 +53,19 @@ describe("cached public asset handler", () => {
     expect(missing.status).toBe(503); expect(missing.headers.get("Cache-Control")).toBe("no-store");
   });
 
-  test("Feed HEAD, Range and validators read only the committed snapshot; invalid generations never reach R2", async () => {
+  test("Feed HEAD, Range and validators render on-demand without R2 and reject invalid generations", async () => {
     const setup = fixture("/podcasts/daily/feed.xml"), props = { showGeneration: 1, feedGeneration: 1 };
-    expect((await serveCachedLifecycleAsset(setup.request({}, "HEAD"), setup.env, props)).status).toBe(200);
-    expect((await serveCachedLifecycleAsset(setup.request({ "If-None-Match": '"revision-etag"' }), setup.env, props)).status).toBe(304);
+    const head = await serveCachedLifecycleAsset(setup.request({}, "HEAD"), setup.env, props);
+    expect(head.status).toBe(200);
+    expect((await serveCachedLifecycleAsset(setup.request({ "If-None-Match": head.headers.get("ETag")! }), setup.env, props)).status).toBe(304);
     const range = await serveCachedLifecycleAsset(setup.request({ Range: "bytes=0-3" }), setup.env, props);
     expect(range.status).toBe(206); expect(await range.text()).toBe("0123");
-    expect(setup.calls.every((call) => call.key === "public/podcasts/daily/feeds/1.xml")).toBe(true);
-    const count = setup.calls.length;
+    expect(setup.calls).toEqual([]);
+    const count = setup.feedCalls.length;
     for (const generation of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
       expect((await serveCachedLifecycleAsset(setup.request(), setup.env, { ...props, feedGeneration: generation })).status).toBe(503);
     }
-    expect(setup.calls).toHaveLength(count);
+    expect(setup.feedCalls).toHaveLength(count);
   });
   test("GET streams the full object with tags and validators; HEAD reads metadata only", async () => {
     const setup = fixture();

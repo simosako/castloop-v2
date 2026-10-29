@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test";
 import { sqliteMediaKey } from "../../shared/src/sqlite-media";
 import { uploadSqliteMedia } from "./sqlite-media-upload";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,7 +19,7 @@ async function fixture(run: (root: string) => Promise<void>) {
 }
 const options = (transport: R2RestTransport) => ({ accountId: config.account_id, apiToken: "private-token", transport });
 
-test("direct media PUTs once with no lookup, readback or journals", async () => {
+test("direct media PUTs once with no lookup, readback, snapshot copies or journals", async () => {
   await fixture(async (root) => {
     const calls: string[] = [];
     await uploadSqliteMedia(root, config, "daily", "audio.mp3", media, options(async (input, init) => {
@@ -34,7 +35,7 @@ test("direct media PUTs once with no lookup, readback or journals", async () => 
       return Response.json({ success: true, result: { key, size: String(bytes.length) } });
     }));
     expect(calls).toEqual(["PUT"]);
-    expect(await readdir(join(root, ".castloop"))).toEqual([]);
+    expect(existsSync(join(root, ".castloop"))).toBe(false);
   });
 });
 
@@ -65,7 +66,7 @@ test("PUT requires HTTP 200, success, matching key and size, and a consumed sour
       } });
     }))).rejects.toThrow();
     expect(calls).toEqual(["PUT"]);
-    expect(await readdir(join(root, ".castloop"))).toEqual([]);
+    expect(existsSync(join(root, ".castloop"))).toBe(false);
   });
 });
 

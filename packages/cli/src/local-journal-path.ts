@@ -2,9 +2,7 @@ import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openS
 import { dirname, join } from "node:path";
 
 export const JOURNAL_FAMILIES = ["rss-import-downloads",
-  "sqlite-drafts", "sqlite-uploads", "sqlite-publications", "sqlite-initializations", "sqlite-registrations", "sqlite-controls",
-  "sqlite-stats-controls",
-  "sqlite-lifecycle", "sqlite-revisions", "sqlite-rss-imports", "sqlite-service-updates", "sqlite-domain-changes", "sqlite-client", "sqlite-operation-requests"] as const;
+  "sqlite-initializations", "sqlite-registrations", "sqlite-rss-imports", "sqlite-domain-changes", "sqlite-client"] as const;
 export type JournalFamily = typeof JOURNAL_FAMILIES[number];
 
 export function localJournalEntryExists(path: string): boolean {

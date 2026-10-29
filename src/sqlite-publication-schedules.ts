@@ -295,7 +295,7 @@ export class SqlitePublicationSchedules {
       let request: SqliteDirectPublicationRequest;
       try { request = parseSqliteDirectPublicationRequest(JSON.parse(row.request_json)); }
       catch { this.failOne(row.schedule_id, "target_unavailable"); continue; }
-      if (!this.queue.admits(request)) { this.suspendOne(row.schedule_id, "runtime_mismatch"); continue; }
+      if (!this.queue.admits(request)) { this.suspendOne(row.schedule_id, "domain_change"); continue; }
       try {
         if (!this.content.matchesScheduledTarget(request)) { this.suspendOne(row.schedule_id, "base_conflict"); continue; }
       } catch { this.failOne(row.schedule_id, "target_unavailable"); continue; }
@@ -303,8 +303,7 @@ export class SqlitePublicationSchedules {
         await this.queue.publish(request, (result) => {
           const current = this.requireRow(row.schedule_id);
           if (current.state !== "scheduled" || current.version !== row.version) throw new ScheduleSkipped();
-          if (!this.scope?.ready()) throw new ScheduleDeferred("domain_change");
-          if (!this.queue.admits(request)) throw new ScheduleDeferred("runtime_mismatch");
+          if (!this.scope?.ready() || !this.queue.admits(request)) throw new ScheduleDeferred("domain_change");
           const time = this.now();
           this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, state = 'dispatched', reason_code = NULL, revision_id = ?,
             dispatched_at_ms = ?, updated_at_ms = ? WHERE schedule_id = ? AND state = 'scheduled' AND version = ?`,

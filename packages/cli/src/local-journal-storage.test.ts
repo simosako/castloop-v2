@@ -6,11 +6,11 @@ import { dirname, join } from "node:path";
 test("journal storage creates private records and atomically replaces them without rewriting an open predecessor", async () => {
   const root = mkdtempSync("/tmp/opencode/castloop-journal-storage-");
   try {
-    const storage = createLocalJournalStorage(root, "sqlite-uploads", "service", "operation.json");
+    const storage = createLocalJournalStorage(root, "sqlite-domain-changes", "service", "operation.json");
     storage.initialize({ phase: "prepared" });
     storage.initialize({ phase: "must-not-overwrite" });
     expect(storage.read()).toEqual({ phase: "prepared" });
-    for (const directory of [join(root, ".castloop"), join(root, ".castloop", "sqlite-uploads"), dirname(storage.path)]) {
+    for (const directory of [join(root, ".castloop"), join(root, ".castloop", "sqlite-domain-changes"), dirname(storage.path)]) {
       expect(lstatSync(directory).mode & 0o777).toBe(0o700);
     }
     expect(lstatSync(storage.path).mode & 0o777).toBe(0o600);

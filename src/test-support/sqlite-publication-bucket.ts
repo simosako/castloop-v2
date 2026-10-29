@@ -1,4 +1,3 @@
-import type { SqlitePublicationBucket } from "../sqlite-publication-executor";
 import { createHash } from "node:crypto";
 
 type Entry = { key: string; bytes: Uint8Array; size: number; etag: string; version: string;
@@ -9,10 +8,10 @@ export function sqlitePublicationBucket() {
   const entries = new Map<string, Entry>(), calls: Array<{ method: string; key: string }> = [];
   const hooks: { beforePut?: (key: string) => Promise<void>; afterPut?: (key: string) => Promise<void>;
     beforeGet?: (key: string) => Promise<void>; beforeHead?: (key: string) => Promise<void> } = {};
-  const bucket: SqlitePublicationBucket & { delete: (key: string) => Promise<void> } = {
-    async delete(key) { calls.push({ method: "DELETE", key }); entries.delete(key); },
-    async head(key) { calls.push({ method: "HEAD", key }); await hooks.beforeHead?.(key); return entries.get(key) ?? null; },
-    async get(key, options) {
+  const bucket = {
+    async delete(key: string) { calls.push({ method: "DELETE", key }); entries.delete(key); },
+    async head(key: string) { calls.push({ method: "HEAD", key }); await hooks.beforeHead?.(key); return entries.get(key) ?? null; },
+    async get(key: string, options?: R2GetOptions): Promise<(Entry & { body?: ReadableStream<Uint8Array> }) | null> {
       calls.push({ method: "GET", key });
       await hooks.beforeGet?.(key);
       const object = entries.get(key);
@@ -20,7 +19,7 @@ export function sqlitePublicationBucket() {
       if (options?.onlyIf && !(options.onlyIf instanceof Headers) && options.onlyIf.etagMatches !== object.etag) return object;
       return { ...object, body: new Blob([object.bytes]).stream() };
     },
-    async put(key, body, options) {
+    async put(key: string, body: string | Uint8Array | ReadableStream<Uint8Array>, options?: R2PutOptions) {
       calls.push({ method: "PUT", key });
       await hooks.beforePut?.(key);
       const existing = entries.get(key);
@@ -38,7 +37,7 @@ export function sqlitePublicationBucket() {
       await hooks.afterPut?.(key);
       return object;
     },
-    async list(options) {
+    async list(options: { prefix: string; limit: number }) {
       calls.push({ method: "LIST", key: options.prefix });
       const objects = [...entries.values()].filter((entry) => entry.key.startsWith(options.prefix)).sort((a, b) => a.key.localeCompare(b.key));
       return { objects: objects.slice(0, options.limit), truncated: objects.length > options.limit };

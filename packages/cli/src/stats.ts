@@ -1,14 +1,11 @@
 import { z } from "zod";
 import { validateId } from "@castloop/shared";
-import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteStatsRetentionRequestSchema } from "../../shared/src/sqlite-stats";
-import { sqliteStatsRetentionResponseSchema } from "../../shared/src/sqlite-service-api";
 import type { SqliteStatsEpisodeDailyResponse, SqliteStatsEpisodesResponse } from "../../shared/src/sqlite-stats";
 import { administratorKey } from "./administrator-key";
-import { createLocalJournalStorage } from "./local-journal-storage";
 import { SqliteServiceClient } from "./sqlite-service-client";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 
 const dateUtc = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
 
@@ -25,44 +22,15 @@ export async function readSqliteStats(root: string, config: SqliteServiceConfig,
   return client.statsEpisodeDaily(validateId(showId, "show"), validateId(options.episodeId, "episode"), query);
 }
 
-const retentionJournalSchema = z.object({
-  schema_version: z.literal(1),
-  request: sqliteStatsRetentionRequestSchema,
-  phase: z.enum(["prepared", "requested", "confirmed"]),
-  result: sqliteStatsRetentionResponseSchema.optional(),
-}).strict();
-
 export async function setSqliteStatsRetention(root: string, config: SqliteServiceConfig, showId: string,
   days: number, operationId: string, transport?: R2RestTransport): Promise<unknown> {
   if (!Number.isSafeInteger(days)) throw new Error("Retention days must be an integer");
   const client = new SqliteServiceClient(config, administratorKey(root), transport);
-  const journal = createLocalJournalStorage(root, "sqlite-stats-controls", config.service_id, `${operationId}.json`);
-  let prior: z.infer<typeof retentionJournalSchema> | null = null;
-  try { prior = retentionJournalSchema.parse(journal.read()); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-  if (prior) {
-    if (prior.request.show_id !== showId || prior.request.retention_days !== days ||
-      prior.request.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error("Retained retention control differs");
-    if (prior.phase !== "prepared") return journal.exclusively(async () => {
-      const state = retentionJournalSchema.parse(journal.read());
-      const result = await client.statsRetentionStatus(showId, operationId);
-      if (JSON.stringify(result.retention.request) !== JSON.stringify(state.request)) throw new Error("Retention control outcome is unknown or differs");
-      journal.replace({ ...state, phase: "confirmed", result });
-      return result;
-    });
-  }
   const health = await client.health(showId);
-  const request = prior?.request ?? sqliteStatsRetentionRequestSchema.parse({
+  const request = sqliteStatsRetentionRequestSchema.parse({
     service_id: config.service_id, service_config_sha256: health.service_config_sha256,
     operation_id: operationId, show_id: showId, retention_days: days });
-  journal.initialize({ schema_version: 1, request, phase: "prepared" });
-  return journal.exclusively(async () => {
-    const state = retentionJournalSchema.parse(journal.read());
-    if (state.phase !== "prepared" || JSON.stringify(state.request) !== JSON.stringify(request)) throw new Error("Retention control is uncertain or changed; do not replay it");
-    journal.replace({ ...state, phase: "requested" });
-    const result = await client.statsRetention(request);
-    journal.replace({ ...state, phase: "confirmed", result });
-    return result;
-  });
+  return client.statsRetention(request);
 }
 
 function instant(ms: number): string {

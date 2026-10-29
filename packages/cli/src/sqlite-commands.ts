@@ -11,7 +11,7 @@ import { readLocalMetadata } from "./local-metadata-read";
 import { executeSqliteLifecycle, previewSqliteLifecycle } from "./sqlite-lifecycle";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { deploySqliteService } from "./sqlite-service-deploy";
-import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
+import type { R2RestOptions, R2RestTransport } from "./bounded-http-read";
 import { diagnoseShows } from "./diagnose";
 import { draftPreview } from "./draft-preview";
 import { showTemplate, episodeTemplate } from "./input-templates";
@@ -44,7 +44,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   "create-show": [1, 2], "create-episode": [1], "publish-show": [1], "publish-episode": [1, 2],
   "service-status": [0], "show-status": [1], "target-show": [1], "target-episode": [2],
   "list-shows": [0], "list-episodes": [1], "preview-show-lifecycle": [2], "preview-episode-lifecycle": [3],
-  "lifecycle-execute": [3], "update-service": [0],
+  "lifecycle-execute": [3], deploy: [0],
   diagnose: Array.from({ length: 20 }, (_, index) => index + 1),
   verify: [1],
   domain: [1, 2],
@@ -180,7 +180,7 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
   if (command === "schedule-reapprove" && args.length === 2) {
     return reapproveSqliteSchedule(root, config, validateId(args[0], "show"), z.uuid().parse(args[1]), options, true);
   }
-  if (command === "update-service" && !args.length && options.workerSource) return deploySqliteService(root, config, await options.workerSource(), cf);
+  if (command === "deploy" && !args.length && options.workerSource) return deploySqliteService(root, config, await options.workerSource(), cf);
   if (command === "service-status" && !args.length) return client.health();
   if (command === "show-status" && args.length === 1) return client.health(validateId(args[0], "show"));
   if (command === "diagnose") {

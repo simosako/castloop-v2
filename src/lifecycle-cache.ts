@@ -1,13 +1,12 @@
 import { sha256Hex } from "../packages/shared/src/sha256";
 import { parsePublicAssetPath, publicAssetCacheTags } from "./public-assets";
 import type { PublicAsset, PublicCacheProps } from "./public-assets";
-import { sqliteFeedSnapshotKey } from "./sqlite-feed";
 
 export type LifecycleFeedRenderer = (showId: string, props: PublicCacheProps) =>
   Promise<{ xml: string; updatedAt: string } | null> | { xml: string; updatedAt: string } | null;
 export type LifecycleCacheEnv = {
   CASTLOOP_BUCKET: Pick<R2Bucket, "head" | "get">;
-  renderFeed?: LifecycleFeedRenderer;
+  renderFeed: LifecycleFeedRenderer;
 };
 export type LifecyclePurgeTarget = { showId: string; episodeId?: string };
 type AssetMetadata = { size: number; httpEtag: string; uploaded: Date };
@@ -85,7 +84,7 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
   if (!asset) return rejected(request, 404);
   if (!validProps(asset, props)) return rejected(request, 503);
   try {
-    if (asset.kind === "feed" && env.renderFeed) {
+    if (asset.kind === "feed") {
       const rendered = await env.renderFeed(asset.showId, props);
       if (!rendered) return rejected(request, 503);
       const bytes = new TextEncoder().encode(rendered.xml);
@@ -110,7 +109,7 @@ export async function serveCachedLifecycleAsset(request: Request, env: Lifecycle
         status: range ? 206 : 200, headers,
       });
     }
-    const key = asset.kind === "feed" ? sqliteFeedSnapshotKey(asset.showId, props.feedGeneration!) : props.objectKey!;
+    const key = props.objectKey!;
     const object = await env.CASTLOOP_BUCKET.head(key);
     if (!object) return rejected(request, asset.kind === "audio" ? 404 : 503);
     if (object.key !== key || !Number.isSafeInteger(object.size) || object.size < 0 || !Number.isFinite(object.uploaded.getTime())) {

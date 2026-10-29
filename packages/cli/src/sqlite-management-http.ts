@@ -1,4 +1,4 @@
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { BoundedReadError, collectStreamBytes, retryAfterMilliseconds } from "./bounded-http-read";
 import { sha256HexSync } from "./sha256";
 import { MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
@@ -52,15 +52,14 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
 
 function readPath(path: string): boolean {
   const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-  if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-service/domain-state", "/admin/sqlite-publication/status", "/admin/sqlite-stats/episodes"].includes(path)) return true;
+  if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-service/domain-state", "/admin/sqlite-stats/episodes"].includes(path)) return true;
   if (path.startsWith("/admin/sqlite-stats/episodes/")) {
     const episodeId = path.slice("/admin/sqlite-stats/episodes/".length);
     return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(episodeId) && episodeId.length <= 80;
   }
-  if (new RegExp(`^/admin/sqlite-stats/retention/${uuid}$`, "i").test(path)) return true;
   if (/^\/admin\/sqlite-service\/registrations\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path) && path.slice("/admin/sqlite-service/registrations/".length).length <= 32) return true;
   if (path === "/admin/sqlite-schedules" || new RegExp(`^/admin/sqlite-schedules/${uuid}$`, "i").test(path)) return true;
-  if (new RegExp(`^/admin/(?:sqlite-service/update-status|sqlite-service/domain-status|sqlite-service/controls)/${uuid}$`, "i").test(path)) return true;
+  if (new RegExp(`^/admin/sqlite-service/domain-status/${uuid}$`, "i").test(path)) return true;
   for (const prefix of ["/admin/sqlite-service/targets/", "/admin/sqlite-service/content/"]) {
     if (path.startsWith(prefix)) {
       const parts = path.slice(prefix.length).split("/");

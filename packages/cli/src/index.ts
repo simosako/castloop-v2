@@ -247,7 +247,6 @@ async function main(context: Invocation): Promise<unknown> {
   } else if (command === "deploy") {
     allowedFlags(flags, []);
     if (positional.length) throw new Error(commandHelp(command));
-    command = "update-service";
   } else if (command === "domain") {
     const [action] = positional;
     allowedFlags(flags, action === "add" ? ["zone-id", "operation-id"] : action === "remove" ? ["operation-id"] : action === "status" ? ["cursor"] : []);
@@ -300,7 +299,7 @@ async function main(context: Invocation): Promise<unknown> {
     allowedFlags(flags, []);
   }
   const count = SQLITE_COMMAND_ARGUMENTS[command];
-  if (count === undefined || !count.includes(positional.length)) throw new Error(commandHelp(command === "update-service" ? "deploy" : command));
+  if (count === undefined || !count.includes(positional.length)) throw new Error(commandHelp(command));
   if (["preview-show-lifecycle", "preview-episode-lifecycle"].includes(command) && !["unpublish", "restore"].includes(positional.at(-1)!) ||
     ["lifecycle-execute", "revision-execute"].includes(command) && positional[2] !== "confirm") throw new Error(commandHelp(command));
   if (episodeCommand) {
@@ -325,7 +324,7 @@ async function main(context: Invocation): Promise<unknown> {
   }
   if (["publish-show", "publish-episode"].includes(command)) context.target.show_id = validateId(positional[0], "show");
   const { runSqliteCommand } = await import("./sqlite-commands");
-  const effects = describeCommand(command === "update-service" ? "deploy" : command).effects;
+  const effects = describeCommand(command).effects;
   context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
     previewOptions: { mode: flags.local ? "local" : flags.remote ? "remote" : "auto", rssOutput: flags["rss-output"] },

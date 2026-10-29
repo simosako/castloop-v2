@@ -115,7 +115,7 @@ test("GET connection validation logs its own boundary and successful receipts pr
   const logger = spyOn(console, "error").mockImplementation((line) => { records.push(String(line)); });
   try {
     const request = await attachmentRequest(f), api = new SqliteDomainCloudflare(f.config, f.options);
-    const connection = await api.confirmAttachment(request, await api.attach(request)); await api.inspect(request, connection);
+    const connection = await api.attach(request); await api.inspect(request, connection);
     expect(records).toEqual([]);
     const invalid = new SqliteDomainCloudflare(f.config, { ...f.options, transport: async (input, init) => {
       const response = await f.transport(input, init);

@@ -3,7 +3,6 @@ import type { SqliteDirectPublishRequest } from "../../packages/shared/src/sqlit
 import { sqliteServiceConfigHash } from "../../packages/shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../packages/shared/src/sqlite-service";
 import { sqlitePublicationFixture } from "./sqlite-publication";
-import { sqlitePublicationBucket } from "./sqlite-publication-bucket";
 import { initializeSqliteDomains, pendingSqliteDomain } from "../sqlite-domain-runtime";
 import { SqlitePublicationContent } from "../sqlite-publication-content";
 import { createSqlitePublicationExecutor } from "../sqlite-publication-executor";
@@ -23,7 +22,7 @@ export async function directPublicationFixture() {
     scope: { showId: "daily", ready: () => !pendingSqliteDomain(domainStorage) } });
   domainStorage = fixture.storage;
   initializeSqliteDomains(domainStorage);
-  const content = new SqlitePublicationContent(fixture.storage), objects = sqlitePublicationBucket();
+  const content = new SqlitePublicationContent(fixture.storage);
   const purges: string[] = [], hooks: { purge?: () => Promise<void> } = {};
   fixture.queue.executor = createSqlitePublicationExecutor(content, config, {
     async purge() { purges.push("media"); await hooks.purge?.(); }, async purgeSite() { purges.push("site"); },
@@ -47,5 +46,5 @@ export async function directPublicationFixture() {
       episode_id: episodeId, base_revision_id: target.base?.revision_id, expected_episode_lifecycle_version: target.episode?.lifecycle_version ?? 0 } : {}), target_revision_id: revisionId });
   };
   const publish = (request: SqliteDirectPublishRequest) => fixture.queue.publish(request);
-  return { ...fixture, ...objects, config, content, purges, hooks, show, episode, action, publish };
+  return { ...fixture, config, content, purges, hooks, show, episode, action, publish };
 }

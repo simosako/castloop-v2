@@ -7,7 +7,7 @@ import type { PublicRequestOptions } from "./public-http";
 import { administratorKey } from "./administrator-key";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { readLocalMetadata } from "./local-metadata-read";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 

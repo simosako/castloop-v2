@@ -150,7 +150,7 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
       purge: (id, confirmed) => this.purgeCaches(id, confirmed),
       purgeMedia: ({ showId: id, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId: id, ...(episodeId ? { episodeId } : {}) }),
       purgeSite: (target) => this.ctx.exports.SiteCachedPages.invalidate(target),
-    }, this.env.CASTLOOP_BUCKET, this.env.CASTLOOP_ADMIN_KEY);
+    }, this.env.CASTLOOP_ADMIN_KEY);
     return this.show;
   }
   async initializeShow(request: ShowRegistration) { await this.initialized; return this.openShow(request.show_id).initialize(request); }

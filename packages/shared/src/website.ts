@@ -31,10 +31,3 @@ export function sitePageUrl(origin: string, page: SitePage): string {
   if (base.protocol !== "https:" || base.port || base.origin !== origin) throw new Error("Invalid site public origin");
   return `${origin}${sitePagePath(page)}`;
 }
-
-export function siteSnapshotKey(page: SitePage, generation: number): string {
-  if (!Number.isSafeInteger(generation) || generation < 1) throw new Error("Invalid site generation");
-  sitePagePath(page);
-  const file = page.kind === "episode" ? `episodes/${page.siteId}.html` : page.page === 1 ? "index.html" : `page/${page.page}.html`;
-  return `public/podcasts/${page.showId}/sites/${generation}/${file}`;
-}

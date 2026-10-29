@@ -1,4 +1,4 @@
-import { parseSitePagePath, sitePageUrl, siteSnapshotKey } from "../packages/shared/src/website";
+import { parseSitePagePath, sitePageUrl } from "../packages/shared/src/website";
 import type { SitePage } from "../packages/shared/src/website";
 import type { SiteCacheProps } from "./site-cache";
 
@@ -19,7 +19,7 @@ export async function serveSiteGateway(request: Request, gateway: SiteGateway): 
     const canonical = sitePageUrl(gateway.publicOrigin, page);
     const decision = await gateway.delivery(page);
     if (decision.status !== 200) return reject(decision.status);
-    siteSnapshotKey(page, decision.props.generation);
+    if (!Number.isSafeInteger(decision.props.generation) || decision.props.generation < 1) throw new Error("Invalid site generation");
     if (url.origin !== gateway.publicOrigin) return new Response(null, { status: 307,
       headers: { Location: canonical, "Cache-Control": "no-store" } });
     const headers = new Headers();

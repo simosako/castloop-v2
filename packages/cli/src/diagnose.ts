@@ -10,7 +10,7 @@ import { collectStreamBytes } from "./bounded-http-read";
 import { readSqliteManagementGet } from "./sqlite-management-http";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { collectDeliveryChecks } from "./verify";
-import type { R2RestOptions, R2RestTransport } from "./verified-r2-put";
+import type { R2RestOptions, R2RestTransport } from "./bounded-http-read";
 
 export const DIAGNOSE_DEFAULT_MAX_SHOWS = 5;
 export const DIAGNOSE_ABSOLUTE_MAX_SHOWS = 20;

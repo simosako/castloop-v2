@@ -120,10 +120,7 @@ test("retention shortening advances the boundary immediately and merges pruned d
   // The pruned part is excluded from period totals, but measurable days still contribute their observed zero.
   expect(after.period).toMatchObject({ initial_downloads: 0, response_bytes: 0 });
   expect(after.coverage).toBe("partial");
-  // Same operation id with the same content replays the stored record; different content is rejected.
-  expect((await value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: operationId, retention_days: 30 }, value.identity)).applied_at_ms)
-    .toBe(applied.applied_at_ms);
-  await expect(value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: operationId, retention_days: 60 }, value.identity)).rejects.toThrow();
+  expect((await value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: operationId, retention_days: 60 }, value.identity)).retention_days).toBe(60);
   await expect(value.stats.applyRetention({ ...value.identity, show_id: "daily", operation_id: crypto.randomUUID(), retention_days: 10 }, value.identity)).rejects.toThrow();
 });
 

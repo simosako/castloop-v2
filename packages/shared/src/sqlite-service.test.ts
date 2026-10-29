@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { stringify as stringifyToml } from "@iarna/toml";
-import { parseSqliteServiceConfig, sqliteServiceConfigHash, sqliteServiceConfigSchema, sqliteServiceStatusSchema } from "./sqlite-service";
+import { parseSqliteServiceConfig, sqliteServiceConfigHash, sqliteServiceConfigSchema } from "./sqlite-service";
 
 const config = { schema_version: 2 as const, storage_layout: "show-v1" as const, publication_protocol: "sqlite-sequential-v1" as const,
   service_id: "service", account_id: "a".repeat(32), bucket_name: "private-bucket", worker_name: "castloop-service",
@@ -38,13 +38,4 @@ test("config hashes bind the complete canonical new config", async () => {
   expect(await sqliteServiceConfigHash(config)).toBe(await sqliteServiceConfigHash(
     Object.fromEntries(Object.entries(config).reverse()) as typeof config));
   expect(await sqliteServiceConfigHash(config)).not.toBe(await sqliteServiceConfigHash({ ...config, bucket_name: "another-bucket" }));
-});
-
-test("ready status reports the runtime identity and protocol without admission vocabulary", () => {
-  const status = { protocol: "sqlite-sequential-v1", service_id: "service", worker_version_id: crypto.randomUUID(),
-    service_config_sha256: "a".repeat(64), publication_ready: true };
-  expect(sqliteServiceStatusSchema.safeParse(status).success).toBe(true);
-  expect(sqliteServiceStatusSchema.safeParse({ ...status, publication_ready: false }).success).toBe(false);
-  expect(sqliteServiceStatusSchema.safeParse({ ...status, state: "open" }).success).toBe(false);
-  expect(sqliteServiceStatusSchema.safeParse({ ...status, admission_window_id: crypto.randomUUID() }).success).toBe(false);
 });

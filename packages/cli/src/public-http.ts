@@ -1,5 +1,5 @@
 import { BoundedReadError, collectStreamBytes } from "./bounded-http-read";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { version } from "../../../package.json";
 
 export type PublicHttpFailureCode = "transport_error" | "too_many_redirects" | "insecure_redirect" |

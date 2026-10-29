@@ -1,6 +1,6 @@
 # 配信統計（Episode別・日別）の利用ガイド
 
-Issue #71の配信統計の操作ガイド。現在のIssue #65／#70統合版は内部queue/content形式 **11/11**、識別`delivery_statistics="episode-daily-v1"`を使う新規環境専用。統計導入時のcontent `9`、予約表追加時のqueue `9`から進んでおり、旧9/9・10/11等の環境への互換配備・データ移行は行わない（[設計](../design/episode_delivery_statistics_plan.md)・[サイトガイド](show_website.md)参照）。
+Issue #71の配信統計の操作ガイド。現行の開発版は内部queue/content形式 **14/13**、識別`delivery_statistics="episode-daily-v1"`を使う新規環境専用。旧環境への互換配備・データ移行は行わない（[設計](../design/episode_delivery_statistics_plan.md)・[サイトガイド](show_website.md)参照）。
 
 ## 何を数えるか・数えないか
 
@@ -56,14 +56,12 @@ castloop stats my-show --cursor 'TOKEN_FROM_PREVIOUS_PAGE'
 ```sh
 # 180日へ短縮（次のUTC日替わり削除から適用）
 castloop stats-retention my-show 180 --operation-id UUID
-
-# 同じ操作IDでの再実行は保存済み結果の照会になる（二重適用しない）
 ```
 
 - 現在値は `castloop stats my-show --json` の応答（`retention_days`）で確認する。
 - **延長**しても、すでに削除済みの日別明細は戻らない（通算累計には残っている）。
 - **短縮**すると、期限を過ぎた行が1日1バッチ（最大200行）ずつ削除され、削除分は通算累計へ合算されるため通算合計は失われない。複数日に分かれても表示は一貫する。
-- 操作は送信前にローカルjournal（`.castloop/sqlite-stats-controls/`）へ記録され、応答不明時は同じ操作IDでの照会のみを行う（`show-pause` 等と同じ規律）。
+- `stats-retention` はShow DOの `retention_days` を直接更新する冪等な操作であり、通信中断時はそのまま最初から再実行できる。
 
 ## 記録の仕組みと限界
 

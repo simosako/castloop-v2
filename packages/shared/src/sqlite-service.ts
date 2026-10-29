@@ -23,14 +23,7 @@ export const sqliteServiceConfigSchema = z.object({ schema_version: z.literal(2)
   }
 });
 
-export const sqliteServiceStatusSchema = sqlitePublicationRuntimeSchema.extend({
-  show_id: z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
-  protocol: z.literal(sqlitePublicationProtocol),
-  publication_ready: z.literal(true),
-}).strict();
-
 export type SqliteServiceConfig = z.infer<typeof sqliteServiceConfigSchema>;
-export type SqliteServiceStatus = z.infer<typeof sqliteServiceStatusSchema>;
 
 export function parseSqliteServiceConfig(source: string): SqliteServiceConfig {
   return sqliteServiceConfigSchema.parse(TOML.parse(source));

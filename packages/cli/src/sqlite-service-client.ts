@@ -9,7 +9,7 @@ import { sha256Hex } from "../../shared/src/sha256";
 import type { SqliteHealth, SqliteInspection, SqliteRuntimeRequest } from "../../shared/src/sqlite-service-api";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadOptions } from "./sqlite-management-http";
-import type { R2RestTransport } from "./verified-r2-put";
+import type { R2RestTransport } from "./bounded-http-read";
 import { sqliteCatalogRequestSchema, sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../../shared/src/sqlite-catalog";
 import { sqliteContentSnapshotSchema, sqliteRevisionDetailResponseSchema, sqliteRevisionListResponseSchema, sqlitePreviewInventorySchema } from "../../shared/src/sqlite-revisions";
@@ -130,10 +130,6 @@ export class SqliteServiceClient {
     const value = await this.checkedRetention(await this.statsPost(request, request.show_id), request.show_id);
     if (JSON.stringify(value.retention.request) !== JSON.stringify(request)) throw new Error("Delivery stats retention frozen request differs");
     return value;
-  }
-  async statsRetentionStatus(showId: string, operationId: string): Promise<SqliteStatsRetentionResponse> {
-    sqliteStatsRetentionRequestSchema.shape.operation_id.parse(operationId);
-    return this.checkedRetention(await this.statsRead(`retention/${operationId}`, {}, showId), showId);
   }
   private async checkRevisionContent(content: SqliteShowRevisionRecord | SqliteEpisodeRevisionRecord | null | undefined) {
     if (!content) return;

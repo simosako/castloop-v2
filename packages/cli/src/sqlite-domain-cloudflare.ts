@@ -3,12 +3,11 @@ import { requireSqliteDomainConnection, sqliteDomainConnectionSchema, sqliteDoma
 import type { SqliteDomainConnection, SqliteDomainRequest } from "../../shared/src/sqlite-domain";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
-import { collectStreamBytes } from "./bounded-http-read";
+import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
+import type { R2RestOptions } from "./bounded-http-read";
 import { AgentError } from "./agent-output";
-import { domainAttachmentMatches, requireSqliteDomainAttachment } from "./sqlite-domain-attachment";
-import type { SqliteDomainAttachment } from "./sqlite-domain-attachment";
-import { requireR2RestOptions } from "./verified-r2-put";
-import type { R2RestOptions } from "./verified-r2-put";
+
+const attachmentSchema = z.object({ ...sqliteDomainConnectionSchema.shape, environment: z.enum(["", "production"]) }).strict();
 
 const id = z.string().regex(/^[a-f0-9]{32}$/);
 const rawDomain = z.object({ id: sqliteDomainIdSchema, hostname: z.string().max(253), service: z.string(), zone_id: id, zone_name: z.string(),
@@ -192,25 +191,31 @@ export class SqliteDomainCloudflare {
     if (routes.some((route) => hostnameCovered(route.pattern, hostname))) throw new Error("An existing Worker route covers this hostname");
     return { hostname, zone_id: zone.id, zone_name: zone.name };
   }
-  async attach(request: SqliteDomainRequest): Promise<SqliteDomainAttachment> {
+  async attach(request: SqliteDomainRequest): Promise<SqliteDomainConnection> {
     if (request.action !== "add") throw new Error("Only an add request can attach a domain");
     const existing = (await this.list()).filter((domain) => domain.service === this.config.worker_name || domain.hostname.toLowerCase() === request.hostname);
+    let acknowledged: z.infer<typeof attachmentSchema>;
     if (existing.length === 1 && existing[0]!.service === this.config.worker_name && existing[0]!.hostname.toLowerCase() === request.hostname) {
-      return requireSqliteDomainAttachment(existing[0], request);
+      acknowledged = attachmentSchema.parse(existing[0]);
+    } else {
+      const target = await this.preflightAdd(request.hostname, request.zone_id);
+      if (target.zone_name !== request.zone_name) throw new Error("Frozen domain zone name differs");
+      const input = (await this.call("domain_attach", "PUT", `${this.account}/workers/domains`, {
+        hostname: target.hostname, zone_id: target.zone_id, service: this.config.worker_name, enabled: true, previews_enabled: false,
+      })).result;
+      try {
+        acknowledged = attachmentSchema.parse(input);
+        if (acknowledged.hostname !== request.hostname || acknowledged.zone_id !== request.zone_id ||
+          acknowledged.zone_name !== request.zone_name || acknowledged.service !== request.previous_config.worker_name) {
+          throw new Error("Domain attachment acknowledgement differs from its frozen target");
+        }
+      } catch (error) { return receiptFailure(input, error, "domain_attach"); }
     }
-    const target = await this.preflightAdd(request.hostname, request.zone_id);
-    if (target.zone_name !== request.zone_name) throw new Error("Frozen domain zone name differs");
-    const input = (await this.call("domain_attach", "PUT", `${this.account}/workers/domains`, {
-      hostname: target.hostname, zone_id: target.zone_id, service: this.config.worker_name, enabled: true, previews_enabled: false,
-    })).result;
-    try { return requireSqliteDomainAttachment(input, request); }
-    catch (error) { return receiptFailure(input, error, "domain_attach"); }
-  }
-  async confirmAttachment(request: SqliteDomainRequest, receipt: SqliteDomainAttachment): Promise<SqliteDomainConnection> {
-    const acknowledged = requireSqliteDomainAttachment(receipt, request);
     const connection = verifiedConnection((await this.call("domain_get", "GET",
       `${this.account}/workers/domains/${encodeURIComponent(acknowledged.id)}`)).result, request);
-    if (!domainAttachmentMatches(acknowledged, connection)) {
+    const { environment: _ackEnv, ...ackRest } = acknowledged;
+    const { environment: _connEnv, ...connRest } = connection;
+    if (JSON.stringify(ackRest) !== JSON.stringify(connRest)) {
       logDomainFailure("domain_get", "GET", "connection_receipt_mismatch", { http_status: 200 });
       throw new Error("Domain connection differs from its acknowledged attachment");
     }
