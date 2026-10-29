@@ -4,8 +4,8 @@
 
 管理者から実環境テストの指示と、次のサンプル利用許可を受けた。
 
-- `/home/sim/project/castloop-v2/.local-test-data/minimal/`
-- `/home/sim/project/castloop-v2/.local-test-data/normal/`
+- `.local-test-data/minimal/`
+- `.local-test-data/normal/`
 
 現在のIssue #65実装は、任意の管理設定と日時変換のCLI基盤だけである。**サーバー側の予約登録・Alarm／FIFO連携は未実装のため、今回はLinux単体CLIを実サンプルに対して実行する検証であり、Cloudflare nativeの予約公開試験ではない。** この区別を実行前に明示した。
 
