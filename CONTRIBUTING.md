@@ -4,7 +4,7 @@ Thank you for considering a contribution. castloop is a safety-sensitive tool: i
 
 ## Project status
 
-castloop is an **early beta** (v0.8.0). Only fresh service configurations using `schema_version = 2`, `sqlite-sequential-v1`, and `storage_layout = "show-v1"` with internal formats 14/13 are supported. Older internal formats are not migrated; Queue/R2 services need the separate v0.5.x line. Check [README.md](README.md) and the [design index](design/README.md) before proposing changes so your idea is not already covered or intentionally excluded.
+castloop is an **early beta** (v0.8.1). Only fresh service configurations using `schema_version = 2`, `sqlite-sequential-v1`, and `storage_layout = "show-v1"` with internal formats 14/13 are supported. Older internal formats are not migrated; Queue/R2 services need the separate v0.5.x line. Check [README.md](README.md) and the [design index](design/README.md) before proposing changes so your idea is not already covered or intentionally excluded.
 
 ## Development setup
 

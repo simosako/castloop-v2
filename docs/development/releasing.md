@@ -22,7 +22,7 @@ node scripts/smoke-agent-cli.mjs dist/castloop-linux-x64
 2. `docs/release-vX.Y.Z.md` にリリースノートを作成します。新機能、利用条件、更新時の注意、動作確認した範囲を記載してください。
 3. 変更した機能の利用ガイドも更新します。
 
-CIは `docs/release-${tag}.md` をリリース本文に使います。例えば `v0.8.0` の本文は [release-v0.8.0.md](../release-v0.8.0.md) です。
+CIは `docs/release-${tag}.md` をリリース本文に使います。例えば `v0.8.1` の本文は [release-v0.8.1.md](../release-v0.8.1.md) です。
 
 ## 3. PRのCI結果を確認する
 
