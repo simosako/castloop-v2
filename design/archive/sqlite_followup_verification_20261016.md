@@ -163,4 +163,4 @@ tail欠測の4件はRange 1ms・条件付きGET 1ms・既存feed 1ms・paused fe
 
 - [先行実機試験と欠測](sqlite_sequential_measurement_20261016.md)
 - [通知とR2読取診断](trial_notifications_and_r2_read_diagnostics.md)
-- [SQLite開発版の操作](../../docs/sqlite_sequential_development.md)
+- [SQLite開発版の操作](../../docs/getting_started.md)

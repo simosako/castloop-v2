@@ -244,7 +244,7 @@ blockedで許可するreasonは既存の`execution_failed`、`execution_interrup
 2. 新規追加と既存更新のclaim／検証済み化／配信条件を揃える。旧MP3検証を公開書込前へ接続する。
 3. metadata-only／audio-only／両方の段階待機・切替・blocked・再生成を実executor経由で試験する。
 4. CLI・lifecycle・Show分離・共有Worker更新の回帰を実行する。
-5. 実装後に[全体設計](initial_design.md)、[SQLite契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)、[SQLiteガイド](../../docs/sqlite_sequential_development.md)、[利用README](../../README.md)、第1段階の範囲記述を更新する。レビュー段階で現行仕様を実装済みへ書き換えない。
+5. 実装後に[全体設計](initial_design.md)、[SQLite契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)、[SQLiteガイド](../../docs/getting_started.md)、[利用README](../../README.md)、第1段階の範囲記述を更新する。レビュー段階で現行仕様を実装済みへ書き換えない。
 
 ## 11. 検証と受け入れ条件
 
@@ -298,5 +298,5 @@ blockedで許可するreasonは既存の`execution_failed`、`execution_interrup
 
 - [第1段階のFeed継続配信設計](episode_add_feed_availability_plan.md)、[小規模実機確認](episode_add_feed_live_verification_20261021.md)
 - [全体設計](initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)
-- [SQLite操作ガイド](../../docs/sqlite_sequential_development.md)、[Worker更新の復旧契約](sqlite_worker_update_recovery.md)
+- [SQLite操作ガイド](../../docs/getting_started.md)、[Worker更新の復旧契約](sqlite_worker_update_recovery.md)
 - [Cloudflare DO SQLite storage](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/): 同期SQL transactionと外部IOの分離。旧内容配信のために長い外部IO待ちを全要求の排他にしない。

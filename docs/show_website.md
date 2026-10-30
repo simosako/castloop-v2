@@ -1,8 +1,8 @@
 # 番組サイトとEpisodeページ
 
-v0.8.0の内蔵サイトは、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を提供する。限定的な非公開実機確認で再生・東京日付表示を確認したが、Cloudflare Free性能の実証や全端末での確認を意味しない。
+内蔵サイトは、番組の一覧・Episodeページと、ブラウザ標準の音声プレイヤーを提供します。標準デザインをそのまま使うか、ShowごとのCSS 1ファイルで見た目を調整できます。外部のWebサイトを紹介先にすることも可能です。
 
-内部queue/content形式14/13の新規環境向け。healthとinspectionは`website="static-show-v2"`を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1。旧環境の変換・移行・資源採用は提供しない。Feed/HTMLはSQLiteからオンデマンド生成し、素材だけR2へ直接配置する。
+サービス作成は[はじめに](getting_started.md)、編集内容の反映は[公開・更新](publishing.md)を参照してください。ファイルを編集しただけではサイトは変わりません。
 
 ## サイト方式を選ぶ
 
@@ -11,12 +11,13 @@ v0.8.0の内蔵サイトは、標準デザイン、Showごとの任意CSS 1フ�
 ```sh
 castloop create-show my-show --site-mode builtin
 # Edit my-show/show.toml and provide the cover named in image_path.
-castloop publish-show my-show
+castloop preview-show my-show --remote --json
+castloop publish-show my-show --expect-preview REVIEWED_HASH
 ```
 
 `create-show`はShow登録とローカル雛形作成だけで、公開しない。`publish-show`がローカル入力を検証・素材配置し、同期公開結果`changed`／`unchanged`とrevisionを返す。
 
-内蔵方式の`show.toml`には次を指定する。他の番組情報・カバーは従来どおり必要である。
+上の例はサービスワークスペースで実行します。`REVIEWED_HASH` は確認した `input_fingerprint` に置き換えてください。内蔵方式の `show.toml` には次を指定します。他の番組情報・カバーも必要です。
 
 ```toml
 site_mode = "builtin"
@@ -61,7 +62,7 @@ site_css_path = "site.css"
 
 HTML構造・表示内容の変更、独自JS、外部CSSのimport、Web font、追加画像のuploadは提供しない。外部画像・font・data URLは既存CSPでも許可しない。Sass等を使う場合の変換は管理者側で行い、castloopに追加runtimeは不要。高度な変更には既存の外部サイト方式を使う。
 
-CSSはShow metadata・revisionの一部としてSQLiteへ保存する。Episode更新・復元では現在のShowのCSSを、Showの過去版採用ではその版のCSSを使う。ドメイン変更後も保存内容だけからHTMLを生成し、ローカルファイルや外部buildを必要としない。CSSは生成する各HTMLへ埋め込み、HTMLサイズ上限とSQLiteの履歴容量に算入する。HTMLやCSSのスナップショットをR2へ保存する方式ではない。履歴は自動削除しない。
+CSSはShowの保存内容と履歴に含まれます。Episode更新・復元では現在のShowのCSS、Showの過去版採用では選んだ版のCSSを使います。反映後のサイト配信に、管理端末や外部ビルドを起動しておく必要はありません。
 
 RSS取り込みでも、最初の公開前に取り込み元directoryのShow TOMLへ指定し、同じ場所へCSSを置いてレビューする。公開入力へ固定し、取り込み先へ保存する。開始後にCSSを変更して既存処理を続行しない。
 
@@ -80,9 +81,9 @@ site_timezone = "Asia/Tokyo"
 
 変更後は`publish-show SHOW`で**全一覧・全公開Episodeページ**の表示を更新する。設定を削除して明示公開すればUTCへ戻る。Show revisionに設定を保存するため、Showの過去版採用ではその版、Episode更新・復元では現在のShow設定を使う。
 
-変えるのはHTMLの表示だけであり、保存済み`published_at`、RSSの`pubDate`、新しい順の並び、GUID、短いURL、音源は変えない。[管理用設定](admin_configuration.md)の`castloop-admin.toml timezone`はCLIの日時入力・確認用で、サイト表示へは流用しない。PCや閲覧者のタイムゾーンからも推測しない。
+変えるのはHTMLの表示だけで、保存済み `published_at`、RSSの `pubDate`、並び順、GUID、URL、音源は変えません。[管理用設定](scheduling.md#任意の管理用設定)の `castloop-admin.toml timezone` はCLIの日時入力・確認用であり、サイト表示には使いません。PCや閲覧者のタイムゾーンからも推測しません。
 
-変換にはWorker標準の`Intl.DateTimeFormat`を使い、1回のHTML生成内で使い回す。キャッシュミス時にサーバーで変換・生成し、閲覧者のブラウザ側の変換や追加JavaScriptは使わない。[採用設計](../design/archive/show_website_timezone_plan.md)も参照する。
+日付はサーバー側で表示用に変換し、閲覧者のブラウザでの変換や追加JavaScriptは使いません。
 
 ## URLとプレイヤー
 
@@ -97,9 +98,9 @@ site_timezone = "Asia/Tokyo"
 
 同じ公開日時の回はEpisode ID順。一覧の説明はタグを除き、文字参照（`&amp;`等）を一度だけ文字へ戻し、段落・改行を空白へまとめた先頭160 Unicode文字を表示する。超える場合だけ`…`を付ける。説明文全体と「全文を読む」は既存のEpisodeページへのリンクで、個別ページに文章全文を表示する。本文が空なら説明リンクを作らず、タイトルから移動できる。末尾の`/`を含む上記形式だけを受け付け、`page/1/`や世代別HTMLの直接URLは提供しない。
 
-Episodeページの識別子は、Episode ID全体のSHA-256から先頭16文字の小文字16進数を自動で割り当てる。管理者がslugを入力する設定はない。同じShow内で衝突した場合、新しい回だけ4文字ずつ延ばす（最大64文字）。対応はShowのSQLiteへ永久予約し、非公開化や失敗・中断でも他の回へ再利用しない。外部サイト方式で公開したEpisodeにも予約を保持し、後で内蔵方式へ変更しても同じ規則を使う。
+Episodeページの短い識別子は自動で割り当てます。管理者がslugを指定する設定はありません。非公開化しても他の回へ使い回さず、外部方式から内蔵方式へ変更した場合も保存された対応を使います。短いURL自体にアクセス制御の効果はありません。
 
-ページ入口はShow直下の短いもの一つだけであり、`e/`付き・`episodes/<episodeId>/`付きのページ入口や旧URLからの転送はない。一覧・RSS item link・canonical・OGPは同じ短いURLを使う。内部Episode ID・GUID・音源URLの`episodes/<episodeId>/<revisionId>.mp3`は変えない。短縮ハッシュ自体にはアクセス制御の効果はない。
+一覧・RSS item link・canonical・OGPは同じ短いページURLを使います。`e/` や `episodes/<episodeId>/` 形式のページ入口は提供しません。Episode ID・GUID・音源URLは、ページの短い識別子とは別です。
 
 全文とShow紹介では段落`p`・改行`br`と、安全なHTTP(S)リンク`a`を作り直す。本文中の`http://`・`https://`のURLは自動でリンクにし、元の`a`はHTTP(S)の絶対URLに限って表示文字列とリンク先を復元する。認証情報付きURL、相対URL、`javascript:`等の別scheme、制御文字・backslashを含むリンク先はリンクにせず本文を残す。元のイベント属性・装飾・`target`等は引き継がず、リンクは同じタブで開く。一覧の抜粋内には外部リンクを作らず、全文ページへのリンクだけを置く。
 
@@ -115,16 +116,13 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 
 ## 更新・停止・保守
 
-- HTMLは確定済みSQLite内容からオンデマンド生成し、HTML専用Gatewayと`SiteCachedPages`のCDN cacheで配信する。Feed／画像／音源の`SqliteCachedAssets`とはcache・purgeを分ける。
-- 一覧は対象ページの最大20件、個別ページは対象1件の公開内容と短縮IDだけをSQLiteから読み出す。条件付き応答は生成した本文のETagで判定し、`Last-Modified`は送らない。`If-Modified-Since`だけの要求には本文を返す。
-- 必要なpurge後、内容と世代を同じSQLiteトランザクションで切り替える。パージやDB失敗では現在内容を維持する。HTML事前生成batch・R2 HTML保存・公開jobは使わない。
-- 旧形式へのcode-only deploy・DB変換は行わない。現行形式同士のcode更新は通常の保守手順で行う。
-- 1 HTMLは1,000,000 bytes以下。公開件数・JSON・Feed予算も適用し、超過を切り詰めない。全件Feed生成などの負荷は残る。
-- 配信停止には既存のlifecycle操作（`unpublish`／`restore`）を使う。cache HIT、HEAD、304、旧workers.devからのredirectの前にも最新のShow判定を行う。
-- domain変更は[専用保守](sqlite_custom_domains.md)でHTMLのcanonical／OGPとFeedを新originへ切り替える。code-only deployでdomainを変更しない。
-- 短い識別子は公開時に確定して索引へ保存する。閲覧時は内部Episode IDを解決し、公開・停止・readiness判定を通してHTML cacheへ進む。
-- RSS previewはサーバーから取得した予約を使い、新規Episodeには未予約の候補を表示する。previewで予約・公開はしない。候補の確定は明示公開の処理で行う。
-- 保存済みHTMLや再生buffer、検索・SNSの第三者コピーを遠隔消去することはできない。
+- HTMLは確定済みの内容から閲覧時に生成・キャッシュします。通常の内容変更にWorkerの再配備は不要です。
+- 条件付き応答は本文のETagで判定し、HTMLには `Last-Modified` を送りません。
+- 1ページのHTML上限は1,000,000 bytesです。公開件数・JSON・RSSの上限も適用し、超過を切り詰めて公開しません。
+- 配信停止には[非公開化・復元](lifecycle.md)を使います。キャッシュがあっても公開可否の判定を通します。
+- 公開URLの変更は[独自ドメイン](custom_domains.md)、Workerコード更新は[サービス保守](maintenance.md)の手順です。
+- RSSプレビューの新規ページURLは候補であり、公開時に確定します。プレビューだけでは公開しません。
+- 保存済みHTML・再生バッファーや、検索・SNS等の第三者コピーを遠隔消去することはできません。
 
 ## RSS取り込み
 
@@ -132,12 +130,8 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 
 ## Cloudflare Freeの前提と検証範囲
 
-有料機能・CPU上限拡張・別Worker／生成用DOを追加しない。画像・音声の解析とupload検証は従来どおりCLI、HTML生成だけをShow DOに置く。管理者にWrangler・Node.js・別R2資格情報は不要。
+無料で無制限のホスティングではありません。キャッシュヒットでもWorkerとShow DOの処理を使うため、要求数・実行時間・SQL・R2操作・履歴容量を同一アカウントの利用量に算入します。キャッシュミスではRSS・HTML生成のCPUも使います。CLIは料金プランやCPU上限を自動変更しません。
 
-無料で無制限のhostingではない。CDN HITでも外側Worker・内側cache entrypointとShow DOの判定を使うため、要求数・DO duration・SQL・R2 operation・履歴容量を**同一アカウントのFree枠へ合算**する。Feed/HTMLのキャッシュミス時には生成CPUも使う。
+現行版の小規模な非公開実機確認は、再生と東京日付表示の確認を含みますが、性能測定・全ブラウザ・モバイル・キーボード操作・全Free適合の証明ではありません。[リリースノートの検証範囲](release-v0.8.0.md#verification-and-limitations)を参照してください。
 
-ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。現在の配信方式は[公開配信設計](../design/components/delivery.md)、検証の責務と限界は[テスト設計](../design/testing.md)を参照する。
-
-別途承認された過去の非公開実機試験（[初回記録](../design/archive/show_website_private_trial_verification_20261025.md)、[標準デザイン・通常音源3件](../design/archive/show_website_css_large_trial_verification_20261026.md)、[自動短縮URL・リンク表示版](../design/archive/show_website_short_url_trial_verification_20261026.md)、[タイムゾーン版](../design/archive/show_website_timezone_trial_verification_20261027.md)）では、ブラウザでの表示・再生・短いURL・東京日付表示および未認証要求のAccess拒否を確認した。現行のオンデマンド生成版（14/13）の実機性能測定は未実施である。
-
-現行14/13形式のv0.8.0でも、Accessで閲覧者を限定した小規模環境でShow・Episode 3件の公開と内蔵サイト再生・東京日付表示を確認した。これは性能測定、全ブラウザ・モバイル・キーボード操作の受け入れ、全Free適合の証明ではない。[v0.8.0の検証範囲](release-v0.8.0.md#verification-and-limitations)を参照する。
+内部のURL割当・配信・キャッシュは[配信設計](../design/components/delivery.md)、追加の実機試験は[検証の責務](../design/testing.md)と[保護条件](../design/security.md#非公開の実機試験)に従います。

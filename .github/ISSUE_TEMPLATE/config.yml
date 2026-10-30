@@ -3,9 +3,9 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/simosako/castloop-v2/security/advisories/new
     about: Report security issues privately via GitHub vulnerability reporting. Never open a public issue for them.
-  - name: SQLite operations guide (Japanese)
-    url: https://github.com/simosako/castloop-v2/blob/main/docs/sqlite_sequential_development.md
+  - name: User guides (Japanese)
+    url: https://github.com/simosako/castloop-v2/blob/main/docs/README.md
     about: Operations, update/recovery details and supported configuration for schema_version = 2 services.
   - name: Queue services (schema version 1) guide (Japanese)
-    url: https://github.com/simosako/castloop-v2/blob/main/docs/queue_service.md
+    url: https://github.com/simosako/castloop-v2/blob/main/docs/archive/queue_service.md
     about: Existing Queue/R2 services need the separate v0.5.x CLI; this CLI no longer supports them and there is no migration.

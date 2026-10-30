@@ -3,7 +3,7 @@
 作成日: 2026-10-24。状態: **Issue #68の合意範囲を実装・検証済み。P0〜P6のローカル検証とP7の2 Show小規模総合実機確認が完了、未リリース。外部同時変更は想定外とする確認済み制約を維持する。** 完了判定は§13、[P0の採用契約](sqlite_custom_domains_p0.md)、[実機結果と限界](sqlite_custom_domain_two_show_verification_20261024.md)を参照する。
 対象Issue: [#68](https://github.com/simosako/castloop-v2/issues/68)。調査基点: v0.7.2 / commit `72bc9f084c3a8ec6b4532d2b4833ac9a47735932`。
 
-本書は開発範囲・契約・実装順と検証範囲を記録する。利用手順は[開発版ガイド](../../docs/sqlite_custom_domains.md)を参照する。配布済みv0.7.2の対応範囲は変更しない。本書の承認も、実Cloudflareへの配備・公開・Resume・DNS/domain/権限/課金変更・削除・証跡cleanupの承認にはしない。
+本書は開発範囲・契約・実装順と検証範囲を記録する。利用手順は[開発版ガイド](../../docs/custom_domains.md)を参照する。配布済みv0.7.2の対応範囲は変更しない。本書の承認も、実Cloudflareへの配備・公開・Resume・DNS/domain/権限/課金変更・削除・証跡cleanupの承認にはしない。
 
 ## 1. 開発するもの
 
@@ -370,7 +370,7 @@ Issue本文の受け入れ条件6件について、実装とローカル故障�
 
 | Issueの条件 | 証拠 |
 | --- | --- |
-| 設定/接続/照会/切断/途中状態の契約と対応範囲 | sharedのstrict domain要求、専用CLI/journal/DO契約、[利用ガイド](../../docs/sqlite_custom_domains.md)。fresh専用・1サービス1専用subdomain、未知資源非採用 |
+| 設定/接続/照会/切断/途中状態の契約と対応範囲 | sharedのstrict domain要求、専用CLI/journal/DO契約、[利用ガイド](../../docs/custom_domains.md)。fresh専用・1サービス1専用subdomain、未知資源非採用 |
 | 許可originのGET/HEAD/Range/ETag、未知origin/公開管理API拒否 | `src/sqlite-gateway.test.ts`と2 Show実機。両originの境界、301/307、日付条件も確認 |
 | 非公開/Pause/readiness/blocked gateとstaging非公開 | gateway/既存配信のローカル回帰、`sqlite-domain-runtime.test.ts`のblocked拘束、実機の非公開/個別Pause/停止120要求・private/admin404 |
 | GUID/日時/音源/revision履歴保持 | `sqlite-domain-operation.test.ts`、`sqlite-feed-generations.test.ts`、実機のGUID/日時/hash・8不変objects・新revision保持 |

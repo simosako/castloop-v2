@@ -370,6 +370,6 @@ job解決は`job-status`と同じ検索順（revision journal → lifecycle jour
 
 ### 実装状況（2026-10-25）
 
-段階A〜D（`diagnose`/`progress`/`verify`/`watch`）を実装し、`bun test`・`npm run check`を通過した。`diagnose --external`（verify検査の集約）、watch成功時のnext_actionsによるverify連鎖、終了code 0/1/2/130を含む。運用文書は[observability.md](../../docs/observability.md)。
+段階A〜D（`diagnose`/`progress`/`verify`/`watch`）を実装し、`bun test`・`npm run check`を通過した。`diagnose --external`（verify検査の集約）、watch成功時のnext_actionsによるverify連鎖、終了code 0/1/2/130を含む。運用文書は[observability.md](../../docs/troubleshooting.md)。
 
 main取り込み時の対応（Issue #66公開受付・配信分離）: `health.state`が3値（`open`/`admission_paused`/`paused`）になったため、`diagnose`のadmission検査は`admission_paused`（受付のみ停止・配信継続）と`show_paused`（受付・配信とも停止）を区別し、`progress`の`observation.health_state`と待機理由詳細も3値に対応した。`verify`の503分類は配信停止を示す文面に更新した（受付のみ停止ではfeedは配信され続けるため）。

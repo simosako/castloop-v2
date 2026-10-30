@@ -68,4 +68,4 @@ workspace、鍵・要求journal、全CLI出力、healthで前後を挟んだ配�
 ## 参照
 
 - [設計とローカル検証](episode_add_feed_availability_plan.md)
-- [SQLite操作ガイド](../../docs/sqlite_sequential_development.md)
+- [SQLite操作ガイド](../../docs/getting_started.md)

@@ -23,6 +23,8 @@ bun test                        # full local test suite
 
 To build the Linux binary: `npm run build:cli -- linux-x64` (output: `dist/castloop-linux-x64`). The executable embeds only `src/sqlite-worker.ts`.
 
+See the [development documentation index](docs/development/README.md) for build, CI and release maintenance. Administrator installation and operation belong in the [user guides](docs/README.md); internal contracts belong in [design/](design/README.md). Keep historical verification results separate from current instructions.
+
 There is **no lint step and no formatter configured**; please do not add tooling. Match the surrounding code style instead: two-space indent, double quotes, ES module imports grouped as external → internal → Node built-ins (`node:` prefix), camelCase identifiers, PascalCase types, UPPER_SNAKE_CASE constants.
 
 ## Safety rules for every change

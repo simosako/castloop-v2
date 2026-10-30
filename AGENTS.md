@@ -73,8 +73,8 @@ If the change grows clearly beyond this during work, stop and ask instead of exp
 
 ## Read documentation by task
 - Use [design/README.md](design/README.md) to locate relevant documents; do not read all design docs or historical records on every task.
-- For implementation tasks, read only the contract documents listed for the task below, and only the sections relevant to the change. Verification records, release notes and `design/archive/` are history, not implementation inputs: do not justify new defensive code with failure modes recorded there.
-- Current architecture: [design/architecture.md](design/architecture.md). Storage and contracts: [storage layout](design/data/storage.md), [SQLite tables](design/data/sqlite.md), [schemas](design/data/schemas.md). Usage: [README.md](README.md).
+- For implementation tasks, read only the contract documents listed for the task below, and only the sections relevant to the change. Verification records, release notes, `docs/archive/` and `design/archive/` are history, not implementation inputs: do not justify new defensive code with failure modes recorded there.
+- Current architecture: [design/architecture.md](design/architecture.md). Storage and contracts: [storage layout](design/data/storage.md), [SQLite tables](design/data/sqlite.md), [schemas](design/data/schemas.md). User operations: [docs/README.md](docs/README.md). Build, CI and release maintenance: [docs/development/README.md](docs/development/README.md).
 - Development supports only fresh SQLite service configs (`schema_version=2`, `sqlite-sequential-v1`, required `storage_layout="show-v1"`); `init` uses this by default. Reject service schema version 1 and legacy layouts before IO or local state changes. Never add migration, legacy layout support, resource adoption or fallback. Shared content/request schema version 1 is independent and remains supported.
 - The production Worker entrypoint is `src/sqlite-worker.ts`; embed only that Worker. Preserve existing DO/cache class names, bindings, compatibility date and persisted SQLite formats during code-only cleanup.
 
@@ -83,8 +83,8 @@ If the change grows clearly beyond this during work, stop and ask instead of exp
 | Overall architecture or simplification | [Architecture](design/architecture.md), then the relevant component in the [design index](design/README.md) |
 | SQLite publication, lifecycle or updates | [CLI](design/components/cli.md), [Show DO](design/components/show-do.md), [publication schemas](design/data/schemas.md) |
 | Show isolation or service control | [Architecture](design/architecture.md), [control DO](design/components/control-do.md), [Show DO](design/components/show-do.md). Keep publication and delivery local to each Show DO; the control DO handles only Show registration, catalog listing and custom domain state |
-| Custom domain changes or deployment | [Control DO and domain changes](design/components/control-do.md), [CLI deployment](design/components/cli.md), [domain usage guide](docs/sqlite_custom_domains.md). Concurrent external changes to the same hostname/DNS/Worker domain are unsupported |
-| Removed Queue code or v0.5.x history | [Removal plan](design/archive/schema_v1_removal_plan.md), [v0.5.x Queue guide](docs/queue_service.md), [archived architecture](design/archive/initial_design_v052.md) |
+| Custom domain changes or deployment | [Control DO and domain changes](design/components/control-do.md), [CLI deployment](design/components/cli.md), [domain usage guide](docs/custom_domains.md). Concurrent external changes to the same hostname/DNS/Worker domain are unsupported |
+| Removed Queue code or v0.5.x history | [Removal plan](design/archive/schema_v1_removal_plan.md), [v0.5.x Queue guide](docs/archive/queue_service.md), [archived architecture](design/archive/initial_design_v052.md) |
 | Lifecycle, deletion or retention | [Show DO](design/components/show-do.md), [storage and retention](design/data/storage.md), [security](design/security.md). Physical deletion is not implemented; do not transplant archived Queue operations |
 | Public delivery or caching | [Delivery and caching](design/components/delivery.md), [security](design/security.md) |
 | Scheduling or delivery statistics | [Show DO](design/components/show-do.md), [SQLite tables](design/data/sqlite.md), [schemas](design/data/schemas.md) |

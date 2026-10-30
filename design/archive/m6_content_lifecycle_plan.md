@@ -6,7 +6,7 @@
 
 現在の状態（2026-10-11）: 承認済みMVP範囲を実装・受け入れし、v0.2.0で公開済み。v0.3.0でもR2制御record・原子的受付・毎要求の配信状態検査・確認付き削除・必要記録保持を維持する。
 
-現在の構成は[全体設計](initial_design.md)、当時のコマンドは[Queue方式ガイド](../../docs/queue_service.md#unpublish-restore-or-delete)、完成範囲は[承認済み方針](m6_review_queue.md)を優先する。旧形式変換・万能なunknown IO復旧・無停止移行は公開条件ではない。独自ドメインはv0.3.0で提供済み。
+現在の構成は[全体設計](initial_design.md)、当時のコマンドは[Queue方式ガイド](../../docs/archive/queue_service.md#unpublish-restore-or-delete)、完成範囲は[承認済み方針](m6_review_queue.md)を優先する。旧形式変換・万能なunknown IO復旧・無停止移行は公開条件ではない。独自ドメインはv0.3.0で提供済み。
 
 以下はv0.1.2を基準にした初期設計と開発経緯。状態・排他・削除・cacheの設計理由を参照するために保持する。未接続・検証待ちの記述は当時の進捗であり、現在の残タスクではない。初期CLI案や応答喪失時の再送案を現在の運用手順として実行しない。
 

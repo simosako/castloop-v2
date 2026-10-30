@@ -34,13 +34,13 @@ Queue／SQLite共通のShow・Episodeスキーマは、RSSへ出力する自由�
 - 一覧20件pagination、Show/Episodeの非公開化・保存snapshotの復元、ローカルRSSの新Showへの逐次公開に対応する。物理削除・独自ドメイン・既存移行・retry/releaseは未対応。
 - 最新36件規模試験は公開36件＋更新10回が完了し、通常HTTP最大3/5ms、probe CPU 60/60だった。DOは通常HTTPの10msではなく既定30秒のCPU上限で評価する。未試験負荷・300MB新経路・purge rate-limit retry・Issue #13恒久解消は保証しない。
 
-操作と制限は[SQLiteガイド](../../docs/sqlite_sequential_development.md)、設計契約は[実装計画](sqlite_sequential_publication_implementation_plan.md)、測定は[2026-10-17の記録](sqlite_size36_measurement_20261017.md)を参照する。
+操作と制限は[SQLiteガイド](../../docs/getting_started.md)、設計契約は[実装計画](sqlite_sequential_publication_implementation_plan.md)、測定は[2026-10-17の記録](sqlite_size36_measurement_20261017.md)を参照する。
 
 ## 以下の章の適用範囲
 
 以下は従来の**Queue/R2方式（schema_version=1）**の詳細・履歴であり、SQLite方式の操作契約として使わない。
 旧公開HTTP受付の説明はv0.4.0までの履歴で、v0.5.0の新しいstaging/publicationは[案C](async_management_implementation.md)のQueue管理を使う。
-現在のQueue操作と更新要件は[Queue方式ガイド](../../docs/queue_service.md)を優先する。特に削除・domain・同じpause IDでのresume・owner/retry契約をSQLiteへ適用しない。
+現在のQueue操作と更新要件は[Queue方式ガイド](../../docs/archive/queue_service.md)を優先する。特に削除・domain・同じpause IDでのresume・owner/retry契約をSQLiteへ適用しない。
 
 ## プロジェクト概要
 
@@ -341,13 +341,13 @@ Cloudflare REST APIによる資源管理・deploy・R2転送とBunによるWorke
 
 **承認済みMVP範囲を実装・検証し、v0.2.0で公開済み。** 新規初期化・互換更新、六lifecycle操作、状態を検査するgateway、原子的受付・所有者検証、cache purge、300 MB音源、正式Linuxバイナリを受け入れた。必要な運用記録は自動期限を付けず保持し、未知IOの万能な復旧や旧形式変換を公開条件にはしなかった。
 
-[設計](m6_content_lifecycle_plan.md)・[実装ログ](m6_implementation_log.md)・[実機受け入れ](m6_standalone_acceptance.md)・[v0.2.0 Release notes](../../docs/release-v0.2.0.md)を参照。
+[設計](m6_content_lifecycle_plan.md)・[実装ログ](m6_implementation_log.md)・[実機受け入れ](m6_standalone_acceptance.md)・[v0.2.0 Release notes](../../docs/archive/releases/release-v0.2.0.md)を参照。
 
 ### 一覧・独自ドメイン
 
 v0.2.1でShow／Episodeの読み取り専用一覧、v0.3.0で独自ドメインの追加・照会・削除と管理URL分離を公開した。機能利用には対応CLIとWorkerの両方が必要で、バイナリの交換だけではWorkerは更新されない。
 
-[一覧の検討](podcast_management_features_draft.md)・[ドメイン計画](custom_domain_plan.md)・[v0.2.1](../../docs/release-v0.2.1.md)・[v0.3.0](../../docs/release-v0.3.0.md)の公開範囲と[run4の実機受け入れ](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)を参照。
+[一覧の検討](podcast_management_features_draft.md)・[ドメイン計画](custom_domain_plan.md)・[v0.2.1](../../docs/archive/releases/release-v0.2.1.md)・[v0.3.0](../../docs/archive/releases/release-v0.3.0.md)の公開範囲と[run4の実機受け入れ](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)を参照。
 
 ### 未提供・今後の検討事項
 
