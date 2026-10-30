@@ -1,6 +1,6 @@
 # 別環境での簡易動作確認（Linux x86-64）
 
-**この文書のコマンドは配布済みv0.1.2向けの過去の手順です。現在のcheckoutからビルドするM6版には、そのまま適用しないでください。** M6の初期paused・明示再開、MP3引数付きpublish、停止/再開/削除、通常更新と復旧上限は[README](../README.md)を参照してください。以下のsource buildで得られるものも現在はM6版であり、v0.1.2の再現には対応tagのcheckoutが必要です。
+**この文書はv0.1.2時点の手順・計画・試験結果を保存した履歴です。現行v0.8.0には適用しないでください。** 以下の「現在」「次の開発予定」は当時を指します。現行版はQueue・Pause/Resume・公開jobを使わず、物理削除も提供しません。現在の操作は[README](../README.md)と[SQLiteガイド](sqlite_sequential_development.md)、導入は[配布ガイド](cli_binary_distribution.md)を参照してください。v0.1.2の再現には対応tagが必要で、この履歴は実環境操作の許可ではありません。
 
 この手順では、ソースコードのない別のLinuxマシンで配布バイナリを実行します。**第1段階**で`workers.dev`を使って専用の検証サービス・Show・Episodeを公開し、**第2段階**で同じworkspaceを独自ドメインへ移行して戻します。Cloudflare上にWorker、private R2 bucket、Queue、DLQと公開コンテンツが作成されます。通常運用中のworkspaceや既存のShow IDは使わないでください。
 

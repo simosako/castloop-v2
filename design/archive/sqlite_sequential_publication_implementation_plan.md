@@ -35,7 +35,7 @@ CLI: 同じjobの結果をpoll
 - 公開用音源・revision履歴は引き続き不変。feed/current/coverの既存固定key更新は維持できる。全面的な世代別feed/coverと公開先ポインター方式を前提にしない。
 - 不明な途中実行は停止・通知する。時間切れlease、旧tokenの奪取、未知PUTの自動再送、万能な自動復旧は作らない。
 
-[保存先再検討書](archive/control_plane_storage_reconsideration_20261016.md)のDO＋Queues/outbox案と、公開先ポインターを必須とした部分は、この計画では採用しない。
+[保存先再検討書](control_plane_storage_reconsideration_20261016.md)のDO＋Queues/outbox案と、公開先ポインターを必須とした部分は、この計画では採用しない。
 既存リリースや現在のCloudflare環境を、そのまま新方式へ切り替える指示ではない。
 
 ## 2. 素材アップロードとCLIの契約
@@ -286,7 +286,7 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 - 実DO class/entrypointは型検査とbrowser bundleの検証。**実機DOのoutput gate/Alarm再配送、実Workers Cache purge、CF APIの応答形・Free制限・性能は、このローカルfixtureだけでは実証していない。** standalone build成功と、同じ入口のsource-process walkthroughも区別する。
 - 全体回帰で見つかった旧listコマンドの引数検査順序を修正し、workspaceへ触る前の拒否を維持した。
 
-操作例・回復制限は[SQLite開発版ガイド](../docs/sqlite_sequential_development.md)を参照する。
+操作例・回復制限は[SQLite開発版ガイド](../../docs/sqlite_sequential_development.md)を参照する。
 次はP6と、新規隔離環境での実機受け入れ計画の準備。既存サービス移行や実機配備は別承認であり、今回の開発ではCloudflare資源・実データを変更していない。Issue #13恒久解消、Free適合、36件性能目標達成、release readinessはまだ示していない。
 
 ### P6a: SQLite一覧
@@ -346,7 +346,7 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 
 ### P7: 承認済み隔離実機試験の到達点
 
-上記のローカルbaseline後、管理者の実機試験指示に基づき、`sq16-668cbdfa`だけを新規作成した。[測定記録](archive/sqlite_sequential_measurement_20261016.md)が実際の到達点を示す。
+上記のローカルbaseline後、管理者の実機試験指示に基づき、`sq16-668cbdfa`だけを新規作成した。[測定記録](sqlite_sequential_measurement_20261016.md)が実際の到達点を示す。
 
 - native初期化、3件の小容量公開・配信・更新・可逆lifecycleは成功。REST settingsにexportsがない応答形をCLIで修正し、既知receiptから検証を継続した。
 - 最初の36件試験は14件成功、15件目がcache purge段階でblockedとなり、その環境を保全した。

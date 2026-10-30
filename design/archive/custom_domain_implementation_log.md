@@ -53,7 +53,7 @@ Cloudflare/DNS、保持環境、証跡ブランチは変更していない。修
 
 検証: **`bun test` 932件成功 / 0失敗**（101 files、14,065 assertions）、`npm run check`、試験用TypeScript検証、Linux単一バイナリbuildと資格情報なしのdomain help/不正引数拒否が成功。全体試験で共通保存helperの変更による失敗時temp保持の差分を検出し、従来の保存契約を維持するよう修正した。試験結果は`/tmp/opencode/castloop-domain-cli-final-tests.log`。
 
-[`docs/custom_domains.md`](../../docs/custom_domains.md)に未リリースbuildの利用・復旧制限を記載した。ローカル実装・自動検証は完了し、残るのは承認された専用hostname/M6サービスでのDNS/TLS・両host配信・lifecycle・通常deploy・removeの実機受け入れ。今回はユーザー指定に従い**Cloudflare/DNS設定を一切変更していない**。未リリースであり、v0.2.1バイナリに提供済みとは扱わない。
+[`docs/custom_domains.md`](custom_domains.md)に未リリースbuildの利用・復旧制限を記載した。ローカル実装・自動検証は完了し、残るのは承認された専用hostname/M6サービスでのDNS/TLS・両host配信・lifecycle・通常deploy・removeの実機受け入れ。今回はユーザー指定に従い**Cloudflare/DNS設定を一切変更していない**。未リリースであり、v0.2.1バイナリに提供済みとは扱わない。
 
 ## 2026-10-04: 共通coreへの管理API接続と秘密を送らないTLS確認
 

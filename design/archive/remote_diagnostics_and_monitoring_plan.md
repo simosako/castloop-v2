@@ -1,6 +1,6 @@
 # リモート診断・公開進捗・完了／障害通知・外形監視の設計案（Issue #67）
 
-2026-10-24。Issue #67対応の設計提案。確認基準はv0.7.2のmain（commit `72bc9f0`）と現行treeの[`doctor.ts`](../packages/cli/src/doctor.ts)、[`sqlite-commands.ts`](../packages/cli/src/sqlite-commands.ts)、[`sqlite-management-http.ts`](../packages/cli/src/sqlite-management-http.ts)、[`sqlite-gateway.ts`](../src/sqlite-gateway.ts)、[`sqlite-publication-queue.ts`](../src/sqlite-publication-queue.ts)と既存文書。本文は設計案であり、実装・配備・実環境操作の承認を含まない。
+2026-10-24。Issue #67対応の設計提案。確認基準はv0.7.2のmain（commit `72bc9f0`）と現行treeの[`doctor.ts`](../../packages/cli/src/doctor.ts)、[`sqlite-commands.ts`](../../packages/cli/src/sqlite-commands.ts)、[`sqlite-management-http.ts`](../../packages/cli/src/sqlite-management-http.ts)、[`sqlite-gateway.ts`](../../src/sqlite-gateway.ts)、[`sqlite-publication-queue.ts`](../../src/sqlite-publication-queue.ts)と既存文書。本文は設計案であり、実装・配備・実環境操作の承認を含まない。
 
 2026-10-24レビュー: §5.1=案A2、§6.1=案B2、§7.1=案C1+C2 fallback（全量downloadなし）、§8.1=案D1、§8.5=案E1に決定。CLI出力は§4.2のエージェント向け規約に統一した。2026-10-25レビュー: 通知はCLI完結（terminal出力・終了code）に決定し、CLI以外の通知経路は非目標とした（§8.3）。
 
@@ -17,7 +17,7 @@
 | `operation-list/status` | `operations` GET／local journal | 操作・要求・checkpoint・events | operatorが状態遷移を自力で解釈する必要がある |
 | `list-shows` / `list-episodes` | `catalog` POST | lifecycle、unfinished_operation、feed_url（文字列） | feed_urlはserver側計算値で、実際の配信は未取得 |
 | `publish-*` の待機 | `sqlite-draft.ts` `wait()` | 当該jobの終端（最大300秒/300回） | CLIプロセス内のみ。終了後の継続観測の導線なし |
-| tail／保存ログ | — | 実行履歴の断片 | 欠測あり（[tail欠測の調査](archive/sqlite_tail_missing_logs_investigation_20261017.md)ほか）。CPU 0msや未実行の証明には使えない |
+| tail／保存ログ | — | 実行履歴の断片 | 欠測あり（[tail欠測の調査](sqlite_tail_missing_logs_investigation_20261017.md)ほか）。CPU 0msや未実行の証明には使えない |
 
 ### 1.2 不足（Issue本文の4提案との対応）
 
@@ -37,7 +37,7 @@
 
 1. **読取のみ**: 追加コマンドが行うremote操作は管理APIへのGETと公開pathへのGET/HEADのみ。probe実行・purge・repair・Resume・公開・未知要求の再送はしない。外形確認のGET/HEADと状態変更を明確に区別する。
 2. **明示対象**: Show・jobは常に明示指定。複数Show確認は明示列挙の読取集約とし、上限を設ける。
-3. **予算**: 観測の回数・時間・並列数に上限を置く。並列数は既定1（直列）。1回のGETは既存のbounded reader（[`sqlite-management-http.ts`](../packages/cli/src/sqlite-management-http.ts)、3回/30秒/サイズ上限）で決着させ、開始済みIOを放置しない。
+3. **予算**: 観測の回数・時間・並列数に上限を置く。並列数は既定1（直列）。1回のGETは既存のbounded reader（[`sqlite-management-http.ts`](../../packages/cli/src/sqlite-management-http.ts)、3回/30秒/サイズ上限）で決着させ、開始済みIOを放置しない。
 4. **真実性**: 不明は`unknown`/`not_checked`で表示し、正常・0値・成功へ変換しない。`queued`とCLIの`ok`を公開成功と表示しない。ログ欠測を根拠に判断しない。
 5. **通知のCLI完結**: 通知はCLIの標準出力・終了codeで完結し、CLI以外への通知経路（外部webhook等）は提供しない。観測不能（unobservable）を成功・正常値として表示しない。
 6. **期待応答の分類**: 未公開の404、停止中の503、削除済みの410、redirect、通信断、取得不一致、観測欠測を別々のcodeで表す。
@@ -79,7 +79,7 @@ type DiagnosticCheck = {
 
 ### 4.2 エージェント向けの出力・操作規約
 
-本CLIはIssue #5以降、AI agentが`--json`出力を読み、`next_actions`に従って次の操作を自律的に選ぶことを前提としている（[`agent-output.ts`](../packages/cli/src/agent-output.ts)の外枠、`describe`のeffects分類）。本Issueの新コマンドも含む**今後のCLI出力・操作すべて**に次を適用する。
+本CLIはIssue #5以降、AI agentが`--json`出力を読み、`next_actions`に従って次の操作を自律的に選ぶことを前提としている（[`agent-output.ts`](../../packages/cli/src/agent-output.ts)の外枠、`describe`のeffects分類）。本Issueの新コマンドも含む**今後のCLI出力・操作すべて**に次を適用する。
 
 1. **外枠とpayloadの厳密化**: `--json`は`agentEnvelope`の外枠1文書。`result` payloadは厳密なZod schemaで検証済みのオブジェクトのみを格納し、未知キー・例外文・応答本文を転載しない。
 2. **安定したcode**: 状態判定はenum化した`code`/`status`で行う。agentは人向け散文`message`をparse対象にしない。`code`は一度決めたら変更しない。
@@ -88,7 +88,7 @@ type DiagnosticCheck = {
 5. **決定論的な並び**: check/phaseの配列順は固定。集計は数値のみ。時刻はRFC 3339文字列。
 6. **長時間コマンドの分離**: `watch`のような長時間コマンドは、途中経過をstderrへJSON linesで出力し、stdoutには最終的な外枠1文書のみを出す（既存の「診断・progressはstderr」規約どおり）。agentはstdoutの末尾1文書だけをparseすればよい。
 7. **プロンプトなし**: 読取専用コマンドは対話プロンプトを出さない。`--non-interactive`相当に固定する。
-8. **事前の副作用宣言**: 新コマンドを`describe`のeffects/authentication/recoveryに機械可読で登録し、agentが実行前に通信・書込みの有無を判定できるようにする。詳細payloadの個別JSON Schema提供は、既存の未提供方針（[agent_usage.md](../docs/agent_usage.md)）のまま将来課題とする。
+8. **事前の副作用宣言**: 新コマンドを`describe`のeffects/authentication/recoveryに機械可読で登録し、agentが実行前に通信・書込みの有無を判定できるようにする。詳細payloadの個別JSON Schema提供は、既存の未提供方針（[agent_usage.md](../../docs/agent_usage.md)）のまま将来課題とする。
 9. **終了codeの意味の固定**: 終了codeは文書化した意味のみに使う（`diagnose`/`verify`はdoctorと同じfail=1/warn=0、`watch`は§8.5のE1）。
 
 ## 5. 機能A: リモート診断 `diagnose`
@@ -122,7 +122,7 @@ type DiagnosticCheck = {
 | `consistency` | cross | local draft journal・operation記録と`inspect`/`jobs`の突合 | 凍結済み公開要求がserverに存在しない・identity矛盾 | local下書きが残存している（未公開の意図の確認催促） |
 | `delivery`（`--external`時） | external | 機能Cの検査 | 公開済みpathが配信されない | paused期待応答など |
 
-- 判定方針: identity矛盾は即`fail`。paused・blocked・未完了は`warn`とし、命令的に修復しない。`next_actions`は既存コマンド（`show-status`・`operation-status`・[操作ガイド](../docs/sqlite_operation_recovery.md)）への読取指示に限定する。
+- 判定方針: identity矛盾は即`fail`。paused・blocked・未完了は`warn`とし、命令的に修復しない。`next_actions`は既存コマンド（`show-status`・`operation-status`・[操作ガイド](sqlite_operation_recovery.md)）への読取指示に限定する。
 - `cf-credentials`（2026-10-25レビューで含める決定）は「token有効性と当該accountへの読取」だけを主張し、操作種別ごとの権限保証は表示しない。Cloudflare APIへの通信不能は管理APIの通信不能とは別のcodeで区別する。
 - 複数Show指定時（2026-10-25レビューで上限を決定）はShowごとのchecks・summaryに加えて全体summaryを出す。終了codeはdoctorと同じ（いずれかのShowにfailがあれば1、warnのみは0）。一部Showの通信断は他Showの検査を中止させず、各Show独立に報告する。
 - 通信断は`remote-*`全体を`fail`（code: `observation_unavailable`）とし、その旨を出力の先頭に明示する。部分的な成功を全体成功として表示しない。
@@ -227,7 +227,7 @@ job解決は`job-status`と同じ検索順（revision journal → lifecycle jour
 - 期待する404・停止中の503・削除済み410・redirect・通信断・取得不一致・観測欠測は、すべて別々の`code`で区別する。
 - Show paused時に公開pathが200を返す場合はgate不整合として`fail`（配信が止まっていないことになる）。
 - 出力は`checks[]`（scope: `external`）に加え、`processing`（local journalのjob終端。無ければ`not_checked`）と`delivery`（外形結果）を独立したblockとして表示する。fail時終了1、warnのみ終了0（doctorと同じ）。
-- 読取には既存のbounded reader（`bounded-http-read.ts`の`collectStreamBytes`）を流用し、回数・時間・byte上限を明示する。feed全量GETのbyte上限はserverのrender予算と同じ32,000,000 bytes（[`publication-budget.ts`](../packages/shared/src/publication-budget.ts)の定数を共通利用し、超過時は`fail`・code: `size_limit_exceeded`）とする（2026-10-25レビュー決定）。`Cache-Control`等の応答headerは観測記録に残すが、検査失敗の理由文に応答本文を転載しない。
+- 読取には既存のbounded reader（`bounded-http-read.ts`の`collectStreamBytes`）を流用し、回数・時間・byte上限を明示する。feed全量GETのbyte上限はserverのrender予算と同じ32,000,000 bytes（[`publication-budget.ts`](../../packages/shared/src/publication-budget.ts)の定数を共通利用し、超過時は`fail`・code: `size_limit_exceeded`）とする（2026-10-25レビュー決定）。`Cache-Control`等の応答headerは観測記録に残すが、検査失敗の理由文に応答本文を転載しない。
 - 実装時の確定（2026-10-25）: (1) cover・audioのURLはfeed内容から導出する。現在の実装ではaudio revision idは公開job idと一致するためlocal記録からも構成可能だが、serverが宣言するURLをそのまま検証する方を引き続き採用する（server側の採番変更に依存せず、購読者が見るURLそのものを検証できる）。(2) GUID照合はlocal journalでsucceededが記録されたEpisodeに限定する。(3) audioのETag照合は省略しContent-Length照合とした。(4) `unpublished_paths`は`unpublished-episodes`（未公開Episodeのfeed上リンク不在確認）として実装した。
 
 ## 8. 機能D: 継続観測と終端報告 `watch JOB_ID`
@@ -258,7 +258,7 @@ job解決は`job-status`と同じ検索順（revision journal → lifecycle jour
 - 通知の受け手は「CLIを後から実行する管理者/agent」だけを想定する。`publish-*`の待機は最大300秒で、それを超えるFIFO待機・blocked・観測不能は、`watch`での継続観測か、`progress`/`job-status`による後発確認で受け取る。
 - 通知とは`watch`の終端報告である（人向けの終端行、`--json`の`result.outcome`、終了code §8.5）。追加の通知機構（outbox・`notification_id`・再送・通知先の秘密管理）は持たない。
 - 報告するイベントは**jobの終端のみ**（`succeeded`/`failed`/`blocked`/`unobservable`）とし、中間遷移（queued→running等）はstderrのJSON linesにのみ出す。
-- 検討した比較案と却下理由: 外部への汎用webhook 1経路（運用者指定の受信側へのJSON POST）は、マシンを離れた運用者への異常到達を満たす唯一の案として検討した。しかし現行の運用仕様（CLI/agent経由の操作と後発確認）に対して過剰であり、通知先の秘密管理・結果不明時の再送設計といった新たな論点を持ち込むため非採用とする。特定SaaS個別対応・OpenCode session通知（[過去試験のsupervisor方式](archive/trial_notifications_and_r2_read_diagnostics.md)）も同様に範囲外とする。外部通知が必要になった時点で別Issueとして再設計する。
+- 検討した比較案と却下理由: 外部への汎用webhook 1経路（運用者指定の受信側へのJSON POST）は、マシンを離れた運用者への異常到達を満たす唯一の案として検討した。しかし現行の運用仕様（CLI/agent経由の操作と後発確認）に対して過剰であり、通知先の秘密管理・結果不明時の再送設計といった新たな論点を持ち込むため非採用とする。特定SaaS個別対応・OpenCode session通知（[過去試験のsupervisor方式](trial_notifications_and_r2_read_diagnostics.md)）も同様に範囲外とする。外部通知が必要になった時点で別Issueとして再設計する。
 
 ### 8.4 通知の表現と再確認
 
@@ -314,9 +314,9 @@ job解決は`job-status`と同じ検索順（revision journal → lifecycle jour
 
 ## 11. 運用文書
 
-- 新規`docs/observability.md`: 4コマンドの使い分け、検査範囲とcode一覧、`watch`の終了codeと再確認の方法、失敗時の読み方（既存[操作ガイド](../docs/sqlite_operation_recovery.md)への接続）。
-- [agent_usage.md](../docs/agent_usage.md)に新コマンドの概要と「ok≠公開成功」「処理成功と配信確認の分離」の記載を追加。
-- [README.md](../README.md)のコマンド一覧への追記、[design/README.md](README.md)の索引更新。CHANGELOGは実装時に記載する。
+- 新規`docs/observability.md`: 4コマンドの使い分け、検査範囲とcode一覧、`watch`の終了codeと再確認の方法、失敗時の読み方（既存[操作ガイド](sqlite_operation_recovery.md)への接続）。
+- [agent_usage.md](../../docs/agent_usage.md)に新コマンドの概要と「ok≠公開成功」「処理成功と配信確認の分離」の記載を追加。
+- [README.md](../../README.md)のコマンド一覧への追記、[design/README.md](../README.md)の索引更新。CHANGELOGは実装時に記載する。
 
 ## 12. 非目標
 
@@ -370,6 +370,6 @@ job解決は`job-status`と同じ検索順（revision journal → lifecycle jour
 
 ### 実装状況（2026-10-25）
 
-段階A〜D（`diagnose`/`progress`/`verify`/`watch`）を実装し、`bun test`・`npm run check`を通過した。`diagnose --external`（verify検査の集約）、watch成功時のnext_actionsによるverify連鎖、終了code 0/1/2/130を含む。運用文書は[observability.md](../docs/observability.md)。
+段階A〜D（`diagnose`/`progress`/`verify`/`watch`）を実装し、`bun test`・`npm run check`を通過した。`diagnose --external`（verify検査の集約）、watch成功時のnext_actionsによるverify連鎖、終了code 0/1/2/130を含む。運用文書は[observability.md](../../docs/observability.md)。
 
 main取り込み時の対応（Issue #66公開受付・配信分離）: `health.state`が3値（`open`/`admission_paused`/`paused`）になったため、`diagnose`のadmission検査は`admission_paused`（受付のみ停止・配信継続）と`show_paused`（受付・配信とも停止）を区別し、`progress`の`observation.health_state`と待機理由詳細も3値に対応した。`verify`の503分類は配信停止を示す文面に更新した（受付のみ停止ではfeedは配信され続けるため）。

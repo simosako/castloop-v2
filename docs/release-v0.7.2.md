@@ -42,4 +42,4 @@ castloop skill export castloop --output /path/to/project/.agents/skills/castloop
 npx skills add https://github.com/simosako/castloop-v2/tree/v0.7.2/skills/castloop --skill castloop
 ```
 
-詳細は[利用ガイド](agent_usage.md)と[改善案・実装範囲](../design/agent_integration_plan.md)を参照する。
+詳細は[利用ガイド](agent_usage.md)と[改善案・実装範囲](../design/archive/agent_integration_plan.md)を参照する。

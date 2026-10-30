@@ -1,6 +1,6 @@
 # 管理workspaceのバックアップと復元
 
-Issue #63で導入した管理workspaceのバックアップ・整合性検証・復元支援。4つのコマンドはいずれも**通信せずlocal完結**で動作し、Cloudflare API tokenもアカウント情報も読まない。管理キーを失うとデプロイ済みサービスが回復不能になるため、`.castloop/`を含むworkspaceの保全はバックアップ以外に対策がない。
+v0.8.0の管理workspaceのバックアップ・整合性検証・復元支援。4つのコマンドはいずれも**通信せずlocal完結**で動作し、Cloudflare API用の環境変数を読まない。サービス設定内のaccount IDはバックアップに含まれる。管理キーの再発行機能はないため、`.castloop/`を含むworkspaceを保全する。対象はサービス設定version 2・`show-v1`のworkspaceで、旧サービスや内部形式を移行する機能ではない。
 
 ```sh
 castloop backup-create --workspace /abs/workspace --output /abs/backup.clbk --passphrase-file /abs/pass.txt
@@ -11,13 +11,15 @@ castloop backup-restore /abs/backup.clbk /abs/new-workspace confirm --passphrase
 
 ## 対象と除外
 
-**対象**: `castloop.toml`・`castloop-admin.toml`(存在時)、`.castloop/`配下の既知journal family全15種(`sqlite-client`のclient ID、`secrets.json`の管理キー、draft・upload・publication等の操作記録)、Showディレクトリ(`show.toml`・Episode TOML・カバー等の素材)。
+**対象**: `castloop.toml`・`castloop-admin.toml`(存在時)、`.castloop/secrets.json`の管理キー、`.castloop/`配下の既知の記録ディレクトリ6種類（`rss-import-downloads`、`sqlite-initializations`、`sqlite-registrations`、`sqlite-rss-imports`、`sqlite-domain-changes`、`sqlite-client`）、Showディレクトリ直下の`show.toml`・Episode TOML・カバー・CSS等の通常ファイル。Showディレクトリ内のサブディレクトリは対象外。
 
 **除外**(manifestと実行結果に記録され、黙って落とすことはない): 旧版が残した`*.lock`と`*.lock.sqlite`(`-journal`/`-wal`/`-shm` sidecar含む)は対象外。現行CLIはロックファイルを作らない。`*.tmp`も対象外。`.gitignore`は復元時に再生成するため対象外。**`*.mp3`音源原本は既定で対象外**で、`backup-create --include-audio`を明示指定したときだけ含まれる。
 
-未知のトップレベルエントリ(workspace直下の関係ないファイル・ディレクトリ、`.castloop/`内の未知family)は`unknown`として記録し対象外にする。対象内のsymlinkはエラーとして作成を拒否する。
+未知のトップレベルエントリ(workspace直下の関係ないファイル・ディレクトリ、`.castloop/`内の未知family)は`unknown`として記録し対象外にする。廃止済みの`sqlite-drafts`・`sqlite-uploads`・`sqlite-publications`・`sqlite-controls`・`sqlite-service-updates`等も対象外で、変換しない。除外一覧を確認し、必要な旧記録は別途保全する。対象として走査する記録・Showディレクトリ内のsymlinkはエラーとして作成を拒否する。
 
-RSS取り込み(`import-rss --output`)の出力ディレクトリは`castloop.toml`を持たないため対象外。移行作業用の一時ディレクトリであり、公開済み分はR2が第一保護、作業中の喪失は元フィードからの再取り込みで復旧できる。
+RSS取り込み(`import-rss --output`)の出力ディレクトリは`castloop.toml`を持たないため対象外。公開完了までは取り込み元のTOML・素材・`.castloop/`を別途保全する。元フィードからの再取得では、手元の編集や取り込み進捗まで復元できるとは限らない。
+
+このバックアップはローカルworkspaceだけを保存し、R2の全メディアやShow DOのSQLite（公開内容・revision履歴・予約・統計）は取得しない。サーバー側データやサービス全体の災害復旧用バックアップではない。
 
 ## パスフレーズ
 
@@ -31,11 +33,11 @@ RSS取り込み(`import-rss --output`)の出力ディレクトリは`castloop.to
 
 音源込み(`--include-audio`)の頻度は**低くてよい**。公開済み音源の第一の保護はR2の不変保持とrevision履歴であり、音源込みバックアップが独自に守るのは「未公開原本」と「アカウント・バケット級災害への備え」に限られる。目安は、失えない未公開原本を追加したとき、または低頻度の定期(例: 月次)の2-3行の運用だけとし、それ以上の複雑な規則は設けない。
 
-並行操作の扱い: journalを含むCLIのローカル書き込みはすべて一時ファイル+renameの原子的な方法で行われるため、バックアップが読むのは常に各ファイルの完全な新旧いずれかであり、破れたコピーは生じない。バックアップ中に他の操作があった場合の結果は「ある中間時点のスナップショット」であり、1秒前に取得したバックアップと本質的に同じで、既存の観測・再送禁止の契約の内側で扱える。ただし利用者自身がエディタ等でTOML・カバー・音源をバックアップ中に保存する書き込みはCLI管理外のため、**バックアップ中はworkspaceの編集・他操作をしない**ことを推奨する。
+並行操作の扱い: 個別のローカル記録の原子的な置換は、複数ファイルにまたがるバックアップ全体の同一時点性を保証しない。同じworkspaceで変更するCLIは1プロセスだけとし、**バックアップ中はworkspaceの編集・他操作をしない**。
 
 ## 検証
 
-`backup-verify`はアーカイブを完全に復号し、全エントリのSHA-256・manifest・`castloop.toml`の妥当性・ciphertext trailerを検証する。含まれたファイル・除外の一覧・残存lock・未完了操作(観測中のdraft・未解決publication・未完了control/domain/service-update)と、走査できなかったfamilyの有無(`scan_errors`)を報告する。
+`backup-verify`はアーカイブを完全に復号し、全エントリのSHA-256・manifest・ciphertext trailerを検証し、サービス設定の妥当性を`config_valid`で報告する。含まれたファイル、除外一覧、対象内で検出・除外したlock、未完了のドメイン変更（`pending.domain_changes`）、ドメイン変更記録を走査できなかった場合の`scan_errors`を報告する。廃止済みdraft・publication・control・service-update記録の状態検査は行わない。
 
 検証成功はアーカイブの整合性だけを証明する。server側SQLite状態の復旧、未確認要求の解消、公開の成功は保証しない。
 
@@ -45,7 +47,7 @@ RSS取り込み(`import-rss --output`)の出力ディレクトリは`castloop.to
 
 復元したworkspaceはconfig hash・管理キー・client_idが同一のため、同一サービスの管理をそのまま継続できる。復元後は`castloop doctor --local --workspace DEST`で管理キーの読取を確認する。
 
-未完了操作の扱い: 復元後に許されるのは`operation-status`等の**観測**と、既存の安全条件内での続行だけである。未知の要求を再送しない。未完了draftは`source_path`絶対パスに原本が同一パスで存在しない限り続行できないため、manifestの`source_paths`とpreviewで確認する。同一パスを維持できない場合はdraftの観測のみ行い、新規draftを作り直す。
+未完了操作の扱い: 復元だけではremote操作を再送・継続しない。未完了のドメイン変更は`domain status OPERATION_UUID --workspace DEST`で確認し、対象と範囲の承認後に[専用手順](sqlite_custom_domains.md#照会と中断後の継続)で`domain continue`を実行する。コンテンツ公開の応答不明は、現在内容を確認して同じ承認済み入力で再実行する。`operation-status`、旧draftの再開、`source_paths`に基づく復旧は現行版にはない。旧記録の復元で廃止済みワークフローが使えるようにはならない。
 
 ## アーカイブ形式
 
@@ -54,13 +56,15 @@ RSS取り込み(`import-rss --output`)の出力ディレクトリは`castloop.to
 {header JSON}\n                       平文: kdf情報, salt, service_id, entry_count, entry_bytes 等
 {暗号化チャンク列}                     チャンクごと: 0x00 + u64be長 + nonce(12) + ciphertext + tag(16)
   復号後のペイロード:                  エントリごと: 0x01 + 長 + {path,kind,size} → 本文 → 0x02 + SHA-256(32bytes)
-                                      最後: 0x03 + 長 + manifest JSON(対象・除外・残存lock・未完了操作・source_paths)
+                                      最後: 0x03 + 長 + manifest JSON(対象・除外・残存lock・未完了ドメイン変更)
 {暗号化領域全体のSHA-256 trailer}      転送破損・truncationの検出用(パスフレーズなしで検出可能)
 ```
 
 manifestは単一読み取りでhashが確定するようにペイロード末尾に置く。改ざん・誤鍵の検出はGCM tagが担う。外部依存は追加しておらず、`node:crypto`だけを使う。
 
 ## 実装と検証の記録(2026-10-26)
+
+以下はIssue #63導入時の旧版での記録であり、v0.8.0の対象family・検査範囲・互換性を示すものではない。
 
 Issue #63の実装として`packages/cli/src/backup-archive.ts`(コンテナ形式)・`backup-create.ts`・`backup-restore.ts`・`backup-passphrase.ts`を追加し、4コマンドをCLIに登録した。
 

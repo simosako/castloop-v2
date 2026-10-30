@@ -1,12 +1,12 @@
 # `initial_design.md` レビュー（第1サイクル）
 
 - レビュー日: 2026-09-19
-- 対象: [`initial_design.md`](../initial_design.md)、[`show-template.toml`](../show-template.toml)、[`episode-template.toml`](../episode-template.toml)、リポジトリ設定・規約
+- 対象: [`initial_design.md`](initial_design.md)、[`show-template.toml`](../show-template.toml)、[`episode-template.toml`](../episode-template.toml)、リポジトリ設定・規約
 - 目的: 実装開始前に、矛盾、未決定事項、依存関係、選択可能な解決案を整理する
 
 ## 決定記録（2026-09-23）
 
-以下は第1サイクルでユーザーの選択を受けて確定した記録。後続の第2サイクルで`temp/`を`staging/`へ改名し、Show用下書きキーとShow公開処理を追加した。入力形式・CLI設定等も含めた後続の採用結果は[`initial_design_review_02.md`](./initial_design_review_02.md)の決定記録を参照。第1サイクル時点の比較・指摘は後段に履歴として残す。正式なMVP方針は[`initial_design.md`](../initial_design.md)にも反映した。
+以下は第1サイクルでユーザーの選択を受けて確定した記録。後続の第2サイクルで`temp/`を`staging/`へ改名し、Show用下書きキーとShow公開処理を追加した。入力形式・CLI設定等も含めた後続の採用結果は[`initial_design_review_02.md`](./initial_design_review_02.md)の決定記録を参照。第1サイクル時点の比較・指摘は後段に履歴として残す。正式なMVP方針は[`initial_design.md`](initial_design.md)にも反映した。
 
 | 項目 | 決定 |
 | --- | --- |

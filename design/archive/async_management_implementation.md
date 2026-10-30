@@ -1,6 +1,6 @@
 # Queue/R2管理経路: 案Cの実装契約
 
-> v0.5.x以前のQueue方式の履歴。v0.6.0以降はこの実装を削除している。現行は[SQLite設計](../initial_design.md)。既存環境や記録の変更許可ではない。
+> v0.5.x以前のQueue方式の履歴。v0.6.0以降はこの実装を削除している。現行は[SQLite設計](initial_design.md)。既存環境や記録の変更許可ではない。
 
 2026-10-15。管理者が[構成比較の案C](async_management_architecture_options.md)の実装とテストを承認。
 `feat/publication-queue-submit`の開発コードであり、v0.4.0公開版ではない。
@@ -83,7 +83,7 @@ upload operation/request IDは別にする。metadata/audioの別updateも維持
 CLIはone-caller target/upload journalとone-time PUTを維持し、過去grantを読んでもPUTを再開しない。
 
 MP3解析・全量readback hashはCLI。Workerが300 MBを全量bufferする変更はない。
-REST PUTのCAS仮定はなく、[未検証のU1](../m6_upload_recovery_options.md)も解決済みとはしない。
+REST PUTのCAS仮定はなく、[未検証のU1](m6_upload_recovery_options.md)も解決済みとはしない。
 upload完了はstagedで止める。実際のpublication `commit.json`はconsumer自身のowned executionでbinding CAS保存する。
 既存R2 marker notificationは重複配送として維持する。
 

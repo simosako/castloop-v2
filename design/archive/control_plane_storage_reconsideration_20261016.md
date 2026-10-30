@@ -5,7 +5,7 @@
 既存のR2制御方式と案Cは、別途変更が承認されるまでは現行仕様である。
 
 **後続の検討による方針修正**: 管理者との検討で、確認済み一意upload→DO SQLiteの逐次キュー→Alarm実行を基本形とした。
-実装は[SQLite逐次公開の実装計画](../sqlite_sequential_publication_implementation_plan.md)に従う。
+実装は[SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md)に従う。
 以下のDO＋Queues/outboxと全面的な公開先ポインター方式は比較履歴であり、最新の実装要件ではない。
 
 ## 結論

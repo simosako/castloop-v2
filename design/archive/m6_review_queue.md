@@ -1,12 +1,14 @@
 # M6: 承認済み方針と開発範囲
 
-> 本書の未知IO保全・記録保持・upload整合性・Paidへ変更しない安全方針は現行SQLiteにも適用する。Queueの開発・実機検証・移行承認は当時の履歴で、v0.6.0の新たな操作許可や実装予定ではない。現行SQLiteは物理delete・独自domain・旧schema移行に対応しない。[現行設計](initial_design.md)参照。
+> 履歴資料。現在も有効な保持・安全契約は[保存構造と保持方針](../data/storage.md)と[セキュリティ](../security.md)を参照する。本文の承認・実装範囲・測定は記載当時のものであり、新たな実環境操作の許可ではない。
+
+> 本書の原本・公開済みメディア・履歴・私有証跡の保全と、Paidへ自動変更しない安全方針は現行SQLiteにも適用する。Queueの開発・実機検証・移行承認や、未知IO・lockの旧復旧制約は当時の履歴であり、新たな実環境操作の許可や現行の実装予定ではない。v0.8.0は独自ドメインに対応するが、物理delete・旧schema移行は提供しない。現行の同期公開・同じ承認済み入力での再実行・ドメイン続行は[現行設計](initial_design.md)と[SQLiteガイド](../../docs/sqlite_sequential_development.md)を優先し、旧jobの強制解放や記録削除に読み替えない。
 
 更新日: 2026-10-04
 
 現在の状態（2026-10-11）: 承認済みMVP範囲は実装・検証済みで、M6をv0.2.0、一覧をv0.2.1、独自ドメインをv0.3.0で公開した。現行REST単一PUTの維持と未解決懸念U1の非ブロッカー扱い、必要記録の保持、unknown IO／残存lockを強制解放しない条件は現在も有効で、再承認を求めない。
 
-以下の承認事項は維持する。到達点・未接続・技術残件の記述は2026-10-04までの履歴であり、現在の残タスクとして再実装しない。現在の仕様は[全体設計](initial_design.md)、公開範囲は[v0.2.0](../docs/release-v0.2.0.md)と[v0.3.0](../docs/release-v0.3.0.md)のRelease notesを参照する。
+以下の承認事項は維持する。到達点・未接続・技術残件の記述は2026-10-04までの履歴であり、現在の残タスクとして再実装しない。現在の仕様は[全体設計](initial_design.md)、公開範囲は[v0.2.0](../../docs/release-v0.2.0.md)と[v0.3.0](../../docs/release-v0.3.0.md)のRelease notesを参照する。
 
 ## 承認済みの試験環境・移行・リリース方針（2026-10-02）
 
@@ -60,7 +62,7 @@
 
 管理者がWorkers Paidの利用不可を明示した。Paidへの変更を再要求せず、無料枠を前提に検証処理の責務・実行場所を見直す。既存の300MB上限を勝手に下げず、全量contents照合・object identity/owner/generation照合を単純に省略しない。現行Worker内全量SHA-256のCPU超過は、この実装方式の問題であり、R2へ300MBを保存できないという実証ではない。
 
-R2/CLIの[完全性検証調査](archive/m6_upload_integrity_review.md)で、管理REST PUTは誤ったchecksumヘッダーでも保存する一方、binding PUTは誤ったSHA-256を拒否し、300MBの検証付きstream保存/HEAD native checksumがCPU 2msで成功することを確認した。管理者が案Bを承認し、既存CLIの全量SHA-256読み戻し結果をexact objectへ結び付け、公開保存時のSHA-256をR2へ任せる方式を実装した。Worker内の二箇所の全量再ハッシュを除き、owner/generation/IO終了確認とnative checksum照合は維持する。接続後の実機受け入れは別記し、旧IO収束の合格とは区別する。
+R2/CLIの[完全性検証調査](m6_upload_integrity_review.md)で、管理REST PUTは誤ったchecksumヘッダーでも保存する一方、binding PUTは誤ったSHA-256を拒否し、300MBの検証付きstream保存/HEAD native checksumがCPU 2msで成功することを確認した。管理者が案Bを承認し、既存CLIの全量SHA-256読み戻し結果をexact objectへ結び付け、公開保存時のSHA-256をR2へ任せる方式を実装した。Worker内の二箇所の全量再ハッシュを除き、owner/generation/IO終了確認とnative checksum照合は維持する。接続後の実機受け入れは別記し、旧IO収束の合格とは区別する。
 
 ### 当時の到達点（2026-10-04・以下は進捗履歴）
 
@@ -68,15 +70,15 @@ R2/CLIの[完全性検証調査](archive/m6_upload_integrity_review.md)で、管
 
 通常更新の完了応答喪失→別standaloneの非書込照合と、feed/cover/小さい音源の実cache HIT・gateway毎回実行も実機合格した。改修前の300MB Worker hashはCPU超過となり、元serviceはpaused/owner/token/payloadを保持する。管理者承認のCLI全量SHA-256証拠＋Worker HEAD照合＋R2公開時検証へ集約した後、新規`castloop-m6-test-7c97f1a0`で300MB公開・audio-only/metadata-only改訂・全量配信/HEAD/Range/304・明示削除まで合格した。試験CLIのmetadata-only引数制約は修正し、publication未開始の確認済みcheckpointだけを続行した。課金/CPU limitは変更しておらず、費用測定計画を通常開発のgateへ戻すものではない。
 
-承認済みMVP範囲の実装・検証・利用案内とRelease notes草案は完成した。残るのは正式version/tagと公開操作の確定・実施であり、万能なunknown IO復旧や追加fault matrixをgateへ戻さない。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](archive/m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
+承認済みMVP範囲の実装・検証・利用案内とRelease notes草案は完成した。残るのは正式version/tagと公開操作の確定・実施であり、万能なunknown IO復旧や追加fault matrixをgateへ戻さない。300MB合格を旧未知owner/tokenの解放へ使わず、未実行/未完了のharnessを合格扱いしない。詳細は[standalone受け入れ](m6_standalone_acceptance.md)。旧形式変換は必要時だけとする。
 
 2026-10-03に管理者が「共通journalリファクタリングをmainへmerge → 別branchで新規M6初期化/稼働判定の分離 → 別branchで形式を変えない通常更新 → 旧形式変換は必要時だけ」を承認した。旧形式変換を新規M6サービスの必須経路にしない。既存環境の即時削除や公開gate解除の承認とは扱わない。
 
-新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを実装した。認証付きHTTP/loopback/Queue起動検証と試験専用standaloneを接続し、別名Cloudflare環境で初期paused→明示再開→Show/Episode公開→GET/HEAD/Rangeを確認した。通常の公開CLI/entryは切り替えず、通常更新・全lifecycle/cache/300MB/unknown IO復旧の受け入れは残る。既存資源の削除/採用はしていない。[新規初期化](archive/m6_fresh_initialization.md)参照。
+新規初期化のserver CAS、runtime readinessと移行監査証拠の分離、CLI durable controller、新規資源/WorkerのREST配備adapterを実装した。認証付きHTTP/loopback/Queue起動検証と試験専用standaloneを接続し、別名Cloudflare環境で初期paused→明示再開→Show/Episode公開→GET/HEAD/Rangeを確認した。通常の公開CLI/entryは切り替えず、通常更新・全lifecycle/cache/300MB/unknown IO復旧の受け入れは残る。既存資源の削除/採用はしていない。[新規初期化](m6_fresh_initialization.md)参照。
 
-保存形式を変えないM6更新を、試験専用の認証HTTP/standaloneへ接続した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通HTTP/Queue/cache runtime検証は初期化と共有する。実機で二つのupload APIがinheritのUUID指定を拒否したため、最新upload/連番/履歴とacknowledged versionを照合する配備経路へ修正し、中間receiptもdurable保存する。`castloop-m6-test-ff3bfd8c`で通常更新・10 object非変更・GUID/revision/URL保持・明示再開/再pauseが合格した。失敗した専用環境はrequested/updatingを保持し、再送/採用/自動再開しない。全lifecycle/cache/300MB/unknown IO復旧と公開CLI gateは残る。[通常更新](archive/m6_compatible_updates.md)参照。
+保存形式を変えないM6更新を、試験専用の認証HTTP/standaloneへ接続した。既存のpause/drainに続いてShow controlの未完了ownerだけを確認し、service CASで閉じてから配備・現在version検証・readiness更新を行う。音源/Episodeのinventoryや変換はしない。共通HTTP/Queue/cache runtime検証は初期化と共有する。実機で二つのupload APIがinheritのUUID指定を拒否したため、最新upload/連番/履歴とacknowledged versionを照合する配備経路へ修正し、中間receiptもdurable保存する。`castloop-m6-test-ff3bfd8c`で通常更新・10 object非変更・GUID/revision/URL保持・明示再開/再pauseが合格した。失敗した専用環境はrequested/updatingを保持し、再送/採用/自動再開しない。全lifecycle/cache/300MB/unknown IO復旧と公開CLI gateは残る。[通常更新](m6_compatible_updates.md)参照。
 
-2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](archive/m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
+2026-10-03に管理者から、MVP前の旧環境は破棄・再作成も許容されるため、メンテナンス移行の必要性を再評価するよう指示された。[移行範囲の再評価](m6_migration_scope_review.md)では、legacyデータ変換と新規初期化/runtime readinessの分離を推奨している。下記の移行残件を新規M6環境にも一律必須とするかは、この見直しの対象である。現時点では移行実装の撤去・公開gate解除・既存Cloudflare環境削除は行っていない。
 
 1. **upload/publication統合**: staging操作IDとdraft job IDの分離、単一PUT前の受付/一度限りの開始、明示的client終了確認、検証token、size/全量checksum/metadata/cover照合、完了/取消receiptとowner解放の基礎処理を追加した。凍結publication manifest・共通CAS受付・staging証拠/current ETag/base revision照合後のcommit準備も追加した。Show/Episode publication runner/実行token付きconsumer/内部purge effect、stream媒体保存と2種改訂の再開まで独立moduleで追加済み。管理API/既存CLIのREST PUTへの接続、状態喪失後の回復手順、本番publication routingを完成する。未知の検証tokenは時間で奪わない。
     staging/publication/lifecycleの3内部管理handlerを未公開の`fetchM6ManagementIntegration`へ接続した。認証/readiness/version照合後のrouteを結合testで検証し、通常candidateはmock readinessがあってもmanagement書込を拒否する。公開入口・CLI書込commandと実機受け入れは未完了である。`m6_management_api.md`参照。
@@ -88,7 +90,7 @@ R2/CLIの[完全性検証調査](archive/m6_upload_integrity_review.md)で、管
     新規Episodeの最初のmetadata/audio stagingへ、generation-zero draft制御の条件付き初期化を追加した。orphan/tombstone拒否・Show共通CAS・exact owner照合後だけ初期化し、公開fixtureの手動draft投入も除いた。公開CLI接続・実機受け入れは残る。`m6_new_episode_staging.md`参照。
     新規Showの永久reservation ID/CAS登録とdraft制御初期化、partial登録時の共通受付拒否、内部`POST /admin/shows`とstrictな非再送clientも追加した。既存/advanced/tombstoneを再初期化せず、同IDの限定補完だけを許す。private/fsync付き登録journal/送信前requested保存/一度限りrunnerも接続した。unknown outcome/残存lockを観測から昇格・再送せず、offline診断のshow-registration familyだけをsource CLIへ追加した。registered receipt/非期限lockを使うローカルShow/Episode下書きhelperも追加したが、legacy confirmedは変換しない。公開`create-show`/local staging state統合/外部復旧/実機受け入れは残る。`m6_show_registration.md`、`m6_show_registration_client.md`と`m6_local_drafts.md`参照。
 2. **consumer invocationの安全な回復**: 全副作用をawaitした通常終了/例外終了からのtoken返却・続行/requeueを独立consumerで実装した。取得応答喪失・runtime強制終了ではブロックを保持する。稼働中invocationを解放せずに終了を確認する手順と、安全な回復を成立させる。時間/HEAD不在だけの奪取を追加しない。
-   2026-10-13再調査で、前回追加したDLQ marker根拠の明示解放を撤回した。at-least-once配送の古い失敗・重複通知のmarkerは現在の実行/IO終了や単一残留service tokenとの対応を証明しない。`release` API/CLIは書込・再送前に拒否し、未知tokenを保全する。通常consumerのsettled経路だけでowner照合して返却し、時間/HEAD/DLQから解放しない。Show/Episodeの固定phase開始/終了ログ、音源の未消費本文cancel、journal/terminal並列読取の全settlement待ちを追加した。診断の`dead_letter_present`は履歴表示であり解放許可ではなく、RSS待機もtoken残留/失敗履歴を表示して停止する。[publication停止の診断とtoken保全](archive/publication_execution_recovery.md)参照。
+   2026-10-13再調査で、前回追加したDLQ marker根拠の明示解放を撤回した。at-least-once配送の古い失敗・重複通知のmarkerは現在の実行/IO終了や単一残留service tokenとの対応を証明しない。`release` API/CLIは書込・再送前に拒否し、未知tokenを保全する。通常consumerのsettled経路だけでowner照合して返却し、時間/HEAD/DLQから解放しない。Show/Episodeの固定phase開始/終了ログ、音源の未消費本文cancel、journal/terminal並列読取の全settlement待ちを追加した。診断の`dead_letter_present`は履歴表示であり解放許可ではなく、RSS待機もtoken残留/失敗履歴を表示して停止する。[publication停止の診断とtoken保全](publication_execution_recovery.md)参照。
 3. **本番配信とpurge**: cache有効named entrypoint向けの内部fetch/stream配信、所有entrypoint内purge、service token/readiness/実行version/cache ownerを照合する配信gate adapterを実装した。adapter/RPCは実cache設定や100%切替を単独で証明せず、まだ本番main moduleへexport/接続していない。gatewayをdefault cache無効の入口へ接続し、CLIのdeploy設定と移行capabilityを完成する。GET/HEAD/Range/304・再検証header・失敗時no-storeを実機回帰する。`m6_delivery_runtime_gate.md`参照。
    別entry moduleの`src/m6-worker.ts`へgateway/named export/新Queue consumerを接続した。現行binary/deployには接続せず、通常候補のmanagement書込は閉じたまま、ready=falseを維持する。未公開fetch結合入口の追加は公開gateを変更しない。bootstrap/本番REST設定/HTTP検証/旧IO/cache purge等は残る。`m6_candidate_worker.md`参照。
 4. **移行とcapability**: サービスCAS registry/pause/drain/atomic移行受付と凍結planのCAS初期化/途中再開を追加した。現行管理API/Queue/DLQのregistry接続と認証必須の読み取り専用capability照会も追加したが、M6 route=false/ready=falseを維持する。旧Worker/CLI直PUTの外部収束確認は別途必要。本番quiescence/cutover callback、applyのAPI/CLI、旧cache purge、100% Worker切替、安全なrollbackを完成する。未知のregistry tokenも時間で解放しない。`m6_migration_runtime_contract.md`参照。
@@ -111,4 +113,4 @@ R2/CLIの[完全性検証調査](archive/m6_upload_integrity_review.md)で、管
 
 strictな制御/request/status/progress/commitとallowlist診断、CAS job journal、Show CAS受付、reserved限定abandon、invocation token、完了解放receipt、移行inventory、削除対象ページ、owner-gated payload batch/verification pass、削除開始/最終purge/子tombstone/完了解放、lifecycle対応feed入力、Show/Episode停止・保存済みsnapshot再開状態機械、通常終了consumer/続行/requeue、公開gateway、内部cached entrypoint/transport/purge。既存本番DLQ handlerの固定診断化は接続済みだが、lifecycle操作はまだ本番へ接続しない。個々の自動テスト合格はM6全体の受け入れ合格ではない。
 
-詳細は[M6設計](archive/m6_content_lifecycle_plan.md)、[実装ログ](archive/m6_implementation_log.md)、[U1と単一PUT方針](./m6_upload_recovery_options.md)を参照。
+詳細は[M6設計](m6_content_lifecycle_plan.md)、[実装ログ](m6_implementation_log.md)、[U1と単一PUT方針](m6_upload_recovery_options.md)を参照。

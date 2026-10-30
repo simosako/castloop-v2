@@ -2,7 +2,7 @@
 
 ## 対象と判断基準
 
-2026-10-18、基準commit `a500ba5`（v0.6.0）。[Issue #24の削除結果](../schema_v1_removal_plan.md#9-ローカル実装結果2026-10-18)を前提に、残存テストの責務を監査する。Queue専用テストの削除は完了しており、旧`validated-local-journal.ts`と旧family wrapper、Queue署名用HMAC helperは現行対象ではない。[旧共通化記録](v050_redundancy_refactor.md)は意図的に分けた契約の参考資料として扱う。
+2026-10-18、基準commit `a500ba5`（v0.6.0）。[Issue #24の削除結果](schema_v1_removal_plan.md#9-ローカル実装結果2026-10-18)を前提に、残存テストの責務を監査する。Queue専用テストの削除は完了しており、旧`validated-local-journal.ts`と旧family wrapper、Queue署名用HMAC helperは現行対象ではない。[旧共通化記録](v050_redundancy_refactor.md)は意図的に分けた契約の参考資料として扱う。
 
 同じ失敗入力でも、primitiveの拒否、clientへの接続、journal保全、公開副作用の抑止は別責務とする。同じ条件・同じ責務の反復だけを統合し、固有条件を残存テストに対応付けられない候補は採用しない。新しいテストフレームワーク・汎用fixture・production実装の変更は行わない。
 

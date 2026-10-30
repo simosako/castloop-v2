@@ -1,9 +1,11 @@
 # エージェントによるPodcast管理の改善案（Issue #5）
 
+> 履歴資料。現行設計は[CLI](../components/cli.md)を参照する。本文の提案・判断・検証範囲は記載当時のものであり、現在の仕様や実環境操作の許可ではない。
+
 作成日: 2026-10-22。対象: [Issue #5: agent integration](https://github.com/simosako/castloop-v2/issues/5)。
 v0.7.1時点のCLIと現行のShow分離方式を調査した**提案**であり、実装済み仕様・実環境操作の承認ではない。
 
-実装追補: 本書は検討時点の案を保持する。P0の主要機能とCLI内で完結するP1（local/staged preview・入力fingerprint照合、doctor、template、Skill同梱）を実装した。現在の構文・導入・JSON互換変更と検証結果は[利用ガイド](../docs/agent_usage.md)を参照する。全コマンドの詳細result型・条件付き引数要件の個別schema化は未完。公開済み全文取得・publishedとのfield差分はWorker拡張と分離して未提供。任意のJSON→TOML変換、大きなwizard、MCPは追加していない。全受け入れ条件を実機・実エージェントで証明したという意味ではない。
+実装追補: 本書は検討時点の案を保持する。v0.8.0はschema・template・validate・doctor・Skill同梱・公開前の入力fingerprint照合に加え、認証付きの公開済み全文取得・published/localの項目別差分に対応する。旧staging・公開job・operation照会・progress/watchは廃止済み。現在の構文・導入・JSON契約と検証範囲は[利用ガイド](../../docs/agent_usage.md)を参照する。全コマンドの詳細result型・条件付き引数要件の個別schema化は未完。任意のJSON→TOML変換、大きなwizard、MCPは追加していない。以下の未提供・復旧制約は検討当時の記述で、全受け入れ条件を実機・実エージェントで証明したという意味ではない。
 
 ## 1. 結論
 
@@ -453,11 +455,11 @@ Issue #5は利用仕様の設計、CLI実装、Skill、シナリオ試験に分�
 
 ## 11. 調査根拠
 
-- [README](../README.md)、[現行構成](initial_design.md)、[SQLite操作ガイド](../docs/sqlite_sequential_development.md)
-- [操作記録・中断後の操作](../docs/sqlite_operation_recovery.md)、[新規入力の項目別上限](show_episode_input_limits.md)
-- [CLI入口](../packages/cli/src/index.ts)、[help定義](../packages/cli/src/help.ts)、[SQLiteコマンド](../packages/cli/src/sqlite-commands.ts)
-- [metadata schema・parser](../packages/shared/src/index.ts)、[日時](../packages/shared/src/metadata-time.ts)、[サービス設定](../packages/shared/src/sqlite-service.ts)
-- [draft検証・stage・publish](../packages/cli/src/sqlite-draft.ts)、[ローカルmetadata読取](../packages/cli/src/local-metadata-read.ts)、[MP3検証](../packages/cli/src/audio.ts)、[一覧schema](../packages/shared/src/sqlite-catalog.ts)
+- [README](../../README.md)、[現行構成](initial_design.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)
+- [操作記録・中断後の操作](sqlite_operation_recovery.md)、[新規入力の項目別上限](show_episode_input_limits.md)
+- [CLI入口](../../packages/cli/src/index.ts)、[help定義](../../packages/cli/src/help.ts)、[SQLiteコマンド](../../packages/cli/src/sqlite-commands.ts)
+- [metadata schema・parser](../../packages/shared/src/index.ts)、[日時](../../packages/shared/src/metadata-time.ts)、[サービス設定](../../packages/shared/src/sqlite-service.ts)
+- [draft検証・stage・publish（廃止前のコード）](https://github.com/simosako/castloop-v2/blob/40953e099cff7077a4d64884ea5b10f5c9b82206/packages/cli/src/sqlite-draft.ts)、[ローカルmetadata読取](../../packages/cli/src/local-metadata-read.ts)、[MP3検証](../../packages/cli/src/audio.ts)、[一覧schema](../../packages/shared/src/sqlite-catalog.ts)
 - [Zod 4 JSON Schema変換](https://zod.dev/json-schema): v4.6.5の文書を参照。自動変換だけではアプリ固有の入力契約は完成しない。
 - [Skills CLI](https://github.com/vercel-labs/skills): `npx skills add`の`--skill`指定、GitHub上のSkill path指定、導入範囲、Node.js/npmが必要なことを確認した。castloopのSkillはまだ提供していない。
 

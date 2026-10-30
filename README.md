@@ -122,7 +122,7 @@ Imports create a new Show and preserve GUIDs/dates. A retained batch record trac
 
 ## Availability, domains and Worker updates
 
-To stop public delivery of a Show or Episode, use lifecycle `unpublish` and `restore`. Separate runtime Pause/Resume commands (`show-pause`, `show-resume`, etc.) have been removed. Media placement alone never publishes. See [availability controls](docs/show_availability.md).
+To stop public delivery of a Show or Episode, use lifecycle `unpublish` and `restore`. Unpublished content returns HTTP 404 while its media and history are retained. Separate runtime Pause/Resume commands (`show-pause`, `show-resume`, etc.) have been removed. Media placement alone never publishes. See [lifecycle operations](docs/sqlite_sequential_development.md#予約rss非公開化).
 
 Ordinary Worker code updates are a single-step deployment without pausing Shows or writing a local journal:
 
@@ -135,7 +135,7 @@ Use code-only `deploy` only with matching configuration, namespace and persisted
 
 ## Backup, agents and failures
 
-Keep `castloop.toml`, local originals and private git-ignored `.castloop/` state together. TOML alone is not a complete workspace. Offline `backup-create`, `backup-verify`, `backup-restore-preview` and `backup-restore` preserve configuration, administrator keys, records and metadata; include MP3 originals explicitly with `--include-audio`. Old records remain eligible for backup but do not restore removed publication workflows. See [backup](docs/workspace_backup.md).
+Keep `castloop.toml`, local originals and private git-ignored `.castloop/` state together. TOML alone is not a complete workspace. Offline `backup-create`, `backup-verify`, `backup-restore-preview` and `backup-restore` preserve configuration, administrator keys, supported local records and metadata; include MP3 originals explicitly with `--include-audio`. Obsolete or unknown journal families are excluded as `unknown`; inspect the exclusions and preserve any needed old records separately. This is a local workspace backup, not an export of R2 or Show DO SQLite. See [backup](docs/workspace_backup.md).
 
 Agents can use `describe`, `schema`, `template`, `validate`, `doctor --local` and the bundled Skill (`skill export castloop --output DIR`). Specify `--workspace`, Episode `--show`, `--non-interactive --json`, review inputs and bind publication to `--expect-preview`. See [agent usage](docs/agent_usage.md).
 

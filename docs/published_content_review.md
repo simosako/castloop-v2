@@ -1,6 +1,6 @@
 # 公開内容の差分確認と過去版の採用
 
-フェーズ2開発版・新規13/13環境向け。旧形式の変換やR2履歴の事後採用は行わない。
+v0.8.0・サービス設定version 2 / `show-v1`、内部queue/content形式14/13の新規環境向け。旧形式の変換やR2履歴の事後採用は行わない。
 
 ## 公開前の比較
 
@@ -17,7 +17,7 @@ MP3省略時は公開済み音声を再利用する。初回公開にはMP3が�
 - `unchanged`：metadata・素材・公開状態が現在値と同じ。履歴・世代・パージを増やさない。
 - identity変更や公開済み画像拡張子の変更は`changed_invalid`となり公開できない。
 
-previewはupload・公開・journal作成を行わない。初期化済みworkspaceでは既定でremoteを読み、`--local`では通信せず未確認を表示する。取得失敗を差分なしにしない。`--expect-preview`は入力と確認したruntime/config/window/base等を照合する。変更後は再previewするが、既に同じ内容が公開済みなら変更なしで返せる。hash自体は管理者承認の証明ではない。
+previewはupload・公開・journal作成を行わない。初期化済みworkspaceでは既定でremoteを読み、`--local`では通信せず未確認を表示する。取得失敗を差分なしにしない。`--expect-preview`はローカル入力、サービス設定、対象と確認済みの更新元revision・世代等を照合する。廃止された受付windowやWorker版の一致は要求しない。変更後は再previewするが、既に同じ内容が公開済みなら変更なしで返せる。hash自体は管理者承認の証明ではない。
 
 ## RSSと素材の確認
 

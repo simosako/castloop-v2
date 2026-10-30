@@ -30,6 +30,8 @@ The target Linux x86-64 machine needs no Bun, Node.js, Wrangler, source tree, `f
 
 ### Build from source
 
+Use the source tree at the **v0.5.2 tag** for the commands below, not the current checkout. The current branch no longer contains the Queue Worker or its commands.
+
 The build machine needs Bun 1.4.2 and Node.js 24/npm:
 
 ```sh
@@ -142,7 +144,7 @@ v0.3.0 and later provide `domain add HOSTNAME`, `domain list`, and `domain remov
 
 Domain operations require explicit pause/drain and finish paused; resume explicitly after checking completion. `public_base_url` is the canonical Podcast URL, while `workers_dev_base_url` remains the same Worker's HTTPS workers.dev origin for CLI administration. Both hosts serve the same public content without redirects. DNS/TLS probes send no secrets. Removal restores workers.dev URLs without deleting media, revisions or GUIDs; normal deployment preserves a matching Custom Domain connection.
 
-See [custom-domain usage and recovery](custom_domains.md) for commands and recovery limits. Do not manually change these settings on a running service. Podcast directory URL changes are the administrator's responsibility; subscription migration and redirects are not provided.
+See [custom-domain usage and recovery](../design/archive/custom_domains.md) for commands and recovery limits. Do not manually change these settings on a running service. Podcast directory URL changes are the administrator's responsibility; subscription migration and redirects are not provided.
 
 ## Errors and recovery limits
 
@@ -159,7 +161,7 @@ Preserve the workspace, journals, locks and remote owners after any error. Do no
 - Initialization journals are `.castloop/service-initializations/SERVICE_ID.json`; update journals are `.castloop/service-updates/SERVICE_ID/OPERATION_UUID.json`. Retain these and their locks. Re-running `init` is not a recovery method for a started operation.
 - HTTP 403: check account/token scope and permissions. Local inputs changed after staging: restage only an editable, unclaimed draft; committed/unknown operations stay frozen.
 
-The single REST PUT recovery model retains [unverified assumption U1](../design/m6_upload_recovery_options.md): a PUT is assumed not to write later after client disconnection. This is not a Cloudflare guarantee. Owner/generation checks and explicit IO settlement remain required.
+The single REST PUT recovery model retains [unverified assumption U1](../design/archive/m6_upload_recovery_options.md): a PUT is assumed not to write later after client disconnection. This is not a Cloudflare guarantee. Owner/generation checks and explicit IO settlement remain required.
 
 ## RSS migration and publication acceptance
 
@@ -173,7 +175,7 @@ The [design document index](../design/README.md) separates current references fr
 
 Use `castloop help COMMAND` for syntax. Source mode is `bun packages/cli/src/index.ts`; it bundles `src/worker.ts`, while compiled binaries contain the Worker. Test-only fault injection and cache nonce headers are excluded from the formal entry points. Do not commit `.castloop/`, credentials or unpublished media.
 
-[M6 acceptance](../design/archive/m6_standalone_acceptance.md) and [approved scope](../design/m6_review_queue.md) describe verified behavior and its limits. See the [v0.5.2 release notes](release-v0.5.2.md), [v0.5.1 release notes](release-v0.5.1.md), [v0.5.0 release notes](release-v0.5.0.md) and [v0.4.0 release notes](release-v0.4.0.md). Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
+[M6 acceptance](../design/archive/m6_standalone_acceptance.md) and [approved scope](../design/archive/m6_review_queue.md) describe verified behavior and its limits. See the [v0.5.2 release notes](release-v0.5.2.md), [v0.5.1 release notes](release-v0.5.1.md), [v0.5.0 release notes](release-v0.5.0.md) and [v0.4.0 release notes](release-v0.4.0.md). Old-format conversion, zero-downtime migration and cost/downtime measurement remain outside the MVP. Existing Cloudflare resources are not automatically deleted.
 
 Existing M6 workspaces without `workers_dev_base_url` retain their original workers.dev URL and configuration hash until an owned domain change saves the field. [Live Cloudflare acceptance passed](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md), including removal and restored workers.dev delivery. Earlier interrupted trial operations remain retained; their unknown requests or tokens are not released by this version.
 

@@ -1,5 +1,7 @@
 # 管理者キーの照合
 
+> 履歴資料。現行の認証契約は[セキュリティ](../security.md)を参照する。本文の仕様・判断は記載当時のものであり、現在の実環境操作の許可ではない。
+
 現行SQLite方式のHTTP管理APIは、従来どおり`X-Castloop-Key`の管理者キーで認証する。CLIの送信形式、秘密鍵の保存形式・更新手順、各routeの401応答は変更しない。v0.5.xのQueue/R2方式も同じHTTP認証を使ったが、v0.6.0以降のコードから旧管理routeは削除した。
 
 `src/admin-auth.ts`は受信値と設定値のUTF-8をSHA-256で32 bytesへそろえ、Workersでは[`crypto.subtle.timingSafeEqual`](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/#timingsafeequal)で比較する。受信値の長さ不一致や先頭文字の一致で比較を打ち切らず、空の設定鍵は必ず拒否する。

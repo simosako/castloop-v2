@@ -1,71 +1,68 @@
-# 設計文書の案内
+# 開発者向け設計文書
 
-`castloop` の現在のアーキテクチャは、2026-10-28〜10-29に実施した全体簡素化（[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)・[フェーズ4](phase4_code_and_test_cleanup_plan.md)）に基づく新規環境専用の構成（内部 queue/content 形式 **14/13**、サービス設定 `schema_version = 2` / `storage_layout = "show-v1"`）である。
+`design/` はcastloopの現行構造・処理・データと、変更時に守る契約を説明する開発者向け文書である。過去の計画を順に読む必要はなく、以下の文書を入口とする。
 
-開発・保守時はまず **[全体設計（initial_design.md）](initial_design.md)** と **[AGENTS.md](../AGENTS.md)** を参照すること。過去の非同期ジョブ方式（v0.6.0〜v0.7.6）や Queue 方式（v0.5.x）の設計書・実機試験記録はすべて **[archive/](archive/)** に分離してあり、通常の開発で参照する必要はない。
+対象は **v0.8.0**、サービス設定 `schema_version = 2` / `show-v1`、内部queue/content形式 **14/13**。現行コードの照合基準は `750133d`。操作手順は [README](../README.md) と `docs/`、開発環境は [CONTRIBUTING.md](../CONTRIBUTING.md)、エージェントの作業規則は [AGENTS.md](../AGENTS.md)を参照する。
 
----
+## 読み始める順序
 
-## 1. 現行アーキテクチャ・全体設計（`design/`）
+1. [全体アーキテクチャ](architecture.md)：構成、責務、データの正本、主要フロー。
+2. [保存構造](data/storage.md)：ローカル・R2・DOごとの配置と保持方針。
+3. 変更対象のコンポーネント設計と、必要な表・スキーマ。
+4. [セキュリティ](security.md)と[テスト](testing.md)：変更・検証の境界。
 
-| 文書 | 内容・用途 |
+各文書から定義元のコードと関連テストを参照できる。新しい動作や未実装の案は現行仕様と混在させない。
+
+## コンポーネント設計
+
+| 文書 | 内容 |
 | --- | --- |
-| **[全体設計（initial_design.md）](initial_design.md)** | **最優先で参照する現在の全体構成・データ正本・公開/配信/管理仕様の要約** |
-| [全体設計の見直しとシンプル化提案](architecture_simplification_review_20261028.md) | 旧アーキテクチャの複雑性の原因分析と、フェーズ1〜4の段階的刷新方針 |
-| [フェーズ1：公開処理の同期アトミック化とオンデマンド配信](phase1_atomic_publication_and_ondemand_delivery_plan.md) | キャッシュパージ＋単一SQLiteトランザクションによる同期公開、RSS/WebサイトHTMLのオンデマンド生成、`blocked` 廃止 |
-| [フェーズ2：直接アップロードと冪等な公開](phase2_direct_media_and_cli_simplification_plan.md) | コンテンツハッシュキーへの直接メディア配置、JSONメタデータ直接送信、同一内容 no-op、ジョブ台帳・操作5表・旧コマンドの廃止 |
-| [フェーズ3：デプロイと稼働制御の簡素化](phase3_deploy_and_runtime_control_simplification_plan.md) | 単発 `deploy`、Pause/Resume 廃止と lifecycle（`unpublish`/`restore`）への統合、変更前設定保存による冪等なドメイン変更、Alarm の予約専用化 |
-| [フェーズ4：全体コード・テスト見直しと残存複雑性の削減](phase4_code_and_test_cleanup_plan.md) | ステージング一時コピー・全量Readbackの撤去、R2スナップショット残骸削除、`stats-retention` 台帳廃止、ドメイン・初期化ジャーナル圧縮、旧試験スクリプト削除 |
-| [Show単位のDO分離](do_show_separation_options.md) | 制御 DO（`service/<id>`）と Show DO（`show/<id>/<show>`）の分離契約 |
+| [CLI](components/cli.md) | 入力検証、プレビューと承認、素材配置、公開、初期化・コード配備、JSON応答・診断 |
+| [Show DO](components/show-do.md) | アトミック公開、現在内容と履歴、公開可否、世代、予約とAlarm、配信統計 |
+| [制御DOと独自ドメイン](components/control-do.md) | Show登録・一覧、設定変更、各DOの確定範囲、ローカルとの同期 |
+| [公開配信とキャッシュ](components/delivery.md) | 公開ルート、公開可否判定、キャッシュ属性、RSS・HTML生成、HTTP条件、パージ |
+| [RSS取り込み](components/rss-import.md) | 外部取得、ローカル保存、公開前検査、順次公開と進捗 |
+| [ワークスペースバックアップ](components/workspace-backup.md) | 対象選別、暗号化形式、整合性検査、復元の条件と範囲 |
 
----
+## データ・横断的な契約
 
-## 2. 個別機能の仕様・安全境界（`design/`）
-
-| 文書 | 内容・用途 |
+| 文書 | 内容 |
 | --- | --- |
-| [Episode予約公開の設計](episode_scheduled_publication_plan.md) | Show DO 内の予約テーブルと Alarm による未来 UTC 公開、ベース変更時の `needs_approval` 遷移、未来 `published_at` の警告 |
-| [公開済み内容との差分確認とリビジョン履歴・過去版採用](published_diff_and_revision_restore_plan.md) | 公開済みメタデータの全文取得・ローカル差分表示、メディア再アップロードなしの過去リビジョン復元 |
-| [Episode別・日別の配信統計の設計](episode_delivery_statistics_plan.md) | 音声配信の観測分類（`initial_downloads`, `equivalent_full_downloads`, Bot 分離）、PII 非保持、保持日数変更と通算累計（`lifetime`）保持 |
-| [管理ワークスペースのバックアップ・検証・復元](workspace_backup_restore_plan.md) | パスフレーズ暗号化アーカイブ（`.clbk`）のフォーマット、1パスハッシュ記録、復元プレビューと安全条件 |
-| [RSS取り込みの設計](m7_rss_import_plan.md) | 既存 Podcast RSS からのメタデータ・メディア取得と新規 Show としての順次公開 |
-| [エージェントによるPodcast管理の設計](agent_integration_plan.md) | 単一バイナリでのスキーマ・テンプレート・Skill 出力、`--json` 応答封筒（`agentEnvelope`）、オフライン検証と `doctor` |
-| [Show/Episodeの項目別入力上限](show_episode_input_limits.md) | タイトル・説明文・カテゴリ等の入力サイズ上限と保存済み履歴の読み取り境界 |
-| [管理者キーの照合](admin_authentication.md) | タイミング安全な管理者キー認証と診断ログのプライバシー制約 |
-| [REST URLの構築](rest_url_construction.md) | Cloudflare REST API 呼び出し時のパス要素エンコードと R2 キー区切り保持の不変条件 |
-| [記録保持・安全方針](m6_review_queue.md) | 公開済みメディア・履歴の不変保持と、物理削除を行わない安全方針 |
-| [非公開の番組サイト画面確認・実機試験手順](show_website_private_trial_plan.md) | 実機テスト環境を作る際の Cloudflare Access 保護・未認証拒否確認の必須手順 |
+| [保存構造と保持方針](data/storage.md) | ディレクトリ、6種類のローカル記録、R2キー、DO別の所有データ |
+| [SQLite表設計](data/sqlite.md) | 全表の配置・列・主キー・制約・インデックス・関連と更新単位 |
+| [スキーマ](data/schemas.md) | 設定、Show/Episode、管理API、保存記録、版、入力・全体上限 |
+| [セキュリティと安全境界](security.md) | 認証、機密情報、公開経路、外部取得、非公開実機試験 |
+| [テストと検証](testing.md) | ローカル・結合・バイナリ・実機の責務と、検証から言える範囲 |
 
-入力テンプレート: [Show テンプレート](show-template.toml)、[Episode テンプレート](episode-template.toml)
+## 変更内容から探す
 
----
+| 変更内容 | 読む文書 |
+| --- | --- |
+| 公開・更新・非公開化・履歴採用 | [CLI](components/cli.md)、[Show DO](components/show-do.md)、[スキーマ](data/schemas.md) |
+| SQLiteの列や保存形式 | [表設計](data/sqlite.md)、[スキーマ](data/schemas.md)、その表を所有するコンポーネント |
+| Show分離・登録・サービス設定 | [全体構成](architecture.md)、[制御DO](components/control-do.md)、[保存構造](data/storage.md) |
+| 独自ドメイン・コード配備 | [制御DO](components/control-do.md)、[CLI](components/cli.md)、[配信](components/delivery.md) |
+| 予約・日時 | [Show DO](components/show-do.md)、[スキーマ](data/schemas.md) |
+| RSS・サイト・音声・キャッシュ | [配信](components/delivery.md)、[Show DO](components/show-do.md)、[セキュリティ](security.md) |
+| 統計・保持期限 | [Show DO](components/show-do.md)、[表設計](data/sqlite.md) |
+| RSS移行 | [RSS取り込み](components/rss-import.md)、[スキーマ](data/schemas.md) |
+| バックアップ・ローカル記録 | [バックアップ](components/workspace-backup.md)、[保存構造](data/storage.md) |
 
-## 3. 利用ガイド（`docs/`）
+## 利用ガイドとの分担
 
-- [SQLite開発・運用ガイド](../docs/sqlite_sequential_development.md): 初期化（`init`）、公開（`publish-*`）、ライフサイクル（`unpublish`/`restore`）、デプロイ（`deploy`）の基本操作
-- [内蔵番組サイト利用ガイド](../docs/show_website.md): `site_mode = "builtin"`、短縮 URL、カスタム CSS、`site_timezone`
-- [管理用設定と予約公開ガイド](../docs/admin_configuration.md): `castloop-admin.toml` と `schedule-*` コマンド
-- [公開内容の確認・リビジョン復元ガイド](../docs/published_content_review.md): `diff-*`, `export-*`, `list-*-revisions`, `revision-execute`
-- [配信統計利用ガイド](../docs/delivery_statistics.md): `stats`, `stats-retention`
-- [SQLite独自ドメイン操作ガイド](../docs/sqlite_custom_domains.md): `domain add|remove|continue|status|list`
-- [リモート診断・検証ガイド](../docs/observability.md): `diagnose`, `verify`
-- [ワークスペースバックアップ利用ガイド](../docs/workspace_backup.md): `backup-create`, `backup-verify`, `backup-restore`
-- [エージェント向けCLI利用ガイド](../docs/agent_usage.md): `schema`, `template`, `validate`, `doctor`, `export-skill`
-- [RSS移行ガイド](../docs/rss_migration.md): `import-rss`, `publish-rss-import`
+利用ガイドは「どう操作するか」、設計文書は「なぜその境界があり、どこで何を確定するか」を扱う。コマンドの全引数や長い操作例は利用ガイドとCLIのヘルプを参照し、設計本文へ重複掲載しない。
 
----
+- 基本操作：[SQLite開発・運用](../docs/sqlite_sequential_development.md)
+- 機能操作：[予約](../docs/admin_configuration.md)、[内容確認・履歴](../docs/published_content_review.md)、[サイト](../docs/show_website.md)、[独自ドメイン](../docs/sqlite_custom_domains.md)、[統計](../docs/delivery_statistics.md)
+- 管理支援：[RSS移行](../docs/rss_migration.md)、[バックアップ](../docs/workspace_backup.md)、[診断](../docs/observability.md)、[エージェント利用](../docs/agent_usage.md)
+- 入力例：[Showテンプレート](show-template.toml)、[Episodeテンプレート](episode-template.toml)。実際の入力形式はCLIの `template` / `schema` / `validate` で確認する。
 
-## 4. アーカイブ（`design/archive/`）
+## 文書の更新
 
-`design/archive/` には、現行の簡素化アーキテクチャ（フェーズ1〜4）によって置き換えられた旧設計書、過去のリリース時点の全体設計スナップショット、および各マイルストーン・Issue の実機検証記録を保存している。**これらは歴史的経緯や過去の測定値の記録であり、現行コードの仕様や実環境操作の許可ではない。**
+動作を変更するときは、該当コンポーネントと必要なデータ設計を同じ変更で更新する。表の列・制約と要求の正確な形式はリンク先のDDL・スキーマへ照合し、説明との不一致を黙って仕様として採用しない。実装済みの動作、設計上の制約、実機で確認した範囲は区別して記載する。
 
-- **旧バージョンの全体設計スナップショット**:
-  - [v0.7.6以前の全体設計（非同期FIFOジョブ・R2ステージング・R2スナップショット時代）](archive/initial_design_v076.md)
-  - [v0.5.2以前の全体設計（Cloudflare Queues方式時代）](archive/initial_design_v052.md)
-  - [旧AGENTS.mdの保存規約・マイルストーン履歴（2026-10-17）](archive/agent_storage_and_milestones_20261017.md)
-- **フェーズ1〜4で置き換えられた旧SQLite設計・検討記録**:
-  - 旧逐次公開・操作記録・復旧・稼働制御: [SQLite逐次公開計画](archive/sqlite_sequential_publication_implementation_plan.md)、[操作記録テーブル設計](archive/sqlite_operation_records_schema.md)、[中断操作の確認・再開案](archive/sqlite_operation_recovery_options.md)、[操作再開ガイド（旧）](archive/sqlite_operation_recovery.md)、[受付停止と配信停止の分離](archive/show_admission_delivery_separation_plan.md)、[停止・再開ガイド（旧）](archive/show_availability.md)、[Worker更新の検証続行](archive/sqlite_worker_update_recovery.md)、[blocked診断・復旧案（未実装）](archive/publication_blocked_recovery_plan.md)、[単一PUT・U1](archive/m6_upload_recovery_options.md)
-  - 旧R2スナップショット・サイト・ドメイン初期計画: [Episode追加中のFeed継続](archive/episode_add_feed_availability_plan.md)、[Episode更新中のFeed継続](archive/episode_update_feed_availability_plan.md)、[Show更新中のFeed継続](archive/show_update_feed_availability_plan.md)、[番組サイト初期設計](archive/show_website_plan.md)、[CSSカスタマイズ比較](archive/show_website_customization_options.md)、[説明文表示改善](archive/show_website_description_display_plan.md)、[短縮URL提案](archive/show_website_site_slug_proposal.md)、[公開日タイムゾーン](archive/show_website_timezone_plan.md)、[独自ドメイン初期計画](archive/sqlite_custom_domains_plan.md)、[独自ドメインP0確認](archive/sqlite_custom_domains_p0.md)、[ドメインenvironmentレビュー](archive/sqlite_custom_domain_environment_review.md)、[ドメイン応答ログ調査](archive/sqlite_domain_response_logging.md)、[リモート診断・監視初期計画](archive/remote_diagnostics_and_monitoring_plan.md)、[v0.6.0 Queue削除計画](archive/schema_v1_removal_plan.md)、[コードレビュー（2026-10-21）](archive/code_review_20261021.md)、[レビュー修正（2026-10-22）](archive/code_review_fixes_20261022.md)
-- **過去の実機検証・環境クリーンアップ記録**:
-  - 試験環境の削除・保持環境廃棄の記録: [2026-10-29 main-head実機テスト環境削除](archive/cloudflare_main_smoke_cleanup_20261029.md)、[保持環境`sq16r-6ec01dc6`の廃棄](archive/sq16r_environment_decommission_20261029.md)、[2026-10-17一括削除](archive/cloudflare_test_environment_cleanup_20261017.md)、[2026-10-17棚卸し](archive/cloudflare_cleanup_inventory_20261017.md)、[Issue #24削除](archive/cloudflare_issue24_cleanup_20261018.md)、[Issue #40削除](archive/cloudflare_issue40_cleanup_20261019.md)、[Issue #48削除](archive/cloudflare_issue48_cleanup_20261021.md)、[2026-10-22削除](archive/cloudflare_review_test_cleanup_20261022.md)
-  - 機能別の過去実機試験: [予約公開 11/11非公開検証](archive/issue65_scheduled_publication_11_live_20261027.md)、[予約公開 9/9検証](archive/issue65_scheduled_publication_live_20261026.md)、[CLI実データ検証](archive/issue65_cli_real_data_verification_20261024.md)、[サイトtimezone検証](archive/show_website_timezone_trial_verification_20261027.md)、[サイト短縮URL検証](archive/show_website_short_url_trial_verification_20261026.md)、[サイト説明文検証](archive/show_website_description_trial_verification_20261026.md)、[サイトCSS検証](archive/show_website_css_large_trial_verification_20261026.md)、[サイト初回検証](archive/show_website_private_trial_verification_20261025.md)、[配信統計実機検証](archive/episode_delivery_statistics_live_20261025.md)、[リモート診断実機検証](archive/remote_diagnostics_live_verification_20261025.md)、[独自ドメイン2 Show検証](archive/sqlite_custom_domain_two_show_verification_20261024.md)、[独自ドメイン反復検証](archive/sqlite_custom_domain_iterative_verification_20261024.md)、[独自ドメイン初回/再試験](archive/sqlite_custom_domain_live_verification_20261024.md)
+## 履歴資料
+
+再編前の全体設計、機能計画、比較検討、実装・検証・環境廃棄の記録は [archive/ の索引](archive/README.md)から参照する。現行仕様を理解するためにこれらを読む必要はない。
+
+履歴内の比較案・未実装項目・過去の試験は現行契約として適用せず、現在の実行環境や操作許可も示さない。実機試験の制約は[セキュリティ](security.md)、検証範囲は[テスト](testing.md)を参照する。

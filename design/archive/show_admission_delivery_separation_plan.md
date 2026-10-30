@@ -6,7 +6,7 @@
 
 - 対象: [Issue #66](https://github.com/simosako/castloop-v2/issues/66)
 - 実装前の調査基準: `627c887f633142e6a3fed451fee4a767f4492004`（package version `0.7.3`）。Issue本文が参照する版より新しく、独自ドメイン対応とIssue #65のCLI日時設定を含む。
-- 以下は未リリース開発版の採用仕様。配布済み版や既存環境へ自動適用されるものではない。操作は[利用ガイド](../docs/show_availability.md)を参照する。
+- 以下は未リリース開発版の採用仕様。配布済み版や既存環境へ自動適用されるものではない。操作は[利用ガイド](show_availability.md)を参照する。
 
 ## 1. 今回作るもの・作らないもの
 
@@ -446,7 +446,7 @@ Showの状態表示には、次を併記する。
 
 ## 参照
 
-- [現在の全体設計](initial_design.md)、[SQLite操作ガイド](../docs/sqlite_sequential_development.md)、[SQLite公開処理の実装計画](sqlite_sequential_publication_implementation_plan.md)
+- [現在の全体設計](initial_design.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)、[SQLite公開処理の実装計画](sqlite_sequential_publication_implementation_plan.md)
 - [Show単位のDO分離](do_show_separation_options.md)、[Show更新中の公開済み内容の配信](show_update_feed_availability_plan.md)
 - [Worker更新の検証続行](sqlite_worker_update_recovery.md)、[独自ドメイン計画](sqlite_custom_domains_plan.md)、[予約公開計画](episode_scheduled_publication_plan.md)
 - [Cloudflare DOのcode updates](https://developers.cloudflare.com/durable-objects/platform/known-issues/#code-updates): WorkerとDOの更新反映には時間差がある。今回対象外とした無停止更新を、単なる停止条件の削除では実現できない理由。2026-10-24確認。

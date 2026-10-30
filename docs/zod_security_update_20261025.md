@@ -1,5 +1,7 @@
 # Zodセキュリティ更新（Issue #78）
 
+> 本書は2026-10-25時点の依存更新と検証の記録である。以下の「現在の開発版」は当時の内部形式6/7を指し、v0.8.0（14/13）の配備手順ではない。現在の互換性と配備条件は[README](../README.md)・[SQLiteガイド](sqlite_sequential_development.md)を参照する。過去の`npm audit`結果は現在の依存全体の安全性を保証しない。
+
 ## 対応内容
 
 [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) / CVE-2023-54404への依存更新。修正版は4.6.6以上で、`package.json`の下限を`^4.6.6`、`package-lock.json`の解決版を**4.6.7**へ更新した。無関係な依存は更新していない。

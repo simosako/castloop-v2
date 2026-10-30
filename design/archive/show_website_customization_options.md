@@ -32,12 +32,12 @@
 
 | 箇所 | 現状と検討への影響 |
 | --- | --- |
-| [`src/site-renderer.ts`](../src/site-renderer.ts) | HTMLと固定CSSを依存ライブラリなしで生成する。説明はテキストとしてescapeし、JavaScriptは使わない |
-| [`src/sqlite-site-content.ts`](../src/sqlite-site-content.ts) | Show DOが凍結した入力から生成する。最大20 HTML・合計4,000,000 bytes／batch、1 HTMLは1,000,000 bytes以下 |
-| [`src/site-cache.ts`](../src/site-cache.ts) | ページ参照にCSSのhashを保持し、対応するCSPを返す。閲覧時はR2の完成済みHTMLを配信する |
+| [`src/site-renderer.ts`](../../src/site-renderer.ts) | HTMLと固定CSSを依存ライブラリなしで生成する。説明はテキストとしてescapeし、JavaScriptは使わない |
+| [`src/sqlite-site-content.ts`](https://github.com/simosako/castloop-v2/blob/0a96d1c7da2febf7d174591e6f4448b21bec3109/src/sqlite-site-content.ts) | Show DOが凍結した入力から生成する。最大20 HTML・合計4,000,000 bytes／batch、1 HTMLは1,000,000 bytes以下 |
+| [`src/site-cache.ts`](../../src/site-cache.ts) | ページ参照にCSSのhashを保持し、対応するCSPを返す。閲覧時はR2の完成済みHTMLを配信する |
 | [第1段の設計](show_website_plan.md) | Show更新は全ページ、通常のEpisode更新は全一覧と対象Episodeページを生成する。FeedとHTMLの公開参照を原子的に切り替える |
-| [サイト利用ガイド](../docs/show_website.md) | `site_mode = "builtin"`と`"external"`を提供済み。外部方式では内蔵HTMLを生成しない |
-| [`packages/shared/src/index.ts`](../packages/shared/src/index.ts) | 現在のstrictなShow schemaにCSS・テンプレート設定はない。ファイルを置くだけでは反映されない |
+| [サイト利用ガイド](../../docs/show_website.md) | `site_mode = "builtin"`と`"external"`を提供済み。外部方式では内蔵HTMLを生成しない |
+| [`packages/shared/src/index.ts`](../../packages/shared/src/index.ts) | 現在のstrictなShow schemaにCSS・テンプレート設定はない。ファイルを置くだけでは反映されない |
 
 現在のCSS hash保存は利用できるが、**任意CSSの受付・履歴保存・安全な埋込みは新たに必要**である。「CSSを連結するだけ」の修正ではない。一方、HTML生成エンジンと公開プロトコルを全面的に交換する必要はない。
 
@@ -144,7 +144,7 @@ JekyllをEleventyに変えても、ここは解消しない。**本件ではツ�
 
 ## 7. 採用案Bの具体化
 
-方式Bは採用済みである。以下の設定名・上限・保存方法を今回の開発版で具体化した。実装範囲は§12、正確なclass一覧と操作は[利用ガイド](../docs/show_website.md)を参照する。公開版v0.7.5の機能や、Cloudflare実機での検証完了とは区別する。
+方式Bは採用済みである。以下の設定名・上限・保存方法を今回の開発版で具体化した。実装範囲は§12、正確なclass一覧と操作は[利用ガイド](../../docs/show_website.md)を参照する。公開版v0.7.5の機能や、Cloudflare実機での検証完了とは区別する。
 
 ### 7.1 管理者が置くもの
 
@@ -312,7 +312,7 @@ CSSを埋め込む案ではCSS用の公開要求を追加しない。ただし�
 
 2026-10-25に公式資料を確認。仕様・料金の調査であり、各ツールのcastloop組込み試験やCloudflare実機性能測定は行っていない。
 
-- [第1段のサイト設計](show_website_plan.md)、[利用ガイド](../docs/show_website.md)、[非公開試験の結果と未確認範囲](show_website_private_trial_verification_20261025.md)。
+- [第1段のサイト設計](show_website_plan.md)、[利用ガイド](../../docs/show_website.md)、[非公開試験の結果と未確認範囲](show_website_private_trial_verification_20261025.md)。
 - Jekyll: [Installation](https://jekyllrb.com/docs/installation/)、[Themes](https://jekyllrb.com/docs/themes/)、[Layouts](https://jekyllrb.com/docs/layouts/)。Ruby等の要件、themeの上書きと依存、Liquid layoutの根拠。
 - Eleventy: [Get Started](https://www.11ty.dev/docs/)、[Template Languages](https://www.11ty.dev/docs/languages/)。JavaScript runtime、静的出力と複数のテンプレート形式。
 - Astro: [Installation](https://docs.astro.build/en/install-and-setup/)、[Deployment](https://docs.astro.build/en/guides/deploy/)。Node.js環境とローカルbuild・静的出力。

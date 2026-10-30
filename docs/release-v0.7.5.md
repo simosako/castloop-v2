@@ -10,7 +10,7 @@ This release adds authenticated published-content comparisons, Show/Episode revi
 - **Local previews and exports.** `--rss-output FILE` renders candidate RSS inside the CLI with the production renderer. `sync-local-metadata` exports reviewed current metadata to a new TOML file. Neither overwrites existing files, publishes staging objects nor creates temporary public preview URLs. Original metadata is not automatically changed after adoption.
 - **Observation integration.** `progress` and `watch` also resolve revision-adoption journals, distinguish prepared plans from unknown submissions and terminal results, and remain read-only. Unknown POST outcomes are never automatically replayed.
 
-See the [review and revision guide](published_content_review.md), [observability guide](observability.md) and [approved design and storage measurements](../design/published_diff_and_revision_restore_plan.md).
+See the [review and revision guide](published_content_review.md), [observability guide](observability.md) and [approved design and storage measurements](../design/archive/published_diff_and_revision_restore_plan.md).
 
 ## Compatibility and safety
 

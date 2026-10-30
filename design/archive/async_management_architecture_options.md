@@ -151,7 +151,7 @@ CLI→R2読取はruntime RPCの能動的なreadiness検証を代替しない。c
 - current Show/Episode generationが変わったらrejectし、caller要求を自動修正しない。
 - admission前のrejected/unclaimedと、admission後のfailed/heldを区別する。ownerなしの拒否をlifecycle job statusへ無理に保存しない。
 - 入力失敗ではfrozen draft/必要なownerを保持し、unknown IO・残留execution・DLQ履歴から自動解放しない。
-- 移譲しても[単一REST PUTの未検証仮定U1](../m6_upload_recovery_options.md)は解決しない。multipartやU1解消を今回の必須ゲートにしない。
+- 移譲しても[単一REST PUTの未検証仮定U1](m6_upload_recovery_options.md)は解決しない。multipartやU1解消を今回の必須ゲートにしない。
 
 ## Public Workerとconsumerの物理分離
 

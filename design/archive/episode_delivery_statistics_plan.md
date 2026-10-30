@@ -1,5 +1,9 @@
 # Issue #71: Episode別・日別の基本的な配信統計の設計案
 
+> 履歴資料。現行の統計設計は[Show DO](../components/show-do.md#配信統計)と[SQLite表設計](../data/sqlite.md)を参照する。本文の提案・仕様・検証範囲は記載当時のものであり、現在の実環境操作の許可ではない。
+
+> **現行版との関係：** 以下は導入当時の設計・比較検討を含む。v0.8.0は新規14/13環境専用で、統計の分類・保持・通算累計は維持するが、`stats-retention`専用の操作台帳・journal・結果照会は[フェーズ4](phase4_code_and_test_cleanup_plan.md)で廃止した。保持日数は直接更新し、同じ日数で再実行できる。旧Pause/Resume・operation表の説明を現行手順に適用せず、操作は[配信統計ガイド](../../docs/delivery_statistics.md)、構成は[現行全体設計](initial_design.md)を優先する。
+
 作成日: 2026-10-25。
 
 **本資料は管理者レビュー用の設計提案であり、実Cloudflare環境での配備・設定変更・資源操作の承認を含まない。**
@@ -546,4 +550,4 @@ DATE_UTC    STATUS      INITIAL_DL  FULL_EQUIV  GET_200  GET_206  RESPONSE_BYTES
 - [公開済み内容との差分確認とrevision履歴・過去版採用](published_diff_and_revision_restore_plan.md)
 - [公開受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md)
 - [リモート診断・監視の設計案](remote_diagnostics_and_monitoring_plan.md)
-- [操作記録のIDとテーブル設計](sqlite_operation_records_schema.md)、[保存先の比較とコスト](archive/sqlite_operation_record_storage_options.md)
+- [操作記録のIDとテーブル設計](sqlite_operation_records_schema.md)、[保存先の比較とコスト](sqlite_operation_record_storage_options.md)

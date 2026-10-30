@@ -1,6 +1,6 @@
 # SQLiteサービスの独自ドメイン
 
-フェーズ3開発版（新規環境のservice schema 2 / `show-v1`、内部queue/content形式 **14/13**、health識別`domain_changes="sqlite-domain-change-v1"`）向け。旧版のDB・journal・資源・外部で作った接続の移行や採用は行わない。
+v0.8.0（新規環境のservice schema 2 / `show-v1`、内部queue/content形式 **14/13**、health識別`domain_changes="sqlite-domain-change-v1"`）向け。旧版のDB・journal・資源・外部で作った接続の移行や採用は行わない。
 
 ## 前提と制約
 
@@ -54,4 +54,6 @@ castloop domain list --workspace ./service --json
 
 同configの通常`deploy`はdomain変更とは別操作で、既知接続を照合・保持するだけで接続/切断しない。
 
-関連: [フェーズ3設計](../design/phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4設計](../design/phase4_code_and_test_cleanup_plan.md)、[P0のAPI根拠・制約](../design/archive/sqlite_custom_domains_p0.md)。
+現行形式のドメイン変更はローカル模擬試験で確認している。v0.8.0の[限定的な実機確認](release-v0.8.0.md#verification-and-limitations)はドメイン変更を含まず、旧版の[実機確認記録](sqlite_custom_domain_live_acceptance.md)を現行手順・性能・全Free適合の証拠として扱わない。
+
+関連: [制御DOと独自ドメイン変更の設計](../design/components/control-do.md)、[設定・要求スキーマ](../design/data/schemas.md)。

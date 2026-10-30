@@ -1,6 +1,6 @@
 # 配信判定の事前生成
 
-> v0.5.x以前のQueue/R2方式の履歴。v0.6.0以降の配信はDOの最新判定を使う。[現行設計](../initial_design.md)を参照する。
+> v0.5.x以前のQueue/R2方式の履歴。v0.6.0以降の配信はDOの最新判定を使う。[現行設計](initial_design.md)を参照する。
 
 2026-10-15。管理者が「管理処理で検証・事前生成し、HTTPでは最新の小さな配信判定だけ読む」設計の開発を承認した。
 `feat/publication-queue-submit`の開発実装であり、main/v0.4.0 releaseは変更していない。

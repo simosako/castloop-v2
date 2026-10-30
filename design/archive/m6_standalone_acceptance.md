@@ -88,7 +88,7 @@ CLIの全量SHA-256読み戻しとPUT receiptのETag/versionが、保存journal/
 
 続行は`--metadata-staged-workspace`でexact version/readiness・同じbase・finished local/remote released staging・読戻し証拠一致・publication未作成・lock/token不在を照合したcheckpointに限る。別の`wx` before fileを作り、元incompleteを保持する。再PUT/再staging/未知POSTの再送・ownerの強制解放はしていない。
 
-最終pauseは`d89332da-8564-42c9-b605-e37a5af0596d`。private `large-media-acceptance.json`と[sanitized結果](../../experiments/m6/large-media-results-20261004.json)を保存した。readonly snapshot競合は9件を有限観測で扱い、mutationは再送していない。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、Linux binaryとlocal HTTPS readonly/production拒否も合格した。
+最終pauseは`d89332da-8564-42c9-b605-e37a5af0596d`。private `large-media-acceptance.json`と[sanitized結果](https://github.com/simosako/castloop-v2/blob/eacbec22285f74993e79c8cb2eebd508225fd74b/experiments/m6/large-media-results-20261004.json)を保存した。readonly snapshot競合は9件を有限観測で扱い、mutationは再送していない。全891テスト/13475 assertions、TypeScript/M6試験tsconfig、Linux binaryとlocal HTTPS readonly/production拒否も合格した。
 
 ## 正式CLI/WorkerのMVP walkthrough: 合格
 
@@ -98,6 +98,6 @@ CLIの全量SHA-256読み戻しとPUT receiptのETag/versionが、保存journal/
 
 試験scriptは当初create-showのfile path出力をJSONとして読んで停止し、その後は処理中のreadonly照会未確認で停止した。初期化/登録または公開のlocal acknowledged receipt、remote完了・owner/lock/token不在、未開始の次工程を照合したcheckpointだけから続行した。mutationを再送せず、元incompleteを保持した。最後のrunではreadonly未確認16件を有限再照会で扱った。公開完了stateは`published`、lifecycle完了stateは`completed`であることもREADME/helpへ正しく反映した。
 
-最終versionは`c2d68ee0-d81a-4d70-99b4-539751c88904`、pause `c626b2f5-94ed-48a5-b8d2-8903126f4446`、generation 146、空registry。正式Workerの最終source hashは試験済みbundleと同じ`ae052ebb5d6aa279ba5a14c97449ef14d1e9cdbfadc493813335f24c52a9bfdc`で、test headerは含まない。資源はpausedで保持し、既存環境/Paid/未知ownerには手を加えない。[sanitized結果](../../experiments/m6/formal-entry-results-20261004.json)を保存した。
+最終versionは`c2d68ee0-d81a-4d70-99b4-539751c88904`、pause `c626b2f5-94ed-48a5-b8d2-8903126f4446`、generation 146、空registry。正式Workerの最終source hashは試験済みbundleと同じ`ae052ebb5d6aa279ba5a14c97449ef14d1e9cdbfadc493813335f24c52a9bfdc`で、test headerは含まない。資源はpausedで保持し、既存環境/Paid/未知ownerには手を加えない。[sanitized結果](https://github.com/simosako/castloop-v2/blob/eacbec22285f74993e79c8cb2eebd508225fd74b/experiments/m6/formal-entry-results-20261004.json)を保存した。
 
 全893テスト/13526 assertions、両TypeScript検査、正式/試験Linux build、認証情報・ソースのないcwdで正式standaloneのversion/全27 help・fault command拒否も合格した。CLI実行権限を保持し、checksum/license同梱の候補artifactをローカルへ用意した。README/help/Release notes草案は完成したが、正式version/tag/GitHub Releaseはまだ作成していない。

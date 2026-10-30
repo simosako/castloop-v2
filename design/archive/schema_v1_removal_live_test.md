@@ -20,7 +20,7 @@
 | 通常36件、1,496,055,589 bytes | **485.53秒（約8分6秒）**。CLI開始から最終RSS照合までのwall time |
 | 短尺3件、801,568 bytes | **25.99秒**。同じく公開command全体のwall time |
 | Linux binary | 83,580,384 → 82,621,920 bytes（約1.15%減） |
-| runtime TS | 17,653 → 4,997行（約71.7%減。集計範囲は[実装記録](../schema_v1_removal_plan.md#基準と測定方法)） |
+| runtime TS | 17,653 → 4,997行（約71.7%減。集計範囲は[実装記録](schema_v1_removal_plan.md#基準と測定方法)） |
 
 今回のwall timeはupload・readback・逐次公開・purge・待機を含み、Worker CPU時間や純粋な転送速度ではない。合格判定時点ではCPU/tail数値は未採取だったが、下記「保存ログによるCPU追加確認」で今回のCPUを追加照会した。過去の3/5msを本patchの測定値として流用しない。比較対照のない単発試験のため速度改善・全Free適合・300MB境界を保証しない。最初の試験は外側240秒timeoutの設定ミスで中断し、約8分必要だった再試験で是正した。異常終了後の診断・回復・cleanupは[Issue #40](https://github.com/simosako/castloop-v2/issues/40)へ分離した。
 

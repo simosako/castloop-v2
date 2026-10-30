@@ -25,7 +25,7 @@ v0.7.0後のコードレビュー修正（PR #54〜#59）を含むLinux x86-64�
 - 保存ログのcanceled Alarmは、同じDO・version・予定時刻の成功Alarmの291ms後で、成功後の重複配送を実行前に取り消した説明が有力。platform内部の取消理由や全過去IOのsettlementまで証明したものではない。
 - 容量境界のnative負荷試験、大量履歴、切断・不明PUT故障注入、300MB公開、全Free適合は未検証。単一PUTのU1も未検証の仮定のまま。
 
-詳細は[修正一覧](../design/code_review_fixes_20261022.md)、[実機確認](../design/archive/code_review_fixes_live_verification_20261022.md)、[観測調査](../design/archive/review_observation_investigation_20261022.md)、[SQLite操作ガイド](sqlite_sequential_development.md)を参照してください。
+詳細は[修正一覧](../design/archive/code_review_fixes_20261022.md)、[実機確認](../design/archive/code_review_fixes_live_verification_20261022.md)、[観測調査](../design/archive/review_observation_investigation_20261022.md)、[SQLite操作ガイド](sqlite_sequential_development.md)を参照してください。
 
 ## 配布
 

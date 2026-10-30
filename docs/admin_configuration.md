@@ -1,6 +1,6 @@
 # 管理用設定と予約公開
 
-フェーズ3開発版。任意の管理用タイムゾーン設定、オフライン日時変換、UTCでの予約登録・実行を提供する。予約実行日時は`published_at`とは別。予約にはローカル入力、明示承認hash、稼働準備完了（`publication_ready`）のShowが必要。新規環境専用の内部queue/content形式**14/13**を使い、旧形式は変換しない。
+v0.8.0向け。任意の管理用タイムゾーン設定、オフライン日時変換、UTCでの予約登録・実行を提供する。予約実行日時は`published_at`とは別。予約にはローカル入力、明示承認hash、稼働準備完了（`publication_ready`）のShowが必要。サービス設定version 2・`show-v1`、新規環境専用の内部queue/content形式**14/13**を使い、旧形式は変換しない。
 
 ## 任意の管理用設定
 
@@ -98,4 +98,4 @@ castloop schedule-status daily SCHEDULE_UUID --workspace /path/to/workspace --js
 - `publish-rss-import`はfuture日時のEpisodeを1件でも含む場合、同じ`--allow-future-published-at`を要求する。一括公開の途中で止まらないよう、開始前に拒否する。
 - 予約公開を使う場合は`preview-episode-schedule`／`schedule-episode`を使う。予約実行日時は`published_at`と独立で、予約は`published_at`を書き換えない。
 
-現行経路はローカルで予約・停止・再承認・取消・Alarm再配送・公開との原子的確定を検証する。実Cloudflareへの配備・性能は未確認。旧形式の実機記録は[設計索引](../design/README.md)で区別する。
+現行経路はローカルで予約・`needs_approval`への遷移・再承認・取消・Alarm再配送・公開との原子的確定を検証する。v0.8.0の[限定的な実機確認](release-v0.8.0.md#verification-and-limitations)は予約公開の実機検証を含まず、現行形式の予約動作・native性能・全Free適合は未実証。旧形式の予約公開の実機記録は[設計索引](../design/README.md)で区別する。

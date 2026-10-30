@@ -1,5 +1,7 @@
 # Issue #64: 公開済み内容との差分確認とrevision履歴・過去版採用の設計案
 
+> 履歴資料。現行設計は[CLI](../components/cli.md)と[Show DO](../components/show-do.md)を参照する。本文の提案・仕様・測定は記載当時のものであり、現在の実環境操作の許可ではない。
+
 作成日: 2026-10-25。
 
 **ステータス: 管理者レビューにより推奨案（1A・2A・3A・4A・5A）をすべて採用済み。** 本書は [Issue #64](https://github.com/simosako/castloop-v2/issues/64) の設計と採用仕様をまとめた文書である。コード実装およびローカル試験の承認は、実Cloudflare環境での配備・公開・再開や資源変更を許可するものではない。
@@ -407,7 +409,7 @@ RSS用に`GET /admin/sqlite-service/content-inventory/<showId>/<feedGeneration>[
 
 ### 7.3 実装・ローカル検証結果（2026-10-25）
 
-採用した5案を実装した。利用手順は[公開内容の差分確認と過去版の採用](../docs/published_content_review.md)を参照する。
+採用した5案を実装した。利用手順は[公開内容の差分確認と過去版の採用](../../docs/published_content_review.md)を参照する。
 
 | 検証 | 結果 |
 | --- | --- |

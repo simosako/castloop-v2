@@ -29,4 +29,4 @@ castloop lifecycle-execute show-plan.json REQUEST_SHA256 confirm --workspace /pa
 - `restore`は保存済みの確定内容を使って配信を復元し、GUID・公開日時・音源identityを保持する。手元の未公開編集を暗黙に採用しない。また、Show全体の`restore`で個別に非公開化したEpisodeが勝手に復活することはない。
 - 既に同じ状態になっている対象への再実行は、`unchanged`として安全に完了する。物理削除は未実装。
 
-詳細は[フェーズ3設計](../design/phase3_deploy_and_runtime_control_simplification_plan.md)および[SQLiteガイド](sqlite_sequential_development.md)を参照する。
+詳細は[フェーズ3設計](phase3_deploy_and_runtime_control_simplification_plan.md)および[SQLiteガイド](../../docs/sqlite_sequential_development.md)を参照する。

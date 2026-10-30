@@ -15,13 +15,13 @@
 
 ## 2. 現状と必要な変更
 
-第1段の[`src/site-renderer.ts`](../src/site-renderer.ts)は、説明文字列をそのまま160文字へ短縮してからHTMLの特殊文字をescapeしていた。このため、タグも文字数に含まれ、`<p>`等が画面に現れた。個別ページも全文をescapeするだけで、段落タグを描画しなかった。`meta description`とOGP（SNS等へページの概要を伝える情報）の説明も同じ影響を受けた。今回、この部分を以下の表示ルールへ変更した。
+第1段の[`src/site-renderer.ts`](../../src/site-renderer.ts)は、説明文字列をそのまま160文字へ短縮してからHTMLの特殊文字をescapeしていた。このため、タグも文字数に含まれ、`<p>`等が画面に現れた。個別ページも全文をescapeするだけで、段落タグを描画しなかった。`meta description`とOGP（SNS等へページの概要を伝える情報）の説明も同じ影響を受けた。今回、この部分を以下の表示ルールへ変更した。
 
 escapeとは、例えば`<`を`&lt;`へ置き換え、本文をHTMLタグとして解釈させない処理を指す。以下の表示改善でも、本文のescapeは維持する。
 
 一方、**Episode個別ページはすでに事前生成している**。新しいページ種別・API・R2公開パスを作る必要はない。タイトルはすでに個別ページへのリンクなので、説明文にも同じ行き先を設定できる。
 
-また、[`stripHtmlTags`](../packages/shared/src/metadata-limits.ts)は入力上限の計測用の簡易処理であり、安全なHTML生成用の処理ではない。これを変更して既存の入力上限・RSS受け入れ条件を変えることはしない。
+また、[`stripHtmlTags`](../../packages/shared/src/metadata-limits.ts)は入力上限の計測用の簡易処理であり、安全なHTML生成用の処理ではない。これを変更して既存の入力上限・RSS受け入れ条件を変えることはしない。
 
 ## 3. 全文を読む方法の比較
 
@@ -152,7 +152,7 @@ RSS由来の説明文は、第三者が作った文字列を含む。元のHTML�
 
 HTMLの生成・R2保存はShow DOのAlarmで、1回あたり最大20 HTML・合計4,000,000 bytesに分ける。正常にbatchを完了して続行情報と次のAlarm予約を保存できた場合だけ、次回へ進む。51 HTMLならファイル数だけでも最低3回のbatchとなり、bytesの上限に達すればさらに分かれる。中断・結果不明の書込を再実行する仕組みではない。
 
-コード上の対応は、[`withSitePublication`](../src/site-publication.ts)が対象Episode IDを渡し、[`SqliteSiteContent.prepare`／`batch`／`commit`](../src/sqlite-site-content.ts)が入力固定・分割生成・未変更個別ページの参照維持を行う。[Alarm実行部](../src/sqlite-publication-alarm.ts)は正常な続行と未知の中断を区別する。
+コード上の対応は、[`withSitePublication`](https://github.com/simosako/castloop-v2/blob/0a96d1c7da2febf7d174591e6f4448b21bec3109/src/site-publication.ts)が対象Episode IDを渡し、[`SqliteSiteContent.prepare`／`batch`／`commit`](https://github.com/simosako/castloop-v2/blob/0a96d1c7da2febf7d174591e6f4448b21bec3109/src/sqlite-site-content.ts)が入力固定・分割生成・未変更個別ページの参照維持を行う。[Alarm実行部](https://github.com/simosako/castloop-v2/blob/0a96d1c7da2febf7d174591e6f4448b21bec3109/src/sqlite-publication-alarm.ts)は正常な続行と未知の中断を区別する。
 
 ### 6.2 「分割しているからFreeで保証できる」とは言えない理由
 
@@ -204,7 +204,7 @@ HTMLファイル数以外にも、次の全件処理がある。
 
 2026-10-26に実装ソースと公式資料を確認した。パッケージの採用は§11のとおり完了した。native性能測定は未実施。
 
-- [現行のサイト仕様](../docs/show_website.md)、[サイト設計](show_website_plan.md)、[カスタマイズの採用方針](show_website_customization_options.md)。
+- [現行のサイト仕様](../../docs/show_website.md)、[サイト設計](show_website_plan.md)、[カスタマイズの採用方針](show_website_customization_options.md)。
 - [通常サイズ3件の試験](show_website_css_large_trial_verification_20261026.md)。今回の説明表示に使う原本と生成経路。
 - [MDN: details](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details)。標準HTMLの開閉と、開閉領域を含むHTMLの構造。
 - [Cloudflare HTMLRewriter](https://developers.cloudflare.com/workers/runtime-apis/html-rewriter/)。要素・text chunkのhandlerと非同期の変換。
@@ -216,10 +216,10 @@ HTMLファイル数以外にも、次の全件処理がある。
 
 ### 11.1 実装
 
-- [`site-description.ts`](../src/site-description.ts)で解析した本文・区切りだけを抽出する。元のタグ・属性を出力へコピーせず、escape済み本文と固定の`p`・`br`で表示を再構成する。全文・抜粋・meta用に同じ説明を別々に解析しない。
-- [`site-renderer.ts`](../src/site-renderer.ts)で一覧の説明リンクと全文領域を接続した。playerはリンクの外に維持し、追加JS・API・設定はない。全文用の段落余白と`cl-description-full`、`cl-description-link`、`cl-read-more`を標準CSSへ追加した。
+- [`site-description.ts`](../../src/site-description.ts)で解析した本文・区切りだけを抽出する。元のタグ・属性を出力へコピーせず、escape済み本文と固定の`p`・`br`で表示を再構成する。全文・抜粋・meta用に同じ説明を別々に解析しない。
+- [`site-renderer.ts`](../../src/site-renderer.ts)で一覧の説明リンクと全文領域を接続した。playerはリンクの外に維持し、追加JS・API・設定はない。全文用の段落余白と`cl-description-full`、`cl-description-link`、`cl-read-more`を標準CSSへ追加した。
 - 元説明文・metadata／RSS・公開参照・DO／cache名・保存形式9/10・batch上限は変更しない。HTMLを保存する既存の公開・復元・domain経路が共通rendererを使う。
-- 直接依存は`htmlparser2@10.1.0`（MIT）の1件。推移依存は6パッケージ実体（`entities`が7.0.1と4.5.0の2版）。MIT／BSD-2-Clauseの表記と本文を[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md)へ追加した。DOM helperのAPIは使用しない。
+- 直接依存は`htmlparser2@10.1.0`（MIT）の1件。推移依存は6パッケージ実体（`entities`が7.0.1と4.5.0の2版）。MIT／BSD-2-Clauseの表記と本文を[`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md)へ追加した。DOM helperのAPIは使用しない。
 
 ### 11.2 確認結果と制約
 
