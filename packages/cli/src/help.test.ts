@@ -32,6 +32,35 @@ test("help works after positional arguments, with -h, and with help COMMAND", ()
   expect(commandHelp("init")).toContain("schema_version=2");
 });
 
+test("help describes current domain, verification, retention and backup behavior", () => {
+  const domain = commandHelp("domain");
+  expect(domain).toContain("domain continue UUID");
+  expect(domain).toContain("previous and target configurations");
+  expect(domain).toContain("after the domain change commits");
+  expect(domain).not.toContain("Show Resume");
+  expect(domain).not.toContain("unknown PUT/POST/DELETE outcomes are never replayed");
+
+  const verify = commandHelp("verify");
+  expect(verify).toContain("authenticated committed content");
+  expect(verify).toContain("administrator key");
+  expect(verify).not.toContain("no administrator key or management API");
+
+  const retention = commandHelp("stats-retention");
+  expect(retention).toContain("same Show and retention value");
+  expect(retention).not.toContain("journaled locally");
+  expect(retention).not.toContain("re-checked by its operation ID");
+
+  expect(commandHelp("publish-rss-import")).not.toContain("blocked");
+  expect(commandHelp("publish-rss-import")).not.toContain("explicitly opens");
+  for (const command of ["backup-create", "backup-verify", "backup-restore-preview", "backup-restore"]) {
+    expect(commandHelp(command)).not.toContain("frozen absolute source paths");
+    expect(commandHelp(command)).not.toContain("point-in-time snapshot");
+  }
+  expect(commandHelp("backup-create")).toContain("not R2 or server-side SQLite");
+  expect(commandHelp("backup-verify")).toContain("unfinished domain changes");
+  expect(commandHelp("backup-restore")).toContain("does not continue remote operations");
+});
+
 test("security containment instructions name supported current commands and reviewed lifecycle containment", () => {
   const policy = readFileSync(join(import.meta.dir, "../../..", "SECURITY.md"), "utf8");
   const commands = [...policy.matchAll(/`castloop ([a-z][a-z-]*)([^`]*)`/g)];

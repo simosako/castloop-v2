@@ -13,7 +13,7 @@ test("embedded schemas retain strict keys and measured constraints", () => {
   expect(() => inputSchema("unknown")).toThrow();
 });
 
-test("help and describe share options; unknown outcomes never advertise retry", () => {
+test("help and describe share options; failure envelopes never authorize retries", () => {
   for (const command of Object.keys(COMMAND_HELP)) {
     expect(describeCommand(command).options).toEqual(commandOptions(command));
     for (const flag of Object.keys(commandOptions(command))) expect(commandHelp(command)).toContain(`--${flag}`);
@@ -24,4 +24,31 @@ test("help and describe share options; unknown outcomes never advertise retry", 
   expect(failed.error?.outcome).toBe("unknown");
   const completed = agentEnvelope("publish-episode", {}, { result: "changed", revision_id: crypto.randomUUID() });
   expect(completed.next_actions).toEqual([]); expect(completed.operation).toBeNull();
+});
+
+test("describe recovery distinguishes observation, local exports and explicit continuation", () => {
+  for (const command of ["init", "create-show", "deploy"]) {
+    expect(describeCommand(command).recovery).toContain("rerun");
+    expect(describeCommand(command).recovery).toContain("saved inputs");
+  }
+  expect(describeCommand("domain").recovery).toContain("domain status UUID");
+  expect(describeCommand("domain").recovery).toContain("domain continue UUID");
+  expect(describeCommand("publish-rss-import").recovery).toContain("same retained batch and inputs");
+  expect(describeCommand("publish-rss-import").recovery).not.toContain("Resume");
+  expect(describeCommand("import-rss").recovery).toContain("same snapshot and output directory");
+  for (const command of ["schedule-show", "schedule-episode"]) {
+    expect(describeCommand(command).recovery).toContain("schedule-list");
+    expect(describeCommand(command).recovery).toContain("Do not blindly create another schedule");
+  }
+  expect(describeCommand("schedule-cancel").recovery).toContain("schedule-status");
+  expect(describeCommand("stats-retention").recovery).toContain("same Show and retention value");
+  for (const command of ["skill", "backup-create", "backup-restore"]) {
+    expect(describeCommand(command).recovery).toContain("Offline only");
+    expect(describeCommand(command).recovery).not.toContain("Read-only observation");
+  }
+  expect(describeCommand("verify").recovery).toContain("Read-only observation");
+  for (const command of ["publish-show", "publish-episode", "lifecycle-execute", "revision-execute"]) {
+    expect(describeCommand(command).recovery).toContain("unchanged");
+    expect(describeCommand(command).recovery).toContain("new review");
+  }
 });

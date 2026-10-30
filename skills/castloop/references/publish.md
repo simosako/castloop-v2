@@ -1,11 +1,11 @@
 # 追加・更新・公開
 
-この開発版は新規14/13環境向け。旧形式を変換・採用しない。実行前に対応CLIと対象workspaceを確認する。
+v0.8.0はサービス設定version 2・`show-v1`・内部形式14/13の新規環境向け。旧形式を変換・採用しない。実行前に対応CLIと対象ワークスペースを確認する。
 
 ## 通常公開
 
 1. 対象Showが準備完了（`publication_ready`）か`show-status`で確認する。通常編集のたびにdeployしない。
-2. `create-episode ID --workspace PATH --show SHOW --non-interactive --json`で手元の雛形を作る。GUIDを保持し、管理者が確認した内容・日時でTOMLを編集する。
+2. 新規Episodeだけ`create-episode ID --workspace PATH --show SHOW --non-interactive --json`で雛形を作る。更新時は既存TOMLを編集し、作成コマンドを実行し直さない。GUIDを保持し、管理者が確認した内容・日時を使う。
 3. `validate episode ABSOLUTE_TOML --audio ABSOLUTE_MP3 --json`で検証する。音声上限は300,000,000 bytes。
 4. `preview-episode ID MP3 --workspace PATH --show SHOW --remote --json`でmetadata・素材・更新元を確認し、内容と`input_fingerprint`の承認を得る。
 5. `publish-episode ID MP3 --workspace PATH --show SHOW --expect-preview HASH --non-interactive --json`で明示公開する。`changed`／`unchanged`とrevisionが確定結果。
@@ -14,15 +14,15 @@ MP3省略時は公開済み音声を再利用する。初回は必須。metadata
 
 Showは`preview-show SHOW`→承認→`publish-show SHOW --expect-preview HASH`。TOML・CSS・カバーを使い、公開済み画像の拡張子は変えない。GUID・日時・permalink意味を通常更新で変更しない。
 
-previewは通信による現在内容の確認だけでupload・journal・lockを作らない。`--local`ではremote未確認を明示する。入力・更新元が変わったら再確認するが、既に同じ内容が公開済みなら変更なしで返せる。hashそのものは承認を証明しない。
+プレビューはローカル入力と現在内容を比較し、アップロード・公開・操作記録の作成は行わない。`--local`は通信せずリモート未確認を示す。既定では`.castloop/`があればリモート確認、なければローカル確認を行い、キー欠落や取得失敗で黙って切り替えない。入力・更新元が変わったら再確認するが、既に同じ内容が公開済みなら変更なしで返せる。ハッシュ自体は承認を証明しない。
 
-`preview-* --rss-output NEW_FILE`は予定RSSをローカル生成し、既存ファイルを上書きしない。新しい音源URLは確認用の仮UUIDであり、実URLは公開時に発行される。素材は手元で確認し、一時公開URLを作らない。
+`preview-* --rss-output NEW_FILE`を明示した場合だけ、認証付き公開一覧から予定RSSをローカルの新規ファイルへ生成する。既存ファイルは上書きせず、公開もしない。新しい音源URLは確認用の仮UUIDを含む場合があり、実URLは公開時に発行される。素材は手元で確認し、一時公開URLを作らない。
 
 未来の`published_at`でも即時公開する。非対話では`--allow-future-published-at`が必要。予約は次の専用操作を使う。
 
 ## 予約公開
 
-- `preview-episode-schedule ID [MP3] --workspace PATH --show SHOW --at DATETIME [--timezone ZONE] --json`で確認し、`schedule-episode`に同じ引数と`--expect-preview APPROVAL_HASH`を渡す。Showには`preview-show-schedule`／`schedule-show`を使う。
+- `preview-episode-schedule ID [MP3] --workspace PATH --show SHOW --at DATETIME [--timezone ZONE] --json`で確認し、出力の`approval_sha256`を`--expect-preview APPROVAL_HASH`に指定して同じ入力の`schedule-episode`へ渡す。通常公開の`input_fingerprint`と取り違えない。Showには`preview-show-schedule`／`schedule-show`を使う。
 - CLIが素材を配置し、metadataと具体的な素材参照を予約へ保存する。`scheduled`は受付、`dispatched`とrevisionは公開確定。端末を待機させる必要はない。
 - `schedule-list SHOW`／`schedule-status SHOW UUID`で確認する。作成応答が不明なら一覧を読み、新規予約を無条件に再作成しない。
 - 日時変更は`preview-schedule-reschedule`→`schedule-reschedule`、取消は`preview-schedule-cancel`→`schedule-cancel`。未実行の予約だけを扱い、version・hashを照合する。

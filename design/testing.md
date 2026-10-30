@@ -44,6 +44,7 @@ SQLite試験は `bun:sqlite` を使う。テスト用ストレージがDOのSQL�
 | 統計 | [集計](../src/sqlite-delivery-stats.test.ts)、[HTTP](../src/sqlite-stats-http.test.ts)、[CLI](../packages/cli/src/stats.test.ts) |
 | RSS取り込み | [取得](../packages/cli/src/rss-import-download.test.ts)、[解析](../packages/cli/src/rss-import-feed.test.ts)、[事前検査](../packages/cli/src/rss-import-preflight.test.ts)、[順次公開](../packages/cli/src/sqlite-rss-publication.test.ts) |
 | ローカル記録・バックアップ | [記録保存](../packages/cli/src/local-journal-storage.test.ts)、[読取](../packages/cli/src/local-journal-read.test.ts)、[バックアップ](../packages/cli/src/backup.test.ts) |
+| CLIの操作案内 | [ヘルプ](../packages/cli/src/help.test.ts)、[自己記述](../packages/cli/src/agent-schema.test.ts)、[同梱Skill](../packages/cli/src/admin-skill.test.ts)。全コマンドのヘルプを設定・認証情報なしで実行し、案内の契約と埋め込み元の一致を確認 |
 
 試験を追加するときは、要求仕様またはサポートする実行経路へ結び付ける。通信中断、パージ拒否、Alarm設定失敗等は該当処理の確定範囲を検査するために使う。信頼された内部契約を人工的に破るだけの試験から、不要な防御処理を増やさない。
 
