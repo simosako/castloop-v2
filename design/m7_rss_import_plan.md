@@ -1,6 +1,6 @@
 # M7: RSSによるPodcast移行（レビュー用草案）
 
-作成日: 2026-10-12。対象: [Issue #1 — migration via RSS](https://github.com/simosako/castloop-v2/issues/1)。**新規Show限定、ローカル確認後の明示公開、GUID schema拡張を含め承認済み。M7ブランチで実装中。**
+作成日: 2026-10-12。対象: [Issue #1 — migration via RSS](https://github.com/simosako/castloop-v2/issues/1)。**新規Show限定、ローカル確認後の明示公開、GUID schema拡張を採用し、v0.4.0で導入済み。** 以下は当時のQueue方式の設計・実装記録である。現行v0.8.0は新規14/13環境向けの同期公開とRSS進捗記録version 3を使い、旧staging・job・lockは使わない。現在の操作と中断後の再実行は[RSSガイド](../docs/rss_migration.md)を優先する。
 
 ## 1. 目的と推奨範囲
 

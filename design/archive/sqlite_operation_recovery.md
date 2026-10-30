@@ -10,12 +10,12 @@
 
 ## 予約とRSS
 
-予約作成の応答が不明なら`schedule-list SHOW`で確認し、新規予約を無条件に再作成しない。`schedule-status`の`dispatched`とrevisionは公開確定と同じトランザクションで保存される。更新元競合やドメイン変更で`needs_approval`になった予約は明示再承認する。[予約ガイド](admin_configuration.md)を参照。
+予約作成の応答が不明なら`schedule-list SHOW`で確認し、新規予約を無条件に再作成しない。`schedule-status`の`dispatched`とrevisionは公開確定と同じトランザクションで保存される。更新元競合やドメイン変更で`needs_approval`になった予約は明示再承認する。[予約ガイド](../../docs/admin_configuration.md)を参照。
 
-RSSは一括進捗記録を保持し、中断時も同じ取り込み入力で`publish-rss-import`を再実行すれば続きから完了する。完了済みの同一内容は変更なしになる。[RSSガイド](rss_migration.md)を参照。
+RSSは一括進捗記録を保持し、中断時も同じ取り込み入力で`publish-rss-import`を再実行すれば続きから完了する。完了済みの同一内容は変更なしになる。[RSSガイド](../../docs/rss_migration.md)を参照。
 
 ## 初期化・Show登録・Worker更新・ドメイン変更
 
 - `init`／`create-show`：各ステップは現在の状態をAPIで確認する冪等な処理となっており、通信断等で中断した場合は同じコマンドを再実行すれば完了する。
 - `deploy`：ローカルjournalを持たない単発処理。R2の音源・画像は変更せず、中断時はもう一度`castloop deploy`を実行して完了させる。
-- `domain`：変更前設定（`previous_config`）と変更後設定（`target_config`）をローカルjournalに保存する。中断時は`castloop domain status UUID`で状態を確認し、`castloop domain continue UUID`で未完了ステップから完了まで進める。[独自ドメインガイド](sqlite_custom_domains.md)を参照。
+- `domain`：変更前設定（`previous_config`）と変更後設定（`target_config`）をローカルjournalに保存する。中断時は`castloop domain status UUID`で状態を確認し、`castloop domain continue UUID`で未完了ステップから完了まで進める。[独自ドメインガイド](../../docs/sqlite_custom_domains.md)を参照。

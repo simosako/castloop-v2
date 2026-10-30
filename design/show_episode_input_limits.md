@@ -1,6 +1,6 @@
 # Show/Episodeメタデータの項目別入力上限（Issue #31）
 
-Apple Podcasts RSSを規範とし、新規入力だけに適用する。保存済みsnapshot/revisionの読取・復元は無制限のまま維持し、無断切り詰め・履歴書換え・暗黙変換は行わない。
+v0.8.0（内部queue/content形式14/13）の入力制約。Apple Podcasts RSSを規範とし、新規入力だけに項目別上限を適用する。保存済みsnapshot/revisionの読取・復元には新規入力の項目別上限を追加せず、無断切り詰め・履歴書換え・暗黙変換は行わない。読取量・描画量の全体上限とは別の制約である。
 
 ## 規範
 
@@ -22,13 +22,13 @@ Apple Podcasts RSSを規範とし、新規入力だけに適用する。保存�
 
 ## 適用範囲
 
-- 適用: `update-show`/`update-episode`のstage時（`SqliteDraft.metadata`）、Worker公開実行のstaging読取（`sqlite-publication-executor`、超過は`validation_failed`）、RSS取込の検証報告（`parseRssImportFeed`の`missing_fields`、TOMLは無加工で保存し編集を促す）。`publish-rss-import`の事前検証でも編集後TOMLを検査し、Showは素材走査前、各Episodeはその音源走査前に拒否する。拒否時はremote IO・Show作成・公開journalの凍結を開始しない。
-- 非適用: 保存済みsnapshot/revision/snapshot復元・lifecycle復元の読取（`showMetadataSchema`/`episodeDraftSchema`/`episodeRevisionSchema`は無制限のまま）。一覧表示は従来通りDB側`substr(...,1,200)`で200文字表示に切る。
-- 既存の全体上限（ローカルTOML 1M、RSS XML 8M、取込準備8M/rendering換算32M、公開要求/draft journal 16K）は変えない。
-- 全体上限は項目別上限とは独立する。公開後のrevision JSON合計2,000,000 code points・最大10,000件と保守的rendering予算を、外部書込前に検査する。RSS事前検証は同じshared予算定義とrevision付加fieldの保守的見積りを使う。保存済み履歴を切り詰めたり、未知IOのblockedをfailedに変更するものではない。
+- 適用: CLIの`validate`・`preview-*`・`publish-*`が読む新規入力（`showMetadataInputSchema` / `episodeDraftInputSchema`）、Workerが受ける直接公開要求のmetadata、RSS取込の検証報告（`parseRssImportFeed`の`missing_fields`）。RSSのTOMLは切り詰めず保存し、編集を促す。`publish-rss-import`の事前検証でも編集後TOMLを検査し、Showは素材走査前、各Episodeはその音源走査前に拒否する。Show登録・素材配置・公開は事前検証の完了後に行う。旧`update-*`・staging・公開job台帳は使わない。
+- 非適用: 保存済みsnapshot/revisionの読取・過去版採用・lifecycle復元のmetadata（`showMetadataSchema` / `episodeDraftSchema` / `episodeRevisionSchema`には新規入力の項目別上限を追加しない）。ただし、読取量と描画量の全体上限は適用する。一覧のタイトル要約はDB側`substr(...,1,200)`で最大200文字とする。
+- ローカルTOMLは1,000,000 bytes以下（ShowのCSS同梱後も同じ上限）。RSS取り込みと公開前に読む保存済みXMLは8 MiB以下。直接公開要求はmetadataをJSONに含み、`MAX_SQLITE_DIRECT_PUBLICATION_BYTES`（1,000,000 bytes＋管理要求の上限）で検査する。旧draft journalの16 KiB制約を公開metadataへ適用しない。
+- 全体上限は項目別上限とは独立する。公開後のEpisode revision JSON合計2,000,000 code points・最大10,000件と保守的な描画予算32,000,000 bytesを検査する。RSS事前検証は同じshared予算定義とrevision付加fieldの保守的見積りを使う。超過時は公開内容を確定せず、保存済み履歴も切り詰めない。
 
 ## 検証
 
 - `packages/shared/src/metadata-limits.test.ts`: 境界（255/256、4000 bytesの多バイト境界1333/1334、10000/10001）、絵文字のcode point数、HTML除外、保存schemaが超過履歴を読み続けられること。
 - `packages/cli/src/rss-import-feed.test.ts`: Show/Episode超過が`missing_fields`に報告されること。
-- `src/sqlite-publication-executor.test.ts`: Show/Episode超過payloadが書込前に`validation_failed`で止まること。
+- `packages/shared/src/sqlite-direct-publication.test.ts`、`src/sqlite-publication-executor.test.ts`: 新規公開要求のmetadata検証、保存済み履歴の採用と公開前の全体予算検査。

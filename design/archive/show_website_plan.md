@@ -1,6 +1,6 @@
 # Issue #70: R2上の静的な番組サイト・Episodeページの設計と実装
 
-**2026-10-27の完了判断：** 第1段後の標準デザイン・任意CSS、説明の抜粋／全文と安全なリンク、自動短縮URL、フッター削除、[Show別タイムゾーン](show_website_timezone_plan.md)を実装し、本人の画面・再生確認を得た。合意した機能開発を完了とする。Issue #65の予約公開を統合した現在の形式は**11/11・static-show-v2**で、新規環境専用。以下は第1段の設計・検証履歴である。現在の操作は[サイトガイド](../docs/show_website.md)を優先する。native Free性能・スマートフォン／キーボードの実機確認・統合版の実配備は未完了であり、機能完了と区別する。
+**2026-10-27の完了判断：** 第1段後の標準デザイン・任意CSS、説明の抜粋／全文と安全なリンク、自動短縮URL、フッター削除、[Show別タイムゾーン](show_website_timezone_plan.md)を実装し、本人の画面・再生確認を得た。合意した機能開発を完了とする。Issue #65の予約公開を統合した現在の形式は**11/11・static-show-v2**で、新規環境専用。以下は第1段の設計・検証履歴である。現在の操作は[サイトガイド](../../docs/show_website.md)を優先する。native Free性能・スマートフォン／キーボードの実機確認・統合版の実配備は未完了であり、機能完了と区別する。
 
 作成・改訂日: 2026-10-25。**Issue #70の第1段となる最小限実装。案Bとサイト方式の2択を採用し、CLI・Show DO・Workerへ接続した開発版**。全公開経路の接続と検証を§13に記録する。見栄え・日時表示などの改善は後続とし、Issue全体の完了とは扱わない。本設計だけでは実Cloudflare操作の承認にならない。
 
@@ -55,7 +55,7 @@
 
 正本は従来どおり、編集元がローカルTOML、公開制御がShow DO SQLite、payload・公開snapshotがR2である。サイトHTMLはその派生物とし、サイト専用の公開状態を別サービスで管理しない。
 
-関連契約: [全体設計](initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離](do_show_separation_options.md)、[受付と配信の分離](show_admission_delivery_separation_plan.md)、[独自domain契約](sqlite_custom_domains_p0.md)、[公開内容確認・過去版採用](../docs/published_content_review.md)。
+関連契約: [全体設計](../initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離](../do_show_separation_options.md)、[受付と配信の分離](show_admission_delivery_separation_plan.md)、[独自domain契約](sqlite_custom_domains_p0.md)、[公開内容確認・過去版採用](../../docs/published_content_review.md)。
 
 ## 3. Cloudflare Freeを前提にした制約
 
@@ -496,7 +496,7 @@ Show metadataの設定、内部形式・health識別、SQLの生成索引、正�
 - 生成した単体CLIを資格情報なしで実行し、version／help／describe／schema、内蔵・外部方式の入力検証、builtinとsite_urlの競合拒否を確認した。
 - `git diff --check`、新規ファイルの末尾改行・空白、本文書と利用ガイドの相対リンクを確認した。
 
-利用手順は[サイトガイド](../docs/show_website.md)にまとめた。これらはローカルの模擬環境と単体CLIの確認であり、次節の実機結果を含まない。
+利用手順は[サイトガイド](../../docs/show_website.md)にまとめた。これらはローカルの模擬環境と単体CLIの確認であり、次節の実機結果を含まない。
 
 ### 13.3 承認済みの実機試験と未確認の範囲
 

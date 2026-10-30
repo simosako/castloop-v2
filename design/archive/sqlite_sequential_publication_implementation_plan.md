@@ -6,9 +6,9 @@
 
 > 2026-10-21追補: Issue #50の[Feed継続配信契約](episode_add_feed_availability_plan.md)を優先する。固定Feed上書きと一律running/blocked配信503を改め、全Feed writerを世代別の不変R2 snapshotへ統一した。purge後のcontent/media/Feed世代/job/操作記録/次回Alarm予約の原子完了は維持する。新規Episode追加のみ、開始時に保存した保護根拠が成立するrunning/blockedで旧公開内容を配信する。その他の更新・lifecycleや要求破損は従来どおり停止する。内部queue/content schemaは3/4、新規環境専用・変換なし。下記の固定key・旧schema・一律503の記述は導入時の履歴である。
 
-> 2026-10-20追補: Issue #48の開発版では[Show分離の採用契約](do_show_separation_options.md)を優先する。1サービス1 DO/全体FIFO/全体Pauseは廃止し、ShowごとのDO/FIFO/Pause/windowと、所属・共有更新の制御DOへ分ける。以下の一件ずつ実行・未知IO保全・purge-before-completion・原子的な受付/完了の安全条件はShow内で維持する。旧layoutは維持・移行せず、必須`storage_layout="show-v1"`で配備前に拒否する。
+> 2026-10-20追補: Issue #48の開発版では[Show分離の採用契約](../do_show_separation_options.md)を優先する。1サービス1 DO/全体FIFO/全体Pauseは廃止し、ShowごとのDO/FIFO/Pause/windowと、所属・共有更新の制御DOへ分ける。以下の一件ずつ実行・未知IO保全・purge-before-completion・原子的な受付/完了の安全条件はShow内で維持する。旧layoutは維持・移行せず、必須`storage_layout="show-v1"`で配備前に拒否する。
 
-> 適用版: 本書の基礎契約は現行SQLiteでも維持する。実装順序・進捗欄はv0.5.0導入時の履歴であり、旧方式併存・明示flag必須・二Worker同梱の記述は当時のもの。v0.6.0向け開発ではSQLite既定・単独Workerとし、旧サービス設定version 1からの移行機能は提供しない。[現行設計](initial_design.md)と[削除計画](schema_v1_removal_plan.md)を優先する。
+> 適用版: 本書の基礎契約は現行SQLiteでも維持する。実装順序・進捗欄はv0.5.0導入時の履歴であり、旧方式併存・明示flag必須・二Worker同梱の記述は当時のもの。v0.6.0向け開発ではSQLite既定・単独Workerとし、旧サービス設定version 1からの移行機能は提供しない。[現行設計](../initial_design.md)と[削除計画](schema_v1_removal_plan.md)を優先する。
 
 2026-10-16。管理者と合意した簡素化案を実装の基準とする。
 計画保存と、それに基づく開発・ローカルテストの指示を受けた。その後、適切な区切りでcommitしながら実装を続ける指示を受けた。push、Cloudflare資源作成・配備、実機測定、既存データ移行は別承認とする。
@@ -35,7 +35,7 @@ CLI: 同じjobの結果をpoll
 - 公開用音源・revision履歴は引き続き不変。feed/current/coverの既存固定key更新は維持できる。全面的な世代別feed/coverと公開先ポインター方式を前提にしない。
 - 不明な途中実行は停止・通知する。時間切れlease、旧tokenの奪取、未知PUTの自動再送、万能な自動復旧は作らない。
 
-[保存先再検討書](archive/control_plane_storage_reconsideration_20261016.md)のDO＋Queues/outbox案と、公開先ポインターを必須とした部分は、この計画では採用しない。
+[保存先再検討書](control_plane_storage_reconsideration_20261016.md)のDO＋Queues/outbox案と、公開先ポインターを必須とした部分は、この計画では採用しない。
 既存リリースや現在のCloudflare環境を、そのまま新方式へ切り替える指示ではない。
 
 ## 2. 素材アップロードとCLIの契約
@@ -286,7 +286,7 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 - 実DO class/entrypointは型検査とbrowser bundleの検証。**実機DOのoutput gate/Alarm再配送、実Workers Cache purge、CF APIの応答形・Free制限・性能は、このローカルfixtureだけでは実証していない。** standalone build成功と、同じ入口のsource-process walkthroughも区別する。
 - 全体回帰で見つかった旧listコマンドの引数検査順序を修正し、workspaceへ触る前の拒否を維持した。
 
-操作例・回復制限は[SQLite開発版ガイド](../docs/sqlite_sequential_development.md)を参照する。
+操作例・回復制限は[SQLite開発版ガイド](../../docs/sqlite_sequential_development.md)を参照する。
 次はP6と、新規隔離環境での実機受け入れ計画の準備。既存サービス移行や実機配備は別承認であり、今回の開発ではCloudflare資源・実データを変更していない。Issue #13恒久解消、Free適合、36件性能目標達成、release readinessはまだ示していない。
 
 ### P6a: SQLite一覧
@@ -346,7 +346,7 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 
 ### P7: 承認済み隔離実機試験の到達点
 
-上記のローカルbaseline後、管理者の実機試験指示に基づき、`sq16-668cbdfa`だけを新規作成した。[測定記録](archive/sqlite_sequential_measurement_20261016.md)が実際の到達点を示す。
+上記のローカルbaseline後、管理者の実機試験指示に基づき、`sq16-668cbdfa`だけを新規作成した。[測定記録](sqlite_sequential_measurement_20261016.md)が実際の到達点を示す。
 
 - native初期化、3件の小容量公開・配信・更新・可逆lifecycleは成功。REST settingsにexportsがない応答形をCLIで修正し、既知receiptから検証を継続した。
 - 最初の36件試験は14件成功、15件目がcache purge段階でblockedとなり、その環境を保全した。

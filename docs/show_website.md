@@ -1,8 +1,8 @@
-# 番組サイトとEpisodeページ（Issue #70開発版）
+# 番組サイトとEpisodeページ
 
-Issue #70の第1段に、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を追加した開発版。合意した機能実装と本人の画面確認は完了した。Cloudflare Free性能の実証や全端末での確認を意味しない。
+v0.8.0の内蔵サイトは、標準デザイン、Showごとの任意CSS 1ファイル、説明の抜粋と安全な本文リンク、自動短縮URL、公開日表示のタイムゾーン設定を提供する。限定的な非公開実機確認で再生・東京日付表示を確認したが、Cloudflare Free性能の実証や全端末での確認を意味しない。
 
-フェーズ3開発版の新規14/13環境向け。healthとinspectionは`website="static-show-v2"`を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1。旧環境の変換・移行・資源採用は提供しない。Feed/HTMLはSQLiteからオンデマンド生成し、素材だけR2へ直接配置する。実環境には未配備。
+内部queue/content形式14/13の新規環境向け。healthとinspectionは`website="static-show-v2"`を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1。旧環境の変換・移行・資源採用は提供しない。Feed/HTMLはSQLiteからオンデマンド生成し、素材だけR2へ直接配置する。
 
 ## サイト方式を選ぶ
 
@@ -61,7 +61,7 @@ site_css_path = "site.css"
 
 HTML構造・表示内容の変更、独自JS、外部CSSのimport、Web font、追加画像のuploadは提供しない。外部画像・font・data URLは既存CSPでも許可しない。Sass等を使う場合の変換は管理者側で行い、castloopに追加runtimeは不要。高度な変更には既存の外部サイト方式を使う。
 
-CSSはShow revisionの一部として保存する。Episode更新・復元では現在のShowのCSSを、Showの過去版採用ではその版のCSSを使う。domain再生成も保存内容だけで行い、ローカルファイルや外部buildを必要としない。CSSは各HTMLと履歴へ重複して保存され、既存のHTML・batch予算とR2無料枠へ算入する。履歴は自動削除しない。
+CSSはShow metadata・revisionの一部としてSQLiteへ保存する。Episode更新・復元では現在のShowのCSSを、Showの過去版採用ではその版のCSSを使う。ドメイン変更後も保存内容だけからHTMLを生成し、ローカルファイルや外部buildを必要としない。CSSは生成する各HTMLへ埋め込み、HTMLサイズ上限とSQLiteの履歴容量に算入する。HTMLやCSSのスナップショットをR2へ保存する方式ではない。履歴は自動削除しない。
 
 RSS取り込みでも、最初の公開前に取り込み元directoryのShow TOMLへ指定し、同じ場所へCSSを置いてレビューする。公開入力へ固定し、取り込み先へ保存する。開始後にCSSを変更して既存処理を続行しない。
 
@@ -82,7 +82,7 @@ site_timezone = "Asia/Tokyo"
 
 変えるのはHTMLの表示だけであり、保存済み`published_at`、RSSの`pubDate`、新しい順の並び、GUID、短いURL、音源は変えない。[管理用設定](admin_configuration.md)の`castloop-admin.toml timezone`はCLIの日時入力・確認用で、サイト表示へは流用しない。PCや閲覧者のタイムゾーンからも推測しない。
 
-変換にはWorker標準の`Intl.DateTimeFormat`を使い、1回のHTML生成内で使い回す。閲覧時の変換・追加JavaScript・新しい依存やサービスはない。[採用設計](../design/archive/show_website_timezone_plan.md)も参照する。
+変換にはWorker標準の`Intl.DateTimeFormat`を使い、1回のHTML生成内で使い回す。キャッシュミス時にサーバーで変換・生成し、閲覧者のブラウザ側の変換や追加JavaScriptは使わない。[採用設計](../design/archive/show_website_timezone_plan.md)も参照する。
 
 ## URLとプレイヤー
 
@@ -103,7 +103,7 @@ Episodeページの識別子は、Episode ID全体のSHA-256から先頭16文字
 
 全文とShow紹介では段落`p`・改行`br`と、安全なHTTP(S)リンク`a`を作り直す。本文中の`http://`・`https://`のURLは自動でリンクにし、元の`a`はHTTP(S)の絶対URLに限って表示文字列とリンク先を復元する。認証情報付きURL、相対URL、`javascript:`等の別scheme、制御文字・backslashを含むリンク先はリンクにせず本文を残す。元のイベント属性・装飾・`target`等は引き継がず、リンクは同じタブで開く。一覧の抜粋内には外部リンクを作らず、全文ページへのリンクだけを置く。
 
-箇条書き等の境界は改行とし、script・style・埋込み・フォーム等は内容ごと除く。プレーンテキストの改行は維持する。元のmetadataやRSSの説明文は変更しない。meta／OGPにはタグなしの抜粋を使う。処理は公開時だけで、閲覧時の解析・追加JS・全文取得APIはない。番組紹介の著者名は表示するが、`copyright`だけを置くフッターは表示しない。RSSの著作権情報は維持する。
+箇条書き等の境界は改行とし、script・style・埋込み・フォーム等は内容ごと除く。プレーンテキストの改行は維持する。元のmetadataやRSSの説明文は変更しない。meta／OGPにはタグなしの抜粋を使う。公開時に描画の妥当性を検査し、配信のキャッシュミス時にサーバーで説明文を解析してHTMLを生成する。ブラウザ側の解析・追加JS・全文取得APIはない。番組紹介の著者名は表示するが、`copyright`だけを置くフッターは表示しない。RSSの著作権情報は維持する。
 
 同じタブで個別ページへ移動すると一覧の再生は終了する。再生を続けながら読む場合はブラウザの操作で別タブに開く。player自体は説明リンクの外にあるため、再生操作だけでページ移動はしない。
 
@@ -128,7 +128,7 @@ EpisodeページのURLはmetadata-only／audio-only更新、保存済みrevision
 
 ## RSS取り込み
 
-download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mode = "builtin"`を追加し、`site_url`を削除してレビューする。その後の`publish-rss-import`は同じ公開経路で各回のページも生成する。設定を変えなければ元RSSの外部サイトURLを維持する。公開開始後は凍結入力を変更せず、未知処理を別jobでやり直さない。
+download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mode = "builtin"`を追加し、`site_url`を削除してレビューする。その後の`publish-rss-import`は同じ公開経路で各回のページを配信可能にする。HTML自体は閲覧時に生成する。設定を変えなければ元RSSの外部サイトURLを維持する。公開開始後は凍結入力を変更せず、中断時は同じ取り込み入力と進捗記録で続行する。
 
 ## Cloudflare Freeの前提と検証範囲
 
@@ -139,3 +139,5 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。詳しい比較・予算・受け入れ条件は[フェーズ1設計](../design/phase1_atomic_publication_and_ondemand_delivery_plan.md)および[初期設計](../design/archive/show_website_plan.md)参照。
 
 別途承認された過去の非公開実機試験（[初回記録](../design/archive/show_website_private_trial_verification_20261025.md)、[標準デザイン・通常音源3件](../design/archive/show_website_css_large_trial_verification_20261026.md)、[自動短縮URL・リンク表示版](../design/archive/show_website_short_url_trial_verification_20261026.md)、[タイムゾーン版](../design/archive/show_website_timezone_trial_verification_20261027.md)）では、ブラウザでの表示・再生・短いURL・東京日付表示および未認証要求のAccess拒否を確認した。現行のオンデマンド生成版（14/13）の実機性能測定は未実施である。
+
+現行14/13形式のv0.8.0でも、Accessで閲覧者を限定した小規模環境でShow・Episode 3件の公開と内蔵サイト再生・東京日付表示を確認した。これは性能測定、全ブラウザ・モバイル・キーボード操作の受け入れ、全Free適合の証明ではない。[v0.8.0の検証範囲](release-v0.8.0.md#verification-and-limitations)を参照する。

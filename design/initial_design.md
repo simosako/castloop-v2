@@ -13,7 +13,7 @@
 `castloop` は、管理者自身の Cloudflare アカウント上に配備するサーバーレスの Podcast ホスティング基盤である。1つのサービスにつき **1個の非公開 R2 バケット** と **1個の Cloudflare Worker（SQLite-backed Durable Objects を内包）** を使用し、単一のスタンドアロン CLI バイナリから管理する。Cloudflare Queues や D1 は使用しない。
 
 ```text
-CLI: ローカルTOML・素材の検証 → 未配置の音源・画像のみ R2 (audio/<sha256>.mp3, covers/<sha256>.jpg|png) へ直接PUT
+CLI: ローカルTOML・素材の検証 → 初回・変更された音源・画像のみ R2 (audio/<sha256>.mp3, covers/<sha256>.jpg|png) へ直接PUT
   → POST /admin/sqlite-publication/publish でメタデータと素材参照を Show DO へ送信
 Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュパージを実行
   → 単一SQLiteトランザクションで公開内容・リビジョン履歴・短縮URL・世代番号を一括コミット
@@ -62,7 +62,7 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 ### 3.2 公開可否の制御（Lifecycle）と過去リビジョンの復元
 
 - 個別の Pause / Resume コマンドは設けず、公開状態の切り替えはすべて `preview-show-lifecycle` / `preview-episode-lifecycle` と `lifecycle-execute`（`unpublish` / `restore`）で行う。
-- `unpublish` は対象を非公開（HTTP `410 Gone`）にしつつ、R2 上のメディアと SQLite 上のリビジョン履歴を保持する。物理削除は実装しない。
+- `unpublish` は対象を非公開（HTTP `404 Not Found`）にしつつ、R2 上のメディアと SQLite 上のリビジョン履歴を保持する。物理削除は実装しない。
 - `list-show-revisions` / `list-episode-revisions`、`preview-*-revision`、`revision-execute` により、過去の保存済みリビジョンをメディアの再アップロードなしで新しいリビジョンとして復元できる。
 
 ---
@@ -78,7 +78,7 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 | `/podcasts/<showId>/episodes/<episodeId>/<audioRevisionId>.mp3` | Episode 音声 | Show DO の公開可否・`audioRevisionId` 一致判定後、`SqliteCachedAssets` 経由で R2 から Range/HEAD/条件付きリクエスト対応で配信 |
 | `/podcasts/<showId>/`<br>`/podcasts/<showId>/page/<n>/`<br>`/podcasts/<showId>/<siteId>/` | 内蔵番組サイト HTML<br>（`site_mode = "builtin"` 時） | Show DO の SQLite から一覧（1ページ20件）または Episode 個別ページ（16文字以上の短縮ハッシュ）をオンデマンド生成し、`SiteCachedPages` でエッジキャッシュ配信 |
 
-- Show が未公開の場合は `404 Not Found`、非公開化（`unpublished`）された場合は `410 Gone`、独自ドメイン変更の進行中（`publication_ready: false`）は `503 Service Unavailable`（`Cache-Control: no-store`）を返す。
+- Show が未公開または非公開化（`unpublished`）されている場合は `404 Not Found`、個別に非公開化したEpisodeのページ・音声も `404` を返す。独自ドメイン変更の進行中（`publication_ready: false`）は `503 Service Unavailable`（`Cache-Control: no-store`）を返す。内部に残る `deleted` 判定は `410 Gone` だが、現行CLIは物理削除を提供しない。
 - 独自ドメイン運用時、管理用オリジン（`workers.dev`）の公開パスへのアクセスは独自ドメインの正規 URL へリダイレクトする（Feed は `301`、メディア・サイト HTML は `307`）。逆に、独自ドメイン上の `/admin/*` パスはすべて `404` で拒否する。
 - 生成したFeed/HTMLは本文のETagで条件付き応答を判定し、`Last-Modified`を送らない。音声・画像にはR2の更新時刻も使う。サイト一覧は対象ページの最大20件、個別ページは対象1件の公開内容と短縮IDだけをSQLiteから読み出す。
 

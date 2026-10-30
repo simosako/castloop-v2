@@ -1,6 +1,6 @@
 # Episode追加中のFeed継続配信設計（Issue #50）
 
-2026-10-21。対象: [Issue #50](https://github.com/simosako/castloop-v2/issues/50)。**承認済み・第1段階を実装し、新規隔離環境で小規模正常系試験に成功。** 世代別Feed、新規Episode追加からの段階開発、世代の蓄積、必要な内部形式変更と移行不要、および§8.1の案Bが承認済み。Show更新・既存Episode更新の無停止化は後続開発とする。[実機記録](archive/episode_add_feed_live_verification_20261021.md)とローカル故障試験の範囲を区別する。
+2026-10-21。対象: [Issue #50](https://github.com/simosako/castloop-v2/issues/50)。**承認済み・第1段階を実装し、新規隔離環境で小規模正常系試験に成功。** 世代別Feed、新規Episode追加からの段階開発、世代の蓄積、必要な内部形式変更と移行不要、および§8.1の案Bが承認済み。Show更新・既存Episode更新の無停止化は後続開発とする。[実機記録](episode_add_feed_live_verification_20261021.md)とローカル故障試験の範囲を区別する。
 
 ## 1. 目的と提案の要約
 
@@ -281,7 +281,7 @@ R2 snapshotの世代とcache propsの世代を一致させる。Workers Caching�
 2. 全Feed writerとcommitをsnapshot方式へ揃える。新旧方式の併存は作らない。
 3. cache ownerの世代別読取を接続してから、新規Episode追加のrunning例外を有効にする。
 4. 故障・競合回帰と正式CLI経路を検証する。
-5. [全体設計](initial_design.md)、[SQLite契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)、[SQLiteガイド](../docs/sqlite_sequential_development.md)、[利用README](../README.md)を実装済みの範囲に更新する。
+5. [全体設計](../initial_design.md)、[SQLite契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](../do_show_separation_options.md)、[SQLiteガイド](../../docs/sqlite_sequential_development.md)、[利用README](../../README.md)を実装済みの範囲に更新する。
 
 ## 11. 検証と受け入れ条件
 
@@ -324,12 +324,12 @@ Cloudflare実機でのDO output gate・Alarm再配送・実Workers Caching/purge
 
 検証結果: `bun test`は**479 pass / 0 fail（62 files、54.56秒）**。`npm run check`、`npm run build:cli -- linux-x64`、`git diff --check`も成功した。nativeのDO output gate、実Workers Cachingのwarm hit・purge・再配送・性能は模擬試験と区別し、実環境への配備・公開は行っていない。
 
-その後の別承認による[小規模実機確認](archive/episode_add_feed_live_verification_20261021.md)では、commit `62cd198`の単体CLIから新規隔離環境を配備し、1 Show・2 Episodeの正常追加と最終Pauseを確認した。前後ともrunningだった16取得組で旧Feedの200/304と新音源404を確認したが、blocked故障注入・native再配送・性能の実証ではない。保持サービスへの配備・移行はしていない。
+その後の別承認による[小規模実機確認](episode_add_feed_live_verification_20261021.md)では、commit `62cd198`の単体CLIから新規隔離環境を配備し、1 Show・2 Episodeの正常追加と最終Pauseを確認した。前後ともrunningだった16取得組で旧Feedの200/304と新音源404を確認したが、blocked故障注入・native再配送・性能の実証ではない。保持サービスへの配備・移行はしていない。
 
 ## 参照
 
 - [Issue #50](https://github.com/simosako/castloop-v2/issues/50)
-- [現行全体設計](initial_design.md)、[Show分離契約 §6](do_show_separation_options.md#6-採用した案cの実装契約)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)
+- [現行全体設計](../initial_design.md)、[Show分離契約 §6](../do_show_separation_options.md#6-採用した案cの実装契約)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)
 - [Cloudflare R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/): 成功したbinding書込のread-after-writeと、結果不明のin-flight IOの区別。REST PUTをCASとして扱う根拠にはしない。
 - [DO SQLite storage / transactions](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/): 同期SQLのtransactionと外部IOの分離。
 - [Workers Caching cache keys](https://developers.cloudflare.com/workers/cache/cache-keys/): named entrypoint・Worker version・propsによる世代分離。今回の実機動作を検証済みとする根拠にはしない。

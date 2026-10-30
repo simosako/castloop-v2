@@ -5,7 +5,7 @@
 
 2026-10-20追補: Issue #48では[Show単位DO](../do_show_separation_options.md)を採用した。本書の「公開状態と同じDO SQLiteに操作記録を置く」方針をShow内で維持し、容量表示もShow DB単位とする。アカウント共通の容量・日次枠は増えない。以下の比較・旧見積もりは新layoutの実機計測ではない。
 
-保存先は既存DO内のSQLiteで検討を進める。作業と要求の区別、要求元クライアントの記録方法、具体的なDDLは、[操作記録のIDとテーブル設計](../sqlite_operation_records_schema.md)を参照する。
+保存先は既存DO内のSQLiteで検討を進める。作業と要求の区別、要求元クライアントの記録方法、具体的なDDLは、[操作記録のIDとテーブル設計](sqlite_operation_records_schema.md)を参照する。
 
 ## 1. 推奨する構成
 
@@ -189,7 +189,7 @@ SQLカーソルの`rowsRead`と`rowsWritten`で処理ごとの行数を確認し
 
 ### 保存するテーブル
 
-既存DOのSQLiteに、次の情報を追加する。列と制約、索引の定義は[DDL案](../sqlite_operation_records_schema.md#ddl)にまとめた。
+既存DOのSQLiteに、次の情報を追加する。列と制約、索引の定義は[DDL案](sqlite_operation_records_schema.md#ddl)にまとめた。
 
 | テーブル案 | 内容 |
 | --- | --- |
@@ -287,7 +287,7 @@ SQLに調査用の補助情報を追加した場合は、次の条件で行単�
 
 DO SQLiteへの記録、`databaseSize`による容量表示、50/70/85%の警告を実装した。85%以上での新規RSS取り込みは、予定操作数×20KB、コンテンツJSON量の2倍を使った概算、10MBの余裕を加えて事前確認する。アカウント全体の日次利用量は取得していないため、`unknown`と表示する。
 
-SQLの自動整理は追加せず、必要な記録を保持する。R2の未公開素材は別の明示操作で削除する。[利用方法](../../docs/sqlite_operation_recovery.md)と[ローカルでの記録量の確認](sqlite_operation_records_verification.md)を参照する。
+SQLの自動整理は追加せず、必要な記録を保持する。R2の未公開素材は別の明示操作で削除する。[利用方法](sqlite_operation_recovery.md)と[ローカルでの記録量の確認](sqlite_operation_records_verification.md)を参照する。
 
 ## 参照した公式資料
 

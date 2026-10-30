@@ -6,7 +6,7 @@
 
 現在の状態（2026-10-11）: 承認済みMVP範囲を実装・受け入れし、v0.2.0で公開済み。v0.3.0でもR2制御record・原子的受付・毎要求の配信状態検査・確認付き削除・必要記録保持を維持する。
 
-現在の構成は[全体設計](../initial_design.md)、実際のコマンドは[README](../../README.md#unpublish-restore-or-delete)、完成範囲は[承認済み方針](../m6_review_queue.md)を優先する。旧形式変換・万能なunknown IO復旧・無停止移行は公開条件ではない。独自ドメインはv0.3.0で提供済み。
+現在の構成は[全体設計](../initial_design.md)、当時のコマンドは[Queue方式ガイド](../../docs/queue_service.md#unpublish-restore-or-delete)、完成範囲は[承認済み方針](../m6_review_queue.md)を優先する。旧形式変換・万能なunknown IO復旧・無停止移行は公開条件ではない。独自ドメインはv0.3.0で提供済み。
 
 以下はv0.1.2を基準にした初期設計と開発経緯。状態・排他・削除・cacheの設計理由を参照するために保持する。未接続・検証待ちの記述は当時の進捗であり、現在の残タスクではない。初期CLI案や応答喪失時の再送案を現在の運用手順として実行しない。
 
@@ -16,7 +16,7 @@
 
 最初の実装ではstrictな状態/request schema、同じShow keyでのCAS受付、凍結request、processing開始時のowner照合、R2を毎回読む公開可否判定を追加した。2026-09-30に専用環境でcache/REST deploy・内部purge・generation key・GET/HEAD/Range構成を実証した。旧recordの移行や既存CLI/consumer/公開入口への接続はまだ行わず、破壊的操作を先行公開しない。Free制限・upload収束・削除/復旧等のゲートは引き続き未通過であり、構成実証をM6全体の合格と扱わない。具体的な進捗は[実装ログ](m6_implementation_log.md)へ記録する。
 
-2026-10-01の管理者判断で、M6のuploadは**現行Cloudflare REST APIの単一PUTを維持**する。クライアント切断後にそのPUTが遅れてobjectを作成・更新することはないと仮定する。これは確認済みのCloudflare仕様ではなく、[未解決の懸念U1](../m6_upload_recovery_options.md)として保持する。U1の解消や分割uploadへの変更をM6公開条件にせず、通常のupload排他・照合・中断回復の実装は引き続き必要とする。
+2026-10-01の管理者判断で、M6のuploadは**現行Cloudflare REST APIの単一PUTを維持**する。クライアント切断後にそのPUTが遅れてobjectを作成・更新することはないと仮定する。これは確認済みのCloudflare仕様ではなく、[未解決の懸念U1](m6_upload_recovery_options.md)として保持する。U1の解消や分割uploadへの変更をM6公開条件にせず、通常のupload排他・照合・中断回復の実装は引き続き必要とする。
 
 2026-10-02の管理者判断で、同一Cloudflareアカウント内の専用試験環境と、公開配信・更新操作の一時停止を許容するメンテナンス移行を採用した。**M6機能一式を完成させて次バージョンとして正式リリース**し、限定先行リリースや無停止移行を必須にしない。無停止移行の検討、費用・停止時間の測定計画はMVP構築後へ回す。機能・安全性の受け入れ条件は維持し、測定値の承認待ちで通常の実装を止めない。詳細は[承認済み方針と残る技術ゲート](../m6_review_queue.md)を参照。
 
@@ -203,7 +203,7 @@ staging/lifecycle/episodes/<showId>/<episodeId>/<jobId>/commit.json
 - 現行CLIのREST直PUTは公開停止とは独立してstorageへ書ける。物理削除との競合を防ぐため、M6対応CLIの`update-*`はupload前に同じShow制御keyで短期のstaging受付を取得し、PUTと照合終了後に解放する。upload操作IDと継続するdraft job IDは分ける。
 - upload中断後の再照会・解放は、**クライアント切断後に旧PUTが遅れてobjectを作成・更新しない**という承認済みのM6仮定の下で設計する。通信中断と、まだ継続中のPUT/Worker処理を区別し、owner/generationを照合して終了・再試行・解放する。通信が生きたままのPUTやpublication processingをタイムアウト/HEAD不在だけで強制解放しない。通常の回復・排他テストは行うが、この仮定自体の実機証明をM6.0公開ゲートにしない。
 - 2026-09-30の専用実測では、R2 REST object PUTは不一致`If-Match`でも200で上書きした。R2 bindingのCAS保証をこのREST経路へ流用せず、条件付きPUT fenceは使わない。この実測はabort後の保存継続を示すものではなく、単独で分割uploadが必要とする根拠にはしない。
-- [単一PUTの維持と未解決懸念U1](../m6_upload_recovery_options.md)に、公開資料では確認できなかった切断後commitのリスク、仮定が誤っていた場合の影響、再検討条件を記録する。M6ではWorker経由の分割upload sessionを採用しない。サポート問い合わせも行わない。
+- [単一PUTの維持と未解決懸念U1](m6_upload_recovery_options.md)に、公開資料では確認できなかった切断後commitのリスク、仮定が誤っていた場合の影響、再検討条件を記録する。M6ではWorker経由の分割upload sessionを採用しない。サポート問い合わせも行わない。
 - M6移行時は旧CLIによる書き込みを止める。Cloudflare tokenを持つ旧CLIや手動REST PUTをWorkerだけで禁止できるとは説明しない。保証範囲はM6対応の管理経路と、移行後に収束済みの旧uploadに限る。
 - 恒久failed/reservedの旧公開jobで停止・削除も塞がるケースを扱う必要がある。M6.0で限定的な安全abandon手順を設計する。reservedを同じCASで失効させ、旧commitの再配送・再claimを耐久的に拒否できることを条件とする。processing、書き込みが始まったjob、状態不明jobは対象外。安全性が確認できるまではブロックを保持し、手動でrecordを消さない。
 - 新v2制御record用の限定abandon基礎関数を実装・実測した。凍結requestを照合し、reservedだけをCASで失効、generationを進め、同じrecordへ直近の取消receiptを残す。応答喪失の再実行はreceiptで確認できる。immutable requestと旧generationはその後も保持し、後続操作がreceiptを置換しても旧jobの再claim/beginを許さない。新consumerが**processing CAS成功前に書かない**ことが前提。旧v1 jobの取消・CLI/API公開・status/progressへの接続は別のゲートであり、旧recordをこの関数で取消しない。
@@ -249,7 +249,7 @@ M6では入口から返すfeed/cover/MP3のクライアント向けheaderを`max
 
 ### REST deployの実証
 
-2026-09-30に[専用実証コード](../../experiments/m6/README.md)で、REST multipart module uploadの`cache_options`と`exports`、installed types・Bun bundle、内部loopback・RPC purge・generation props・GET/HEAD/Rangeを確認した。default cache無効/内部cache有効の構成はStandard環境で成立した。外側からのpurgeでは内部cacheを消せず、内部entrypointでのtag/path purgeが必要であることも実測した。検証resourceは削除済みで、運用サービスには配備していない。
+2026-09-30に[専用実証コード](https://github.com/simosako/castloop-v2/blob/eacbec22285f74993e79c8cb2eebd508225fd74b/experiments/m6/README.md)で、REST multipart module uploadの`cache_options`と`exports`、installed types・Bun bundle、内部loopback・RPC purge・generation props・GET/HEAD/Rangeを確認した。default cache無効/内部cache有効の構成はStandard環境で成立した。外側からのpurgeでは内部cacheを消せず、内部entrypointでのtag/path purgeが必要であることも実測した。検証resourceは削除済みで、運用サービスには配備していない。
 
 公式[Workers Cache料金](https://developers.cloudflare.com/workers/cache/#pricing)では、cache HITとcache付きloopback呼出もrequest課金対象。gatewayが実行されるので、内部HITでもgatewayのCPUとR2状態readは残る。外部1要求とcached inner 1呼出の構成では、2 request相当を基本とした試算が必要であり、「同じWorkerだから追加request料金なし」としない。Freeの100,000 request/日・10ms CPU制限、実請求/CPU、300MB音源・複数coloでの挙動は今回未実証。purgeにもWorkers Cache共通のFree-tier rate limitがある。Wranglerを管理端末の必須ツールに戻さず、別製品も増やさない。
 

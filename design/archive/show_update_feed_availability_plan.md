@@ -1,6 +1,6 @@
 # Show更新中のFeed継続配信設計（第3段階）
 
-2026-10-21。**§12の全項目を承認済み・実装とローカル／小規模実機検証が成功。** [Episode追加](episode_add_feed_availability_plan.md)、[Episode更新](episode_update_feed_availability_plan.md)に続く第3段階。基点はcommit `c4f2b9d`。管理者から開発・ローカルテスト・小規模実機テストの実施指示を受けた。[実機結果と未確認範囲](archive/show_update_feed_live_verification_20261021.md)を区別する。実機対象は新規隔離環境のみで、既存の保持環境・原本・journal・私有証跡は変更しない。
+2026-10-21。**§12の全項目を承認済み・実装とローカル／小規模実機検証が成功。** [Episode追加](episode_add_feed_availability_plan.md)、[Episode更新](episode_update_feed_availability_plan.md)に続く第3段階。基点はcommit `c4f2b9d`。管理者から開発・ローカルテスト・小規模実機テストの実施指示を受けた。[実機結果と未確認範囲](show_update_feed_live_verification_20261021.md)を区別する。実機対象は新規隔離環境のみで、既存の保持環境・原本・journal・私有証跡は変更しない。
 
 ## 1. 目的と提案の要約
 
@@ -267,7 +267,7 @@ Show復元では、保存済みSQLのmetadataとcover Cを使い、Cのkey・siz
 
 ローカル検証: **549 tests / 0 fail（63 files、59.63秒）**、型検査・Linux x64単体CLI build・差分チェック成功。3種類のShow編集×旧cover HEAD/候補検証/private TOML/cover保存中/保存後/Feed保存後/purgeの21待機点、6故障段階と再生成、cover identity破損・guard不整合・初回/0 Episode・同bytesの304・遅い旧世代読取・形式拒否・CLI素材登録と明示公開を回帰へ追加した。cache hit/miss/旧fillの試験はローカルモデルであり、native cacheの実証とは区別する。
 
-実機確認は小規模実機指示を受け、新規隔離環境・1 Show・短尺Episode 1件で完了した。同形式の異なる2画像を使い、3種類の編集と別のmetadata更新1回を観測した。前後ともrunningの計8取得組で旧Feed200/304、画像本文の旧hashまたはHEAD/ETag・304を確認。画像のみの更新ではFeed hash不変・304が正常に成立した。Episode更新・Show非公開化/復元と13 snapshot保持も確認し、最終ready/paused/drainedで保持した。詳細・観測方法の差と未実証事項は[実機記録](archive/show_update_feed_live_verification_20261021.md)を参照する。
+実機確認は小規模実機指示を受け、新規隔離環境・1 Show・短尺Episode 1件で完了した。同形式の異なる2画像を使い、3種類の編集と別のmetadata更新1回を観測した。前後ともrunningの計8取得組で旧Feed200/304、画像本文の旧hashまたはHEAD/ETag・304を確認。画像のみの更新ではFeed hash不変・304が正常に成立した。Episode更新・Show非公開化/復元と13 snapshot保持も確認し、最終ready/paused/drainedで保持した。詳細・観測方法の差と未実証事項は[実機記録](show_update_feed_live_verification_20261021.md)を参照する。
 
 過去のEpisode試験をShow更新の実証には使わない。native故障注入・再配送・実cache hit/miss・全拠点purge・CPU/負荷は確認した範囲を分け、ローカル成功だけで完全な無停止、Free適合、Issue #13恒久解消を主張しない。
 
@@ -281,6 +281,6 @@ Show復元では、保存済みSQLのmetadataとcover Cを使い、Cのkey・siz
 ## 参照
 
 - [Episode追加の設計](episode_add_feed_availability_plan.md)、[Episode更新の設計](episode_update_feed_availability_plan.md)
-- [現行全体設計](initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)、[SQLite操作ガイド](../docs/sqlite_sequential_development.md)
+- [現行全体設計](../initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](../do_show_separation_options.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)
 - [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/): bindingの条件付き保存・checksum・object metadata。REST staging PUTのCASや未知IOの取消保証へ拡張しない。
 - [Workers Cachingのcache keys](https://developers.cloudflare.com/workers/cache/cache-keys/): propsによる分離。今回のnativeのcache/purge動作を実証済みとする根拠ではない。

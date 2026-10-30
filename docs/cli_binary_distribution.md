@@ -41,7 +41,7 @@ native検証で判明した挙動: macOS runnerの初回smokeで、`os.tmpdir()`
 
 ## 5. OS別の導入手順
 
-共通事項: `CLOUDFLARE_ACCOUNT_ID`と`CLOUDFLARE_API_TOKEN`を環境変数で与える。workspaceは`--workspace`での明示指定を推奨し、Show/Episode定義のカバー画像・MP3のpathはそのOSの絶対pathで書く（MP3は300,000,000 bytes以下）。管理者マシンにBun/Node.js/Wrangler/ffprobe等は不要である。
+共通事項: `CLOUDFLARE_ACCOUNT_ID`と`CLOUDFLARE_API_TOKEN`を環境変数で与える。workspaceは`--workspace`での明示指定を推奨する。Show TOMLの`image_path`は同じShowディレクトリに置いた画像のファイル名（例: `cover.jpg`）とし、絶対pathやサブディレクトリを指定しない。CLIへ渡すMP3はそのOSの絶対pathを推奨し、相対pathはShowディレクトリ基準になる（MP3は300,000,000 bytes以下）。管理者マシンにBun/Node.js/Wrangler/ffprobe等は不要である。
 
 ### Linux x86-64
 

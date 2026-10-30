@@ -30,6 +30,8 @@ The target Linux x86-64 machine needs no Bun, Node.js, Wrangler, source tree, `f
 
 ### Build from source
 
+Use the source tree at the **v0.5.2 tag** for the commands below, not the current checkout. The current branch no longer contains the Queue Worker or its commands.
+
 The build machine needs Bun 1.4.2 and Node.js 24/npm:
 
 ```sh
@@ -142,7 +144,7 @@ v0.3.0 and later provide `domain add HOSTNAME`, `domain list`, and `domain remov
 
 Domain operations require explicit pause/drain and finish paused; resume explicitly after checking completion. `public_base_url` is the canonical Podcast URL, while `workers_dev_base_url` remains the same Worker's HTTPS workers.dev origin for CLI administration. Both hosts serve the same public content without redirects. DNS/TLS probes send no secrets. Removal restores workers.dev URLs without deleting media, revisions or GUIDs; normal deployment preserves a matching Custom Domain connection.
 
-See [custom-domain usage and recovery](custom_domains.md) for commands and recovery limits. Do not manually change these settings on a running service. Podcast directory URL changes are the administrator's responsibility; subscription migration and redirects are not provided.
+See [custom-domain usage and recovery](../design/archive/custom_domains.md) for commands and recovery limits. Do not manually change these settings on a running service. Podcast directory URL changes are the administrator's responsibility; subscription migration and redirects are not provided.
 
 ## Errors and recovery limits
 
@@ -159,7 +161,7 @@ Preserve the workspace, journals, locks and remote owners after any error. Do no
 - Initialization journals are `.castloop/service-initializations/SERVICE_ID.json`; update journals are `.castloop/service-updates/SERVICE_ID/OPERATION_UUID.json`. Retain these and their locks. Re-running `init` is not a recovery method for a started operation.
 - HTTP 403: check account/token scope and permissions. Local inputs changed after staging: restage only an editable, unclaimed draft; committed/unknown operations stay frozen.
 
-The single REST PUT recovery model retains [unverified assumption U1](../design/m6_upload_recovery_options.md): a PUT is assumed not to write later after client disconnection. This is not a Cloudflare guarantee. Owner/generation checks and explicit IO settlement remain required.
+The single REST PUT recovery model retains [unverified assumption U1](../design/archive/m6_upload_recovery_options.md): a PUT is assumed not to write later after client disconnection. This is not a Cloudflare guarantee. Owner/generation checks and explicit IO settlement remain required.
 
 ## RSS migration and publication acceptance
 

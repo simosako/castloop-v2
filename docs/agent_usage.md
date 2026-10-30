@@ -1,10 +1,10 @@
 # エージェントによるPodcast管理
 
-Issue #64の開発版は、認証付き全文取得・公開中/local/stagedの項目別差分、revision履歴、素材再uploadなしの過去版採用に対応する。`preview-*`は管理鍵のあるworkspaceでは既定でremote読取を行い、`--local`は通信なし。内部形式7/8の新規環境専用。構文・確認hash・原本保全は[公開内容の確認ガイド](published_content_review.md)を優先する。
+v0.8.0は、認証付き全文取得・公開済み内容とローカル入力の項目別差分、revision履歴、素材再uploadなしの過去版採用に対応する。`preview-*`は管理鍵のあるworkspaceでは既定でremote読取を行い、`--local`は通信なし。サービス設定version 2・`show-v1`、内部queue/content形式14/13の新規環境専用で、ステージング・公開job台帳は使わない。構文・確認hash・原本保全は[公開内容の確認ガイド](published_content_review.md)を優先する。
 
-未リリースのIssue #68対応版では[独自ドメイン管理](sqlite_custom_domains.md)を追加する。`describe domain --json`と`help domain`で対応を確認し、追加・削除・continueは管理者が明示した対象と範囲でだけ実行する。list/statusは読取専用、continueは変更を含み得る。doctorは未完了domain記録も読取検査するが修復しない。旧versionの環境への移行は提供しない。
+[独自ドメイン管理](sqlite_custom_domains.md)にも対応する。`describe domain --json`と`help domain`で構文を確認し、追加・削除・continueは管理者が明示した対象と範囲でだけ実行する。list/statusは読取専用、continueは変更を含み得る。doctorは未完了domain記録も読取検査するが修復しない。旧versionの環境への移行は提供しない。
 
-v0.7.2で追加したIssue #5のCLI機能。管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。既存のCloudflare環境・永続形式・公開プロトコルは変更しない。[リリースノート](release-v0.7.2.md)を参照する。
+管理者側は対応するcastloopバイナリだけで利用でき、Node.js/npm/Bun/Wrangler/ffprobe等は不要。MCPは使用しない。Skillの導入だけではCloudflare環境を変更せず、旧版サービスを現行版へ移行することもない。[v0.8.0の互換性と検証範囲](release-v0.8.0.md)を参照する。
 
 ## Skillの導入
 
@@ -22,10 +22,10 @@ Node.js/npmを既に使う場合の任意の導入方法:
 npx skills add simosako/castloop-v2 --skill castloop
 ```
 
-既定ブランチのSkillである。v0.7.2に固定する場合は次を使う。配置するエージェントとproject/global範囲を選び、開発用Skillをまとめて導入しない。
+既定ブランチのSkillである。v0.8.0に固定する場合は次を使う。配置するエージェントとproject/global範囲を選び、開発用Skillをまとめて導入しない。使用するCLIと同じ版を選ぶ。
 
 ```sh
-npx skills add https://github.com/simosako/castloop-v2/tree/v0.7.2/skills/castloop --skill castloop
+npx skills add https://github.com/simosako/castloop-v2/tree/v0.8.0/skills/castloop --skill castloop
 ```
 
 ## 利用仕様と入力
@@ -48,7 +48,7 @@ describe/schema/template/validate/doctorは通信しない。検証・診断は�
 
 同じworkspaceまたはRSS取り込みディレクトリで、変更するCLIを同時に複数起動しない。ローカル記録にロックファイルは使わない。中断後は元プロセスの終了を確認してから同じ操作を再実行する。
 
-任意の`castloop-admin.toml`は管理用timezoneを設定する。`preview-schedule-time`はオフライン日時変換だけであり、予約には`preview-episode-schedule ID [MP3]`／`schedule-episode ID [MP3]`（Showは`*-show-schedule`／`schedule-show`）を使う。承認hashを`--expect-preview`へ渡し、予約の`dispatched`とrevisionで確定を確認する。停止後は明示再承認が必要。未来の`published_at`は予約ではなく、即時公開には`--allow-future-published-at`が必要。[管理用設定ガイド](admin_configuration.md)を参照する。
+任意の`castloop-admin.toml`は管理用timezoneを設定する。`preview-schedule-time`はオフライン日時変換だけであり、予約には`preview-episode-schedule ID [MP3]`／`schedule-episode ID [MP3]`（Showは`preview-show-schedule`／`schedule-show`）を使う。承認hashを`--expect-preview`へ渡し、予約の`dispatched`とrevisionで確定を確認する。更新元競合・ドメイン変更で`needs_approval`になった予約は明示再承認が必要。未来の`published_at`は予約ではなく、非対話での即時公開には`--allow-future-published-at`が必要。[管理用設定ガイド](admin_configuration.md)を参照する。
 
 JSON Schemaはparse後のTOML値を記述する。裸のTOML日時ではなく引用符付きRFC 3339文字列を使う。サービス設定version 2、content version 1、機械出力のcontract_version 1は別物。HTML除外後の文字数、UTF-8 bytes、XML文字、実在日付、URL、field間制約は`x-castloop-validation`を参照し、CLI validateで最終検証する。保存済みsnapshot用schemaに新規入力上限を追加したものではない。
 
@@ -58,7 +58,7 @@ JSON Schemaはparse後のTOML値を記述する。裸のTOML日時ではなく�
 
 doctorは人向け1項目1行とJSONの`result.checks`を同じ検査から生成する。pass/warn/fail/not_checkedを区別し、failは終了1、warnだけは終了0。認証情報の存在は有効性・権限を証明しない。remote検査・自動修復は行わない。
 
-`diagnose SHOW_ID [SHOW_ID...]`は明示指定Showの読取専用remote診断。管理APIへのGETとCloudflare accountへの読取GET 1件だけを行い、各検査にscope（local/remote/cross）とpass/warn/fail/not_checkedを付けて分類する。修復・Resume・purge・再送は行わない。failが1つでもあれば終了1、warnのみは終了0。同時指定は既定5 Showまでで、`--max-shows N`（1〜20）で変更できる。queuedやCLIの`ok`を公開成功として表示しない。
+`diagnose SHOW_ID [SHOW_ID...]`は明示指定Showの読取専用remote診断。管理APIへのGETとCloudflare accountへの読取GET 1件を行い、`--external`指定時だけ公開配信も検査する。各検査にscope（local/remote/cross/external）とpass/warn/fail/not_checkedを付けて分類する。修復・purge・再送は行わない。failが1つでもあれば終了1、warnのみは終了0。同時指定は既定5 Showまでで、`--max-shows N`（1〜20）で変更できる。予約受付やCLIの`ok`を公開完了と混同しない。
 
 `verify SHOW_ID [--episode ID]`は確定済み内容と公開pathの配信を比較する。公開jobを廃止したため`progress`／`watch`／`job-status`はない。[診断ガイド](observability.md)を参照する。
 
@@ -84,12 +84,12 @@ castloop publish-episode first audio.mp3 --workspace /absolute/workspace --show 
 
 ## バックアップ・復元
 
-workspaceのバックアップ・検証・復元は4つの`backup-*`コマンドで行う。いずれも通信せず、Cloudflare資格情報も読まない。`backup-create`のパスフレーズは`--passphrase-file`またはTTYプロンプトからだけ読み、`--json`・`--non-interactive`では`--passphrase-file`が必須になる。音源原本のバックアップは利用者・エージェントが`--include-audio`を明示したときだけ行われ、既定のバックアップではmanifestに除外として記録される。復元は`backup-restore-preview`で確認してから`backup-restore ARCHIVE DEST confirm`で行い、復元後の未完了操作は観測のみで再送しない。対象・頻度・保証範囲は[バックアップガイド](workspace_backup.md)を優先する。
+workspaceのバックアップ・検証・復元は4つの`backup-*`コマンドで行う。いずれも通信せず、Cloudflare API用の環境変数を読まない。ローカルの管理キーはバックアップ対象である。`backup-create`のパスフレーズは`--passphrase-file`またはTTYプロンプトからだけ読み、`--json`・`--non-interactive`では`--passphrase-file`が必須になる。音源原本のバックアップは利用者・エージェントが`--include-audio`を明示したときだけ行われ、既定のバックアップではmanifestに除外として記録される。復元は`backup-restore-preview`で確認してから`backup-restore ARCHIVE DEST confirm`で行う。復元自体は未完了操作を再送・継続せず、別途状態確認と承認が必要。旧journal familyの除外を含む対象・保証範囲は[バックアップガイド](workspace_backup.md)を優先する。
 
 ## 検証範囲
 
-ローカル模擬Cloudflareによる従来の公開・復旧試験、独立CLI processのcwd非依存操作、オフラインコマンドとSkill exportを検証する。`node scripts/smoke-agent-cli.mjs dist/castloop`は開発用テストであり、実行する子バイナリは空PATH・ソース不在の作業場所から動かす。Nodeは管理者環境の依存ではない。
+ローカル模擬Cloudflareによる公開・中断後の再実行試験、独立CLI processのcwd非依存操作、オフラインコマンドとSkill exportを検証する。`node scripts/smoke-agent-cli.mjs dist/castloop-linux-x64`は開発用テストであり、実行する子バイナリは空PATH・ソース不在の作業場所から動かす。Nodeは管理者環境の依存ではない。
 
-実エージェントによる質問判断の品質、`npx skills`による各製品への導入、Cloudflare native性能、300MB実機公開、全Free互換はこのローカル検査で証明しない。デプロイ・公開・Resume・実資源変更は行わない。
+実エージェントによる質問判断の品質、`npx skills`による各製品への導入、Cloudflare native性能、300MB実機公開、全Free互換はこのローカル検査で証明しない。ローカル検査はデプロイ・公開・実資源変更を行わない。v0.8.0の限定的な非公開実機確認は[リリースノート](release-v0.8.0.md#verification-and-limitations)と区別する。
 
-実装時のローカル確認: `bun test`は579 pass / 0 fail（70 files）、`npm run check`と`npm run build:cli`は成功。構築した`dist/castloop`で上記standalone smokeも成功し、空PATHでの素材検証・Skill内容一致・上書き拒否・local-only previewの無書き込みを確認した。release workflow自体のGitHub上での実行や新releaseの発行は行っていない。
+v0.7.2導入時のローカル確認では、`bun test`は579 pass / 0 fail（70 files）、型検査・CLI build・standalone smokeが成功した。これは当時の記録であり、現行版のテスト件数や全機能の検証結果ではない。現在の配布・OS別の検証範囲は[CLIバイナリ配布](cli_binary_distribution.md)を参照する。

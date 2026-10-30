@@ -1,6 +1,6 @@
 # 独自ドメイン（v0.3.0）
 
-**現行SQLiteの開発版は[SQLite独自ドメインガイド](sqlite_custom_domains.md)を参照する。** 以下は旧Queue専用の履歴であり、現行のコマンド・再配備・redirect・続行契約には適用しない。旧版の固定手順は[v0.5.2文書](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/custom_domains.md)を使う。
+**現行SQLite版は[SQLite独自ドメインガイド](../../docs/sqlite_custom_domains.md)を参照する。** 以下は旧Queue専用の履歴であり、現行のコマンド・再配備・redirect・続行契約には適用しない。旧版の固定手順は[v0.5.2文書](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/custom_domains.md)を使う。
 
 > **以下はv0.5.x以前のQueueサービス専用。** 対応するv0.5.x CLI/Workerと[固定文書](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/custom_domains.md)を使用する。CLI交換だけでは配備済みdomainや旧runtime probeは変わらない。
 
@@ -20,7 +20,7 @@
 
 ## 追加
 
-既存M6サービスでは最初に[Queue方式の通常更新手順](queue_service.md#compatible-worker-updates)に従い、対応Workerをdeployしてください。domain操作自体はWorkerを再配備しません。その後、service workspaceで実行します。
+既存M6サービスでは最初に[Queue方式の通常更新手順](../../docs/queue_service.md#compatible-worker-updates)に従い、対応Workerをdeployしてください。domain操作自体はWorkerを再配備しません。その後、service workspaceで実行します。
 
 ```sh
 castloop service-pause NEW_PAUSE_UUID

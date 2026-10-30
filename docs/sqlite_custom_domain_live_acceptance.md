@@ -1,10 +1,12 @@
 # SQLite独自ドメインの実機確認
 
-Issue #68向け。2026-10-24、別途承認された[第9環境の2 Show総合機能試験](../design/sqlite_custom_domain_two_show_verification_20261024.md)で、以下の通常機能範囲を確認した。公開/独自origin配信/redirect/更新/復元/通常deploy/切断復帰・履歴保持が成功し、両Show paused/ready/drainedで終了。故障注入・内部cache状態・性能/全Free適合等は未実証で、詳細は同記録を参照する。
+> **旧版の履歴。** 本書は2026-10-24のIssue #68（内部形式6/7）の試験記録・手順であり、Pause/Resume廃止後のv0.8.0（14/13）には適用しない。現行操作は[独自ドメインガイド](sqlite_custom_domains.md)を参照する。以下の試験結果や過去の承認は、新しい実環境操作の許可でも現行版の実機検証結果でもない。
+
+Issue #68向け。2026-10-24、別途承認された[第9環境の2 Show総合機能試験](../design/archive/sqlite_custom_domain_two_show_verification_20261024.md)で、以下の通常機能範囲を確認した。公開/独自origin配信/redirect/更新/復元/通常deploy/切断復帰・履歴保持が成功し、両Show paused/ready/drainedで終了。故障注入・内部cache状態・性能/全Free適合等は未実証で、詳細は同記録を参照する。
 
 再試験は実装・ローカル試験・commitだけを実行許可にせず、対象account・新規Worker/bucket・専用hostname・許可する接続/配備/公開/Resume/切断の範囲を別途承認してから使う。保持サービス、非テストDNS、共有証明書、原本/journal/私有証跡は変更しない。
 
-[第3試験](../design/sqlite_custom_domain_environment_review.md)はPUTのenvironment固定検証で停止した。その後の別承認による[ログ付き反復試験](../design/sqlite_custom_domain_iterative_verification_20261024.md)で元PUT空文字と元DELETE空本文を特定・修正し、第8環境では**Show 0件の接続・限定続行・切断・workers.dev設定復帰が完了**した。Show 0件の診断と今回の2 Show確認を区別し、旧unknown/残存lockは保持する。
+[第3試験](../design/archive/sqlite_custom_domain_environment_review.md)はPUTのenvironment固定検証で停止した。その後の別承認による[ログ付き反復試験](../design/archive/sqlite_custom_domain_iterative_verification_20261024.md)で元PUT空文字と元DELETE空本文を特定・修正し、第8環境では**Show 0件の接続・限定続行・切断・workers.dev設定復帰が完了**した。Show 0件の診断と今回の2 Show確認を区別し、旧unknown/残存lockは保持する。
 
 第9環境の結果は先行試行のunknownを成功へ変更するものではない。以前の8環境と停止/完了記録は保持し、今回の新しい成功記録と区別する。
 

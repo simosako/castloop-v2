@@ -3,7 +3,7 @@
 作成日: 2026-10-24。状態: **Issue #68の合意範囲を実装・検証済み。P0〜P6のローカル検証とP7の2 Show小規模総合実機確認が完了、未リリース。外部同時変更は想定外とする確認済み制約を維持する。** 完了判定は§13、[P0の採用契約](sqlite_custom_domains_p0.md)、[実機結果と限界](sqlite_custom_domain_two_show_verification_20261024.md)を参照する。
 対象Issue: [#68](https://github.com/simosako/castloop-v2/issues/68)。調査基点: v0.7.2 / commit `72bc9f084c3a8ec6b4532d2b4833ac9a47735932`。
 
-本書は開発範囲・契約・実装順と検証範囲を記録する。利用手順は[開発版ガイド](../docs/sqlite_custom_domains.md)を参照する。配布済みv0.7.2の対応範囲は変更しない。本書の承認も、実Cloudflareへの配備・公開・Resume・DNS/domain/権限/課金変更・削除・証跡cleanupの承認にはしない。
+本書は開発範囲・契約・実装順と検証範囲を記録する。利用手順は[開発版ガイド](../../docs/sqlite_custom_domains.md)を参照する。配布済みv0.7.2の対応範囲は変更しない。本書の承認も、実Cloudflareへの配備・公開・Resume・DNS/domain/権限/課金変更・削除・証跡cleanupの承認にはしない。
 
 ## 1. 開発するもの
 
@@ -370,7 +370,7 @@ Issue本文の受け入れ条件6件について、実装とローカル故障�
 
 | Issueの条件 | 証拠 |
 | --- | --- |
-| 設定/接続/照会/切断/途中状態の契約と対応範囲 | sharedのstrict domain要求、専用CLI/journal/DO契約、[利用ガイド](../docs/sqlite_custom_domains.md)。fresh専用・1サービス1専用subdomain、未知資源非採用 |
+| 設定/接続/照会/切断/途中状態の契約と対応範囲 | sharedのstrict domain要求、専用CLI/journal/DO契約、[利用ガイド](../../docs/sqlite_custom_domains.md)。fresh専用・1サービス1専用subdomain、未知資源非採用 |
 | 許可originのGET/HEAD/Range/ETag、未知origin/公開管理API拒否 | `src/sqlite-gateway.test.ts`と2 Show実機。両originの境界、301/307、日付条件も確認 |
 | 非公開/Pause/readiness/blocked gateとstaging非公開 | gateway/既存配信のローカル回帰、`sqlite-domain-runtime.test.ts`のblocked拘束、実機の非公開/個別Pause/停止120要求・private/admin404 |
 | GUID/日時/音源/revision履歴保持 | `sqlite-domain-operation.test.ts`、`sqlite-feed-generations.test.ts`、実機のGUID/日時/hash・8不変objects・新revision保持 |
@@ -383,7 +383,7 @@ RSS公開の独自origin照合は`sqlite-rss-publication.test.ts`でローカル
 
 ## 参照
 
-- 現行契約: [全体設計](initial_design.md)、[Show分離](do_show_separation_options.md)、[SQLite公開](sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧](sqlite_worker_update_recovery.md)、[Show更新・不変Feed/cover](show_update_feed_availability_plan.md)。
-- 過去の参考: [旧domain計画](archive/custom_domain_plan.md)、[Issue #6: Pause中の配信](https://github.com/simosako/castloop-v2/issues/6)、[Issue #7: DELETE応答](https://github.com/simosako/castloop-v2/issues/7)。旧方式の実装・承認・実機実績を今回へ流用しない。
+- 現行契約: [全体設計](../initial_design.md)、[Show分離](../do_show_separation_options.md)、[SQLite公開](sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧](sqlite_worker_update_recovery.md)、[Show更新・不変Feed/cover](show_update_feed_availability_plan.md)。
+- 過去の参考: [旧domain計画](custom_domain_plan.md)、[Issue #6: Pause中の配信](https://github.com/simosako/castloop-v2/issues/6)、[Issue #7: DELETE応答](https://github.com/simosako/castloop-v2/issues/7)。旧方式の実装・承認・実機実績を今回へ流用しない。
 - Cloudflare一次資料（2026-10-24確認）: [Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)、[Attach](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/update/)、[Detach](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/delete/)。Custom DomainはDNS/TLSを自動構成し、切断しても関連証明書は自動削除されない。料金・全Free適合・APIの未記載の原子性は推測で保証しない。
 - redirectの参考: [Apple Podcasts: Change the RSS feed URL](https://podcasters.apple.com/support/837-change-the-rss-feed-url)（2026-10-24確認）。301と`itunes:new-feed-url`を4週間以上維持する案内。今回の301案を、同手順全体の自動実行や全アプリの移行保証へ拡大しない。

@@ -1,6 +1,8 @@
 # Issue #48: DOをShow単位で分離する検討
 
-2026-10-25追補: Issue #66の開発版は[受付停止と配信停止の分離設計](show_admission_delivery_separation_plan.md)を採用した。Show単位の責務は維持し、`admission_paused`で受付だけを止めて公開済み内容を配信する。既存`paused`の両方停止、共有保守の全Show個別Pause/drain、再開前の動作確認、未知IOの保全は変更しない。以下の通常状態がopen/pausedだけという記述に、この3状態目を加える。新規環境専用の内部queue/content形式7/7で、旧形式を変換しない。
+> **現行版との関係：** ShowごとのSQLite DOと小さい制御DOへの責務分離はv0.8.0にも適用する。一方、以下のPause/Resume・受付window・drain・共有Worker更新手順・操作記録表は導入当時の仕様で、現行14/13では廃止済み。現在は公開・配信を各Show DOで扱い、制御DOはShow登録・カタログ一覧・独自ドメイン状態を扱う。現行契約は[全体設計](initial_design.md)と[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)を優先する。
+
+2026-10-25追補: Issue #66の開発版は[受付停止と配信停止の分離設計](archive/show_admission_delivery_separation_plan.md)を採用した。Show単位の責務は維持し、`admission_paused`で受付だけを止めて公開済み内容を配信する。既存`paused`の両方停止、共有保守の全Show個別Pause/drain、再開前の動作確認、未知IOの保全は変更しない。以下の通常状態がopen/pausedだけという記述に、この3状態目を加える。新規環境専用の内部queue/content形式7/7で、旧形式を変換しない。
 
 更新日: 2026-10-20。Issue #48への採用設計。**Show単位DO、Show単位Pause/Resume、全体Pauseの廃止、旧版互換・移行不要、および実装・ローカル検証は管理者承認済み。Cloudflareへの配備・資源変更・既存環境の削除は対象外。** v0.6.2の旧構成とは区別する。
 
@@ -115,13 +117,13 @@ registryが予約・所属の正本、Show DOが公開状態の正本であれ�
 
 ### 6.3 配信とキャッシュ
 
-2026-10-21第3段階追補: [Show更新の継続配信契約](show_update_feed_availability_plan.md)も実装した。以下のEpisode専用の例外を公開済みShowのmetadata/cover更新へ広げ、Feed/Show/coverと対象種別のguardを照合する。Show更新は旧coverのR2 identity検証後にverifiedを保存する。不変coverを別keyへ準備し、metadata/cover/Feedはpurge後の同一transactionで確定する。公開cover URLは固定し、遅い単一要求は許可世代へ固定するが、別要求間のsnapshot一致は保証しない。queue/content schema **5/6**、`cover_storage="immutable-generation-v1"`と`publication_read_boundary="show-episode-v1"`を必須とする。旧形式の移行・互換配備はなく、Show停止・保守拘束・後続FIFO停止とShow間分離は維持する。
+2026-10-21第3段階追補: [Show更新の継続配信契約](archive/show_update_feed_availability_plan.md)も実装した。以下のEpisode専用の例外を公開済みShowのmetadata/cover更新へ広げ、Feed/Show/coverと対象種別のguardを照合する。Show更新は旧coverのR2 identity検証後にverifiedを保存する。不変coverを別keyへ準備し、metadata/cover/Feedはpurge後の同一transactionで確定する。公開cover URLは固定し、遅い単一要求は許可世代へ固定するが、別要求間のsnapshot一致は保証しない。queue/content schema **5/6**、`cover_storage="immutable-generation-v1"`と`publication_read_boundary="show-episode-v1"`を必須とする。旧形式の移行・互換配備はなく、Show停止・保守拘束・後続FIFO停止とShow間分離は維持する。
 
-2026-10-21追加追補: [Episode更新の継続配信契約](episode_update_feed_availability_plan.md)を実装し、以下の追加専用条件を既存Episodeのmetadata/audio更新にも広げる。更新では公開中の対象revisionとlifecycle世代が開始時のguardに一致することを必須とする。新音源の承認とFeed切替はpurge後の同じtransactionで確定し、旧音源は保持する。新規環境専用のqueue/content schema 4/5と必須health識別を使い、旧形式を変換しない。
+2026-10-21追加追補: [Episode更新の継続配信契約](archive/episode_update_feed_availability_plan.md)を実装し、以下の追加専用条件を既存Episodeのmetadata/audio更新にも広げる。更新では公開中の対象revisionとlifecycle世代が開始時のguardに一致することを必須とする。新音源の承認とFeed切替はpurge後の同じtransactionで確定し、旧音源は保持する。新規環境専用のqueue/content schema 4/5と必須health識別を使い、旧形式を変換しない。
 
 gatewayはpublic pathから対象Showを決め、要求ごとにそのShow DOの最新判定だけを確認する。制御DOへの毎回の配信照会や、状態のTTL cacheは設けない。Show DOがpaused、未ready、共有更新の保守拘束中なら503とする。Pauseは従来の安全側の意味をShow単位へ移し、新規受付と配信を閉じる。既受付jobは取り消さずdrainを続ける。
 
-Issue #50では[Feed継続配信契約](episode_add_feed_availability_plan.md)に従い、新規Episode追加のrunning/blockedだけ、開始時に保存した確定Feed/Show世代・要求hash・対象Episode未登録の根拠が成立すれば旧Feedと承認済みcover/audioを配信する。それ以外のrunning/blockedは503、別Show固有のblockedだけでは配信拒否しない。全Feedは世代別の不変R2 snapshotへ保存し、読取先もcache propsと同世代に固定する。R2 streamingと承認済みpublic path、必要なpurge成功後の公開完了は維持する。音源本体をDO経由で中継しない。
+Issue #50では[Feed継続配信契約](archive/episode_add_feed_availability_plan.md)に従い、新規Episode追加のrunning/blockedだけ、開始時に保存した確定Feed/Show世代・要求hash・対象Episode未登録の根拠が成立すれば旧Feedと承認済みcover/audioを配信する。それ以外のrunning/blockedは503、別Show固有のblockedだけでは配信拒否しない。全Feedは世代別の不変R2 snapshotへ保存し、読取先もcache propsと同世代に固定する。R2 streamingと承認済みpublic path、必要なpurge成功後の公開完了は維持する。音源本体をDO経由で中継しない。
 
 通常配信の判定は1 Show DOへの要求であり、制御DOの障害を毎回の配信依存にしない。共有Worker/R2/cache/アカウント上限の共通障害範囲は残る。
 
@@ -209,6 +211,6 @@ Issue #48は、**Showを業務上の自然な境界として採用し、通常�
 
 ## 参照
 
-- 設計: [全体設計](initial_design.md)、[SQLite逐次公開の実装計画](sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧契約](sqlite_worker_update_recovery.md)、[操作記録の設計](sqlite_operation_records_schema.md)、[テスト責務監査](archive/sqlite_test_responsibility_audit.md)、[v0.6.0 Queue削除計画](schema_v1_removal_plan.md)
+- 設計: [全体設計](initial_design.md)、[SQLite逐次公開の実装計画](archive/sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧契約](archive/sqlite_worker_update_recovery.md)、[操作記録の設計](archive/sqlite_operation_records_schema.md)、[テスト責務監査](archive/sqlite_test_responsibility_audit.md)、[v0.6.0 Queue削除計画](archive/schema_v1_removal_plan.md)
 - 測定: [SQLite実機受け入れ・測定](archive/sqlite_sequential_measurement_20261016.md)、[36件規模の再試験・CPU測定](archive/sqlite_size36_measurement_20261017.md)
 - 公式: [DOの上限](https://developers.cloudflare.com/durable-objects/platform/limits/)、[DOの料金](https://developers.cloudflare.com/durable-objects/platform/pricing/)、[DO SQLite storage](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/)

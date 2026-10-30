@@ -23,7 +23,7 @@ markerは同じcommitの古い失敗や重複通知でも残り得る。実行to
   ownerやregistryを編集しない。CASは所有権保護であり、未知の旧I/Oが終了した証明の代わりにはならない。
 
 万能な外部復旧は追加しない。[既存の安全方針](../m6_review_queue.md)に戻し、未知の実行は保全する。
-U1は[未検証仮定](../m6_upload_recovery_options.md)のままで、今回解決したものではない。
+U1は[未検証仮定](m6_upload_recovery_options.md)のままで、今回解決したものではない。
 
 ## Issue #13の保存済みShow証跡
 

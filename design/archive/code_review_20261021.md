@@ -247,7 +247,7 @@ reader取得、累積サイズ確認、chunk保持、結合、cancel/releaseの�
 
 ## 参照
 
-- [現行構成](initial_design.md)、[Show分離契約](do_show_separation_options.md)
-- [項目別入力上限](show_episode_input_limits.md)、[SQLite実装契約](sqlite_sequential_publication_implementation_plan.md)
-- [管理認証](admin_authentication.md)、[セキュリティポリシー](../SECURITY.md)
+- [現行構成](../initial_design.md)、[Show分離契約](../do_show_separation_options.md)
+- [項目別入力上限](../show_episode_input_limits.md)、[SQLite実装契約](sqlite_sequential_publication_implementation_plan.md)
+- [管理認証](../admin_authentication.md)、[セキュリティポリシー](../../SECURITY.md)
 - Cloudflare公式: [streaming](https://developers.cloudflare.com/workers/runtime-apis/streams/)、[Workers Caching](https://developers.cloudflare.com/workers/cache/)、[Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)。現行ドキュメントを参照し、cache keyのprops/version分離とstreaming方針を確認した。

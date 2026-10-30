@@ -1,6 +1,6 @@
 # Issue #40: 操作記録のIDとテーブル設計
 
-更新日: 2026-10-20。公開状態と同じDO SQLiteに保存する操作記録の設計。Issue #48の開発版では各Show DOへこのDDLを適用し、制御DOへ操作記録の正本を分離しない。remote検索・指示は`--show SHOW_ID`を必須とする。旧DB/journalの移行は提供しない。[Show分離契約](do_show_separation_options.md)参照。
+更新日: 2026-10-20。公開状態と同じDO SQLiteに保存する操作記録の設計。Issue #48の開発版では各Show DOへこのDDLを適用し、制御DOへ操作記録の正本を分離しない。remote検索・指示は`--show SHOW_ID`を必須とする。旧DB/journalの移行は提供しない。[Show分離契約](../do_show_separation_options.md)参照。
 
 ## 1. 再検討の結論
 
@@ -347,7 +347,7 @@ Workerによる履歴では、結合先のクライアントは処理を依頼�
 
 ## 6. 記録の保持と容量管理
 
-現在のDDLは、再開・結果照会・重複防止に必要な小さい記録を保持する構成である。初版は5テーブルを維持し、容量表示と警告を加える。初期の費用見積もりと警告基準は、[保存先比較の容量管理](archive/sqlite_operation_record_storage_options.md#6-容量管理と記録の保持)を参照する。
+現在のDDLは、再開・結果照会・重複防止に必要な小さい記録を保持する構成である。初版は5テーブルを維持し、容量表示と警告を加える。初期の費用見積もりと警告基準は、[保存先比較の容量管理](sqlite_operation_record_storage_options.md#6-容量管理と記録の保持)を参照する。
 
 操作・要求・ファイル識別情報と、開始・保存成功・検証・最終結果などの履歴を関連付けたまま保持する。版番号1の履歴は作成元の確認に、`expected_version`が指す履歴は要求の判断根拠の確認に使う。
 
@@ -385,11 +385,11 @@ RSS詳細の`summary=true`は、親操作の索引から子操作の状態別件
 
 RSS取り込みでは、親の`import_id`に、upload・公開・登録/ローカル配置の子操作を関連付ける。単独のShow登録の旧journal、init、Worker更新、サービスのpause/resumeは従来の専用記録で管理する。今回の5表へ既存操作を事後登録しない。
 
-実装は`src/sqlite-operation-records.ts`、DDLは`src/sqlite-operation-schema.ts`、入出力の検証は`packages/shared/src/sqlite-operations.ts`に置く。[利用方法](../docs/sqlite_operation_recovery.md)と[確認結果](archive/sqlite_operation_records_verification.md)を参照する。
+実装は`src/sqlite-operation-records.ts`、DDLは`src/sqlite-operation-schema.ts`、入出力の検証は`packages/shared/src/sqlite-operations.ts`に置く。[利用方法](sqlite_operation_recovery.md)と[確認結果](sqlite_operation_records_verification.md)を参照する。
 
 ## 関連資料
 
-- [操作の確認・再開・取消](archive/sqlite_operation_recovery_options.md)
-- [保存先の比較とコスト](archive/sqlite_operation_record_storage_options.md)
+- [操作の確認・再開・取消](sqlite_operation_recovery_options.md)
+- [保存先の比較とコスト](sqlite_operation_record_storage_options.md)
 - [DO SQLite Storage API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/)
 - [SQLiteの外部キー](https://www.sqlite.org/foreignkeys.html)、[CREATE TABLEと制約](https://www.sqlite.org/lang_createtable.html)

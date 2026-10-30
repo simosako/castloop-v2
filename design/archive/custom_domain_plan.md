@@ -101,7 +101,7 @@ Queue方式の公開プローブは、同一request内のservice設定の二重�
 3. domain CLIを接続し、TLS待ち、API応答喪失、feed/purge失敗、設定片側更新からの再開と、早すぎるresume/deployの拒否を変更箇所で検証する。既存のM6全安全条件を別のテスト群へ複製しない。**ローカル実装・変更箇所テスト完了。**
 4. 承認された専用hostnameとM6サービスで、単一バイナリによるadd→明示再開→公開・停止/restore→通常deploy→remove→明示再開を確認し、READMEを更新する。**run4で完了。**
 
-実行方法と合格条件は[専用hostnameでの実機検証手順](../../docs/custom_domain_live_acceptance.md)、合格結果は[run4の固定commit](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)を参照する。
+実行方法と合格条件は[専用hostnameでの実機検証手順](custom_domain_live_acceptance.md)、合格結果は[run4の固定commit](https://github.com/simosako/castloop-v2/blob/7e57cac5b22435c54d68d0a6edc9a28e2285ff71/design/acceptance/custom-domains/20261011-run4/run4/result.md)を参照する。
 
 実機では複数Show、非公開/削除Episodeの不復活、両hostのfeed/cover/audio、GET/HEAD/Range、cache purge、GUID・媒体・revision不変を確認する。300 MB uploadの既存受け入れは再利用し、URL切替で音源再uploadやWorker全量hash計算は追加しない。
 

@@ -83,7 +83,7 @@ upload operation/request IDは別にする。metadata/audioの別updateも維持
 CLIはone-caller target/upload journalとone-time PUTを維持し、過去grantを読んでもPUTを再開しない。
 
 MP3解析・全量readback hashはCLI。Workerが300 MBを全量bufferする変更はない。
-REST PUTのCAS仮定はなく、[未検証のU1](../m6_upload_recovery_options.md)も解決済みとはしない。
+REST PUTのCAS仮定はなく、[未検証のU1](m6_upload_recovery_options.md)も解決済みとはしない。
 upload完了はstagedで止める。実際のpublication `commit.json`はconsumer自身のowned executionでbinding CAS保存する。
 既存R2 marker notificationは重複配送として維持する。
 

@@ -34,7 +34,7 @@ Queue／SQLite共通のShow・Episodeスキーマは、RSSへ出力する自由�
 - 一覧20件pagination、Show/Episodeの非公開化・保存snapshotの復元、ローカルRSSの新Showへの逐次公開に対応する。物理削除・独自ドメイン・既存移行・retry/releaseは未対応。
 - 最新36件規模試験は公開36件＋更新10回が完了し、通常HTTP最大3/5ms、probe CPU 60/60だった。DOは通常HTTPの10msではなく既定30秒のCPU上限で評価する。未試験負荷・300MB新経路・purge rate-limit retry・Issue #13恒久解消は保証しない。
 
-操作と制限は[SQLiteガイド](../../docs/sqlite_sequential_development.md)、設計契約は[実装計画](../sqlite_sequential_publication_implementation_plan.md)、測定は[2026-10-17の記録](sqlite_size36_measurement_20261017.md)を参照する。
+操作と制限は[SQLiteガイド](../../docs/sqlite_sequential_development.md)、設計契約は[実装計画](sqlite_sequential_publication_implementation_plan.md)、測定は[2026-10-17の記録](sqlite_size36_measurement_20261017.md)を参照する。
 
 ## 以下の章の適用範囲
 
@@ -86,7 +86,7 @@ Queue／SQLite共通のShow・Episodeスキーマは、RSSへ出力する自由�
 - 管理者はDashboardでR2・Queuesを利用可能にし、Workers Scripts・Workers R2 Storage・Queuesの読み書き権限を持つaccount-scoped API tokenを取得する。CLIは`CLOUDFLARE_ACCOUNT_ID`と`CLOUDFLARE_API_TOKEN`を使い、資源作成・配備・R2 uploadをCloudflare REST APIへ直接送る。Wrangler、Node.js、Bun、`ffprobe`、別のR2 S3 credentialは管理者の実行環境には不要
 - API tokenはTOMLやGitへ保存せず、配信Workerへも渡さない。Worker管理API用の別の管理鍵を`.castloop/`に保存し、Workerのsecret bindingと照合する。CLIの管理APIは常にworkers.devへ接続する
 - MP3上限は**300,000,000 bytes**。CLIで送信前に上限・MP3・再生時間を検証し、単一REST PUT後に全量を読み戻してsize・SHA-256・ETag／versionを照合する。Workerは認証付きreceiptとR2 HEADを照合し、音源を全量再ハッシュしない。新しい公開音源はR2 bindingへSHA-256を渡してstream保存し、native checksumを確認する。[300 MBの実機受け入れ](m6_standalone_acceptance.md)は合格済みだが、サービス全体のFree適合を証明するものではない
-- R2 REST PUTの`If-Match`をR2 binding CASと同一視しない。切断後のPUTが遅れて書き込まないという[未検証の仮定U1](../m6_upload_recovery_options.md)はCloudflareの保証ではない。経過時間やHEAD不在だけでownerを解放しない。300 MBの受け入れはv0.4.0のHTTP CPUがFree上限に収まる証明ではない
+- R2 REST PUTの`If-Match`をR2 binding CASと同一視しない。切断後のPUTが遅れて書き込まないという[未検証の仮定U1](m6_upload_recovery_options.md)はCloudflareの保証ではない。経過時間やHEAD不在だけでownerを解放しない。300 MBの受け入れはv0.4.0のHTTP CPUがFree上限に収まる証明ではない
 
 ## 利用シナリオ（概要）
 
@@ -213,7 +213,7 @@ R2 Event Notificationは`staging/` prefix・`commit.json` suffixのobject-create
 - `deploy`は初期化済みM6サービスのデータ形式を変えない更新。既存pause IDを保持し、service invocationsと全Show ownerの終了を確認して配備・稼働検証する。完了後もpausedで、明示resumeが必要。旧形式変換・自動rollback・無停止更新は行わない
 - `domain add HOSTNAME`／`domain list`／`domain remove`で1つのhostnameを管理する。同じaccountのactive/full Zone、Workers Scripts Write・Zone Read・DNS Read権限が必要。既存DNS・他Worker接続を上書きしない
 - add/removeはpause・処理終了確認後、active feedの再生成、cache purge、R2／ローカル設定同期と到達検証を行い、pausedで完了する。domain操作自体ではWorkerを再配備しない。通常deployは一致する接続を保持する
-- 正規URLの切替でも音源・revision・GUID・公開日時・ShowのサイトURLは維持する。workers.devでも同じ内容をredirectなしで配信し、管理APIはworkers.devに固定する。Podcast directoryの登録URL変更は管理者が行う。[独自ドメイン利用案内](../../docs/custom_domains.md)参照
+- 正規URLの切替でも音源・revision・GUID・公開日時・ShowのサイトURLは維持する。workers.devでも同じ内容をredirectなしで配信し、管理APIはworkers.devに固定する。Podcast directoryの登録URL変更は管理者が行う。[独自ドメイン利用案内](custom_domains.md)参照
 
 ### 状態照会と復旧の限界
 

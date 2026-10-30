@@ -10,7 +10,7 @@ castloop is an **early beta** (v0.8.0). Only fresh service configurations using 
 
 Requirements:
 
-- [Bun](https://bun.sh) 1.4.2 (runtime and test runner)
+- [Bun](https://bun.sh) 1.4.4 (runtime and test runner, matching CI)
 - Node.js 24 and npm (for `npm ci` and TypeScript)
 - No Wrangler, no Cloudflare account, and no API tokens: the test suite is fully local and never touches Cloudflare.
 
@@ -30,12 +30,12 @@ There is **no lint step and no formatter configured**; please do not add tooling
 - **Never commit** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, anything from `.castloop/` (administrator key, journals), unpublished audio, or real service URLs from your own account. These paths are git-ignored; keep them that way.
 - Tests must stay local. Do not add tests that require live Cloudflare credentials, deployments, or network access to your own resources.
 - Worker diagnostics must stay on the allowlisted diagnostic codes; do not log arbitrary exceptions, content text, email addresses or secrets.
-- Preserve the safety gates when touching related code: explicit publication (create/update/upload must not publish), `failed`/`blocked` distinction, no automatic retry of POST/PUT mutations, immutable published audio during normal updates, and the delivery/caching gates. If you believe a gate should change, open an issue first.
+- Preserve the safety gates when touching related code: explicit publication (create/preview/media placement must not publish), synchronous atomic publication, reviewed configuration/target/base and generation checks, no automatic retry of POST/PUT mutations, immutable published audio and revision history during normal updates, and lifecycle/readiness checks before cached delivery. Publication job states such as `blocked` are no longer used. If you believe a gate should change, open an issue first.
 - When behavior changes, update the relevant documents under `docs/` or `design/` in the same pull request. Design and operations documents are currently written in Japanese; English translations of unchanged content are welcome as separate pull requests.
 
 ## How to propose a change
 
-1. **Open an issue first** for anything that is not an obvious bug fix — especially changes to the publication protocol, lifecycle behavior, or anything that touches the frozen-request/recovery model. Wait for alignment before investing in a large implementation.
+1. **Open an issue first** for anything that is not an obvious bug fix — especially changes to the publication protocol, lifecycle behavior, or retained inputs and safe re-execution of interrupted operations. Wait for alignment before investing in a large implementation.
 2. Create a feature branch from `main`, named after the issue (for example `feat/issue-40-operation-recovery`).
 3. Keep pull requests focused: one behavior per PR, with tests that fail before and pass after.
 4. Run `npm run check` and `bun test` locally; CI runs the same checks plus a smoke test of the built binary.

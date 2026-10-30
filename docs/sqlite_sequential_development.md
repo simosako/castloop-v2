@@ -1,6 +1,6 @@
 # SQLiteのShow単位公開方式
 
-フェーズ3開発版は、新規環境専用の内部queue/content形式 **14/13** を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1のまま。旧形式の変換・資源採用・互換配備は行わない。配布済み版の仕様・実機記録とは区別する。
+v0.8.0は、新規環境専用の内部queue/content形式 **14/13** を使う。サービス設定はversion 2・`show-v1`、metadataはversion 1のまま。旧形式の変換・資源採用・互換配備は行わない。互換性と検証範囲は[v0.8.0リリースノート](release-v0.8.0.md)を参照する。
 
 ## 構成と公開
 
@@ -49,7 +49,7 @@ castloop publish-episode first audio.mp3 --expect-preview REVIEWED_HASH
 
 - 予約はローカルmetadataと配置済み素材参照を予約表へ凍結する。時刻到来時の公開と実行済み状態は同じトランザクションで確定する。更新元（base revision）の競合や独自ドメイン変更では`needs_approval`となるが、通常のコード配備（`deploy`）では予約はそのまま維持される。[予約操作](admin_configuration.md)を参照。
 - `publish-rss-import`はShow→各Episodeの順に公開する。取得・新Show登録・一括進捗記録は維持し、個別upload/job追跡は行わない。[RSSガイド](rss_migration.md)を参照。
-- 非公開化は`preview-episode-lifecycle SHOW EPISODE unpublish`→計画確認→`lifecycle-execute FILE HASH confirm`（番組全体は`preview-show-lifecycle SHOW unpublish`）。`restore`は保存済み内容を使い、Showの復元で個別非公開Episodeを復活させない。同じ状態は変更なし。物理削除は未実装。独立したruntime停止コマンド（`show-pause`／`show-resume`等）は廃止し、配信制御はこのlifecycle操作に一本化した。
+- 非公開化は`preview-episode-lifecycle SHOW EPISODE unpublish`→計画確認→`lifecycle-execute FILE HASH confirm`（番組全体は`preview-show-lifecycle SHOW unpublish`）。非公開化した対象の公開パスはHTTP 404を返す。`restore`は保存済み内容を使い、Showの復元で個別非公開Episodeを復活させない。同じ状態は変更なし。物理削除は未実装。独立したruntime停止コマンド（`show-pause`／`show-resume`等）は廃止し、配信制御はこのlifecycle操作に一本化した。
 
 ## 互換Worker更新
 
@@ -70,4 +70,4 @@ castloop service-status
 
 `diagnose`は状態、`verify`は確定内容と公開配信を確認する。廃止したjob照会・operation操作・progress/watchは使わない。[診断](observability.md)を参照。
 
-この開発版の確認はローカルSQLite・模擬R2・CLI試験とbuildに限る。native Cloudflare性能、Free適合、実環境配備は未確認であり、別途承認が必要である。
+v0.8.0ではローカルSQLite・模擬R2・CLI試験とbuildに加え、Accessで閲覧者を限定したCloudflare環境で初期化・Show公開・Episode 3件の公開・内蔵サイトの再生と東京日付表示を確認した。この小規模確認は予約・ドメイン変更・更新・障害時動作を含む全機能や、native性能・全Free適合を実証するものではない。詳細は[リリースノート](release-v0.8.0.md#verification-and-limitations)を参照し、追加の実環境操作には別途承認を得る。

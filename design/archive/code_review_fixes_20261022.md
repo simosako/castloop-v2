@@ -1,6 +1,6 @@
 # コード全体レビューへの対応（2026-10-22）
 
-[レビュー](code_review_20261021.md)の推奨順に修正を作成し、指摘ごとのcommitと5件の依存PRに分けた。**PR提出時点ではマージ・リリース・Cloudflareへの配備は行っていない。** レビュー本文は調査時点の記録として保持する。その後、別途承認された[新規隔離環境の小規模実機確認](archive/code_review_fixes_live_verification_20261022.md)で11 jobの成功と最終Pauseを確認したが、tail欠測・canceled Alarmを含む観測の受け入れは未完了として記録した。既存環境は変更していない。
+[レビュー](code_review_20261021.md)の推奨順に修正を作成し、指摘ごとのcommitと5件の依存PRに分けた。**PR提出時点ではマージ・リリース・Cloudflareへの配備は行っていない。** レビュー本文は調査時点の記録として保持する。その後、別途承認された[新規隔離環境の小規模実機確認](code_review_fixes_live_verification_20261022.md)で11 jobの成功と最終Pauseを確認したが、tail欠測・canceled Alarmを含む観測の受け入れは未完了として記録した。既存環境は変更していない。
 
 ## PRと修正範囲
 
@@ -38,4 +38,4 @@ baseは`main → #54のbranch → #55のbranch → #56のbranch → #57のbranch
 - 不要と確定した既存テストはないため削除しなかった。保存形式・compatibility date・binding/class名・認証・世代/base/owner照合・不変音源/履歴・purge-before-completionを維持する。
 - blocked解放、未知要求の再送、旧layout移行、journal/lock/資源の削除は行っていない。修正PR提出後の実機確認は上記の別記録を参照する。U1の未検証性、300MB・Free適合・native DO特性の未確認範囲は残る。
 
-運用上の詳細: [SQLiteガイド](../docs/sqlite_sequential_development.md)、[操作記録](../docs/sqlite_operation_recovery.md)、[入力上限](show_episode_input_limits.md)、[Show分離契約](do_show_separation_options.md)、[CIの固定・更新方針](../docs/ci_security.md)。
+運用上の詳細: [SQLiteガイド](../../docs/sqlite_sequential_development.md)、[操作記録](sqlite_operation_recovery.md)、[入力上限](../show_episode_input_limits.md)、[Show分離契約](../do_show_separation_options.md)、[CIの固定・更新方針](../../docs/ci_security.md)。

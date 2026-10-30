@@ -24,7 +24,7 @@
 
 Attachの公開入力はhostname、service、Zone指定、enabled/previews設定であり、非上書きflagや期待旧接続IDは掲載されていない。Detachも対象IDによる要求であり、GET時のWorker/hostnameと一致する場合だけ削除する条件指定は掲載されていない。どちらも、他ツールが同時に変更する場合の保護を推測で補わない。
 
-Attach/DetachのAPI受け入れ権限は公式記載では`Workers Scripts Write`。これとは別にZone/DNS/routesの事前読取権限が必要になる。Cloudflareのrouting案内は変更対象Zoneの`Workers Routes Write`も要求するため、API単体の記載だけを最小権限の保証にはしない。[利用ガイド](../docs/sqlite_custom_domains.md)に必要範囲を記載し、権限変更は自動実行しない。
+Attach/DetachのAPI受け入れ権限は公式記載では`Workers Scripts Write`。これとは別にZone/DNS/routesの事前読取権限が必要になる。Cloudflareのrouting案内は変更対象Zoneの`Workers Routes Write`も要求するため、API単体の記載だけを最小権限の保証にはしない。[利用ガイド](../../docs/sqlite_custom_domains.md)に必要範囲を記載し、権限変更は自動実行しない。
 
 Detachの公開成功形式はHTTP 200の`success: true`、`errors`、`messages`を持つenvelope。新実装ではerrorsが空配列またはnullであることと本文の完全読取を要求する。2026-10-24の別途承認された実機確認では、空のWorker domain一覧が`errors: null`、`result_info={page:1,per_page:0,count:0,total_count:0}`（`total_pages`なし）を返した。単一page一覧はcountと全件数の一致を引き続き要求し、DNSの複数page列挙は明示的な`per_page=100`と`total_pages`を必須のまま維持する。旧バグ対応にあった200/nullや204を、この資料だけから許可する根拠は得られていない。未知形式は未知結果として保持し、後の不在GETで完了へ昇格しない。
 

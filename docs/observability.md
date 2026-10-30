@@ -1,6 +1,6 @@
 # 観測・診断コマンド
 
-フェーズ3開発版では公開job台帳とPause/Resume制御を廃止したため、`job-status`・`progress`・`watch`・`show-control-status`は提供しない。同期公開の`changed`／`unchanged`とrevision、現在内容、予約状態を確認する。
+v0.8.0では公開job台帳とPause/Resume制御を廃止したため、`job-status`・`progress`・`watch`・`show-control-status`は提供しない。内部queue/content形式14/13の新規サービスを対象に、同期公開の`changed`／`unchanged`とrevision、現在内容、予約状態を確認する。
 
 ## diagnose
 

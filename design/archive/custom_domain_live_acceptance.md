@@ -1,6 +1,6 @@
 # 独自ドメインの実機検証手順（専用hostname）
 
-> **v0.5.x以前のQueue方式の履歴。** 現行SQLite開発版の確認案は[SQLite専用手順](sqlite_custom_domain_live_acceptance.md)を使う。過去の承認は実環境操作の新たな許可ではない。
+> **v0.5.x以前のQueue方式の履歴。** 後続の旧SQLite版の確認案は[SQLite専用手順（履歴）](../../docs/sqlite_custom_domain_live_acceptance.md)に保存している。現行の操作は[独自ドメインガイド](../../docs/sqlite_custom_domains.md)を参照する。過去の承認は実環境操作の新たな許可ではない。
 
 更新日: 2026-10-11。対象は独自ドメイン対応を含むソースからビルドしたCLI／Worker。
 
@@ -348,4 +348,4 @@ Issue #7のrun3は、削除時の生HTTP status／bodyと完了receiptが残っ�
 - 第5〜8節の各確認項目の合格／不合格／未実施と、対応する保存ファイル名。
 - 最後の停止状態、保持したリソース、未解決事項。エラーのstderrと、JSONに`reason_code`があればその値を保存し、秘密やmetadata本文を報告へ転載しないこと。
 
-参照: [利用・復旧手順](custom_domains.md)、[実装計画](../design/archive/custom_domain_plan.md)。
+参照: [利用・復旧手順](custom_domains.md)、[実装計画](custom_domain_plan.md)。

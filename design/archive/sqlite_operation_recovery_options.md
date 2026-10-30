@@ -1,7 +1,7 @@
 # Issue #40: 中断した操作の確認・再開・取消
 
 更新日: 2026-10-19。対象は[Issue #40](https://github.com/simosako/castloop-v2/issues/40)のSQLiteサービス。
-案Bを採用し、サーバーへの記録、再開、取消・未公開素材の削除を開発版へ実装した。[利用方法](../../docs/sqlite_operation_recovery.md)と[ローカルでの確認結果](sqlite_operation_records_verification.md)を参照する。以下は比較と採用理由を含む設計書である。
+案Bを採用し、サーバーへの記録、再開、取消・未公開素材の削除を開発版へ実装した。[利用方法](sqlite_operation_recovery.md)と[ローカルでの確認結果](sqlite_operation_records_verification.md)を参照する。以下は比較と採用理由を含む設計書である。
 
 ## 1. 目的
 
@@ -17,7 +17,7 @@ Issue #40では、36件のRSS取り込みで18件の公開後にCLIが終了し�
 
 実現方法として、CLIの操作記録を改善する案A、サーバーでも操作を管理する案B、分割アップロードを導入する案Cを比較する。
 
-レビューを受け、既存DO内のSQLiteへ記録する案Bを採用した。[保存先の比較](sqlite_operation_record_storage_options.md)と、[操作記録のID・テーブルのDDL](../sqlite_operation_records_schema.md)を別紙にまとめた。
+レビューを受け、既存DO内のSQLiteへ記録する案Bを採用した。[保存先の比較](sqlite_operation_record_storage_options.md)と、[操作記録のID・テーブルのDDL](sqlite_operation_records_schema.md)を別紙にまとめた。
 
 ## 2. 利用者の操作
 
@@ -166,7 +166,7 @@ RSS取り込みの記録にも、処理番号だけでなく、対象エピソ�
 
 ### 操作記録と再開条件
 
-要求元は`client_id`、再開の対象となる作業は`operation_id`、その作業への個々の指示は`request_id`で識別する。各要求にクライアントIDとサーバーの受信時刻を直接記録し、セッション表は設けない。詳しくは[IDとDDL案](../sqlite_operation_records_schema.md)を参照する。
+要求元は`client_id`、再開の対象となる作業は`operation_id`、その作業への個々の指示は`request_id`で識別する。各要求にクライアントIDとサーバーの受信時刻を直接記録し、セッション表は設けない。詳しくは[IDとDDL案](sqlite_operation_records_schema.md)を参照する。
 
 各操作には固有のIDを付け、サービス設定、Workerのバージョン、対象の番組・エピソード、下書き、元ファイルのハッシュ、操作開始時の公開済み版と更新番号を保存する。再開時にこれらを照合し、同じ操作の続きであることを確認する。
 
@@ -209,9 +209,9 @@ RSS取り込みの記録にも、処理番号だけでなく、対象エピソ�
 
 ## 関連資料
 
-- [操作記録のIDとテーブル設計](../sqlite_operation_records_schema.md)
+- [操作記録のIDとテーブル設計](sqlite_operation_records_schema.md)
 - [サーバー側の操作記録の保存先比較](sqlite_operation_record_storage_options.md)
 - [現行の構成と公開処理](../initial_design.md)
 - [SQLite方式の操作ガイド](../../docs/sqlite_sequential_development.md)
 - [RSS取り込みの操作ガイド](../../docs/rss_migration.md)
-- [単一アップロードの通信断後に残る課題](../m6_upload_recovery_options.md)
+- [単一アップロードの通信断後に残る課題](m6_upload_recovery_options.md)

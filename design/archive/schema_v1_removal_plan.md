@@ -198,11 +198,11 @@ P2/P3は依存関係上、同じレビュー単位にまとめてもよい。た
 
 ## 参照する現行契約
 
-- [SQLite操作・制限](../docs/sqlite_sequential_development.md)、[SQLite公開の実装計画](sqlite_sequential_publication_implementation_plan.md)
+- [SQLite操作・制限](../../docs/sqlite_sequential_development.md)、[SQLite公開の実装計画](sqlite_sequential_publication_implementation_plan.md)
 - [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md)
-- [Queue操作（v0.5.x）](../docs/queue_service.md)、[Queue非同期管理](archive/async_management_implementation.md)
-- [配信判定projection](archive/public_delivery_projection.md)、[明示公開・保持・安全方針](m6_review_queue.md)
-- [旧実装整理で分離した検証責務](archive/v050_redundancy_refactor.md)
+- [Queue操作（v0.5.x）](../../docs/queue_service.md)、[Queue非同期管理](async_management_implementation.md)
+- [配信判定projection](public_delivery_projection.md)、[明示公開・保持・安全方針](../m6_review_queue.md)
+- [旧実装整理で分離した検証責務](v050_redundancy_refactor.md)
 
 ## 9. ローカル実装結果（2026-10-18）
 
@@ -250,4 +250,4 @@ Linux／Bun 1.4.2、同じcheckout・lockfileで`npm ci`後に確認した。最
 - 相対import欠落と、production sourceの旧protocol／binding／Worker参照を検査し、該当なし。残るversion 1はcontent／SQLite要求・journal、queueはSQL FIFO、旧名称のcache/source helperは共通処理。プラットフォームの汎用Queue型は変更していない。
 - 変更・移動した文書のローカルリンクを確認した。既存のM6資料2箇所にある過去の`experiments/m6/`不在リンクは本件以前のもので、旧証跡の再作成やcleanupはしていない。
 - 模擬試験の初回追加時にテスト側のmetadata出力名、fixtureの管理鍵参照先、削除済みWorkerを要求する旧bundle期待値を補正した。製品IOの安全条件を緩和したものではない。
-- 上記ローカル検証時点ではCloudflareへの配備・公開・資源操作・未知IO再送・証跡削除は0件で、commit／push／Issue更新・close／リリースも未実施。その後の承認済み実機回帰は[試験結果・性能サマリー](archive/schema_v1_removal_live_test.md)を参照。管理者は新規隔離環境での全36件公開・全39音源配信照合・Worker更新後の保持確認を合格と判断した。
+- 上記ローカル検証時点ではCloudflareへの配備・公開・資源操作・未知IO再送・証跡削除は0件で、commit／push／Issue更新・close／リリースも未実施。その後の承認済み実機回帰は[試験結果・性能サマリー](schema_v1_removal_live_test.md)を参照。管理者は新規隔離環境での全36件公開・全39音源配信照合・Worker更新後の保持確認を合格と判断した。

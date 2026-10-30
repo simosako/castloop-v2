@@ -11,7 +11,7 @@ Issue #68 adds dedicated custom subdomains for fresh SQLite services. The custom
 
 ## Verification and limitations
 
-- The two-Show native functional trial passed publication, canonical delivery, redirects, updates/restore, domain-preserving deploy, and workers.dev restoration. Both Shows finished paused, ready, and drained. See the [trial record](../design/sqlite_custom_domain_two_show_verification_20261024.md).
+- The two-Show native functional trial passed publication, canonical delivery, redirects, updates/restore, domain-preserving deploy, and workers.dev restoration. Both Shows finished paused, ready, and drained. See the [trial record](../design/archive/sqlite_custom_domain_two_show_verification_20261024.md).
 - Native API response differences are handled with allowlisted diagnostics and durable receipts; earlier uncertain operations were not adopted or replayed.
 - This trial does not establish performance, full Cloudflare Free compatibility, or native fault-injection behavior. It does not authorize changes to any other live environment.
 - Release and installation do not deploy or modify Cloudflare resources. Only Linux x86-64 CLI binaries are distributed.

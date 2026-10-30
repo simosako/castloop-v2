@@ -1,12 +1,12 @@
 # SQLite Worker更新の検証続行
 
-2026-10-25追補: Issue #66の受付だけの停止（`admission_paused`）はWorker更新の準備条件を満たさない。引き続き対象Showすべてを`show-pause`でpausedにして、既受付処理の終了を確認する。更新・確認・保守終了後もpausedを維持する。配信だけなら`show-delivery-resume`、受付も戻すなら`show-resume`を個別に明示する。停止・再開操作の返答喪失は`show-control-status SHOW OPERATION_UUID`で保存結果を読む。[操作ガイド](../docs/show_availability.md)参照。更新中の配信継続、未知prepare/PUT/activationの再送・自動解除は追加しない。
+2026-10-25追補: Issue #66の受付だけの停止（`admission_paused`）はWorker更新の準備条件を満たさない。引き続き対象Showすべてを`show-pause`でpausedにして、既受付処理の終了を確認する。更新・確認・保守終了後もpausedを維持する。配信だけなら`show-delivery-resume`、受付も戻すなら`show-resume`を個別に明示する。停止・再開操作の返答喪失は`show-control-status SHOW OPERATION_UUID`で保存結果を読む。[操作ガイド](show_availability.md)参照。更新中の配信継続、未知prepare/PUT/activationの再送・自動解除は追加しない。
 
-> 2026-10-20: Issue #48の新layoutでは[Show分離契約](do_show_separation_options.md)の共有更新手順を適用する。全体Pauseはなく、各ShowのPause/drain・原子的なprepare/Resume拘束と所属集合固定を行う。全Showと制御DOのprobe成功・保守拘束解除を確認するまで全体完了を返さない。Show別prepare/activation/解除の送信開始と結果を制御DOへ永続記録し、未知応答を再送しない。旧layoutやそのjournalへの互換導入・変換は対象外。以下のPUT checkpoint・正確なruntime照合・非再送の安全条件を新layoutでも維持する。
+> 2026-10-20: Issue #48の新layoutでは[Show分離契約](../do_show_separation_options.md)の共有更新手順を適用する。全体Pauseはなく、各ShowのPause/drain・原子的なprepare/Resume拘束と所属集合固定を行う。全Showと制御DOのprobe成功・保守拘束解除を確認するまで全体完了を返さない。Show別prepare/activation/解除の送信開始と結果を制御DOへ永続記録し、未知応答を再送しない。旧layoutやそのjournalへの互換導入・変換は対象外。以下のPUT checkpoint・正確なruntime照合・非再送の安全条件を新layoutでも維持する。
 
 新layoutの配備後GETは制御DOだけでなく、固定した全Showのnative version/prepared/保守拘束も照合する。`targets_native_ready=false`なら、制御DOが新versionでもactivationを始めない。有限観測で停止後は、同じ既知配備のverifyで読取から続行し、全対象を確認した後だけ初回activationを行う。
 
-2026-10-21の[Show分離後の小規模実機確認](archive/do_show_separation_worker_update_live_20261021.md)では、2 Show・6 Episodeを保持してcode-only更新した。native反映待ちで有限観測が停止した後、全対象の新version/preparedを読取確認し、再配備せず正式verifyからactivation/probeを完了。保守拘束解除、個別Resume、既存配信保持とmetadata-only公開2件を確認し、最終paused/ready/drainedとした。故障注入・負荷測定や旧layout移行の証拠ではない。
+2026-10-21の[Show分離後の小規模実機確認](do_show_separation_worker_update_live_20261021.md)では、2 Show・6 Episodeを保持してcode-only更新した。native反映待ちで有限観測が停止した後、全対象の新version/preparedを読取確認し、再配備せず正式verifyからactivation/probeを完了。保守拘束解除、個別Resume、既存配信保持とmetadata-only公開2件を確認し、最終paused/ready/drainedとした。故障注入・負荷測定や旧layout移行の証拠ではない。
 
 Issue [#11](https://github.com/simosako/castloop-v2/issues/11)の最新コメントと、
 [#33の棚卸し](https://github.com/simosako/castloop-v2/issues/33)で確認した現行SQLite経路を対象とするv0.5.2の修正。
@@ -90,7 +90,7 @@ activation開始後は、応答がなくても旧deploymentが見えても`verif
 fixtureのETagは送信sourceのhashとして模擬する。実Cloudflareの応答形、ETag処理、native rollout/Alarm/output gateをこの試験だけで実証したとは扱わない。
 修正作成時の上記ローカル検証では、実環境の配備・resume・公開・資源変更、旧環境の再構築や元journalの復旧は行っていない。
 
-その後、管理者の別承認により新規隔離環境で[限定実機検証](archive/sqlite_update_recovery_verification_20261018.md)を実施した。
+その後、管理者の別承認により新規隔離環境で[限定実機検証](sqlite_update_recovery_verification_20261018.md)を実施した。
 2箇所のGET故障注入から再配備せず続行し、同一code更新2回のETag分離とnative readinessを確認した。
 両更新ともnative versionの有限待機で一度停止し、GET-only照合後に未開始のactivationを明示続行している。
 最終ready/paused/drained、公開0件。元のtimeout原因確定・旧upload-only journal復旧・性能測定の実証には広げない。

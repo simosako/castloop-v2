@@ -1,6 +1,6 @@
 # M6: 承認済み方針と開発範囲
 
-> 本書の未知IO保全・記録保持・upload整合性・Paidへ変更しない安全方針は現行SQLiteにも適用する。Queueの開発・実機検証・移行承認は当時の履歴で、v0.6.0の新たな操作許可や実装予定ではない。現行SQLiteは物理delete・独自domain・旧schema移行に対応しない。[現行設計](initial_design.md)参照。
+> 本書の原本・公開済みメディア・履歴・私有証跡の保全と、Paidへ自動変更しない安全方針は現行SQLiteにも適用する。Queueの開発・実機検証・移行承認や、未知IO・lockの旧復旧制約は当時の履歴であり、新たな実環境操作の許可や現行の実装予定ではない。v0.8.0は独自ドメインに対応するが、物理delete・旧schema移行は提供しない。現行の同期公開・同じ承認済み入力での再実行・ドメイン続行は[現行設計](initial_design.md)と[SQLiteガイド](../docs/sqlite_sequential_development.md)を優先し、旧jobの強制解放や記録削除に読み替えない。
 
 更新日: 2026-10-04
 
@@ -111,4 +111,4 @@ R2/CLIの[完全性検証調査](archive/m6_upload_integrity_review.md)で、管
 
 strictな制御/request/status/progress/commitとallowlist診断、CAS job journal、Show CAS受付、reserved限定abandon、invocation token、完了解放receipt、移行inventory、削除対象ページ、owner-gated payload batch/verification pass、削除開始/最終purge/子tombstone/完了解放、lifecycle対応feed入力、Show/Episode停止・保存済みsnapshot再開状態機械、通常終了consumer/続行/requeue、公開gateway、内部cached entrypoint/transport/purge。既存本番DLQ handlerの固定診断化は接続済みだが、lifecycle操作はまだ本番へ接続しない。個々の自動テスト合格はM6全体の受け入れ合格ではない。
 
-詳細は[M6設計](archive/m6_content_lifecycle_plan.md)、[実装ログ](archive/m6_implementation_log.md)、[U1と単一PUT方針](./m6_upload_recovery_options.md)を参照。
+詳細は[M6設計](archive/m6_content_lifecycle_plan.md)、[実装ログ](archive/m6_implementation_log.md)、[U1と単一PUT方針](archive/m6_upload_recovery_options.md)を参照。

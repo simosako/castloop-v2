@@ -1,6 +1,6 @@
 # 配信統計（Episode別・日別）の利用ガイド
 
-Issue #71の配信統計の操作ガイド。現行の開発版は内部queue/content形式 **14/13**、識別`delivery_statistics="episode-daily-v1"`を使う新規環境専用。旧環境への互換配備・データ移行は行わない（[設計](../design/episode_delivery_statistics_plan.md)・[サイトガイド](show_website.md)参照）。
+v0.8.0の配信統計の操作ガイド。内部queue/content形式 **14/13**、識別`delivery_statistics="episode-daily-v1"`を使う新規環境専用。旧環境への互換配備・データ移行は行わない（[設計](../design/episode_delivery_statistics_plan.md)・[サイトガイド](show_website.md)参照）。
 
 ## 何を数えるか・数えないか
 

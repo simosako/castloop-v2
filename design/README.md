@@ -2,7 +2,7 @@
 
 `castloop` の現在のアーキテクチャは、2026-10-28〜10-29に実施した全体簡素化（[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)・[フェーズ4](phase4_code_and_test_cleanup_plan.md)）に基づく新規環境専用の構成（内部 queue/content 形式 **14/13**、サービス設定 `schema_version = 2` / `storage_layout = "show-v1"`）である。
 
-開発・保守時はまず **[全体設計（initial_design.md）](initial_design.md)** と **[AGENTS.md](../AGENTS.md)** を参照すること。過去の非同期ジョブ方式（v0.6.0〜v0.7.6）や Queue 方式（v0.5.x）の設計書・実機試験記録はすべて **[archive/](archive/)** に分離してあり、通常の開発で参照する必要はない。
+開発・保守時はまず **[全体設計（initial_design.md）](initial_design.md)** と **[AGENTS.md](../AGENTS.md)** を参照すること。過去の非同期ジョブ方式（v0.6.0〜v0.7.6）や Queue 方式（v0.5.x）の文書の多くは **[archive/](archive/)** に保存している。ただし、直下の個別機能設計にも導入時の比較検討・旧仕様が残る。現行契約は全体設計・フェーズ1〜4の最終状態・現行利用ガイドで確認し、旧Pause/Resume・job・staging手順を現在の操作に適用しない。
 
 ---
 
@@ -45,12 +45,12 @@
 - [SQLite開発・運用ガイド](../docs/sqlite_sequential_development.md): 初期化（`init`）、公開（`publish-*`）、ライフサイクル（`unpublish`/`restore`）、デプロイ（`deploy`）の基本操作
 - [内蔵番組サイト利用ガイド](../docs/show_website.md): `site_mode = "builtin"`、短縮 URL、カスタム CSS、`site_timezone`
 - [管理用設定と予約公開ガイド](../docs/admin_configuration.md): `castloop-admin.toml` と `schedule-*` コマンド
-- [公開内容の確認・リビジョン復元ガイド](../docs/published_content_review.md): `diff-*`, `export-*`, `list-*-revisions`, `revision-execute`
+- [公開内容の確認・リビジョン復元ガイド](../docs/published_content_review.md): `preview-*`, `sync-local-metadata`, `list-*-revisions`, `revision-execute`
 - [配信統計利用ガイド](../docs/delivery_statistics.md): `stats`, `stats-retention`
 - [SQLite独自ドメイン操作ガイド](../docs/sqlite_custom_domains.md): `domain add|remove|continue|status|list`
 - [リモート診断・検証ガイド](../docs/observability.md): `diagnose`, `verify`
 - [ワークスペースバックアップ利用ガイド](../docs/workspace_backup.md): `backup-create`, `backup-verify`, `backup-restore`
-- [エージェント向けCLI利用ガイド](../docs/agent_usage.md): `schema`, `template`, `validate`, `doctor`, `export-skill`
+- [エージェント向けCLI利用ガイド](../docs/agent_usage.md): `schema`, `template`, `validate`, `doctor`, `skill export`
 - [RSS移行ガイド](../docs/rss_migration.md): `import-rss`, `publish-rss-import`
 
 ---
