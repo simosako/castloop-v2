@@ -1,120 +1,103 @@
 # 全体アーキテクチャ
 
-castloopは、管理者のCloudflareアカウントに配備するPodcastホスティング基盤である。管理者は単一のCLIバイナリで番組を管理し、リスナーはRSS、音声、カバー画像、内蔵番組サイトをHTTPで取得する。
+castloopは、管理者のCloudflareアカウントで動くPodcastホスティング基盤です。管理者はCLIで番組とエピソードを編集・公開します。リスナーは、RSS（Feed）、音声、カバー画像、内蔵番組サイトをHTTPで取得します。
 
-この設計文書群はv0.8.0の現行実装を対象とする。操作方法は[利用ガイド](../README.md)、開発環境は[CONTRIBUTING.md](../CONTRIBUTING.md)を参照する。
+本書ではサービスの構成と主要な処理を説明します。次に[保存構造](data/storage.md)を読むと、各処理が使うデータの配置を確認できます。
 
-## 構成と責務
+## サービスの構成
 
-1サービスを1個のWorker、1個の非公開R2バケット、SQLite-backed Durable Objects（DO）で構成する。QueuesやD1は使わない。
+1サービスは、1個のWorker、1個の非公開R2バケット、SQLiteを使うDurable Objects（DO）で構成します。DOは、サービス全体を扱う制御DOと、番組ごとの公開内容を扱うShow DOに分かれます。
 
 ```mermaid
 flowchart LR
-  管理者 --> CLI[スタンドアロンCLI]
-  CLI --> ローカル[ローカルTOML・素材・管理記録]
-  CLI -->|管理API| Gateway[Workerの入口]
-  CLI -->|Cloudflare REST API| CF[配備・DNS・R2管理]
+  Admin[管理者] --> CLI[CLI]
+  CLI --> Local[ローカルTOML・素材・管理記録]
+  CLI -->|管理API| Worker[Worker]
+  CLI -->|Cloudflare REST API| CF[Worker配備・DNS・R2管理]
   CF --> R2[非公開R2]
-  リスナー --> Gateway
-  Gateway --> Control[制御DO：サービス単位]
-  Gateway --> Show[Show DO：番組単位]
-  Gateway --> Cache[メディア・サイトのキャッシュ入口]
+  Listener[リスナー] --> Worker
+  Worker --> Control[制御DO：サービス単位]
+  Worker --> Show[Show DO：番組単位]
+  Worker --> Cache[キャッシュ用エントリポイント]
   Cache -->|音声・画像| R2
   Cache -->|RSS・HTML生成| Show
-  Control -->|登録・一覧・ドメイン変更| Show
+  Control -->|登録・状態確認・ドメイン変更| Show
 ```
 
-| コンポーネント | 責務 |
+| コンポーネント | 役割 |
 | --- | --- |
-| [CLI](components/cli.md) | ローカル入力の検証、差分確認、素材の直接配置、明示的な公開、配備・設定管理 |
-| Workerの入口 | オリジン・パス・対象Showの判定。管理APIと公開配信の振り分け |
-| [Show DO](components/show-do.md) | 各番組の公開内容、履歴、公開可否、予約、統計の保持と更新 |
-| [制御DO](components/control-do.md) | Show登録・一覧取得、サービス全体の独自ドメイン変更の調整 |
-| [配信・キャッシュ](components/delivery.md) | 公開可否の確認後にメディアを配信し、RSS・HTMLを必要時に生成してキャッシュ |
-| R2 | 不変メディアとサービス設定の保存。公開済みメタデータの正本にはしない |
+| [CLI](components/cli.md) | ローカル入力の検証、プレビュー、素材のアップロード、公開、サービス管理 |
+| Worker | オリジン・パス・対象Showを確認し、管理APIと公開配信を振り分ける |
+| [制御DO](components/control-do.md) | Showの登録・一覧取得と、サービス全体の独自ドメイン変更 |
+| [Show DO](components/show-do.md) | 番組ごとの公開内容、履歴、公開状態、予約、配信統計の管理 |
+| [配信・キャッシュ](components/delivery.md) | 配信可否を確認した要求に対し、素材の取得やRSS・HTMLの生成を行う |
+| R2 | 音声・カバー画像とサービス設定の保存 |
 
-制御DOの名前は `service/<service_id>`、Show DOは `show/<service_id>/<show_id>`。同じDOクラスを使うが、SQLiteと公開状態はDOごとに分離する。通常の公開・配信は対象Show DOだけで完結し、制御DOを経由しない。
+制御DOの名前は `service/<service_id>`、Show DOは `show/<service_id>/<show_id>` です。同じDOクラスから作られますが、保存先のSQLiteは独立しています。通常の公開・配信は対象のShow DOで処理します。
 
-## データの正本
+## データの役割
 
-| 場所 | 正本とするもの |
+| 保存先 | 保持するデータ |
 | --- | --- |
-| ローカルワークスペース | 管理者が編集するTOML、メディア原本、管理者キー、操作継続に必要な記録 |
-| Show DO SQLite | 確定済みShow/Episodeメタデータ、リビジョン履歴、公開可否、予約、配信統計 |
-| 制御DO SQLite | Show登録簿と独自ドメイン接続情報 |
-| 非公開R2 | SHA-256をキーにした音声・カバー画像と `system/service.toml` |
+| ローカルワークスペース | 編集用TOML、素材の原本、管理者キー、操作の進捗記録 |
+| 制御DOのSQLite | Show登録簿、独自ドメイン接続情報 |
+| Show DOのSQLite | 確定したメタデータ、履歴、公開状態、予約、配信統計 |
+| 非公開R2 | SHA-256をキーにした音声・カバー画像、`system/service.toml` |
 
-ローカルファイルを編集しただけでは公開済み内容は変わらない。配信はローカルファイルではなく、SQLiteに確定した内容と承認済みメディア参照を使う。配置と保持方針は[保存構造](data/storage.md)を参照する。
+ローカルファイルは編集元、Show DOのSQLiteは公開内容の正本です。公開操作でSQLiteに内容を確定すると、配信に反映されます。音声と画像はR2に保存し、SQLiteからその素材を参照します。
 
-## 主要フロー
+## 公開・更新の流れ
 
-### 公開・更新
+1. CLIがTOMLと素材を検証し、現在の公開内容との差分を取得します。
+2. 新規または変更された素材を、R2のハッシュ付きキーへアップロードします。
+3. CLIがメタデータ、素材参照、更新元の版をShow DOへ送ります。
+4. Show DOが対象と更新元を確認し、更新後のRSS・サイトを検証して、必要なキャッシュを消去します。
+5. Show DOが、現在内容・履歴・短縮URLの対応・世代番号を1回のSQLiteトランザクションで確定します。
 
-1. CLIがTOMLと素材を検証し、現在の公開内容との差分・更新元の版を取得する。
-2. 初回または変更された素材だけを、R2のコンテンツハッシュキーへ直接PUTする。
-3. メタデータと素材参照をShow DOへ送る。
-4. Show DOが対象・更新元・生成結果を検証し、必要なキャッシュパージを完了する。
-5. 単一SQLiteトランザクションで公開内容・履歴・短縮URL対応・世代番号を確定する。
+公開内容の版をリビジョンと呼びます。同じ内容を再送した場合は、現在のリビジョンを返します。内容を変える場合は更新元の版を照合するため、古いプレビューから別の更新を上書きすることを防げます。
 
-同一内容なら履歴を追加しない。素材配置とSQLite更新は分散トランザクションではないため、公開に失敗してもR2に素材が残る場合がある。残った素材だけで配信可能にはならず、失敗を理由に削除もしない。
+R2へのアップロードとSQLiteへの確定は別の処理です。公開が失敗すると、R2に素材だけが残る場合があります。配信ではSQLiteで承認された素材参照を使うため、その素材が単独で公開されることはありません。素材の保持方針は[保存構造](data/storage.md)を参照してください。
 
-### 公開配信
+## 公開配信の流れ
 
-1. Workerが公開オリジン・許可パス・HTTPメソッドを検査する。
-2. Show DOが公開可否と世代、配信対象を返す。
-3. その判定を通った要求だけを、世代情報付きでキャッシュ入口へ渡す。
-4. キャッシュミス時、音声・画像はR2から取得し、RSS・HTMLはShow DOのSQLiteから生成する。
+1. Workerが要求のオリジン、パス、HTTPメソッドを確認します。
+2. Show DOが対象の公開状態を確認し、配信対象と世代番号を返します。
+3. Workerが世代番号を添えて、キャッシュ用エントリポイントを呼び出します。
+4. キャッシュに本文がなければ、音声・画像はR2から取得し、RSS・HTMLはShow DOのデータから生成します。
 
-キャッシュヒットでも公開可否の確認は省略しない。非公開化した内容が古いキャッシュから漏れないことが設計上の境界である。
+公開状態は、キャッシュに本文がある場合も毎回確認します。これにより、非公開化した内容を古いキャッシュから配信することを防ぎます。
 
-### サービス管理
+## サービス管理の流れ
 
-- `init` は新規サービスを作り、配備と稼働確認を行う。
-- `create-show` はShowを登録してローカルTOMLを作るが、公開はしない。
-- `deploy` は同一設定のコード更新。設定変更は独自ドメイン変更の専用処理で行う。
-- 独自ドメイン変更は変更前後の設定を保存し、制御DOと全Show DOで反映を確認する。サービス全体をまたぐ単一トランザクションではない。
-
-## 実装上の境界
-
-| 項目 | 現行値 |
+| 操作 | 処理 |
 | --- | --- |
-| サービス設定 | `schema_version = 2`、`storage_layout = "show-v1"` |
-| 公開プロトコル | `sqlite-sequential-v1` |
-| SQLite内部形式 | queue 14 / content 13、配信統計 1 |
-| Show/Episodeメタデータ | `schema_version = 1` |
-| Workerエントリポイント | `src/sqlite-worker.ts` |
-| 配備時のCompatibility Date | `2026-10-16` |
+| `init` | 新規サービスの設定とリソースを作り、Workerを配備して稼働を確認する |
+| `create-show` | 制御DOとShow DOに番組を登録し、ローカルの編集用TOMLを作る |
+| `deploy` | 同じサービス設定でWorkerのコードを更新する |
+| 独自ドメイン変更 | 変更前後の設定を保存し、Cloudflare側の接続、全Show DO、制御DO、ローカル設定の順に反映を確認する |
 
-新規環境のみを対象とし、異なる内部形式の変換や既存リソースの採用は行わない。設定版・内部DB形式・要求スキーマ版は別の識別子である。詳細は[スキーマ](data/schemas.md)を参照する。
+Showの登録後は `draft` 状態です。公開操作を行うと `published` になります。独自ドメイン変更は複数の保存先にまたがるため、各保存先の状態を確認しながら進めます。詳細は[制御DO](components/control-do.md)を参照してください。
 
-### Workerの配備設定
+## Workerの実装と配備設定
+
+Workerのエントリポイントは `src/sqlite-worker.ts` です。CLIのビルド時にWorkerをバンドルして埋め込み、配備時には以下のバインディングを設定します。Compatibility Dateは `2026-10-16` です。
 
 | バインディング | 用途 |
 | --- | --- |
-| `CASTLOOP_BUCKET` | サービスの非公開R2バケット |
-| `CASTLOOP_SQLITE` | SQLite-backed DOクラス `SqlitePublicationService` の名前空間 |
-| `CASTLOOP_ADMIN_KEY` | 管理APIの共有秘密。secret bindingで渡す |
+| `CASTLOOP_BUCKET` | 非公開R2バケット |
+| `CASTLOOP_SQLITE` | DOクラス `SqlitePublicationService` の名前空間 |
+| `CASTLOOP_ADMIN_KEY` | 管理APIの共有秘密。secret bindingとして設定 |
 | `CASTLOOP_VERSION_METADATA` | 稼働Worker版の識別 |
 | `CASTLOOP_SQLITE_CONFIG` | サービス設定のJSON |
 | `CASTLOOP_SERVICE_ID` | サービス識別子 |
 | `CASTLOOP_MANAGEMENT_ORIGIN` | 管理用オリジン |
 
-`enable_ctx_exports` を有効にし、メディア・Feed用の `SqliteCachedAssets` とHTML用の `SiteCachedPages` をキャッシュ対応入口として公開する。標準入口のキャッシュとWorker版をまたぐキャッシュ共有は無効。クラス名・バインディング名・Compatibility Date・保存形式は、コード整理だけを理由に変更しない。
+`enable_ctx_exports` を有効にし、メディア・RSS用の `SqliteCachedAssets` とHTML用の `SiteCachedPages` をキャッシュ用エントリポイントとして公開します。標準エントリポイントのキャッシュと、Worker版をまたぐキャッシュ共有は無効です。
 
-## 変更時に守ること
+DOクラス名やバインディング名、保存形式は既存データとの接続に関わります。コードの整理ではこれらを維持します。設定・要求・SQLiteの形式は[スキーマ](data/schemas.md)にまとめています。
 
-- 作成・プレビュー・素材配置では公開しない。
-- 内容を変更する要求では設定・対象・更新元・世代を照合し、古い入力で上書きしない。
-- 必要なパージが成功するまで公開内容を確定しない。
-- 公開済みメディアと履歴を保持し、非公開化と物理削除を混同しない。
-- 統計記録の失敗を配信失敗にしない。
-- ローカル試験の成功を、Cloudflare上の性能や料金プラン適合の証明にしない。
+## 関連する設計と実装
 
-認証と機密情報の扱いは[セキュリティ](security.md)、確認方法は[テスト](testing.md)を参照する。
-
-## 主な定義元
-
-- [WorkerとDOの接続](../src/sqlite-worker.ts)
-- [Showへの振り分け](../src/sqlite-show-routing.ts)
-- [Worker配備メタデータ](../packages/shared/src/sqlite-worker-deployment.ts)
-- [CLIバイナリのビルド](../scripts/build-cli.ts)
+- 次に読む資料：[保存構造](data/storage.md)、[スキーマ](data/schemas.md)
+- 横断的な設計：[セキュリティ](security.md)、[テスト](testing.md)
+- 実装：[Worker](../src/sqlite-worker.ts)、[Showの振り分け](../src/sqlite-show-routing.ts)、[配備メタデータ](../packages/shared/src/sqlite-worker-deployment.ts)、[CLIビルド](../scripts/build-cli.ts)

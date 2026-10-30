@@ -1,12 +1,12 @@
-# Annotated input example for episode-<episodeId>.toml, not a file consumed by the CLI.
-# Edit the file from create-episode; preserve its episode_id, guid and published_at.
-# Do not upload or publish this example unchanged.
+# Field reference for episode-<episode_id>.toml.
+# Start with create-episode and fill in the episode information before publishing.
+# Keep episode_id, guid, and published_at when updating a published episode.
 schema_version = 1
 episode_id = "2026-01-02-hello"
 guid = "550e8400-e29b-41d4-a716-446655440000"
 title = "はじめまして"
 description = "番組の最初のエピソード"
-published_at = "2026-01-02T10:00:00+09:00" # Example only; use a quoted RFC 3339 string.
+published_at = "2026-01-02T10:00:00+09:00" # Quoted RFC 3339 timestamp.
 episode_type = "full"
 
 # Optional fields
@@ -14,5 +14,5 @@ episode_type = "full"
 # season_number = 1
 # episode_number = 1
 
-# Audio paths, URLs and generated revision fields do not belong in this file.
-# A future published_at is not a schedule; use the scheduling commands to wait.
+# Pass the audio file path to the publication or scheduling command.
+# Use scheduling commands to publish at a specified time.

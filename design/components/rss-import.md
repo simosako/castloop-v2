@@ -1,24 +1,35 @@
 # RSS取り込みの設計
 
-RSS取り込みは、外部Podcastのメタデータと素材をローカルへ保存し、内容を確認した後、新規Showとして公開する機能である。元サービスの変更、旧Feedのリダイレクト、購読者の移行完了までは行わない。
+RSS取り込みは、外部PodcastのRSSと素材をローカルへ保存し、内容を確認・編集した後に新規Showとして公開する機能です。取得、事前検査、順次公開の3段階に分けています。利用者向けの手順は[RSS移行ガイド](../../docs/rss_migration.md)を参照してください。
 
-## 入出力と段階
+## 処理の構成
 
-| 処理 | 入力 | 出力・副作用 |
+| 処理 | 入力 | 出力 |
 | --- | --- | --- |
-| `import-rss --dry-run` | 新規Show ID、RSS URL | 件数、音声申告サイズ、必須項目不足、警告。Cloudflareを変更しない |
-| `import-rss --output` | 同上、保存先 | RSSスナップショット、TOML、素材、ダウンロード完了記録 |
-| `publish-rss-import` | 保存済み取り込みディレクトリ、サービス設定 | 新規Show登録、素材配置、ShowとEpisodeの順次公開、結果Feedの照合 |
+| `import-rss --dry-run` | 新規Show ID、RSS URL | 件数、申告音声サイズ、不足項目、警告 |
+| `import-rss --output` | 同上、保存先 | RSSスナップショット、TOML、素材、ダウンロード記録 |
+| `publish-rss-import` | 取り込みディレクトリ、サービス設定 | Show登録、素材アップロード、Show・Episodeの公開、公開Feedの確認結果 |
 
-ダウンロードと公開を分離する。TOMLの修正は公開前に行い、元のGUID・公開日時等の同一性は保持する。
+ダウンロード後にTOMLを編集し、公開処理へ進みます。タイトルや説明は修正できます。EpisodeのGUID・公開日時など、元の番組との同一性を表す値は保持します。
 
-## 外部取得
+## RSSと素材の取得
 
-RSS URLと素材URLはHTTP(S)に限定し、認証情報、フラグメント、独自ポート、localhostを拒否する。DNSの全結果が公開アドレスであることを検査し、検査したアドレスへ接続する。リダイレクトごとに再検査し、HTTPSからHTTPへの変更を拒否する。リダイレクトは最大5回。
+外部URLへの通信では、取得先とサイズを制限します。内部ネットワークへの接続を防ぐため、URL検査とDNS検査を組み合わせます。
 
-圧縮応答は受け付けず、申告サイズと実際の読取量を検査する。RSSと保存済みXMLは8 MiB、カバーは5,000,000 bytes、音声1本は300,000,000 bytesまで。取得結果は空でないこと、宣言された長さと一致することを確認する。
+1. HTTP(S) URLを解析し、認証情報・フラグメント・独自ポート・localhostを拒否します。
+2. DNSの全結果が公開アドレスであることを確認し、検査したアドレスへ接続します。
+3. リダイレクト先でも同じ検査を行います。最大5回とし、HTTPSからHTTPへの変更を拒否します。
+4. 圧縮されていない本文を読み、申告サイズと実際の読み取り量を確認します。
 
-## ローカル保存
+| 対象 | 上限 |
+| --- | --- |
+| RSS・保存済みXML | 8 MiB |
+| カバー | 5,000,000バイト |
+| 音声1本 | 300,000,000バイト |
+
+空の取得結果や、宣言された長さと異なる結果はエラーにします。
+
+## ローカルへの保存
 
 ```text
 取り込みディレクトリ/
@@ -34,41 +45,44 @@ RSS URLと素材URLはHTTP(S)に限定し、認証情報、フラグメント、
     └── <episode_id>.json
 ```
 
-制御記録は取り込みUUID、Show ID、要求URL、最終URL、RSSハッシュを保持する。素材の完了記録は保存先・長さ・SHA-256を持つ。一時ファイルへ保存・同期した後に配置し、ディレクトリも同期する。
+`control.json` には取り込みUUID、Show ID、要求URL、最終URL、RSSハッシュを保存します。素材の完了記録には、保存先・サイズ・SHA-256を持たせます。ファイルは一時ファイルへの書き込みと同期後に配置し、ディレクトリも同期します。
 
-再実行では保存済みRSSと完了素材を照合して再利用する。完了記録のない既存素材、変更された完了素材、異なるURL・Showの記録を黙って採用しない。生成済みTOMLはダウンロードの再実行で上書きしないため、公開前の編集を保持できる。
+再実行時は保存済みRSSと完了記録を照合し、確認できた素材を再利用します。既存素材に完了記録がない場合や、記録と素材が一致しない場合はエラーにします。生成済みTOMLは保持するため、ダウンロードの再実行後も編集内容が残ります。
 
-## 公開前の検査
+## 公開前の一括検査
 
-公開処理は、Show登録やメディアPUTより先に全入力を検査する。
+Show登録や素材アップロードを始める前に、全入力を検査します。
 
 - RSSスナップショットと制御記録の一致
-- Show/Episodeの形式、項目別入力上限、カバー形式
-- 元RSSに対するEpisode ID、GUID、permalink指定の意味、公開日時の維持
-- ダウンロード記録に対する音声のサイズ・ハッシュ一致とMP3解析
-- 公開後の全体読取・描画予算。取り込みでは付加されるリビジョン情報等も保守的に見積もる
+- Show/Episodeの形式、項目別上限、カバー形式
+- 元RSSに対するEpisode ID・GUID・permalink指定・公開日時の維持
+- ダウンロード記録と音声サイズ・ハッシュの一致、MP3の解析結果
+- 公開後の一覧読み取りとRSS描画のサイズ制限
 
-タイトルや説明等は編集できるが、制約超過を自動的に切り詰めない。未来の `published_at` を含む場合は、即時公開を認める明示指定が必要になる。
+描画サイズは、公開時に追加されるリビジョン情報も含めて見積もります。制限を超えた入力はエラーとして返します。未来の `published_at` を含む場合は、即時公開を認める明示指定を求めます。
 
-## 順次公開と再実行
+## 順次公開
 
-ワークスペース側の `sqlite-rss-imports/<service_id>/<import_id>.json` に、設定・取り込み元・全入力のハッシュ、配置完了、公開手順の位置を保存する。記録のスキーマ版は3で、状態は `ready` / `publishing` / `completed`。
+公開の進捗は、ワークスペースの `.castloop/sqlite-rss-imports/<service_id>/<import_id>.json` に保存します。記録には設定・取り込み元・全入力のハッシュ、ファイル配置の完了、公開位置を持たせます。状態は `ready` / `publishing` / `completed` です。
 
-1. 新規Showであることを確認し、通常の `create-show` を呼ぶ。
-2. 検査済みのTOML・カバー・CSSをShowディレクトリへ配置する。
-3. Showを公開し、Episodeを公開日時・IDの順に1件ずつ公開する。
-4. 各成功結果を確認して手順位置を進める。
-5. 公開Feedを取得し、GUID・日時・音声URL等を照合して完了にする。
+1. 対象が新規Showであることを確認し、`create-show` で登録します。
+2. 検査したTOML・カバー・CSSをShowディレクトリへ配置します。
+3. Showを公開し、Episodeを公開日時・IDの順に1件ずつ公開します。
+4. 各結果を確認して、進捗記録を更新します。
+5. 公開Feedを取得し、GUID・日時・音声URLなどを照合して完了にします。
 
-**バッチ全体はアトミックではない。** 中断前に成功したShow/Episodeは公開されたまま残る。再実行時は同じ取り込み記録を使い、通常公開の同一内容判定を利用する。入力・設定・取り込み元を途中で変えたり、既存Showへ追記するために記録を流用したりしない。
+公開の確定単位は1件ずつです。途中で中断した場合、それまでに成功したShow/Episodeは公開済みとして残ります。
 
-配置完了が記録される前に中断した場合は、確認済み取り込み元から生成ファイルを配置し直す。公開開始後も、配置済みメタデータと素材を承認済み入力に照合する。音声は取り込み元パスから読むため、公開完了までは元ディレクトリを保持する。
+## 中断後の再実行
 
-ローカル取り込みディレクトリはサービス設定を持たず、ワークスペースバックアップの対象ではない。元の編集・素材・記録は別途保全する。
+同じ取り込みディレクトリ、サービス設定、入力で再実行します。進捗記録と公開済み内容を照合し、同一内容の公開は通常の公開処理の `unchanged` 判定を使います。
 
-## 定義元と関連テスト
+ファイル配置の完了を記録する前に中断した場合は、取り込み元から配置し直します。公開開始後も、配置済みメタデータと素材を承認済み入力に照合します。音声は取り込み元のパスから読むため、完了までそのディレクトリを保持します。
 
-- [取得先と通信制約](../../packages/cli/src/rss-import-download.ts)、[RSS解析](../../packages/cli/src/rss-import-feed.ts)、[ローカル保存](../../packages/cli/src/rss-import-local.ts)
-- [公開前検査](../../packages/cli/src/rss-import-preflight.ts)、[順次公開](../../packages/cli/src/sqlite-rss-publication.ts)、[Feed照合](../../packages/cli/src/rss-publication-content.ts)
-- [取得テスト](../../packages/cli/src/rss-import-download.test.ts)、[ローカル保存テスト](../../packages/cli/src/rss-import-local.test.ts)、[事前検査テスト](../../packages/cli/src/rss-import-preflight.test.ts)、[順次公開テスト](../../packages/cli/src/sqlite-rss-publication.test.ts)
-- 操作方法：[RSS移行ガイド](../../docs/rss_migration.md)
+取り込みディレクトリはワークスペースとは別に保存・保管します。進捗記録の形式は[スキーマ](../data/schemas.md)、ワークスペースとの関係は[保存構造](../data/storage.md)を参照してください。
+
+## 実装と関連テスト
+
+- 取得と保存：[通信](../../packages/cli/src/rss-import-download.ts)、[RSS解析](../../packages/cli/src/rss-import-feed.ts)、[ローカル保存](../../packages/cli/src/rss-import-local.ts)
+- 公開：[事前検査](../../packages/cli/src/rss-import-preflight.ts)、[順次公開](../../packages/cli/src/sqlite-rss-publication.ts)、[Feed照合](../../packages/cli/src/rss-publication-content.ts)
+- テスト：[取得](../../packages/cli/src/rss-import-download.test.ts)、[保存](../../packages/cli/src/rss-import-local.test.ts)、[事前検査](../../packages/cli/src/rss-import-preflight.test.ts)、[順次公開](../../packages/cli/src/sqlite-rss-publication.test.ts)

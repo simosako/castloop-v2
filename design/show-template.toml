@@ -1,6 +1,5 @@
-# Annotated input example for <showId>/show.toml, not a file consumed by the CLI.
-# Edit the file from create-show; preserve its show_id and replace sample metadata.
-# Do not upload or publish this example unchanged.
+# Field reference for <show_id>/show.toml.
+# Start with create-show, keep its show_id, and fill in your podcast information.
 schema_version = 1
 show_id = "samplepodcast"
 title = "Sample Podcast"
@@ -17,12 +16,11 @@ image_path = "cover.jpg"
 # Optional fields
 # copyright = "Copyright 2026 Taro Yamada"
 # show_type = "episodic"
-# site_timezone = "Asia/Tokyo" # Optional builtin website date display; default UTC.
-# site_css_path = "site.css" # Optional CSS file beside show.toml; do not set site_css directly.
+# site_timezone = "Asia/Tokyo" # Website date display; default UTC.
+# site_css_path = "site.css" # CSS file beside show.toml.
 
 # External websites: replace site_mode with "external", set site_url below,
 # and omit site_timezone and site_css_path.
 # site_url = "https://example.com/samplepodcast"
 
-# image_path names a JPEG/PNG file beside show.toml; media files are not included here.
-# public_base_url belongs in castloop.toml, not in this file.
+# image_path names a JPEG/PNG file beside show.toml.
