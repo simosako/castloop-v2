@@ -6,17 +6,18 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   domain: { usage: "domain add HOSTNAME --zone-id ZONE_ID [--operation-id UUID] | remove [--operation-id UUID] | list | status UUID [--cursor SHOW_ID] | continue UUID",
     description: "Manage one dedicated custom subdomain in the same account's active/full Cloudflare DNS zone. Registrar transfer is not required.\n" +
       "add/remove redeploy the same Worker with a new canonical origin, bump Feed generations and purge caches in one committed step per Durable Object.\n" +
-      "Public workers.dev URLs redirect to the custom domain (Feed 301, cover/audio 307) only after explicit Show Resume. Administration remains on workers.dev.\n" +
-      "list/status are read-only. continue may perform unstarted mutations using exact acknowledged evidence; unknown PUT/POST/DELETE outcomes are never replayed or adopted.\n" +
+      "Public workers.dev URLs redirect to the custom domain (Feed 301, cover/audio 307) after the domain change commits. Administration remains on workers.dev.\n" +
+      "list/status are read-only. Use domain status UUID, then explicitly run domain continue UUID with the saved previous and target configurations.\n" +
+      "continue checks current API state and completes the same retained operation; it does not adopt unrelated resources or bypass identity checks.\n" +
       "Do not change this hostname's DNS or Worker domain connections with other tools during a domain operation. Certificates are retained on remove.\n" +
-      "Removing a domain cannot undo feed URLs saved by podcast apps. Preserve the workspace and journals on interruption; no automatic Resume or rollback." },
+      "Removing a domain cannot undo feed URLs saved by podcast apps. Preserve the workspace and journals on interruption; no automatic rollback." },
   doctor: { usage: "doctor [--local] [--workspace PATH] [--json]", description: "Compact offline checks with no writes, key generation, networking or repairs. Warnings alone exit 0; failed checks exit 1. Credential presence is not validity." },
   diagnose: { usage: "diagnose SHOW_ID [SHOW_ID...] [--max-shows N] [--external]",
     description: "Read-only local and remote diagnosis for explicitly listed Shows (serial; at most 5 by default, --max-shows up to 20).\n" +
-      "Performs management API GETs plus one Cloudflare account GET; never mutates, repairs, purges, resumes or replays anything.\n" +
-      "Checks workspace, key and credentials, service runtime identity, shared maintenance, admission, registration and published content,\n" +
+      "Performs management API GETs plus one Cloudflare account GET; never mutates, repairs, purges or retries publication.\n" +
+      "Checks workspace, key and credentials, service identity, domain-change readiness, registration and committed content,\n" +
       "classifying every check with a scope (local/remote/cross/external) and pass/warn/fail/not_checked. Any failed check exits 1; warnings alone exit 0.\n" +
-      "queued or a CLI ok is never reported as publication success; --external adds public-path delivery checks via the verify family." },
+      "A CLI ok or scheduled receipt is not publication success; --external adds public-path delivery checks via the verify family." },
   template: { usage: "template service-config|admin-config|show|episode", description: "Print an embedded example TOML without IO or registration. admin-config is optional workspace CLI preferences, not service identity. Examples are not administrator answers or registered identities; init/create-episode own real resource and GUID generation." },
   "preview-show": { usage: "preview-show ID [--local|--remote] [--rss-output FILE]", description: "Compare local TOML/CSS/cover with published content. No staging or upload. --local never networks; remote failures stop. Bind approval to publish-show --expect-preview HASH." },
   "preview-episode": { usage: "preview-episode ID [MP3] [--local|--remote] [--rss-output FILE]", description: "Compare local TOML and optional MP3 with published content. Omitted MP3 reuses published audio; initial publication needs MP3. --local reports remote not_checked. Future published_at is a warning, not a schedule. Bind approval to publish-episode --expect-preview HASH." },
@@ -35,10 +36,10 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "schedule-status": { usage: "schedule-status SHOW SCHEDULE_UUID", description: "Read a schedule, its frozen content, version, time and resulting revision. dispatched means publication and schedule completion committed together." },
   "preview-schedule-reschedule": { usage: "preview-schedule-reschedule SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE]", description: "Read-only preview of moving an undispatched schedule to a new future UTC time. Prints the current schedule, resolved time and approval_sha256; bind it to schedule-reschedule --expect-preview HASH." },
   "preview-schedule-cancel": { usage: "preview-schedule-cancel SHOW SCHEDULE_UUID", description: "Read-only preview of cancelling the current schedule version. Prints approval_sha256; bind it to schedule-cancel --expect-preview HASH." },
-  "preview-schedule-reapprove": { usage: "preview-schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N", description: "Review saved schedule content against the current runtime/base. Prints approval_sha256; no local draft journal is needed." },
+  "preview-schedule-reapprove": { usage: "preview-schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N", description: "Review saved schedule content against the current configuration/base and new time. Prints approval_sha256; does not adopt local edits." },
   "schedule-reschedule": { usage: "schedule-reschedule SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Move an undispatched schedule to a new future UTC time without changing its frozen content. Rejects a stale version or dispatched/cancelled schedule. Obtain the hash from preview-schedule-reschedule first." },
   "schedule-cancel": { usage: "schedule-cancel SHOW SCHEDULE_UUID --expect-version N --expect-preview HASH", description: "Cancel an undispatched schedule. Does not delete media or undo publication." },
-  "schedule-reapprove": { usage: "schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Explicitly reapprove saved schedule content with the reviewed current runtime/base and new time. Does not resume Shows or change saved metadata/media." },
+  "schedule-reapprove": { usage: "schedule-reapprove SHOW SCHEDULE_UUID --at DATETIME [--timezone IANA_ZONE] --expect-version N --expect-preview HASH", description: "Explicitly reapprove saved schedule content with the reviewed current configuration/base and new time. Does not change saved metadata/media or publish immediately." },
   skill: { usage: "skill export castloop --output DIRECTORY", description: "Export the embedded administrator Skill without networking or external tools. The destination must not exist; existing Skills and AGENTS.md are never overwritten." },
   validate: { usage: "validate service|admin-config|show|episode FILE [--assets] [--audio MP3] [--json]", description: "Read-only offline validation using publication input rules. admin-config validates optional CLI preferences (UTC or an IANA timezone, not abbreviations). File/audio paths use caller cwd; cover uses the TOML directory. Does not prove remote readiness or publication success." },
   describe: { usage: "describe [COMMAND] [--json]", description: "Read offline command specifications, effects and recovery rules. No credentials or workspace required." },
@@ -46,21 +47,22 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   init: {
     usage: "init [dir] [--publication-protocol sqlite-sequential-v1] [--service-id ID] [--account-id ID] [--bucket-name NAME] [--workers-subdomain NAME] [--operation-id UUID]",
     description: "Create a fresh SQLite service (schema_version=2) by default; no protocol option is required.\n" +
-      "--publication-protocol sqlite-sequential-v1 remains optional for existing scripts; no other protocol is supported.\n" +
+      "--publication-protocol sqlite-sequential-v1 is optional; no other protocol is supported.\n" +
       "Missing values are prompted on a terminal. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
       "Creates a private R2 bucket, Worker and SQLite-backed Durable Object without Queues.\n" +
-      "Verifies each step from the current state; an interrupted initialization is completed by running init again.\n" +
+      "Verifies current state; after interruption run init on the same directory with saved inputs, without repeating fresh-creation flags.\n" +
       "Existing resources are never adopted. Service schema_version=1 requires v0.5.x; migration is not provided.",
   },
   "create-show": {
     usage: "create-show ID [--site-mode builtin|external] [--site-url URL]",
-    description: "Run from the service workspace. Reserve a Show ID and create its local show.toml.\n" +
+    description: "Run from the service workspace or select it with --workspace. Reserve a Show ID and create its local show.toml.\n" +
       "Use --site-mode builtin for an automatically generated website (no --site-url). Otherwise a real external website URL is required (prompted if omitted).\n" +
-      "Registers the Show DO; it is immediately ready for publication. Does not publish.",
+      "Registers the Show DO; it is immediately ready for publication. Does not publish. After interruption rerun with the same workspace and Show ID.",
   },
   "create-episode": {
     usage: "create-episode ID",
-    description: "Run from the Show directory. Create a local Episode TOML draft with a GUID and published_at.\n" +
+    description: "Run from the Show directory, or use --workspace and --show. Create a new Episode TOML with a GUID and published_at.\n" +
+      "For updates, edit the existing TOML instead of creating the Episode again.\n" +
       "This does not upload or publish the Episode.",
   },
   "publish-show": {
@@ -78,7 +80,8 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   verify: {
     usage: "verify SHOW_ID [--episode EPISODE_ID]",
-    description: "Check public delivery with GET/HEAD against the configured public origin only; no administrator key or management API.\n" +
+    description: "Compare authenticated committed content with public GET/HEAD delivery; requires the workspace administrator key.\n" +
+      "Reads the management API on workers.dev, then checks the configured public origin without sending the key there.\n" +
       "Fetches the feed (bounded by the server render budget), then checks feed structure, enclosure origins, known GUIDs,\n" +
       "the published cover and (with --episode) the published audio by status/length. Processing success and delivery are reported separately.\n" +
       "Expected 404/503 answers are classified distinctly; any failed check exits 1.",
@@ -97,14 +100,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "stats-retention SHOW_ID DAYS [--operation-id UUID]",
     description: "Change this Show's delivery-statistics daily retention window (30..3650, default 400) without redeploying.\n" +
       "The new limit applies from the next UTC-day pruning; already pruned daily rows never come back, and shortening prunes\n" +
-      "older rows into lifetime totals instead of losing them. Idempotent per operation ID: the request is journaled locally\n" +
-      "before submission and an unknown outcome is only re-checked by its operation ID, never replayed blindly.",
+      "older rows into lifetime totals instead of losing them. Directly updates the retention value without a local journal.\n" +
+      "After interruption check stats, then explicitly reapply the same Show and retention value if needed; no automatic mutation retries.",
   },
   deploy: {
     usage: "deploy",
     description: "Run from the service workspace. Perform a code-only update of the same config/schema/namespace.\n" +
-      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. No Show pause, probe or resume is needed; publication and\n" +
-      "delivery continue and schedules are kept. An interrupted deployment is completed by running deploy again.\n" +
+      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Publication, delivery, schedules and R2 media are preserved.\n" +
+      "An interrupted deployment is completed by running deploy again with the same configuration and compatible persisted formats.\n" +
       "Configuration changes belong to the dedicated domain-change procedure.",
   },
   "service-status": {
@@ -160,35 +163,35 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   "publish-rss-import": {
     usage: "publish-rss-import DIRECTORY [--allow-future-published-at]",
     description: "Publish a reviewed local RSS import as a new Show from the service workspace.\n" +
-      "Requires a ready SQLite service, administrator key and Cloudflare credentials; creates and explicitly opens only the new Show.\n" +
+      "Requires a ready SQLite service, administrator key and Cloudflare credentials; registers only the new Show without publishing other Shows.\n" +
       "Validates inputs, preserves GUIDs/dates, then publishes the Show and Episodes sequentially. Not an atomic batch.\n" +
       "If any imported Episode has a future published_at, publication starts immediately and requires --allow-future-published-at.\n" +
-      "Re-running continues batch progress; identical publication content is unchanged.\n" +
-      "Unknown mutations stay blocked. Does not adopt existing Shows, convert services or remove the old host.",
+      "Re-running with the same retained batch and inputs checks registration and continues publication progress; identical content is unchanged.\n" +
+      "Keep the source directory and .castloop records. Does not adopt existing Shows, convert services or remove the old host.",
   },
   "backup-create": {
     usage: "backup-create [--workspace PATH] --output FILE [--include-audio] [--passphrase-file FILE] [--json]",
-    description: "Create one encrypted local backup archive of a service workspace: configuration, .castloop state (administrator key, client IDs, journals), Show TOML and covers.\n" +
+    description: "Create one encrypted local backup archive: configuration, administrator key, supported .castloop records, Show TOML, covers and CSS.\n" +
       "Offline only; never networks or mutates the service. MP3 originals are excluded unless --include-audio is explicit; every exclusion is recorded in the archive manifest.\n" +
-      "Run while no other castloop command edits the workspace; the archive is a point-in-time snapshot.\n" +
-      "Audio-included backups matter for unpublished originals or account-level disasters; published audio is kept immutably in R2, so a low cadence is enough.\n" +
+      "Do not edit the workspace or run other modifying commands during backup. Unknown files and journal families are excluded; inspect the manifest.\n" +
+      "Backs up local files, not R2 or server-side SQLite content, revision history, schedules or statistics.\n" +
       "The passphrase (8 to 1024 bytes) comes from --passphrase-file or an interactive prompt, never from the command line or environment.",
   },
   "backup-verify": {
     usage: "backup-verify FILE [--passphrase-file FILE] [--json]",
-    description: "Decrypt and fully verify one backup archive offline: every entry digest, the manifest, the service configuration and the ciphertext trailer.\n" +
-      "Reports included and excluded files, retained locks and unfinished local operations. Read-only; verification success does not prove server-side recovery.",
+    description: "Decrypt and verify entry digests, the manifest and ciphertext trailer offline; config_valid reports service-configuration validity separately.\n" +
+      "Reports included and excluded files, retained locks, unfinished domain changes and scan_errors. Read-only; success does not prove server-side recovery.",
   },
   "backup-restore-preview": {
     usage: "backup-restore-preview FILE --dest PATH [--passphrase-file FILE] [--json]",
-    description: "Show the restoration plan for one archive: destination conflict check, expansion list, unfinished local operations and frozen absolute source paths. Writes nothing.",
+    description: "Show the restoration plan: destination conflict check, expansion list, exclusions, unfinished domain changes and scan_errors. Writes nothing.",
   },
   "backup-restore": {
     usage: "backup-restore FILE DEST confirm [--passphrase-file FILE] [--json]",
     description: "Restore an archive into DEST, which must not exist; any failure removes the partial destination.\n" +
       "Restores the same service identity (configuration hash, administrator key, client IDs) and regenerates .gitignore.\n" +
-      "After restoration run doctor --local; preserve old operation records and never replay their unknown outcomes.\n" +
-      "Does not network, publish, resume or authorize anything remotely.",
+      "After restoration run doctor --local, then inspect any unfinished domain change or uncertain publication before separately approved action.\n" +
+      "Offline only; does not continue remote operations, publish or authorize remote changes.",
   },
 };
 
@@ -259,6 +262,16 @@ export function describeCommand(command: string) {
     effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? ["skill", "backup-create", "backup-restore"].includes(command) ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command.startsWith("schedule-") && !["schedule-list", "schedule-status"].includes(command) ||
       command === "lifecycle-execute" || command === "revision-execute" },
     output_schema: "result", input_schemas: ["service-config", "admin-config", "show-input", "episode-input"],
-    recovery: read ? "Read-only observation; snapshots do not authorize mutations." : command === "publish-rss-import" ? "Resume only the same retained batch and inputs. Identical content is unchanged; unknown Show registration, Resume or local installation outcomes stop without replay." : ["publish-show", "publish-episode", "lifecycle-execute", "revision-execute"].includes(command) ? "Review current content after a lost response. Repeating the same desired content is unchanged; changed bases require a new review." : "Preserve the exact workspace, target and records. Unknown resource, deployment and control outcomes must not be replayed.",
+    recovery: offline ? "Offline only; does not perform or authorize remote recovery. Preserve local inputs and outputs." :
+      read ? "Read-only observation; snapshots do not authorize mutations." :
+      command === "import-rss" ? "Continue the same snapshot and output directory with the same command; retain download records and local edits." :
+      command === "publish-rss-import" ? "Continue the same retained batch and inputs after checking current state. Identical content is unchanged; preserve the source directory and progress records." :
+      ["publish-show", "publish-episode", "lifecycle-execute", "revision-execute"].includes(command) ? "Review current content after a lost response. Repeating the same desired content is unchanged; changed bases require a new review." :
+      ["init", "create-show", "deploy"].includes(command) ? "Preserve the same workspace, target and saved inputs; check current state, then explicitly rerun the same operation to complete it. No automatic mutation retries or unrelated resource adoption." :
+      command === "domain" ? "Read domain list or domain status UUID, then explicitly use domain continue UUID with the saved previous and target configurations. Do not restart add/remove as a new operation or adopt unrelated resources." :
+      ["schedule-show", "schedule-episode"].includes(command) ? "Read schedule-list and schedule-status after a lost response. Do not blindly create another schedule." :
+      ["schedule-reschedule", "schedule-cancel", "schedule-reapprove"].includes(command) ? "Read schedule-status first; review the current version and obtain a new preview if state or inputs changed. Preserve the saved schedule content." :
+      command === "stats-retention" ? "Read stats after interruption, then explicitly reapply the same Show and retention value if needed. No automatic mutation retries." :
+      "Preserve the exact workspace, target, inputs and records. Inspect current state before any separately approved mutation; do not delete state.",
     paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };
 }

@@ -86,6 +86,8 @@ Cloudflare REST URLは、アカウントID・バケット名・Worker名等を�
 
 `schema`、`template`、`validate`、`describe`、`skill export` により、スキーマ・入力例・操作情報・Skillをバイナリから取得できる。`--json` は `contract_version = 1` の単一応答を返し、成功結果とエラーを分離する。失敗時は `outcome` を `not_started` または `unknown` として報告し、一般例外や入力全文をそのまま出力しない。
 
+`help` と `describe` は [help.ts](../../packages/cli/src/help.ts) の説明と引数定義を共有する。`describe.recovery` は操作別の中断時案内であり、CLIの自動再送や変更操作の許可ではない。同梱Skillは [skills/castloop/](../../skills/castloop/SKILL.md) の本文と参照文書を埋め込み、既存の配置先を上書きせず出力する。動作の説明を変えるときは、これらと利用ガイドを同じ変更で照合する。
+
 `doctor --local` はローカル確認、`diagnose` はローカル・リモート・相互整合性の確認、`verify` は公開配信の確認を担う。未確認を成功や0件へ置き換えない。これらの照会結果自体は、変更操作の承認にはならない。
 
 ## 定義元と関連テスト

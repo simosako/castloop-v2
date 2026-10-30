@@ -1,4 +1,6 @@
-# Draft template for <showId>/show.toml. The CLI replaces example values and asks for site_url.
+# Annotated input example for <showId>/show.toml, not a file consumed by the CLI.
+# Edit the file from create-show; preserve its show_id and replace sample metadata.
+# Do not upload or publish this example unchanged.
 schema_version = 1
 show_id = "samplepodcast"
 title = "Sample Podcast"
@@ -9,13 +11,18 @@ owner_name = "Taro Yamada"
 owner_email = "owner@example.com"
 categories = ["Technology"]
 explicit = false
-site_url = "https://example.com/samplepodcast"
+site_mode = "builtin"
 image_path = "cover.jpg"
 
 # Optional fields
 # copyright = "Copyright 2026 Taro Yamada"
 # show_type = "episodic"
-# Builtin websites: set site_mode = "builtin" and remove site_url.
 # site_timezone = "Asia/Tokyo" # Optional builtin website date display; default UTC.
+# site_css_path = "site.css" # Optional CSS file beside show.toml; do not set site_css directly.
 
-# public_base_url belongs in the service config, not in this file.
+# External websites: replace site_mode with "external", set site_url below,
+# and omit site_timezone and site_css_path.
+# site_url = "https://example.com/samplepodcast"
+
+# image_path names a JPEG/PNG file beside show.toml; media files are not included here.
+# public_base_url belongs in castloop.toml, not in this file.

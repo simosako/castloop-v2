@@ -55,7 +55,7 @@
 - 基本操作：[サービス作成と公開](../docs/getting_started.md)、[公開・更新](../docs/publishing.md)、[非公開化・復元](../docs/lifecycle.md)
 - 機能操作：[予約](../docs/scheduling.md)、[内容確認・履歴](../docs/published_content_review.md)、[サイト](../docs/show_website.md)、[独自ドメイン](../docs/custom_domains.md)、[統計](../docs/delivery_statistics.md)
 - 管理支援：[RSS移行](../docs/rss_migration.md)、[バックアップ](../docs/workspace_backup.md)、[診断](../docs/troubleshooting.md)、[エージェント利用](../docs/agent_usage.md)
-- 入力例：[Showテンプレート](show-template.toml)、[Episodeテンプレート](episode-template.toml)。実際の入力形式はCLIの `template` / `schema` / `validate` で確認する。
+- 入力例：[最小例と使い方](../examples/README.md)、任意項目を説明した[Showテンプレート](show-template.toml)・[Episodeテンプレート](episode-template.toml)。CLIの雛形生成は [input-templates.ts](../packages/cli/src/input-templates.ts)、入力条件は共有スキーマを正本とし、例は[整合テスト](../packages/cli/src/doctor-templates.test.ts)で確認する。
 
 ## 文書の更新
 

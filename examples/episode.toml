@@ -1,3 +1,5 @@
+# Input example only; do not publish these sample values.
+# Edit the file from create-episode; preserve its episode_id, guid and published_at.
 schema_version = 1
 episode_id = "first-episode"
 guid = "ff39c154-d2a7-47b4-97b0-5c7d3f74a3a1"
