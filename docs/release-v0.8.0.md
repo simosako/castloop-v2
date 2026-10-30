@@ -1,27 +1,28 @@
 # castloop v0.8.0
 
-This release completes the architecture simplification described in Phases 1–4. The release is intended for fresh SQLite services; it does not migrate or adopt services created with earlier internal formats.
+番組やエピソードの公開・更新を、プレビューと公開コマンドで行える版です。
 
-## Changes
+## 主な変更
 
-- **Synchronous atomic publication.** Show and Episode metadata plus media references are committed directly to the Show Durable Object after validation and required cache purges. A publication either commits atomically or fails without a partially published state.
-- **Direct media placement.** New audio and cover files are uploaded once to content-addressed keys in private R2. Staging copies, full upload readbacks, publication job ledgers and their progress/retry commands are removed.
-- **On-demand delivery.** RSS feeds and builtin-site HTML are rendered from committed SQLite content when requested and then cached. Published audio remains immutable during ordinary updates.
-- **Simpler administration.** `publish-show` and `publish-episode` replace the old update/job workflow. Worker code deployment is one operation with readiness verification. Availability is controlled through lifecycle publication/unpublication rather than Pause/Resume controls. Show publication state remains isolated in each Show Durable Object.
-- **Focused CLI and tests.** Obsolete operation, staging, recovery and observation mechanisms were removed; the release workflow now smoke-tests the current CLI commands.
+- **公開と更新**：`publish-show` と `publish-episode` で内容を反映し、その場で結果を確認できます。
+- **番組サイトとRSS**：保存された公開内容から配信します。内蔵サイトではエピソードの紹介と音声再生ができます。
+- **非公開化と復元**：番組・エピソードごとに配信を止め、保存済み内容から再公開できます。
+- **サーバー更新**：`deploy` でWorkerを更新し、稼働状態まで確認できます。
 
-## Compatibility and safety
+## 利用を始める
 
-- Requires a fresh service configuration with `schema_version = 2`, `publication_protocol = "sqlite-sequential-v1"`, and `storage_layout = "show-v1"`, plus internal queue/content formats **14/13**. Existing services using earlier internal formats, including v0.7.6 services, are not migrated or updated by installing this release.
-- Show and Episode metadata continue to use content schema version 1. This is independent of the service and internal storage formats.
-- Installing this release does not deploy a Worker or mutate Cloudflare resources. Do not deploy it onto an older service format.
+[インストール](installation.md)後、[サービス作成と初回公開](getting_started.md)へ進んでください。
 
-## Verification and limitations
+本版は、新規作成するサービス向けです。v0.7.6以前の内部形式を使うサービスからの更新・移行には対応していません。
 
-- `bun test` and `npm run check` pass. The tag workflow builds and smoke-tests native binaries on Linux x64, macOS Apple Silicon and Windows x64 before publishing release assets.
-- A small, isolated Cloudflare smoke test used a private R2 bucket, a `workers.dev` Worker and Cloudflare Access restricted to the reviewer. It verified service initialization, Show publication, three Episode publications and builtin-site playback. The reviewer confirmed playback and Tokyo timezone display in the browser.
-- Native Cloudflare performance, full Free-plan compatibility, broad production behavior, and mobile/keyboard browser acceptance have not been established by this smoke test.
+<a id="verification-and-limitations"></a>
 
-## Downloads
+## 動作確認の範囲
 
-Download the Linux, macOS and Windows binaries, `SHA256SUMS`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, and optional `castloop-skill.tar.gz` from the [v0.8.0 GitHub release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.0). Verify the checksums before installation. Binaries are unsigned; see the [distribution guide](installation.md).
+ローカルの自動テストと型検査、およびLinux x64・macOS Apple Silicon・Windows x64での配布バイナリの起動確認を行っています。
+
+Cloudflareの実環境では、アクセスを限定した小規模な構成でサービス作成、番組公開、3件のエピソード公開を確認しました。ブラウザでの音声再生と、日本時間の日付表示も確認しています。性能、大規模運用、Freeプラン全体への適合性は未検証です。
+
+## ダウンロード
+
+[v0.8.0のGitHub Release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.0)から、利用するOSのファイルをダウンロードしてください。導入手順は[CLIのインストール](installation.md)を参照してください。
