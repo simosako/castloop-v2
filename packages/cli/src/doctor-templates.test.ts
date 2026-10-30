@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
-import { inputTemplate } from "./input-templates";
-import { validateLocalInput } from "./local-input";
+import { parseShowMetadata, stringifyToml } from "@castloop/shared";
+import { inputTemplate, showTemplate } from "./input-templates";
+import { loadLocalInput, validateLocalInput } from "./local-input";
 import { diagnoseLocal, formatDoctor } from "./doctor";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,14 +9,41 @@ import { join } from "node:path";
 test("embedded templates and documented examples use the same input validators", async () => {
   const root = mkdtempSync("/tmp/opencode/castloop-templates-");
   try {
-    for (const kind of ["service-config", "show", "episode"]) {
+    for (const kind of ["service-config", "admin-config", "show", "episode"]) {
       const file = join(root, `${kind}.toml`); writeFileSync(file, inputTemplate(kind));
-      expect((await validateLocalInput(kind === "service-config" ? "service" : kind, file, {})).publication_ready).toBe(false);
+      const result = await validateLocalInput(kind === "service-config" ? "service" : kind, file, {});
+      expect(result.checks[0]).toEqual({ id: "metadata", status: "pass" });
+      expect(result.publication_ready).toBe(false);
     }
     for (const kind of ["show", "episode"]) {
-      const file = join(root, `${kind}.toml`);
-      writeFileSync(file, readFileSync(join(import.meta.dir, `../../../design/${kind}-template.toml`), "utf8"));
-      expect((await validateLocalInput(kind, file, {})).checks[0]?.status).toBe("pass");
+      for (const path of [`design/${kind}-template.toml`, `examples/${kind}.toml`]) {
+        const file = join(import.meta.dir, "../../..", path);
+        const result = await validateLocalInput(kind, file, {});
+        expect(result.checks[0]).toEqual({ id: "metadata", status: "pass" });
+        expect(result.publication_ready).toBe(false);
+      }
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Show examples match the builtin creation default and support the documented site alternatives", async () => {
+  const root = mkdtempSync("/tmp/opencode/castloop-site-templates-");
+  try {
+    const css = readFileSync(join(import.meta.dir, "../../../examples/show-site.css"), "utf8");
+    writeFileSync(join(root, "site.css"), css);
+    const sources = [inputTemplate("show"), ...["design/show-template.toml", "examples/show.toml"].map((path) =>
+      readFileSync(join(import.meta.dir, "../../..", path), "utf8"))];
+    for (const source of sources) {
+      const show = parseShowMetadata(source);
+      expect(show.site_mode).toBe(showTemplate(show.show_id).site_mode);
+      expect(show.site_url).toBeUndefined();
+      expect(show.site_css).toBeUndefined();
+      const file = join(root, "show.toml");
+      writeFileSync(file, stringifyToml({ ...show, site_timezone: "Asia/Tokyo", site_css_path: "site.css" }));
+      const builtin = await loadLocalInput("show", file);
+      expect(builtin.value).toMatchObject({ site_mode: "builtin", site_timezone: "Asia/Tokyo", site_css: css });
+      writeFileSync(file, stringifyToml({ ...show, site_mode: "external", site_url: "https://example.com/podcast" }));
+      expect((await validateLocalInput("show", file, {})).checks[0]?.status).toBe("pass");
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

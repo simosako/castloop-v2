@@ -1,3 +1,5 @@
+# Input example only; do not publish without replacing the sample metadata and cover.
+# Preserve the show_id from create-show instead of copying this example ID.
 schema_version = 1
 show_id = "sample-show"
 title = "Sample Podcast"
@@ -8,5 +10,6 @@ owner_name = "Your name"
 owner_email = "podcast@example.com"
 categories = ["Technology"]
 explicit = false
-site_url = "https://example.com/your-podcast"
+site_mode = "builtin"
+# Builtin websites omit site_url. See README.md for the external-site alternative.
 image_path = "cover.jpg"

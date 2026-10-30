@@ -36,6 +36,8 @@ castloop create-show my-show --site-mode builtin --workspace /path/to/workspace
 
 `my-show/show.toml` を編集し、実際の番組情報と所有者情報を入力します。`image_path` は同じディレクトリに置くカバーのファイル名（例：`cover.jpg`）です。番組IDなどCLIが確定した識別情報は保持してください。
 
+項目の書き方は[入力例](../examples/README.md)を参照できます。例のファイルで生成済みのTOMLを丸ごと置き換えないでください。
+
 ```sh
 castloop preview-show my-show --workspace /path/to/workspace --remote --json
 castloop publish-show my-show --workspace /path/to/workspace --expect-preview REVIEWED_HASH --json
