@@ -1,5 +1,7 @@
 # Cloudflare REST URLの構築
 
+> 履歴資料。現行のURL構築契約は[CLI](../components/cli.md#通信失敗とローカル記録)を参照する。本文の実装名・検証範囲は記載当時のものであり、現在の実環境操作の許可ではない。
+
 CLIのREST URLでは、account ID、bucket名、Worker名、version IDをそれぞれ`encodeURIComponent`でエンコードする。既存schemaの文字種・対象照合はそのまま維持し、エンコードを入力検証の代わりにしない。
 
 R2 object keyは未エンコードの文字列を受け取り、`/`で分割した各要素だけをエンコードして再結合する。[Upload Objectの仕様](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/upload/)に従い、区切りの`/`を`%2F`へ置換しない。文字列として含まれる`%2F`は`%252F`になり、既存のエスケープ表現として解釈しない。

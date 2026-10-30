@@ -1,6 +1,6 @@
 # M0 技術検証実行計画
 
-- 対象: [`initial_design.md`](../initial_design.md) のM0。最優先は **Show/Episodeを通じ、同一Showの未完了公開を原子的に1件だけ受け付ける**こと。
+- 対象: [`initial_design.md`](initial_design.md) のM0。最優先は **Show/Episodeを通じ、同一Showの未完了公開を原子的に1件だけ受け付ける**こと。
 - 方針: 本番に近いCloudflareの検証用リソースで、最小のCLI呼び出し・Worker実験コードを動かす。結果を得る前に受付方式を確定しない。M1/M2の製品機能を完成させる計画ではない。
 
 ## 実行順と合格条件

@@ -201,7 +201,7 @@ P2/P3は依存関係上、同じレビュー単位にまとめてもよい。た
 - [SQLite操作・制限](../../docs/sqlite_sequential_development.md)、[SQLite公開の実装計画](sqlite_sequential_publication_implementation_plan.md)
 - [SQLite Worker更新の検証続行](sqlite_worker_update_recovery.md)
 - [Queue操作（v0.5.x）](../../docs/queue_service.md)、[Queue非同期管理](async_management_implementation.md)
-- [配信判定projection](public_delivery_projection.md)、[明示公開・保持・安全方針](../m6_review_queue.md)
+- [配信判定projection](public_delivery_projection.md)、[明示公開・保持・安全方針](m6_review_queue.md)
 - [旧実装整理で分離した検証責務](v050_redundancy_refactor.md)
 
 ## 9. ローカル実装結果（2026-10-18）

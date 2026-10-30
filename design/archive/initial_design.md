@@ -1,10 +1,12 @@
-# castloop v2 全体設計（現行アーキテクチャ）
+# castloop v2 全体設計（再編前の要約）
+
+> 履歴資料。現行設計は[開発者向け設計索引](../README.md)と[全体アーキテクチャ](../architecture.md)を参照する。本文は再編前の要約として保持し、現在の実環境操作の許可には使わない。
 
 最終更新: 2026-10-30（フェーズ1〜4 簡素化完了版、内部queue/content形式 `14/13`）
 
 - 関連設計: [全体設計の見直し](architecture_simplification_review_20261028.md)、[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4](phase4_code_and_test_cleanup_plan.md)、[Show単位のDO分離](do_show_separation_options.md)
-- 利用ガイド: [README](../README.md)、[SQLite開発・運用ガイド](../docs/sqlite_sequential_development.md)、[番組サイト](../docs/show_website.md)、[予約公開・管理設定](../docs/admin_configuration.md)、[独自ドメイン](../docs/sqlite_custom_domains.md)、[配信統計](../docs/delivery_statistics.md)、[バックアップ](../docs/workspace_backup.md)
-- 旧版設計の保存先: [v0.7.6以前の非同期ジョブ・R2スナップショット設計](archive/initial_design_v076.md)、[v0.5.2以前のQueue方式設計](archive/initial_design_v052.md)
+- 利用ガイド: [README](../../README.md)、[SQLite開発・運用ガイド](../../docs/sqlite_sequential_development.md)、[番組サイト](../../docs/show_website.md)、[予約公開・管理設定](../../docs/admin_configuration.md)、[独自ドメイン](../../docs/sqlite_custom_domains.md)、[配信統計](../../docs/delivery_statistics.md)、[バックアップ](../../docs/workspace_backup.md)
+- 旧版設計の保存先: [v0.7.6以前の非同期ジョブ・R2スナップショット設計](initial_design_v076.md)、[v0.5.2以前のQueue方式設計](initial_design_v052.md)
 
 ---
 
@@ -87,19 +89,19 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 ## 5. 周辺機能の設計
 
 ### 5.1 Episode・Show の予約公開（Schedule）
-- 詳細は [Episode予約公開の設計](episode_scheduled_publication_plan.md) および [管理用設定ガイド](../docs/admin_configuration.md) を参照。
+- 詳細は [Episode予約公開の設計](episode_scheduled_publication_plan.md) および [管理用設定ガイド](../../docs/admin_configuration.md) を参照。
 - メディアを先に R2 へ配置した上で、未来の UTC 日時を指定して Show DO の `publication_schedules` テーブルに予約を登録する。
 - Show DO の Alarm は最も早い予約時刻に合わせて設定され、時刻到来時に `dispatchDue()` が通常の公開処理と同一のトランザクションで公開と `dispatched` 状態への遷移を確定する。
 - 予約時刻前にベースリビジョンが変更された場合や独自ドメイン変更中だった場合は、自動実行せず `needs_approval` 状態へ移し、管理者の明示的な `schedule-reapprove` を要求する。
 
 ### 5.2 配信統計（Delivery Statistics）
-- 詳細は [配信統計の設計](episode_delivery_statistics_plan.md) および [利用ガイド](../docs/delivery_statistics.md) を参照。
+- 詳細は [配信統計の設計](episode_delivery_statistics_plan.md) および [利用ガイド](../../docs/delivery_statistics.md) を参照。
 - Gateway で音声レスポンス（`200` / `206` / `304` / `HEAD`）が確定した際、`ctx.waitUntil` で非同期に Show DO の日別集計テーブルへ加算する。統計記録の失敗が音声配信を妨げることはない。
 - IP アドレス、Cookie、User-Agent 原文などの個人情報は保存せず、既知の Bot 判定（真偽値）とリクエスト種別・転送バイト数のみを集計する。
 - 日別明細の保持日数（既定400日、30〜3650日）を超えた行は日次バッチで削除されるが、削除分は通算累計（`lifetime`）テーブルに合算して保持される。`castloop stats-retention <show> <days>` で保持日数を冪等に変更できる。
 
 ### 5.3 デプロイ（`deploy`）と独自ドメイン変更（`domain`）
-- 詳細は [フェーズ3設計](phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4設計](phase4_code_and_test_cleanup_plan.md)、[独自ドメイン利用ガイド](../docs/sqlite_custom_domains.md) を参照。
+- 詳細は [フェーズ3設計](phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4設計](phase4_code_and_test_cleanup_plan.md)、[独自ドメイン利用ガイド](../../docs/sqlite_custom_domains.md) を参照。
 - **通常のコード更新（`castloop deploy`）**: 設定（`castloop.toml`）を変更しない同一サービスの Worker 更新は、事前の Show 停止やローカルジャーナルを必要とせず、現在の Cloudflare 側の設定・ドメイン接続・名前空間を API で確認した上で `system/service.toml` と Worker スクリプトを更新し、`health` を確認する単発の冪等操作として動作する。
 - **独自ドメインの追加・削除（`castloop domain add|remove|continue|status|list`）**:
   - 変更前の設定（`previous_config`）と変更後の設定（`target_config`）をローカルジャーナル（6フェーズ: `prepared` → `connected` → `deployed` → `remote_ready` → `local_synced` → `completed`）に保存して進める。
@@ -107,6 +109,6 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
   - DNS/TLS 待機や通信中断で停止した場合は、`castloop domain continue <operation_id>` により API の現在状態を確認して未完了ステップから安全に再開できる。
 
 ### 5.4 RSS インポートとワークスペースバックアップ
-- **RSS インポート**: [RSS取り込み設計](m7_rss_import_plan.md) および [利用ガイド](../docs/rss_migration.md) を参照。既存フィードからローカルへメタデータとメディアをダウンロードして検証・プレビューした後、新規 Show として GUID と公開日時を維持したまま順次公開する。
+- **RSS インポート**: [RSS取り込み設計](m7_rss_import_plan.md) および [利用ガイド](../../docs/rss_migration.md) を参照。既存フィードからローカルへメタデータとメディアをダウンロードして検証・プレビューした後、新規 Show として GUID と公開日時を維持したまま順次公開する。
 - **ローカル操作**: workspaceまたは取り込みディレクトリごとに、変更するCLIは一度に1プロセスだけ実行する。記録は一時ファイルから原子的に置換し、ロックファイルは使わない。RSS公開記録はversion 3のみ対応し、旧version 2用の処理は保持しない。ローカル配置の完了記録がない場合は、確認済み取り込み元から生成ファイルをすべて作り直す。取り込み元や公開済み内容は削除しない。
-- **暗号化バックアップ**: [バックアップ設計](workspace_backup_restore_plan.md) および [利用ガイド](../docs/workspace_backup.md) を参照。`backup-create` / `backup-verify` / `backup-restore` により、`castloop.toml`、各 Show/Episode の TOML、`.castloop/` 内の管理者キー・ジャーナル、カバー画像（および任意で MP3 原本）をパスフレーズ暗号化された単一アーカイブ（`.clbk`）として保存・検証・復元できる。
+- **暗号化バックアップ**: [バックアップ設計](workspace_backup_restore_plan.md) および [利用ガイド](../../docs/workspace_backup.md) を参照。`backup-create` / `backup-verify` / `backup-restore` により、`castloop.toml`、各 Show/Episode の TOML、`.castloop/` 内の管理者キー・ジャーナル、カバー画像（および任意で MP3 原本）をパスフレーズ暗号化された単一アーカイブ（`.clbk`）として保存・検証・復元できる。

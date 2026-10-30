@@ -1,6 +1,6 @@
 # Queue/R2管理経路: 案Cの実装契約
 
-> v0.5.x以前のQueue方式の履歴。v0.6.0以降はこの実装を削除している。現行は[SQLite設計](../initial_design.md)。既存環境や記録の変更許可ではない。
+> v0.5.x以前のQueue方式の履歴。v0.6.0以降はこの実装を削除している。現行は[SQLite設計](initial_design.md)。既存環境や記録の変更許可ではない。
 
 2026-10-15。管理者が[構成比較の案C](async_management_architecture_options.md)の実装とテストを承認。
 `feat/publication-queue-submit`の開発コードであり、v0.4.0公開版ではない。

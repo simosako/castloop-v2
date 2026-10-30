@@ -446,8 +446,8 @@ Showの状態表示には、次を併記する。
 
 ## 参照
 
-- [現在の全体設計](../initial_design.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)、[SQLite公開処理の実装計画](sqlite_sequential_publication_implementation_plan.md)
-- [Show単位のDO分離](../do_show_separation_options.md)、[Show更新中の公開済み内容の配信](show_update_feed_availability_plan.md)
-- [Worker更新の検証続行](sqlite_worker_update_recovery.md)、[独自ドメイン計画](sqlite_custom_domains_plan.md)、[予約公開計画](../episode_scheduled_publication_plan.md)
+- [現在の全体設計](initial_design.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)、[SQLite公開処理の実装計画](sqlite_sequential_publication_implementation_plan.md)
+- [Show単位のDO分離](do_show_separation_options.md)、[Show更新中の公開済み内容の配信](show_update_feed_availability_plan.md)
+- [Worker更新の検証続行](sqlite_worker_update_recovery.md)、[独自ドメイン計画](sqlite_custom_domains_plan.md)、[予約公開計画](episode_scheduled_publication_plan.md)
 - [Cloudflare DOのcode updates](https://developers.cloudflare.com/durable-objects/platform/known-issues/#code-updates): WorkerとDOの更新反映には時間差がある。今回対象外とした無停止更新を、単なる停止条件の削除では実現できない理由。2026-10-24確認。
 - [Workers Cacheのcache keys](https://developers.cloudflare.com/workers/cache/cache-keys/): Workerの版、呼出し先、渡したpropsに応じたキャッシュの区別。2026-10-24確認。

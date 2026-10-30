@@ -383,7 +383,7 @@ RSS公開の独自origin照合は`sqlite-rss-publication.test.ts`でローカル
 
 ## 参照
 
-- 現行契約: [全体設計](../initial_design.md)、[Show分離](../do_show_separation_options.md)、[SQLite公開](sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧](sqlite_worker_update_recovery.md)、[Show更新・不変Feed/cover](show_update_feed_availability_plan.md)。
+- 現行契約: [全体設計](initial_design.md)、[Show分離](do_show_separation_options.md)、[SQLite公開](sqlite_sequential_publication_implementation_plan.md)、[Worker更新の復旧](sqlite_worker_update_recovery.md)、[Show更新・不変Feed/cover](show_update_feed_availability_plan.md)。
 - 過去の参考: [旧domain計画](custom_domain_plan.md)、[Issue #6: Pause中の配信](https://github.com/simosako/castloop-v2/issues/6)、[Issue #7: DELETE応答](https://github.com/simosako/castloop-v2/issues/7)。旧方式の実装・承認・実機実績を今回へ流用しない。
 - Cloudflare一次資料（2026-10-24確認）: [Workers Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)、[Attach](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/update/)、[Detach](https://developers.cloudflare.com/api/resources/workers/subresources/domains/methods/delete/)。Custom DomainはDNS/TLSを自動構成し、切断しても関連証明書は自動削除されない。料金・全Free適合・APIの未記載の原子性は推測で保証しない。
 - redirectの参考: [Apple Podcasts: Change the RSS feed URL](https://podcasters.apple.com/support/837-change-the-rss-feed-url)（2026-10-24確認）。301と`itunes:new-feed-url`を4週間以上維持する案内。今回の301案を、同手順全体の自動実行や全アプリの移行保証へ拡大しない。

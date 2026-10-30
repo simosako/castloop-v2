@@ -2,14 +2,14 @@
 
 ## 現行開発版：フェーズ1・2・3（簡素化アーキテクチャ）
 
-2026-10-28〜10-29の簡素化（[全体見直し](../architecture_simplification_review_20261028.md)・[フェーズ1](../phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](../phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](../phase3_deploy_and_runtime_control_simplification_plan.md)）では、Podcast配信の本来の目的に合わせて全体を以下のシンプルな構造に刷新した。
+2026-10-28〜10-29の簡素化（[全体見直し](architecture_simplification_review_20261028.md)・[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)）では、Podcast配信の本来の目的に合わせて全体を以下のシンプルな構造に刷新した。
 
 - **同期アトミックな公開と直接素材配置**: CLIはローカル入力を検証し、変更された音源・画像だけを内容ハッシュ（SHA-256）のR2キーへ直接配置して、metadataと素材参照をJSONでShow DOへ送る。DOは素材の読取・コピーを行わず、必要なキャッシュパージ後に単一SQLiteトランザクションで公開内容・履歴・短縮ID・世代を一括確定する（同一内容なら`unchanged`）。失敗時は副作用を残さず、そのまま同じコマンドを再実行できる。
 - **RSSフィード・番組サイトのオンデマンド生成**: Feed XMLと番組サイトHTMLはR2へ事前バッチ生成せず、配信リクエスト時にShow DOのSQLiteからオンデマンド描画してEdgeキャッシュに乗せる。
 - **単発deployと稼働制御の簡素化**: `worker_version_id` のDB保存・一致強制、起動Probe Alarm、`admission_window_id`、および `show-pause` / `show-resume` 系コマンドを廃止した。登録したShowは即座に稼働し、配信を止めたい場合は既存のlifecycle操作（非公開化・復元）を使う。`castloop deploy` は事前停止やjournalなしの単発スクリプト更新であり、予約公開もそのまま維持される。DOのAlarmは予約公開（`dispatchDue`）のみに使用する。
 - **変更前設定の保存と再実行可能な管理操作**: 初期化（`init`）や独自ドメイン変更（`domain`）は、途中の通信失敗で永久ロックするのではなく、変更前後の設定を保持し、APIで現状を確認しながら同じ目標状態へ再実行・継続できる設計とする。
 
-内部queue/content形式は新規環境専用の**14/13**。配備は未実施で、旧形式からの変換・互換配備は提供しない。具体契約は[フェーズ1](../phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](../phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](../phase3_deploy_and_runtime_control_simplification_plan.md)、操作は[SQLiteガイド](../../docs/sqlite_sequential_development.md)を優先する。以下は簡素化前の導入履歴・旧契約であり、FIFO・job・staging・事前生成・Pause/Resume・2相更新・未知IOロックに関する記述は現行経路へ適用しない。
+内部queue/content形式は新規環境専用の**14/13**。配備は未実施で、旧形式からの変換・互換配備は提供しない。具体契約は[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)・[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)・[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)、操作は[SQLiteガイド](../../docs/sqlite_sequential_development.md)を優先する。以下は簡素化前の導入履歴・旧契約であり、FIFO・job・staging・事前生成・Pause/Resume・2相更新・未知IOロックに関する記述は現行経路へ適用しない。
 
 ## 簡素化前の設計・導入履歴
 
@@ -20,9 +20,9 @@ Issue #70の自動短縮URL版は内部queue/content形式10/11の新規環境�
 Issue #70のCSSカスタマイズ開発版は内部queue/content形式**9/10**の新規環境専用。固定HTML＋標準デザイン1種類＋Show単位のCSS 1ファイルを提供する。CLIがCSSを検証してShow metadataへ同梱し、既存Show DOがHTMLへ事前に埋め込む。生成用サービスは追加しない。後続の[説明表示改善](show_website_description_display_plan.md)ではHTML解析用の`htmlparser2`を追加し、一覧のタグなし160文字から既存個別ページの全文へリンクする。全文は安全な段落・改行とHTTP(S)リンクで表示する。第1段8/9からの移行・互換配備はしない。[CSS採用方針](show_website_customization_options.md)と[利用ガイド](../../docs/show_website.md)を参照する。
 
 Issue #70開発版は、Showごとに内蔵サイト／外部サイトを選択できる。内蔵HTMLは既存Show DOのAlarmで生成し、private R2の世代別snapshotへ保存する。`SiteCachedPages`とHTML専用Gatewayは既存media cacheから分離し、最新のShow判定を共有する。必要な両purge後、Feedとサイト全体の世代・ページ参照を同一transactionで確定する。内部queue/content形式は**8/9**、必須`website="static-show-v1"`の新規環境専用。下記の7/8以前の番号は各機能導入時点の履歴である。[サイト設計](show_website_plan.md)・[利用ガイド](../../docs/show_website.md)参照。Freeの実機性能・ブラウザ実機再生は未確認。
-Issue #65開発版は、Show内の予約表と既存Alarmでfuture UTCのEpisode／Show公開を実行する。予約はFIFOへ先に入らず、到来時に同じShowの通常jobとして原子的に投入される。Pause・受付停止・保守・runtime／config／base変更では`needs_approval`へ移り、明示再承認なしに実行しない。予約実行日時は`published_at`と別で、後者を書き換えない。CLIは`preview-episode-schedule`／`schedule-episode`、`schedule-list`／`status`／`reschedule`／`cancel`／`reapprove`を提供する。内部queue/content形式は**9/9**、fresh環境専用で旧8/9を含む環境を変換しない。未来の`published_at`は予約ではなく、`preview-episode`の`future_published_at`警告と`publish-episode --allow-future-published-at`で即時公開を明示する。[予約設計](../episode_scheduled_publication_plan.md)・[管理用設定ガイド](../../docs/admin_configuration.md)参照。9/9環境で予定前未配信・予定後配信、Pause→再承認→公開、日時変更→取消、未来予約中の即時公開、直リンクの404/200を確認した。11/11統合版は新規の本人限定環境で予約3件・取消1件とAccess拒否を確認した。Alarm再配送・blocked・同時刻予約・性能は未確認（[9/9実機検証](issue65_scheduled_publication_live_20261026.md)、[11/11非公開実機検証](issue65_scheduled_publication_11_live_20261027.md)）。
+Issue #65開発版は、Show内の予約表と既存Alarmでfuture UTCのEpisode／Show公開を実行する。予約はFIFOへ先に入らず、到来時に同じShowの通常jobとして原子的に投入される。Pause・受付停止・保守・runtime／config／base変更では`needs_approval`へ移り、明示再承認なしに実行しない。予約実行日時は`published_at`と別で、後者を書き換えない。CLIは`preview-episode-schedule`／`schedule-episode`、`schedule-list`／`status`／`reschedule`／`cancel`／`reapprove`を提供する。内部queue/content形式は**9/9**、fresh環境専用で旧8/9を含む環境を変換しない。未来の`published_at`は予約ではなく、`preview-episode`の`future_published_at`警告と`publish-episode --allow-future-published-at`で即時公開を明示する。[予約設計](episode_scheduled_publication_plan.md)・[管理用設定ガイド](../../docs/admin_configuration.md)参照。9/9環境で予定前未配信・予定後配信、Pause→再承認→公開、日時変更→取消、未来予約中の即時公開、直リンクの404/200を確認した。11/11統合版は新規の本人限定環境で予約3件・取消1件とAccess拒否を確認した。Alarm再配送・blocked・同時刻予約・性能は未確認（[9/9実機検証](issue65_scheduled_publication_live_20261026.md)、[11/11非公開実機検証](issue65_scheduled_publication_11_live_20261027.md)）。
 
-Issue #64の開発版では、認証付きの公開済み全文・履歴取得とCLIの項目差分・ローカルRSS生成、保存済みrevisionの明示採用を追加した。Show内SQLiteに履歴2表を置き、R2の不変metadata・画像・音源と照合する。採用は新revisionとして保存・purge・SQL確定し、素材再uploadや過去履歴の上書きはしない。内部queue/content形式**7/8**、必須`revision_history="sqlite-revisions-v1"`の新規環境専用で旧環境は変換しない。[採用設計](../published_diff_and_revision_restore_plan.md)と[利用ガイド](../../docs/published_content_review.md)参照。実Cloudflareの配備・公開・性能確認は行っていない。
+Issue #64の開発版では、認証付きの公開済み全文・履歴取得とCLIの項目差分・ローカルRSS生成、保存済みrevisionの明示採用を追加した。Show内SQLiteに履歴2表を置き、R2の不変metadata・画像・音源と照合する。採用は新revisionとして保存・purge・SQL確定し、素材再uploadや過去履歴の上書きはしない。内部queue/content形式**7/8**、必須`revision_history="sqlite-revisions-v1"`の新規環境専用で旧環境は変換しない。[採用設計](published_diff_and_revision_restore_plan.md)と[利用ガイド](../../docs/published_content_review.md)参照。実Cloudflareの配備・公開・性能確認は行っていない。
 
 Issue #66の未リリース開発版では、Showの状態を`open / admission_paused / paused`に分ける。`admission_paused`は新しい公開依頼と素材アップロードを止め、既存の検証条件を満たす公開済み内容は配信する。`paused`は受付と配信を両方止める従来の意味を維持する。停止・再開ごとの変更番号と操作ID別の適用結果を同じShow内で保存し、古い確認結果による再開を拒否する。応答喪失後は結果のGET照会だけを行う。内部queue/content形式**7/7**と必須`availability_controls="show-admission-delivery-v1"`を使う新規環境専用。Worker更新中の配信継続や旧環境の変換は提供しない。[採用設計](show_admission_delivery_separation_plan.md)と[操作ガイド](show_availability.md)を優先し、下記のリリース時点の2状態・6/7形式の記述と区別する。
 
@@ -32,7 +32,7 @@ DO側のdomain変更は専用prepare/activate/status/finalizeと`domain_changes=
 
 2026-10-21追補: [Show更新中のFeed継続配信設計](show_update_feed_availability_plan.md)を実装した。Episode追加・更新に加え、公開済みShowのmetadata/cover/同時更新でも旧Feed・画像・承認済み音源を配信する。Feed/Show/cover世代と対象種別のguardを保存・照合し、不変cover snapshotと新metadata/Feedをpurge後に原子的に切り替える。内部queue/content schema **5/6**、healthの必須`feed_storage`/`cover_storage`は`immutable-generation-v1`、`publication_read_boundary="show-episode-v1"`を使う新規環境専用。第1・第2段階を含む旧環境の移行・互換配備は提供しない。
 
-更新日: 2026-10-21。**v0.7.0の仕様**。v0.6.2の公開・操作記録機能をShow単位DOへ分離し、Pause/ResumeをShow単位に変更する。配布済みv0.6.2の旧layoutとは非互換で、移行・旧版サポートは提供しない。設計と検証範囲は[採用設計](../do_show_separation_options.md)、過去のリリースは[v0.6.2](../../docs/release-v0.6.2.md)を参照。
+更新日: 2026-10-21。**v0.7.0の仕様**。v0.6.2の公開・操作記録機能をShow単位DOへ分離し、Pause/ResumeをShow単位に変更する。配布済みv0.6.2の旧layoutとは非互換で、移行・旧版サポートは提供しない。設計と検証範囲は[採用設計](do_show_separation_options.md)、過去のリリースは[v0.6.2](../../docs/release-v0.6.2.md)を参照。
 操作は[README](../../README.md)、詳細は[SQLiteガイド](../../docs/sqlite_sequential_development.md)、[文書索引](../README.md)を参照する。
 
 ## リリース境界

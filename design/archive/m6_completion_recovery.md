@@ -1,6 +1,6 @@
 # M6: 完了応答喪失の明示照合
 
-> v0.5.x以前のQueue方式の設計。SQLiteの継続・照合とは別契約。[現行設計](../initial_design.md)を参照する。
+> v0.5.x以前のQueue方式の設計。SQLiteの継続・照合とは別契約。[現行設計](initial_design.md)を参照する。
 
 更新日: 2026-10-04
 
@@ -24,7 +24,7 @@ file保存とlockは既存共通storageへ置き、初期化/更新固有のphas
 
 ## 検証履歴とサポート境界
 
-以下は2026-10-04の検証記録。対象operation/versionは[アーカイブの実機記録](m6_standalone_acceptance.md)にある。新規初期化専用fault harnessや万能な外部復旧は[承認済みMVP範囲](../m6_review_queue.md)の完成条件ではない。試験専用faultコマンドは正式CLIへ含めない。
+以下は2026-10-04の検証記録。対象operation/versionは[アーカイブの実機記録](m6_standalone_acceptance.md)にある。新規初期化専用fault harnessや万能な外部復旧は[承認済みMVP範囲](m6_review_queue.md)の完成条件ではない。試験専用faultコマンドは正式CLIへ含めない。
 
 実HTTP handler/Queue/CASを使うlocal結合で、初期化・更新のcompletion応答喪失→永続証拠の非書込照合→local完了→paused維持を確認した。未完了、欠落/別request receipt、別pause、live token、途中generation変更を拒否し、remote writes/Queue送信が増えないことを回帰する。
 

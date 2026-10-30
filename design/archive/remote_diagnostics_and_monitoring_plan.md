@@ -324,7 +324,7 @@ job解決は`job-status`と同じ検索順（revision journal → lifecycle jour
 - CLI以外の通知経路（外部webhook・SaaS連携・メール・OS通知等）。常駐daemon。必要になった時点で別Issueとして再設計する。
 - ログ（tail・保存ログ）に基づく判定。CPU時間の推定。
 - Worker管理API・永続形式の変更。全Show横断索引の新設。
-- 公開済み全文の管理API取得・field差分表示は[Issue #64](../published_diff_and_revision_restore_plan.md)で扱い、このIssueの観測コマンドからは追加取得しない。
+- 公開済み全文の管理API取得・field差分表示は[Issue #64](published_diff_and_revision_restore_plan.md)で扱い、このIssueの観測コマンドからは追加取得しない。
 - 音源全量downloadによる監視・確認（提供しない。将来再検討の可能性は残すが、本Issueの範囲外）。
 
 ## 13. 安全条件・受け入れ条件との対応

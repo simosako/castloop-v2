@@ -1,6 +1,6 @@
 # castloop v2 デザインドキュメント
 
-> v0.5.2時点の設計・履歴を保存した資料。v0.6.0以降の現行仕様は[全体設計](../initial_design.md)を参照する。本文のQueue機能・操作はv0.5.x以前に限る。
+> v0.5.2時点の設計・履歴を保存した資料。v0.6.0以降の現行仕様は[全体設計](initial_design.md)を参照する。本文のQueue機能・操作はv0.5.x以前に限る。
 
 更新日: 2026-10-18。現在の公開版はv0.5.2。具体的な操作・導入手順は[v0.5.2 README](https://github.com/simosako/castloop-v2/blob/v0.5.2/README.md)、関連文書は[設計文書の案内](../README.md)を参照する。
 
@@ -351,7 +351,7 @@ v0.2.1でShow／Episodeの読み取り専用一覧、v0.3.0で独自ドメイン
 
 ### 未提供・今後の検討事項
 
-M7として[外部RSSからの移行](../m7_rss_import_plan.md)を開発中。新規Showへローカル取り込み・管理者確認・明示公開の2段階で移し、元GUIDと公開日時を維持する。公開済みv0.3.0には含まれない。[開発版利用案内](../../docs/rss_migration.md)参照。
+M7として[外部RSSからの移行](m7_rss_import_plan.md)を開発中。新規Showへローカル取り込み・管理者確認・明示公開の2段階で移し、元GUIDと公開日時を維持する。公開済みv0.3.0には含まれない。[開発版利用案内](../../docs/rss_migration.md)参照。
 
 - 予約配信、アクセス統計、音源変換、公開済み旧revisionの選択的削除
 - 複数domain・Show別domain、購読先の自動移行・redirect

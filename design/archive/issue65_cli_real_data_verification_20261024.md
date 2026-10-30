@@ -87,4 +87,4 @@ private証跡はこのworktree内の次の新規ディレクトリに保全し�
 - 300,000,000 bytes上限付近の音源、性能・CPU・Free適合、障害下での最大遅延。
 - 通信syscallの観測。PCの`TZ`非依存を確認しても、Cloudflare runtime自体のtimezoneを実測したことにはならない。
 
-予約公開の実機試験は、[採用計画](../episode_scheduled_publication_plan.md)のサーバー実装とローカル回帰後に、対象と変更範囲を明確にした別の試験として行う。
+予約公開の実機試験は、[採用計画](episode_scheduled_publication_plan.md)のサーバー実装とローカル回帰後に、対象と変更範囲を明確にした別の試験として行う。

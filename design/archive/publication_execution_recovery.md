@@ -1,6 +1,6 @@
 # publication停止の診断と未知の実行tokenの保全
 
-> v0.5.x以前のQueue方式の調査・安全判断の保存資料。v0.6.0以降の操作契約ではない。解放案の撤回と未知IO保全の判断は引き続き有効。現行は[SQLite設計](../initial_design.md)。
+> v0.5.x以前のQueue方式の調査・安全判断の保存資料。v0.6.0以降の操作契約ではない。解放案の撤回と未知IO保全の判断は引き続き有効。現行は[SQLite設計](initial_design.md)。
 
 Issue #13のShow公開と、別環境で報告された断続的なEpisode公開停止を扱う。
 最初の再調査では別環境のEpisode停止時ログが未取得だった。後続の隔離試験ではcommit時の503と
@@ -22,7 +22,7 @@ markerは同じcommitの古い失敗や重複通知でも残り得る。実行to
 - 前回版の解放コマンドは使用しない。DLQ・経過時間・HEAD不在・platformのcanceled表示だけで
   ownerやregistryを編集しない。CASは所有権保護であり、未知の旧I/Oが終了した証明の代わりにはならない。
 
-万能な外部復旧は追加しない。[既存の安全方針](../m6_review_queue.md)に戻し、未知の実行は保全する。
+万能な外部復旧は追加しない。[既存の安全方針](m6_review_queue.md)に戻し、未知の実行は保全する。
 U1は[未検証仮定](m6_upload_recovery_options.md)のままで、今回解決したものではない。
 
 ## Issue #13の保存済みShow証跡

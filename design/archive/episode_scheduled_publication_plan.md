@@ -1,8 +1,10 @@
 # Issue #65: Episode予約公開の設計・開発計画
 
-**現行版との関係：** v0.8.0は内部queue/content形式**14/13**の新規環境専用で、予約には配置済み素材参照とmetadataを保存し、Alarmで同期公開と`dispatched`を原子的に確定する。Pause・受付window・公開jobは廃止済み。再承認が必要になる理由は更新元競合とドメイン変更で、通常deployは予約を維持する。現在の設定・操作は[管理用設定ガイド](../docs/admin_configuration.md)、仕様は[現行全体設計](initial_design.md)と[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)を優先する。
+> 履歴資料。現行の予約設計は[Show DO](../components/show-do.md#予約公開)と[スキーマ](../data/schemas.md)を参照する。本文の提案・仕様・検証範囲は記載当時のものであり、現在の実環境操作の許可ではない。
 
-以下の9/9・11/11は導入当時の設計・実機確認の記録である。11/11版では本人限定環境で予約3件・取消1件とAccess拒否を確認した（[11/11実機検証](archive/issue65_scheduled_publication_11_live_20261027.md)）が、現行14/13の予約公開の実機検証ではない。旧形式からのDB変換・互換配備は提供しない。
+**現行版との関係：** v0.8.0は内部queue/content形式**14/13**の新規環境専用で、予約には配置済み素材参照とmetadataを保存し、Alarmで同期公開と`dispatched`を原子的に確定する。Pause・受付window・公開jobは廃止済み。再承認が必要になる理由は更新元競合とドメイン変更で、通常deployは予約を維持する。現在の設定・操作は[管理用設定ガイド](../../docs/admin_configuration.md)、仕様は[現行全体設計](initial_design.md)と[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)を優先する。
+
+以下の9/9・11/11は導入当時の設計・実機確認の記録である。11/11版では本人限定環境で予約3件・取消1件とAccess拒否を確認した（[11/11実機検証](issue65_scheduled_publication_11_live_20261027.md)）が、現行14/13の予約公開の実機検証ではない。旧形式からのDB変換・互換配備は提供しない。
 
 作成日: 2026-10-24。**管理者レビューにより、scheduler A／管理設定C／日時identity A／停止後Aと4節の日時解決規則を採用し、開発・ローカル検証へ進む。**
 
@@ -342,8 +344,8 @@ castloop schedule-reapprove SCHEDULE_UUID --workspace /path/to/service --show da
 ## 12. 参照
 
 - [現行設計](initial_design.md)、[Show分離契約](do_show_separation_options.md)
-- [SQLite公開契約](archive/sqlite_sequential_publication_implementation_plan.md)、[運用ガイド](../docs/sqlite_sequential_development.md)
-- [Worker更新の検証続行](archive/sqlite_worker_update_recovery.md)、[操作記録schema](archive/sqlite_operation_records_schema.md)
+- [SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[運用ガイド](../../docs/sqlite_sequential_development.md)
+- [Worker更新の検証続行](sqlite_worker_update_recovery.md)、[操作記録schema](sqlite_operation_records_schema.md)
 - [Cloudflare Alarms](https://developers.cloudflare.com/durable-objects/api/alarms/) — 単一Alarm、上書き、実行中の`getAlarm`、at-least-onceと有限retry。
 - [Cloudflare local development: Defaults](https://developers.cloudflare.com/workers/local-development/#defaults) — 本番と一致するUTC runtimeの説明。
 - [Cloudflare SQLite storage](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/)、[Web standards](https://developers.cloudflare.com/workers/runtime-apis/web-standards/)
@@ -373,4 +375,4 @@ castloop schedule-reapprove SCHEDULE_UUID --workspace /path/to/service --show da
 
 ローカル回帰はBun 1.4.4で`bun test`: **857 pass / 0 fail**（96 files）。`npm run check`とLinux単体CLI buildも成功した。これはBun SQLiteとmemory R2 fixtureによる検証であり、DO runtimeの永続性・native Alarm再配送・実Cache purgeの証明ではない。
 
-fresh隔離環境で3 Episodeを約3分間隔に予約し、各予定前のFeed未配信と予定後の追加、`publication_state=succeeded`、予約時刻+2msのdispatchを確認した。同じ9/9環境で追加確認を行い、Pause→`needs_approval`→Resume→再承認→公開、日時変更→取消、約3時間後の予約を残したまま別Episodeの即時公開、予定前の直リンク404と公開後の200/206・SHA-256一致を確認した。11/11統合版は新規の本人限定環境で予約3件・取消1件を実行し、予定前後のFeed、Pause/再承認、Access 129要求拒否、site_timezone、音源hashを確認した。環境・結果・未確認範囲は[9/9実機検証](archive/issue65_scheduled_publication_live_20261026.md)と[11/11実機検証](archive/issue65_scheduled_publication_11_live_20261027.md)に保存した。CLI基盤の実データ検証（指定サンプル3＋36 Episode、約1.50GB、162コマンド）は[別記録](archive/issue65_cli_real_data_verification_20261024.md)に保持する。これは予約本体の実機検証ではない。
+fresh隔離環境で3 Episodeを約3分間隔に予約し、各予定前のFeed未配信と予定後の追加、`publication_state=succeeded`、予約時刻+2msのdispatchを確認した。同じ9/9環境で追加確認を行い、Pause→`needs_approval`→Resume→再承認→公開、日時変更→取消、約3時間後の予約を残したまま別Episodeの即時公開、予定前の直リンク404と公開後の200/206・SHA-256一致を確認した。11/11統合版は新規の本人限定環境で予約3件・取消1件を実行し、予定前後のFeed、Pause/再承認、Access 129要求拒否、site_timezone、音源hashを確認した。環境・結果・未確認範囲は[9/9実機検証](issue65_scheduled_publication_live_20261026.md)と[11/11実機検証](issue65_scheduled_publication_11_live_20261027.md)に保存した。CLI基盤の実データ検証（指定サンプル3＋36 Episode、約1.50GB、162コマンド）は[別記録](issue65_cli_real_data_verification_20261024.md)に保持する。これは予約本体の実機検証ではない。

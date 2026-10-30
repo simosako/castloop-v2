@@ -281,6 +281,6 @@ Show復元では、保存済みSQLのmetadataとcover Cを使い、Cのkey・siz
 ## 参照
 
 - [Episode追加の設計](episode_add_feed_availability_plan.md)、[Episode更新の設計](episode_update_feed_availability_plan.md)
-- [現行全体設計](../initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](../do_show_separation_options.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)
+- [現行全体設計](initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)
 - [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/): bindingの条件付き保存・checksum・object metadata。REST staging PUTのCASや未知IOの取消保証へ拡張しない。
 - [Workers Cachingのcache keys](https://developers.cloudflare.com/workers/cache/cache-keys/): propsによる分離。今回のnativeのcache/purge動作を実証済みとする根拠ではない。

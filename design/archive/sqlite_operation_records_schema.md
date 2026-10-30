@@ -1,6 +1,6 @@
 # Issue #40: 操作記録のIDとテーブル設計
 
-更新日: 2026-10-20。公開状態と同じDO SQLiteに保存する操作記録の設計。Issue #48の開発版では各Show DOへこのDDLを適用し、制御DOへ操作記録の正本を分離しない。remote検索・指示は`--show SHOW_ID`を必須とする。旧DB/journalの移行は提供しない。[Show分離契約](../do_show_separation_options.md)参照。
+更新日: 2026-10-20。公開状態と同じDO SQLiteに保存する操作記録の設計。Issue #48の開発版では各Show DOへこのDDLを適用し、制御DOへ操作記録の正本を分離しない。remote検索・指示は`--show SHOW_ID`を必須とする。旧DB/journalの移行は提供しない。[Show分離契約](do_show_separation_options.md)参照。
 
 ## 1. 再検討の結論
 

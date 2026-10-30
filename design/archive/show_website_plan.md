@@ -55,7 +55,7 @@
 
 正本は従来どおり、編集元がローカルTOML、公開制御がShow DO SQLite、payload・公開snapshotがR2である。サイトHTMLはその派生物とし、サイト専用の公開状態を別サービスで管理しない。
 
-関連契約: [全体設計](../initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離](../do_show_separation_options.md)、[受付と配信の分離](show_admission_delivery_separation_plan.md)、[独自domain契約](sqlite_custom_domains_p0.md)、[公開内容確認・過去版採用](../../docs/published_content_review.md)。
+関連契約: [全体設計](initial_design.md)、[SQLite公開契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離](do_show_separation_options.md)、[受付と配信の分離](show_admission_delivery_separation_plan.md)、[独自domain契約](sqlite_custom_domains_p0.md)、[公開内容確認・過去版採用](../../docs/published_content_review.md)。
 
 ## 3. Cloudflare Freeを前提にした制約
 

@@ -37,7 +37,7 @@
 
 本人以外の認証済みアカウントを使った実ログイン試験はしていない。本人限定の設定照合と未認証拒否の確認を、その試験の代わりに成功と記録しない。後続の本人レビューで、表示は問題なく、「全文を読む」とタイトルクリックの両方でEpisode全文を読めたとの報告を得た。
 
-今後の試験でも同じ境界を守るため、[`AGENTS.md`のSafety boundaries](../../AGENTS.md#safety-boundaries)へ「全テストデプロイは承認されたレビュアー限定とし、保護確認前にサンプルをupload／publishしない」という共通指示を追加した。具体的な手順は[非公開試験案](../show_website_private_trial_plan.md)を参照する。推測しにくいURLやnoindexだけでは非公開扱いにしない。
+今後の試験でも同じ境界を守るため、[`AGENTS.md`のSafety boundaries](../../AGENTS.md#safety-boundaries)へ「全テストデプロイは承認されたレビュアー限定とし、保護確認前にサンプルをupload／publishしない」という共通指示を追加した。具体的な手順は[非公開試験案](show_website_private_trial_plan.md)を参照する。推測しにくいURLやnoindexだけでは非公開扱いにしない。
 
 ## 3. 生成内容とデータ保全
 

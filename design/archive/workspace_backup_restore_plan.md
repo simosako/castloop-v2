@@ -1,6 +1,8 @@
 # 管理workspaceのバックアップ・整合性検証・復元支援の実装計画(Issue #63)
 
-status: 採択(2026-10-26実装承認)。実装済み。以下は導入時の設計・判断の記録であり、旧journal family・draft・operation-status・source_paths・並行操作の説明は現行契約ではない。v0.8.0は[フェーズ4](phase4_code_and_test_cleanup_plan.md#24-ローカルジャーナル種別journal_familiesとバックアップbackup-の旧仕様スキャン整理)で対象を現行6種類の記録ディレクトリと管理キーへ整理し、未完了操作の検査はドメイン変更だけとした。現在の対象・除外・復元手順・実行中は編集や他操作をしない条件は[バックアップガイド](../docs/workspace_backup.md)を優先する。同ガイド末尾の検証記録は導入当時のもの。
+> 履歴資料。現行設計は[ワークスペースバックアップ](../components/workspace-backup.md)を参照する。本文の提案・仕様・検証範囲は記載当時のものであり、現在の実環境操作の許可ではない。
+
+status: 採択(2026-10-26実装承認)。実装済み。以下は導入時の設計・判断の記録であり、旧journal family・draft・operation-status・source_paths・並行操作の説明は現行契約ではない。v0.8.0は[フェーズ4](phase4_code_and_test_cleanup_plan.md#24-ローカルジャーナル種別journal_familiesとバックアップbackup-の旧仕様スキャン整理)で対象を現行6種類の記録ディレクトリと管理キーへ整理し、未完了操作の検査はドメイン変更だけとした。現在の対象・除外・復元手順・実行中は編集や他操作をしない条件は[バックアップガイド](../../docs/workspace_backup.md)を優先する。同ガイド末尾の検証記録は導入当時のもの。
 
 ## 1. 結論(価値評価)
 

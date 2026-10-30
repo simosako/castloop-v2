@@ -211,7 +211,7 @@ RSS取り込みの記録にも、処理番号だけでなく、対象エピソ�
 
 - [操作記録のIDとテーブル設計](sqlite_operation_records_schema.md)
 - [サーバー側の操作記録の保存先比較](sqlite_operation_record_storage_options.md)
-- [現行の構成と公開処理](../initial_design.md)
+- [現行の構成と公開処理](initial_design.md)
 - [SQLite方式の操作ガイド](../../docs/sqlite_sequential_development.md)
 - [RSS取り込みの操作ガイド](../../docs/rss_migration.md)
 - [単一アップロードの通信断後に残る課題](m6_upload_recovery_options.md)

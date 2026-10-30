@@ -1,12 +1,12 @@
 # M6: Episode・Showの公開停止と削除
 
-> **v0.5.x以前のQueue方式の設計・検討履歴。** v0.6.0のSQLiteは非公開化・保存snapshotの復元だけを提供し、物理削除・旧方式からの移行は実装しない。共通の保持・不可逆削除の安全条件は維持するが、旧Queue実装を代替として呼び出さない。[現行設計](../initial_design.md)を参照する。
+> **v0.5.x以前のQueue方式の設計・検討履歴。** v0.6.0のSQLiteは非公開化・保存snapshotの復元だけを提供し、物理削除・旧方式からの移行は実装しない。共通の保持・不可逆削除の安全条件は維持するが、旧Queue実装を代替として呼び出さない。[現行設計](initial_design.md)を参照する。
 
 作成日: 2026-09-30
 
 現在の状態（2026-10-11）: 承認済みMVP範囲を実装・受け入れし、v0.2.0で公開済み。v0.3.0でもR2制御record・原子的受付・毎要求の配信状態検査・確認付き削除・必要記録保持を維持する。
 
-現在の構成は[全体設計](../initial_design.md)、当時のコマンドは[Queue方式ガイド](../../docs/queue_service.md#unpublish-restore-or-delete)、完成範囲は[承認済み方針](../m6_review_queue.md)を優先する。旧形式変換・万能なunknown IO復旧・無停止移行は公開条件ではない。独自ドメインはv0.3.0で提供済み。
+現在の構成は[全体設計](initial_design.md)、当時のコマンドは[Queue方式ガイド](../../docs/queue_service.md#unpublish-restore-or-delete)、完成範囲は[承認済み方針](m6_review_queue.md)を優先する。旧形式変換・万能なunknown IO復旧・無停止移行は公開条件ではない。独自ドメインはv0.3.0で提供済み。
 
 以下はv0.1.2を基準にした初期設計と開発経緯。状態・排他・削除・cacheの設計理由を参照するために保持する。未接続・検証待ちの記述は当時の進捗であり、現在の残タスクではない。初期CLI案や応答喪失時の再送案を現在の運用手順として実行しない。
 
@@ -18,7 +18,7 @@
 
 2026-10-01の管理者判断で、M6のuploadは**現行Cloudflare REST APIの単一PUTを維持**する。クライアント切断後にそのPUTが遅れてobjectを作成・更新することはないと仮定する。これは確認済みのCloudflare仕様ではなく、[未解決の懸念U1](m6_upload_recovery_options.md)として保持する。U1の解消や分割uploadへの変更をM6公開条件にせず、通常のupload排他・照合・中断回復の実装は引き続き必要とする。
 
-2026-10-02の管理者判断で、同一Cloudflareアカウント内の専用試験環境と、公開配信・更新操作の一時停止を許容するメンテナンス移行を採用した。**M6機能一式を完成させて次バージョンとして正式リリース**し、限定先行リリースや無停止移行を必須にしない。無停止移行の検討、費用・停止時間の測定計画はMVP構築後へ回す。機能・安全性の受け入れ条件は維持し、測定値の承認待ちで通常の実装を止めない。詳細は[承認済み方針と残る技術ゲート](../m6_review_queue.md)を参照。
+2026-10-02の管理者判断で、同一Cloudflareアカウント内の専用試験環境と、公開配信・更新操作の一時停止を許容するメンテナンス移行を採用した。**M6機能一式を完成させて次バージョンとして正式リリース**し、限定先行リリースや無停止移行を必須にしない。無停止移行の検討、費用・停止時間の測定計画はMVP構築後へ回す。機能・安全性の受け入れ条件は維持し、測定値の承認待ちで通常の実装を止めない。詳細は[承認済み方針と残る技術ゲート](m6_review_queue.md)を参照。
 
 ## 1. 目的と開発順序
 
@@ -387,9 +387,9 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 
 この文書の作成だけで、以下を承認済みとは扱わない。
 
-2026-10-01に管理者が[レビュー待ち一覧](../m6_review_queue.md)へのannotationで公開時の利用条件を承認した。停止404/削除410/空feed 200、外部cache再検証、削除ID再利用禁止、進行中jobへ割り込まない仕様、状態照会/内部cache構成に伴うrequest・CPU・R2 read増を許容する方針を承認済みとする。続けて、小さい必要な管理/操作記録は自動期限削除せず保持し、本文/個人情報/secretを複製せずpayloadを物理削除する方針も承認した。性能/料金の具体値や実機受け入れは別途確認する。
+2026-10-01に管理者が[レビュー待ち一覧](m6_review_queue.md)へのannotationで公開時の利用条件を承認した。停止404/削除410/空feed 200、外部cache再検証、削除ID再利用禁止、進行中jobへ割り込まない仕様、状態照会/内部cache構成に伴うrequest・CPU・R2 read増を許容する方針を承認済みとする。続けて、小さい必要な管理/操作記録は自動期限削除せず保持し、本文/個人情報/secretを複製せずpayloadを物理削除する方針も承認した。性能/料金の具体値や実機受け入れは別途確認する。
 
-独立して進められる実装を継続し、最終確認待ちと技術残件は[レビュー待ち一覧](../m6_review_queue.md)に分離してまとめる。未接続moduleの自動テスト追加を、公開policyの承認やM6の実機受け入れと扱わない。
+独立して進められる実装を継続し、最終確認待ちと技術残件は[レビュー待ち一覧](m6_review_queue.md)に分離してまとめる。未接続moduleの自動テスト追加を、公開policyの承認やM6の実機受け入れと扱わない。
 
 1. **承認済み（2026-10-01）**: deleteはpayloadの物理削除、unpublishは保持。必要な小さい管理/操作記録を残す方針と分離する。
 2. **承認済み（2026-10-02）**: unpublishと対になるrestoreも含め、M6機能一式を構築して次バージョンとして正式リリースする。通常publishによる暗黙再開ではなく明示restoreを使う。
@@ -410,5 +410,5 @@ Show予約、Show制御record、Episode tombstone、lifecycle request/commit/pro
 - [Cache purge](https://developers.cloudflare.com/workers/cache/purge/) — tag/path prefix、entrypoint scope、success確認とrate limits。
 - [R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/) — bindingのread/write/delete/listは強整合、cacheは別。
 - [Queue delivery guarantees](https://developers.cloudflare.com/queues/reference/delivery-guarantees/) — at-least-once配送。
-- [全体設計](../initial_design.md)、[独自ドメイン計画](custom_domain_plan.md)、[M3実装ログ](m3_implementation_log.md)、[M5実装ログ](m5_implementation_log.md)。
+- [全体設計](initial_design.md)、[独自ドメイン計画](custom_domain_plan.md)、[M3実装ログ](m3_implementation_log.md)、[M5実装ログ](m5_implementation_log.md)。
 - [M6実装ログ](m6_implementation_log.md) — 今後の判断・検証・進捗を記録する。

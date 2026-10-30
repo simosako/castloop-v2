@@ -136,7 +136,7 @@ download後、**最初の公開前**に取り込み先の`show.toml`へ`site_mod
 
 無料で無制限のhostingではない。CDN HITでも外側Worker・内側cache entrypointとShow DOの判定を使うため、要求数・DO duration・SQL・R2 operation・履歴容量を**同一アカウントのFree枠へ合算**する。Feed/HTMLのキャッシュミス時には生成CPUも使う。
 
-ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。詳しい比較・予算・受け入れ条件は[フェーズ1設計](../design/phase1_atomic_publication_and_ondemand_delivery_plan.md)および[初期設計](../design/archive/show_website_plan.md)参照。
+ローカルのSQL/R2/cache/REST模擬試験・型検査・単体CLI buildは、Cloudflare FreeのHTTP CPU 10msやDO既定CPU上限への適合証拠ではない。実Cloudflareでの配備・CPU／要求数／duration／容量測定、Safari／Chrome実機での再生・シーク確認は別承認で行う。現在の配信方式は[公開配信設計](../design/components/delivery.md)、検証の責務と限界は[テスト設計](../design/testing.md)を参照する。
 
 別途承認された過去の非公開実機試験（[初回記録](../design/archive/show_website_private_trial_verification_20261025.md)、[標準デザイン・通常音源3件](../design/archive/show_website_css_large_trial_verification_20261026.md)、[自動短縮URL・リンク表示版](../design/archive/show_website_short_url_trial_verification_20261026.md)、[タイムゾーン版](../design/archive/show_website_timezone_trial_verification_20261027.md)）では、ブラウザでの表示・再生・短いURL・東京日付表示および未認証要求のAccess拒否を確認した。現行のオンデマンド生成版（14/13）の実機性能測定は未実施である。
 
