@@ -286,7 +286,7 @@ P4までの検証: **1,262 pass / 0 fail**（134 files、76.99秒）、`npm run 
 - 実DO class/entrypointは型検査とbrowser bundleの検証。**実機DOのoutput gate/Alarm再配送、実Workers Cache purge、CF APIの応答形・Free制限・性能は、このローカルfixtureだけでは実証していない。** standalone build成功と、同じ入口のsource-process walkthroughも区別する。
 - 全体回帰で見つかった旧listコマンドの引数検査順序を修正し、workspaceへ触る前の拒否を維持した。
 
-操作例・回復制限は[SQLite開発版ガイド](../../docs/sqlite_sequential_development.md)を参照する。
+操作例・回復制限は[SQLite開発版ガイド](../../docs/getting_started.md)を参照する。
 次はP6と、新規隔離環境での実機受け入れ計画の準備。既存サービス移行や実機配備は別承認であり、今回の開発ではCloudflare資源・実データを変更していない。Issue #13恒久解消、Free適合、36件性能目標達成、release readinessはまだ示していない。
 
 ### P6a: SQLite一覧

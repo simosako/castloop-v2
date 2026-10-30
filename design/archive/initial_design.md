@@ -5,7 +5,7 @@
 最終更新: 2026-10-30（フェーズ1〜4 簡素化完了版、内部queue/content形式 `14/13`）
 
 - 関連設計: [全体設計の見直し](architecture_simplification_review_20261028.md)、[フェーズ1](phase1_atomic_publication_and_ondemand_delivery_plan.md)、[フェーズ2](phase2_direct_media_and_cli_simplification_plan.md)、[フェーズ3](phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4](phase4_code_and_test_cleanup_plan.md)、[Show単位のDO分離](do_show_separation_options.md)
-- 利用ガイド: [README](../../README.md)、[SQLite開発・運用ガイド](../../docs/sqlite_sequential_development.md)、[番組サイト](../../docs/show_website.md)、[予約公開・管理設定](../../docs/admin_configuration.md)、[独自ドメイン](../../docs/sqlite_custom_domains.md)、[配信統計](../../docs/delivery_statistics.md)、[バックアップ](../../docs/workspace_backup.md)
+- 利用ガイド: [README](../../README.md)、[SQLite開発・運用ガイド](../../docs/getting_started.md)、[番組サイト](../../docs/show_website.md)、[予約公開・管理設定](../../docs/scheduling.md)、[独自ドメイン](../../docs/custom_domains.md)、[配信統計](../../docs/delivery_statistics.md)、[バックアップ](../../docs/workspace_backup.md)
 - 旧版設計の保存先: [v0.7.6以前の非同期ジョブ・R2スナップショット設計](initial_design_v076.md)、[v0.5.2以前のQueue方式設計](initial_design_v052.md)
 
 ---
@@ -89,7 +89,7 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 ## 5. 周辺機能の設計
 
 ### 5.1 Episode・Show の予約公開（Schedule）
-- 詳細は [Episode予約公開の設計](episode_scheduled_publication_plan.md) および [管理用設定ガイド](../../docs/admin_configuration.md) を参照。
+- 詳細は [Episode予約公開の設計](episode_scheduled_publication_plan.md) および [管理用設定ガイド](../../docs/scheduling.md) を参照。
 - メディアを先に R2 へ配置した上で、未来の UTC 日時を指定して Show DO の `publication_schedules` テーブルに予約を登録する。
 - Show DO の Alarm は最も早い予約時刻に合わせて設定され、時刻到来時に `dispatchDue()` が通常の公開処理と同一のトランザクションで公開と `dispatched` 状態への遷移を確定する。
 - 予約時刻前にベースリビジョンが変更された場合や独自ドメイン変更中だった場合は、自動実行せず `needs_approval` 状態へ移し、管理者の明示的な `schedule-reapprove` を要求する。
@@ -101,7 +101,7 @@ Show DO: 入力と現在状態・世代を検証 → 必要なCDNキャッシュ
 - 日別明細の保持日数（既定400日、30〜3650日）を超えた行は日次バッチで削除されるが、削除分は通算累計（`lifetime`）テーブルに合算して保持される。`castloop stats-retention <show> <days>` で保持日数を冪等に変更できる。
 
 ### 5.3 デプロイ（`deploy`）と独自ドメイン変更（`domain`）
-- 詳細は [フェーズ3設計](phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4設計](phase4_code_and_test_cleanup_plan.md)、[独自ドメイン利用ガイド](../../docs/sqlite_custom_domains.md) を参照。
+- 詳細は [フェーズ3設計](phase3_deploy_and_runtime_control_simplification_plan.md)、[フェーズ4設計](phase4_code_and_test_cleanup_plan.md)、[独自ドメイン利用ガイド](../../docs/custom_domains.md) を参照。
 - **通常のコード更新（`castloop deploy`）**: 設定（`castloop.toml`）を変更しない同一サービスの Worker 更新は、事前の Show 停止やローカルジャーナルを必要とせず、現在の Cloudflare 側の設定・ドメイン接続・名前空間を API で確認した上で `system/service.toml` と Worker スクリプトを更新し、`health` を確認する単発の冪等操作として動作する。
 - **独自ドメインの追加・削除（`castloop domain add|remove|continue|status|list`）**:
   - 変更前の設定（`previous_config`）と変更後の設定（`target_config`）をローカルジャーナル（6フェーズ: `prepared` → `connected` → `deployed` → `remote_ready` → `local_synced` → `completed`）に保存して進める。

@@ -124,4 +124,4 @@ addはTLS pending、次の続行は配備PUT成功checkpoint（deploy_acknowledg
 
 **Show 0件での実Cloudflare接続・限定続行・切断・workers.dev設定復帰は合格**。元PUT空文字と元DELETE空本文という2つのCLI応答検証不具合を、実測を根拠に修正できた。TLS/native伝播待ちは無効化せず、明示照会・成功receiptからの続行で処理した。
 
-この最小試験で、2 Showの公開Feed切替、旧workers.devの301/307、正規domainでの音源/画像配信・Range/ETag、履歴保持、通常publish/restore/RSS/code-only deploy、性能/全Free適合を実証したとは扱わない。[2 Show受け入れ案](../../docs/sqlite_custom_domain_live_acceptance.md)の残りと区別する。既存unknown/lockの修復・旧環境切断・削除を次の通常作業として実施しない。
+この最小試験で、2 Showの公開Feed切替、旧workers.devの301/307、正規domainでの音源/画像配信・Range/ETag、履歴保持、通常publish/restore/RSS/code-only deploy、性能/全Free適合を実証したとは扱わない。[2 Show受け入れ案](../../docs/archive/sqlite_custom_domain_live_acceptance.md)の残りと区別する。既存unknown/lockの修復・旧環境切断・削除を次の通常作業として実施しない。

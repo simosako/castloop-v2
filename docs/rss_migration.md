@@ -1,11 +1,8 @@
-# RSSからのPodcast取り込み
+# RSS取り込みと購読先の移行
 
-v0.8.0はサービス設定version 2・`storage_layout="show-v1"`、内部queue/content形式14/13の新規サービス専用。`publish-rss-import`は新Showを登録して順番に公開する。Pause/Resumeは不要。RSS公開のローカル記録はversion 3のみ対応し、旧version 2の記録は変換しない。以下の過去の実機結果は現行版の検証ではない。
+外部RSSをローカルへ取得し、内容を確認・編集してから新しいShowへ一度だけ取り込む手順です。取得と公開は別の操作です。公開先は[現行形式のサービス](README.md#対象と用語)を使い、使用するCLIとWorkerの内部形式を一致させてください。
 
-公開には同じ内部形式に対応するCLI・Worker・private workspaceが必要。旧サービス設定version 1からのマイグレーション機能やjournal変換は提供しない。
-旧版v0.5.2の操作は[同版のガイド](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)を参照する。v0.6.0の検証は[新規隔離環境の回帰試験](../design/archive/schema_v1_removal_live_test.md)、v0.6.1の入力上限は[リリースノート](release-v0.6.1.md)、v0.6.2の操作記録は[リリースノート](release-v0.6.2.md)、v0.7.0の変更は[リリースノート](release-v0.7.0.md)に記録した。超過した取込は切り詰めず、TOML編集後に再審査する。
-
-ローカルdownloadはサービスworkspace不要。既存の取り込み素材は引き続き検証して利用できるが、旧Queue公開cursorをSQLiteの受付記録として採用しない。
+ローカルへの取得には、Cloudflare認証やサービスワークスペースは不要です。公開進捗のローカル記録はversion 3だけを扱い、古いサービス・進捗記録の移行や変換は行いません。
 
 ## 対象
 
@@ -22,7 +19,7 @@ v0.8.0はサービス設定version 2・`storage_layout="show-v1"`、内部queue/
 castloop import-rss my-show https://old-host.example/feed.xml --dry-run
 ```
 
-空のディレクトリへ素材とTOMLを保存する。親ディレクトリは事前に作成しておく。Cloudflare認証やサービスworkspaceは不要。
+空のディレクトリへ素材とTOMLを保存します。親ディレクトリは事前に作成してください。
 
 ```sh
 castloop import-rss my-show https://old-host.example/feed.xml --output /path/to/import
@@ -49,7 +46,7 @@ download中に失敗したら、同じコマンド・同じ出力先で続行す
 
 ## 2. 確認した内容を公開する
 
-サービスworkspaceで実行する。新規サービスは方式指定なしの`castloop init`で作成する。[SQLiteガイド](sqlite_sequential_development.md)に従い、サービスの稼働を確認する。公開コマンドが新Showを登録し、他Showは変更しない。既存layoutは採用・移行しない。
+[サービス作成ガイド](getting_started.md)に従って公開先を用意し、そのワークスペースで実行します。公開コマンドが新Showを登録するため、同じIDのShowを先に作成する必要はありません。他のShowは変更しません。試験環境では、素材のアップロード前に[非公開の保護条件](../design/security.md#非公開の実機試験)を満たしてください。
 
 ```sh
 export CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=...
@@ -59,17 +56,13 @@ castloop service-status
 castloop publish-rss-import /path/to/import
 ```
 
-全TOML・素材を検証した後、Show登録・Show公開・各Episodeの公開を既存runnerで順番に実行する。既存または削除済みShow IDは採用しない。操作中は取り込みファイルや対象Showを別の操作で変更しない。
+全TOML・素材を検証した後、Show登録・Show公開・各Episodeの公開を順番に実行します。入力上限の超過を切り詰めて公開することはありません。エラーになった入力を編集し、公開前に再確認してください。既存または削除済みShow IDは採用しません。操作中は取り込みファイルや対象Showを別の操作で変更しないでください。
 
 インポート元Episodeに未来の`published_at`がある場合、RSS一括公開はそれを待たず即時公開する。開始前に`--allow-future-published-at`を要求し、指定がなければ`future_published_at`で失敗する。将来日時で公開したいEpisodeは、RSS一括公開ではなく`preview-episode-schedule`／`schedule-episode`を使う。
 
 Episodeは古い公開日時から同期公開し、各応答を確認して次へ進む。**全件同時公開ではなく、完了したEpisodeから配信される。** 途中で失敗しても完了済み分を削除・rollbackしない。
 
-| 公開先 | 必要な稼働状態 | 完了証拠 |
-| --- | --- | --- |
-| SQLite | 同じサービス設定の`publication_ready: true` | `changed`／`unchanged`と現在revision |
-
-CLIは検証した素材をハッシュ由来キーへ直接配置し、metadataと素材参照をDOへ送る。DOはパージ後にSQLiteで一括確定する。個別upload/jobの操作追跡や全量readbackは行わず、一括進捗記録を保持する。既存／削除済みShowは採用しない。現行版は新規14/13環境専用で、旧形式から変換しない。
+公開先の `publication_ready: true` と、各公開結果の `changed`／`unchanged`・現在のリビジョンを確認します。取り込み全体の進捗はローカル記録へ保存するため、途中で `.castloop/` を削除しないでください。
 
 完了時に新RSSの番組情報、Episode件数、GUID・公開日時・説明、音源URLを照合し、`feed_url`を返す。`subscriber_migration_completed: false`は、購読者の移行は別途必要という意味。
 
@@ -77,24 +70,14 @@ CLIは検証した素材をハッシュ由来キーへ直接配置し、metadata
 
 - 複数Episodeは逐次処理のため、import全体は数分以上かかり得る。同じworkspaceまたは取り込みディレクトリで変更するCLIは1プロセスだけ実行する。ロックファイルは使わないため、元processの終了を確認してから再実行する。
 - 公開応答を失った場合も、同じ取り込み入力で`publish-rss-import`を再実行できる。完了済みの同じ内容は変更なしとなり、進捗を続ける。更新元を自動で取り直す通常公開retryは行わない。
-- Show登録の応答が不明なら、同じ登録操作の状態を確認して続行する。ローカル配置の完了記録前に中断した場合は、確認済み取り込み元からShow/EpisodeのTOML・カバー・CSSをすべて作り直す。配置済みファイルの個別照合やEpisodeひな形の再作成は行わない。取り込み元や登録済みShow、公開済みEpisodeは削除しない。
+- Show登録の応答が不明でも、元の進捗記録を保持して同じコマンドで続行します。サービス側への編集元コピーの完了前に中断した場合は、CLIが確認済み取り込み元からTOML・カバー・CSSを作り直します。取り込み元や登録済みShow、公開済みEpisodeを手動で削除しないでください。
 - SQLite管理GETの一時障害は最大3試行。POST/PUTを自動再送しない。
 - `.castloop/`、取り込み元のTOML/cover/audio、元workspaceを保持する。公開開始後に入力・公開URL・サービスを変えたり、進捗記録を削除したりしない。
 - 状態は`show-status`、現在内容はpreview・履歴、配信は`verify`で確認する。
 
 GUIDはUUIDに限らず元RSSの文字列を維持する。旧形式のCLI／Workerへのdowngrade・記録変換は非対応。
 
-### Workerの時間ログと性能比較
-
-対応WorkerのCloudflare Workers Logsを使用し、runtime/version・request/trace IDを照合する。現行経路には公開job IDはない。
-保存ログの収集・CPU数値とapplication log・tail配送の不足は区別する。対象要求と対応しない記録や欠測を0msとして扱わない。
-
-SQLiteでは通常Worker HTTP/cacheとDO HTTP/RPC/Alarmを区別する。通常Free HTTPは10ms、DOは既定30秒のCPU上限で評価し、異なるinvocationのCPUを1要求の上限として合算しない。
-2026-10-17の旧方式の試験では外側/cache HTTP最大は3/5ms、公開probeは60/60対応したが、現行版や全invocation・未試験負荷の保証ではない。[過去の測定記録](../design/archive/sqlite_size36_measurement_20261017.md)を参照。
-
-診断ログは本文・秘密・任意例外文を含めない。sampling・保持・tail配送不足とCPU 0msを混同しない。v0.8.0の[限定的な実機確認](release-v0.8.0.md#verification-and-limitations)はRSS一括取り込みを含まず、現行形式のRSS取り込みの実機性能・全Free適合は未実証。
-
-実機試験には別承認が必要。旧`scripts/test-support/`の採取器は削除済みで、現行手順として実行しない。旧Queueのphase・R2カタログ・診断手順は[v0.5.2時点の資料](https://github.com/simosako/castloop-v2/blob/v0.5.2/docs/rss_migration.md)に保存する。
+現在内容と配信の確認は[診断ガイド](troubleshooting.md)を参照してください。現行版のRSS一括取り込みの実機性能・全Free適合は未実証です。検証範囲は[テスト設計](../design/testing.md#実機検証と証明できる範囲)、過去の測定は[設計アーカイブ](../design/archive/README.md)に分けて記録しています。
 
 ## 3. 購読先を切り替える
 

@@ -24,4 +24,4 @@ This release completes the architecture simplification described in Phases 1–4
 
 ## Downloads
 
-Download the Linux, macOS and Windows binaries, `SHA256SUMS`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, and optional `castloop-skill.tar.gz` from the [v0.8.0 GitHub release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.0). Verify the checksums before installation. Binaries are unsigned; see the [distribution guide](cli_binary_distribution.md).
+Download the Linux, macOS and Windows binaries, `SHA256SUMS`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, and optional `castloop-skill.tar.gz` from the [v0.8.0 GitHub release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.0). Verify the checksums before installation. Binaries are unsigned; see the [distribution guide](installation.md).

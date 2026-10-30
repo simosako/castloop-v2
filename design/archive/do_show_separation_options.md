@@ -206,7 +206,7 @@ Bは「索引をShow別に変えてclaim/enqueueを調整するだけ」の軽�
 1. **採用仕様を実装する**: Show単位DO/Pause/Resumeと、所属・共有更新の制御DOを接続する。Bは比較の履歴であり先行実装しない。
 2. **CLIと配備前検査を更新する**: 新layout必須、旧設定の副作用前拒否、対象Showへの管理要求、一覧・操作参照、通常更新を接続する。
 3. **ローカル検証する**: 独立SQLite/Alarmの複数Showで正常・blocked・Pause/Resume・共有更新・未知応答を試験する。`bun test`、`npm run check`、CLI buildとローカルwalkthroughを行う。
-4. **仕様と結果を更新する**: [全体設計](initial_design.md)、[SQLiteガイド](../../docs/sqlite_sequential_development.md)、更新・操作記録の関連契約を更新する。未確認の実機特性を明記する。
+4. **仕様と結果を更新する**: [全体設計](initial_design.md)、[SQLiteガイド](../../docs/getting_started.md)、更新・操作記録の関連契約を更新する。未確認の実機特性を明記する。
 5. **実機確認は対象・範囲を別途承認する**: 単一Showの逐次負荷と複数Showの同時負荷を分け、競合待ち・IO wall・purge・配信遅延・DO利用量を測る。既存測定を新構成の性能証拠へ流用しない。
 
 Issue #48は、**Showを業務上の自然な境界として採用し、通常運用と共有更新を分離する**。旧稿の却下方針やBの先行実装へは戻さない。

@@ -75,4 +75,4 @@ CLIが変更前後の設定を保存
 - [制御DO](../../src/sqlite-service-control.ts)、[DO側の設定変更](../../src/sqlite-domain-runtime.ts)、[稼働設定の照合](../../src/sqlite-runtime-identity.ts)
 - [CLIの変更処理](../../packages/cli/src/sqlite-domain-operation.ts)、[ローカルジャーナル](../../packages/cli/src/sqlite-domain-journal.ts)、[Cloudflare接続管理](../../packages/cli/src/sqlite-domain-cloudflare.ts)
 - [Show分離テスト](../../packages/cli/src/sqlite-show-separation.test.ts)、[ドメイン操作テスト](../../packages/cli/src/sqlite-domain-operation.test.ts)、[稼働設定テスト](../../packages/cli/src/sqlite-domain-runtime.test.ts)、[サービス実行時テスト](../../src/sqlite-service-runtime.test.ts)
-- 操作方法：[独自ドメイン利用ガイド](../../docs/sqlite_custom_domains.md)
+- 操作方法：[独自ドメイン利用ガイド](../../docs/custom_domains.md)

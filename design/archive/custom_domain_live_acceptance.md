@@ -1,6 +1,6 @@
 # 独自ドメインの実機検証手順（専用hostname）
 
-> **v0.5.x以前のQueue方式の履歴。** 後続の旧SQLite版の確認案は[SQLite専用手順（履歴）](../../docs/sqlite_custom_domain_live_acceptance.md)に保存している。現行の操作は[独自ドメインガイド](../../docs/sqlite_custom_domains.md)を参照する。過去の承認は実環境操作の新たな許可ではない。
+> **v0.5.x以前のQueue方式の履歴。** 後続の旧SQLite版の確認案は[SQLite専用手順（履歴）](../../docs/archive/sqlite_custom_domain_live_acceptance.md)に保存している。現行の操作は[独自ドメインガイド](../../docs/custom_domains.md)を参照する。過去の承認は実環境操作の新たな許可ではない。
 
 更新日: 2026-10-11。対象は独自ドメイン対応を含むソースからビルドしたCLI／Worker。
 

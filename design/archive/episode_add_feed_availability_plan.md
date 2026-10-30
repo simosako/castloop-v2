@@ -281,7 +281,7 @@ R2 snapshotの世代とcache propsの世代を一致させる。Workers Caching�
 2. 全Feed writerとcommitをsnapshot方式へ揃える。新旧方式の併存は作らない。
 3. cache ownerの世代別読取を接続してから、新規Episode追加のrunning例外を有効にする。
 4. 故障・競合回帰と正式CLI経路を検証する。
-5. [全体設計](initial_design.md)、[SQLite契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)、[SQLiteガイド](../../docs/sqlite_sequential_development.md)、[利用README](../../README.md)を実装済みの範囲に更新する。
+5. [全体設計](initial_design.md)、[SQLite契約](sqlite_sequential_publication_implementation_plan.md)、[Show分離契約](do_show_separation_options.md)、[SQLiteガイド](../../docs/getting_started.md)、[利用README](../../README.md)を実装済みの範囲に更新する。
 
 ## 11. 検証と受け入れ条件
 

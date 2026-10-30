@@ -1,6 +1,6 @@
 # 配信統計（Episode別・日別）の利用ガイド
 
-v0.8.0の配信統計の操作ガイド。内部queue/content形式 **14/13**、識別`delivery_statistics="episode-daily-v1"`を使う新規環境専用。旧環境への互換配備・データ移行は行わない（[統計設計](../design/components/show-do.md#配信統計)・[サイトガイド](show_website.md)参照）。
+Episode別・UTC日付別の音声配信リクエストと転送量を確認します。**リスナー数や聴取完了率を測る機能ではありません。** 対応するサービス形式は[利用ガイド](README.md#対象と用語)を参照してください。
 
 ## 何を数えるか・数えないか
 
@@ -21,20 +21,20 @@ v0.8.0の配信統計の操作ガイド。内部queue/content形式 **14/13**、
 ## 使い方
 
 ```sh
-# Show内のEpisode別集計（既定: 直近30日・UTC。1ページ20 Episode）
+# Episode totals: last 30 UTC days, 20 Episodes per page.
 castloop stats my-show
 
-# 期間指定とJSON出力（最大366日）
+# Select a period of up to 366 days and return JSON.
 castloop stats my-show --from 2026-10-01 --to 2026-10-25 --json
 
-# 特定Episodeの日別推移（1ページ31日）と音源revision別内訳
+# Daily totals for one Episode, 31 days per page, with audio revisions.
 castloop stats my-show --episode first --by-revision
 
-# 次ページ
+# Fetch the next page.
 castloop stats my-show --cursor 'TOKEN_FROM_PREVIOUS_PAGE'
 ```
 
-`--json` は他のコマンドと同じ `agentEnvelope` 規約（Issue #67）で1文書を返す。通信に失敗した場合は `0` や空一覧へフォールバックせず、exit code 1 で失敗を報告する。
+上の例はサービスワークスペースで実行します。別の場所からは `--workspace /path/to/workspace` を指定してください。`--json` は共通の結果外枠を持つ1文書を返します。通信に失敗した場合は `0` や空一覧にはせず、終了コード1で失敗を報告します。
 
 ## 「0件」「未計測」「保持期限切れ」の区別
 
@@ -54,7 +54,7 @@ castloop stats my-show --cursor 'TOKEN_FROM_PREVIOUS_PAGE'
 既定の保持日数は **400日**（30〜3650日の範囲で変更可能）。Showごとに、再配備なしで変更できる。
 
 ```sh
-# 180日へ短縮（次のUTC日替わり削除から適用）
+# Shorten retention to 180 days, effective at the next UTC daily prune.
 castloop stats-retention my-show 180 --operation-id UUID
 ```
 
@@ -65,9 +65,11 @@ castloop stats-retention my-show 180 --operation-id UUID
 
 ## 記録の仕組みと限界
 
-- 観測はGateway（`serveSqliteGateway`）で応答確定後に行われ、`ctx.waitUntil` でShow DOへ非同期記録される。キャッシュヒット／ミスの両方でちょうど1回カウントされる。**統計記録の失敗が配信を止めることは構造的にない**（失敗は `recording_error_count` として応答に含まれ、隠されない）。
+- キャッシュヒット・ミスのどちらも集計対象です。応答後に非同期で記録し、記録失敗で配信を止めません。読み取り結果には `recording_error_count` も含まれますが、通信や保存の失敗を含む完全な収集を保証するものではありません。
 - 失敗・拒否応答（404/410/412/416/503）や旧URLからの307リダイレクトは計上しない。未承認の音源revisionは公開可否gateで拒否され、記録されない。
 - `User-Agent` はクライアントの自己申告であり、一般ブラウザを名乗るクローラはbot側へ分類できない。
+
+記録・保持・集計の内部契約は[統計設計](../design/components/show-do.md#配信統計)を参照してください。
 
 ## リスナー向けのプライバシー説明（番組サイト等への記載例）
 

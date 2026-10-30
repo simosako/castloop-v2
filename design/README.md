@@ -2,7 +2,7 @@
 
 `design/` はcastloopの現行構造・処理・データと、変更時に守る契約を説明する開発者向け文書である。過去の計画を順に読む必要はなく、以下の文書を入口とする。
 
-対象は **v0.8.0**、サービス設定 `schema_version = 2` / `show-v1`、内部queue/content形式 **14/13**。現行コードの照合基準は `750133d`。操作手順は [README](../README.md) と `docs/`、開発環境は [CONTRIBUTING.md](../CONTRIBUTING.md)、エージェントの作業規則は [AGENTS.md](../AGENTS.md)を参照する。
+対象は **v0.8.0**、サービス設定 `schema_version = 2` / `show-v1`、内部queue/content形式 **14/13**。現行コードの照合基準は `750133d`。操作手順は[利用ガイド](../docs/README.md)、開発環境は [CONTRIBUTING.md](../CONTRIBUTING.md)、CI・配布の保守は[開発資料](../docs/development/README.md)、エージェントの作業規則は [AGENTS.md](../AGENTS.md)を参照する。
 
 ## 読み始める順序
 
@@ -52,9 +52,9 @@
 
 利用ガイドは「どう操作するか」、設計文書は「なぜその境界があり、どこで何を確定するか」を扱う。コマンドの全引数や長い操作例は利用ガイドとCLIのヘルプを参照し、設計本文へ重複掲載しない。
 
-- 基本操作：[SQLite開発・運用](../docs/sqlite_sequential_development.md)
-- 機能操作：[予約](../docs/admin_configuration.md)、[内容確認・履歴](../docs/published_content_review.md)、[サイト](../docs/show_website.md)、[独自ドメイン](../docs/sqlite_custom_domains.md)、[統計](../docs/delivery_statistics.md)
-- 管理支援：[RSS移行](../docs/rss_migration.md)、[バックアップ](../docs/workspace_backup.md)、[診断](../docs/observability.md)、[エージェント利用](../docs/agent_usage.md)
+- 基本操作：[サービス作成と公開](../docs/getting_started.md)、[公開・更新](../docs/publishing.md)、[非公開化・復元](../docs/lifecycle.md)
+- 機能操作：[予約](../docs/scheduling.md)、[内容確認・履歴](../docs/published_content_review.md)、[サイト](../docs/show_website.md)、[独自ドメイン](../docs/custom_domains.md)、[統計](../docs/delivery_statistics.md)
+- 管理支援：[RSS移行](../docs/rss_migration.md)、[バックアップ](../docs/workspace_backup.md)、[診断](../docs/troubleshooting.md)、[エージェント利用](../docs/agent_usage.md)
 - 入力例：[Showテンプレート](show-template.toml)、[Episodeテンプレート](episode-template.toml)。実際の入力形式はCLIの `template` / `schema` / `validate` で確認する。
 
 ## 文書の更新

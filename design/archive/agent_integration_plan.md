@@ -455,7 +455,7 @@ Issue #5は利用仕様の設計、CLI実装、Skill、シナリオ試験に分�
 
 ## 11. 調査根拠
 
-- [README](../../README.md)、[現行構成](initial_design.md)、[SQLite操作ガイド](../../docs/sqlite_sequential_development.md)
+- [README](../../README.md)、[現行構成](initial_design.md)、[SQLite操作ガイド](../../docs/getting_started.md)
 - [操作記録・中断後の操作](sqlite_operation_recovery.md)、[新規入力の項目別上限](show_episode_input_limits.md)
 - [CLI入口](../../packages/cli/src/index.ts)、[help定義](../../packages/cli/src/help.ts)、[SQLiteコマンド](../../packages/cli/src/sqlite-commands.ts)
 - [metadata schema・parser](../../packages/shared/src/index.ts)、[日時](../../packages/shared/src/metadata-time.ts)、[サービス設定](../../packages/shared/src/sqlite-service.ts)
