@@ -1,15 +1,26 @@
-# リリースCIのAction固定と更新
+# リリースCIで使うActionの更新
 
-[ビルドワークフロー](../../.github/workflows/build-binaries.yml)の外部Actionは、完全な40桁commit SHAへ固定します。横の英語コメントは確認したrelease tagです。可変major tag・branch・短縮SHAは使いません。ビルド・配布全体は[リリース保守](releasing.md)を参照してください。
+[ビルドワークフロー](../../.github/workflows/build-binaries.yml)では、外部Actionを40桁のコミットSHAで指定しています。更新するときは、公式リリースを確認してから固定先を変更します。
 
-## 更新手順
+## 1. 更新先を確認する
 
-1. リリース準備時に、各Actionの公式upstreamで互換releaseとsecurity告知を確認する。SHA固定では修正を自動取得しないため、固定後も確認が必要。
-2. 公式repositoryのrelease tagが指すcommitを取得する。annotated tagならtag objectを辿ってcommitを確認し、forkのSHAを流用しない。release差分・`action.yml`・実行runtime・追加権限やdownload先をレビューする。
-3. 同じActionを使うすべてのstepのSHAとversionコメントを同時に更新する。major更新・runner/Bun/Node変更は単なるSHA更新と区別してレビューする。
-4. `bun test`と`npm run check`を行い、PRのbuild/smoke結果を確認する。SHA形式のローカルテストは、upstreamの真正性やAction内部の安全性の証明ではない。
-5. 既定`contents: read`、tag push限定release jobの`contents: write`を維持する。Action更新のために権限・自動更新bot・release tagを追加しない。
+各Actionの公式リポジトリで、リリース内容とセキュリティの案内を読みます。実行環境、必要な権限、ダウンロード先に変更がある場合は、その影響も確認してください。
 
-SHA固定は更新を制御する仕組みであり、Action全依存の完全監査ではありません。Bun・Node、runner image、外部ダウンロードやnpm依存まで不変にはなりません。GitHub-hosted buildの成功を、ローカル検証の代用として扱わないでください。
+採用するリリースタグが指すコミットSHAを取得します。注釈付きタグの場合は、タグが参照するコミットまで確認します。
 
-公式案内: [GitHub Actions secure use](https://docs.github.com/en/actions/reference/security/secure-use)。
+## 2. ワークフローを変更する
+
+同じActionを使っているすべてのステップで、SHAと横のバージョンコメントを更新します。コメントは英語で記載してください。
+
+権限は、通常のジョブが `contents: read`、タグから公開するreleaseジョブが `contents: write` です。この区分を維持します。
+
+## 3. 検証してマージする
+
+```sh
+bun test
+npm run check
+```
+
+ローカルの検査後にPRを作成し、各OSのbuild・smokeジョブを確認します。メジャーバージョンや実行環境も変更する場合は、その変更点をPRに明記してください。
+
+詳細は[GitHub Actionsのセキュリティガイド](https://docs.github.com/en/actions/reference/security/secure-use)を参照してください。

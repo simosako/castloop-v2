@@ -1,36 +1,36 @@
 # サービスの保守
 
-ここでは、既存サービスの設定と保存形式を維持したWorkerコード更新を扱います。番組内容の変更は[公開・更新](publishing.md)、公開URLの変更は[独自ドメイン](custom_domains.md)の操作です。
+新しいCLIに含まれる配信サーバー（Worker）を、利用中のサービスに反映する手順です。
 
-## 更新前に確認すること
+## 1. 更新の準備をする
 
-- 使用するCLIとサービスが、同じ永続形式・設定・名前空間に対応していることを確認します。現行版の対象は[利用ガイドの対応条件](README.md#対象と用語)を参照してください。
-- リリースノートの互換条件を確認します。CLIのインストールだけで、配備済みWorkerは更新されません。
-- 元のワークスペースと `.castloop/` を保持します。[バックアップ](workspace_backup.md)はローカル状態の保全であり、サーバーのSQLiteやR2のバックアップではありません。
-- 対象アカウントと変更範囲を確認し、エージェントに実行させる場合は配備を明示的に承認します。
+1. [リリースノート](https://github.com/simosako/castloop-v2/releases)で、利用中のサービスを更新できる版か確認します。
+2. [CLIを更新](installation.md#cliを更新する)します。
+3. 元のワークスペースの[バックアップ](workspace_backup.md)を作成します。
+4. CloudflareのアカウントIDとAPIトークンを[環境変数に設定](getting_started.md#1-cloudflareの認証情報を設定する)します。
 
-旧版の内部形式から現行形式への移行には使えません。設定値の書き換えや別サービスの管理記録のコピーで、互換性検査を回避しないでください。
+## 2. サーバーを更新する
 
-## Workerコードを更新する
+更新前の状態を確認してから、`deploy` を実行します。
 
 ```sh
 castloop service-status --workspace /path/to/workspace --json
 castloop deploy --workspace /path/to/workspace --json
-castloop service-status --workspace /path/to/workspace --json
 ```
 
-`CLOUDFLARE_ACCOUNT_ID` と `CLOUDFLARE_API_TOKEN`、元ワークスペースの管理キーを使います。CLIに埋め込まれたWorkerを配備し、反映と稼働準備状態を確認して完了します。別途Wranglerを導入する必要はありません。
+公開内容、音声、画像、履歴、予約、独自ドメインは維持されます。
 
-通常の配備では次を維持します。
+## 3. 更新後の状態を確認する
 
-- 公開済み音源・画像・内容・履歴と予約。
-- 既知の独自ドメイン接続とサービス設定。
-- Showごとの公開・非公開状態。
+```sh
+castloop service-status --workspace /path/to/workspace --json
+castloop verify my-show --workspace /path/to/workspace --json
+```
 
-公開状態を切り替える事前操作や、配備後の手動再開は不要です。通常の配備でR2メディアを変更・削除したり、独自ドメインを追加・切断したりはしません。
+`publication_ready` が `true` であることを確認し、番組サイトでも表示と音声を確かめてください。
 
-## 中断した場合
+## 更新が中断した場合
 
-通信断等で中断した場合は、元プロセスの終了と現在状態を確認し、同じ対象・設定で `deploy` を再実行できます。設定や保存形式が一致しない場合は、エラーを無視して続けないでください。
+実行していたコマンドの終了を確認し、`service-status` で現在の状態を調べます。その後、同じワークスペースと設定で `deploy` を再実行してください。
 
-未完了の独自ドメイン変更がある場合は、配備で置き換えず、[ドメイン専用の照会・継続手順](custom_domains.md#照会と中断後の継続)を使います。配信に問題があれば[診断](troubleshooting.md)で、公開確定と外部配信を分けて確認します。
+互換性や設定のエラーが出た場合は、リリースノートとエラー内容を確認します。その他の状態確認は[トラブルシューティング](troubleshooting.md)を参照してください。

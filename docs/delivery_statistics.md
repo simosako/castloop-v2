@@ -1,76 +1,80 @@
-# 配信統計（Episode別・日別）の利用ガイド
+# 配信統計
 
-Episode別・UTC日付別の音声配信リクエストと転送量を確認します。**リスナー数や聴取完了率を測る機能ではありません。** 対応するサービス形式は[利用ガイド](README.md#対象と用語)を参照してください。
+エピソードごとの音声配信回数と転送量を確認できます。集計は音声ファイルへのアクセスを基準にしており、同じ人による複数回の取得や分割ダウンロードも数えます。
 
-## 何を数えるか・数えないか
+以下のコマンドはサービスのワークスペースで実行します。別の場所から使う場合は、`--workspace /path/to/workspace` を付けてください。
 
-集計対象は公開済みEpisode音声（`/podcasts/<showId>/episodes/<episodeId>/<audioRevisionId>.mp3`）へのリクエストのみ。Feed（`feed.xml`）とカバー画像は対象外。統計はUTC日付単位の整数カウンタとして、その番組（Show）のDurable Object内のSQLiteに保存される。
+## 最近の配信状況を見る
+
+```sh
+castloop stats my-show
+```
+
+直近30日分の統計を、エピソード別に表示します。日付はUTC基準です。
+
+期間を指定する場合は、開始日と終了日を付けます。一度に最大366日分を確認できます。
+
+```sh
+castloop stats my-show --from 2026-10-01 --to 2026-10-25
+```
+
+一覧の続きがある場合は、結果のカーソルを指定します。
+
+```sh
+castloop stats my-show --cursor '前の結果に表示されたカーソル'
+```
+
+## 一つのエピソードを詳しく見る
+
+```sh
+castloop stats my-show --episode first --by-revision
+```
+
+日別の統計と、音声の版ごとの内訳を表示します。音声を差し替えた場合は、差し替え前後の音声を分けて確認できます。エピソードの合計には両方が含まれます。
+
+データを保存・加工する場合は、各コマンドに `--json` を付けてください。
+
+## 数値の読み方
 
 | 指標 | 意味 |
 | --- | --- |
-| `initial_downloads` | 先頭からの本編取得開始数。`GET 200`、または先頭（`offset = 0`）から `min(64KiB, 音源サイズ)` 以上を返した `GET 206` |
-| `equivalent_full_downloads` | ファイルサイズ換算値。`response_bytes ÷ 音源サイズ`（小数第2位）。分割Rangeでも合計1本分で `1.0` |
-| `audio_get_requests` | 音声を返したGET総数（`get_200_requests + get_206_requests`） |
-| `response_bytes` | 応答ヘッダーの `Content-Length` 合計。**クライアントの途中切断は差し引かない** |
-| `head_requests` / `not_modified_requests` | `HEAD` 成功数 / `304 Not Modified` 数（音声本文なし） |
-| `probe_range_requests` | `bytes=0-0` 等の微小Range確認数（`initial_downloads` に含めない） |
-| `bot_get_requests` / `bot_response_bytes` | 既知bot・クローラ・`castloop-verify` のGET応答（本編統計から分離） |
+| `initial_downloads` | 音声の先頭から取得を始めた回数。短い確認用アクセスは別に集計します |
+| `equivalent_full_downloads` | 転送量を音声ファイルのサイズで割った、本数換算の値 |
+| `audio_get_requests` | 音声データを返したリクエストの合計 |
+| `response_bytes` | 応答で返す音声データ量の合計。途中切断分も含みます |
+| `head_requests` / `not_modified_requests` | ファイル情報の確認回数 / キャッシュの更新確認で304を返した回数 |
+| `probe_range_requests` | ごく短い範囲だけを取得する確認用アクセスの回数 |
+| `bot_get_requests` / `bot_response_bytes` | 既知のボットやcastloopの配信確認による取得回数・転送量 |
 
-これらは「サーバーが観測した事実の分類」であって、実際に聴いたユニーク人数や再生完了率ではない。IPアドレス、Cookie、User-Agent文字列は保存しない（bot判定はbooleanのみ）。
+音声の配信後に集計を記録するため、表示への反映に時間がかかる場合があります。記録時のエラーは `recording_error_count` で確認できます。
 
-## 使い方
+## 日別の集計状態を確認する
 
-```sh
-# Episode totals: last 30 UTC days, 20 Episodes per page.
-castloop stats my-show
+日別の `STATUS` 列（JSONでは `coverage`）を見て、どの期間の数値かを確認します。
 
-# Select a period of up to 366 days and return JSON.
-castloop stats my-show --from 2026-10-01 --to 2026-10-25 --json
-
-# Daily totals for one Episode, 31 days per page, with audio revisions.
-castloop stats my-show --episode first --by-revision
-
-# Fetch the next page.
-castloop stats my-show --cursor 'TOKEN_FROM_PREVIOUS_PAGE'
-```
-
-上の例はサービスワークスペースで実行します。別の場所からは `--workspace /path/to/workspace` を指定してください。`--json` は共通の結果外枠を持つ1文書を返します。通信に失敗した場合は `0` や空一覧にはせず、終了コード1で失敗を報告します。
-
-## 「0件」「未計測」「保持期限切れ」の区別
-
-各日の `coverage`（表示の `STATUS` 列）は次の4値で、**未計測・期限切れは `0` と表示しない**（JSONでは `counters: null`）。
-
-| coverage | 意味 |
+| 状態 | 意味 |
 | --- | --- |
-| `measured` | 通日計測済み。アクセスがなければ明確に `0` |
-| `partial` | 計測開始日の途中（00:00Z開始でない）、または照会日の当日 |
-| `unmeasured` | 統計機能の計測開始日より前 |
-| `pruned` | 保持日数Nによる削除済み期間。`lifetime`（通算）には含まれる |
+| `measured` | 1日分を計測済み。アクセスがなかった日は0です |
+| `partial` | 計測を始めた日の一部、または集計中の当日 |
+| `unmeasured` | 計測を始める前の期間 |
+| `pruned` | 保持期限を過ぎた期間。通算値には含まれます |
 
-`lifetime` は削除分を合算したEpisode×音源revision別の通算累計で、`period`（期間合計）とは独立に返される。metadata-only更新（タイトル等の変更）では音源URLが変わらないため集計は分断しない。音声差し替えでは旧音源と新音源がrevision別に区別され、Episode合計では両者が合算される。
+`period` は指定期間の合計、`lifetime` は保持期限を過ぎた分も含む通算値です。
 
-## 保持日数の変更
+## 日別データの保持期間を変える
 
-既定の保持日数は **400日**（30〜3650日の範囲で変更可能）。Showごとに、再配備なしで変更できる。
+既定は400日です。番組ごとに30〜3650日で設定できます。現在値は `castloop stats my-show --json` の `retention_days` で確認します。
+
+例えば180日に変更する場合は、次を実行します。
 
 ```sh
-# Shorten retention to 180 days, effective at the next UTC daily prune.
-castloop stats-retention my-show 180 --operation-id UUID
+castloop stats-retention my-show 180
 ```
 
-- 現在値は `castloop stats my-show --json` の応答（`retention_days`）で確認する。
-- **延長**しても、すでに削除済みの日別明細は戻らない（通算累計には残っている）。
-- **短縮**すると、期限を過ぎた行が1日1バッチ（最大200行）ずつ削除され、削除分は通算累計へ合算されるため通算合計は失われない。複数日に分かれても表示は一貫する。
-- `stats-retention` はShow DOの `retention_days` を直接更新する冪等な操作であり、通信中断時はそのまま最初から再実行できる。
+変更後にもう一度 `stats` で設定を確認してください。期限を過ぎた日別データは順次整理され、通算値に残ります。保持期間を延ばす場合も、過去に整理された期間は通算値で確認します。
 
-## 記録の仕組みと限界
+## リスナーへの説明例
 
-- キャッシュヒット・ミスのどちらも集計対象です。応答後に非同期で記録し、記録失敗で配信を止めません。読み取り結果には `recording_error_count` も含まれますが、通信や保存の失敗を含む完全な収集を保証するものではありません。
-- 失敗・拒否応答（404/410/412/416/503）や旧URLからの307リダイレクトは計上しない。未承認の音源revisionは公開可否gateで拒否され、記録されない。
-- `User-Agent` はクライアントの自己申告であり、一般ブラウザを名乗るクローラはbot側へ分類できない。
+番組サイトなどに説明を載せる場合は、次の文章を参考にしてください。
 
-記録・保持・集計の内部契約は[統計設計](../design/components/show-do.md#配信統計)を参照してください。
-
-## リスナー向けのプライバシー説明（番組サイト等への記載例）
-
-> 当番組の配信サーバー（Castloop）では、エピソードごとの日別配信回数および転送データ量の合計を集計しています。この集計処理において、リスナー個人のIPアドレス、Cookie、端末識別子、User-Agent文字列などの個人情報をデータベースへ保存したり、個人を追跡したりすることはありません。（なお、配信インフラであるCloudflareのネットワーク運用・セキュリティ保護のために処理される通信情報については、Cloudflareのプライバシーポリシーが適用されます。）
+> 当番組では、エピソードごとの日別配信回数と転送量を集計しています。castloopの統計には、個人のIPアドレス、Cookie、端末識別子、User-Agent文字列を保存しません。配信基盤のCloudflareが通信情報を扱う方法については、Cloudflareのプライバシーポリシーをご確認ください。

@@ -1,86 +1,88 @@
 # 保存構造と保持方針
 
-保存場所は、ローカル編集元、R2の不変素材、DOごとの確定済みデータに分ける。キャッシュは再生成可能な配信用データであり、正本にはしない。
+castloopは、編集元をローカルワークスペース、音声・画像をR2、確定した公開内容をDurable Objects（DO）のSQLiteに保存します。本書ではそれぞれの配置と保持方針を説明します。
 
 ## ローカルワークスペース
 
 ```text
 ワークスペース/
-├── castloop.toml
-├── castloop-admin.toml                 任意
+├── castloop.toml                       サービス設定
+├── castloop-admin.toml                 CLIの任意設定
 ├── .gitignore
 ├── .castloop/
-│   ├── secrets.json
+│   ├── secrets.json                    管理者キー
 │   └── <記録種別>/...
 └── <show_id>/
     ├── show.toml
     ├── episode-<episode_id>.toml
     ├── cover.jpg または cover.png
-    └── カスタムCSS・任意の音声原本
+    └── カスタムCSS・音声原本など
 ```
 
-Show/EpisodeのIDはディレクトリ・ファイル名と内容で一致させる。カバーとCSSはShowディレクトリ直下のファイル名で参照する。音声引数は絶対パス、またはShowディレクトリ基準の相対パスであり、必ずしもワークスペース内にあるとは限らない。
+Show/EpisodeのIDは、ディレクトリ・ファイル名とTOML内の値を一致させます。カバーとCSSはShowディレクトリ直下のファイル名で参照します。音声のパス引数は、絶対パスまたはShowディレクトリ基準の相対パスです。
 
-`castloop.toml` はサービスの配備先と公開オリジン、`castloop-admin.toml` はCLIの任意設定を持つ。管理者キーは `.castloop/secrets.json` の `CASTLOOP_ADMIN_KEY` に保存し、設定TOMLには入れない。
+`castloop.toml` は配備先と公開オリジン、`castloop-admin.toml` はタイムゾーンなどのCLI設定を持ちます。管理者キーは `.castloop/secrets.json` の `CASTLOOP_ADMIN_KEY` に保存します。
 
-### ローカル記録
+### 操作の進捗記録
 
-記録種別は `JOURNAL_FAMILIES` で定めた6種類だけを対象とする。`rss-import-downloads` 以外は `.castloop/<種別>/<service_id>/` に置く。
+CLIは、複数の手順を持つ操作について、対象・入力ハッシュ・確認済みの進捗をJSONで保存します。再実行時は記録と現在の状態を照合します。
 
-| 種別 | 主な内容 |
+`rss-import-downloads` は取り込みディレクトリ内、それ以外はワークスペースの `.castloop/<種別>/<service_id>/` に配置します。
+
+| 種別 | ファイルと内容 |
 | --- | --- |
-| `rss-import-downloads` | 取り込みディレクトリ内のRSS識別情報・素材完了記録。サービスIDで区切らない |
-| `sqlite-initializations` | `initialize.json`。初期化対象、ソース・配備設定のハッシュ、配備証拠 |
-| `sqlite-registrations` | `<show_id>.json`。Show登録ID、設定ハッシュ、登録確認済み範囲 |
-| `sqlite-rss-imports` | `<import_id>.json`。取り込み元・入力ハッシュ、配置完了、公開手順位置 |
-| `sqlite-domain-changes` | `<operation_id>.json`。変更前後設定、接続・配備証拠、継続位置 |
-| `sqlite-client` | 既知の記録種別・バックアップ対象として列挙される。現行CLIにこの種別の記録を新規作成する処理はない |
+| `sqlite-initializations` | `initialize.json`。初期化対象、ソース・配備設定のハッシュ、配備情報 |
+| `sqlite-registrations` | `<show_id>.json`。Show登録ID、設定ハッシュ、登録の進捗 |
+| `sqlite-rss-imports` | `<import_id>.json`。取り込み元、入力ハッシュ、ファイル配置と公開の進捗 |
+| `sqlite-domain-changes` | `<operation_id>.json`。変更前後の設定、接続・配備情報、進捗 |
+| `rss-import-downloads` | RSS識別情報、素材の保存先・ハッシュ・完了記録 |
 
-記録はJSONを専用スキーマで検査する。通常ファイルと実ディレクトリを使い、一時ファイルの同期・rename・親ディレクトリの同期で置換する。同じ保存先を変更するCLIは1プロセスに限定する。ロックファイルは作らない。
+記録種別は `JOURNAL_FAMILIES` で定義します。同定義には `sqlite-client` も含まれ、バックアップの対象として認識します。現行CLIが作成する記録は上表の5種類です。
 
-RSS取り込みの出力は別のローカル構造を持つ。[RSS取り込み](../components/rss-import.md)を参照する。
+記録の書き込みは、一時ファイルへの保存、ファイル同期、rename、親ディレクトリの同期の順に行います。同じ保存先を変更するCLIは1プロセスで実行します。RSS取り込みのファイル構成は[RSS取り込み](../components/rss-import.md)を参照してください。
 
 ## R2オブジェクト
 
-1サービスで1個の非公開バケットを使う。
+1サービスにつき1個の非公開バケットを使います。
 
 | キー | 内容 |
 | --- | --- |
 | `system/service.toml` | サービス設定 |
-| `public/podcasts/<show_id>/audio/<sha256>.mp3` | 不変音声 |
-| `public/podcasts/<show_id>/covers/<sha256>.jpg` または `.png` | 不変カバー |
+| `public/podcasts/<show_id>/audio/<sha256>.mp3` | 音声 |
+| `public/podcasts/<show_id>/covers/<sha256>.jpg` または `.png` | カバー画像 |
 
-キー中の `public/` は公開バケットを意味しない。実際の公開URLとR2キーは異なり、Show DOが返す承認済み参照をWorkerが解決する。
+素材のキーはShow IDと内容のSHA-256で決まります。同じShow内で同じ素材を使う場合は、同じキーを参照します。内容を変えるとキーが変わり、元の素材は残ります。
 
-- 同じShow内の同じ内容は同じ素材キーを使う。Showをまたいだ共有キーにはしない。
-- 新規または変更された素材だけを直接PUTする。更新済み参照と同じ素材には存在確認の通信もしない。
-- Feed、HTML、メタデータのスナップショットはR2へ保存しない。
-- 配置済み素材は、公開失敗・更新・配備を理由に削除しない。
+公開URLはR2キーとは別の形式です。WorkerがShow DOの承認済み参照を使ってR2オブジェクトを取得します。キーの `public/` は保存先の接頭辞で、バケット自体は非公開です。
 
-## DO SQLite
+CLIは新規・変更された素材を直接アップロードし、現在の参照と一致する素材は再利用します。RSSとHTMLはSQLiteから生成します。
 
-| DO名 | 所有データ |
+## DOごとの所有データ
+
+| DO名 | 保存するデータ |
 | --- | --- |
-| `service/<service_id>` | Show登録簿、確定した独自ドメイン接続、サービス設定識別とドメイン変更記録 |
-| `show/<service_id>/<show_id>` | Show登録情報、現在内容、履歴、公開可否、世代、短縮ID、予約・イベント、統計、設定識別とドメイン変更記録 |
+| `service/<service_id>` | Show登録簿、独自ドメイン接続、サービス設定の識別情報、ドメイン変更記録 |
+| `show/<service_id>/<show_id>` | Show登録情報、現在内容、履歴、公開状態、世代、短縮ID、予約・イベント、統計、設定識別情報、ドメイン変更記録 |
 
-表の名前にShow IDを持っていても、複数Showの公開データを1個のShow DOへ混在させない。制御DOにも共通初期化でコンテンツ表は作られるが、Show内容の保存・公開には使わない。物理的に作られる表と、業務データの所有範囲の違いは[SQLite表設計](sqlite.md)を参照する。
+各DOのSQLiteは独立しています。Show IDを含む列も、そのDOに対応するShowのデータを保存します。
 
-## 保持と復元の境界
+共通の初期化処理により、制御DOにも内容・予約の表が作られます。実際の公開データを書き込むのはShow DOです。表の配置と使用範囲は[SQLite表設計](sqlite.md)で確認できます。
 
-| データ | 保持・削除の扱い |
+## データの保持
+
+| データ | 保持方針 |
 | --- | --- |
-| 公開済み音声・カバー | 不変保持。通常管理で削除しない |
-| Show/Episode履歴 | 内容の更新や非公開化でも保持。過去版を新リビジョンとして採用できる |
-| 非公開化済み内容 | 配信だけ止める。メタデータ・素材を消さない |
-| 統計日別明細 | 保持期限を過ぎた分を順次整理し、累計は保持 |
-| ローカル原本・管理記録 | 管理者が保全。配備やバックアップ復元で無関係な原本を消さない |
-| キャッシュ | 消去・再生成可能。内容・公開可否の正本にはしない |
+| アップロード済み音声・カバー | 内容を固定して保持。公開失敗・更新・配備後も残す |
+| Show/Episodeの履歴 | 更新・非公開化後も保持。過去版の採用に使う |
+| 非公開化済み内容 | メタデータと素材を保持し、配信を停止する |
+| 統計の日別明細 | 保持期限を過ぎた行を累計へ合算し、明細を削除する |
+| ローカル原本・管理記録 | 管理者が保管・バックアップする |
+| キャッシュ | 必要に応じて消去し、保存データから再生成する |
 
-[ワークスペースバックアップ](../components/workspace-backup.md)はローカルだけを保存する。外部パスの音声、取り込み元、R2全体、DO SQLiteのエクスポートを含むものではない。メディアと履歴の保持も、アカウント・バケット全体の喪失に備えた別系統のバックアップを意味しない。
+[ワークスペースバックアップ](../components/workspace-backup.md)は、ローカルの管理ファイルを保存する機能です。R2・DOのデータやワークスペース外の原本は、別に保管対象を決めます。
 
-## 定義元
+## 実装
 
 - [素材キー](../../packages/shared/src/sqlite-media.ts)、[DO名と振り分け](../../src/sqlite-show-routing.ts)
-- [記録種別とディレクトリ](../../packages/cli/src/local-journal-path.ts)、[記録の書込み](../../packages/cli/src/local-journal-storage.ts)、[管理者キー](../../packages/cli/src/administrator-key.ts)
-- [ワークスペース保護](../../packages/cli/src/workspace-protection.ts)、[バックアップ対象選別](../../packages/cli/src/backup-create.ts)
+- [記録種別](../../packages/cli/src/local-journal-path.ts)、[記録の書き込み](../../packages/cli/src/local-journal-storage.ts)、[管理者キー](../../packages/cli/src/administrator-key.ts)
+- [ローカル保護設定](../../packages/cli/src/workspace-protection.ts)、[バックアップ対象選別](../../packages/cli/src/backup-create.ts)
