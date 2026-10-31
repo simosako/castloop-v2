@@ -1,6 +1,6 @@
 # 変更履歴
 
-版ごとの変更の入口です。詳細・互換性・検証範囲は各リリースノートを参照してください。**過去版の機能や手順が現行版でも使えるとは限りません。** 現在の使い方は[利用ガイド](docs/README.md)、実装の構造は[設計文書](design/README.md)で説明しています。
+版ごとの変更の入口です。詳細・互換性・検証範囲は各リリースノートを参照してください。**過去版の機能や手順が現行版でも使えるとは限りません。** 現在の使い方は[利用ガイド](docs/README_ja.md)、実装の構造は[設計文書](design/README.md)で説明しています。
 
 ## 未リリース
 
@@ -12,7 +12,8 @@
 
 | 版 | 主な変更 | リリースノート |
 | --- | --- | --- |
-| [v0.8.2](https://github.com/simosako/castloop-v2/releases/tag/v0.8.2) | リリース手順の整理 | [ノート](docs/release-v0.8.2.md) |
+| [v0.8.3](https://github.com/simosako/castloop-v2/releases/tag/v0.8.3) | 利用ガイドの日英対応、READMEと貢献ガイドの更新、ライセンス表記の整理 | [ノート](docs/release-v0.8.3.md) |
+| [v0.8.2](https://github.com/simosako/castloop-v2/releases/tag/v0.8.2) | リリース手順の整理 | [ノート](docs/archive/releases/release-v0.8.2.md) |
 | [v0.8.1](https://github.com/simosako/castloop-v2/releases/tag/v0.8.1) | 公開チェックと中断時RSS再実行の簡素化、ヘルプ・同梱Skill・ガイドの現行動作への整合 | [ノート](docs/archive/releases/release-v0.8.1.md) |
 | [v0.8.0](https://github.com/simosako/castloop-v2/releases/tag/v0.8.0) | 同期・アトミック公開、素材の直接配置、RSS・サイトの要求時生成、管理処理の簡素化 | [ノート](docs/archive/releases/release-v0.8.0.md) |
 | [v0.7.6](https://github.com/simosako/castloop-v2/releases/tag/v0.7.6) | 内蔵番組サイト、予約公開、暗号化ワークスペースバックアップ | [ノート](docs/archive/releases/release-v0.7.6.md) |
