@@ -1,50 +1,50 @@
-# CLIのリリース
+# Releasing the CLI
 
-リリース準備をPRでマージし、`main` のコミットにタグを付けてGitHub Releaseを公開します。CLIには配信用Workerが含まれます。
+Merge release preparation through a PR, then tag the commit on `main` to publish a GitHub Release. The CLI includes the delivery Worker.
 
-## 1. リリースを準備する
+## 1. Prepare the release
 
-1. 最新の `main` からリリース準備用ブランチを作成します。
-2. 前回のリリース以降の変更を確認し、公開する版番号、利用者に伝える変更点、互換性や更新時の注意を整理します。版番号の判断に迷う場合は依頼者に確認します。
-3. 次のファイルを更新し、変更内容とリンクを確認します。
+1. Create a release preparation branch from the latest `main`.
+2. Review the changes since the previous release. Decide the version, user-facing changes, compatibility information, and update instructions. Ask the requester if the version is unclear.
+3. Update the following files and check their content and links:
 
-| 対象 | 更新内容 |
+| File | Update |
 | --- | --- |
-| `package.json`、`package-lock.json` | 両方のバージョンを新版に揃える。CLIの `--version` は `package.json` の値を使う |
-| `docs/release-vX.Y.Z.md` | 新版のリリースノートを作成する。主な変更、利用条件、更新時の注意、実際に確認した範囲を記載する |
-| `CHANGELOG.md` | 新版の概要とノートへのリンクを追加し、未リリースの項目を整理する |
-| `README.md`、`CONTRIBUTING.md` | 最新版の番号、リリースノートへのリンク、互換性の説明を確認し、必要に応じて更新する |
-| `skills/castloop/SKILL.md`、`skills/castloop/references/publish.md`、`packages/cli/src/admin-skill.test.ts` | 版番号や利用条件の記述とテストを確認し、必要に応じて更新する |
-| `docs/archive/releases/` | 前版のリリースノートを移動し、`README.md` の一覧を更新する。移動したノート内の相対リンクも確認する |
-| その他のガイド・索引 | 変更された機能の説明と、最新版や移動したノートへのリンクを確認し、必要に応じて更新する |
+| `package.json`, `package-lock.json` | Set both versions to the new version. The CLI's `--version` uses `package.json`. |
+| `docs/release-vX.Y.Z.md` | Write the new release notes in English, covering the main changes, requirements, update instructions, and verification performed. |
+| `CHANGELOG.md` | Add a summary and link to the new notes, and organize unreleased entries. |
+| `README.md`, `README_ja.md`, `CONTRIBUTING.md` | Check the latest version, release notes links, and compatibility information; update them as needed. |
+| `skills/castloop/SKILL.md`, `skills/castloop/references/publish.md`, `packages/cli/src/admin-skill.test.ts` | Check version and requirements descriptions and their tests; update them as needed. |
+| `docs/archive/releases/` | Move the previous release notes here and update its `README.md` index. Check relative links in the moved notes. |
+| Other guides and indexes | Update descriptions of changed features and links to the latest or moved notes as needed. |
 
-最新版のノートは `docs/` 直下に置きます。CIはタグ名に対応する `docs/release-vX.Y.Z.md` をGitHub Releaseの本文に使うため、リポジトリ上とGitHub Releaseの両方でリンク先を確認してください。
+Write release notes in English only and keep the latest notes directly under `docs/`. CI uses `docs/release-vX.Y.Z.md` matching the tag as the GitHub Release body, so check links both in the repository and on GitHub Releases.
 
-リリースノートには、実施した検証とその範囲を記載します。Cloudflare実環境の試験は対象と操作範囲の明示的な承認を得てから実施し、実施していない検証を完了したとは記載しません。
+Describe the verification actually performed and its scope. Obtain explicit approval for the target and operations before live Cloudflare testing, and do not report unperformed checks as complete.
 
-## 2. PRを作成してマージする
+## 2. Create and merge the PR
 
-準備した変更をコミットしてpushし、`main` 向けのPRを作成します。[build-binaries.yml](../../.github/workflows/build-binaries.yml) のすべてのbuild・smokeジョブの成功を確認してからマージします。
+Commit and push the prepared changes, then create a PR targeting `main`. Confirm that all build and smoke jobs in [build-binaries.yml](../../.github/workflows/build-binaries.yml) pass before merging.
 
-CIではLinuxで型検査と全ローカルテストを実行し、Linux x64・macOS arm64・Windows x64の各環境でCLIをビルドして起動確認します。バージョン、ヘルプ、チェックサム、入力検証、ローカルプレビュー、Skill出力なども検査します。
+CI runs type checking and the full local test suite on Linux, then builds and smoke-tests the CLI on Linux x64, macOS arm64, and Windows x64. It also checks version, help, checksums, input validation, local previews, Skill output, and more.
 
-ローカルでのフル検査はリリースの必須手順ではありません。変更中に早く結果を確認したい場合や、問題を調査する場合は[ローカルでの確認](#ローカルでの確認)を実行してください。
+A full local run is not required for release. To get earlier feedback while making changes or to investigate a problem, use the [local checks](#local-checks).
 
-## 3. タグを付けて公開する
+## 3. Tag and publish
 
-1. マージ後の `main` と公開対象コミットを確認します。公開対象に含まれる変更は、PRのCI成功を確認してください。マージ後に修正が必要になった場合もPRで変更します。
-2. 公開対象コミットに、`package.json` のバージョンと一致する `vX.Y.Z` タグを付けてpushします。
-3. タグのpushで起動したCIの成功を確認します。CIは再度ビルドと起動確認を行い、成功後にGitHub Releaseを作成します。
-4. GitHub Releaseの本文、リンク、次の添付ファイルを確認します。
+1. Check `main` after the merge and identify the commit to release. Confirm that PR CI passed for the changes included in it. If fixes are needed after merging, make them through a PR as well.
+2. Tag the release commit with `vX.Y.Z`, matching the version in `package.json`, and push the tag.
+3. Confirm that the CI run triggered by the tag succeeds. CI builds and smoke-tests again, then creates the GitHub Release.
+4. Check the GitHub Release body, links, and these attachments:
 
-   - `castloop-linux-x64`、`castloop-macos-arm64`、`castloop-windows-x64.exe`
+   - `castloop-linux-x64`, `castloop-macos-arm64`, `castloop-windows-x64.exe`
    - `castloop-skill.tar.gz`
-   - `SHA256SUMS`、`SKILL_SHA256SUMS`
-   - `LICENSE`、`THIRD_PARTY_NOTICES.md`
+   - `SHA256SUMS`, `SKILL_SHA256SUMS`
+   - `LICENSE`, `THIRD_PARTY_NOTICES.md`
 
-## ローカルでの確認
+## Local checks
 
-開発環境は[CONTRIBUTING.md](../../CONTRIBUTING.md)で準備してください。次はLinux x64で検査する例です。
+Set up the development environment using [CONTRIBUTING.md](../../CONTRIBUTING.md). The following example checks a Linux x64 build:
 
 ```sh
 npm ci
@@ -54,8 +54,8 @@ npm run build:cli -- linux-x64
 node scripts/smoke-agent-cli.mjs dist/castloop-linux-x64
 ```
 
-実行ファイルは `dist/` に出力されます。[ビルドスクリプト](../../scripts/build-cli.ts)は `src/sqlite-worker.ts` をCLIに埋め込みます。
+The executable is written to `dist/`. The [build script](../../scripts/build-cli.ts) embeds `src/sqlite-worker.ts` in the CLI.
 
-## CIを保守する
+## Maintain CI
 
-外部Actionの更新は[更新手順](ci_security.md)に従います。実行環境やBun・Node.jsを更新した場合は、3種類のバイナリのビルドと起動確認をやり直してください。
+Follow the [update guide](ci_security.md) when updating external actions. If you update the runtime environment, Bun, or Node.js, repeat the build and smoke checks for all three binaries.

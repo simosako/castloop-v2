@@ -1,26 +1,26 @@
-# リリースCIで使うActionの更新
+# Updating actions used by release CI
 
-[ビルドワークフロー](../../.github/workflows/build-binaries.yml)では、外部Actionを40桁のコミットSHAで指定しています。更新するときは、公式リリースを確認してから固定先を変更します。
+The [build workflow](../../.github/workflows/build-binaries.yml) pins external actions to 40-character commit SHAs. Check the official releases before updating these pins.
 
-## 1. 更新先を確認する
+## 1. Review the update
 
-各Actionの公式リポジトリで、リリース内容とセキュリティの案内を読みます。実行環境、必要な権限、ダウンロード先に変更がある場合は、その影響も確認してください。
+Read the release and security information in each action's official repository. If the runtime, required permissions, or download sources change, review their impact.
 
-採用するリリースタグが指すコミットSHAを取得します。注釈付きタグの場合は、タグが参照するコミットまで確認します。
+Find the commit SHA referenced by the release tag you intend to use. For an annotated tag, follow the tag to its commit.
 
-## 2. ワークフローを変更する
+## 2. Update the workflow
 
-同じActionを使っているすべてのステップで、SHAと横のバージョンコメントを更新します。コメントは英語で記載してください。
+Update the SHA and adjacent version comment in every step that uses the action. Write comments in English.
 
-権限は、通常のジョブが `contents: read`、タグから公開するreleaseジョブが `contents: write` です。この区分を維持します。
+Keep the existing permission separation: ordinary jobs use `contents: read`, and the release job that publishes from a tag uses `contents: write`.
 
-## 3. 検証してマージする
+## 3. Verify and merge
 
 ```sh
 bun test
 npm run check
 ```
 
-ローカルの検査後にPRを作成し、各OSのbuild・smokeジョブを確認します。メジャーバージョンや実行環境も変更する場合は、その変更点をPRに明記してください。
+After the local checks, create a PR and verify the build and smoke jobs on each operating system. If you also change a major version or runtime environment, describe those changes in the PR.
 
-詳細は[GitHub Actionsのセキュリティガイド](https://docs.github.com/en/actions/reference/security/secure-use)を参照してください。
+For details, see GitHub's [security guide for GitHub Actions](https://docs.github.com/en/actions/reference/security/secure-use).

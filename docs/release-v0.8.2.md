@@ -1,20 +1,20 @@
 # castloop v0.8.2
 
-リリース手順を整理したメンテナンスリリースです。v0.8.1からCLIとWorkerの機能に変更はありません。
+This maintenance release clarifies the release procedure. The CLI and Worker have no functional changes from v0.8.1.
 
-## 主な変更
+## Highlights
 
-- リリース準備で更新するファイルと、PRの作成からGitHub Releaseの確認までの手順を明記しました。
-- リリース時に参照する手順書を `AGENTS.md` に追加しました。
+- Documented which files to update during release preparation and the steps from creating a PR to checking the GitHub Release.
+- Added the release procedure to `AGENTS.md` for reference when releasing.
 
-## 利用条件
+## Requirements
 
-サービス設定と対応する内部形式はv0.8.1と同じです。利用を始めるには、[インストール](https://github.com/simosako/castloop-v2/blob/v0.8.2/docs/installation.md)後、[サービス作成と初回公開](https://github.com/simosako/castloop-v2/blob/v0.8.2/docs/getting_started.md)へ進んでください。
+The service configuration and supported internal formats are unchanged from v0.8.1. To get started, follow the current [installation guide](https://github.com/simosako/castloop-v2/blob/main/docs/installation.md), then [create a service and publish your first episode](https://github.com/simosako/castloop-v2/blob/main/docs/getting_started.md).
 
-## 動作確認の範囲
+## Verification
 
-GitHub Actionsで型検査と自動テスト、およびLinux x64・macOS arm64・Windows x64の配布バイナリの起動確認を行います。Cloudflare実環境での確認は行っていません。
+GitHub Actions runs type checking and automated tests, and smoke-tests the release binaries on Linux x64, macOS arm64, and Windows x64. No live Cloudflare testing was performed.
 
-## ダウンロード
+## Download
 
-[v0.8.2のGitHub Release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.2)から、利用するOSのファイルをダウンロードしてください。
+Download the file for your operating system from the [v0.8.2 GitHub Release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.2).

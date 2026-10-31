@@ -1,16 +1,16 @@
-# 開発・リリース担当者向け資料
+# Development and release documentation
 
-castloop本体の開発や配布を担当する人向けの資料です。Podcastの管理手順は[利用ガイド](../README_ja.md)から確認できます。
+These documents are for people developing and distributing castloop. For podcast management, see the [user guide](../README.md).
 
-## 開発を始める
+## Start development
 
-1. [CONTRIBUTING.md](../../CONTRIBUTING.md)で環境を準備し、テストを実行します。
-2. [設計文書](../../design/README.md)で変更する機能の構成を確認します。
-3. [テスト設計](../../design/testing.md)に沿って、変更内容を検証します。
+1. Set up your environment and run the tests using [CONTRIBUTING.md](../../CONTRIBUTING.md).
+2. Review the relevant components in the [design documentation](../../design/README.md) (Japanese).
+3. Verify your changes using the [testing guide](../../design/testing.md) (Japanese).
 
-## 配布を更新する
+## Update a release
 
-- [CLIのビルドとリリース](releasing.md)
-- [リリースCIで使うActionの更新](ci_security.md)
+- [Build and release the CLI](releasing.md)
+- [Update actions used by release CI](ci_security.md)
 
-Cloudflareの実環境で試験する場合は、対象と操作範囲の承認を受け、[非公開試験の保護条件](../../design/security.md#非公開の実機試験)を確認してから実行してください。
+Before testing against a live Cloudflare environment, obtain approval for the target and operations and review the [private testing requirements](../../design/security.md#非公開の実機試験) (Japanese).
