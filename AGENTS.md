@@ -92,6 +92,7 @@ If the change grows clearly beyond this during work, stop and ask instead of exp
 | Local journals or backups | [Storage layout](design/data/storage.md), [workspace backup](design/components/workspace-backup.md) |
 | Authentication or input validation | [Security](design/security.md), [schemas](design/data/schemas.md), [CLI](design/components/cli.md) |
 | Testing or live trial preparation | [Testing](design/testing.md), [private trial procedure](design/security.md) |
+| Release preparation and publication | [Release procedure](docs/development/releasing.md) |
 | Live environments or past acceptance claims | [Archive index](design/archive/README.md), [retained service disposal 2026-10-29](design/archive/sq16r_environment_decommission_20261029.md), [2026-10-17 cleanup outcome](design/archive/cloudflare_test_environment_cleanup_20261017.md), then the relevant measurement record |
 
 - `design/archive/` is historical evidence, not a task queue or current operational authorization. Consult it only for relevant history. The former long-form agent storage notes and milestones are preserved in [this snapshot](design/archive/agent_storage_and_milestones_20261017.md).
