@@ -1,36 +1,36 @@
-# サービスの保守
+# Service maintenance
 
-新しいCLIに含まれる配信サーバー（Worker）を、利用中のサービスに反映する手順です。
+This guide explains how to update the delivery server (Worker) of an existing service using the version bundled with a new CLI.
 
-## 1. 更新の準備をする
+## 1. Prepare for the update
 
-1. [リリースノート](https://github.com/simosako/castloop-v2/releases)で、利用中のサービスを更新できる版か確認します。
-2. [CLIを更新](installation.md#cliを更新する)します。
-3. 元のワークスペースの[バックアップ](workspace_backup.md)を作成します。
-4. CloudflareのアカウントIDとAPIトークンを[環境変数に設定](getting_started.md#1-cloudflareの認証情報を設定する)します。
+1. Check the [release notes](https://github.com/simosako/castloop-v2/releases) to make sure your service can be updated to the new version.
+2. [Update the CLI](installation.md#update-the-cli).
+3. Create a [backup](workspace_backup.md) of the original workspace.
+4. Set the Cloudflare account ID and API token as [environment variables](getting_started.md#1-set-cloudflare-credentials).
 
-## 2. サーバーを更新する
+## 2. Update the server
 
-更新前の状態を確認してから、`deploy` を実行します。
+Check the current status, then run `deploy`:
 
 ```sh
 castloop service-status --workspace /path/to/workspace --json
 castloop deploy --workspace /path/to/workspace --json
 ```
 
-公開内容、音声、画像、履歴、予約、独自ドメインは維持されます。
+Published content, audio, images, history, schedules, and custom domains are preserved.
 
-## 3. 更新後の状態を確認する
+## 3. Check the result
 
 ```sh
 castloop service-status --workspace /path/to/workspace --json
 castloop verify my-show --workspace /path/to/workspace --json
 ```
 
-`publication_ready` が `true` であることを確認し、番組サイトでも表示と音声を確かめてください。
+Check that `publication_ready` is `true`, and check the display and audio on the show website.
 
-## 更新が中断した場合
+## If an update is interrupted
 
-実行していたコマンドの終了を確認し、`service-status` で現在の状態を調べます。その後、同じワークスペースと設定で `deploy` を再実行してください。
+Make sure the command has finished and check the current status with `service-status`. Then run `deploy` again using the same workspace and configuration.
 
-互換性や設定のエラーが出た場合は、リリースノートとエラー内容を確認します。その他の状態確認は[トラブルシューティング](troubleshooting.md)を参照してください。
+For compatibility or configuration errors, check the release notes and the error message. See [Troubleshooting](troubleshooting.md) for other status checks.

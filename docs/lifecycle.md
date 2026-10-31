@@ -1,65 +1,65 @@
-# 非公開化と公開の復元
+# Unpublishing and restoring content
 
-番組全体、またはエピソード単位で配信を止められます。非公開にした内容や素材は保存され、後から再公開できます。
+You can stop delivery of an entire show or an individual episode. Unpublished content and assets are retained and can be published again later.
 
-## エピソードを非公開にする
+## Unpublish an episode
 
-### 1. 変更内容を確認する
+### 1. Review the change
 
-次の例では、番組 `my-show` のエピソード `first` を非公開にします。
+This example unpublishes episode `first` of show `my-show`:
 
 ```sh
 castloop preview-episode-lifecycle my-show first unpublish --workspace /path/to/workspace > /path/to/workspace/unpublish-plan.json
 ```
 
-`unpublish-plan.json` を開き、番組、エピソード、変更後の状態を確認します。
+Open `unpublish-plan.json` and check the show, episode, and resulting state.
 
-### 2. 実行する
+### 2. Execute the plan
 
-計画内の `request_sha256` を `REVIEWED_REQUEST_SHA256` に入れます。`confirm` はそのまま入力してください。
+Replace `REVIEWED_REQUEST_SHA256` with the `request_sha256` from the plan. Enter `confirm` exactly as shown.
 
 ```sh
 castloop lifecycle-execute unpublish-plan.json REVIEWED_REQUEST_SHA256 confirm --workspace /path/to/workspace --json
 ```
 
-完了後、エピソードがRSSと番組サイトの一覧から消えたことを確認します。エピソードのページと音声も配信が停止します。
+Afterward, check that the episode is no longer listed in the RSS feed or on the show website. Delivery of its page and audio also stops.
 
-## エピソードを再公開する
+## Restore an episode
 
-保存されている最新の内容で公開を戻します。親の番組を公開状態にしてから実行してください。
+Restore the latest saved content. Publish the parent show first.
 
 ```sh
 castloop preview-episode-lifecycle my-show first restore --workspace /path/to/workspace > /path/to/workspace/restore-plan.json
 ```
 
-`restore-plan.json` の内容を確認し、その計画の `request_sha256` を使って実行します。
+Review `restore-plan.json` and execute it using its `request_sha256`:
 
 ```sh
 castloop lifecycle-execute restore-plan.json REVIEWED_REQUEST_SHA256 confirm --workspace /path/to/workspace --json
 ```
 
-再公開後は番組サイトで表示と再生を確認してください。
+After restoring the episode, check its display and playback on the show website.
 
-## 番組全体を非公開にする・再公開する
+## Unpublish or restore an entire show
 
-番組全体を止める場合は、次のコマンドで計画を作ります。
+To stop delivery of a show, create a plan:
 
 ```sh
 castloop preview-show-lifecycle my-show unpublish --workspace /path/to/workspace > /path/to/workspace/show-plan.json
 ```
 
-計画を確認し、`request_sha256` を使って実行します。
+Review the plan and execute it using its `request_sha256`:
 
 ```sh
 castloop lifecycle-execute show-plan.json REVIEWED_REQUEST_SHA256 confirm --workspace /path/to/workspace --json
 ```
 
-番組のRSS、サイト、画像、音声の配信が停止します。
+Delivery of the show's RSS feed, website, images, and audio stops.
 
-再公開するときは、プレビューの `unpublish` を `restore` に替えて新しい計画を作り、確認して実行します。個別に非公開にしていたエピソードは、その状態が維持されます。
+To restore the show, replace `unpublish` with `restore` in the preview command, then review and execute the new plan. Episodes that were individually unpublished remain unpublished.
 
-## 別の内容で公開したい場合
+## Publish different content
 
-- 手元で編集した内容を公開する：[通常の公開・更新](publishing.md)
-- 特定の過去版に戻す：[履歴の閲覧と採用](published_content_review.md#履歴の閲覧と採用)
-- 操作の結果が分からない：[中断後の確認](troubleshooting.md#操作が中断した場合)
+- To publish local edits, follow [Publishing and updating](publishing.md).
+- To restore a particular earlier version, see [Reviewing and restoring revisions](published_content_review.md#review-and-restore-revisions).
+- If the result of an operation is unclear, see [When an operation is interrupted](troubleshooting.md#when-an-operation-is-interrupted).

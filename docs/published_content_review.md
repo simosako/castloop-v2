@@ -1,81 +1,81 @@
-# 公開内容の確認と過去版の採用
+# Reviewing content and restoring revisions
 
-公開前の差分やRSSを確認する方法と、保存されている過去の内容に戻す方法を説明します。
+This guide explains how to review changes and RSS before publication and restore previously saved content.
 
-## 公開前の差分を確認する
+## Review changes before publication
 
-エピソードを編集したら、次のコマンドで公開中の内容と比較します。
+After editing an episode, compare it with the published version:
 
 ```sh
 castloop preview-episode first --workspace /path/to/workspace --show my-show --remote --json
 ```
 
-音声も差し替える場合は、`first` の後にMP3の絶対パスを指定します。番組情報を比較する場合は `preview-show my-show` を使います。
+To replace audio as well, specify the MP3's absolute path after `first`. To compare show information, use `preview-show my-show`.
 
-主に次の項目を確認してください。
+Check these fields:
 
-| 項目 | 確認する内容 |
+| Field | Meaning |
 | --- | --- |
-| `published` | サーバーに保存されている現在の内容 |
-| `local` | 手元で編集した内容 |
-| `changes.metadata_fields` | 変更された項目 |
-| `assets` | 使用するカバーや音声 |
-| `unchanged` | `true` なら公開済みの内容と同じ |
+| `published` | Current content saved on the server |
+| `local` | Locally edited content |
+| `changes.metadata_fields` | Changed fields |
+| `assets` | Cover and audio to be used |
+| `unchanged` | `true` if the content matches the published version |
 
-内容が正しければ、`input_fingerprint` を使って[公開](publishing.md)します。入力を修正した場合は、再度プレビューしてください。
+If the content is correct, use `input_fingerprint` to [publish](publishing.md). If you edit the input, preview again.
 
-## RSSをファイルで確認する
+## Review RSS in a file
 
-プレビューに `--rss-output` を付けると、変更を反映したRSSを手元に保存できます。保存先には新しいファイル名を指定します。
+Add `--rss-output` to a preview to save the RSS feed with your changes locally. Specify a new filename:
 
 ```sh
 castloop preview-episode first --workspace /path/to/workspace --show my-show --remote --rss-output /path/to/preview.xml --json
 ```
 
-`preview.xml` を開き、番組情報や各エピソードの記載を確認してください。新しい音声のURLは仮の値です。音声やカバー自体は、プレビューの `verification_paths` に表示された手元のファイルで確認します。
+Open `preview.xml` and review the show information and episodes. New audio URLs are placeholders. To review the audio and cover themselves, use the local files listed in the preview's `verification_paths`.
 
-## 履歴の閲覧と採用
+## Review and restore revisions
 
-### 1. 戻したい版を探す
+### 1. Find the revision
 
-エピソードの履歴を表示します。
+List the episode's revisions:
 
 ```sh
 castloop list-episode-revisions first --workspace /path/to/workspace --show my-show --json
 ```
 
-番組情報の履歴には `list-show-revisions my-show` を使います。
+For show information, use `list-show-revisions my-show`.
 
-履歴は新しい順に表示されます。続きがある場合は、結果の `next_cursor` を `--cursor` に指定して次のページを取得してください。
+Revisions are listed newest first. If more results are available, pass `next_cursor` from the result to `--cursor` to fetch the next page.
 
-### 2. 過去版との差分を確認する
+### 2. Review the differences
 
-選んだ版の `revision_id` を `SAVED_REVISION_UUID` に入れ、確認用の計画ファイルを保存します。
+Replace `SAVED_REVISION_UUID` with the selected revision's `revision_id` and save a plan for review:
 
 ```sh
 castloop preview-episode-revision first SAVED_REVISION_UUID --workspace /path/to/workspace --show my-show > /path/to/workspace/revision-plan.json
 ```
 
-番組情報には `preview-show-revision my-show SAVED_REVISION_UUID` を使います。
+For show information, use `preview-show-revision my-show SAVED_REVISION_UUID`.
 
-計画ファイルを開き、現在の内容、採用する過去版、差分、素材を確認します。過去版を採用すると、その内容で公開されます。エピソードを戻す場合は、先に番組を公開状態にしてください。
+Open the plan and review the current content, selected revision, differences, and assets. Executing the plan publishes the selected revision. To restore an episode, first make sure its show is published.
 
-### 3. 確認した過去版を採用する
+### 3. Restore the reviewed revision
 
-計画の `request_sha256` を `REVIEWED_REQUEST_SHA256` に入れます。最後の `confirm` はそのまま入力してください。
+Replace `REVIEWED_REQUEST_SHA256` with the plan's `request_sha256`. Enter the final `confirm` exactly as shown.
 
 ```sh
 castloop revision-execute revision-plan.json REVIEWED_REQUEST_SHA256 confirm --workspace /path/to/workspace --json
 ```
 
-実行後は[配信確認](troubleshooting.md#verify)を行い、番組サイトでも内容を確認します。採用した内容も履歴から確認できます。
+Afterward, [verify delivery](troubleshooting.md#verify) and review the content on the show website. The restored content is also available in the revision history.
 
-## サーバーの内容をTOMLに書き出す
+## Export server content to TOML
 
-過去版を採用した後も、手元の編集ファイルは元のままです。サーバーの現在内容を編集元にしたい場合は、現在の `revision_id` を指定して新しいTOMLに書き出します。出力先のフォルダを先に用意してください。
+Restoring a revision does not change local editable files. To use the server's current content as the basis for editing, specify its current `revision_id` and export it to a new TOML file. Create the output directory first.
 
 ```sh
 castloop sync-local-metadata --workspace /path/to/workspace --show my-show --episode first --expect-revision CURRENT_REVISION_UUID --output /path/to/exported-episode.toml --json
 ```
 
-書き出したTOMLを確認してから、手元の編集ファイルに反映してください。音声やカバーは保管してある原本を使います。
+Review the exported TOML before applying it to your local editable file. Use your retained original audio and cover files.

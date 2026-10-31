@@ -1,80 +1,80 @@
-# 配信統計
+# Delivery statistics
 
-エピソードごとの音声配信回数と転送量を確認できます。集計は音声ファイルへのアクセスを基準にしており、同じ人による複数回の取得や分割ダウンロードも数えます。
+You can view audio delivery counts and transferred data by episode. The statistics count accesses to audio files, including repeated downloads by the same person and partial downloads.
 
-以下のコマンドはサービスのワークスペースで実行します。別の場所から使う場合は、`--workspace /path/to/workspace` を付けてください。
+Run the following commands in the service workspace. To run them elsewhere, add `--workspace /path/to/workspace`.
 
-## 最近の配信状況を見る
+## View recent delivery
 
 ```sh
 castloop stats my-show
 ```
 
-直近30日分の統計を、エピソード別に表示します。日付はUTC基準です。
+This displays statistics for the past 30 days by episode. Dates are in UTC.
 
-期間を指定する場合は、開始日と終了日を付けます。一度に最大366日分を確認できます。
+To choose a period, specify its start and end dates. You can view up to 366 days at a time:
 
 ```sh
 castloop stats my-show --from 2026-10-01 --to 2026-10-25
 ```
 
-一覧の続きがある場合は、結果のカーソルを指定します。
+If there are more results, specify the cursor from the result:
 
 ```sh
-castloop stats my-show --cursor '前の結果に表示されたカーソル'
+castloop stats my-show --cursor 'cursor from the previous result'
 ```
 
-## 一つのエピソードを詳しく見る
+## View an episode in detail
 
 ```sh
 castloop stats my-show --episode first --by-revision
 ```
 
-日別の統計と、音声の版ごとの内訳を表示します。音声を差し替えた場合は、差し替え前後の音声を分けて確認できます。エピソードの合計には両方が含まれます。
+This displays daily statistics and a breakdown by audio revision. If you replaced the audio, you can view the old and new audio separately. The episode total includes both.
 
-データを保存・加工する場合は、各コマンドに `--json` を付けてください。
+Add `--json` to any of these commands to save or process the data.
 
-## 数値の読み方
+## Understanding the numbers
 
-| 指標 | 意味 |
+| Metric | Meaning |
 | --- | --- |
-| `initial_downloads` | 音声の先頭から取得を始めた回数。短い確認用アクセスは別に集計します |
-| `equivalent_full_downloads` | 転送量を音声ファイルのサイズで割った、本数換算の値 |
-| `audio_get_requests` | 音声データを返したリクエストの合計 |
-| `response_bytes` | 応答で返す音声データ量の合計。途中切断分も含みます |
-| `head_requests` / `not_modified_requests` | ファイル情報の確認回数 / キャッシュの更新確認で304を返した回数 |
-| `probe_range_requests` | ごく短い範囲だけを取得する確認用アクセスの回数 |
-| `bot_get_requests` / `bot_response_bytes` | 既知のボットやcastloopの配信確認による取得回数・転送量 |
+| `initial_downloads` | Downloads started from the beginning of the audio. Short probe requests are counted separately. |
+| `equivalent_full_downloads` | Transferred bytes divided by audio file size, expressed as equivalent full downloads. |
+| `audio_get_requests` | Total requests that returned audio data. |
+| `response_bytes` | Total audio bytes in responses, including interrupted transfers. |
+| `head_requests` / `not_modified_requests` | Requests for file information / cache validation requests that returned 304. |
+| `probe_range_requests` | Requests for a very short range used to probe the file. |
+| `bot_get_requests` / `bot_response_bytes` | Requests and transferred bytes from known bots or castloop delivery checks. |
 
-音声の配信後に集計を記録するため、表示への反映に時間がかかる場合があります。記録時のエラーは `recording_error_count` で確認できます。
+Statistics are recorded after audio delivery, so they may take time to appear. Check `recording_error_count` for recording errors.
 
-## 日別の集計状態を確認する
+## Check daily coverage
 
-日別の `STATUS` 列（JSONでは `coverage`）を見て、どの期間の数値かを確認します。
+The daily `STATUS` column (`coverage` in JSON) shows what each period represents:
 
-| 状態 | 意味 |
+| Status | Meaning |
 | --- | --- |
-| `measured` | 1日分を計測済み。アクセスがなかった日は0です |
-| `partial` | 計測を始めた日の一部、または集計中の当日 |
-| `unmeasured` | 計測を始める前の期間 |
-| `pruned` | 保持期限を過ぎた期間。通算値には含まれます |
+| `measured` | The full day was measured. Days with no accesses show zero. |
+| `partial` | Part of the first day of measurement, or the current day while aggregation is in progress. |
+| `unmeasured` | A period before measurement began. |
+| `pruned` | A period past the retention limit. It remains included in lifetime totals. |
 
-`period` は指定期間の合計、`lifetime` は保持期限を過ぎた分も含む通算値です。
+`period` is the total for the selected period; `lifetime` includes data past the retention limit.
 
-## 日別データの保持期間を変える
+## Change daily data retention
 
-既定は400日です。番組ごとに30〜3650日で設定できます。現在値は `castloop stats my-show --json` の `retention_days` で確認します。
+The default is 400 days. You can set 30–3650 days per show. Check the current `retention_days` using `castloop stats my-show --json`.
 
-例えば180日に変更する場合は、次を実行します。
+For example, to set 180 days:
 
 ```sh
 castloop stats-retention my-show 180
 ```
 
-変更後にもう一度 `stats` で設定を確認してください。期限を過ぎた日別データは順次整理され、通算値に残ります。保持期間を延ばす場合も、過去に整理された期間は通算値で確認します。
+Run `stats` again to check the setting. Expired daily data is pruned over time but remains in lifetime totals. If you increase retention, previously pruned periods remain available only in lifetime totals.
 
-## リスナーへの説明例
+## Example explanation for listeners
 
-番組サイトなどに説明を載せる場合は、次の文章を参考にしてください。
+You can adapt the following text for your show website:
 
-> 当番組では、エピソードごとの日別配信回数と転送量を集計しています。castloopの統計には、個人のIPアドレス、Cookie、端末識別子、User-Agent文字列を保存しません。配信基盤のCloudflareが通信情報を扱う方法については、Cloudflareのプライバシーポリシーをご確認ください。
+> This show collects daily audio delivery counts and transferred bytes for each episode. castloop statistics do not store individual IP addresses, cookies, device identifiers, or User-Agent strings. Please see Cloudflare's privacy policy for how Cloudflare handles connection information in its delivery infrastructure.

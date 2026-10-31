@@ -1,116 +1,116 @@
-# サービスを作り、最初のエピソードを公開する
+# Create a service and publish your first episode
 
-[CLIのインストール](installation.md)を済ませてから、次の順に進めます。
+After [installing the CLI](installation.md), follow these steps:
 
-1. Cloudflareの認証情報を設定する
-2. サービスを作る
-3. 番組を公開する
-4. エピソードを公開する
-5. RSSと音声を確認する
+1. Set Cloudflare credentials.
+2. Create a service.
+3. Publish a show.
+4. Publish an episode.
+5. Check the RSS feed and audio.
 
-このページでは、ワークスペースを `/path/to/workspace`、番組IDを `my-show` とします。パスや名前は自分の環境に合わせて置き換えてください。
+The examples use `/path/to/workspace` as the workspace and `my-show` as the show ID. Replace paths and names to suit your environment.
 
-## 1. Cloudflareの認証情報を設定する
+## 1. Set Cloudflare credentials
 
-Cloudflareのダッシュボードで、次を確認します。
+Find the following in the Cloudflare dashboard:
 
-- アカウントID
-- Workers・R2・SQLite Durable Objectsを管理できるAPIトークン
-- 利用する `workers.dev` サブドメイン
+- Your account ID
+- An API token with permission to manage Workers, R2, and SQLite Durable Objects
+- The `workers.dev` subdomain you want to use
 
-認証情報をターミナルの環境変数に設定します。
+Set the credentials as environment variables in your terminal.
 
-Linux・macOSの場合：
+On Linux or macOS:
 
 ```sh
-export CLOUDFLARE_ACCOUNT_ID="アカウントID"
-export CLOUDFLARE_API_TOKEN="APIトークン"
+export CLOUDFLARE_ACCOUNT_ID="ACCOUNT_ID"
+export CLOUDFLARE_API_TOKEN="API_TOKEN"
 ```
 
-WindowsのPowerShellの場合：
+In Windows PowerShell:
 
 ```powershell
-$env:CLOUDFLARE_ACCOUNT_ID = "アカウントID"
-$env:CLOUDFLARE_API_TOKEN = "APIトークン"
+$env:CLOUDFLARE_ACCOUNT_ID = "ACCOUNT_ID"
+$env:CLOUDFLARE_API_TOKEN = "API_TOKEN"
 ```
 
-## 2. サービスを作る
+## 2. Create a service
 
-管理ファイルを保存する新しいフォルダと、未使用のサービスID・R2バケット名を決めます。
+Choose a new folder for your management files, an unused service ID, and an unused R2 bucket name.
 
 ```sh
 castloop init /path/to/workspace --service-id my-service --bucket-name my-private-bucket --workers-subdomain my-account-subdomain
 castloop service-status --workspace /path/to/workspace --json
 ```
 
-`init` はCloudflare上に配信環境を作り、手元にワークスペースを作成します。`service-status` の結果で `publication_ready` が `true` になっていることを確認してください。
+`init` creates the delivery environment on Cloudflare and a local workspace. Check that `publication_ready` is `true` in the `service-status` result.
 
-ワークスペースの `castloop.toml` はサービスの設定、`.castloop/` は管理キーや操作記録です。両方を保管してください。
+Keep the workspace's `castloop.toml`, which contains the service configuration, and `.castloop/`, which contains administrator keys and operation records.
 
-試験用の番組を限られた人だけに公開する場合は、素材をアップロードする前に[アクセス保護](../design/security.md#非公開の実機試験)を設定します。
+For a test show intended only for selected reviewers, set up [access protection](../design/security.md#非公開の実機試験) (Japanese) before uploading assets.
 
-## 3. 番組を公開する
+## 3. Publish a show
 
-番組の雛形を作ります。この例では、castloopの番組サイトを使います。
+Create a show template. This example uses castloop's built-in show website:
 
 ```sh
 castloop create-show my-show --site-mode builtin --workspace /path/to/workspace
 ```
 
-作成された `my-show/show.toml` を開き、番組名、説明、著者、所有者の連絡先などを入力します。[入力例](../examples/README.md)を参考に、生成されたファイルの各項目を編集してください。
+Open the generated `my-show/show.toml` and enter the show name, description, author, owner contact details, and other fields. Use the [examples](../examples/README.md) (Japanese) as a reference when editing the generated file.
 
-番組のカバー画像を `my-show/` に置き、`image_path` にファイル名を書きます。カバーには5,000,000バイト以下のJPEGまたはPNGを使います。
+Place the show's cover image in `my-show/` and set `image_path` to its filename. Use a JPEG or PNG no larger than 5,000,000 bytes.
 
-準備ができたらプレビューします。
+When ready, preview the show:
 
 ```sh
 castloop preview-show my-show --workspace /path/to/workspace --remote --json
 ```
 
-番組情報とカバーを確認し、結果の `input_fingerprint` をコピーします。次の `REVIEWED_HASH` をその値に置き換えて公開します。
+Review the show information and cover, then copy `input_fingerprint` from the result. Replace `REVIEWED_HASH` with that value and publish:
 
 ```sh
 castloop publish-show my-show --workspace /path/to/workspace --expect-preview REVIEWED_HASH --json
 ```
 
-## 4. エピソードを公開する
+## 4. Publish an episode
 
-エピソードの雛形を作ります。
+Create an episode template:
 
 ```sh
 castloop create-episode first --workspace /path/to/workspace --show my-show
 ```
 
-`my-show/episode-first.toml` を開き、タイトルや説明を入力します。生成されたGUID（エピソードの識別子）はそのまま使い、公開日時を確認してください。
+Open `my-show/episode-first.toml` and enter a title and description. Keep the generated GUID (the episode identifier) and check the publication date.
 
-300,000,000バイト以下のMP3を用意し、プレビューします。音声のパスは絶対パスで指定すると分かりやすくなります。
+Prepare an MP3 no larger than 300,000,000 bytes and preview the episode. An absolute path makes the audio file location clear.
 
 ```sh
 castloop preview-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --remote --json
 ```
 
-内容と音声を確認し、この結果の `input_fingerprint` を使って公開します。
+Review the content and audio, then publish using the resulting `input_fingerprint`:
 
 ```sh
 castloop publish-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
-日時を指定して公開する場合は、公開コマンドの代わりに[予約公開](scheduling.md)を使ってください。
+To publish at a specified time, use [scheduled publication](scheduling.md) instead of the publish command.
 
-## 5. RSSと音声を確認する
+## 5. Check the RSS feed and audio
 
 ```sh
 castloop list-episodes my-show --workspace /path/to/workspace --json
 castloop verify my-show --episode first --workspace /path/to/workspace --json
 ```
 
-`castloop.toml` の `public_base_url` を確認し、次のURLをブラウザで開きます。
+Check `public_base_url` in `castloop.toml` and open these URLs in a browser:
 
-| 内容 | URL |
+| Content | URL |
 | --- | --- |
-| 番組サイト | `<public_base_url>/podcasts/my-show/` |
-| RSS | `<public_base_url>/podcasts/my-show/feed.xml` |
+| Show website | `<public_base_url>/podcasts/my-show/` |
+| RSS feed | `<public_base_url>/podcasts/my-show/feed.xml` |
 
-番組名や説明を確認し、音声を再生してください。
+Check the show name and description, and play the audio.
 
-公開できたら[ワークスペースのバックアップ](workspace_backup.md)を作成します。次回からの編集は[公開と更新](publishing.md)を参照してください。
+After publishing, create a [workspace backup](workspace_backup.md). For later edits, see [Publishing and updating](publishing.md).

@@ -3,64 +3,54 @@
 [![Latest release](https://img.shields.io/github/v/release/simosako/castloop-v2)](https://github.com/simosako/castloop-v2/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one private R2 bucket and one Worker per service, multiple Shows.
+[日本語](README_ja.md)
 
-**Early beta.** Commands and persisted formats can change incompatibly. v0.8.2 requires fresh services with internal queue/content formats **14/13**; older services are not migrated or adopted. Native performance, full Free-plan compatibility and broad production behavior remain unverified. See the [release notes](docs/release-v0.8.2.md) for compatibility and the limited live-verification scope.
+castloop is a podcast hosting tool that runs on your Cloudflare account. Use its command-line interface to manage your shows and episodes, publish an RSS feed and a website, and schedule content for release.
 
-The CLI validates local TOML/media, places content-addressed media in private R2, and explicitly sends metadata plus media references to the target Show DO. After validation and required cache purges, one SQLite transaction commits content, revisions and delivery generations. Each Show has independent SQLite state; a small control DO tracks Show registration, catalog listing and custom domain state. No Cloudflare Queues or D1 are used.
+> **Early beta:** Commands and data formats may change incompatibly. Check the [release notes](https://github.com/simosako/castloop-v2/releases/latest) before installing or updating.
 
-## Get started
+## Why castloop?
 
-Download the matching binary, `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` from the [latest release](https://github.com/simosako/castloop-v2/releases/latest). Released binaries do not include unreleased branch changes.
+Podcast hosting services make publishing accessible, but their interfaces and plans may not offer the control you need. You might want to automate uploads, schedule an episode for a future date, or keep a growing archive without a hosting plan's fixed storage allowance.
 
-| Platform | Binary |
-| --- | --- |
-| Linux x86-64, glibc | `castloop-linux-x64` |
-| macOS Apple Silicon, macOS 11+ | `castloop-macos-arm64` |
-| Windows x64, Windows 10+ | `castloop-windows-x64.exe` |
+castloop puts podcast management in your hands. Its CLI fits into scripts and other workflows, and its bundled Skill helps AI agents work with your shows. You can prepare and review changes before publishing, or schedule them for later. Your content is hosted in your own Cloudflare account, so storage can grow with your needs and Cloudflare usage and pricing apply.
 
-Verify the downloaded checksum before execution. Binaries are unsigned; follow the [installation guide](docs/installation.md) for OS-specific instructions and verification limits.
+castloop is designed to make use of Cloudflare's free tiers where possible. For example, R2 Standard storage includes 10 GB-month of storage per month in its free tier. Actual costs depend on storage, requests, and other Cloudflare services used; see [R2 pricing](https://developers.cloudflare.com/r2/pricing/) and [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) for current details. Individual MP3 files are limited to 300,000,000 bytes.
 
-The administrator needs no Bun, Node.js, Wrangler, ffprobe or separate R2 S3 credentials. Supply `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` with the required Worker/R2/SQLite DO permissions. The CLI never expands permissions or changes billing/CPU limits.
+## Features
 
-1. [Install the CLI](docs/installation.md).
-2. [Create a service and publish your first Show and Episode](docs/getting_started.md).
-3. Use the **[user guide index / 利用ガイド](docs/README.md)** for ongoing administration. Guides are written in Japanese.
+- Manage multiple podcasts from a CLI using local, editable TOML files.
+- Publish episodes with audio, an RSS feed, and a built-in podcast website.
+- Preview changes before publishing and schedule shows or episodes for a later date.
+- Review published revisions and restore earlier content.
+- Import an existing podcast from its RSS feed.
+- Use a custom domain and view episode delivery statistics.
+- Export a Skill to help an AI agent manage your podcast.
 
-See `castloop help COMMAND` for the syntax supported by your installed version.
+## Getting started
 
-## Guides
+1. Download the CLI for your platform from the [latest release](https://github.com/simosako/castloop-v2/releases/latest) and follow the [installation guide](docs/installation.md).
+2. Set up your Cloudflare credentials and create a service in your account.
+3. Create a show and an episode, edit their TOML files, and prepare your cover image and MP3.
+4. Preview and publish your content, then check your podcast website and RSS feed.
 
-| Task | Guide |
-| --- | --- |
-| Publish or update content | [Publication](docs/publishing.md), [review and revisions](docs/published_content_review.md) |
-| Schedule publication | [Scheduling and timezone settings](docs/scheduling.md) |
-| Stop or restore delivery | [Unpublish and restore](docs/lifecycle.md) |
-| Configure the builtin website | [Website, CSS and dates](docs/show_website.md) |
-| Import an existing podcast | [RSS import](docs/rss_migration.md) |
-| Inspect traffic | [Delivery statistics](docs/delivery_statistics.md) |
-| Inspect state or handle interruptions | [Troubleshooting](docs/troubleshooting.md) |
-| Preserve administrator state | [Workspace backup](docs/workspace_backup.md) |
-| Update the Worker or public domain | [Maintenance](docs/maintenance.md), [custom domains](docs/custom_domains.md) |
-| Work with an AI agent | [Agent usage and bundled Skill](docs/agent_usage.md) |
+The [getting started guide](docs/getting_started.md) walks through the commands and setup. For example, after creating a service, you can create the local files for a show and its first episode with:
 
-## Operational boundaries
+```sh
+castloop create-show my-show --site-mode builtin --workspace /path/to/workspace
+castloop create-episode first --workspace /path/to/workspace --show my-show
+```
 
-- Creation and preview do not publish. Publication is explicit; future `published_at` values do not delay immediate publication. Use schedules to wait until a specified time.
-- MP3s are limited to **300,000,000 bytes**, JPEG/PNG covers to **5,000,000 bytes**. Normal updates retain published audio and revision history. Physical deletion and automatic orphan-media cleanup are not implemented.
-- Preserve local originals, `castloop.toml` and private, git-ignored `.castloop/` state together. Administrator keys cannot be reissued. Workspace backups do not export R2 or server-side SQLite.
-- Run only one modifying CLI process at a time in a workspace or RSS import directory, and do not edit inputs while it runs. Follow the operation-specific interruption guidance rather than deleting state.
-- No install, build, test or historical approval authorizes deployment, publication or resource deletion. Private trials require [protection of every content path before upload](design/security.md#非公開の実機試験).
+Edit the generated files, then follow the guide to preview and publish them. See `castloop --help` or `castloop help COMMAND` for available commands.
 
-## Development and documentation
+## Documentation
 
-- [CONTRIBUTING.md](CONTRIBUTING.md): source setup, tests and contribution rules.
-- [Current design](design/README.md): architecture, components, storage, tables and schemas.
-- [Development and release maintenance](docs/development/README.md): builds, CI and distribution.
-- [Changelog](CHANGELOG.md), [current release](docs/release-v0.8.2.md) and [archived user documents](docs/archive/README.md): version-specific history, not current operating instructions.
+- [User guide](docs/README.md): publishing, scheduling, importing, backups, and ongoing administration.
+- [AI agent usage](docs/agent_usage.md): export the Skill and work with an agent.
+- [Design documentation](design/README.md) (Japanese): architecture and implementation details.
+- [Contributing](CONTRIBUTING.md): development setup and contribution guidelines.
+- [Changelog](CHANGELOG.md) and [releases](https://github.com/simosako/castloop-v2/releases): changes and version-specific notes.
 
-## Disclaimer and contribution
+## License
 
-castloop creates resources in your Cloudflare account. You are responsible for costs, availability and compliance. It is early-beta software, supplied "AS IS" under the [MIT License](LICENSE), and is not affiliated with Cloudflare. Keep [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with redistributed binaries.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [Code of Conduct](CODE_OF_CONDUCT.md), [changelog](CHANGELOG.md) and [design index](design/README.md). Local tests do not establish native performance or full Free-plan compatibility.
+castloop is available under the [MIT License](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party notices.

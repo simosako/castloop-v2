@@ -1,20 +1,20 @@
-# CLIのインストール
+# Install the CLI
 
-## 1. ダウンロードする
+## 1. Download the CLI
 
-[GitHub Releases](https://github.com/simosako/castloop-v2/releases/latest)を開き、利用するOSに合ったファイルをダウンロードします。
+Open [GitHub Releases](https://github.com/simosako/castloop-v2/releases/latest) and download the file for your operating system.
 
-| OS | ファイル |
+| Operating system | File |
 | --- | --- |
-| Linux x86-64（glibc） | `castloop-linux-x64` |
-| macOS Apple Silicon（macOS 11以降） | `castloop-macos-arm64` |
-| Windows x64（Windows 10以降） | `castloop-windows-x64.exe` |
+| Linux x86-64 (glibc) | `castloop-linux-x64` |
+| macOS Apple Silicon (macOS 11 or later) | `castloop-macos-arm64` |
+| Windows x64 (Windows 10 or later) | `castloop-windows-x64.exe` |
 
-## 2. コマンドを使えるようにする
+## 2. Set up the command
 
 ### Linux
 
-ダウンロードしたフォルダで、次のコマンドを実行します。
+Run these commands in the folder containing the downloaded file:
 
 ```sh
 chmod +x castloop-linux-x64
@@ -23,11 +23,11 @@ mv castloop-linux-x64 "$HOME/.local/bin/castloop"
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-次回からも使えるように、最後の `export` 行をシェルの設定ファイル（Bashでは `~/.bashrc`）にも追加してください。
+To make the command available in future sessions, add the last `export` line to your shell configuration file (for Bash, `~/.bashrc`).
 
 ### macOS
 
-ダウンロードしたフォルダで、次のコマンドを実行します。
+Run these commands in the folder containing the downloaded file:
 
 ```sh
 chmod +x castloop-macos-arm64
@@ -36,13 +36,13 @@ mv castloop-macos-arm64 "$HOME/.local/bin/castloop"
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-次回からも使えるように、最後の `export` 行を `~/.zprofile` にも追加してください。
+To make the command available in future sessions, also add the last `export` line to `~/.zprofile`.
 
-配布ファイルは無署名のため、初回起動時にmacOSが実行を止めることがあります。ダウンロード元を確認し、「システム設定」→「プライバシーとセキュリティ」から実行を許可してください。
+The binary is unsigned, so macOS may block it on first launch. Check where you downloaded it from, then allow it to run in System Settings → Privacy & Security.
 
 ### Windows
 
-ダウンロードしたフォルダでPowerShellを開き、次のコマンドを実行します。
+Open PowerShell in the folder containing the downloaded file and run:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\castloop\bin" | Out-Null
@@ -50,21 +50,21 @@ Move-Item castloop-windows-x64.exe "$HOME\castloop\bin\castloop.exe"
 [Environment]::SetEnvironmentVariable("Path", "$HOME\castloop\bin;" + [Environment]::GetEnvironmentVariable("Path", "User"), "User")
 ```
 
-実行後にターミナルを開き直してください。
+Close and reopen the terminal afterward.
 
-初回起動時にSmartScreenの警告が表示された場合は、ダウンロード元を確認し、「詳細情報」→「実行」を選びます。
+If SmartScreen displays a warning on first launch, check where you downloaded the file from, then select “More info” → “Run anyway”.
 
-## 3. 起動を確認する
+## 3. Check the installation
 
 ```sh
 castloop --version
 castloop --help
 ```
 
-バージョンとヘルプが表示されたら、[サービスの作成](getting_started.md)へ進みます。
+Once the version and help are displayed, continue to [creating a service](getting_started.md).
 
-## CLIを更新する
+## Update the CLI
 
-新しいバージョンのファイルをダウンロードし、インストール先の `castloop`（Windowsでは `castloop.exe`）を置き換えます。[リリースノート](https://github.com/simosako/castloop-v2/releases)で利用中のサービスとの互換性を確認してから更新してください。
+Download the new version and replace the installed `castloop` executable (`castloop.exe` on Windows). Check the [release notes](https://github.com/simosako/castloop-v2/releases) for compatibility with your service before updating.
 
-配信サーバーも更新する場合は、続けて[サービスの保守](maintenance.md)の手順を実行します。
+To update the delivery server as well, follow the [service maintenance](maintenance.md) guide.

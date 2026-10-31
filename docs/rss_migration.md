@@ -1,87 +1,87 @@
-# RSS取り込みと購読先の移行
+# Importing and migrating an RSS feed
 
-別の配信サービスで管理しているPodcastを、新しいcastloopの番組へ移す手順です。
+Follow these steps to move a podcast from another hosting service to a new castloop show:
 
-1. RSSと素材を手元にダウンロードする
-2. 番組情報とエピソードを確認する
-3. castloopに公開する
-4. 旧サービスから購読先を切り替える
+1. Download the RSS feed and assets.
+2. Review the show information and episodes.
+3. Publish them with castloop.
+4. Redirect subscriptions from the old service.
 
-取り込みには、自分が管理する公開RSS 2.0のURLを使います。音声は300,000,000バイト以下のMP3、カバーは5,000,000バイト以下のJPEG・PNGが対象です。
+Use a public RSS 2.0 feed URL that you manage. Audio must be MP3 up to 300,000,000 bytes; covers must be JPEG or PNG up to 5,000,000 bytes.
 
-## 1. RSSと素材をダウンロードする
+## 1. Download the feed and assets
 
-まず、取り込む件数や不足している項目を確認します。
+First check the number of episodes and any missing fields:
 
 ```sh
 castloop import-rss my-show https://old-host.example/feed.xml --dry-run
 ```
 
-続いて、保存先を指定してダウンロードします。保存先は新規または空のフォルダにし、親フォルダは先に作成してください。
+Then specify a destination and download. The destination must be a new or empty folder; create its parent folder first.
 
 ```sh
 castloop import-rss my-show https://old-host.example/feed.xml --output /path/to/import
 ```
 
-保存先には、元のRSS、`show.toml`、エピソードごとのTOMLとMP3、カバー、`import.json`、進捗を保存する `.castloop/` が作られます。
+The destination contains the original RSS feed, `show.toml`, a TOML file and MP3 for each episode, the cover, `import.json`, and `.castloop/`, which stores progress.
 
-## 2. 内容を確認・編集する
+## 2. Review and edit
 
-ダウンロードが完了したら、次の順に確認します。
+Once the download is complete:
 
-1. 旧サービスのエピソード件数と、取り込んだ件数を比べます。取り込み対象は、指定したRSSに掲載されている回です。
-2. `import.json` の `missing_fields` と `warnings` を確認します。
-3. `show.toml` とエピソードのTOMLを開き、番組情報、所有者の連絡先、タイトル、説明を整えます。
-4. カバーを開き、MP3を再生して確認します。
-5. 説明文にある旧サービスへのリンクを確認し、移行後も使うリンク先に更新します。
+1. Compare the episode count on the old service with the imported count. Episodes listed in the specified RSS feed are imported.
+2. Check `missing_fields` and `warnings` in `import.json`.
+3. Open `show.toml` and the episode TOML files and edit the show information, owner contact, titles, and descriptions.
+4. Open the cover and play the MP3 files.
+5. Review links to the old service in descriptions and update them to destinations that will remain available after migration.
 
-エピソードのGUID、公開日時、`guid_is_permalink` は、元のRSSから取り込んだ値を使ってください。
+Keep the episode GUIDs, publication dates, and `guid_is_permalink` values imported from the original RSS feed.
 
-### castloopの番組サイトを使う場合
+### Use the castloop show website
 
-`show.toml` の `site_mode` を次のように設定し、`site_url` の行を削除します。
+Set `site_mode` in `show.toml` as follows and remove the `site_url` line:
 
 ```toml
 site_mode = "builtin"
 ```
 
-見た目や日付表示も設定したい場合は、[番組サイト](show_website.md)を参照してください。外部サイトを紹介先として使う場合は、`site_url` を移行後も使えるURLにします。
+To configure appearance or date display, see [Show website](show_website.md). If you use an external website instead, set `site_url` to a URL that will remain available after migration.
 
-## 3. castloopに公開する
+## 3. Publish with castloop
 
-[サービス作成](getting_started.md#2-サービスを作る)の手順で公開先を用意し、Cloudflareの環境変数を設定します。番組の登録は次の公開コマンドで行います。
+Prepare a destination using [Create a service](getting_started.md#2-create-a-service) and set the Cloudflare environment variables. The publication command below registers the show.
 
 ```sh
 castloop service-status --workspace /path/to/workspace --json
 ```
 
-`publication_ready` が `true` であることを確認し、公開を始めます。
+Check that `publication_ready` is `true` before publishing.
 
-試験用の番組を限られた人だけに公開する場合は、先に[アクセス保護](../design/security.md#非公開の実機試験)を設定してください。
+For a test show intended only for selected reviewers, set up [access protection](../design/security.md#非公開の実機試験) (Japanese) first.
 
 ```sh
 castloop publish-rss-import /path/to/import --workspace /path/to/workspace
 ```
 
-番組情報、古いエピソード、新しいエピソードの順に公開されます。完了した回から配信が始まるため、実行中は取り込みファイルをそのまま保管し、コマンドの終了を待ってください。
+The show information is published first, followed by episodes from oldest to newest. Completed episodes become available as the command runs, so keep the import files unchanged and wait for it to finish.
 
-未来の公開日時が付いた回を今すぐ公開する場合は、内容を確認して `--allow-future-published-at` を付けます。指定日時まで待って公開する回には、[予約公開](scheduling.md)を使ってください。
+To publish an episode with a future publication date immediately, review the content and add `--allow-future-published-at`. To wait until the specified time, use [scheduled publication](scheduling.md).
 
-完了したら、出力された `feed_url` を開きます。番組情報、件数、各回のGUID・公開日時・説明を確認し、番組サイトやPodcastアプリで音声を再生してください。
+When complete, open the `feed_url` in the output. Check the show information, episode count, GUIDs, publication dates, and descriptions, then play audio on the show website or in a podcast app.
 
-## 停止した場合
+## If the operation stops
 
-実行していたコマンドが終了していることを確認し、停止した段階に応じて同じコマンドを再実行します。
+Make sure the command has finished, then rerun the appropriate command:
 
-| 停止した段階 | 再実行する操作 |
+| Where it stopped | How to continue |
 | --- | --- |
-| ダウンロード中 | 同じRSS URL、番組ID、`--output` で `import-rss` を実行 |
-| 公開中 | 同じ取り込みフォルダとワークスペースで `publish-rss-import` を実行 |
+| Download | Run `import-rss` with the same RSS URL, show ID, and `--output`. |
+| Publication | Run `publish-rss-import` with the same import folder and workspace. |
 
-保存済みの素材や公開済みの内容を確認しながら続行します。取り込みフォルダ、素材、`.castloop/` の進捗記録をそろえて保管してください。公開開始後の入力は、続行時にも同じものを使います。
+The operation continues while checking saved assets and published content. Keep the import folder, assets, and progress records in `.castloop/`. After publication has started, use the same inputs when continuing.
 
-## 4. 購読先を切り替える
+## 4. Redirect subscriptions
 
-新しいRSSと音声を確認してから、旧サービス側で新RSSへのリダイレクトを設定します。登録しているPodcast配信先でも、それぞれの手順に沿ってRSS URLを更新してください。
+After checking the new RSS feed and audio, configure a redirect to the new feed on the old service. Also update the RSS URL at each podcast directory according to its instructions.
 
-[Appleの案内](https://podcasters.apple.com/support/837-change-the-rss-feed-url)では、リダイレクトなどを少なくとも4週間維持するよう求めています。各配信先での移行と必要な維持期間を確認してから、旧サービスの契約を終了します。
+[Apple's guidance](https://podcasters.apple.com/support/837-change-the-rss-feed-url) asks that redirects and related migration arrangements remain in place for at least four weeks. Confirm the migration and required retention period for each directory before ending your old service contract.

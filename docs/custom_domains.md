@@ -1,71 +1,71 @@
-# 独自ドメインの設定と変更
+# Setting up and changing a custom domain
 
-`podcasts.example.com` のような専用サブドメインを、一つのサービスの配信先に設定できます。そのサービスのすべての番組が同じドメインを使います。
+You can set a dedicated subdomain such as `podcasts.example.com` as the delivery address for a service. All shows in that service use the same domain.
 
-## 1. ドメインを準備する
+## 1. Prepare the domain
 
-次を用意してください。
+You will need:
 
-- Workerと同じCloudflareアカウントでDNSを管理しているドメイン
-- 配信に使う未使用のサブドメイン
-- 対象ドメインのZone ID
-- 通常の管理権限に加えて、対象Zoneの読み取り、DNSの読み取り、Workers Routesの操作権限を持つAPIトークン
+- A domain whose DNS is managed in the same Cloudflare account as the Worker
+- An unused subdomain for delivery
+- The domain's Zone ID
+- An API token with the usual administrative permissions, plus permission to read the zone and DNS and manage Workers Routes
 
-Cloudflareのダッシュボードで、対象ドメインの設定（Zone）が有効になっていることを確認します。アカウントIDとAPIトークンを環境変数に設定し、サービスのワークスペースを用意してください。
+In the Cloudflare dashboard, check that the domain's zone is active. Set your account ID and API token as environment variables and have the service workspace ready.
 
-ドメインの切り替え中は配信が一時停止します。予約公開は再承認が必要になるため、作業する時間を決めてから始めます。切り替え中のDNSとWorkerのドメイン設定は、castloopに任せます。
+Delivery pauses during the switch, and scheduled publications require reapproval, so choose a suitable time for the change. Let castloop manage DNS and Worker domain settings during the switch.
 
-## 2. 独自ドメインを追加する
+## 2. Add the custom domain
 
-サービスの状態を確認します。
+Check the service status:
 
 ```sh
 castloop service-status --workspace /path/to/workspace --json
 ```
 
-ホスト名とZone IDを実際の値に置き換えて実行します。
+Replace the hostname and Zone ID with your values and run:
 
 ```sh
 castloop domain add podcasts.example.com --zone-id ZONE_ID --workspace /path/to/workspace --json
 ```
 
-接続、DNS・TLSの確認、配信先の切り替えが順に行われます。実行結果に表示された操作IDを控えてください。中断した場合は、下の「照会と中断後の継続」に進みます。
+castloop connects the domain, checks DNS and TLS, and switches delivery. Save the operation ID shown in the result. If the operation is interrupted, see [Checking and continuing an interrupted operation](#checking-and-continuing-an-interrupted-operation).
 
-## 3. 配信を確認する
+## 3. Check delivery
 
 ```sh
 castloop domain list --workspace /path/to/workspace --json
 castloop service-status --workspace /path/to/workspace --json
 ```
 
-新しいドメインと `publication_ready: true` を確認し、ブラウザでRSS、番組サイト、音声を開きます。手元の `castloop.toml` も新しい公開URLに更新されます。
+Check the new domain and `publication_ready: true`, then open the RSS feed, show website, and audio in a browser. The local `castloop.toml` is also updated with the new public URL.
 
-切り替え後、以前の `workers.dev` のRSS URLは独自ドメインへ転送されます。以後の編集は、新しい設定でプレビューして公開してください。
+After the switch, the previous `workers.dev` RSS URL redirects to the custom domain. For subsequent edits, preview and publish using the new configuration.
 
-予約がある場合は、[再承認](scheduling.md#再確認が必要な予約を承認する)を行います。
+If you have scheduled publications, [reapprove them](scheduling.md#reapprove-a-schedule).
 
-## 照会と中断後の継続
+## Checking and continuing an interrupted operation
 
-中断した操作のIDを `OPERATION_UUID` に入れ、状態を確認します。
+Replace `OPERATION_UUID` with the interrupted operation's ID and check its status:
 
 ```sh
 castloop domain status OPERATION_UUID --workspace /path/to/workspace --json
 ```
 
-対象ドメインと変更内容を確認し、同じ操作を続行します。
+Check the target domain and change, then continue the same operation:
 
 ```sh
 castloop domain continue OPERATION_UUID --workspace /path/to/workspace --json
 ```
 
-`domain_tls_pending` はDNS・TLSの準備待ち、`domain_rollout_pending` はWorkerの反映待ちです。時間を置いて状態を確認し、続行してください。ワークスペースと `.castloop/` の操作記録は保管したまま使います。
+`domain_tls_pending` means DNS and TLS are not yet ready; `domain_rollout_pending` means the Worker update is pending. Wait, check the status, and continue. Keep using the workspace and the operation records in `.castloop/`.
 
-## 独自ドメインの利用をやめる
+## Remove a custom domain
 
-独自ドメインを外すと、配信先は `workers.dev` に戻ります。購読アプリが独自ドメインのURLを記憶していることがあるため、先に購読先の変更方法を確認し、リスナーへの案内と配信先の登録変更を行ってください。
+Removing a custom domain returns delivery to `workers.dev`. Podcast apps may remember the custom-domain URL, so first check how to change subscription URLs, notify listeners, and update registrations with podcast directories.
 
 ```sh
 castloop domain remove --workspace /path/to/workspace --json
 ```
 
-完了後に `domain list` と `service-status` を確認し、`workers.dev` のRSSと音声を開きます。この変更後も、予約がある場合は再承認を行います。
+Afterward, check `domain list` and `service-status` and open the RSS feed and audio on `workers.dev`. Reapprove any scheduled publications after this change as well.
