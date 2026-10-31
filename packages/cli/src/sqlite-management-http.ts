@@ -8,10 +8,9 @@ type ReadFailureCode = "transport_error" | "observation_timeout" | "http_error" 
 export type SqliteManagementReadDiagnostic = { event: "sqlite_management_get"; outcome: "retry" | "failed";
   reason_code: ReadFailureCode; target_sha256: string; attempt: number; maximum_attempts: number; elapsed_ms: number;
   http_status?: number; retry_in_ms?: number };
-export type SqliteManagementReadBudget = { beforeAttempt?: () => boolean };
-export type SqliteManagementReadOptions = SqliteManagementReadBudget & { onDiagnostic?: (diagnostic: SqliteManagementReadDiagnostic) => void;
+export type SqliteManagementReadOptions = { transport?: R2RestTransport; timeoutMs?: number; onDiagnostic?: (diagnostic: SqliteManagementReadDiagnostic) => void;
   now?: () => number; delay?: (milliseconds: number) => Promise<void> };
-type GetOptions = SqliteManagementReadOptions & { transport?: R2RestTransport; timeoutMs?: number; maximumBytes?: number; allowMissing?: boolean };
+type GetOptions = SqliteManagementReadOptions & { maximumBytes?: number; allowMissing?: boolean };
 
 class ReadFailure extends Error {
   constructor(readonly code: ReadFailureCode, readonly retryable: boolean, readonly status?: number, readonly retryAfterMs = 0) { super(code); }
@@ -105,7 +104,7 @@ export async function readSqliteManagementGet(url: URL, headers: HeadersInit, op
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const remaining = deadline - now();
     let failure: ReadFailure;
-    if (remaining <= 0 || options.beforeAttempt && !options.beforeAttempt()) failure = new ReadFailure("deadline_exceeded", false);
+    if (remaining <= 0) failure = new ReadFailure("deadline_exceeded", false);
     else {
       const controller = new AbortController(), timer = setTimeout(() => controller.abort(), Math.max(1, Math.ceil(Math.min(10000, remaining))));
       try {

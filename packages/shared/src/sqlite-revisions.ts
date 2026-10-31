@@ -229,7 +229,6 @@ export const sqliteRevisionPlanSchema = z.object({
   request: revisionRequestSchema,
   request_sha256: sqlitePublicationRuntimeSchema.shape.service_config_sha256,
 }).strict();
-export type SqliteRevisionPlan = z.infer<typeof sqliteRevisionPlanSchema>;
 
 export const sqlitePreviewInventorySchema = sqlitePublicationRuntimeSchema.extend({
   show_id: slug(32), feed_generation: counter, after: slug(80).nullable(),

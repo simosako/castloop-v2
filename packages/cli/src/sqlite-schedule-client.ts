@@ -5,7 +5,7 @@ import type { SqliteScheduleCancel, SqliteScheduleCreate, SqliteScheduleList, Sq
   SqliteScheduleReschedule, SqliteScheduleStatus, SqliteServiceConfig } from "@castloop/shared";
 import { sqliteDirectPublicationRequestHash, MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
-import type { SqliteManagementReadBudget, SqliteManagementReadOptions } from "./sqlite-management-http";
+import type { SqliteManagementReadOptions } from "./sqlite-management-http";
 import type { R2RestTransport } from "./bounded-http-read";
 
 export class SqliteScheduleClient {
@@ -24,10 +24,10 @@ export class SqliteScheduleClient {
     }
   }
 
-  private async get(path: string, showId: string, budget: SqliteManagementReadBudget = {}): Promise<unknown> {
+  private async get(path: string, showId: string): Promise<unknown> {
     return readSqliteManagementGet(new URL(`/admin/sqlite-schedules${path}`, this.config.workers_dev_base_url), {
       "X-Castloop-Key": this.administratorKey, "X-Castloop-Show-Id": showId, Accept: "application/json",
-    }, { ...this.readOptions, ...budget, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768 });
+    }, { ...this.readOptions, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768 });
   }
 
   private async post(path: string, input: SqliteScheduleCreate | SqliteScheduleReschedule | SqliteScheduleCancel | SqliteScheduleReapprove): Promise<unknown> {
@@ -77,9 +77,9 @@ export class SqliteScheduleClient {
     return parsed.data;
   }
 
-  async status(showId: string, scheduleId: string, budget: SqliteManagementReadBudget = {}): Promise<SqliteScheduleStatus> {
+  async status(showId: string, scheduleId: string): Promise<SqliteScheduleStatus> {
     sqliteScheduleCancelSchema.shape.schedule_id.parse(scheduleId);
-    const result = await this.checked(await this.get(`/${scheduleId}`, showId, budget), scheduleId);
+    const result = await this.checked(await this.get(`/${scheduleId}`, showId), scheduleId);
     if (result.show_id !== showId) throw new Error("SQLite schedule status target differs");
     return result;
   }

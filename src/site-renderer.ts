@@ -82,11 +82,6 @@ export function orderedSiteEpisodes(episodes: EpisodeRevision[]): EpisodeRevisio
   return episodes.toSorted(comparePublishedEpisodes);
 }
 
-export function renderSiteListing(input: SiteRenderInput, episodes: EpisodeRevision[], page: number): string {
-  const ordered = orderedSiteEpisodes(episodes), pages = Math.max(1, Math.ceil(ordered.length / SITE_PAGE_SIZE));
-  return renderSiteListingPage(input, ordered.slice((page - 1) * SITE_PAGE_SIZE, page * SITE_PAGE_SIZE), page, pages);
-}
-
 export function renderSiteListingPage(input: SiteRenderInput, episodes: EpisodeRevision[], page: number, pages: number,
   formatDate = siteDateFormatter(input.show.site_timezone)): string {
   const target: SitePage = { kind: "listing", showId: input.show.show_id, page };

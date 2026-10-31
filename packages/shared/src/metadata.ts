@@ -138,10 +138,6 @@ export function parseEpisodeDraft(source: string): EpisodeDraft {
   return episodeDraftSchema.parse(TOML.parse(source));
 }
 
-export function parseEpisodeRevision(source: string): EpisodeRevision {
-  return episodeRevisionSchema.parse(TOML.parse(source));
-}
-
 export function stringifyToml(value: SqliteServiceConfig | AdminConfig | ShowMetadata | EpisodeDraft | EpisodeRevision): string {
   return TOML.stringify(value as TOML.JsonMap);
 }
