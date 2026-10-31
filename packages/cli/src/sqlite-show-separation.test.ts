@@ -2,7 +2,7 @@ import { afterEach, expect, spyOn, test } from "bun:test";
 import { runSqliteCommand } from "./sqlite-commands";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { deploySqliteService } from "./sqlite-service-deploy";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
 import { parseSqliteDirectPublicationRequest } from "../../shared/src/sqlite-direct-publication";
 import { directShow, directCover } from "../../../src/test-support/direct-publication";
 import { administratorKey } from "./administrator-key";
@@ -14,7 +14,7 @@ import { join } from "node:path";
 
 const fixtures: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const fixture of fixtures.splice(0)) fixture.close(); });
-const wait = { attempts: 2, delay: async () => {} };
+const wait = TEST_WAIT;
 async function fixture() {
   const f = await sqliteServiceFixture(); fixtures.push(f);
   await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "initial", f.options, wait);

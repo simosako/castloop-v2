@@ -1,6 +1,7 @@
 import type { RssAssetTransport } from "../rss-import-download";
+import { TEST_MP3 } from "./media";
 
-export const RSS_IMPORT_AUDIO = Buffer.concat(Array.from({ length: 50 }, () => Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)])));
+export const RSS_IMPORT_AUDIO = TEST_MP3;
 export const RSS_IMPORT_SOURCE = `<rss version="2.0" xmlns:i="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel>
   <title>Imported</title><description>Description</description><language>ja</language><link>https://site.example/podcast</link>
   <i:author>Author</i:author><i:owner><i:name>Owner</i:name><i:email>owner@example.com</i:email></i:owner>

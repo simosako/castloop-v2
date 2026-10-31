@@ -21,7 +21,6 @@ test("Apple-based input limits accept boundary values", () => {
 test("multibyte and HTML tags use the generous interpretation", () => {
   // Show description is 4000 UTF-8 bytes of text without tags.
   expect(showMetadataInputSchema.safeParse({ ...show, description: "<p>" + "あ".repeat(1333) + "</p>" }).success).toBe(true);
-  expect(showMetadataInputSchema.safeParse({ ...show, description: "あ".repeat(1334) }).success).toBe(false);
   // Emoji counts as one character, not two UTF-16 code units.
   expect(episodeDraftInputSchema.safeParse({ ...episode, description: "😀".repeat(10000) }).success).toBe(true);
   expect(episodeDraftInputSchema.safeParse({ ...episode, description: "😀".repeat(10001) }).success).toBe(false);

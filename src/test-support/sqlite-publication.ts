@@ -3,6 +3,15 @@ import type { SqlitePublicationRuntime } from "../../packages/shared/src/sqlite-
 import { SqlitePublicationQueue } from "../sqlite-publication-queue";
 import type { PublicationQueueStorage } from "../sqlite-publication-queue";
 
+export function seedPublishedEpisode(storage: PublicationQueueStorage, lengthBytes = 6_000_000): string {
+  const audioRevision = crypto.randomUUID();
+  storage.sql.exec("INSERT INTO publication_shows (show_id, reservation_id, state_version, feed_generation, lifecycle) VALUES ('daily', ?, 0, 0, 'published')", crypto.randomUUID());
+  storage.sql.exec("INSERT INTO publication_episodes (show_id, episode_id, lifecycle, lifecycle_version, revision_id) VALUES ('daily', 'first', 'published', 0, ?)", crypto.randomUUID());
+  storage.sql.exec("INSERT INTO publication_media (show_id, episode_id, audio_revision_id, sha256, length_bytes) VALUES ('daily', 'first', ?, ?, ?)",
+    audioRevision, "b".repeat(64), lengthBytes);
+  return audioRevision;
+}
+
 export function sqlitePublicationFixture(options: { path?: string; runtime?: SqlitePublicationRuntime;
   scope?: { showId: string; ready: () => boolean } } = {}) {
   const database = new Database(options.path ?? ":memory:", { strict: true });

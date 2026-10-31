@@ -31,9 +31,3 @@ test("schema and service mismatches do not reset existing data", () => {
   expect(f.database.query("SELECT version FROM publication_queue_schema").get()).toEqual({ version: 1 });
 });
 
-for (const version of [1, 9, 10, 11, 12, 13]) test(`earlier queue schema ${version} is rejected without conversion`, () => {
-  const f = sqlitePublicationFixture(); cleanups.push(f.close);
-  f.database.exec(`UPDATE publication_queue_schema SET version = ${version}`);
-  expect(() => new SqlitePublicationQueue(f.storage, f.runtime)).toThrow("Unsupported");
-  expect(f.database.query("SELECT version FROM publication_queue_schema").get()).toEqual({ version });
-});

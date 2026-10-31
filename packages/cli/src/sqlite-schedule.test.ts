@@ -1,13 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
 import { parseEpisodeDraft, stringifyToml } from "@castloop/shared";
 import { sqliteScheduleStatusSchema } from "../../shared/src/sqlite-schedule";
-import { SQLITE_DOMAIN_PROTOCOL, sqliteDomainRequestHash } from "../../shared/src/sqlite-domain";
-import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
+import { sqliteDomainRequestHash } from "../../shared/src/sqlite-domain";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { initializeSqliteService } from "./sqlite-initialization";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
 import { RSS_IMPORT_AUDIO } from "./test-support/rss-import";
+import { customDomainRequest } from "./test-support/sqlite-domain";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -15,7 +15,7 @@ const fixtures: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const f of fixtures.splice(0)) f.close(); });
 async function fixture() {
   const f = await sqliteServiceFixture(); fixtures.push(f);
-  await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "source", f.options, { attempts: 2, delay: async () => {} });
+  await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "source", f.options, TEST_WAIT);
   const run = (name: string, args: string[], extra: SqliteCommandOptions = {}) => runSqliteCommand(f.root, f.config, name, args,
     { transport: f.transport, cloudflare: f.options, ...extra });
   await run("create-show", ["daily", "https://example.com"]);
@@ -45,13 +45,7 @@ test("reapproval keeps server-frozen metadata and media rather than edited local
     { scheduleOptions: f.scheduleOptions, expectedPreview: f.preview.approval_sha256 }));
 
   // A completed domain change suspends future schedules and requires explicit reapproval afterwards.
-  const target = { ...f.config, public_base_url: "https://podcasts.example.com" };
-  const request = { schema_version: 1 as const, protocol: SQLITE_DOMAIN_PROTOCOL, operation_id: crypto.randomUUID(), action: "add" as const,
-    hostname: "podcasts.example.com", zone_id: "c".repeat(32), zone_name: "example.com", namespace_id: "b".repeat(32),
-    previous_config: f.config, previous_config_sha256: await sqliteServiceConfigHash(f.config), target_config: target,
-    target_config_sha256: await sqliteServiceConfigHash(target), worker_source_sha256: "d".repeat(64), worker_metadata_sha256: "e".repeat(64) };
-  const connection = { id: "f".repeat(32), cert_id: crypto.randomUUID(), hostname: request.hostname, zone_id: request.zone_id,
-    zone_name: request.zone_name, service: f.config.worker_name, environment: "production" as const, enabled: true as const, previews_enabled: false as const };
+  const { target, request, connection } = await customDomainRequest(f);
   await f.control.prepareDomain(request);
   await f.bucket.put("system/service.toml", stringifyToml(target));
   const deployed = await f.deployConfiguration(target);

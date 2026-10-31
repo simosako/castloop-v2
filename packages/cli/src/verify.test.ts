@@ -4,8 +4,9 @@ import { runSqliteCommand } from "./sqlite-commands";
 import { verifyResultSchema } from "./verify";
 import type { VerifyResult } from "./verify";
 import { initializeSqliteService } from "./sqlite-initialization";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
 import type { R2RestTransport } from "./bounded-http-read";
+import { TEST_COVER_JPEG, TEST_MP3 } from "./test-support/media";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -45,7 +46,7 @@ function feedXml(guids: Array<{ episode: string; guid: string; linked: boolean }
 
 async function fixture() {
   const value = await sqliteServiceFixture(); values.push(value);
-  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, { attempts: 2, delay: async () => {} });
+  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, TEST_WAIT);
   const command = (name: string, args: string[] = [], options: Parameters<typeof runSqliteCommand>[4] = {}) => runSqliteCommand(value.root, value.config, name, args,
     { transport: value.transport, cloudflare: value.options, ...options });
   return Object.assign(value, { command });
@@ -55,10 +56,10 @@ async function publishedShowWithEpisode(value: Awaited<ReturnType<typeof fixture
   await value.command("create-show", ["daily", "https://example.com/my-podcast"]);
  
   const directory = join(value.root, "daily");
-  writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
+  writeFileSync(join(directory, "cover.jpg"), TEST_COVER_JPEG);
   await value.command("publish-show", ["daily"]);
   await value.command("create-episode", ["daily", "first"]);
-  writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+  writeFileSync(join(directory, "audio.mp3"), TEST_MP3);
   await value.command("publish-episode", ["daily", "first", "audio.mp3"]);
   const guid = parseEpisodeDraft(readFileSync(join(directory, "episode-first.toml"), "utf8")).guid;
   return { guid };

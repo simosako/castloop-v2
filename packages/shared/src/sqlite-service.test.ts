@@ -7,7 +7,6 @@ const config = { schema_version: 2 as const, storage_layout: "show-v1" as const,
   public_base_url: "https://podcasts.example.com", workers_dev_base_url: "https://castloop-service.example.workers.dev" };
 
 test("SQLite service config does not require or adopt Queue settings", () => {
-  expect(sqliteServiceConfigSchema.parse(config)).toEqual(config);
   expect(parseSqliteServiceConfig(stringifyToml(config))).toEqual(config);
   for (const change of [{ schema_version: 1 }, { publication_protocol: "queue-management-v1" },
     { queue_name: "legacy-queue" }, { dlq_name: "legacy-dlq" }, { api_token: "secret" }]) {

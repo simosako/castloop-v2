@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { initializeSqliteService, readSqliteInitialization } from "./sqlite-initialization";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
 import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
 import { existsSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,7 +8,7 @@ import { join } from "node:path";
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
 async function fixture() { const value = await sqliteServiceFixture(); values.push(value); return value; }
-const wait = { attempts: 2, delay: async () => {} };
+const wait = TEST_WAIT;
 const unrelatedResourcePath = /\/(?:queues|event_notifications|d1)(?:\/|$)/;
 
 test("resource path checks distinguish D1 endpoints from deployment UUIDs", () => {

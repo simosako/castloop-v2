@@ -4,7 +4,8 @@ import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { administratorKey } from "./administrator-key";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_COVER_JPEG, TEST_MP3 } from "./test-support/media";
 import { join } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -12,14 +13,14 @@ const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
 async function fixture() {
   const value = await sqliteServiceFixture(); values.push(value);
-  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, { attempts: 2, delay: async () => {} });
+  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, TEST_WAIT);
   const command = (name: string, args: string[] = [], transport = value.transport) => runSqliteCommand(value.root, value.config, name, args,
     { transport, cloudflare: value.options });
   await command("create-show", ["daily", "https://example.com/podcast"]);
-  writeFileSync(join(value.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
+  writeFileSync(join(value.root, "daily", "cover.jpg"), TEST_COVER_JPEG);
   await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);
-  writeFileSync(join(value.root, "daily", "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+  writeFileSync(join(value.root, "daily", "audio.mp3"), TEST_MP3);
   await command("publish-episode", ["daily", "first", "audio.mp3"]);
   const preview = async (action: string, episode = true) => sqliteLifecyclePlanSchema.parse(await command(episode ? "preview-episode-lifecycle" : "preview-show-lifecycle",
     episode ? ["daily", "first", action] : ["daily", action]));

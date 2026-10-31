@@ -7,7 +7,8 @@ import { SqliteServiceClient } from "./sqlite-service-client";
 import { draftPreview } from "./draft-preview";
 import { previewRevision, executeRevision, syncLocalMetadata, readRevisionPlanFile } from "./sqlite-revision-commands";
 import { exportPreviewRss } from "./preview-rss";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_COVER_JPEG, TEST_MP3 } from "./test-support/media";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -16,16 +17,16 @@ const close: Array<() => void> = [];
 afterEach(() => { for (const cleanup of close.splice(0)) cleanup(); });
 async function fixture() {
   const f = await sqliteServiceFixture(); close.push(f.close);
-  await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "source", f.options, { attempts: 2, delay: async () => {} });
+  await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "source", f.options, TEST_WAIT);
   const run = (name: string, args: string[], transport = f.transport) =>
     runSqliteCommand(f.root, f.config, name, args, { cloudflare: f.options, transport });
   await run("create-show", ["daily", "https://example.com/podcast"]);
  
   const showFile = join(f.root, "daily", "show.toml"), file = join(f.root, "daily", "episode-first.toml");
   const coverFile = join(f.root, "daily", "cover.jpg"), audioFile = join(f.root, "daily", "audio.mp3");
-  writeFileSync(coverFile, Buffer.from([255, 216, 255, 2]));
+  writeFileSync(coverFile, TEST_COVER_JPEG);
   await run("publish-show", ["daily"]); await run("create-episode", ["daily", "first"]);
-  writeFileSync(audioFile, Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+  writeFileSync(audioFile, TEST_MP3);
   await run("publish-episode", ["daily", "first", "audio.mp3"]);
   const key = administratorKey(f.root), client = new SqliteServiceClient(f.config, key, f.transport);
   const target = { kind: "episode" as const, show_id: "daily", episode_id: "first" };

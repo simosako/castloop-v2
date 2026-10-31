@@ -5,6 +5,12 @@ import { createSqlitePublicationHttp } from "./sqlite-publication-http";
 const cleanups: Array<() => void> = [];
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 async function fixture() { const value = await directPublicationFixture(); cleanups.push(value.close); return value; }
+async function publishedFixture() {
+  const value = await fixture();
+  await value.publish(value.show());
+  await value.publish(value.episode());
+  return value;
+}
 
 test("publication commits inline metadata and media references without R2 IO or operation/job tables", async () => {
   const f = await fixture();
@@ -29,7 +35,7 @@ test("identical requests including stale bases add no history, generations or pu
 });
 
 test("metadata-only keeps audio URLs, GUID/date and immutable history", async () => {
-  const f = await fixture(); await f.publish(f.show()); await f.publish(f.episode());
+  const f = await publishedFixture();
   const old = f.content.currentEpisodeRevision("daily", "first", f.config.public_base_url)!;
   const update = f.episode(); update.metadata.title = "Changed";
   await f.publish(update);
@@ -40,7 +46,7 @@ test("metadata-only keeps audio URLs, GUID/date and immutable history", async ()
 });
 
 test("audio replacement preserves old audio delivery and resolves both to content-hash keys", async () => {
-  const f = await fixture(); await f.publish(f.show()); await f.publish(f.episode());
+  const f = await publishedFixture();
   const old = f.content.currentEpisodeRevision("daily", "first", f.config.public_base_url)!;
   const update = f.episode(); update.audio = { ...directAudio, sha256: "d".repeat(64) }; await f.publish(update);
   const current = f.content.currentEpisodeRevision("daily", "first", f.config.public_base_url)!;
@@ -52,14 +58,14 @@ test("audio replacement preserves old audio delivery and resolves both to conten
 });
 
 test("changed content with a stale base conflicts before purge", async () => {
-  const f = await fixture(); await f.publish(f.show()); await f.publish(f.episode());
+  const f = await publishedFixture();
   const stale = f.episode(), next = f.episode(); next.metadata.title = "Next"; await f.publish(next);
   const count = f.purges.length; stale.metadata.title = "Stale";
   await expect(f.publish(stale)).rejects.toThrow("base_conflict"); expect(f.purges).toHaveLength(count);
 });
 
 test("GUID, date, duplicate GUID and cover extension changes are rejected", async () => {
-  const f = await fixture(); await f.publish(f.show()); await f.publish(f.episode());
+  const f = await publishedFixture();
   const before = f.content.inspect("daily", "first");
   for (const field of ["guid", "published_at"] as const) {
     const request = f.episode(); request.metadata[field] = field === "guid" ? "changed" : "2026-10-17T00:00:00Z";
@@ -73,7 +79,7 @@ test("GUID, date, duplicate GUID and cover extension changes are rejected", asyn
 });
 
 test("purge failure leaves committed content unchanged and does not write media", async () => {
-  const f = await fixture(); await f.publish(f.show()); await f.publish(f.episode());
+  const f = await publishedFixture();
   const before = f.content.inspect("daily", "first"), update = f.episode(); update.metadata.title = "New";
   f.hooks.purge = async () => { throw new Error("Purge failure"); };
   await expect(f.publish(update)).rejects.toThrow("cache purge failed");

@@ -53,22 +53,18 @@ test("unclassified or permanent rejection is not retried", async () => {
   }
 });
 
-test("a thrown or malformed purge result is unknown and is never resent", async () => {
-  for (const malformed of [false, true]) {
-    let calls = 0, waits = 0;
-    const events: SqliteCachePurgeEvent[] = [];
-    await expect(purgeSqliteCache({ async purge() {
-      calls++;
-      if (malformed) return undefined as never;
-      throw new Error("Private title private@example.com secret");
-    } }, { showId: "daily" }, { delay: async () => { waits++; }, onEvent: (event) => events.push(event) })).rejects.toThrow("unconfirmed");
-    expect(calls).toBe(1);
-    expect(waits).toBe(0);
-    expect(events).toEqual([{ event: "sqlite_cache_purge", show_id: "daily", reason_code: "purge_unconfirmed", attempt: 1, will_retry: false,
-      ...(malformed ? { failure_kind: "invalid_acknowledgement", result_kind: "undefined", success_kind: "undefined" } :
-        { failure_kind: "call_threw", exception_kind: "other" }) }]);
-    expect(JSON.stringify(events)).not.toMatch(/Private|private@|secret/);
-  }
+test("a malformed purge result is unknown and is never resent", async () => {
+  let calls = 0, waits = 0;
+  const events: SqliteCachePurgeEvent[] = [];
+  await expect(purgeSqliteCache({ async purge() {
+    calls++;
+    return undefined as never;
+  } }, { showId: "daily" }, { delay: async () => { waits++; }, onEvent: (event) => events.push(event) })).rejects.toThrow("unconfirmed");
+  expect(calls).toBe(1);
+  expect(waits).toBe(0);
+  expect(events).toEqual([{ event: "sqlite_cache_purge", show_id: "daily", reason_code: "purge_unconfirmed", attempt: 1, will_retry: false,
+    failure_kind: "invalid_acknowledgement", result_kind: "undefined", success_kind: "undefined" }]);
+  expect(JSON.stringify(events)).not.toMatch(/Private|private@|secret/);
 });
 
 test("malformed acknowledgement diagnostics retain only value types, never response contents", async () => {

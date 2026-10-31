@@ -7,6 +7,7 @@ import { createLocalBackup } from "./backup-create";
 import { previewBackupRestore, restoreLocalBackup, verifyLocalBackup } from "./backup-restore";
 import { backupPassphrase } from "./backup-passphrase";
 import { administratorKey } from "./administrator-key";
+import { TEST_COVER_JPEG, TEST_MP3 } from "./test-support/media";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -37,8 +38,8 @@ function backupWorkspace(): string {
   mkdirSync(join(root, "daily"), { recursive: true });
   writeFileSync(join(root, "daily", "show.toml"), `schema_version = 1\nshow_id = "daily"\ntitle = "Daily"\ndescription = "d"\nlanguage = "ja"\nauthor = "a"\nowner_name = "a"\nowner_email = "a@example.com"\nexplicit = false\nsite_mode = "builtin"\n`);
   writeFileSync(join(root, "daily", "episode-first.toml"), "schema_version = 1\n");
-  writeFileSync(join(root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
-  writeFileSync(join(root, "daily", "episode-first.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+  writeFileSync(join(root, "daily", "cover.jpg"), TEST_COVER_JPEG);
+  writeFileSync(join(root, "daily", "episode-first.mp3"), TEST_MP3);
   writeFileSync(join(root, "notes.txt"), "loose file");
   return root;
 }

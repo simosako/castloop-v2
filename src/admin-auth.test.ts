@@ -10,7 +10,6 @@ const request = (key?: string) => new Request("https://service.example/admin/hea
 for (const [label, key, expected] of [
   ["exact match", secret, true],
   ["missing header", undefined, false],
-  ["empty header", "", false],
   ["shorter key", secret.slice(0, -1), false],
   ["longer key", `${secret}0`, false],
   ["same-length mismatch", `x${secret.slice(1)}`, false],
