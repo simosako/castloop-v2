@@ -10,7 +10,7 @@ v0.8.0の公開・配信の動作を保ちながら、公開チェックとRSS�
 
 ## 利用を始める
 
-[インストール](installation.md)後、[サービス作成と初回公開](getting_started.md)へ進んでください。
+[インストール](../../installation.md)後、[サービス作成と初回公開](../../getting_started.md)へ進んでください。
 
 本版は、新規作成するサービス向けです。v0.8.0以前の内部形式を使うサービスからの更新・移行には対応していません。
 
@@ -18,8 +18,8 @@ v0.8.0の公開・配信の動作を保ちながら、公開チェックとRSS�
 
 ローカルの自動テストと型検査、およびLinux x64・macOS Apple Silicon・Windows x64での配布バイナリの起動確認を行っています。
 
-本版の変更については、Cloudflareの実環境での確認は行っていません。実機で確認した範囲は、前版の[リリースノート](archive/releases/release-v0.8.0.md)を参照してください。
+本版の変更については、Cloudflareの実環境での確認は行っていません。実機で確認した範囲は、前版の[リリースノート](release-v0.8.0.md)を参照してください。
 
 ## ダウンロード
 
-[v0.8.1のGitHub Release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.1)から、利用するOSのファイルをダウンロードしてください。導入手順は[CLIのインストール](installation.md)を参照してください。
+[v0.8.1のGitHub Release](https://github.com/simosako/castloop-v2/releases/tag/v0.8.1)から、利用するOSのファイルをダウンロードしてください。導入手順は[CLIのインストール](../../installation.md)を参照してください。

@@ -21,7 +21,7 @@ test("Skill export embeds canonical files and refuses overwrites and symlink par
 
 test("embedded Skill separates creation, publication, schedules and retained-state recovery", () => {
   const skill = ADMIN_SKILL_FILES["SKILL.md"];
-  expect(skill).toContain("v0.8.1");
+  expect(skill).toContain("v0.8.2");
   expect(skill).toContain("castloop --version");
   expect(skill).not.toContain("この開発版");
   expect(skill).not.toContain("毎回`--workspace");
