@@ -1,6 +1,6 @@
 import { version } from "../../../package.json";
 import type { SqliteServiceConfig } from "@castloop/shared";
-import { backupEntryFramedBytes, emitBackupEntry, sealBackupArchive } from "./backup-archive";
+import { backupEntryFramedBytes, backupExcludedCounts, backupPendingSummary, emitBackupEntry, sealBackupArchive } from "./backup-archive";
 import type { BackupExcludedReason, BackupManifest, BackupPending } from "./backup-archive";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { pendingLocalDomainChanges } from "./sqlite-domain-local";
@@ -120,12 +120,6 @@ function emitFileContent(absolute: string, emit: (chunk: Buffer) => void): void 
   } finally { closeSync(fd); }
 }
 
-function excludedCounts(excluded: ExcludedEntry[]): Record<BackupExcludedReason, number> {
-  const counts: Record<BackupExcludedReason, number> = { lock: 0, temporary: 0, regenerated: 0, audio_default_excluded: 0, unknown: 0 };
-  for (const entry of excluded) counts[entry.reason]++;
-  return counts;
-}
-
 export async function createLocalBackup(root: string, output: string,
   options: { includeAudio: boolean; passphrase: string }): Promise<BackupCreateResult> {
   const config = await loadWorkspaceConfig(root);
@@ -146,13 +140,13 @@ export async function createLocalBackup(root: string, output: string,
         pending, scan_errors: scanErrors };
     });
   return { archive: output, service_id: manifest.service_id, created_at: manifest.created_at, include_audio: manifest.include_audio,
-    entry_count: manifest.entries.length, entry_bytes: entryBytes, excluded_counts: excludedCounts(manifest.excluded),
+    entry_count: manifest.entries.length, entry_bytes: entryBytes, excluded_counts: backupExcludedCounts(manifest.excluded),
     pending: manifest.pending, scan_errors: manifest.scan_errors };
 }
 
 export function formatBackupCreate(result: BackupCreateResult): string {
   const excluded = Object.entries(result.excluded_counts).filter(([, count]) => count > 0).map(([reason, count]) => `${count} ${reason}`).join(", ") || "none";
-  const pendingParts = result.pending.domain_changes.length ? `${result.pending.domain_changes.length} domain change(s)` : "none";
+  const pendingParts = backupPendingSummary(result.pending);
   const lines = [
     `Archive: ${result.archive}`,
     `Service: ${result.service_id}  Created: ${result.created_at}`,

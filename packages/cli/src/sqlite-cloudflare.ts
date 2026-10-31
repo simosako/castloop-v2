@@ -5,6 +5,7 @@ import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata, SQLITE_WORKER_COMPATIBILITY_DATE } from "../../shared/src/sqlite-worker-deployment";
 import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
 import type { R2RestOptions } from "./bounded-http-read";
+import { decodeUtf8Strict } from "./utf8";
 
 const uuid = z.uuid(), hash = z.string().min(1).max(256);
 export const sqliteScriptUploadReceiptSchema = z.object({ script_etag: hash }).strict();
@@ -36,7 +37,7 @@ export class SqliteCloudflareApi {
     }
     try {
       const bytes = await collectStreamBytes(response.body, 1_000_000, true);
-      const parsed = z.object({ success: z.literal(true), result: z.unknown() }).parse(JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)));
+      const parsed = z.object({ success: z.literal(true), result: z.unknown() }).parse(JSON.parse(decodeUtf8Strict(bytes)));
       if (absent && parsed.result === null) throw new Error("Only an explicit 404 proves resource absence");
       return parsed.result;
     } catch { throw new Error("Cloudflare response was not verified; do not replay a mutation"); }
@@ -84,12 +85,17 @@ export class SqliteCloudflareApi {
   }
   async deploymentReceipt(input: SqliteScriptUploadReceipt): Promise<{ script_etag: string; worker_version_id: string; deployment_id: string }> {
     const receipt = sqliteScriptUploadReceiptSchema.parse(input);
+    const { deployment, versionId, version } = await this.currentDeployment();
+    if (version.id !== versionId || version.resources.script.etag !== receipt.script_etag) throw new Error("SQLite deployment does not match its acknowledged script upload");
+    return { ...receipt, worker_version_id: versionId, deployment_id: deployment.id };
+  }
+  private async currentDeployment(): Promise<{ deployment: { id: string; versions: { version_id: string }[] };
+    versionId: string; version: { id: string; resources: { script: { etag: string } } } }> {
     const deployment = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`));
     const versionId = deployment.versions[0].version_id;
     const version = z.object({ id: uuid, resources: z.object({ script: z.object({ etag: hash }) }) }).parse(
       await this.json("GET", `${this.path()}/versions/${encodeURIComponent(versionId)}`));
-    if (version.id !== versionId || version.resources.script.etag !== receipt.script_etag) throw new Error("SQLite deployment does not match its acknowledged script upload");
-    return { ...receipt, worker_version_id: versionId, deployment_id: deployment.id };
+    return { deployment, versionId, version };
   }
   private singleDeployment(input: unknown, versionId?: string) {
     const deployment = deploymentSchema.parse(input).deployments[0];
@@ -153,9 +159,7 @@ export class SqliteCloudflareApi {
     return evidenceSchema.parse({ ...expected, namespace_id: settings.namespaceId });
   }
   async current(): Promise<SqliteDeploymentEvidence> {
-    const deployment = this.singleDeployment(await this.json("GET", `${this.path()}/deployments`));
-    const versionId = deployment.versions[0].version_id;
-    const version = z.object({ id: uuid, resources: z.object({ script: z.object({ etag: hash }) }) }).parse(await this.json("GET", `${this.path()}/versions/${encodeURIComponent(versionId)}`));
+    const { deployment, versionId, version } = await this.currentDeployment();
     if (version.id !== versionId) throw new Error("SQLite current version differs");
     return this.inspect({ worker_version_id: versionId, deployment_id: deployment.id, script_etag: version.resources.script.etag });
   }

@@ -4,9 +4,9 @@ import { renderPublicationFeed } from "../../../src/publication-inputs";
 import { draftPreview } from "./draft-preview";
 import type { SqliteServiceClient } from "./sqlite-service-client";
 import { writeSyncedLocalFile } from "./local-journal-storage";
+import { assertRealParentDirectories } from "./local-journal-path";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import { sha256HexSync } from "./sha256";
-import { lstatSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 export async function exportPreviewRss(root: string, config: SqliteServiceConfig, preview: Awaited<ReturnType<typeof draftPreview>>,
@@ -47,10 +47,7 @@ export async function exportPreviewRss(root: string, config: SqliteServiceConfig
   const final = await draftPreview(root, config, preview.target, { mode: "remote", client });
   if (final.input_fingerprint !== preview.input_fingerprint || !final.publishable) throw new Error("RSS preview changed during collection; review again");
   const file = resolve(output);
-  for (let parent = dirname(file);; parent = dirname(parent)) {
-    if (!lstatSync(parent).isDirectory()) throw new Error("RSS output parents must be real directories");
-    if (dirname(parent) === parent) break;
-  }
+  assertRealParentDirectories(file, "RSS output");
   writeSyncedLocalFile(file, () => xml);
   syncLocalJournalDirectory(dirname(file));
   return { status: "generated_locally", path: file, sha256: sha256HexSync(xml), length_bytes: Buffer.byteLength(xml),

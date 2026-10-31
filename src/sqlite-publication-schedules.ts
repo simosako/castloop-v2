@@ -41,6 +41,11 @@ class ScheduleDeferred extends Error {
 }
 class ScheduleSkipped extends Error {}
 
+const scheduleTimeValues = (time: SqliteScheduleRecord["scheduled_at"]): [
+  string, number, string, string, string, string, string, string, string | null,
+] => [time.scheduled_at, time.scheduled_at_ms, time.timezone, time.timezone_source, time.resolution_source,
+  time.input, time.local_datetime, time.offset, time.input_offset];
+
 export type SqliteScheduleSummary = { scheduled: number; needs_approval: number; dispatched: number; next_scheduled_at_ms: number | null };
 
 export class SqlitePublicationSchedules {
@@ -105,7 +110,6 @@ export class SqlitePublicationSchedules {
 
   async create(input: SqliteScheduleCreate): Promise<SqliteScheduleStatus> {
     const request = sqliteScheduleCreateSchema.parse(input), showId = this.requireScope(request.show_id);
-    if (request.show_id !== showId) throw new Error("Publication schedule target differs");
     const publication = parseSqliteDirectPublicationRequest(request.publication);
     const hash = await sqliteDirectPublicationRequestHash(publication);
     if (request.scheduled_at.scheduled_at_ms <= this.now()) throw new Error("Publication schedule must be in the future");
@@ -132,10 +136,8 @@ export class SqlitePublicationSchedules {
           resolution_source, local_input, local_datetime, local_offset, input_offset, preview_sha256,
           request_sha256, request_json, created_at_ms, updated_at_ms)
         VALUES (?, ?, ?, ?, 1, 'scheduled', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      request.schedule_id, publication.show_id, publication.kind, publication.episode_id ?? null, request.scheduled_at.scheduled_at,
-      request.scheduled_at.scheduled_at_ms, request.scheduled_at.timezone, request.scheduled_at.timezone_source,
-      request.scheduled_at.resolution_source, request.scheduled_at.input, request.scheduled_at.local_datetime,
-      request.scheduled_at.offset, request.scheduled_at.input_offset, request.preview_sha256,
+      request.schedule_id, publication.show_id, publication.kind, publication.episode_id ?? null,
+      ...scheduleTimeValues(request.scheduled_at), request.preview_sha256,
       hash, JSON.stringify(publication), time, time);
       this.event(this.requireRow(request.schedule_id), "create", "scheduled", null, time);
       await this.wakeAt(request.scheduled_at.scheduled_at_ms);
@@ -145,8 +147,7 @@ export class SqlitePublicationSchedules {
 
   async reschedule(input: SqliteScheduleReschedule): Promise<SqliteScheduleStatus> {
     const request = sqliteScheduleRescheduleSchema.parse(input), showId = this.requireScope(request.show_id);
-    const row = this.requireRow(request.schedule_id);
-    if (row.show_id !== showId) throw new Error("Publication schedule target differs");
+    this.requireRow(request.schedule_id);
     if (request.scheduled_at.scheduled_at_ms <= this.now()) throw new Error("Publication schedule must be in the future");
     await this.storage.transaction(async () => {
       const current = this.requireRow(request.schedule_id);
@@ -158,10 +159,8 @@ export class SqlitePublicationSchedules {
       const time = this.now();
       this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, scheduled_at = ?, scheduled_at_ms = ?, timezone = ?,
         timezone_source = ?, resolution_source = ?, local_input = ?, local_datetime = ?, local_offset = ?, input_offset = ?,
-        preview_sha256 = ?, updated_at_ms = ? WHERE schedule_id = ? AND version = ?`, request.scheduled_at.scheduled_at,
-      request.scheduled_at.scheduled_at_ms, request.scheduled_at.timezone, request.scheduled_at.timezone_source,
-      request.scheduled_at.resolution_source, request.scheduled_at.input, request.scheduled_at.local_datetime,
-      request.scheduled_at.offset, request.scheduled_at.input_offset, request.preview_sha256, time, request.schedule_id,
+        preview_sha256 = ?, updated_at_ms = ? WHERE schedule_id = ? AND version = ?`,
+      ...scheduleTimeValues(request.scheduled_at), request.preview_sha256, time, request.schedule_id,
       request.expected_version);
       this.event(this.requireRow(request.schedule_id), "reschedule", "scheduled", null, time);
       await this.wakeAt(request.scheduled_at.scheduled_at_ms);
@@ -171,8 +170,7 @@ export class SqlitePublicationSchedules {
 
   async cancel(input: SqliteScheduleCancel): Promise<SqliteScheduleStatus> {
     const request = sqliteScheduleCancelSchema.parse(input), showId = this.requireScope(request.show_id);
-    const row = this.requireRow(request.schedule_id);
-    if (row.show_id !== showId) throw new Error("Publication schedule target differs");
+    this.requireRow(request.schedule_id);
     this.storage.transactionSync(() => {
       const current = this.requireRow(request.schedule_id);
       if (current.version === request.expected_version + 1 && current.state === "cancelled" && current.preview_sha256 === request.preview_sha256) return;
@@ -191,7 +189,6 @@ export class SqlitePublicationSchedules {
   async reapprove(input: SqliteScheduleReapprove): Promise<SqliteScheduleStatus> {
     const request = sqliteScheduleReapproveSchema.parse(input), showId = this.requireScope(request.show_id);
     const row = this.requireRow(request.schedule_id);
-    if (row.show_id !== showId) throw new Error("Publication schedule target differs");
     const publication = parseSqliteDirectPublicationRequest(request.publication);
     const hash = await sqliteDirectPublicationRequestHash(publication);
     if (publication.show_id !== row.show_id || publication.kind !== row.kind ||
@@ -213,10 +210,8 @@ export class SqlitePublicationSchedules {
       this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, state = 'scheduled', reason_code = NULL,
         scheduled_at = ?, scheduled_at_ms = ?, timezone = ?, timezone_source = ?, resolution_source = ?, local_input = ?,
          local_datetime = ?, local_offset = ?, input_offset = ?, preview_sha256 = ?, request_sha256 = ?,
-        request_json = ?, updated_at_ms = ? WHERE schedule_id = ? AND version = ?`, request.scheduled_at.scheduled_at,
-      request.scheduled_at.scheduled_at_ms, request.scheduled_at.timezone, request.scheduled_at.timezone_source,
-      request.scheduled_at.resolution_source, request.scheduled_at.input, request.scheduled_at.local_datetime,
-      request.scheduled_at.offset, request.scheduled_at.input_offset, request.preview_sha256, hash,
+        request_json = ?, updated_at_ms = ? WHERE schedule_id = ? AND version = ?`,
+      ...scheduleTimeValues(request.scheduled_at), request.preview_sha256, hash,
       JSON.stringify(publication), time, request.schedule_id, request.expected_version);
       this.event(this.requireRow(request.schedule_id), "reapprove", "scheduled", null, time);
       await this.wakeAt(request.scheduled_at.scheduled_at_ms);
@@ -235,7 +230,6 @@ export class SqlitePublicationSchedules {
     const showId = this.requireScope();
     if (cursor !== undefined) sqliteScheduleCancelSchema.shape.schedule_id.parse(cursor);
     const anchor = cursor ? this.requireRow(cursor) : null;
-    if (anchor && anchor.show_id !== showId) throw new Error("Publication schedule cursor belongs to another Show");
     const rows = this.storage.sql.exec<ScheduleRow>(`SELECT * FROM publication_schedules
       WHERE show_id = ? AND sequence < ? ORDER BY sequence DESC LIMIT ?`, showId, anchor?.sequence ?? Number.MAX_SAFE_INTEGER,
     SQLITE_SCHEDULE_PAGE_SIZE + 1).toArray();
@@ -264,26 +258,23 @@ export class SqlitePublicationSchedules {
     }
   }
 
-  private suspendOne(scheduleId: string, reason: SqliteScheduleReason): void {
+  private transitionOne(scheduleId: string, state: "needs_approval" | "failed", action: "suspend" | "fail", reason: SqliteScheduleReason): void {
     this.storage.transactionSync(() => {
       const row = this.requireRow(scheduleId);
       if (row.state !== "scheduled") return;
       const time = this.now();
-      this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, state = 'needs_approval', reason_code = ?,
-        updated_at_ms = ? WHERE schedule_id = ? AND state = 'scheduled'`, reason, time, scheduleId);
-      this.event(this.requireRow(scheduleId), "suspend", "needs_approval", reason, time);
+      this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, state = ?, reason_code = ?,
+        updated_at_ms = ? WHERE schedule_id = ? AND state = 'scheduled'`, state, reason, time, scheduleId);
+      this.event(this.requireRow(scheduleId), action, state, reason, time);
     });
   }
 
+  private suspendOne(scheduleId: string, reason: SqliteScheduleReason): void {
+    this.transitionOne(scheduleId, "needs_approval", "suspend", reason);
+  }
+
   private failOne(scheduleId: string, reason: SqliteScheduleReason): void {
-    this.storage.transactionSync(() => {
-      const row = this.requireRow(scheduleId);
-      if (row.state !== "scheduled") return;
-      const time = this.now();
-      this.storage.sql.exec(`UPDATE publication_schedules SET version = version + 1, state = 'failed', reason_code = ?,
-        updated_at_ms = ? WHERE schedule_id = ? AND state = 'scheduled'`, reason, time, scheduleId);
-      this.event(this.requireRow(scheduleId), "fail", "failed", reason, time);
-    });
+    this.transitionOne(scheduleId, "failed", "fail", reason);
   }
 
   async dispatchDue(): Promise<number> {
@@ -330,7 +321,6 @@ export class SqlitePublicationSchedules {
     const next = this.storage.sql.exec<{ scheduled_at_ms: number }>(`SELECT scheduled_at_ms FROM publication_schedules
       WHERE state = 'scheduled' ORDER BY scheduled_at_ms, sequence LIMIT 1`).toArray()[0];
     if (!next) return;
-    const alarm = await this.storage.getAlarm();
-    if (alarm === null || alarm > next.scheduled_at_ms) await this.storage.setAlarm(next.scheduled_at_ms);
+    await this.wakeAt(next.scheduled_at_ms);
   }
 }

@@ -1,7 +1,7 @@
 import type { SqliteServiceConfig } from "@castloop/shared";
 import { administratorKey } from "./administrator-key";
 import { AgentError } from "./agent-output";
-import { draftPreview } from "./draft-preview";
+import { draftPreview, localPublicationPath } from "./draft-preview";
 import type { PreviewTarget } from "./draft-preview";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { SqlitePublicationClient } from "./sqlite-publication-client";
@@ -9,7 +9,6 @@ import { uploadSqliteMedia } from "./sqlite-media-upload";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { loadLocalInput } from "./local-input";
 import { sha256HexSync } from "./sha256";
-import { join } from "node:path";
 
 export async function prepareSqlitePublication(root: string, config: SqliteServiceConfig, target: PreviewTarget, options: SqliteCommandOptions) {
   const key = administratorKey(root), client = new SqliteServiceClient(config, key, options.transport);
@@ -37,8 +36,7 @@ export async function placeSqlitePublicationMedia(root: string, config: SqliteSe
       options.cloudflare ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" });
   }
   const target = preview.target;
-  const file = join(root, target.show_id, target.kind === "show" ? "show.toml" : `episode-${target.episode_id}.toml`);
-  const current = await loadLocalInput(target.kind, file);
+  const current = await loadLocalInput(target.kind, localPublicationPath(root, target));
   if (sha256HexSync(current.bytes) !== preview.local.sha256) throw new Error("Local publication metadata changed during media placement; preview again");
 }
 

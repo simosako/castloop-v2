@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { diagnosticCheckSchema, diagnosticSummarySchema, parseEpisodeDraft, PUBLICATION_RENDER_BUDGET_BYTES,
-  sqliteServiceConfigSchema, validateId } from "@castloop/shared";
+  sqliteServiceConfigSchema, summarizeDiagnostics, validateId } from "@castloop/shared";
 import type { DiagnosticCheck, DiagnosticSummary, SqliteServiceConfig } from "@castloop/shared";
 import { publicRequest, PublicHttpError } from "./public-http";
 import type { PublicRequestOptions } from "./public-http";
@@ -22,12 +22,6 @@ export const verifyResultSchema = z.object({
 export type VerifyResult = z.infer<typeof verifyResultSchema>;
 
 type EpisodeEvidence = { episodeId: string; guid: string | null; published: boolean; audioLength: number | null; audioEtag: string | null };
-
-function summarize(checks: DiagnosticCheck[]): DiagnosticSummary {
-  const summary = { pass: 0, warn: 0, fail: 0, not_checked: 0 };
-  for (const entry of checks) summary[entry.status] += 1;
-  return summary;
-}
 
 async function publishedEvidence(root: string, config: SqliteServiceConfig, showId: string, transport?: R2RestTransport) {
   const episodes = new Map<string, EpisodeEvidence>();
@@ -230,7 +224,7 @@ export async function verifyShowDelivery(root: string, input: SqliteServiceConfi
   const { checks, processing } = await collectDeliveryChecks(root, config, validateId(showId, "show"),
     episodeId === undefined ? undefined : validateId(episodeId, "episode"), transport);
   return verifyResultSchema.parse({ schema_version: 1, show_id: showId, ...(episodeId !== undefined ? { episode_id: episodeId } : {}),
-    checks, summary: summarize(checks), processing });
+    checks, summary: summarizeDiagnostics(checks), processing });
 }
 
 export function formatVerify(result: VerifyResult): string {

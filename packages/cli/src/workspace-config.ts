@@ -2,6 +2,7 @@ import * as TOML from "@iarna/toml";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { readLocalMetadata } from "./local-metadata-read";
+import { decodeUtf8Strict } from "./utf8";
 import { join } from "node:path";
 
 export function parseSqliteWorkspaceConfigText(source: string): SqliteServiceConfig {
@@ -20,7 +21,7 @@ export async function loadWorkspaceConfig(root: string): Promise<SqliteServiceCo
   let source: string;
   try {
     const bytes = await readLocalMetadata(join(root, "castloop.toml"), 16384);
-    source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    source = decodeUtf8Strict(bytes);
   } catch (error) {
     throw new Error("Cannot read castloop.toml: expected a stable regular UTF-8 file of 1 to 16384 bytes, not a symbolic link", { cause: error });
   }

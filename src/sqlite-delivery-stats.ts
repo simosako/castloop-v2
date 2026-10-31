@@ -8,6 +8,7 @@ import { sha256Hex } from "../packages/shared/src/sha256";
 import { sqlitePublicationTargetSchema } from "../packages/shared/src/sqlite-publication";
 import type { SqliteServiceIdentity } from "../packages/shared/src/sqlite-publication";
 import type { PublicationQueueStorage } from "./sqlite-publication-queue";
+import { ensureSchemaVersionTable } from "./sqlite-publication-queue";
 
 export const SQLITE_DELIVERY_STATS_SCHEMA_VERSION = 1;
 const SQLITE_STATS_PRUNE_BATCH_ROWS = 200;
@@ -88,10 +89,8 @@ export class SqliteDeliveryStats {
       const queue = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
       const content = storage.sql.exec<{ version: number }>("SELECT version FROM publication_content_schema WHERE id = 1").toArray()[0];
       if (!queue || !content) throw new Error("Initialize the publication schemas before delivery statistics");
-      storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_delivery_stats_schema (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL)");
-      const schema = storage.sql.exec<{ version: number }>("SELECT version FROM publication_delivery_stats_schema WHERE id = 1").toArray()[0];
-      if (schema && schema.version !== SQLITE_DELIVERY_STATS_SCHEMA_VERSION) throw new Error("Unsupported delivery statistics schema; do not reset stored statistics");
-      storage.sql.exec("INSERT OR IGNORE INTO publication_delivery_stats_schema (id, version) VALUES (1, ?)", SQLITE_DELIVERY_STATS_SCHEMA_VERSION);
+      ensureSchemaVersionTable(storage, "publication_delivery_stats_schema", SQLITE_DELIVERY_STATS_SCHEMA_VERSION,
+        "Unsupported delivery statistics schema; do not reset stored statistics");
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_delivery_stats_meta (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         measurement_started_at_ms INTEGER NOT NULL CHECK (measurement_started_at_ms >= 0),
@@ -349,14 +348,19 @@ export class SqliteDeliveryStats {
     return from < meta.retained_from_date_utc ? meta.retained_from_date_utc : from;
   }
 
-  episodePage(input: { from_date_utc?: string; to_date_utc?: string; cursor?: string }): {
-    episodes: SqliteStatsEpisodeSummary[]; nextCursor: string | null; fromDate: string; toDate: string } {
-    const now = this.now(), meta = this.meta(), today = utcDateFromMs(now);
+  private window(input: { from_date_utc?: string; to_date_utc?: string }): { from: string; to: string; today: string } {
+    const today = utcDateFromMs(this.now());
     const to = input.to_date_utc ?? today;
     const from = input.from_date_utc ?? shiftUtcDate(to, -(SQLITE_STATS_DEFAULT_WINDOW_DAYS - 1));
     if (from > to || to > today || diffUtcDays(from, to) + 1 > SQLITE_STATS_MAX_WINDOW_DAYS) {
       throw new Error("Delivery statistics window differs from its supported range");
     }
+    return { from, to, today };
+  }
+
+  episodePage(input: { from_date_utc?: string; to_date_utc?: string; cursor?: string }): {
+    episodes: SqliteStatsEpisodeSummary[]; nextCursor: string | null; fromDate: string; toDate: string } {
+    const meta = this.meta(), { from, to, today } = this.window(input);
     let after = "";
     if (input.cursor) {
       const decoded = sqliteStatsEpisodesCursorSchema.parse(JSON.parse(atob(input.cursor)));
@@ -405,12 +409,7 @@ export class SqliteDeliveryStats {
     revisions: { audio_revision_id: string; length_bytes: number; is_current_enclosure: boolean;
       period: SqliteStatsCounters | null; lifetime: SqliteStatsCounters | null }[];
     days: SqliteStatsDailyEntry[]; nextCursor: string | null } {
-    const now = this.now(), meta = this.meta(), today = utcDateFromMs(now);
-    const to = input.to_date_utc ?? today;
-    const from = input.from_date_utc ?? shiftUtcDate(to, -(SQLITE_STATS_DEFAULT_WINDOW_DAYS - 1));
-    if (from > to || to > today || diffUtcDays(from, to) + 1 > SQLITE_STATS_MAX_WINDOW_DAYS) {
-      throw new Error("Delivery statistics window differs from its supported range");
-    }
+    const meta = this.meta(), { from, to, today } = this.window(input);
     let afterDate: string | null = null;
     if (input.cursor) {
       const decoded = sqliteStatsDailyCursorSchema.parse(JSON.parse(atob(input.cursor)));

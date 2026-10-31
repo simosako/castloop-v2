@@ -10,7 +10,7 @@ import type { SqlitePublicationExecutor } from "./sqlite-publication-queue";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { publicationChecksum, renderPublicationFeed } from "./publication-inputs";
 import { canonicalEnclosureUrl } from "./media-url";
-import { SITE_HTML_LIMIT_BYTES, orderedSiteEpisodes, renderSiteEpisode, renderSiteListingPage, siteCssHash, siteDateFormatter } from "./site-renderer";
+import { SITE_HTML_LIMIT_BYTES, orderedSiteEpisodes, renderSiteEpisode, renderSiteListingPage, siteCssHash, siteDateFormatter, siteShowFromMetadata } from "./site-renderer";
 import type { SiteRenderInput } from "./site-renderer";
 import type { SitePurgeTarget } from "./site-storage";
 
@@ -40,11 +40,8 @@ async function validateSiteRender(show: ShowMetadata, episodes: EpisodeRevision[
   await input(() => siteCssHash(show.site_css));
   input(() => {
     const formatDate = siteDateFormatter(show.site_timezone);
-    const renderInput: SiteRenderInput = { origin: baseUrl, coverExtension: extension, episodeSiteIds: siteIds, show: {
-      show_id: show.show_id, title: show.title, description: show.description, language: show.language, author: show.author,
-      ...(show.site_timezone !== undefined ? { site_timezone: show.site_timezone } : {}),
-      ...(show.site_css !== undefined ? { site_css: show.site_css } : {}), ...(show.copyright ? { copyright: show.copyright } : {}),
-    } };
+    const renderInput: SiteRenderInput = { origin: baseUrl, coverExtension: extension, episodeSiteIds: siteIds,
+      show: siteShowFromMetadata(show) };
     const sorted = orderedSiteEpisodes(episodes), pages = Math.max(1, Math.ceil(sorted.length / SITE_PAGE_SIZE));
     const listing = renderSiteListingPage(renderInput, sorted.slice(0, SITE_PAGE_SIZE), 1, pages, formatDate);
     if (new TextEncoder().encode(listing).byteLength > SITE_HTML_LIMIT_BYTES) throw new Error("Site listing HTML exceeds budget");

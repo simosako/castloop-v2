@@ -6,6 +6,7 @@ import type { SqliteAudioReference, SqliteCoverReference } from "../../shared/sr
 import { diffEpisodeDraftFields, diffShowMetadataFields } from "../../shared/src/sqlite-revisions";
 import { administratorKey } from "./administrator-key";
 import { AgentError } from "./agent-output";
+import { isMissingFileError } from "./local-journal-path";
 import { inspectCover, inspectLocalAsset, loadLocalInput } from "./local-input";
 import { analyzeAudio } from "./audio";
 import { sha256HexSync as sha256 } from "./sha256";
@@ -16,11 +17,15 @@ import { join, resolve } from "node:path";
 export type PreviewTarget = { kind: "show" | "episode"; show_id: string; episode_id?: string; audio_path?: string };
 export type PreviewOptions = { mode?: "local" | "remote" | "auto"; client?: SqliteServiceClient };
 
+export function localPublicationPath(root: string, target: PreviewTarget): string {
+  return join(root, target.show_id, target.kind === "show" ? "show.toml" : `episode-${target.episode_id}.toml`);
+}
+
 export async function draftPreview(root: string, config: SqliteServiceConfig, target: PreviewTarget, options: PreviewOptions = {}) {
   for (const parent of [root, join(root, target.show_id)]) {
     if (!(await lstat(parent)).isDirectory()) throw new AgentError("invalid_directory", "Content parents must be real directories.");
   }
-  const file = join(root, target.show_id, target.kind === "show" ? "show.toml" : `episode-${target.episode_id}.toml`);
+  const file = localPublicationPath(root, target);
   const { bytes, value } = await loadLocalInput(target.kind, file);
   if ("show_id" in value ? value.show_id !== target.show_id : !("episode_id" in value) || value.episode_id !== target.episode_id) throw new Error("Local metadata targets another Show or Episode");
   const metadata = value as ShowMetadata | EpisodeDraft;
@@ -39,7 +44,7 @@ export async function draftPreview(root: string, config: SqliteServiceConfig, ta
     let localOnly = false;
     if (options.mode !== "remote") {
       try { await lstat(join(root, ".castloop")); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") localOnly = true; else throw error; }
+      catch (error) { if (isMissingFileError(error)) localOnly = true; else throw error; }
     }
     if (!localOnly) client = new SqliteServiceClient(config, administratorKey(root));
   }

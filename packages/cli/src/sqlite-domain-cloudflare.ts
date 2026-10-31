@@ -6,6 +6,7 @@ import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
 import type { R2RestOptions } from "./bounded-http-read";
 import { AgentError } from "./agent-output";
+import { decodeUtf8Strict } from "./utf8";
 
 const attachmentSchema = z.object({ ...sqliteDomainConnectionSchema.shape, environment: z.enum(["", "production"]) }).strict();
 
@@ -112,7 +113,7 @@ export class SqliteDomainCloudflare {
         if (bytes.byteLength !== 0) throw new Error("Domain DELETE response length differs");
         return undefined;
       }
-      text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+      text = decodeUtf8Strict(bytes);
     } catch {
       logDomainFailure(operation, method, "body_unverified", { http_status: response.status });
       throw new Error("Cloudflare domain response was not verified; never replay an uncertain mutation");
@@ -134,11 +135,14 @@ export class SqliteDomainCloudflare {
     }
     return parsed.data;
   }
+  private assertSinglePage(label: string, response: { result_info?: { page: number; total_pages?: number; total_count: number; count: number } }, items: unknown[]): void {
+    if (response.result_info && (response.result_info.page !== 1 || (response.result_info.total_pages ?? 1) > 1 ||
+      response.result_info.total_count !== items.length || response.result_info.count !== items.length)) throw new Error(`${label} listing is incomplete`);
+  }
   async list() {
     const response = await this.call("domain_list", "GET", `${this.account}/workers/domains`);
     const domains = z.array(rawDomain).max(10000).parse(response.result);
-    if (response.result_info && (response.result_info.page !== 1 || (response.result_info.total_pages ?? 1) > 1 ||
-      response.result_info.total_count !== domains.length || response.result_info.count !== domains.length)) throw new Error("Domain listing is incomplete");
+    this.assertSinglePage("Domain", response, domains);
     return domains;
   }
   async verifyKnown(connection: SqliteDomainConnection | null): Promise<void> {
@@ -186,8 +190,7 @@ export class SqliteDomainCloudflare {
     }
     const response = await this.call("route_list", "GET", `/zones/${zoneId}/workers/routes`);
     const routes = z.array(z.object({ pattern: z.string() })).max(10000).parse(response.result);
-    if (response.result_info && (response.result_info.page !== 1 || (response.result_info.total_pages ?? 1) > 1 ||
-      response.result_info.total_count !== routes.length || response.result_info.count !== routes.length)) throw new Error("Worker route listing is incomplete");
+    this.assertSinglePage("Worker route", response, routes);
     if (routes.some((route) => hostnameCovered(route.pattern, hostname))) throw new Error("An existing Worker route covers this hostname");
     return { hostname, zone_id: zone.id, zone_name: zone.name };
   }

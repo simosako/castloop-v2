@@ -1,10 +1,10 @@
 import { sqliteScheduleCancelSchema, sqliteScheduleCreateSchema, sqliteScheduleListSchema,
-  sqliteScheduleReapproveSchema, sqliteScheduleRescheduleSchema, sqliteScheduleStatusSchema, sqliteServiceConfigHash,
+  sqliteScheduleReapproveSchema, sqliteScheduleRescheduleSchema, sqliteScheduleStatusSchema,
   sqliteServiceConfigSchema } from "@castloop/shared";
 import type { SqliteScheduleCancel, SqliteScheduleCreate, SqliteScheduleList, SqliteScheduleReapprove,
   SqliteScheduleReschedule, SqliteScheduleStatus, SqliteServiceConfig } from "@castloop/shared";
 import { sqliteDirectPublicationRequestHash, MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
-import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
+import { assertSqliteServiceIdentity, readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadOptions } from "./sqlite-management-http";
 import type { R2RestTransport } from "./bounded-http-read";
 
@@ -19,9 +19,7 @@ export class SqliteScheduleClient {
   }
 
   private async identity(value: { service_id: string; service_config_sha256: string }): Promise<void> {
-    if (value.service_id !== this.config.service_id || value.service_config_sha256 !== await sqliteServiceConfigHash(this.config)) {
-      throw new Error("SQLite schedule response belongs to another service configuration");
-    }
+    await assertSqliteServiceIdentity(value, this.config, "SQLite schedule response belongs to another service configuration");
   }
 
   private async get(path: string, showId: string): Promise<unknown> {

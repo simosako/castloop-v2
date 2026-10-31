@@ -9,6 +9,8 @@ import { receiveRssAsset, validateRssSourceUrl } from "./rss-import-download";
 import type { RssAssetTransport } from "./rss-import-download";
 import { parseRssImportFeed, RSS_IMPORT_MAXIMUM_BYTES } from "./rss-import-feed";
 import { sha256HexSync } from "./sha256";
+import { decodeUtf8PreservingBom } from "./utf8";
+import { coverExtensionFromHeader } from "./cover-signature";
 import { createHash, randomUUID } from "node:crypto";
 import { constants, lstatSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { link, open, unlink } from "node:fs/promises";
@@ -42,7 +44,7 @@ export async function hashRssImportFile(file: string, maximum: number): Promise<
 }
 
 export async function readRssImportSnapshot(file: string): Promise<string> {
-  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(await readLocalMetadata(file, RSS_IMPORT_MAXIMUM_BYTES));
+  return decodeUtf8PreservingBom(await readLocalMetadata(file, RSS_IMPORT_MAXIMUM_BYTES));
 }
 
 export async function rssImportCoverExtension(file: string): Promise<"jpg" | "png"> {
@@ -52,8 +54,8 @@ export async function rssImportCoverExtension(file: string): Promise<"jpg" | "pn
     if (!stat.isFile() || stat.size < 3 || stat.size > 5_000_000) throw new Error("Imported cover size/type is invalid");
     const header = Buffer.alloc(8);
     await image.read(header, 0, 8, 0);
-    if (header[0] === 255 && header[1] === 216 && header[2] === 255) return "jpg";
-    if (header.equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "png";
+    const extension = coverExtensionFromHeader(header);
+    if (extension) return extension;
     throw new Error("Imported cover must be JPEG or PNG");
   } finally { await image.close(); }
 }
@@ -61,7 +63,7 @@ export async function rssImportCoverExtension(file: string): Promise<"jpg" | "pn
 async function fetchFeed(url: string, transport?: RssAssetTransport): Promise<{ source: string; url: string }> {
   const chunks: Buffer[] = [];
   const result = await receiveRssAsset(url, RSS_IMPORT_MAXIMUM_BYTES, async (bytes) => { chunks.push(Buffer.from(bytes)); }, transport);
-  return { source: new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(Buffer.concat(chunks)), url: result.url };
+  return { source: decodeUtf8PreservingBom(Buffer.concat(chunks)), url: result.url };
 }
 
 export async function inspectRssImport(showId: string, sourceUrl: string, transport?: RssAssetTransport): Promise<unknown> {

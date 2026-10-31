@@ -1,17 +1,11 @@
 import { AgentError } from "./agent-output";
-import { BACKUP_PASSPHRASE_MAX_BYTES, BACKUP_PASSPHRASE_MIN_BYTES } from "./backup-archive";
+import { assertValidPassphrase, BACKUP_PASSPHRASE_MAX_BYTES, BACKUP_PASSPHRASE_MIN_BYTES } from "./backup-archive";
+import { decodeUtf8Strict } from "./utf8";
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
 const BACKUP_PASSPHRASE_FILE_LIMIT_BYTES = 4096;
-
-function validatePassphrase(passphrase: string): void {
-  const bytes = Buffer.byteLength(passphrase, "utf8");
-  if (bytes < BACKUP_PASSPHRASE_MIN_BYTES || bytes > BACKUP_PASSPHRASE_MAX_BYTES) {
-    throw new Error(`Backup passphrase must be ${BACKUP_PASSPHRASE_MIN_BYTES} to ${BACKUP_PASSPHRASE_MAX_BYTES} bytes`);
-  }
-}
 
 function readPassphraseFile(file: string): string {
   const fd = openSync(resolve(file), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
@@ -25,9 +19,9 @@ function readPassphraseFile(file: string): string {
       if (!read) break;
       size += read;
     }
-    const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer.subarray(0, size));
+    const source = decodeUtf8Strict(buffer.subarray(0, size));
     const passphrase = source.replace(/\r?\n$/, "");
-    validatePassphrase(passphrase);
+    assertValidPassphrase(passphrase);
     return passphrase;
   } finally { closeSync(fd); }
 }
@@ -56,6 +50,6 @@ export async function backupPassphrase(flags: Record<string, string>, confirm: b
     const second = await askHidden("Repeat backup passphrase");
     if (first !== second) throw new Error("Backup passphrases differ");
   }
-  validatePassphrase(first);
+  assertValidPassphrase(first);
   return first;
 }

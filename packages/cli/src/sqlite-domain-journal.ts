@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { requireSqliteDomainConnection, sqliteDomainConnectionSchema, sqliteDomainRequestSchema } from "../../shared/src/sqlite-domain";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
-import { createLocalJournalStorage } from "./local-journal-storage";
+import { sqliteDeploymentReceiptSchema } from "../../shared/src/sqlite-worker-deployment";
+import { createLocalJournalStorage, readLocalJournalOrNull } from "./local-journal-storage";
 
-const deployment = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
+const deployment = sqliteDeploymentReceiptSchema;
 export const sqliteDomainJournalSchema = z.object({ schema_version: z.literal(1), request: sqliteDomainRequestSchema,
   request_sha256: z.string().regex(/^[a-f0-9]{64}$/), previous: deployment.extend({ namespace_id: z.string().regex(/^[a-f0-9]{32}$/) }),
   phase: z.enum(["prepared", "connected", "deployed", "remote_ready", "local_synced", "completed"]),
@@ -28,6 +29,5 @@ export function sqliteDomainJournal(root: string, config: SqliteServiceConfig, o
   return createLocalJournalStorage(root, "sqlite-domain-changes", config.service_id, `${operationId}.json`);
 }
 export function readSqliteDomainJournal(root: string, config: SqliteServiceConfig, operationId: string): SqliteDomainJournal | null {
-  try { return sqliteDomainJournalSchema.parse(sqliteDomainJournal(root, config, operationId).read()); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; return null; }
+  return readLocalJournalOrNull(sqliteDomainJournal(root, config, operationId), sqliteDomainJournalSchema);
 }

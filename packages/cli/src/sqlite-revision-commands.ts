@@ -8,9 +8,9 @@ import { SqlitePublicationClient } from "./sqlite-publication-client";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { writeSyncedLocalFile } from "./local-journal-storage";
+import { assertRealParentDirectories } from "./local-journal-path";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import type { R2RestTransport } from "./bounded-http-read";
-import { lstatSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 export function readRevisionPlanFile(file: string): unknown {
@@ -57,10 +57,7 @@ export async function syncLocalMetadata(root: string, config: SqliteServiceConfi
   const content = episodeId === undefined ? snapshot.show_content : snapshot.episode_content;
   if (!content || content.revision_id !== expectedRevision) throw new Error("Current revision differs from the reviewed revision");
   const file = output ? resolve(output) : join(root, showId, episodeId === undefined ? "show.toml" : `episode-${episodeId}.toml`);
-  for (let parent = dirname(file);; parent = dirname(parent)) {
-    if (!lstatSync(parent).isDirectory()) throw new Error("Metadata output parents must be real directories");
-    if (dirname(parent) === parent) break;
-  }
+  assertRealParentDirectories(file, "Metadata output");
   writeSyncedLocalFile(file, () => stringifyToml(content.metadata));
   syncLocalJournalDirectory(dirname(file));
   return { path: file, revision_id: content.revision_id, result: "metadata_exported", assets_downloaded: false, existing_files_overwritten: false };

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { diagnosticCheckSchema, diagnosticSummarySchema, sqliteServiceConfigHash, sqliteServiceConfigSchema, validateId } from "@castloop/shared";
+import { diagnosticCheckSchema, diagnosticSummarySchema, sqliteServiceConfigHash, sqliteServiceConfigSchema, summarizeDiagnostics, validateId } from "@castloop/shared";
 import type { DiagnosticCheck, DiagnosticSummary, SqliteServiceConfig } from "@castloop/shared";
 import { sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
 import type { SqliteHealth } from "../../shared/src/sqlite-service-api";
@@ -11,6 +11,7 @@ import { readSqliteManagementGet } from "./sqlite-management-http";
 import { SqliteServiceClient } from "./sqlite-service-client";
 import { collectDeliveryChecks } from "./verify";
 import type { R2RestOptions, R2RestTransport } from "./bounded-http-read";
+import { decodeUtf8Strict } from "./utf8";
 
 export const DIAGNOSE_DEFAULT_MAX_SHOWS = 5;
 export const DIAGNOSE_ABSOLUTE_MAX_SHOWS = 20;
@@ -26,11 +27,6 @@ type DiagnoseOptions = { maxShows?: number; external?: boolean; transport?: R2Re
 
 function check(id: string, scope: DiagnosticCheck["scope"], status: DiagnosticCheck["status"], code: string,
   message: string, next_actions: string[] = []): DiagnosticCheck { return { id, scope, status, code, message, next_actions }; }
-function summarize(checks: DiagnosticCheck[]): DiagnosticSummary {
-  const summary = { pass: 0, warn: 0, fail: 0, not_checked: 0 };
-  for (const entry of checks) summary[entry.status] += 1;
-  return summary;
-}
 
 async function cfCredentialsCheck(config: SqliteServiceConfig, options: DiagnoseOptions): Promise<DiagnosticCheck> {
   const accountId = options.cloudflare?.accountId, token = options.cloudflare?.apiToken;
@@ -48,7 +44,7 @@ async function cfCredentialsCheck(config: SqliteServiceConfig, options: Diagnose
   }
   try {
     const bytes = await collectStreamBytes(response.body, 1_000_000);
-    const value = z.object({ success: z.literal(true), result: z.object({ id: z.string() }) }).parse(JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)));
+    const value = z.object({ success: z.literal(true), result: z.object({ id: z.string() }) }).parse(JSON.parse(decodeUtf8Strict(bytes)));
     if (value.result.id !== config.account_id || value.result.id !== accountId) throw new Error("Cloudflare account differs");
     return check("cf-credentials", "remote", "pass", "cf_account_readable", "The API token can read the configured account; operation permissions are not proven");
   } catch { return check("cf-credentials", "remote", "fail", "cf_unverified", "The Cloudflare account response was not verifiable"); }
@@ -80,7 +76,7 @@ async function diagnoseShow(config: SqliteServiceConfig, showId: string, key: st
       } catch { checks.push(check("target-state", "remote", "fail", "observation_unavailable", "Published Show content was not observable")); }
     } else for (const id of ["admission", "target-state"]) checks.push(check(id, "remote", "not_checked", "show_missing", "Show-dependent checks require a completed registration"));
   }
-  return { show_id: showId, checks, summary: summarize(checks) };
+  return { show_id: showId, checks, summary: summarizeDiagnostics(checks) };
 }
 
 export async function diagnoseShows(root: string, input: SqliteServiceConfig, showIds: string[], options: DiagnoseOptions = {}): Promise<DiagnoseResult> {
@@ -116,9 +112,9 @@ export async function diagnoseShows(root: string, input: SqliteServiceConfig, sh
       const failed = delivery.checks.some((entry) => entry.status === "fail"), warned = delivery.checks.some((entry) => entry.status === "warn");
       show.checks.push(check("delivery", "external", failed ? "fail" : warned ? "warn" : "pass", failed ? "delivery_verification_failed" : warned ? "delivery_warn" : "delivery_verified", "External delivery checks completed", failed ? ["verify_show"] : []));
     } catch { show.checks.push(check("delivery", "external", "fail", "delivery_observation_unavailable", "External delivery checks could not be performed", ["verify_show"])); }
-    show.summary = summarize(show.checks);
+    show.summary = summarizeDiagnostics(show.checks);
   }
-  return diagnoseResultSchema.parse({ schema_version: 1, shared: { checks: shared, summary: summarize(shared) }, shows, summary: summarize([...shared, ...shows.flatMap((show) => show.checks)]) });
+  return diagnoseResultSchema.parse({ schema_version: 1, shared: { checks: shared, summary: summarizeDiagnostics(shared) }, shows, summary: summarizeDiagnostics([...shared, ...shows.flatMap((show) => show.checks)]) });
 }
 
 export function formatDiagnose(result: DiagnoseResult): string {

@@ -1,4 +1,4 @@
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { z } from "zod";
 import { sqliteHealthSchema, sqliteInspectionSchema, sqliteRegistryStatusSchema, sqliteStatsRetentionResponseSchema } from "../../shared/src/sqlite-service-api";
@@ -7,7 +7,7 @@ import { sqliteStatsEpisodesResponseSchema, sqliteStatsEpisodeDailyResponseSchem
 import type { SqliteStatsEpisodesResponse, SqliteStatsEpisodeDailyResponse, SqliteStatsRetentionRequest } from "../../shared/src/sqlite-stats";
 import { sha256Hex } from "../../shared/src/sha256";
 import type { SqliteHealth, SqliteInspection, SqliteRuntimeRequest } from "../../shared/src/sqlite-service-api";
-import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
+import { assertSqliteServiceIdentity, readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
 import type { SqliteManagementReadOptions } from "./sqlite-management-http";
 import type { R2RestTransport } from "./bounded-http-read";
 import { sqliteCatalogRequestSchema, sqliteCatalogResponseSchema } from "../../shared/src/sqlite-catalog";
@@ -22,12 +22,12 @@ export class SqliteServiceClient {
     this.config = sqliteServiceConfigSchema.parse(config);
     if (!key || /[^\x21-\x7e]/.test(key) || key.length > 1024) throw new Error("Missing SQLite administrator key");
   }
-  private async call(path: string, body?: object, showId?: string): Promise<unknown> {
+  private async call(path: string, body?: object, showId?: string, basePath = "/admin/sqlite-service"): Promise<unknown> {
     const scope: Record<string, string> = showId ? { "X-Castloop-Show-Id": sqliteInspectionSchema.shape.show_id.parse(showId) } : {};
     try {
-      if (!body) return await readSqliteManagementGet(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url),
+      if (!body) return await readSqliteManagementGet(new URL(`${basePath}/${path}`, this.config.workers_dev_base_url),
         { "X-Castloop-Key": this.key, ...scope }, { ...this.readOptions, transport: this.transport });
-      const response = await this.transport(new URL(`/admin/sqlite-service/${path}`, this.config.workers_dev_base_url), {
+      const response = await this.transport(new URL(`${basePath}/${path}`, this.config.workers_dev_base_url), {
         method: body ? "POST" : "GET", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(30000),
         headers: { "X-Castloop-Key": this.key, ...scope, ...(body ? { "Content-Type": "application/json" } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -38,7 +38,7 @@ export class SqliteServiceClient {
     } catch { throw new Error("SQLite service request was not verified; preserve its journal without automatic replay"); }
   }
   private async identity(value: { service_id: string; service_config_sha256: string }): Promise<void> {
-    if (value.service_id !== this.config.service_id || value.service_config_sha256 !== await sqliteServiceConfigHash(this.config)) throw new Error("SQLite service response belongs to another configuration");
+    await assertSqliteServiceIdentity(value, this.config, "SQLite service response belongs to another configuration");
   }
   async health(showId?: string): Promise<SqliteHealth> {
     const value = sqliteHealthSchema.parse(await this.call("health", undefined, showId)); await this.identity(value);
@@ -107,16 +107,7 @@ export class SqliteServiceClient {
     return value;
   }
   private async statsPost(body: object, showId: string): Promise<unknown> {
-    try {
-      const response = await this.transport(new URL("/admin/sqlite-stats/retention", this.config.workers_dev_base_url), {
-        method: "POST", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(30000),
-        headers: { "X-Castloop-Key": this.key, "X-Castloop-Show-Id": showId, "Content-Type": "application/json" },
-        body: JSON.stringify(body) });
-      if (response.status !== 200) {
-        await response.body?.cancel(); throw new Error("Unverified service response");
-      }
-      return await readSqliteManagementJson(response, 16384);
-    } catch { throw new Error("SQLite service request was not verified; preserve its journal without automatic replay"); }
+    return this.call("retention", body, showId, "/admin/sqlite-stats");
   }
   private async checkedRetention(input: unknown, showId: string): Promise<SqliteStatsRetentionResponse> {
     const value = sqliteStatsRetentionResponseSchema.parse(input);

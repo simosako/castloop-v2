@@ -34,16 +34,21 @@ export type SqlitePublicationExecutor = {
   execute: (request: SqliteDirectPublicationRequest) => Promise<{ revisionId: string; commit: () => void }>;
 };
 
+export function ensureSchemaVersionTable(storage: PublicationQueueStorage, table: string, version: number, mismatch: string): void {
+  storage.sql.exec(`CREATE TABLE IF NOT EXISTS ${table} (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)`);
+  const saved = storage.sql.exec<{ version: number }>(`SELECT version FROM ${table} WHERE id = 1`).toArray()[0];
+  if (saved && saved.version !== version) throw new Error(mismatch);
+  storage.sql.exec(`INSERT OR IGNORE INTO ${table} (id, version) VALUES (1, ?)`, version);
+}
+
 export class SqlitePublicationQueue {
   executor?: SqlitePublicationExecutor;
   constructor(private readonly storage: PublicationQueueStorage, private runtime: SqlitePublicationRuntime,
     private readonly scope?: { showId: string; ready: () => boolean }) {
     this.runtime = sqlitePublicationRuntimeSchema.parse(runtime);
     storage.transactionSync(() => {
-      storage.sql.exec("CREATE TABLE IF NOT EXISTS publication_queue_schema (id INTEGER PRIMARY KEY CHECK(id = 1), version INTEGER NOT NULL)");
-      const schema = storage.sql.exec<{ version: number }>("SELECT version FROM publication_queue_schema WHERE id = 1").toArray()[0];
-      if (schema && schema.version !== SQLITE_QUEUE_SCHEMA_VERSION) throw new Error("Unsupported SQLite publication schema; do not reset stored state");
-      storage.sql.exec("INSERT OR IGNORE INTO publication_queue_schema (id, version) VALUES (1, ?)", SQLITE_QUEUE_SCHEMA_VERSION);
+      ensureSchemaVersionTable(storage, "publication_queue_schema", SQLITE_QUEUE_SCHEMA_VERSION,
+        "Unsupported SQLite publication schema; do not reset stored state");
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_service (
         id INTEGER PRIMARY KEY CHECK(id = 1), service_id TEXT NOT NULL, service_config_sha256 TEXT NOT NULL)`);
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedules (

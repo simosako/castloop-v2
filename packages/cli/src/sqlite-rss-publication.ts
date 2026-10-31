@@ -17,6 +17,7 @@ import { AgentError } from "./agent-output";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { sha256HexSync as digest } from "./sha256";
+import { decodeUtf8Strict } from "./utf8";
 import { constants } from "node:fs";
 import { copyFile, open, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -34,7 +35,7 @@ export function createSqliteRssEffects(root: string, config: SqliteServiceConfig
   return { command: (name, args) => runSqliteCommand(root, config, name, args, options), async readFeed(url) {
     const chunks: Buffer[] = [];
     await receiveRssAsset(url, 32_000_000, async (bytes) => { chunks.push(Buffer.from(bytes)); });
-    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks));
+    return decodeUtf8Strict(Buffer.concat(chunks));
   } };
 }
 

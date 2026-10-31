@@ -3,6 +3,7 @@ import { sqliteMediaKey, sqliteAudioReferenceSchema, sqliteCoverReferenceSchema 
 import type { SqliteAudioReference, SqliteCoverReference } from "../../shared/src/sqlite-media";
 import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
 import type { R2RestOptions } from "./bounded-http-read";
+import { decodeUtf8Strict } from "./utf8";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
@@ -12,7 +13,7 @@ import { finished } from "node:stream/promises";
 async function readJson(response: Response): Promise<unknown> {
   if (!response.body) throw new Error("R2 response is missing");
   const bytes = await collectStreamBytes(response.body, 65536, true);
-  return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes));
+  return JSON.parse(decodeUtf8Strict(bytes));
 }
 
 const receiptSchema = z.object({ success: z.literal(true), result: z.object({

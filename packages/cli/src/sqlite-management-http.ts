@@ -1,7 +1,15 @@
 import type { R2RestTransport } from "./bounded-http-read";
 import { BoundedReadError, collectStreamBytes, retryAfterMilliseconds } from "./bounded-http-read";
 import { sha256HexSync } from "./sha256";
+import { decodeUtf8Strict } from "./utf8";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
+import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
+
+export async function assertSqliteServiceIdentity(value: { service_id: string; service_config_sha256: string },
+  config: SqliteServiceConfig, message: string): Promise<void> {
+  if (value.service_id !== config.service_id || value.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error(message);
+}
 
 type ReadFailureCode = "transport_error" | "observation_timeout" | "http_error" | "invalid_response" |
   "body_read_failed" | "length_mismatch" | "size_limit" | "invalid_utf8" | "invalid_json" | "cleanup_failed" | "deadline_exceeded";
@@ -44,7 +52,7 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
   if (signal?.aborted) throw new ReadFailure("observation_timeout", true);
   if (compareLength && declared !== null && Number(declared) !== bytes.length) throw new ReadFailure("length_mismatch", true);
   let source: string;
-  try { source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
+  try { source = decodeUtf8Strict(bytes); }
   catch { throw new ReadFailure("invalid_utf8", false); }
   try { return JSON.parse(source) as unknown; } catch { throw new ReadFailure("invalid_json", false); }
 }

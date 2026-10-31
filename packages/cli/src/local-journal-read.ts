@@ -1,3 +1,4 @@
+import { decodeUtf8Strict } from "./utf8";
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 
 export function readBoundedLocalJournal(file: string, maximum = 16384): unknown {
@@ -18,6 +19,6 @@ export function readBoundedLocalJournal(file: string, maximum = 16384): unknown 
     if (BigInt(size) !== before.size || before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) {
       throw new Error("Local journal changed during inspection");
     }
-    return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer.subarray(0, size))) as unknown;
+    return JSON.parse(decodeUtf8Strict(buffer.subarray(0, size))) as unknown;
   } finally { closeSync(fd); }
 }

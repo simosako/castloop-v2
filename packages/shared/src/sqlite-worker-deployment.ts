@@ -1,7 +1,11 @@
+import { z } from "zod";
 import { sqliteServiceConfigSchema } from "./sqlite-service";
 import type { SqliteServiceConfig } from "./sqlite-service";
 
 export const SQLITE_WORKER_COMPATIBILITY_DATE = "2026-10-16";
+export const sqliteDeploymentReceiptSchema = z.object({
+  worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256),
+}).strict();
 type SqliteWorkerBinding = { name: "CASTLOOP_BUCKET"; type: "r2_bucket"; bucket_name: string } |
   { name: "CASTLOOP_ADMIN_KEY"; type: "secret_text"; text: string } |
   { name: "CASTLOOP_VERSION_METADATA"; type: "version_metadata" } |

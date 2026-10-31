@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
+import { sqliteDeploymentReceiptSchema } from "../../shared/src/sqlite-worker-deployment";
 import { administratorKey } from "./administrator-key";
 import { SqliteCloudflareApi } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
@@ -8,7 +9,7 @@ import { SqliteDomainClient } from "./sqlite-domain-client";
 import { SqliteDomainCloudflare } from "./sqlite-domain-cloudflare";
 import type { R2RestOptions } from "./bounded-http-read";
 
-const receiptSchema = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
+const receiptSchema = sqliteDeploymentReceiptSchema;
 export type SqliteDeployResult = z.infer<typeof deployResultSchema>;
 const deployResultSchema = receiptSchema.extend({ previous_worker_version_id: z.uuid(), namespace_id: z.string().regex(/^[a-f0-9]{32}$/),
   publication_ready: z.literal(true) }).strict();

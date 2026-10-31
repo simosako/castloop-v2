@@ -9,6 +9,15 @@ import { escapeSiteText as escapeHtml, formatSiteDescription } from "./site-desc
 import type { SiteDescription } from "./site-description";
 
 export type SiteShow = Pick<ShowMetadata, "show_id" | "title" | "description" | "language" | "author" | "copyright" | "site_css" | "site_timezone">;
+export function siteShowFromMetadata(metadata: ShowMetadata): SiteShow {
+  return {
+    show_id: metadata.show_id, title: metadata.title, description: metadata.description, language: metadata.language,
+    author: metadata.author,
+    ...(metadata.site_timezone !== undefined ? { site_timezone: metadata.site_timezone } : {}),
+    ...(metadata.site_css !== undefined ? { site_css: metadata.site_css } : {}),
+    ...(metadata.copyright ? { copyright: metadata.copyright } : {}),
+  };
+}
 export type SiteRenderInput = { show: SiteShow; origin: string; coverExtension: "jpg" | "png"; episodeSiteIds: Record<string, string> };
 export const SITE_HTML_LIMIT_BYTES = 1_000_000;
 export const SITE_CSS = `:root{color-scheme:light;--cl-accent:#245c65;--cl-background:#f5f7f8;--cl-text:#202b33;--cl-muted:#53636e;--cl-content-width:64rem;--cl-radius:1rem}

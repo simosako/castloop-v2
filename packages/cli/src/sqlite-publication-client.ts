@@ -5,8 +5,6 @@ import type { SqliteDirectPublicationRequest, SqliteDirectPublicationResult } fr
 import type { R2RestTransport } from "./bounded-http-read";
 import { readSqliteManagementJson } from "./sqlite-management-http";
 
-export { readSqliteManagementJson } from "./sqlite-management-http";
-
 export class SqlitePublicationClient {
   readonly config: SqliteServiceConfig;
   constructor(input: SqliteServiceConfig, private readonly administratorKey: string,
