@@ -1,64 +1,57 @@
 # Contributing to castloop
 
-Thank you for considering a contribution. castloop is a safety-sensitive tool: it deploys and manages real Cloudflare resources, and its local state contains secrets. The rules below exist to keep contributions reviewable and to make it impossible to leak credentials through the repository.
+Thank you for your interest in contributing to castloop. Bug reports, documentation improvements, and code contributions are welcome.
 
-## Project status
+## Before you start
 
-castloop is an **early beta** (v0.8.2). Only fresh service configurations using `schema_version = 2`, `sqlite-sequential-v1`, and `storage_layout = "show-v1"` with internal formats 14/13 are supported. Older internal formats are not migrated; Queue/R2 services need the separate v0.5.x line. Check [README.md](README.md) and the [design index](design/README.md) before proposing changes so your idea is not already covered or intentionally excluded.
+For a bug or usage problem, please use an [issue template](.github/ISSUE_TEMPLATE). For a larger change, open an issue first to discuss the approach. For a security vulnerability, follow the private reporting instructions in [SECURITY.md](SECURITY.md).
 
-## Development setup
+The [design documentation](design/README.md) describes how castloop works and is a useful starting point for implementation changes. The user guides in [docs/](docs/README.md) describe current behavior.
 
-Requirements:
+## Set up the development environment
 
-- [Bun](https://bun.sh) 1.4.4 (runtime and test runner, matching CI)
-- Node.js 24 and npm (for `npm ci` and TypeScript)
-- No Wrangler, no Cloudflare account, and no API tokens: the test suite is fully local and never touches Cloudflare.
+The CI environment uses [Bun](https://bun.sh) 1.4.4 and Node.js 24 with npm. After cloning the repository, install the dependencies and run the checks:
 
 ```sh
 npm ci
-mkdir -p -m 700 /tmp/opencode   # scratch workspace some tests use
-npm run check                   # TypeScript, must be clean
-bun test                        # full local test suite
+mkdir -p -m 700 /tmp/opencode
+npm run check
+bun test
 ```
 
-To build the Linux binary: `npm run build:cli -- linux-x64` (output: `dist/castloop-linux-x64`). The executable embeds only `src/sqlite-worker.ts`.
+Some tests use `/tmp/opencode` for temporary files; the command above creates it on Linux. The full test suite runs locally, using simulated Cloudflare services. CI runs it and the TypeScript check on Linux, and builds and smoke-tests the CLI on Linux, macOS, and Windows.
 
-See the [development documentation index](docs/development/README.md) for build, CI and release maintenance. Administrator installation and operation belong in the [user guides](docs/README.md); internal contracts belong in [design/](design/README.md). Keep historical verification results separate from current instructions.
+To build the Linux CLI locally:
 
-There is **no lint step and no formatter configured**; please do not add tooling. Match the surrounding code style instead: two-space indent, double quotes, ES module imports grouped as external → internal → Node built-ins (`node:` prefix), camelCase identifiers, PascalCase types, UPPER_SNAKE_CASE constants.
+```sh
+npm run build:cli -- linux-x64
+```
 
-## Safety rules for every change
+The binary is written to `dist/castloop-linux-x64`. See the [testing guide](design/testing.md) for test locations and checks for specific changes, and the [development documentation](docs/development/README.md) for build and release information.
 
-- **Never commit** `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, anything from `.castloop/` (administrator key, journals), unpublished audio, or real service URLs from your own account. These paths are git-ignored; keep them that way.
-- Tests must stay local. Do not add tests that require live Cloudflare credentials, deployments, or network access to your own resources.
-- Worker diagnostics must stay on the allowlisted diagnostic codes; do not log arbitrary exceptions, content text, email addresses or secrets.
-- Preserve the safety gates when touching related code: explicit publication (create/preview/media placement must not publish), synchronous atomic publication, reviewed configuration/target/base and generation checks, no automatic retry of POST/PUT mutations, immutable published audio and revision history during normal updates, and lifecycle/readiness checks before cached delivery. Publication job states such as `blocked` are no longer used. If you believe a gate should change, open an issue first.
-- When behavior changes, update the relevant documents under `docs/` or `design/` in the same pull request. Design and operations documents are currently written in Japanese; English translations of unchanged content are welcome as separate pull requests.
+## Make a change
 
-## How to propose a change
+1. Create a branch from `main` and keep the change focused.
+2. Add or update tests for changes in behavior. Follow the surrounding code style; no formatter or linter is configured.
+3. Update the relevant [user guides](docs/README.md) and [design documentation](design/README.md) when behavior changes. These documents are currently written in Japanese.
+4. Run `npm run check` and `bun test`. For documentation-only changes, check the wording, links, and accuracy instead.
+5. Open a pull request describing the change, its motivation, and how you tested it. Link the related issue when applicable.
 
-1. **Open an issue first** for anything that is not an obvious bug fix — especially changes to the publication protocol, lifecycle behavior, or retained inputs and safe re-execution of interrupted operations. Wait for alignment before investing in a large implementation.
-2. Create a feature branch from `main`, named after the issue (for example `feat/issue-40-operation-recovery`).
-3. Keep pull requests focused: one behavior per PR, with tests that fail before and pass after.
-4. Run `npm run check` and `bun test` locally; CI runs the same checks plus a smoke test of the built binary.
-5. Write commit messages in the imperative mood with a type prefix (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `release:`), as the existing history does.
+Discuss new dependencies before adding them, and update [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) if dependency notices change. Please discuss new lint or formatting tools before proposing them.
 
-## Pull request checklist
+## Protect data and publication
 
-- [ ] `npm run check` passes
-- [ ] `bun test` passes
-- [ ] No credentials, `.castloop/` content, or unpublished audio is included
-- [ ] No new dependencies without prior discussion, and `THIRD_PARTY_NOTICES.md` updated if dependencies changed
-- [ ] Relevant `docs/` / `design/` documents updated when behavior changed
-- [ ] No new lint/format tooling introduced
+castloop manages Cloudflare resources and podcast content. When working on changes:
+
+- Keep credentials, `.castloop/` state, private URLs, and unpublished content out of issues, pull requests, and commits. Redact examples and logs before sharing them.
+- Keep automated tests local and independent of live Cloudflare credentials and resources. Live testing requires authorization for the target environment and operations; see the [private trial procedure](design/security.md#非公開の実機試験).
+- Preserve explicit publication, atomic updates, checks on reviewed inputs and delivery readiness, and published audio and revision history. Do not automatically retry mutating requests.
+- Keep Worker diagnostics limited to the approved codes and messages; do not log secrets, content, email addresses, or arbitrary exceptions. See the [security design](design/security.md) and the relevant [component design](design/README.md) for details.
 
 ## Agent-assisted contributions
 
-Contributions authored with coding agents are welcome. The repository's [AGENTS.md](AGENTS.md) documents the durable rules agents must follow (documentation routing, safety boundaries, code conventions); point your agent at it before starting work.
+Contributions made with coding agents are welcome. The repository's [AGENTS.md](AGENTS.md) provides project-specific instructions for agents.
 
-## Reporting bugs and security issues
+## License
 
-- Bugs and usage problems: use the [issue templates](.github/ISSUE_TEMPLATE). Redact tokens, keys, journals and private URLs.
-- Security vulnerabilities: follow [SECURITY.md](SECURITY.md) — private vulnerability reporting only.
-
-Licensing: by contributing, you agree that your contributions are licensed under the [MIT License](LICENSE) that covers the project.
+By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).

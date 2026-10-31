@@ -1,52 +1,52 @@
-# castloop 利用ガイド
+# castloop User Guide
 
-castloopは、Cloudflare上でPodcastを配信するためのツールです。コマンドラインから番組やエピソードを公開し、RSSと番組サイトを管理できます。
+castloop is a tool for hosting podcasts on Cloudflare. Use the command line to publish shows and episodes and manage your RSS feed and show website.
 
-## 初めて使う
+## Getting started
 
-1. [CLIをインストールする](installation.md)
-2. [サービスを作り、最初のエピソードを公開する](getting_started.md)
-3. [公開した内容を更新する](publishing.md)
+1. [Install the CLI](installation.md).
+2. [Create a service and publish your first episode](getting_started.md).
+3. [Update published content](publishing.md).
 
-既存のPodcastを移す場合は、サービスを作成してから[RSS取り込みと購読先の移行](rss_migration.md)へ進んでください。
+To move an existing podcast, create a service first, then follow [Importing and migrating an RSS feed](rss_migration.md).
 
-## 目的から探す
+## Find a guide
 
-| やりたいこと | ガイド |
+| Task | Guide |
 | --- | --- |
-| 公開前に差分やRSSを確認する・過去の内容に戻す | [公開内容の確認と過去版の採用](published_content_review.md) |
-| 日時を指定して公開する | [予約公開](scheduling.md) |
-| 配信を止める・再開する | [非公開化と公開の復元](lifecycle.md) |
-| 番組サイトの見た目や日付表示を変える | [番組サイト](show_website.md) |
-| 別の配信サービスから移す | [RSS取り込みと購読先の移行](rss_migration.md) |
-| エピソードごとの配信回数を調べる | [配信統計](delivery_statistics.md) |
-| エラーや中断の後に状態を調べる | [トラブルシューティング](troubleshooting.md) |
-| 管理ファイルを保存する・別の端末に戻す | [バックアップと復元](workspace_backup.md) |
-| 配信サーバーを更新する | [サービスの保守](maintenance.md) |
-| 独自ドメインを使う | [独自ドメイン](custom_domains.md) |
-| AIエージェントに操作を依頼する | [エージェントによる管理](agent_usage.md) |
+| Review changes or RSS before publishing, or restore an earlier version | [Reviewing published content and restoring revisions](published_content_review.md) |
+| Publish at a specified time | [Scheduling publication](scheduling.md) |
+| Stop or resume delivery | [Unpublishing and restoring content](lifecycle.md) |
+| Change the appearance or date display of a show website | [Show website](show_website.md) |
+| Move from another hosting service | [Importing and migrating an RSS feed](rss_migration.md) |
+| Check delivery counts by episode | [Delivery statistics](delivery_statistics.md) |
+| Check the status after an error or interruption | [Troubleshooting](troubleshooting.md) |
+| Back up management files or restore them on another device | [Backup and restore](workspace_backup.md) |
+| Update the delivery server | [Service maintenance](maintenance.md) |
+| Use a custom domain | [Custom domains](custom_domains.md) |
+| Ask an AI agent to manage a podcast | [Managing a podcast with an agent](agent_usage.md) |
 
-## 用語
+## Terms
 
-| 用語 | 意味 |
+| Term | Meaning |
 | --- | --- |
-| サービス | Cloudflare上に作成する配信環境。一つのサービスで複数の番組を管理できます |
-| Show | 番組。番組ごとにRSSとエピソードを持ちます |
-| Episode | エピソード。音声と、タイトル・説明・公開日時などの情報を持ちます |
-| ワークスペース | 設定、管理キー、番組の編集ファイルを保存する手元のフォルダ |
-| リビジョン | 公開時に保存される内容の版。変更履歴の確認や過去版への復元に使います |
+| Service | A delivery environment created on Cloudflare. One service can manage multiple shows. |
+| Show | A podcast, with its own RSS feed and episodes. |
+| Episode | An audio recording and its metadata, including a title, description, and publication date. |
+| Workspace | The local folder containing configuration, administrator keys, and editable show files. |
+| Revision | A version of content saved at publication, used to review history and restore previous versions. |
 
-## 管理ファイルの扱い
+## Managing your files
 
-ワークスペースには、サービス設定の `castloop.toml`、番組ごとのフォルダ、管理キーを含む `.castloop/` が保存されます。これらと音声の原本を保管し、定期的に[バックアップ](workspace_backup.md)を作成してください。`.castloop/` は秘密情報として扱い、Gitや共有先への公開を避けてください。
+The workspace contains the service configuration in `castloop.toml`, a folder for each show, and `.castloop/`, which contains administrator keys. Keep these files and your original audio, and create regular [backups](workspace_backup.md). Treat `.castloop/` as confidential and keep it out of Git and shared locations.
 
-操作は一つずつ実行し、コマンドが終了してから次の編集や操作へ進みます。
+Run operations one at a time, and wait for each command to finish before making further edits or running another operation.
 
-コマンドの引数を調べるには、`castloop help コマンド名` を実行してください。
+To check a command's arguments, run `castloop help COMMAND`.
 
-## 関連資料
+## Related documentation
 
-- [v0.8.2リリースノート](release-v0.8.2.md)
-- [開発・リリース担当者向け資料](development/README.md)
-- [設計文書](../design/README.md)
-- [過去の資料](archive/README.md)
+- [v0.8.3 release notes](release-v0.8.3.md)
+- [Development and release documentation](development/README.md)
+- [Design documentation](../design/README.md) (Japanese)
+- [Archived documents](archive/README.md)

@@ -1,112 +1,112 @@
-# 予約公開
+# Scheduling publication
 
-番組やエピソードの内容を、指定した日時に公開できます。公開するファイルを準備し、日時と内容をプレビューしてから予約します。
+You can publish show or episode content at a specified date and time. Prepare the files, then preview the content and time before creating the schedule.
 
-以下の日時は例です。実行時には、希望する未来の日時に置き換えてください。
+The dates below are examples. Replace them with the future dates you want to use.
 
-## 任意の管理用設定
+## Optional administrator settings
 
-日本時間で予約を入力する場合は、ワークスペース直下に `castloop-admin.toml` を作成します。
+To enter scheduled times in Japan time, create `castloop-admin.toml` at the root of the workspace:
 
 ```toml
 schema_version = 1
 timezone = "Asia/Tokyo"
 ```
 
-この設定を使うと、時差の記載がない日時を日本時間として扱います。既定はUTCです。コマンドごとに指定する場合は `--timezone Asia/Tokyo` を使えます。
+With this setting, dates without an offset are interpreted in Japan time. The default is UTC. To specify the time zone per command, use `--timezone Asia/Tokyo`.
 
-## 1. 公開する内容と日時を確認する
+## 1. Review the content and time
 
-[通常の公開](publishing.md)と同じようにTOMLと素材を準備します。エピソードを初めて公開する場合はMP3を用意し、親の番組を公開しておきます。
+Prepare the TOML and assets as you would for [normal publication](publishing.md). For a new episode, prepare an MP3 and publish the parent show first.
 
-次の例は、エピソード `first` を日本時間の2026年12月1日9時に公開する予約です。
+This example schedules episode `first` for 9:00 on December 1, 2026, in Japan time:
 
 ```sh
 castloop preview-episode-schedule first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --json
 ```
 
-プレビューで内容、素材、現地日時、UTCでの日時を確認し、`approval_sha256` をコピーします。公開済み音声を使う更新では、MP3の指定を省略できます。
+Review the content, assets, local time, and UTC time in the preview, and copy `approval_sha256`. For an update using already published audio, you can omit the MP3 path.
 
-日時の解釈だけを先に確認したい場合は、次を実行してください。
+To check how a date and time will be interpreted first, run:
 
 ```sh
 castloop preview-schedule-time 2026-12-01T09:00:00 --workspace /path/to/workspace --timezone Asia/Tokyo --json
 ```
 
-## 2. 予約する
+## 2. Create the schedule
 
-確認した `approval_sha256` を `REVIEWED_HASH` に入れます。内容、素材、日時はプレビュー時と同じ値を指定してください。
+Replace `REVIEWED_HASH` with the reviewed `approval_sha256`. Specify the same content, assets, and time as in the preview:
 
 ```sh
 castloop schedule-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --expect-preview REVIEWED_HASH --json
 ```
 
-結果の予約ID（`schedule_id`）を控えます。予約にはこの時点の内容が保存されます。予約後にTOMLを編集しても、予約済みの内容はそのままです。
+Save the schedule ID (`schedule_id`) from the result. The schedule saves the content as it was at this point; later edits to the TOML do not change it.
 
-番組情報を予約する場合も、プレビューしてから実行します。番組のプレビューで得た `approval_sha256` を使ってください。
+To schedule show information, also preview before scheduling and use the show's `approval_sha256`:
 
 ```sh
 castloop preview-show-schedule my-show --workspace /path/to/workspace --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --json
 castloop schedule-show my-show --workspace /path/to/workspace --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --expect-preview REVIEWED_HASH --json
 ```
 
-## 3. 実行結果を確認する
+## 3. Check the result
 
 ```sh
 castloop schedule-list my-show --workspace /path/to/workspace --json
 castloop schedule-status my-show SCHEDULE_UUID --workspace /path/to/workspace --json
 ```
 
-`SCHEDULE_UUID` は予約IDに置き換えます。
+Replace `SCHEDULE_UUID` with the schedule ID.
 
-| 状態 | 意味・操作 |
+| Status | Meaning and action |
 | --- | --- |
-| `scheduled` | 予約済み。指定日時以降にサーバーが公開を実行します |
-| `dispatched` | 公開済み。`revision_id` と番組サイトで内容を確認します |
-| `needs_approval` | 設定や公開内容の変更により、再確認が必要です。下の再承認手順へ進みます |
+| `scheduled` | Scheduled. The server will publish at or after the specified time. |
+| `dispatched` | Published. Check the `revision_id` and the show website. |
+| `needs_approval` | A configuration or publication change requires another review. Follow the reapproval procedure below. |
 
-予約後の処理はサーバーが行います。予定時刻を過ぎたら、`schedule-status` で結果を確認してください。
+The server handles the schedule after creation. Once the scheduled time has passed, check the result with `schedule-status`.
 
-## 予約日時を変更する
+## Change a scheduled time
 
-1. プレビューで現在の予約と新しい日時を確認します。
-2. 出力の `schedule.version` を `N`、`approval_sha256` を `REVIEWED_HASH` に入れて実行します。
+1. Preview the current schedule and the new time.
+2. Replace `N` with `schedule.version` and `REVIEWED_HASH` with `approval_sha256` from the preview, then run the change.
 
 ```sh
 castloop preview-schedule-reschedule my-show SCHEDULE_UUID --workspace /path/to/workspace --at 2026-12-02T09:00:00 --timezone Asia/Tokyo --json
 castloop schedule-reschedule my-show SCHEDULE_UUID --workspace /path/to/workspace --at 2026-12-02T09:00:00 --timezone Asia/Tokyo --expect-version N --expect-preview REVIEWED_HASH --json
 ```
 
-## 予約を取り消す
+## Cancel a schedule
 
-プレビューで対象を確認し、同様に版番号とハッシュを使って取り消します。
+Review the target in the preview, then cancel using its version and hash:
 
 ```sh
 castloop preview-schedule-cancel my-show SCHEDULE_UUID --workspace /path/to/workspace --json
 castloop schedule-cancel my-show SCHEDULE_UUID --workspace /path/to/workspace --expect-version N --expect-preview REVIEWED_HASH --json
 ```
 
-## 再確認が必要な予約を承認する
+## Reapprove a schedule
 
-独自ドメインや公開内容を変更すると、予約が `needs_approval` になることがあります。
+Changing a custom domain or published content can put a schedule in `needs_approval`.
 
-1. `schedule-status` で理由と現在の `schedule.version` を確認します。
-2. その版番号を `N` に入れ、今後の実行日時を指定してプレビューします。
-3. 保存されている内容と日時を確認し、`approval_sha256` を使って再承認します。
+1. Check the reason and current `schedule.version` with `schedule-status`.
+2. Replace `N` with that version and preview a future execution time.
+3. Review the saved content and time, then reapprove using `approval_sha256`.
 
 ```sh
 castloop preview-schedule-reapprove my-show SCHEDULE_UUID --workspace /path/to/workspace --at 2026-12-02T09:00:00 --timezone Asia/Tokyo --expect-version N --json
 castloop schedule-reapprove my-show SCHEDULE_UUID --workspace /path/to/workspace --at 2026-12-02T09:00:00 --timezone Asia/Tokyo --expect-version N --expect-preview REVIEWED_HASH --json
 ```
 
-再承認では、予約に保存されている内容を使います。内容も変更したい場合は、元の予約を取り消してから、編集した内容で予約し直してください。
+Reapproval uses the content saved in the schedule. To change the content as well, cancel the original schedule and create a new one with the edited content.
 
-## 日時を入力するときのポイント
+## Entering dates and times
 
-- `2026-12-01T09:00:00` のように、日付と時刻を `T` でつなぎます。
-- `2026-12-01T09:00:00+09:00` のように時差を書くこともできます。`--timezone` も指定する場合は、その地域の時差と合わせます。
-- 夏時間の切り替わりで同じ時刻が2回ある場合は、意図する時差も指定します。
-- エピソードの `published_at` はRSSに記載する日時です。公開を開始する日時は `--at` で指定します。
-- 未来の `published_at` を付けて今すぐ公開したい場合は、通常の公開で確認に答えます。`--json` で実行する場合は `--allow-future-published-at` を付けます。
+- Join the date and time with `T`, as in `2026-12-01T09:00:00`.
+- You can include an offset, as in `2026-12-01T09:00:00+09:00`. If you also specify `--timezone`, the offset must match that time zone.
+- When a daylight saving transition makes a local time occur twice, specify the intended offset as well.
+- An episode's `published_at` is the date shown in RSS. Use `--at` for the time publication should begin.
+- To publish immediately with a future `published_at`, answer the confirmation during normal publication. With `--json`, add `--allow-future-published-at`.
 
-番組サイトの日付表示は、[サイトのタイムゾーン](show_website.md#公開日表示のタイムゾーン)で設定します。
+Set the show website's date display separately using the [website time zone](show_website.md#publication-date-time-zone).

@@ -1,69 +1,69 @@
-# 番組・エピソードの公開と更新
+# Publishing and updating shows and episodes
 
-公開済みの番組やエピソードは、手元のファイルを編集し、プレビューしてから公開します。新しい番組やエピソードの作成は[初回公開の手順](getting_started.md)を参照してください。
+To update a published show or episode, edit your local files, preview the changes, and publish. To create a new show or episode, see [publishing for the first time](getting_started.md).
 
-このページでは、ワークスペースを `/path/to/workspace`、番組IDを `my-show`、エピソードIDを `first` とします。
+The examples use `/path/to/workspace` as the workspace, `my-show` as the show ID, and `first` as the episode ID.
 
-## 1. ファイルを編集する
+## 1. Edit the files
 
-| 変更する内容 | 編集するもの |
+| Change | What to edit |
 | --- | --- |
-| 番組名・説明・サイト設定 | `my-show/show.toml` |
-| 番組のカバー | `show.toml` の `image_path` で指定した画像 |
-| エピソードのタイトル・説明 | `my-show/episode-first.toml` |
-| エピソードの音声 | 新しいMP3ファイルを用意 |
+| Show name, description, or website settings | `my-show/show.toml` |
+| Show cover | The image specified by `image_path` in `show.toml` |
+| Episode title or description | `my-show/episode-first.toml` |
+| Episode audio | Prepare a new MP3 file |
 
-公開済みエピソードのGUIDと公開日時は、保存されている値を使います。カバーを差し替える場合は、現在と同じ拡張子の画像を用意してください。
+For a published episode, use its saved GUID and publication date. When replacing the cover, use an image with the same extension as the current one.
 
-素材の上限は、MP3が300,000,000バイト、JPEG・PNGのカバーが5,000,000バイトです。
+The size limit is 300,000,000 bytes for MP3 audio and 5,000,000 bytes for a JPEG or PNG cover.
 
-## 2. 変更を確認して公開する
+## 2. Review and publish changes
 
-次の例から、変更する内容に合ったものを選びます。まずプレビューだけを実行し、差分と素材を確認してください。
+Choose the example that matches your change. First run the preview alone and review the differences and assets.
 
-確認後、プレビュー結果の `input_fingerprint` をコピーし、公開コマンドの `REVIEWED_HASH` に入れます。
+After review, copy `input_fingerprint` from the preview result and use it as `REVIEWED_HASH` in the publish command.
 
-### 番組情報・カバーを更新する
+### Update show information or cover
 
 ```sh
 castloop preview-show my-show --workspace /path/to/workspace --remote --json
 castloop publish-show my-show --workspace /path/to/workspace --expect-preview REVIEWED_HASH --json
 ```
 
-### エピソードのタイトル・説明を更新する
+### Update an episode title or description
 
-公開済み音声を使って、編集した情報を反映します。
+Publish the edited information using the already published audio:
 
 ```sh
 castloop preview-episode first --workspace /path/to/workspace --show my-show --remote --json
 castloop publish-episode first --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
-### エピソードの音声を差し替える
+### Replace episode audio
 
-新しいMP3を絶対パスで指定します。
+Specify the new MP3 with an absolute path:
 
 ```sh
 castloop preview-episode first /path/to/new.mp3 --workspace /path/to/workspace --show my-show --remote --json
 castloop publish-episode first /path/to/new.mp3 --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
-プレビュー後にファイルを編集した場合は、もう一度プレビューして新しいハッシュを使ってください。
+If you edit a file after previewing, preview again and use the new hash.
 
-## 3. 結果を確認する
+## 3. Check the result
 
-公開結果の `changed` は更新完了、`unchanged` は同じ内容が公開済みであることを表します。どちらも `revision_id` で保存された版を確認できます。
+In the publication result, `changed` means the update was applied; `unchanged` means the same content was already published. In either case, `revision_id` identifies the saved revision.
 
 ```sh
 castloop verify my-show --episode first --workspace /path/to/workspace --json
 ```
 
-番組サイトでも、変更箇所や音声を確認してください。
+Also check the changes and audio on the show website.
 
-エラーや通信切断で結果が分からない場合は、[中断後の確認手順](troubleshooting.md#操作が中断した場合)へ進みます。
+If an error or disconnection leaves the result unclear, follow [the interruption checks](troubleshooting.md#when-an-operation-is-interrupted).
 
-## 関連する操作
+## Related operations
 
-- [日時を指定して公開する](scheduling.md)：`published_at` はRSSに載せる日時です。公開する時刻は予約で指定します。
-- [差分・RSS・過去版を確認する](published_content_review.md)
-- [非公開にする・公開を戻す](lifecycle.md)
+- [Schedule publication](scheduling.md): `published_at` is the date included in the RSS feed; the schedule determines when publication happens.
+- [Review differences, RSS, and earlier revisions](published_content_review.md)
+- [Unpublish or restore content](lifecycle.md)

@@ -4,7 +4,7 @@
 
 | 系列 | リリースノート |
 | --- | --- |
-| v0.8 | [0.8.1](release-v0.8.1.md)、[0.8.0](release-v0.8.0.md) |
+| v0.8 | [0.8.2](release-v0.8.2.md)、[0.8.1](release-v0.8.1.md)、[0.8.0](release-v0.8.0.md) |
 | v0.7 | [0.7.6](release-v0.7.6.md)、[0.7.5](release-v0.7.5.md)、[0.7.4](release-v0.7.4.md)、[0.7.3](release-v0.7.3.md)、[0.7.2](release-v0.7.2.md)、[0.7.1](release-v0.7.1.md)、[0.7.0](release-v0.7.0.md) |
 | v0.6 | [0.6.2](release-v0.6.2.md)、[0.6.1](release-v0.6.1.md)、[0.6.0](release-v0.6.0.md) |
 | v0.5 | [0.5.2](release-v0.5.2.md)、[0.5.1](release-v0.5.1.md)、[0.5.0](release-v0.5.0.md) |
@@ -13,4 +13,4 @@
 | v0.2 | [0.2.1](release-v0.2.1.md)、[0.2.0](release-v0.2.0.md) |
 | v0.1 | [0.1.2](release-v0.1.2.md)、[0.1.1](release-v0.1.1.md)、[0.1.0](release-v0.1.0.md) |
 
-当時の実装と操作資料は、各版の [GitHub Release](https://github.com/simosako/castloop-v2/releases) とGitタグから確認できます。最新の [v0.8.2ノート](../../release-v0.8.2.md) は別に維持しています。
+当時の実装と操作資料は、各版の [GitHub Release](https://github.com/simosako/castloop-v2/releases) とGitタグから確認できます。最新の [v0.8.3ノート](../../release-v0.8.3.md) は別に維持しています。

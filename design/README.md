@@ -47,8 +47,8 @@
 
 ## 関連資料
 
-- [開発・CI・リリース](../docs/development/README.md)
+- [開発・CI・リリース](../docs/development/README_ja.md)
 - [エージェントの作業規則](../AGENTS.md)
 - [過去の設計・検証記録](archive/README.md)
 
-この設計ガイドはv0.8.2の実装を対象としています。形式の版番号は[スキーマ](data/schemas.md)にまとめています。
+この設計ガイドはv0.8.3の実装を対象としています。形式の版番号は[スキーマ](data/schemas.md)にまとめています。

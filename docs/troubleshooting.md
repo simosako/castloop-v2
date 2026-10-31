@@ -1,76 +1,76 @@
-# 状態確認とトラブルシューティング
+# Status checks and troubleshooting
 
-コマンドが失敗したときや、公開結果が分からないときは、設定、サーバー、公開URLの順に確認します。
+If a command fails or a publication result is unclear, check the local configuration, server, and public URLs in that order.
 
-以下はワークスペースを `/path/to/workspace`、番組IDを `my-show` とした例です。
+The examples use `/path/to/workspace` as the workspace and `my-show` as the show ID.
 
-## 1. 手元の設定を確認する
+## 1. Check local configuration
 
 ```sh
 castloop doctor --local --workspace /path/to/workspace --json
 ```
 
-設定ファイルや管理キーの読み取り結果を確認します。問題が表示された項目から、パスや設定内容を見直してください。
+Review the results for configuration files and administrator keys. For any reported problem, check the relevant path or configuration.
 
-## 2. サービスと番組の状態を確認する
+## 2. Check service and show status
 
 ```sh
 castloop service-status --workspace /path/to/workspace --json
 castloop show-status my-show --workspace /path/to/workspace --json
 ```
 
-対象サービスと番組が正しいか、`publication_ready` が `true` かを確認します。
+Check that the service and show are correct and that `publication_ready` is `true`.
 
 ## diagnose
 
-まとめて診断したい場合は、次を実行します。
+To run a combined diagnosis:
 
 ```sh
 castloop diagnose my-show --workspace /path/to/workspace --json
 ```
 
-設定、認証情報、Cloudflareへの接続、番組の登録・公開内容を確認できます。公開URLも調べる場合は `--external` を付けます。
+This checks configuration, credentials, Cloudflare connectivity, and show registration and publication. Add `--external` to check public URLs too.
 
-各項目の `pass` は確認済み、`warn` は注意、`fail` は失敗、`not_checked` は未確認を表します。`fail` になった項目の説明を読んで対処してください。
+For each item, `pass` means the check passed, `warn` indicates a warning, `fail` indicates failure, and `not_checked` means it was not checked. Read the descriptions of failed checks and address them.
 
 ## verify
 
-公開後の配信を確認するには、次を実行します。
+To verify delivery after publication:
 
 ```sh
 castloop verify my-show --episode first --workspace /path/to/workspace --json
 ```
 
-サーバーに保存された内容と、公開RSS・カバー・指定した音声の配信を照合します。RSSとカバーを確認するときは `--episode first` を省略できます。
+This compares server content with delivery of the public RSS feed, cover, and specified audio. To check the RSS feed and cover alone, omit `--episode first`.
 
-アクセス保護を設定している場合は、閲覧を許可されたアカウントでブラウザからも確認してください。
+If access protection is enabled, also check in a browser using an authorized account.
 
-## 操作が中断した場合
+## When an operation is interrupted
 
-実行していたコマンドが終了していることを確認します。ワークスペース、入力ファイル、素材、`.castloop/` を保管したまま、次の表に沿って進めてください。
+Make sure the command has finished. Keep the workspace, input files, assets, and `.castloop/`, then follow the appropriate row:
 
-| 中断した操作 | 確認・続行の方法 |
+| Interrupted operation | How to check and continue |
 | --- | --- |
-| 公開・更新 | プレビューと履歴で現在内容を確認し、同じ確認済み入力で再実行します。更新元が変わっていたら、差分を再確認します |
-| 非公開化・過去版の採用 | 現在状態を確認し、保存した計画を実行します。計画が古い場合は新しく作成して確認します |
-| 予約作成 | `schedule-list` と `schedule-status` で受付済みかを確認してから、必要な操作を選びます |
-| 初期化 | 元の保存先で `castloop init /path/to/workspace` を実行し、保存されている入力で続行します |
-| 番組作成 | 元のワークスペースで、同じ番組ID・設定の `create-show` を再実行します |
-| サーバー更新 | 現在状態を確認し、同じ設定で `deploy` を再実行します。[保守手順](maintenance.md)を参照してください |
-| 独自ドメインの変更 | [操作IDを使って状態を確認し、続行](custom_domains.md#照会と中断後の継続)します |
-| RSS取り込み | [同じ保存先・入力で続行](rss_migration.md#停止した場合)します |
+| Publication or update | Check current content using the preview and history, then rerun with the same reviewed inputs. If the base revision has changed, review the differences again. |
+| Unpublishing or restoring a revision | Check the current state and execute the saved plan. If the plan is stale, create and review a new one. |
+| Creating a schedule | Check `schedule-list` and `schedule-status` to see whether it was accepted, then choose the appropriate operation. |
+| Initialization | Run `castloop init /path/to/workspace` at the original destination and continue with the saved inputs. |
+| Creating a show | Rerun `create-show` in the original workspace with the same show ID and settings. |
+| Server update | Check the current state and rerun `deploy` with the same settings. See [Service maintenance](maintenance.md). |
+| Custom domain change | [Check and continue using the operation ID](custom_domains.md#checking-and-continuing-an-interrupted-operation). |
+| RSS import | [Continue with the same destination and inputs](rss_migration.md#if-the-operation-stops). |
 
-公開結果の `unchanged` は、同じ内容が既に反映されていることを示します。予約については、`schedule-status` が `dispatched` になり、`revision_id` が表示されたら公開完了です。
+A publication result of `unchanged` means the same content is already applied. A scheduled publication is complete when `schedule-status` reports `dispatched` and displays a `revision_id`.
 
-## 公開URLでエラーになる場合
+## Errors at a public URL
 
-| 表示・状態 | 確認すること |
+| Result | What to check |
 | --- | --- |
-| 404 | URLと、番組・エピソードの公開状態を確認します。再公開する場合は[公開の復元](lifecycle.md)へ進みます |
-| 503 | `service-status` と、実行中のドメイン変更の状態を確認します |
-| 認証画面やアクセス拒否 | アクセス保護の対象URLと、閲覧を許可されたアカウントを確認します |
-| 更新内容が分からない | プレビューでサーバーの現在内容を確認し、`verify` で公開URLと照合します |
+| 404 | Check the URL and whether the show or episode is published. To republish, see [Restoring content](lifecycle.md). |
+| 503 | Check `service-status` and the status of any domain change in progress. |
+| Authentication screen or access denied | Check the URLs covered by access protection and the authorized account. |
+| Unclear whether changes were applied | Preview the current server content and compare it with public URLs using `verify`. |
 
-## 問い合わせる前に
+## Before asking for help
 
-CLIのバージョン、実行したコマンド、エラーコード、診断で失敗した項目を整理します。APIトークン、管理キー、`.castloop/` の内容、未公開の文章や個人の連絡先は伏せて共有してください。
+Collect the CLI version, command, error code, and any failed diagnostic checks. Keep API tokens, administrator keys, `.castloop/` contents, unpublished text, and personal contact information private when sharing details.
