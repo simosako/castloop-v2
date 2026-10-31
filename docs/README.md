@@ -46,7 +46,7 @@ castloopは、Cloudflare上でPodcastを配信するためのツールです。�
 
 ## 関連資料
 
-- [v0.8.1リリースノート](release-v0.8.1.md)
+- [v0.8.2リリースノート](release-v0.8.2.md)
 - [開発・リリース担当者向け資料](development/README.md)
 - [設計文書](../design/README.md)
 - [過去の資料](archive/README.md)

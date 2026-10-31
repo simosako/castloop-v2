@@ -5,7 +5,7 @@
 
 Serverless podcast hosting on Cloudflare, managed with a standalone CLI: one private R2 bucket and one Worker per service, multiple Shows.
 
-**Early beta.** Commands and persisted formats can change incompatibly. v0.8.1 requires fresh services with internal queue/content formats **14/13**; older services are not migrated or adopted. Native performance, full Free-plan compatibility and broad production behavior remain unverified. See the [release notes](docs/release-v0.8.1.md) for compatibility and the limited live-verification scope.
+**Early beta.** Commands and persisted formats can change incompatibly. v0.8.2 requires fresh services with internal queue/content formats **14/13**; older services are not migrated or adopted. Native performance, full Free-plan compatibility and broad production behavior remain unverified. See the [release notes](docs/release-v0.8.2.md) for compatibility and the limited live-verification scope.
 
 The CLI validates local TOML/media, places content-addressed media in private R2, and explicitly sends metadata plus media references to the target Show DO. After validation and required cache purges, one SQLite transaction commits content, revisions and delivery generations. Each Show has independent SQLite state; a small control DO tracks Show registration, catalog listing and custom domain state. No Cloudflare Queues or D1 are used.
 
@@ -57,7 +57,7 @@ See `castloop help COMMAND` for the syntax supported by your installed version.
 - [CONTRIBUTING.md](CONTRIBUTING.md): source setup, tests and contribution rules.
 - [Current design](design/README.md): architecture, components, storage, tables and schemas.
 - [Development and release maintenance](docs/development/README.md): builds, CI and distribution.
-- [Changelog](CHANGELOG.md), [current release](docs/release-v0.8.1.md) and [archived user documents](docs/archive/README.md): version-specific history, not current operating instructions.
+- [Changelog](CHANGELOG.md), [current release](docs/release-v0.8.2.md) and [archived user documents](docs/archive/README.md): version-specific history, not current operating instructions.
 
 ## Disclaimer and contribution
 
