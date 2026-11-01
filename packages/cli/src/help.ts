@@ -49,6 +49,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Create a fresh SQLite service (schema_version=2) by default; no protocol option is required.\n" +
       "--publication-protocol sqlite-sequential-v1 is optional; no other protocol is supported.\n" +
       "Missing values are prompted on a terminal. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
+      "The service ID is a lowercase slug of at most 20 characters; it prefixes the Worker and R2 bucket names.\n" +
       "Creates a private R2 bucket, Worker and SQLite-backed Durable Object without Queues.\n" +
       "Verifies current state; after interruption run init on the same directory with saved inputs, without repeating fresh-creation flags.\n" +
       "Existing resources are never adopted. Service schema_version=1 requires v0.5.x; migration is not provided.",

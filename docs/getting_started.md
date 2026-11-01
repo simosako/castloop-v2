@@ -83,16 +83,17 @@ castloop create-episode first --workspace /path/to/workspace --show my-show
 
 Open `my-show/episode-first.toml` and enter a title and description. Keep the generated GUID (the episode identifier) and check the publication date.
 
-Prepare an MP3 no larger than 300,000,000 bytes and preview the episode. An absolute path makes the audio file location clear.
+Prepare an MP3 no larger than 300,000,000 bytes, copy it into the show directory, and preview the episode. Episode commands resolve the MP3 path relative to the show directory, so pass the file name alone; absolute paths are not supported.
 
 ```sh
-castloop preview-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --remote --json
+cp /path/to/audio.mp3 /path/to/workspace/my-show/
+castloop preview-episode first audio.mp3 --workspace /path/to/workspace --show my-show --remote --json
 ```
 
 Review the content and audio, then publish using the resulting `input_fingerprint`:
 
 ```sh
-castloop publish-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
+castloop publish-episode first audio.mp3 --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
 To publish at a specified time, use [scheduled publication](scheduling.md) instead of the publish command.

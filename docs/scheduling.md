@@ -17,12 +17,12 @@ With this setting, dates without an offset are interpreted in Japan time. The de
 
 ## 1. Review the content and time
 
-Prepare the TOML and assets as you would for [normal publication](publishing.md). For a new episode, prepare an MP3 and publish the parent show first.
+Prepare the TOML and assets as you would for [normal publication](publishing.md). For a new episode, prepare an MP3, copy it into the show directory, and publish the parent show first. Episode commands resolve the MP3 path relative to the show directory; pass the file name alone.
 
 This example schedules episode `first` for 9:00 on December 1, 2026, in Japan time:
 
 ```sh
-castloop preview-episode-schedule first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --json
+castloop preview-episode-schedule first audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --json
 ```
 
 Review the content, assets, local time, and UTC time in the preview, and copy `approval_sha256`. For an update using already published audio, you can omit the MP3 path.
@@ -38,7 +38,7 @@ castloop preview-schedule-time 2026-12-01T09:00:00 --workspace /path/to/workspac
 Replace `REVIEWED_HASH` with the reviewed `approval_sha256`. Specify the same content, assets, and time as in the preview:
 
 ```sh
-castloop schedule-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --expect-preview REVIEWED_HASH --json
+castloop schedule-episode first audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --expect-preview REVIEWED_HASH --json
 ```
 
 Save the schedule ID (`schedule_id`) from the result. The schedule saves the content as it was at this point; later edits to the TOML do not change it.

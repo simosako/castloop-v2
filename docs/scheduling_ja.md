@@ -17,12 +17,12 @@ timezone = "Asia/Tokyo"
 
 ## 1. 公開する内容と日時を確認する
 
-[通常の公開](publishing_ja.md)と同じようにTOMLと素材を準備します。エピソードを初めて公開する場合はMP3を用意し、親の番組を公開しておきます。
+[通常の公開](publishing_ja.md)と同じようにTOMLと素材を準備します。エピソードを初めて公開する場合はMP3を用意して番組ディレクトリにコピーし、親の番組を公開しておきます。音声のパスは番組ディレクトリからの相対で解決されるため、ファイル名だけを指定します。
 
 次の例は、エピソード `first` を日本時間の2026年12月1日9時に公開する予約です。
 
 ```sh
-castloop preview-episode-schedule first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --json
+castloop preview-episode-schedule first audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --json
 ```
 
 プレビューで内容、素材、現地日時、UTCでの日時を確認し、`approval_sha256` をコピーします。公開済み音声を使う更新では、MP3の指定を省略できます。
@@ -38,7 +38,7 @@ castloop preview-schedule-time 2026-12-01T09:00:00 --workspace /path/to/workspac
 確認した `approval_sha256` を `REVIEWED_HASH` に入れます。内容、素材、日時はプレビュー時と同じ値を指定してください。
 
 ```sh
-castloop schedule-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --expect-preview REVIEWED_HASH --json
+castloop schedule-episode first audio.mp3 --workspace /path/to/workspace --show my-show --at 2026-12-01T09:00:00 --timezone Asia/Tokyo --expect-preview REVIEWED_HASH --json
 ```
 
 結果の予約ID（`schedule_id`）を控えます。予約にはこの時点の内容が保存されます。予約後にTOMLを編集しても、予約済みの内容はそのままです。
