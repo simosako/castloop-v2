@@ -29,6 +29,7 @@ test("fresh initialization provisions only R2/Worker/SQLite and finishes immedia
   expect(value.calls).toContainEqual({ method: "GET", path: `/workers/scripts/${value.config.worker_name}/versions/${state.receipt!.worker_version_id}` });
   const metadata = value.metadata()!;
   expect(metadata.exports).toMatchObject({ default: { cache: { enabled: false } }, SqliteCachedAssets: { cache: { enabled: true } },
+    SqliteCachedDecisions: { cache: { enabled: true } },
     SqlitePublicationService: { type: "durable-object", storage: "sqlite" } });
   const source = readFileSync(join(value.root, ".castloop", "sqlite-initializations", value.config.service_id, "initialize.json"), "utf8");
   expect(source).not.toContain("private-token"); expect(source).not.toContain("CASTLOOP_ADMIN_KEY"); expect(source).not.toContain("worker source");

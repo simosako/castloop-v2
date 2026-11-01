@@ -1,6 +1,6 @@
 # 公開配信とキャッシュの設計
 
-公開配信は、配信可否を判定する処理と、本文を取得・生成する処理に分かれます。Workerが要求を受け、Show DOの公開状態を確認してから、キャッシュ用エントリポイントを呼び出します。音声・画像は非公開R2、RSS・HTMLはShow DOのデータから取得します。
+公開配信は、配信可否を判定する処理と、本文を取得・生成する処理に分かれます。Workerが要求を受け、判定用キャッシュを通してShow DOの公開状態を確認してから、キャッシュ用エントリポイントを呼び出します。音声・画像は非公開R2、RSS・HTMLはShow DOのデータから取得します。
 
 ## 公開ルート
 
@@ -18,8 +18,8 @@ GETとHEADに対応します。サイトのルートは `site_mode = "builtin"` 
 ## 要求から本文取得まで
 
 1. Workerがオリジン、パス、HTTPメソッドを確認します。
-2. パスのShow IDに対応するShow DOへ問い合わせます。
-3. Show DOが公開状態と対象の存在を確認し、素材参照や世代番号を返します。
+2. Workerが `SqliteCachedDecisions`（判定用キャッシュ）にパスを渡します。キャッシュに判定があれば、Show DOを呼ばずに済みます。
+3. 判定がなければ、判定用エントリポイントがパスのShow IDに対応するShow DOへ問い合わせます。Show DOが公開状態と対象の存在を確認し、素材参照や世代番号を返します。判定は200応答のみがキャッシュに載り、404・410・503はキャッシュしません。
 4. Workerがその情報を使い、`SqliteCachedAssets` または `SiteCachedPages` を呼び出します。
 5. キャッシュに本文がなければ、R2から取得するか、SQLiteのデータから生成します。
 
@@ -43,6 +43,8 @@ GETとHEADに対応します。サイトのルートは `site_mode = "builtin"` 
 ## キャッシュの構成
 
 Workerの標準エントリポイントで配信可否を判定し、`ctx.exports` 経由でキャッシュ用エントリポイントを呼びます。キャッシュはそのエントリポイントで有効にし、Worker版をまたぐ共有は無効にします。
+
+判定用の `SqliteCachedDecisions` は、Show DOの判定結果（公開可否・R2キー・キャッシュ属性）自体をキャッシュします。キャッシュキーはエントリポイントとパスです。ヒット時は判定コードもShow DOも実行されないため、Feed・カバー・サイトHTMLの要求はShow DOに到達せず、音声も統計記録の1要求のみが残ります。判定応答のキャッシュタグは対応する本文キャッシュと同一（Feed・カバー・音声は `show-` と各識別タグ、サイトは `site-` 系タグ）にし、保持期間は300秒です。このTTLはパージが失われた場合の伝播上限でしかなく、正しさは後述の消去順序が保証します。
 
 | 対象 | キャッシュの識別に使う属性 |
 | --- | --- |
@@ -86,7 +88,7 @@ HTMLはサーバー側で生成します。説明文は、表示に使うリン�
 
 ## 更新時のキャッシュ消去
 
-公開内容の確定前に、変更対象に応じてFeed、カバー、Episode音声、サイト一覧・個別ページのキャッシュを消去します。タグとパス接頭辞を使い、ドメイン変更ではShow全体を対象にします。
+公開内容の確定前に、変更対象に応じてFeed、カバー、Episode音声、サイト一覧・個別ページのキャッシュを消去します。タグとパス接頭辞を使い、ドメイン変更ではShow全体を対象にします。判定キャッシュ（`SqliteCachedDecisions`）は本文キャッシュより先に、対応する本文キャッシュと同じタグで消去します。判定が残っていると消去済みの本文が再取得されて配信が続くためです。
 
 キャッシュAPIから明示的なレート制限応答が返った場合は、12秒間隔で最大6回試行します。その他のエラーは失敗として返します。必要な消去が完了してから、公開内容をSQLiteに確定します。
 
@@ -97,6 +99,7 @@ HTMLはサーバー側で生成します。説明文は、表示に使うリン�
 ## 実装と関連テスト
 
 - 要求の振り分け：[Worker](../../src/sqlite-worker.ts)、[公開Gateway](../../src/sqlite-gateway.ts)、[サイトGateway](../../src/site-gateway.ts)
+- 判定キャッシュ：[判定の配信とパージ](../../src/decision-cache.ts)
 - キャッシュ：[メディア・RSS](../../src/lifecycle-cache.ts)、[サイト](../../src/site-cache.ts)、[パージ](../../src/sqlite-cache-purge.ts)
 - 生成：[RSS](../../src/feed.ts)、[公開前の生成検証](../../src/publication-inputs.ts)、[サイト描画](../../src/site-renderer.ts)、[説明文整形](../../src/site-description.ts)
-- テスト：[Gateway](../../src/sqlite-gateway.test.ts)、[キャッシュ](../../src/lifecycle-cache.test.ts)、[生成配信](../../src/sqlite-generated-delivery.test.ts)、[サイトページング](../../src/sqlite-site-pagination.test.ts)、[パージ](../../src/sqlite-cache-purge.test.ts)
+- テスト：[Gateway](../../src/sqlite-gateway.test.ts)、[キャッシュ](../../src/lifecycle-cache.test.ts)、[判定キャッシュ](../../src/decision-cache.test.ts)、[生成配信](../../src/sqlite-generated-delivery.test.ts)、[サイトページング](../../src/sqlite-site-pagination.test.ts)、[パージ](../../src/sqlite-cache-purge.test.ts)

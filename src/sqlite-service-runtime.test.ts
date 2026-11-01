@@ -81,6 +81,7 @@ test("the native Worker bundle contains real DO and cache exports without Queue 
   expect(output.success).toBe(true); expect(output.outputs).toHaveLength(1);
   const source = await output.outputs[0].text();
   expect(source).toContain("SqlitePublicationService"); expect(source).toContain("SqliteCachedAssets");
+  expect(source).toContain("SqliteCachedDecisions");
   expect(source).not.toContain("queueM6Candidate");
   expect(source).not.toContain("queue-management-v1");
   expect(source).not.toContain("queue-commit-v1");
