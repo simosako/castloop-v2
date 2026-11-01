@@ -4,7 +4,7 @@
 
 人気Showで配信要求が増えたときに、Workers FreeのDOリクエスト上限（100,000/日）に到達して配信が止まる事態を避けるための検討。現行の配信経路と1要求あたりの消費はIssue #118にまとめたとおりで、音声1応答につきDOリクエスト2回（配信ゲートと統計記録）を消費するため、上限には音声約5万応答/日で到達する。
 
-本検討の案はいずれも、次の既存保証を維持することを前提とする（[配信とキャッシュ](components/delivery.md)）:
+本検討の案はいずれも、次の既存保証を維持することを前提とする（[配信とキャッシュ](../components/delivery.md)）:
 
 - 非公開化・削除済みShow/Episodeの即時拒否（404/410）。公開操作前のキャッシュ消去と、同期・アトミックな公開
 - Range・HEAD・304・412・416への対応
@@ -54,13 +54,13 @@ durationが問題になるのは次の場合に限られる:
 
 ## 案1: 配信ゲート判定をキャッシュする（第三のキャッシュエントリポイント）※実装済み
 
-実装は[判定キャッシュ](components/delivery.md)として設計に反映済み（エントポイント名 `SqliteCachedDecisions`、TTL 300秒、判定タグは本文キャッシュと同一、消去は判定→本文の順）。
+実装は[判定キャッシュ](../components/delivery.md)として設計に反映済み（エントポイント名 `SqliteCachedDecisions`、TTL 300秒、判定タグは本文キャッシュと同一、消去は判定→本文の順）。
 
 現行の「Worker標準エントリポイント→Show DO `delivery()`→`SqliteCachedAssets`」のうち、Show DOへの問い合わせ結果（公開可否・R2キー・`cache_props`のJSON）そのものを、`SqliteCachedAssets` / `SiteCachedPages` と同じWorkers Caching（エントポイント単位キャッシュ）に載せる。ゲートウェイはShow DOを直接呼ばず、`ctx.exports` 経由で判定用エントポイント（例: `SqliteCachedDecisions`）を呼ぶ。
 
 - キャッシュキーはエントポイント+パス。ヒット時はコードもDOも実行されない
 - 判定応答には既存と同じ `Cache-Tag`（`show-<id>` / `feed-<id>` / `episode-<id>/<ep>` / `cover-<id>` / site系）と短いTTL（例: 300秒）を付ける
-- 正しさの保証は現行の媒体キャッシュと同一: 公開操作はSQLite確定前にタグでパージしており（[パージ](components/delivery.md#更新時のキャッシュ消去)）、パージ失敗なら公開自体が失敗する。TTLはパージ漏れの際の伝播上限でしかない
+- 正しさの保証は現行の媒体キャッシュと同一: 公開操作はSQLite確定前にタグでパージしており（[パージ](../components/delivery.md#更新時のキャッシュ消去)）、パージ失敗なら公開自体が失敗する。TTLはパージ漏れの際の伝播上限でしかない
 
 **効果**: 音声 = 1 Workers req + **1 DO req（統計のみ）**。フィード・カバー・HTML = 1 Workers req + **0 DO req**。
 
@@ -156,7 +156,7 @@ Cloudflareの課金仕様では、RPCメソッド呼び出しの戻り値とし�
 
 ## 結果（2026-11-01時点）
 
-1. **案1を採用・実装済み**（PR #120、[実機検証](archive/issue118_decision_cache_live_trial_20261101.md)済み）。両モードで有効・保証を維持したままDO消費を音声1リクエスト/応答・フィード0リクエストに減らした
+1. **案1を採用・実装済み**（PR #120、[実機検証](issue118_decision_cache_live_trial_20261101.md)済み）。両モードで有効・保証を維持したままDO消費を音声1リクエスト/応答・フィード0リクエストに減らした
 2. **案2は不採用**。保持3ヶ月固定（有償でも延長不可）が運用要件を満たさない。統計はShow DO SQLiteを維持する
 3. **案4は [#122](https://github.com/simosako/castloop-v2/issues/122) に分離**。独自ドメイン運用でWorkersリクエスト10万/日の天井が実際に迫った段階で検討する。workers.dev運用の並行維持を前提に、統計後退と非公開化手順の変更を受け入れられるかで判断する
 4. 案3は案1と天井が同じで統計だけ失われるため、引き続き採用しない
@@ -170,4 +170,4 @@ Cloudflareの課金仕様では、RPCメソッド呼び出しの戻り値とし�
 - [R2 Public buckets（カスタムドメイン・r2.dev）](https://developers.cloudflare.com/r2/buckets/public-buckets/) / [R2とキャッシュ](https://developers.cloudflare.com/cache/interaction-cloudflare-products/r2/)
 - [キャッシュパージの全プラン開放](https://blog.cloudflare.com/instant-purge-for-all/) / [パージの制限](https://developers.cloudflare.com/cache/how-to/purge-cache/)
 - [Analytics Engine料金](https://developers.cloudflare.com/analytics/analytics-engine/pricing/) / [制限（保持3ヶ月）](https://developers.cloudflare.com/analytics/analytics-engine/limits/) / [サンプリングFAQ](https://developers.cloudflare.com/analytics/faq/wae-faqs/)
-- Issue [#118](https://github.com/simosako/castloop-v2/issues/118)、[配信とキャッシュ設計](components/delivery.md)、[Show DO設計](components/show-do.md)
+- Issue [#118](https://github.com/simosako/castloop-v2/issues/118)、[配信とキャッシュ設計](../components/delivery.md)、[Show DO設計](../components/show-do.md)

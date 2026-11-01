@@ -55,7 +55,7 @@ GraphQL Analytics（`workersInvocationsAdaptive`／`durableObjectsInvocationsAda
 
 ## 関連
 
-- 検討: [配信の無料枠スケーリング検討](../delivery-free-tier-scaling.md)
+- 検討: [配信の無料枠スケーリング検討](delivery-free-tier-scaling.md)
 - 設計: [公開配信とキャッシュの設計](../components/delivery.md)
 - 手順書: [実機試験手順書](../live-trial.md)
 - Issue: [#118](https://github.com/simosako/castloop-v2/issues/118)（継続検討のため未解決のまま）
