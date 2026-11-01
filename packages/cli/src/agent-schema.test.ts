@@ -18,6 +18,11 @@ test("help and describe share options; failure envelopes never authorize retries
     expect(describeCommand(command).options).toEqual(commandOptions(command));
     for (const flag of Object.keys(commandOptions(command))) expect(commandHelp(command)).toContain(`--${flag}`);
   }
+  for (const command of ["publish-show", "publish-episode"]) {
+    expect(commandOptions(command).review).toBe("boolean");
+    expect(describeCommand(command).constraints).toContain("--review requires an interactive terminal without --json or --non-interactive");
+  }
+  expect(commandOptions("preview-episode").review).toBeUndefined();
   const failed = agentEnvelope("publish-episode", {}, null, new Error("private-token"), true);
   expect(resultEnvelopeSchema.safeParse(failed).success).toBe(true);
   expect(JSON.stringify(failed)).not.toContain("private-token");
