@@ -17,7 +17,7 @@ With this setting, dates without an offset are interpreted in Japan time. The de
 
 ## 1. Review the content and time
 
-Prepare the TOML and assets as you would for [normal publication](publishing.md). For a new episode, prepare an MP3, copy it into the show directory, and publish the parent show first. Episode commands resolve the MP3 path relative to the show directory; pass the file name alone.
+Prepare the TOML and assets as you would for [normal publication](publishing.md). For a new episode, prepare an MP3 and publish the parent show first. Episode commands accept an absolute MP3 path or a path relative to the show directory. This example assumes the file is named `audio.mp3` in the show directory.
 
 This example schedules episode `first` for 9:00 on December 1, 2026, in Japan time:
 
