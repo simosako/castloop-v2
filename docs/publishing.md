@@ -2,7 +2,13 @@
 
 To update a published show or episode, edit your local files, preview the changes, and publish. To create a new show or episode, see [publishing for the first time](getting_started.md).
 
-The examples use `/path/to/workspace` as the workspace, `my-show` as the show ID, and `first` as the episode ID.
+The examples use `/path/to/workspace` as the workspace, `my-show` as the show ID, and `first` as the episode ID. Run the commands from the workspace directory:
+
+```sh
+cd /path/to/workspace
+```
+
+To work from another directory, see [running commands from other directories](getting_started.md#running-commands-from-other-directories).
 
 ## 1. Edit the files
 
@@ -26,8 +32,8 @@ After review, copy `input_fingerprint` from the preview result and use it as `RE
 ### Update show information or cover
 
 ```sh
-castloop preview-show my-show --workspace /path/to/workspace --remote --json
-castloop publish-show my-show --workspace /path/to/workspace --expect-preview REVIEWED_HASH --json
+castloop preview-show my-show --remote --json
+castloop publish-show my-show --expect-preview REVIEWED_HASH --json
 ```
 
 ### Update an episode title or description
@@ -35,17 +41,17 @@ castloop publish-show my-show --workspace /path/to/workspace --expect-preview RE
 Publish the edited information using the already published audio:
 
 ```sh
-castloop preview-episode first --workspace /path/to/workspace --show my-show --remote --json
-castloop publish-episode first --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
+castloop preview-episode first --show my-show --remote --json
+castloop publish-episode first --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
 ### Replace episode audio
 
-Specify the new MP3 with an absolute path:
+Specify the new MP3 with an absolute path, or a path relative to the show directory. This example uses an absolute path; use the same path for the preview and publication:
 
 ```sh
-castloop preview-episode first /path/to/new.mp3 --workspace /path/to/workspace --show my-show --remote --json
-castloop publish-episode first /path/to/new.mp3 --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
+castloop preview-episode first /path/to/new.mp3 --show my-show --remote --json
+castloop publish-episode first /path/to/new.mp3 --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
 If you edit a file after previewing, preview again and use the new hash.
@@ -55,7 +61,7 @@ If you edit a file after previewing, preview again and use the new hash.
 In the publication result, `changed` means the update was applied; `unchanged` means the same content was already published. In either case, `revision_id` identifies the saved revision.
 
 ```sh
-castloop verify my-show --episode first --workspace /path/to/workspace --json
+castloop verify my-show --episode first --json
 ```
 
 Also check the changes and audio on the show website.
