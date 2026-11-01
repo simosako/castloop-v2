@@ -92,4 +92,8 @@ try {
   assert.equal(error.includes("never-echo@example.com"), false);
   assert.equal(JSON.parse(error).error.outcome, "not_started");
   console.log("Standalone agent smoke checks passed (empty PATH, no source/runtime dependencies).");
-} finally { rmSync(root, { recursive: true, force: true }); }
+} finally {
+  // Windows can briefly hold a lock on the spawned binary after it exits;
+  // retry the cleanup so a transient EPERM cannot mask a passed smoke run.
+  rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
