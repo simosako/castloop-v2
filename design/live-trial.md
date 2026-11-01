@@ -70,13 +70,13 @@ cp dist/castloop "$EVID/castloop"
 
 ### Step 2: サービスの初期化
 
-`init` がWorker、Durable Object、専用の非公開R2バケットを作成します。`account-id` と `workers-subdomain` は前回証跡の `workspace/castloop.toml` と同じ値を使います。
+`init` がWorker、Durable Object、専用の非公開R2バケットを作成します。`account-id` と `workers-subdomain` は前回証跡と同じ値を使います(`workers-subdomain` は `castloop.toml` に設定項目として現れないため、前回の `workers_dev_base_url` のホスト部の2番目のラベルから読み取ります)。operation-idは `--operation-id` フラグで渡します。initの位置引数は対象ワークスペースディレクトリとして解釈され、`--workspace` と不一致なら `target_mismatch` で拒否されるため、UUIDを位置引数にしないでください。
 
 ```bash
 CLI="$EVID/castloop"; WS="$EVID/workspace"
-"$CLI" init "$(uuidgen | tr 'A-Z' 'a-z')" \
-  --service-id "$SID" --account-id "$CLOUDFLARE_ACCOUNT_ID" \
+"$CLI" init --service-id "$SID" --account-id "$CLOUDFLARE_ACCOUNT_ID" \
   --bucket-name "castloop-$SID" --workers-subdomain "<アカウントのsubdomain>" \
+  --operation-id "$(uuidgen | tr 'A-Z' 'a-z')" \
   --non-interactive --json --workspace "$WS" \
   > "$EVID/init-stdout.json" 2> "$EVID/init-stderr.txt"; echo $? > "$EVID/init-exit.txt"
 ```
@@ -122,9 +122,12 @@ python3 scripts/live-trial-verify.py pre-upload "$EVID" "<show-id>"
 
 ```bash
 SHOW="rev<リビジョン短縮shaの末尾3桁>-normal"
-"$CLI" create-show "$SHOW" --non-interactive --json --workspace "$WS" \
+ORIGIN=$(python3 -c "import tomllib;print(tomllib.load(open('$WS/castloop.toml','rb'))['workers_dev_base_url'])")
+"$CLI" create-show "$SHOW" --site-url "$ORIGIN/podcasts/$SHOW/" --non-interactive --json --workspace "$WS" \
   > "$EVID/create-show-stdout.json" 2> "$EVID/create-show-stderr.txt"; echo $? > "$EVID/create-show-exit.txt"
 ```
+
+`--site-url` は非対話実行では必須です。値は生成される雛形の初期値にのみ使われ、次の段落で `show.toml` を転記して置き換えるため、公開内容には影響しません(`ORIGIN` は `castloop.toml` の `workers_dev_base_url`)。
 
 `create-show` が生成した雛形を、前回証跡の `show.toml`(`show_id` を今回の値へ変更)、`episode-*.toml`、そして素材の `cover.jpg` と選定した3件のMP3で置き換えます。MP3のファイル名が `episode_id` と一致するように配置します。
 
@@ -184,6 +187,7 @@ python3 scripts/live-trial-verify.py post-publication "$EVID"
 | 落とし穴 | 内容 |
 | --- | --- |
 | service IDの長さ | 入力検証で20文字上限。`rev-ebaf516-d09bb9` 形式(19文字)に収める(過去に20文字超で拒否された実績) |
+| initの位置引数 | 位置引数は対象ワークスペースディレクトリとして解釈される。operation-idを位置引数にすると `target_mismatch` で拒否される |
 | 検証のUser-Agent | Pythonの既定UAはBrowser Integrity Checkで403になる。検証スクリプトは識別UA(`castloop-private-trial/1.0`)を使う |
 | プレビューURLの設定箇所 | `previews_enabled` はスクリプト単位のsubdomain API(`/accounts/<a>/workers/scripts/<name>/subdomain`)でのみ確認できる。アカウントの `/workers/subdomain` 応答には含まれない |
 | 匿名 `/podcasts` | Accessが `/podcasts` 接頭辞をカバーするため匿名では302(認証後404)。404だけを期待する検証は誤ってFAILする |
