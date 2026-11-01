@@ -56,13 +56,13 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   "create-show": {
     usage: "create-show ID [--site-mode builtin|external] [--site-url URL]",
-    description: "Run from the service workspace or select it with --workspace. Reserve a Show ID and create its local show.toml.\n" +
+    description: "Find the service workspace or select it with --workspace. Reserve a Show ID and create its local show.toml.\n" +
       "Use --site-mode builtin for an automatically generated website (no --site-url). Otherwise a real external website URL is required (prompted if omitted).\n" +
       "Registers the Show DO; it is immediately ready for publication. Does not publish. After interruption rerun with the same workspace and Show ID.",
   },
   "create-episode": {
     usage: "create-episode ID",
-    description: "Run from the Show directory, or use --workspace and --show. Create a new Episode TOML with a GUID and published_at.\n" +
+    description: "Run inside the Show directory, use --show, or use --workspace and --show. Create a new Episode TOML with a GUID and published_at.\n" +
       "For updates, edit the existing TOML instead of creating the Episode again.\n" +
       "This does not upload or publish the Episode.",
   },
@@ -199,7 +199,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
 export function commandHelp(command: string): string {
   const help = Object.hasOwn(COMMAND_HELP, command) ? COMMAND_HELP[command] : undefined;
   if (!help) throw new Error(`Unknown command: ${command}`);
-  return `Usage: castloop ${help.usage}\n\n${help.description}\n\nOptions:\n  --help, -h  Show this help\n${Object.entries(commandOptions(command)).map(([name, type]) => `  --${name}${type === "string" ? " VALUE" : ""}`).join("\n")}\n\nExplicit --workspace selects only that service root. Episode commands also require --show.\nAudio paths use the Show directory; lifecycle plans use the workspace. New validate paths use caller cwd.\n--non-interactive disables CLI prompts, not administrator approval.`;
+  return `Usage: castloop ${help.usage}\n\n${help.description}\n\nOptions:\n  --help, -h  Show this help\n${Object.entries(commandOptions(command)).map(([name, type]) => `  --${name}${type === "string" ? " VALUE" : ""}`).join("\n")}\n\nManagement commands and backup-create find castloop.toml in the current directory or its five parents.\ninit, doctor and preview-schedule-time use the current directory; other offline commands do not use a workspace.\nExplicit --workspace selects only that service root and requires --show for Episode commands.\nWithout --show, Episode commands require a matching Show directory under the workspace.\nAudio paths use the Show directory; lifecycle plans use the workspace. New validate paths use caller cwd.\n--non-interactive disables CLI prompts, not administrator approval.`;
 }
 
 export function commandOptions(command: string): Record<string, "string" | "boolean"> {
@@ -274,5 +274,9 @@ export function describeCommand(command: string) {
       ["schedule-reschedule", "schedule-cancel", "schedule-reapprove"].includes(command) ? "Read schedule-status first; review the current version and obtain a new preview if state or inputs changed. Preserve the saved schedule content." :
       command === "stats-retention" ? "Read stats after interruption, then explicitly reapply the same Show and retention value if needed. No automatic mutation retries." :
       "Preserve the exact workspace, target, inputs and records. Inspect current state before any separately approved mutation; do not delete state.",
-    paths: { workspace: "caller cwd", audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };
+    paths: { workspace: command === "init" ? "explicit directory or --workspace, otherwise caller cwd" :
+      ["doctor", "preview-schedule-time"].includes(command) ? "explicit --workspace or caller cwd" :
+      ["describe", "schema", "import-rss", "validate", "template", "skill", "backup-verify", "backup-restore-preview", "backup-restore"].includes(command) ? "not used" :
+      "explicit --workspace or nearest castloop.toml in caller cwd or its five parents",
+    audio: "Show directory", lifecycle_plan: "workspace", validation_inputs: "caller cwd" } };
 }

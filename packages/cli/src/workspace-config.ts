@@ -1,9 +1,36 @@
 import * as TOML from "@iarna/toml";
+import { validateId } from "@castloop/shared";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
+import { AgentError } from "./agent-output";
+import { localJournalEntryExists } from "./local-journal-path";
 import { readLocalMetadata } from "./local-metadata-read";
 import { decodeUtf8Strict } from "./utf8";
-import { join } from "node:path";
+import { lstatSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+
+export function findWorkspace(start: string): string {
+  let directory = resolve(start);
+  for (let depth = 0; depth <= 5; depth += 1) {
+    if (localJournalEntryExists(join(directory, "castloop.toml"))) return directory;
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  throw new AgentError("missing_workspace", "No castloop.toml in the current directory or its five parents; specify --workspace PATH.");
+}
+
+export async function inferWorkspaceShow(root: string, cwd: string): Promise<string> {
+  const name = relative(root, cwd).split(sep)[0];
+  if (!name || !localJournalEntryExists(join(root, name, "show.toml"))) {
+    throw new AgentError("missing_show", "Specify --show ID or run inside a Show directory in the workspace.");
+  }
+  const showId = validateId(name, "show"), directory = join(root, showId);
+  if (!lstatSync(directory).isDirectory()) throw new AgentError("invalid_directory", "Show directory must be a real directory.");
+  const metadata = TOML.parse(decodeUtf8Strict(await readLocalMetadata(join(directory, "show.toml"))));
+  if (metadata.show_id !== showId) throw new AgentError("target_mismatch", "Show directory and show.toml identify different Shows.");
+  return showId;
+}
 
 export function parseSqliteWorkspaceConfigText(source: string): SqliteServiceConfig {
   const value: unknown = TOML.parse(source);

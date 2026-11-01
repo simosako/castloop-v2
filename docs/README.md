@@ -40,6 +40,8 @@ To move an existing podcast, create a service first, then follow [Importing and 
 
 The workspace contains the service configuration in `castloop.toml`, a folder for each show, and `.castloop/`, which contains administrator keys. Keep these files and your original audio, and create regular [backups](workspace_backup.md). Treat `.castloop/` as confidential and keep it out of Git and shared locations.
 
+Most management commands and `backup-create` find the nearest workspace in the current directory or up to five parents. Explicit `--workspace` always selects only the specified directory. For Episode commands, a matching Show directory can supply the show ID when `--workspace` is omitted; otherwise use `--show`. See [running commands from other directories](getting_started.md#running-commands-from-other-directories) for details and exceptions.
+
 Run operations one at a time, and wait for each command to finish before making further edits or running another operation.
 
 To check a command's arguments, run `castloop help COMMAND`.
