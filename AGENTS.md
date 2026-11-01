@@ -91,7 +91,7 @@ If the change grows clearly beyond this during work, stop and ask instead of exp
 | RSS import or publication | [RSS import](design/components/rss-import.md), [RSS migration guide](docs/rss_migration.md) |
 | Local journals or backups | [Storage layout](design/data/storage.md), [workspace backup](design/components/workspace-backup.md) |
 | Authentication or input validation | [Security](design/security.md), [schemas](design/data/schemas.md), [CLI](design/components/cli.md) |
-| Testing or live trial preparation | [Testing](design/testing.md), [private trial procedure](design/security.md) |
+| Testing or live trial preparation | [Testing](design/testing.md), [private trial procedure](design/security.md), [live trial runbook](design/live-trial.md) |
 | Release preparation and publication | [Release procedure](docs/development/releasing.md) |
 | Live environments or past acceptance claims | [Archive index](design/archive/README.md), [retained service disposal 2026-10-29](design/archive/sq16r_environment_decommission_20261029.md), [2026-10-17 cleanup outcome](design/archive/cloudflare_test_environment_cleanup_20261017.md), then the relevant measurement record |
 

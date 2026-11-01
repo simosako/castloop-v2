@@ -38,6 +38,7 @@
 | RSS・サイト・音声・キャッシュ | [配信](components/delivery.md)、[セキュリティ](security.md) |
 | RSS移行 | [RSS取り込み](components/rss-import.md) |
 | ローカル記録・バックアップ | [保存構造](data/storage.md)、[バックアップ](components/workspace-backup.md) |
+| 実機試験の実施・再現 | [実機試験手順書](live-trial.md)、[セキュリティ](security.md) |
 
 ## 実装を調べるとき
 
