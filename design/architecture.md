@@ -20,7 +20,7 @@ flowchart LR
   Worker --> Show[Show DO：番組単位]
   Worker --> Cache[キャッシュ用エントリポイント]
   Cache -->|音声・画像| R2
-  Cache -->|RSS・HTML生成| Show
+  Cache -->|判定・RSS・HTML生成| Show
   Control -->|登録・状態確認・ドメイン変更| Show
 ```
 

@@ -38,7 +38,7 @@ SQLiteテストは `bun:sqlite` を使います。テスト用ストレージで
 | Showの分離・管理 | [振り分け](../src/sqlite-show-routing.test.ts)、[Show分離](../packages/cli/src/sqlite-show-separation.test.ts)、[サービス実行時](../src/sqlite-service-runtime.test.ts) |
 | 予約 | [予約実行](../src/sqlite-publication-schedules.test.ts)、[CLI予約](../packages/cli/src/sqlite-schedule.test.ts)、[時刻解決](../packages/cli/src/schedule-time.test.ts) |
 | ドメイン・配備 | [ドメイン操作](../packages/cli/src/sqlite-domain-operation.test.ts)、[Cloudflare接続](../packages/cli/src/sqlite-domain-cloudflare.test.ts)、[初期化](../packages/cli/src/sqlite-initialization.test.ts)、[CLI入口](../packages/cli/src/sqlite-cli-entrypoint.test.ts) |
-| 配信・生成・キャッシュ消去 | [Gateway](../src/sqlite-gateway.test.ts)、[キャッシュ](../src/lifecycle-cache.test.ts)、[生成配信](../src/sqlite-generated-delivery.test.ts)、[サイト](../src/site.test.ts)、[パージ](../src/sqlite-cache-purge.test.ts) |
+| 配信・生成・キャッシュ消去 | [Gateway](../src/sqlite-gateway.test.ts)、[キャッシュ](../src/lifecycle-cache.test.ts)、[判定キャッシュ](../src/decision-cache.test.ts)、[生成配信](../src/sqlite-generated-delivery.test.ts)、[サイト](../src/site.test.ts)、[パージ](../src/sqlite-cache-purge.test.ts) |
 | 統計 | [集計](../src/sqlite-delivery-stats.test.ts)、[HTTP](../src/sqlite-stats-http.test.ts)、[CLI](../packages/cli/src/stats.test.ts) |
 | RSS取り込み | [取得](../packages/cli/src/rss-import-download.test.ts)、[解析](../packages/cli/src/rss-import-feed.test.ts)、[事前検査](../packages/cli/src/rss-import-preflight.test.ts)、[順次公開](../packages/cli/src/sqlite-rss-publication.test.ts) |
 | ローカル記録・バックアップ | [記録保存](../packages/cli/src/local-journal-storage.test.ts)、[読み取り](../packages/cli/src/local-journal-read.test.ts)、[バックアップ](../packages/cli/src/backup.test.ts) |
