@@ -1,5 +1,5 @@
 import type { SqliteServiceConfig } from "@castloop/shared";
-import { readBackupArchive } from "./backup-archive";
+import { backupExcludedCounts, backupPendingSummary, readBackupArchive } from "./backup-archive";
 import type { BackupExcludedReason, BackupPending, BackupReadSink } from "./backup-archive";
 import { protectLocalState } from "./workspace-protection";
 import { parseSqliteWorkspaceConfigText } from "./workspace-config";
@@ -23,16 +23,6 @@ function parseConfigText(text: string | null): SqliteServiceConfig | null {
   if (text === null) return null;
   try { return parseSqliteWorkspaceConfigText(text); }
   catch { return null; }
-}
-
-function excludedCounts(excluded: Array<{ reason: BackupExcludedReason }>): Record<BackupExcludedReason, number> {
-  const counts: Record<BackupExcludedReason, number> = { lock: 0, temporary: 0, regenerated: 0, audio_default_excluded: 0, unknown: 0 };
-  for (const entry of excluded) counts[entry.reason]++;
-  return counts;
-}
-
-function pendingSummary(pending: BackupPending): string {
-  return pending.domain_changes.length ? `${pending.domain_changes.length} domain change(s)` : "none";
 }
 
 export type BackupVerifyResult = {
@@ -63,7 +53,7 @@ export function verifyLocalBackup(file: string, passphrase: string): BackupVerif
     cli_version: header.cli_version, include_audio: manifest.include_audio,
     entry_count: manifest.entries.length, entry_bytes: header.entry_bytes,
     config_valid: parseConfigText(configText) !== null,
-    excluded_counts: excludedCounts(manifest.excluded), retained_locks: manifest.retained_locks,
+    excluded_counts: backupExcludedCounts(manifest.excluded), retained_locks: manifest.retained_locks,
     pending: manifest.pending, scan_errors: manifest.scan_errors };
 }
 
@@ -81,7 +71,7 @@ export function previewBackupRestore(file: string, destination: string, passphra
     service_id: manifest.service_id, created_at: manifest.created_at, include_audio: manifest.include_audio,
     config_valid: parseConfigText(configText) !== null,
     entries: manifest.entries.map(({ path, size, kind }) => ({ path, size, kind })), entry_bytes: header.entry_bytes,
-    excluded_counts: excludedCounts(manifest.excluded), retained_locks: manifest.retained_locks,
+    excluded_counts: backupExcludedCounts(manifest.excluded), retained_locks: manifest.retained_locks,
     pending: manifest.pending, scan_errors: manifest.scan_errors, next_steps: nextSteps };
 }
 
@@ -154,7 +144,7 @@ export function formatBackupVerify(result: BackupVerifyResult): string {
     `Audio originals: ${result.include_audio ? "included" : "excluded at creation"}`,
     `Excluded: ${Object.entries(result.excluded_counts).filter(([, count]) => count > 0).map(([reason, count]) => `${count} ${reason}`).join(", ") || "none"}`,
     `Retained locks recorded: ${result.retained_locks.length}`,
-    `Unfinished local operations: ${pendingSummary(result.pending)}`,
+    `Unfinished local operations: ${backupPendingSummary(result.pending)}`,
   ];
   if (result.scan_errors.length) lines.push(`Scan errors (archived without inspection): ${result.scan_errors.join(", ")}`);
   return lines.join("\n");
@@ -170,7 +160,7 @@ export function formatBackupRestorePreview(result: BackupRestorePreviewResult): 
     ...result.entries.slice(0, 20).map((entry) => `  ${entry.size.toString().padStart(10)}  ${entry.kind.padEnd(8)} ${entry.path}`),
     ...(result.entries.length > 20 ? [`  ... and ${result.entries.length - 20} more`] : []),
     `Excluded at creation: ${Object.entries(result.excluded_counts).filter(([, count]) => count > 0).map(([reason, count]) => `${count} ${reason}`).join(", ") || "none"}`,
-    `Unfinished local operations: ${pendingSummary(result.pending)}`,
+    `Unfinished local operations: ${backupPendingSummary(result.pending)}`,
   ];
   lines.push(...result.next_steps.map((step) => `Next: ${step}`));
   return lines.join("\n");
@@ -182,7 +172,7 @@ export function formatBackupRestore(result: BackupRestoreResult): string {
     `Destination: ${result.restored_to}`,
     `Service: ${result.service_id}  Archive created: ${result.created_at}`,
     `Entries: ${result.entry_count} (${result.entry_bytes} bytes)`,
-    `Unfinished local operations: ${pendingSummary(result.pending)}`,
+    `Unfinished local operations: ${backupPendingSummary(result.pending)}`,
   ];
   if (result.scan_errors.length) lines.push(`Scan errors (archived without inspection): ${result.scan_errors.join(", ")}`);
   lines.push(...result.next_steps.map((step) => `Next: ${step}`));

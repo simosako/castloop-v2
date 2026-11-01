@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { continueSqliteDomainChange, listSqliteDomains, sqliteDomainOperationStatus, startSqliteDomainChange } from "./sqlite-domain-operation";
 import { readSqliteDomainJournal } from "./sqlite-domain-journal";
@@ -12,13 +12,14 @@ import { runSqliteCommand } from "./sqlite-commands";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { diagnoseLocal } from "./doctor";
 import { AgentError, agentEnvelope } from "./agent-output";
+import { TEST_COVER_JPEG, TEST_MP3 } from "./test-support/media";
 import { readFileSync, writeFileSync } from "node:fs";
 import { stringifyToml } from "@castloop/shared";
 import { join } from "node:path";
 
 const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
-const wait = { attempts: 2, delay: async () => {} };
+const wait = TEST_WAIT;
 const target = { hostname: "podcasts.example.com", zoneId: "c".repeat(32) };
 async function fixture() {
   const f = await sqliteServiceFixture(); values.push(f);
@@ -264,7 +265,7 @@ test("domain switching preserves saved Episode identities, unpublished media and
   writeFileSync(join(f.root, "daily", "cover.jpg"), Uint8Array.of(255, 216, 255));
   await run("publish-show", ["daily"]);
   await run("create-episode", ["daily", "first"]);
-  writeFileSync(join(f.root, "daily", "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+  writeFileSync(join(f.root, "daily", "audio.mp3"), TEST_MP3);
   await run("publish-episode", ["daily", "first", "audio.mp3"]);
   const node = f.nodes.get("daily")!, base = node.service.content.inspect("daily", "first").base!;
   const preserved = new Map([...f.entries].filter(([key]) => !key.includes("/feeds/") && key !== "system/service.toml").map(([key, object]) => [key, object.etag]));

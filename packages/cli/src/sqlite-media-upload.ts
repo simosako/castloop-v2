@@ -3,6 +3,8 @@ import { sqliteMediaKey, sqliteAudioReferenceSchema, sqliteCoverReferenceSchema 
 import type { SqliteAudioReference, SqliteCoverReference } from "../../shared/src/sqlite-media";
 import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
 import type { R2RestOptions } from "./bounded-http-read";
+import { decodeUtf8Strict } from "./utf8";
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -11,7 +13,7 @@ import { finished } from "node:stream/promises";
 async function readJson(response: Response): Promise<unknown> {
   if (!response.body) throw new Error("R2 response is missing");
   const bytes = await collectStreamBytes(response.body, 65536, true);
-  return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes));
+  return JSON.parse(decodeUtf8Strict(bytes));
 }
 
 const receiptSchema = z.object({ success: z.literal(true), result: z.object({
@@ -31,16 +33,19 @@ export async function uploadSqliteMedia(root: string, config: { account_id: stri
   const settled = finished(stream, { cleanup: true }).catch(() => undefined);
   const iterator = stream[Symbol.asyncIterator]();
   const expected = media.length_bytes;
+  const hash = createHash("sha256");
   let length = 0;
   let completed = false;
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
       const chunk = await iterator.next();
       if (chunk.done) throw new Error("Local media source ended before its expected size");
+      hash.update(chunk.value);
       length += chunk.value.length;
       if (length > expected) throw new Error("Local media source grew during upload");
       if (length === expected) {
         if (!(await iterator.next()).done) throw new Error("Local media source grew during upload");
+        if (hash.digest("hex") !== media.sha256) throw new Error("Local media content changed since inspection; preview again");
         completed = true;
         controller.enqueue(chunk.value);
         controller.close();

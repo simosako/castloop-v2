@@ -49,6 +49,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     description: "Create a fresh SQLite service (schema_version=2) by default; no protocol option is required.\n" +
       "--publication-protocol sqlite-sequential-v1 is optional; no other protocol is supported.\n" +
       "Missing values are prompted on a terminal. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.\n" +
+      "The service ID is a lowercase slug of at most 20 characters; it prefixes the Worker and R2 bucket names.\n" +
       "Creates a private R2 bucket, Worker and SQLite-backed Durable Object without Queues.\n" +
       "Verifies current state; after interruption run init on the same directory with saved inputs, without repeating fresh-creation flags.\n" +
       "Existing resources are never adopted. Service schema_version=1 requires v0.5.x; migration is not provided.",
@@ -206,7 +207,7 @@ export function commandOptions(command: string): Record<string, "string" | "bool
   if (!["describe", "schema", "import-rss", "validate", "template", "skill", "backup-verify", "backup-restore-preview", "backup-restore"].includes(command)) options.workspace = "string";
   const byCommand: Record<string, Record<string, "string" | "boolean">> = {
     init: { "publication-protocol": "string", "service-id": "string", "account-id": "string", "bucket-name": "string", "workers-subdomain": "string", "operation-id": "string" },
-    "create-show": { "site-url": "string", "site-mode": "string" }, deploy: { "operation-id": "string" }, schema: { format: "string" },
+    "create-show": { "site-url": "string", "site-mode": "string" }, schema: { format: "string" },
     domain: { "zone-id": "string", "operation-id": "string", cursor: "string" },
     "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
     diagnose: { "max-shows": "string", external: "boolean" },

@@ -21,3 +21,9 @@ export type DiagnosticScope = z.infer<typeof diagnosticScopeSchema>;
 export type DiagnosticStatus = z.infer<typeof diagnosticStatusSchema>;
 export type DiagnosticCheck = z.infer<typeof diagnosticCheckSchema>;
 export type DiagnosticSummary = z.infer<typeof diagnosticSummarySchema>;
+
+export function summarizeDiagnostics(checks: DiagnosticCheck[]): DiagnosticSummary {
+  const summary = { pass: 0, warn: 0, fail: 0, not_checked: 0 };
+  for (const entry of checks) summary[entry.status] += 1;
+  return summary;
+}

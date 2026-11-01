@@ -3,17 +3,17 @@ import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { resultEnvelopeSchema } from "./agent-schema";
 import { readSqliteDomainJournal } from "./sqlite-domain-journal";
 import { loadWorkspaceConfig } from "./workspace-config";
+import { forwardLoopback, loopbackTarget, TEST_LOOPBACK_ALLOWED_ORIGINS } from "./test-support/loopback";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS observation and cutover without leaking credentials", async () => {
   const f = await sqliteServiceFixture();
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
-    const target = request.headers.get("X-Castloop-Test-Target");
-    if (!target || !["api.cloudflare.com", "test-worker.example.workers.dev", "podcasts.example.com"].includes(new URL(target).hostname)) return new Response(null, { status: 400 });
-    const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
+    const target = loopbackTarget(request, [...TEST_LOOPBACK_ALLOWED_ORIGINS, "https://podcasts.example.com"]);
+    if (!target) return new Response(null, { status: 400 });
     try {
-      const response = await f.transport(target, { method: request.method, headers, ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+      const response = await forwardLoopback(request, target, f.transport);
       if (request.method === "PUT" && new URL(target).pathname.endsWith("/workers/domains")) {
         const body = await response.json() as { result: object };
         return Response.json({ success: true, errors: null, result: { ...body.result, environment: "" } });
@@ -54,7 +54,6 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
     expect(f.content.renderSitePage({ kind: "listing", showId: "daily", page: 1 }, custom.public_base_url)!.html).toContain('href="https://podcasts.example.com/podcasts/daily/"');
     expect((await invoke(["domain", "list"])).result).toMatchObject({ connections_match: true });
     expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
-    expect((await invoke(["domain", "status", id])).result).toMatchObject({ remote: { phase: "completed" } });
     await invoke(["publish-show", "daily"]);
     const removed = crypto.randomUUID();
     expect((await invoke(["domain", "remove", "--operation-id", removed])).result).toMatchObject({ phase: "completed" });
@@ -65,11 +64,9 @@ test("formal domain CLI supports JSON, explicit workspaces, interrupted TLS obse
 test("formal domain CLI emits safe receipt-stage diagnostics to stderr and preserves unknown attachments without retry", async () => {
   const f = await sqliteServiceFixture();
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
-    const target = request.headers.get("X-Castloop-Test-Target");
-    if (!target || !["api.cloudflare.com", "test-worker.example.workers.dev"].includes(new URL(target).hostname)) return new Response(null, { status: 400 });
-    const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
-    const response = await f.transport(target, { method: request.method, headers,
-      ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+    const target = loopbackTarget(request);
+    if (!target) return new Response(null, { status: 400 });
+    const response = await forwardLoopback(request, target, f.transport);
     if (request.method === "PUT" && new URL(target).pathname.endsWith("/workers/domains")) {
       const body = await response.json() as { result: object };
       return Response.json({ success: true, errors: null, result: { ...body.result, environment: null } });

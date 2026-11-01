@@ -1,8 +1,8 @@
 import { expect, spyOn, test } from "bun:test";
 import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { SqliteDomainCloudflare } from "./sqlite-domain-cloudflare";
-import { parseSqliteDomainRequest, SQLITE_DOMAIN_PROTOCOL } from "../../shared/src/sqlite-domain";
-import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
+import { customDomainRequest } from "./test-support/sqlite-domain";
+import { parseSqliteDomainRequest } from "../../shared/src/sqlite-domain";
 
 test("an empty native Worker domain list permits null errors and count-complete pagination without total_pages", async () => {
   const f = await sqliteServiceFixture();
@@ -69,11 +69,8 @@ test("DNS pagination retains its explicit page-size and final-page requirements"
 });
 
 async function attachmentRequest(f: Awaited<ReturnType<typeof sqliteServiceFixture>>) {
-  const target = { ...f.config, public_base_url: "https://podcasts.example.com" };
-  return parseSqliteDomainRequest({ schema_version: 1, protocol: SQLITE_DOMAIN_PROTOCOL, operation_id: crypto.randomUUID(), action: "add",
-    hostname: "podcasts.example.com", zone_id: "c".repeat(32), zone_name: "example.com", namespace_id: "b".repeat(32),
-    previous_config: f.config, previous_config_sha256: await sqliteServiceConfigHash(f.config), target_config: target,
-    target_config_sha256: await sqliteServiceConfigHash(target), worker_source_sha256: "d".repeat(64), worker_metadata_sha256: "e".repeat(64) });
+  const { request } = await customDomainRequest(f);
+  return parseSqliteDomainRequest(request);
 }
 
 test("attachment logs distinguish missing, null, unexpected and non-string environment fields without exposing values", async () => {

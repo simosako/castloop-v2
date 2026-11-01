@@ -2,12 +2,16 @@ import { closeSync, constants, fsyncSync, lstatSync, mkdirSync, openSync } from 
 import { dirname, join } from "node:path";
 
 export const JOURNAL_FAMILIES = ["rss-import-downloads",
-  "sqlite-initializations", "sqlite-registrations", "sqlite-rss-imports", "sqlite-domain-changes", "sqlite-client"] as const;
+  "sqlite-initializations", "sqlite-registrations", "sqlite-rss-imports", "sqlite-domain-changes"] as const;
 export type JournalFamily = typeof JOURNAL_FAMILIES[number];
+
+export function isMissingFileError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException).code === "ENOENT";
+}
 
 export function localJournalEntryExists(path: string): boolean {
   try { lstatSync(path); return true; } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    if (isMissingFileError(error)) return false;
     throw error;
   }
 }
@@ -15,6 +19,13 @@ export function localJournalEntryExists(path: string): boolean {
 export function syncLocalJournalDirectory(path: string): void {
   const fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
   try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+export function assertRealParentDirectories(file: string, label: string): void {
+  for (let parent = dirname(file);; parent = dirname(parent)) {
+    if (!lstatSync(parent).isDirectory()) throw new Error(`${label} parents must be real directories`);
+    if (dirname(parent) === parent) break;
+  }
 }
 
 export function ensureLocalJournalParents(root: string, family: JournalFamily, serviceId: string | undefined, create = false): void {

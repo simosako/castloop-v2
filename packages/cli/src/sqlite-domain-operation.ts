@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { stringifyToml } from "@castloop/shared";
 import { parseSqliteDomainRequest, requireSqliteDomainConnection, SQLITE_DOMAIN_PROTOCOL, sqliteDomainConnectionSchema, sqliteDomainRequestHash } from "../../shared/src/sqlite-domain";
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
 import { administratorKey } from "./administrator-key";
@@ -28,7 +28,7 @@ const sourceFor = (source: string, id: string) => `${source}\n// castloop SQLite
 export async function startSqliteDomainChange(root: string, config: SqliteServiceConfig,
   action: "add" | "remove", operationId: string, source: string, options: R2RestOptions,
   target?: { hostname: string; zoneId: string }, wait = defaultWait): Promise<SqliteDomainJournal> {
-  config = sqliteServiceConfigSchema.parse(config); z.uuid().parse(operationId);
+  z.uuid().parse(operationId);
   if (!source) throw new Error("Domain changes require the embedded Worker source");
   if (readSqliteDomainJournal(root, config, operationId)) throw new Error("Domain operation already exists; inspect or continue it explicitly without replay");
   if (pendingLocalDomainChanges(root, config).length) throw new Error("An unfinished domain operation exists; inspect or continue that operation");
@@ -62,7 +62,6 @@ export async function startSqliteDomainChange(root: string, config: SqliteServic
 
 export async function continueSqliteDomainChange(root: string, config: SqliteServiceConfig, id: string,
   source: string, options: R2RestOptions, wait = defaultWait): Promise<SqliteDomainJournal> {
-  config = sqliteServiceConfigSchema.parse(config);
   if (!Number.isSafeInteger(wait.attempts) || wait.attempts < 1 || wait.attempts > 120) throw new Error("Invalid finite domain observation budget");
   const journal = sqliteDomainJournal(root, config, id), key = administratorKey(root);
   let state = sqliteDomainJournalSchema.parse(journal.read());

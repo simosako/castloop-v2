@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test";
 import type { EpisodeRevision } from "../packages/shared/src/index";
 import { showMetadataSchema } from "../packages/shared/src/index";
-import { parseSitePagePath, sitePagePath } from "../packages/shared/src/website";
-import { SITE_CSS, renderSiteEpisode, renderSiteListing, renderSiteListingPage, siteContentSecurityPolicy, siteCssHash } from "./site-renderer";
+import { parseSitePagePath, sitePagePath, SITE_PAGE_SIZE } from "../packages/shared/src/website";
+import { SITE_CSS, orderedSiteEpisodes, renderSiteEpisode, renderSiteListingPage, siteContentSecurityPolicy, siteCssHash } from "./site-renderer";
+import type { SiteRenderInput } from "./site-renderer";
 import { serveSiteGateway } from "./site-gateway";
 import { serveCachedSitePage } from "./site-cache";
 import { purgeSitePages, sitePurgeTags } from "./site-storage";
@@ -21,6 +22,11 @@ function episode(id = "first", date = "2026-10-25T00:00:00Z"): EpisodeRevision {
     revision_id: audioId, enclosure_url: `${origin}/podcasts/daily/episodes/${id}/${audioId}.mp3`,
     content_type: "audio/mpeg", length_bytes: 100, duration_seconds: 10, sha256: "a".repeat(64), updated_at: date };
 }
+
+const renderSiteListing = (input: SiteRenderInput, episodes: EpisodeRevision[], page: number) => {
+  const ordered = orderedSiteEpisodes(episodes), pages = Math.max(1, Math.ceil(ordered.length / SITE_PAGE_SIZE));
+  return renderSiteListingPage(input, ordered.slice((page - 1) * SITE_PAGE_SIZE, page * SITE_PAGE_SIZE), page, pages);
+};
 
 test("site choices are strict and external URLs cannot carry executable schemes or credentials", () => {
   const metadata = { ...input.show, schema_version: 1, owner_name: "Owner", owner_email: "private@example.com",

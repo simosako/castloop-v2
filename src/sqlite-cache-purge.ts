@@ -15,11 +15,10 @@ function valueKind(value: unknown): ValueKind { return value === null ? "null" :
 
 export async function purgeSqliteCache(cache: Pick<CacheContext, "purge"> | undefined, input: LifecyclePurgeTarget,
   options: PurgeOptions = {}): Promise<void> {
-  const showId = validateId(input.showId, "show");
-  const episodeId = input.episodeId === undefined ? undefined : validateId(input.episodeId, "episode");
   const target: CachePurgeOptions = {
-    tags: episodeId ? [`feed-${showId}`, `episode-${showId}/${episodeId}`] : [`show-${showId}`, `feed-${showId}`, `cover-${showId}`],
-    pathPrefixes: [episodeId ? `/podcasts/${showId}/episodes/${episodeId}/` : `/podcasts/${showId}/`],
+    tags: input.episodeId ? [`feed-${input.showId}`, `episode-${input.showId}/${input.episodeId}`] :
+      [`show-${input.showId}`, `feed-${input.showId}`, `cover-${input.showId}`],
+    pathPrefixes: [input.episodeId ? `/podcasts/${input.showId}/episodes/${input.episodeId}/` : `/podcasts/${input.showId}/`],
   };
   return purgeCacheTarget(cache, input, target, options);
 }

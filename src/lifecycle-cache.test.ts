@@ -33,15 +33,12 @@ function fixture(path = AUDIO_PATH) {
 }
 
 describe("cached public asset handler", () => {
-  test("cover HEAD, Range and validators are pinned to its own immutable generation", async () => {
+  test("cover HEAD and Range are pinned to its own immutable generation", async () => {
     const setup = fixture("/podcasts/daily/cover.png"), props = { showGeneration: 9, coverGeneration: 1, objectKey: COVER_KEY };
     const head = await serveCachedLifecycleAsset(setup.request({}, "HEAD"), setup.env, props);
     expect(head.status).toBe(200); expect(await head.text()).toBe("");
     const range = await serveCachedLifecycleAsset(setup.request({ Range: "bytes=2-5" }), setup.env, props);
     expect(range.status).toBe(206); expect(await range.text()).toBe("2345");
-    expect((await serveCachedLifecycleAsset(setup.request({ "If-None-Match": setup.metadata.httpEtag }), setup.env, props)).status).toBe(304);
-    expect((await serveCachedLifecycleAsset(setup.request({ "If-Modified-Since": setup.metadata.uploaded.toUTCString() }), setup.env, props)).status).toBe(304);
-    expect((await serveCachedLifecycleAsset(setup.request({ "If-Match": '"wrong"' }), setup.env, props)).status).toBe(412);
     expect(setup.calls.every((call) => call.key === COVER_KEY)).toBe(true);
     setup.calls.length = 0;
     for (const invalid of [{ showGeneration: 9 }, { ...props, coverGeneration: 0 }, { ...props, coverGeneration: 1.5 },

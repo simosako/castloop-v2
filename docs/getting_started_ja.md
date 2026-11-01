@@ -83,16 +83,17 @@ castloop create-episode first --workspace /path/to/workspace --show my-show
 
 `my-show/episode-first.toml` を開き、タイトルや説明を入力します。生成されたGUID（エピソードの識別子）はそのまま使い、公開日時を確認してください。
 
-300,000,000バイト以下のMP3を用意し、プレビューします。音声のパスは絶対パスで指定すると分かりやすくなります。
+300,000,000バイト以下のMP3を用意して番組ディレクトリにコピーし、プレビューします。音声のパスは番組ディレクトリからの相対で解決されるため、ファイル名だけを指定します。絶対パスは指定できません。
 
 ```sh
-castloop preview-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --remote --json
+cp /path/to/audio.mp3 /path/to/workspace/my-show/
+castloop preview-episode first audio.mp3 --workspace /path/to/workspace --show my-show --remote --json
 ```
 
 内容と音声を確認し、この結果の `input_fingerprint` を使って公開します。
 
 ```sh
-castloop publish-episode first /path/to/audio.mp3 --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
+castloop publish-episode first audio.mp3 --workspace /path/to/workspace --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
 日時を指定して公開する場合は、公開コマンドの代わりに[予約公開](scheduling_ja.md)を使ってください。

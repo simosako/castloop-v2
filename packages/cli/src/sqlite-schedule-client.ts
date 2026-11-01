@@ -1,11 +1,10 @@
 import { sqliteScheduleCancelSchema, sqliteScheduleCreateSchema, sqliteScheduleListSchema,
-  sqliteScheduleReapproveSchema, sqliteScheduleRescheduleSchema, sqliteScheduleStatusSchema, sqliteServiceConfigHash,
-  sqliteServiceConfigSchema } from "@castloop/shared";
+  sqliteScheduleReapproveSchema, sqliteScheduleRescheduleSchema, sqliteScheduleStatusSchema } from "@castloop/shared";
 import type { SqliteScheduleCancel, SqliteScheduleCreate, SqliteScheduleList, SqliteScheduleReapprove,
   SqliteScheduleReschedule, SqliteScheduleStatus, SqliteServiceConfig } from "@castloop/shared";
 import { sqliteDirectPublicationRequestHash, MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
-import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
-import type { SqliteManagementReadBudget, SqliteManagementReadOptions } from "./sqlite-management-http";
+import { assertSqliteServiceIdentity, readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
+import type { SqliteManagementReadOptions } from "./sqlite-management-http";
 import type { R2RestTransport } from "./bounded-http-read";
 
 export class SqliteScheduleClient {
@@ -13,21 +12,19 @@ export class SqliteScheduleClient {
   constructor(input: SqliteServiceConfig, private readonly administratorKey: string,
     private readonly transport: R2RestTransport = fetch, private readonly timeoutMs = 30000,
     private readonly readOptions: SqliteManagementReadOptions = {}) {
-    this.config = sqliteServiceConfigSchema.parse(input);
+    this.config = input;
     if (!administratorKey || administratorKey.length > 1024 || /[^\x21-\x7e]/.test(administratorKey) ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid SQLite management credentials or timeout");
   }
 
   private async identity(value: { service_id: string; service_config_sha256: string }): Promise<void> {
-    if (value.service_id !== this.config.service_id || value.service_config_sha256 !== await sqliteServiceConfigHash(this.config)) {
-      throw new Error("SQLite schedule response belongs to another service configuration");
-    }
+    await assertSqliteServiceIdentity(value, this.config, "SQLite schedule response belongs to another service configuration");
   }
 
-  private async get(path: string, showId: string, budget: SqliteManagementReadBudget = {}): Promise<unknown> {
+  private async get(path: string, showId: string): Promise<unknown> {
     return readSqliteManagementGet(new URL(`/admin/sqlite-schedules${path}`, this.config.workers_dev_base_url), {
       "X-Castloop-Key": this.administratorKey, "X-Castloop-Show-Id": showId, Accept: "application/json",
-    }, { ...this.readOptions, ...budget, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768 });
+    }, { ...this.readOptions, transport: this.transport, timeoutMs: this.timeoutMs, maximumBytes: MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768 });
   }
 
   private async post(path: string, input: SqliteScheduleCreate | SqliteScheduleReschedule | SqliteScheduleCancel | SqliteScheduleReapprove): Promise<unknown> {
@@ -77,9 +74,9 @@ export class SqliteScheduleClient {
     return parsed.data;
   }
 
-  async status(showId: string, scheduleId: string, budget: SqliteManagementReadBudget = {}): Promise<SqliteScheduleStatus> {
+  async status(showId: string, scheduleId: string): Promise<SqliteScheduleStatus> {
     sqliteScheduleCancelSchema.shape.schedule_id.parse(scheduleId);
-    const result = await this.checked(await this.get(`/${scheduleId}`, showId, budget), scheduleId);
+    const result = await this.checked(await this.get(`/${scheduleId}`, showId), scheduleId);
     if (result.show_id !== showId) throw new Error("SQLite schedule status target differs");
     return result;
   }

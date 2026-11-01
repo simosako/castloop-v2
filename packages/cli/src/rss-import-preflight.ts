@@ -8,6 +8,7 @@ import { readShowPublicationInput } from "./show-publication-input";
 import { parseRssImportFeed } from "./rss-import-feed";
 import { hashRssImportFile, readRssImportSnapshot, rssImportAssetSchema, rssImportControlSchema, rssImportCoverExtension } from "./rss-import-local";
 import { sha256HexSync } from "./sha256";
+import { decodeUtf8Strict } from "./utf8";
 import { createHash } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -27,7 +28,7 @@ export async function prepareRssImportPublication(output: string, publicBaseUrl 
     throw new Error("RSS snapshot differs from its retained import record");
   }
   const feed = parseRssImportFeed(source, state.show_id, state.final_url);
-  const text = (bytes: Buffer) => new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  const text = (bytes: Buffer) => decodeUtf8Strict(bytes);
   const showBytes = await readShowPublicationInput(join(root, "show.toml"));
   const show = parseShowMetadata(text(showBytes));
   assertShowMetadataInputLimits(show);

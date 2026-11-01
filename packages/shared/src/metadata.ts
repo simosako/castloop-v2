@@ -6,7 +6,7 @@ import type { AdminConfig } from "./admin-config";
 import { isXml10Text } from "./xml";
 import { validateSiteCss } from "./site-style";
 import { timeZoneSchema } from "./time-zone";
-import { assertEpisodeDraftInputLimits, assertShowMetadataInputLimits } from "./metadata-limits";
+import { MetadataLimitError, assertEpisodeDraftInputLimits, assertShowMetadataInputLimits } from "./metadata-limits";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ID = (max: number) => z.string().max(max).regex(SLUG);
@@ -87,24 +87,12 @@ export type EpisodeRevision = z.infer<typeof episodeRevisionSchema>;
 // Input schemas enforce Apple-based size limits for new drafts and imports.
 // Storage schemas above stay unbounded so saved snapshots and revisions remain
 // readable even when they predate the limits or came from larger hosts.
-const showLimitPath = (message: string): string[] => {
-  if (message.startsWith("Show title")) return ["title"];
-  if (message.startsWith("Show description")) return ["description"];
-  if (message.startsWith("Show author")) return ["author"];
-  if (message.startsWith("Show owner_name")) return ["owner_name"];
-  if (message.startsWith("Show owner_email")) return ["owner_email"];
-  if (message.startsWith("Show category")) return ["categories"];
-  if (message.startsWith("Show copyright")) return ["copyright"];
-  if (message.startsWith("Show site_url")) return ["site_url"];
-  return [];
-};
-
 export const showMetadataInputSchema = showMetadataSchema.superRefine((value, context) => {
   try {
     assertShowMetadataInputLimits(value);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Show metadata exceeds its input limit";
-    context.addIssue({ code: "custom", path: showLimitPath(message), message });
+    context.addIssue({ code: "custom", path: error instanceof MetadataLimitError ? [error.field] : [], message });
   }
 });
 
@@ -113,7 +101,7 @@ export const episodeDraftInputSchema = episodeDraftSchema.superRefine((value, co
     assertEpisodeDraftInputLimits(value);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Episode metadata exceeds its input limit";
-    context.addIssue({ code: "custom", path: message.startsWith("Episode description") ? ["description"] : ["title"], message });
+    context.addIssue({ code: "custom", path: error instanceof MetadataLimitError ? [error.field] : [], message });
   }
 });
 
@@ -136,10 +124,6 @@ export function parseShowMetadata(source: string): ShowMetadata {
 
 export function parseEpisodeDraft(source: string): EpisodeDraft {
   return episodeDraftSchema.parse(TOML.parse(source));
-}
-
-export function parseEpisodeRevision(source: string): EpisodeRevision {
-  return episodeRevisionSchema.parse(TOML.parse(source));
 }
 
 export function stringifyToml(value: SqliteServiceConfig | AdminConfig | ShowMetadata | EpisodeDraft | EpisodeRevision): string {

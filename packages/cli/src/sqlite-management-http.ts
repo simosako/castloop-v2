@@ -1,17 +1,24 @@
 import type { R2RestTransport } from "./bounded-http-read";
 import { BoundedReadError, collectStreamBytes, retryAfterMilliseconds } from "./bounded-http-read";
 import { sha256HexSync } from "./sha256";
+import { decodeUtf8Strict } from "./utf8";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
+import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
+
+export async function assertSqliteServiceIdentity(value: { service_id: string; service_config_sha256: string },
+  config: SqliteServiceConfig, message: string): Promise<void> {
+  if (value.service_id !== config.service_id || value.service_config_sha256 !== await sqliteServiceConfigHash(config)) throw new Error(message);
+}
 
 type ReadFailureCode = "transport_error" | "observation_timeout" | "http_error" | "invalid_response" |
   "body_read_failed" | "length_mismatch" | "size_limit" | "invalid_utf8" | "invalid_json" | "cleanup_failed" | "deadline_exceeded";
 export type SqliteManagementReadDiagnostic = { event: "sqlite_management_get"; outcome: "retry" | "failed";
   reason_code: ReadFailureCode; target_sha256: string; attempt: number; maximum_attempts: number; elapsed_ms: number;
   http_status?: number; retry_in_ms?: number };
-export type SqliteManagementReadBudget = { beforeAttempt?: () => boolean };
-export type SqliteManagementReadOptions = SqliteManagementReadBudget & { onDiagnostic?: (diagnostic: SqliteManagementReadDiagnostic) => void;
+export type SqliteManagementReadOptions = { transport?: R2RestTransport; timeoutMs?: number; onDiagnostic?: (diagnostic: SqliteManagementReadDiagnostic) => void;
   now?: () => number; delay?: (milliseconds: number) => Promise<void> };
-type GetOptions = SqliteManagementReadOptions & { transport?: R2RestTransport; timeoutMs?: number; maximumBytes?: number; allowMissing?: boolean };
+type GetOptions = SqliteManagementReadOptions & { maximumBytes?: number; allowMissing?: boolean };
 
 class ReadFailure extends Error {
   constructor(readonly code: ReadFailureCode, readonly retryable: boolean, readonly status?: number, readonly retryAfterMs = 0) { super(code); }
@@ -45,7 +52,7 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
   if (signal?.aborted) throw new ReadFailure("observation_timeout", true);
   if (compareLength && declared !== null && Number(declared) !== bytes.length) throw new ReadFailure("length_mismatch", true);
   let source: string;
-  try { source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
+  try { source = decodeUtf8Strict(bytes); }
   catch { throw new ReadFailure("invalid_utf8", false); }
   try { return JSON.parse(source) as unknown; } catch { throw new ReadFailure("invalid_json", false); }
 }
@@ -105,7 +112,7 @@ export async function readSqliteManagementGet(url: URL, headers: HeadersInit, op
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const remaining = deadline - now();
     let failure: ReadFailure;
-    if (remaining <= 0 || options.beforeAttempt && !options.beforeAttempt()) failure = new ReadFailure("deadline_exceeded", false);
+    if (remaining <= 0) failure = new ReadFailure("deadline_exceeded", false);
     else {
       const controller = new AbortController(), timer = setTimeout(() => controller.abort(), Math.max(1, Math.ceil(Math.min(10000, remaining))));
       try {

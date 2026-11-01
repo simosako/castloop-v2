@@ -18,6 +18,8 @@ import type { SqliteDomainConnection } from "../../../shared/src/sqlite-domain";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+export const TEST_WAIT = { attempts: 2, delay: async () => {} };
+
 export async function sqliteServiceFixture(input?: SqliteServiceConfig, keyRoot?: string) {
   const root = mkdtempSync("/tmp/opencode/castloop-sqlite-service-");
   const config: SqliteServiceConfig = input ?? { schema_version: 2, storage_layout: "show-v1", publication_protocol: "sqlite-sequential-v1", service_id: "service", account_id: "a".repeat(32),

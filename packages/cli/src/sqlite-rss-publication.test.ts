@@ -5,7 +5,8 @@ import { createSqliteRssEffects, publishSqliteRssImport } from "./sqlite-rss-pub
 import type { SqliteRssEffects } from "./sqlite-rss-publication";
 import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
+import { forwardLoopback, loopbackTarget } from "./test-support/loopback";
 import { startSqliteDomainChange } from "./sqlite-domain-operation";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { parseShowMetadata, stringifyToml } from "@castloop/shared";
@@ -18,9 +19,9 @@ const values: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const value of values.splice(0)) value.close(); });
 async function fixture(count = 2, customDomain = false, future = false) {
   const value = await sqliteServiceFixture(); values.push(value);
-  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, { attempts: 2, delay: async () => {} });
+  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "source", value.options, TEST_WAIT);
   if (customDomain) await startSqliteDomainChange(value.root, value.config, "add", crypto.randomUUID(), "source", value.options,
-    { hostname: "podcasts.example.com", zoneId: "c".repeat(32) }, { attempts: 2, delay: async () => {} });
+    { hostname: "podcasts.example.com", zoneId: "c".repeat(32) }, TEST_WAIT);
   const config = await loadWorkspaceConfig(value.root);
   const options = { transport: value.transport, cloudflare: value.options };
   const original = RSS_IMPORT_SOURCE.match(/<item>[\s\S]*?<\/item>/)![0];
@@ -159,14 +160,12 @@ test("the current RSS batch resumes after SIGKILL with no lock files or duplicat
   const value = await fixture(), entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
   let hold = true;
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
-    const target = request.headers.get("X-Castloop-Test-Target");
-    if (!target || !["api.cloudflare.com", "test-worker.example.workers.dev"].includes(new URL(target).hostname)) return new Response(null, { status: 400 });
+    const target = loopbackTarget(request);
+    if (!target) return new Response(null, { status: 400 });
     if (new URL(target).pathname === "/podcasts/imported/feed.xml") {
       return new Response(value.nodes.get("imported")!.service.renderFeed()!.xml);
     }
-    const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
-    const response = await value.transport(target, { method: request.method, headers,
-      ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+    const response = await forwardLoopback(request, target, value.transport);
     if (hold && new URL(target).pathname.endsWith("/publish")) {
       hold = false; entered.resolve(); await release.promise;
     }

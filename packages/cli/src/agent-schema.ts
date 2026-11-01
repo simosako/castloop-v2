@@ -15,7 +15,7 @@ export const resultEnvelopeSchema = z.object({
   contract_version: z.literal(CONTRACT_VERSION), command: z.string(), ok: z.boolean(),
   target: z.object({ workspace: z.string().optional(), show_id: z.string().optional() }).strict(),
   result: z.json().nullable(),
-  operation: z.object({ kind: z.string(), job_id: z.string().optional(), state: z.string().optional() }).strict().nullable(),
+  operation: z.object({ kind: z.string(), state: z.string().optional() }).strict().nullable(),
   error: z.object({ code: z.string(), message: z.string(), outcome: z.enum(["not_started", "unknown"]),
     fields: z.array(z.object({ path: z.array(z.union([z.string(), z.number()])), code: z.string() }).strict()).optional() }).strict().nullable(),
   next_actions: z.array(z.object({ action: z.string(), command: z.string().optional(), args: z.array(z.string()).optional() }).strict()),

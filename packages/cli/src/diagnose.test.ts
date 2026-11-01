@@ -3,8 +3,9 @@ import { runSqliteCommand } from "./sqlite-commands";
 import { diagnoseResultSchema, diagnoseShows, formatDiagnose } from "./diagnose";
 import type { DiagnoseResult } from "./diagnose";
 import { initializeSqliteService } from "./sqlite-initialization";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
 import type { R2RestTransport } from "./bounded-http-read";
+import { TEST_COVER_JPEG } from "./test-support/media";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -13,7 +14,7 @@ afterEach(() => { for (const value of values.splice(0)) value.close(); });
 
 async function fixture() {
   const value = await sqliteServiceFixture(); values.push(value);
-  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, { attempts: 2, delay: async () => {} });
+  await initializeSqliteService(value.root, value.config, crypto.randomUUID(), "worker source", value.options, TEST_WAIT);
   const command = (name: string, args: string[] = [], options: Parameters<typeof runSqliteCommand>[4] = {}) => runSqliteCommand(value.root, value.config, name, args,
     { transport: value.transport, cloudflare: value.options, diagnoseOptions: { environment: {} }, ...options });
   return Object.assign(value, { command });
@@ -27,7 +28,7 @@ test("diagnose classifies local, remote and cross checks for a published Show", 
   const value = await fixture();
   await value.command("create-show", ["daily", "https://example.com/my-podcast"]);
  
-  writeFileSync(join(value.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
+  writeFileSync(join(value.root, "daily", "cover.jpg"), TEST_COVER_JPEG);
   await value.command("publish-show", ["daily"]);
   const result = diagnoseResultSchema.parse(await value.command("diagnose", ["daily"]));
   expect(result.schema_version).toBe(1);
@@ -52,7 +53,7 @@ test("diagnose warns without failing for an unpublished Show with an unpublished
   const value = await fixture();
   await value.command("create-show", ["daily", "https://example.com"]);
 
-  writeFileSync(join(value.root, "daily", "cover.jpg"), Buffer.from([255, 216, 255, 2]));
+  writeFileSync(join(value.root, "daily", "cover.jpg"), TEST_COVER_JPEG);
 
   const result = diagnoseResultSchema.parse(await value.command("diagnose", ["daily"]));
   expect(find(result, "admission")).toMatchObject({ status: "pass", code: "publication_ready" });

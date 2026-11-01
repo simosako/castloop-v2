@@ -18,10 +18,25 @@ test("Apple-based input limits accept boundary values", () => {
   expect(episodeDraftInputSchema.safeParse({ ...episode, description: "d".repeat(10001) }).success).toBe(false);
 });
 
+test("input limit violations report the offending field as the issue path", () => {
+  const longEmail = `${"a".repeat(64)}@${"b".repeat(190)}.com`;
+  for (const [field, value] of [
+    ["title", "t".repeat(256)], ["description", "あ".repeat(1334)], ["author", "a".repeat(256)],
+    ["owner_name", "o".repeat(256)], ["owner_email", longEmail], ["categories", ["c".repeat(256)]],
+    ["copyright", "c".repeat(256)], ["site_url", `https://example.com/${"a".repeat(2048)}`],
+  ] as const) {
+    const result = showMetadataInputSchema.safeParse({ ...show, [field]: value });
+    expect(result.error?.issues[0]?.path).toEqual([field]);
+  }
+  for (const [field, value] of [["title", "t".repeat(256)], ["description", "d".repeat(10001)]] as const) {
+    const result = episodeDraftInputSchema.safeParse({ ...episode, [field]: value });
+    expect(result.error?.issues[0]?.path).toEqual([field]);
+  }
+});
+
 test("multibyte and HTML tags use the generous interpretation", () => {
   // Show description is 4000 UTF-8 bytes of text without tags.
   expect(showMetadataInputSchema.safeParse({ ...show, description: "<p>" + "あ".repeat(1333) + "</p>" }).success).toBe(true);
-  expect(showMetadataInputSchema.safeParse({ ...show, description: "あ".repeat(1334) }).success).toBe(false);
   // Emoji counts as one character, not two UTF-16 code units.
   expect(episodeDraftInputSchema.safeParse({ ...episode, description: "😀".repeat(10000) }).success).toBe(true);
   expect(episodeDraftInputSchema.safeParse({ ...episode, description: "😀".repeat(10001) }).success).toBe(false);

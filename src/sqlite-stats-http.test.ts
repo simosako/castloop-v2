@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { SqliteDeliveryStats } from "./sqlite-delivery-stats";
 import { createSqliteStatsHttp } from "./sqlite-stats-http";
-import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
+import { sqlitePublicationFixture, seedPublishedEpisode } from "./test-support/sqlite-publication";
 import { sqliteHealthSchema } from "../packages/shared/src/sqlite-service-api";
 import type { SqliteHealth } from "../packages/shared/src/sqlite-service-api";
 import { sqliteStatsEpisodesResponseSchema, sqliteStatsEpisodeDailyResponseSchema } from "../packages/shared/src/sqlite-stats";
@@ -15,10 +15,7 @@ function httpFixture() {
   const value = sqlitePublicationFixture();
   fixtures.push(value);
   new SqlitePublicationContent(value.storage);
-  const audioRevision = crypto.randomUUID();
-  value.storage.sql.exec("INSERT INTO publication_shows (show_id, reservation_id, state_version, feed_generation, lifecycle) VALUES ('daily', ?, 0, 0, 'published')", crypto.randomUUID());
-  value.storage.sql.exec("INSERT INTO publication_episodes (show_id, episode_id, lifecycle, lifecycle_version, revision_id) VALUES ('daily', 'first', 'published', 0, ?)", crypto.randomUUID());
-  value.storage.sql.exec("INSERT INTO publication_media (show_id, episode_id, audio_revision_id, sha256, length_bytes) VALUES ('daily', 'first', ?, ?, 6000000)", audioRevision, "b".repeat(64));
+  const audioRevision = seedPublishedEpisode(value.storage);
   const stats = new SqliteDeliveryStats(value.storage, "daily", value.runtime, () => Date.UTC(2026, 9, 20, 12));
   const health = (): SqliteHealth => sqliteHealthSchema.parse({ ...value.runtime, protocol: "sqlite-sequential-v1",
     domain_changes: "sqlite-domain-change-v1",
@@ -31,7 +28,7 @@ function httpFixture() {
 }
 
 test("statistics endpoints require authentication, return bounded pages and reject unknown routes", async () => {
-  const { handler, request, audioRevision } = httpFixture();
+  const { handler, request } = httpFixture();
   const anonymous = await handler(new Request("https://worker.example.workers.dev/admin/sqlite-stats/episodes"));
   expect(anonymous.status).toBe(401);
   stats: {
@@ -53,7 +50,6 @@ test("statistics endpoints require authentication, return bounded pages and reje
   expect((await handler(request("episodes/first?from=bad"))).status).toBe(400);
   expect((await handler(request("episodes/unknown-episode"))).status).toBe(404);
   expect((await handler(request("episodes", { method: "POST" }))).status).toBe(405);
-  return void audioRevision;
 });
 
 test("retention changes apply idempotently and validate bounds", async () => {

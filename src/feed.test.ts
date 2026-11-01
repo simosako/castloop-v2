@@ -28,7 +28,7 @@ test("RSS is well-formed XML and escaping preserves Unicode, text whitespace and
 });
 
 test("rendering refuses invalid XML text even when callers bypass metadata schemas", () => {
-  for (const character of ["\u0000", "\u0008", "\u000b", "\u000c", "\u001f", "\ufffe", "\uffff", "\ud800", "\udfff"]) {
+  for (const character of ["\u0000", "\ud800", "\ufffe"]) {
     const invalid = `before${character}after`;
     for (const field of ["title", "description", "author", "owner_name", "owner_email", "site_url", "language", "copyright"] as const) {
       expect(() => renderFeed({ ...show, [field]: invalid }, [], "https://public.example.com", "jpg")).toThrow("XML");

@@ -5,6 +5,8 @@ import { AgentError } from "./agent-output";
 import { readLocalMetadata } from "./local-metadata-read";
 import { readShowPublicationInput } from "./show-publication-input";
 import { analyzeAudio } from "./audio";
+import { decodeUtf8Strict } from "./utf8";
+import { JPEG_SIGNATURE, PNG_SIGNATURE } from "./cover-signature";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
@@ -43,7 +45,7 @@ export async function inspectLocalAsset(path: string, maximumBytes: number): Pro
 export async function loadLocalInput(kind: string, file: string) {
   const bytes = kind === "show" ? await readShowPublicationInput(file) :
     await readLocalMetadata(file, ["service", "admin-config"].includes(kind) ? 16384 : 1000000);
-  const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  const source = decodeUtf8Strict(bytes);
   if (kind === "service") return { bytes, value: parseSqliteServiceConfig(source) };
   if (kind === "admin-config") return { bytes, value: parseAdminConfig(source) };
   if (kind === "show") {
@@ -59,8 +61,9 @@ export async function inspectCover(file: string) {
   if (!/\.(png|jpg|jpeg)$/i.test(file)) throw new Error("Cover must use a JPEG or PNG extension");
   const png = file.toLowerCase().endsWith(".png");
   const cover = await inspectLocalAsset(file, 5_000_000);
-  const signature = png ? Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]) : Buffer.from([255, 216, 255]);
-  if (!cover.prefix.subarray(0, signature.length).equals(signature)) throw new Error("Local cover signature differs from its extension");
+  if (!cover.prefix.subarray(0, (png ? PNG_SIGNATURE : JPEG_SIGNATURE).length).equals(png ? PNG_SIGNATURE : JPEG_SIGNATURE)) {
+    throw new Error("Local cover signature differs from its extension");
+  }
   return { length_bytes: cover.length_bytes, sha256: cover.sha256, extension: png ? "png" as const : "jpg" as const };
 }
 

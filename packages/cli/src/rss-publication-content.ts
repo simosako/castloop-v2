@@ -6,13 +6,14 @@ import { readLocalMetadata } from "./local-metadata-read";
 import { readShowPublicationInput } from "./show-publication-input";
 import { parseRssImportFeed } from "./rss-import-feed";
 import type { PreparedRssImport } from "./rss-import-preflight";
+import { decodeUtf8Strict } from "./utf8";
 import { randomUUID } from "node:crypto";
 import { renameSync } from "node:fs";
 import { resolve } from "node:path";
 
 export async function writeImportedMetadata(source: string, target: string, expected: object): Promise<void> {
   const bytes = await readLocalMetadata(source);
-  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+  const text = decodeUtf8Strict(
     target.endsWith("show.toml") ? await readShowPublicationInput(source) : bytes);
   const actual = target.endsWith("show.toml") ? parseShowMetadata(text) : parseEpisodeDraft(text);
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error("Import metadata changed after publication preparation");

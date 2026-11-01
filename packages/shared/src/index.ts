@@ -11,7 +11,7 @@ export type { SqliteScheduleTime, SqliteScheduleReason, SqliteScheduleCreate, Sq
   SqliteSchedulePlan } from "./sqlite-schedule";
 export { sqliteServiceConfigSchema, parseSqliteServiceConfig, sqliteServiceConfigHash } from "./sqlite-service";
 export type { SqliteServiceConfig } from "./sqlite-service";
-export { diagnosticCheckSchema, diagnosticScopeSchema, diagnosticStatusSchema, diagnosticSummarySchema } from "./diagnostics";
+export { diagnosticCheckSchema, diagnosticScopeSchema, diagnosticStatusSchema, diagnosticSummarySchema, summarizeDiagnostics } from "./diagnostics";
 export type { DiagnosticCheck, DiagnosticScope, DiagnosticStatus, DiagnosticSummary } from "./diagnostics";
 export { validateId } from "./ids";
 export { assertPublicationInventoryBudget, assertPublicationRenderBudget, publicationCharacterLength, PUBLICATION_RENDER_BUDGET_BYTES } from "./publication-budget";

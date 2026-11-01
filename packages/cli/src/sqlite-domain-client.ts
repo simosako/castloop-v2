@@ -1,7 +1,6 @@
 import { parseSqliteDomainRequest, sqliteDomainCommitSchema, sqliteDomainFinalizeSchema,
   sqliteDomainRequestHash, sqliteDomainServiceStatusSchema, sqliteDomainStateSchema } from "../../shared/src/sqlite-domain";
 import type { SqliteDomainCommit, SqliteDomainFinalize, SqliteDomainRequest } from "../../shared/src/sqlite-domain";
-import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
 import { readSqliteManagementGet, readSqliteManagementJson } from "./sqlite-management-http";
@@ -10,7 +9,7 @@ import type { R2RestTransport } from "./bounded-http-read";
 export class SqliteDomainClient {
   readonly config: SqliteServiceConfig;
   constructor(config: SqliteServiceConfig, private readonly key: string, private readonly transport: R2RestTransport = fetch) {
-    this.config = sqliteServiceConfigSchema.parse(config);
+    this.config = config;
     if (!key || /[^\x21-\x7e]/.test(key) || key.length > 1024) throw new Error("Missing domain administrator key");
   }
   private async call(path: string, body?: object): Promise<unknown> {

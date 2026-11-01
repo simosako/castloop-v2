@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseEpisodeDraft, parseShowMetadata } from "@castloop/shared";
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteDirectPublicationResultSchema } from "../../shared/src/sqlite-direct-publication";
 import { prepareRssImportPublication } from "./rss-import-preflight";
@@ -17,6 +17,7 @@ import { AgentError } from "./agent-output";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { sha256HexSync as digest } from "./sha256";
+import { decodeUtf8Strict } from "./utf8";
 import { constants } from "node:fs";
 import { copyFile, open, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -34,13 +35,12 @@ export function createSqliteRssEffects(root: string, config: SqliteServiceConfig
   return { command: (name, args) => runSqliteCommand(root, config, name, args, options), async readFeed(url) {
     const chunks: Buffer[] = [];
     await receiveRssAsset(url, 32_000_000, async (bytes) => { chunks.push(Buffer.from(bytes)); });
-    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(Buffer.concat(chunks));
+    return decodeUtf8Strict(Buffer.concat(chunks));
   } };
 }
 
 export async function publishSqliteRssImport(root: string, config: SqliteServiceConfig, output: string,
   options: SqliteCommandOptions = {}, effects = createSqliteRssEffects(root, config, options)): Promise<SqliteRssResult> {
-  config = sqliteServiceConfigSchema.parse(config);
   const prepared = await prepareRssImportPublication(resolve(root, output), config.public_base_url), key = administratorKey(root);
   if (prepared.episodes.some((episode) => Date.parse(episode.metadata.published_at) > Date.now()) && !options.allowFuturePublishedAt) {
     throw new AgentError("future_published_at", "Imported Episodes include future published_at values. Use --allow-future-published-at to publish immediately.");

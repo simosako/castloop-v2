@@ -125,9 +125,7 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     return this.show ? this.show.renderSitePage(page, props) : null;
   }
   async recordDeliveryStats(observations: SqliteDeliveryObservation[]): Promise<void> {
-    await this.initialized;
-    if (!this.show) throw new Error("Show is not initialized");
-    this.show.stats.record(observations);
+    (await this.requireShow()).stats.record(observations);
   }
   private async purgeCaches(showId: string, confirmed?: SqliteCachePurgeConfirmation): Promise<void> {
     await this.ctx.exports.SqliteCachedAssets.invalidate({ showId });
@@ -153,19 +151,24 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     }, this.env.CASTLOOP_ADMIN_KEY);
     return this.show;
   }
+  private async requireShow(): Promise<SqliteShowService> {
+    await this.initialized;
+    if (!this.show) throw new Error("Show is not initialized");
+    return this.show;
+  }
   async initializeShow(request: ShowRegistration) { await this.initialized; return this.openShow(request.show_id).initialize(request); }
-  async showHealth() { await this.initialized; if (!this.show) throw new Error("Show is not initialized"); return this.show.health(); }
+  async showHealth() { return (await this.requireShow()).health(); }
   async showCatalog(request: SqliteCatalogRequest) {
-    await this.initialized; if (!this.show) throw new Error("Show is not initialized"); return this.show.runtime.catalog(request);
+    return (await this.requireShow()).runtime.catalog(request);
   }
   async prepareShowDomain(request: SqliteDomainRequest) {
-    await this.initialized; if (!this.show) throw new Error("Show is not initialized"); return this.show.prepareDomain(request);
+    return (await this.requireShow()).prepareDomain(request);
   }
   async commitShowDomain(request: SqliteDomainCommit) {
-    await this.initialized; if (!this.show) throw new Error("Show is not initialized"); return this.show.commitDomain(request);
+    return (await this.requireShow()).commitDomain(request);
   }
   async showDomainStatus(id: string) {
-    await this.initialized; if (!this.show) throw new Error("Show is not initialized"); return this.show.domainStatus(id);
+    return (await this.requireShow()).domainStatus(id);
   }
 }
 

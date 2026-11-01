@@ -12,9 +12,9 @@ const config = { account_id: "a".repeat(32), bucket_name: "private-bucket" };
 const bytes = Buffer.from("frozen-media-input");
 const media = { sha256: createHash("sha256").update(bytes).digest("hex"), length_bytes: bytes.length, duration_seconds: 10 };
 const key = sqliteMediaKey("daily", media);
-async function fixture(run: (root: string) => Promise<void>) {
+async function fixture(run: (root: string) => Promise<void>, content: Buffer = bytes) {
   const root = await mkdtemp(join(tmpdir(), "castloop-direct-media-"));
-  try { await writeFile(join(root, "audio.mp3"), bytes); await run(root); }
+  try { await writeFile(join(root, "audio.mp3"), content); await run(root); }
   finally { await rm(root, { recursive: true }); }
 }
 const options = (transport: R2RestTransport) => ({ accountId: config.account_id, apiToken: "private-token", transport });
@@ -68,6 +68,19 @@ test("PUT requires HTTP 200, success, matching key and size, and a consumed sour
     expect(calls).toEqual(["PUT"]);
     expect(existsSync(join(root, ".castloop"))).toBe(false);
   });
+});
+
+test("media content differing from its inspected hash aborts the PUT before the final chunk", async () => {
+  await fixture(async (root) => {
+    const calls: string[] = [];
+    await expect(uploadSqliteMedia(root, config, "daily", "audio.mp3", media, options(async (_, init) => {
+      calls.push(init!.method!);
+      await new Response(init?.body).arrayBuffer();
+      return Response.json({ success: true, result: { key, size: bytes.length } });
+    }))).rejects.toThrow("Local media content changed since inspection");
+    expect(calls).toEqual(["PUT"]);
+    expect(existsSync(join(root, ".castloop"))).toBe(false);
+  }, Buffer.from("edited-media-input"));
 });
 
 test("oversized media and invalid references fail before local or network IO", async () => {

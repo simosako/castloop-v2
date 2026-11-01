@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { SqlitePublicationContent } from "./sqlite-publication-content";
 import { SqliteDeliveryStats, sqliteDeliveryCounterDelta } from "./sqlite-delivery-stats";
-import { sqlitePublicationFixture } from "./test-support/sqlite-publication";
+import { sqlitePublicationFixture, seedPublishedEpisode } from "./test-support/sqlite-publication";
 import type { SqliteDeliveryObservation } from "../packages/shared/src/sqlite-stats";
 
 const fixtures: Array<ReturnType<typeof sqlitePublicationFixture>> = [];
@@ -18,11 +18,7 @@ function statsFixture(startedAtMs: number) {
   fixtures.push(value);
   const content = new SqlitePublicationContent(value.storage);
   let now = startedAtMs;
-  const audioRevision = crypto.randomUUID();
-  value.storage.sql.exec("INSERT INTO publication_shows (show_id, reservation_id, state_version, feed_generation, lifecycle) VALUES ('daily', ?, 0, 0, 'published')", crypto.randomUUID());
-  value.storage.sql.exec("INSERT INTO publication_episodes (show_id, episode_id, lifecycle, lifecycle_version, revision_id) VALUES ('daily', 'first', 'published', 0, ?)", crypto.randomUUID());
-  value.storage.sql.exec("INSERT INTO publication_media (show_id, episode_id, audio_revision_id, sha256, length_bytes) VALUES ('daily', 'first', ?, ?, ?)",
-    audioRevision, "b".repeat(64), audioLength);
+  const audioRevision = seedPublishedEpisode(value.storage, audioLength);
   const stats = new SqliteDeliveryStats(value.storage, "daily", value.identity, () => now);
   const advanceTo = (ms: number) => { now = ms; };
   const recordAt = (ms: number, entries: SqliteDeliveryObservation[]) => { now = ms; stats.record(entries); };

@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
-import { buildSqliteWorkerMetadata } from "../../shared/src/sqlite-worker-deployment";
+import { buildSqliteWorkerMetadata, sqliteDeploymentReceiptSchema } from "../../shared/src/sqlite-worker-deployment";
 import { administratorKey } from "./administrator-key";
-import { createLocalJournalStorage } from "./local-journal-storage";
+import { createLocalJournalStorage, readLocalJournalOrNull } from "./local-journal-storage";
 import { sha256HexSync as digest } from "./sha256";
 import { SqliteCloudflareApi } from "./sqlite-cloudflare";
 import { SqliteServiceClient } from "./sqlite-service-client";
@@ -11,7 +11,7 @@ import type { R2RestOptions } from "./bounded-http-read";
 import { protectLocalState } from "./workspace-protection";
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
-const receiptSchema = z.object({ worker_version_id: z.uuid(), deployment_id: z.uuid(), script_etag: z.string().min(1).max(256) }).strict();
+const receiptSchema = sqliteDeploymentReceiptSchema;
 const stateSchema = z.object({ protocol: z.literal("sqlite-sequential-v1"), operation_id: z.uuid(), service_config_sha256: hash,
   worker_source_sha256: hash, worker_metadata_sha256: hash,
   phase: z.enum(["fresh", "prepared", "deployed", "ready"]),
@@ -25,14 +25,12 @@ export type SqliteInitializationState = z.infer<typeof stateSchema>;
 const local = (root: string, config: SqliteServiceConfig) => createLocalJournalStorage(root, "sqlite-initializations", config.service_id, "initialize.json");
 
 export function readSqliteInitialization(root: string, config: SqliteServiceConfig): SqliteInitializationState | null {
-  try { return stateSchema.parse(local(root, config).read()); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; return null; }
+  return readLocalJournalOrNull(local(root, config), stateSchema);
 }
 
 // Each initialization step checks current state and can be safely re-run after an interrupted attempt.
-export async function initializeSqliteService(root: string, configInput: SqliteServiceConfig, operationId: string, source: string,
+export async function initializeSqliteService(root: string, config: SqliteServiceConfig, operationId: string, source: string,
   options: R2RestOptions, wait: { delay: () => Promise<void>; attempts: number } = { delay: () => Bun.sleep(1000), attempts: 120 }): Promise<SqliteInitializationState> {
-  const config = sqliteServiceConfigSchema.parse(configInput);
   protectLocalState(root);
   const key = administratorKey(root, true);
   if (!Number.isSafeInteger(wait.attempts) || wait.attempts < 1 || wait.attempts > 120) throw new Error("Invalid SQLite initialization observation limit");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { version } from "../../../package.json";
 import { syncLocalJournalDirectory } from "./local-journal-path";
+import { decodeUtf8Strict } from "./utf8";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, openSync, readSync, unlinkSync, writeSync } from "node:fs";
 import { dirname } from "node:path";
@@ -48,7 +49,17 @@ export type BackupExcludedReason = BackupManifest["excluded"][number]["reason"];
 export type BackupSealMeta = { serviceId: string; includeAudio: boolean; entryCount: number; entryBytes: number };
 type Sink = (chunk: Buffer) => void;
 
-function assertValidPassphrase(passphrase: string): void {
+export function backupExcludedCounts(excluded: Array<{ reason: BackupExcludedReason }>): Record<BackupExcludedReason, number> {
+  const counts: Record<BackupExcludedReason, number> = { lock: 0, temporary: 0, regenerated: 0, audio_default_excluded: 0, unknown: 0 };
+  for (const entry of excluded) counts[entry.reason]++;
+  return counts;
+}
+
+export function backupPendingSummary(pending: BackupPending): string {
+  return pending.domain_changes.length ? `${pending.domain_changes.length} domain change(s)` : "none";
+}
+
+export function assertValidPassphrase(passphrase: string): void {
   const bytes = Buffer.byteLength(passphrase, "utf8");
   if (bytes < BACKUP_PASSPHRASE_MIN_BYTES || bytes > BACKUP_PASSPHRASE_MAX_BYTES) {
     throw new Error(`Backup passphrase must be ${BACKUP_PASSPHRASE_MIN_BYTES} to ${BACKUP_PASSPHRASE_MAX_BYTES} bytes`);
@@ -57,10 +68,6 @@ function assertValidPassphrase(passphrase: string): void {
 
 function deriveKey(passphrase: string, salt: Buffer): Buffer {
   return scryptSync(passphrase, salt, 32, { N: BACKUP_KDF.N, r: BACKUP_KDF.r, p: BACKUP_KDF.p, maxmem: 128 * BACKUP_KDF.N * BACKUP_KDF.r * 2 });
-}
-
-function decodeUtf8(buffer: Buffer): string {
-  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer);
 }
 
 class ByteQueue {
@@ -265,7 +272,7 @@ class PlaintextParser {
     }
     if (this.state === "entry_json") {
       const entry = z.object({ path: z.string().min(1).max(1024), kind: z.string().min(1).max(32), size: z.number().int().min(0) })
-        .strict().parse(JSON.parse(decodeUtf8(this.queue.take(this.recordLength))));
+        .strict().parse(JSON.parse(decodeUtf8Strict(this.queue.take(this.recordLength))));
       assertSafeEntryPath(entry.path);
       if (this.seenPaths.has(entry.path)) throw new Error("Duplicate backup entry path");
       this.seenPaths.add(entry.path);
@@ -307,7 +314,7 @@ class PlaintextParser {
       return;
     }
     if (this.state === "manifest") {
-      this.manifest = manifestSchema.parse(JSON.parse(decodeUtf8(this.queue.take(this.recordLength))));
+      this.manifest = manifestSchema.parse(JSON.parse(decodeUtf8Strict(this.queue.take(this.recordLength))));
       this.state = "ended";
       return;
     }
@@ -345,10 +352,10 @@ export function readBackupArchive(file: string, passphrase: string, sink?: Backu
     const headBuffer = Buffer.alloc(Math.min(total - 32, 2 * BACKUP_HEADER_LIMIT_BYTES));
     const head = headBuffer.subarray(0, readInto(fd, headBuffer, headBuffer.length, 0));
     const firstLine = head.indexOf("\n");
-    if (firstLine < 0 || decodeUtf8(head.subarray(0, firstLine)) !== BACKUP_FORMAT) throw new Error("Unsupported backup archive format");
+    if (firstLine < 0 || decodeUtf8Strict(head.subarray(0, firstLine)) !== BACKUP_FORMAT) throw new Error("Unsupported backup archive format");
     const secondLine = head.indexOf("\n", firstLine + 1);
     if (secondLine < 0 || secondLine > BACKUP_HEADER_LIMIT_BYTES) throw new Error("Backup archive header exceeds its limit");
-    const header = headerSchema.parse(JSON.parse(decodeUtf8(head.subarray(firstLine + 1, secondLine))));
+    const header = headerSchema.parse(JSON.parse(decodeUtf8Strict(head.subarray(firstLine + 1, secondLine))));
     if (header.kdf.N !== BACKUP_KDF.N || header.kdf.r !== BACKUP_KDF.r || header.kdf.p !== BACKUP_KDF.p || header.cipher !== "aes-256-gcm") {
       throw new Error("Unsupported backup KDF or cipher parameters");
     }

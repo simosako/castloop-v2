@@ -1,4 +1,4 @@
-import { ensureLocalJournalParents, localJournalEntryExists, syncLocalJournalDirectory } from "./local-journal-path";
+import { ensureLocalJournalParents, isMissingFileError, localJournalEntryExists, syncLocalJournalDirectory } from "./local-journal-path";
 import type { JournalFamily } from "./local-journal-path";
 import { readBoundedLocalJournal } from "./local-journal-read";
 import { closeSync, fsyncSync, openSync, renameSync, writeFileSync } from "node:fs";
@@ -46,4 +46,9 @@ export function createLocalJournalStorage(root: string, family: JournalFamily, s
       syncLocalJournalDirectory(dirname(file));
     },
   };
+}
+
+export function readLocalJournalOrNull<T>(storage: LocalJournalStorage, schema: { parse: (value: unknown) => T }): T | null {
+  try { return schema.parse(storage.read()); }
+  catch (error) { if (isMissingFileError(error)) return null; throw error; }
 }

@@ -6,7 +6,8 @@ import { initializeSqliteService } from "./sqlite-initialization";
 import { runSqliteCommand } from "./sqlite-commands";
 import type { SqliteCommandOptions } from "./sqlite-commands";
 import { draftPreview } from "./draft-preview";
-import { sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_WAIT, sqliteServiceFixture } from "./test-support/sqlite-service";
+import { TEST_COVER_JPEG, TEST_MP3 } from "./test-support/media";
 import { readFileSync, readdirSync, writeFileSync, truncateSync } from "node:fs";
 import { join } from "node:path";
 
@@ -14,14 +15,14 @@ const fixtures: Array<Awaited<ReturnType<typeof sqliteServiceFixture>>> = [];
 afterEach(() => { for (const f of fixtures.splice(0)) f.close(); });
 async function fixture(publishShow = true) {
   const f = await sqliteServiceFixture(); fixtures.push(f);
-  await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "worker source", f.options, { attempts: 2, delay: async () => {} });
+  await initializeSqliteService(f.root, f.config, crypto.randomUUID(), "worker source", f.options, TEST_WAIT);
   const options = { transport: f.transport, cloudflare: f.options };
   const command = (name: string, args: string[] = [], extra: SqliteCommandOptions = {}) => runSqliteCommand(f.root, f.config, name, args, { ...options, ...extra });
   await command("create-show", ["daily", "https://example.com"]);
-  const directory = join(f.root, "daily"); writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
+  const directory = join(f.root, "daily"); writeFileSync(join(directory, "cover.jpg"), TEST_COVER_JPEG);
   if (publishShow) await command("publish-show", ["daily"]);
   await command("create-episode", ["daily", "first"]);
-  writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+  writeFileSync(join(directory, "audio.mp3"), TEST_MP3);
   return { ...f, directory, command };
 }
 

@@ -3,6 +3,8 @@ import { sqliteServiceFixture } from "./test-support/sqlite-service";
 import { sqliteLifecyclePlanSchema } from "./sqlite-lifecycle";
 import { loadWorkspaceConfig } from "./workspace-config";
 import { resultEnvelopeSchema } from "./agent-schema";
+import { TEST_COVER_JPEG, TEST_MP3 } from "./test-support/media";
+import { forwardLoopback, loopbackTarget } from "./test-support/loopback";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,11 +14,8 @@ test("formal CLI entrypoint initializes ready and publishes through the SQLite r
   const preload = fileURLToPath(new URL("./test-support/sqlite-cli-preload.ts", import.meta.url).href);
   const cli = fileURLToPath(new URL("./index.ts", import.meta.url).href);
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
-    const target = request.headers.get("X-Castloop-Test-Target");
-    if (!target || !["api.cloudflare.com", "test-worker.example.workers.dev"].includes(new URL(target).hostname)) return new Response(null, { status: 400 });
-    const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
-    return setup.transport(target, { method: request.method, headers,
-      ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+    const target = loopbackTarget(request);
+    return target ? forwardLoopback(request, target, setup.transport) : new Response(null, { status: 400 });
   } });
   const environment = { ...process.env, CASTLOOP_TEST_LOOPBACK_ORIGIN: `http://127.0.0.1:${server.port}`,
     CLOUDFLARE_ACCOUNT_ID: setup.config.account_id, CLOUDFLARE_API_TOKEN: "private-token" };
@@ -36,13 +35,13 @@ test("formal CLI entrypoint initializes ready and publishes through the SQLite r
     const [showOutput, showError, showCode] = await Promise.all([new Response(show.stdout).text(), new Response(show.stderr).text(), show.exited]);
     expect(showCode, showError).toBe(0); expect(showOutput).toContain("show.toml");
     const directory = join(setup.root, "daily");
-    writeFileSync(join(directory, "cover.jpg"), Buffer.from([255, 216, 255, 2]));
+    writeFileSync(join(directory, "cover.jpg"), TEST_COVER_JPEG);
     expect(await command(["publish-show", "daily"])).toMatchObject({ result: "changed" });
     const episode = Bun.spawn([process.execPath, "--preload", preload, cli, "create-episode", "first"], { cwd: directory,
       env: environment, stdout: "pipe", stderr: "pipe" });
     const [episodeError, episodeCode] = await Promise.all([new Response(episode.stderr).text(), episode.exited]);
     await new Response(episode.stdout).text(); expect(episodeCode, episodeError).toBe(0);
-    writeFileSync(join(directory, "audio.mp3"), Buffer.concat(Array(50).fill(Buffer.concat([Buffer.from([255, 251, 144, 100]), Buffer.alloc(413)]))));
+    writeFileSync(join(directory, "audio.mp3"), TEST_MP3);
     const preview = await command(["preview-episode", "first", "audio.mp3", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode");
     expect(preview.publishable).toBe(true);
     const publication = await command(["publish-episode", "first", "audio.mp3", "--workspace", setup.root, "--show", "daily", "--expect-preview", String(preview.input_fingerprint), "--json"], "/tmp/opencode"); expect(publication).toMatchObject({ result: "changed" });
@@ -97,11 +96,8 @@ for (const explicit of [false, true]) {
     const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
       fixture ??= loadWorkspaceConfig(workspace).then((config) => sqliteServiceFixture(config, workspace));
       const setup = await fixture;
-      const target = request.headers.get("X-Castloop-Test-Target");
-      if (!target || !["https://api.cloudflare.com", setup.config.workers_dev_base_url].includes(new URL(target).origin)) return new Response(null, { status: 400 });
-      const headers = new Headers(request.headers); headers.delete("X-Castloop-Test-Target"); headers.delete("Host");
-      return setup.transport(target, { method: request.method, headers,
-        ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+      const target = loopbackTarget(request, ["https://api.cloudflare.com", setup.config.workers_dev_base_url]);
+      return target ? forwardLoopback(request, target, setup.transport) : new Response(null, { status: 400 });
     } });
     const preload = join(root, "preload.ts");
     writeFileSync(preload, `import { loadWorkspaceConfig } from ${JSON.stringify(join(import.meta.dir, "workspace-config.ts"))};
