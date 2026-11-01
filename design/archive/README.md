@@ -41,7 +41,7 @@
 
 必要な対象の記録だけを参照する。履歴に載る環境が現在も存在するとは限らず、廃棄済みの資源名を再利用しない。
 
-- 実機検証：[予約9/9](issue65_scheduled_publication_live_20261026.md)、[予約11/11](issue65_scheduled_publication_11_live_20261027.md)、[サイト初回](show_website_private_trial_verification_20261025.md)、[配信統計](episode_delivery_statistics_live_20261025.md)、[独自ドメイン2 Show](sqlite_custom_domain_two_show_verification_20261024.md)、[手順書検証](live_trial_runbook_verification_20261101.md)
+- 実機検証：[予約9/9](issue65_scheduled_publication_live_20261026.md)、[予約11/11](issue65_scheduled_publication_11_live_20261027.md)、[サイト初回](show_website_private_trial_verification_20261025.md)、[配信統計](episode_delivery_statistics_live_20261025.md)、[独自ドメイン2 Show](sqlite_custom_domain_two_show_verification_20261024.md)、[手順書検証](live_trial_runbook_verification_20261101.md)、[判定キャッシュ（Issue #118 案1）](issue118_decision_cache_live_trial_20261101.md)
 - 環境廃棄：[2026-10-29 mainスモーク環境](cloudflare_main_smoke_cleanup_20261029.md)、[保持サービス廃棄](sq16r_environment_decommission_20261029.md)、[2026-10-17クリーンアップ](cloudflare_test_environment_cleanup_20261017.md)、[2026-11-01実機試験環境2件](live_trial_environments_cleanup_20261101.md)
 
 その他の記録はファイル名と各資料からの参照でたどる。測定値・進捗ログ・一度限りの承認は履歴資料に保存し、現行設計本文や `AGENTS.md` に時系列で積み上げない。

@@ -2,8 +2,11 @@ import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../packages/shared/src/sqlite-service";
 import { sqlitePublicationRuntimeSchema } from "../packages/shared/src/sqlite-publication";
 import type { PublicCacheProps } from "./public-assets";
+import { parsePublicAssetPath } from "./public-assets";
 import { serveCachedLifecycleAsset } from "./lifecycle-cache";
 import type { LifecyclePurgeTarget } from "./lifecycle-cache";
+import { cachedDeliveryDecisions, purgeDeliveryDecisions, serveCachedDeliveryDecision } from "./decision-cache";
+import type { DecisionPurgeTarget } from "./decision-cache";
 import { purgeSqliteCache } from "./sqlite-cache-purge";
 import { serveSiteGateway } from "./site-gateway";
 import { serveCachedSitePage } from "./site-cache";
@@ -41,6 +44,21 @@ export type SqliteWorkerEnv = { CASTLOOP_BUCKET: R2Bucket; CASTLOOP_ADMIN_KEY: s
   CASTLOOP_VERSION_METADATA: WorkerVersionMetadata; CASTLOOP_SQLITE_CONFIG: string;
   CASTLOOP_SERVICE_ID: string; CASTLOOP_MANAGEMENT_ORIGIN: string;
   CASTLOOP_SQLITE: DurableObjectNamespace<SqlitePublicationService> };
+
+export class SqliteCachedDecisions extends WorkerEntrypoint<SqliteWorkerEnv> {
+  fetch(request: Request): Promise<Response> {
+    return serveCachedDeliveryDecision(request, {
+      delivery: (path) => this.env.CASTLOOP_SQLITE
+        .getByName(sqliteShowObjectName(this.env.CASTLOOP_SERVICE_ID, parsePublicAssetPath(path)!.showId)).delivery(path),
+      siteDelivery: (page) => this.env.CASTLOOP_SQLITE
+        .getByName(sqliteShowObjectName(this.env.CASTLOOP_SERVICE_ID, page.showId)).siteDelivery(page),
+    });
+  }
+  async invalidate(target: DecisionPurgeTarget): Promise<void> {
+    if (!this.ctx.cache) throw new Error("Delivery decision cache is unavailable");
+    await purgeDeliveryDecisions(this.ctx.cache, target);
+  }
+}
 
 export class SqliteCachedAssets extends WorkerEntrypoint<SqliteWorkerEnv, PublicCacheProps> {
   fetch(request: Request): Promise<Response> {
@@ -128,6 +146,7 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     (await this.requireShow()).stats.record(observations);
   }
   private async purgeCaches(showId: string, confirmed?: SqliteCachePurgeConfirmation): Promise<void> {
+    await this.ctx.exports.SqliteCachedDecisions.invalidate({ showId });
     await this.ctx.exports.SqliteCachedAssets.invalidate({ showId });
     confirmed?.("media");
     await this.ctx.exports.SiteCachedPages.invalidate({ showId });
@@ -146,8 +165,14 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
     if (this.show) { if (this.show.showId !== showId) throw new Error("Show scope differs"); return this.show; }
     this.show = new SqliteShowService(this.ctx.storage, showId, this.identity, this.config, {
       purge: (id, confirmed) => this.purgeCaches(id, confirmed),
-      purgeMedia: ({ showId: id, episodeId }) => this.ctx.exports.SqliteCachedAssets.invalidate({ showId: id, ...(episodeId ? { episodeId } : {}) }),
-      purgeSite: (target) => this.ctx.exports.SiteCachedPages.invalidate(target),
+      purgeMedia: async ({ showId: id, episodeId }) => {
+        await this.ctx.exports.SqliteCachedDecisions.invalidate({ showId: id, ...(episodeId ? { episodeId } : {}) });
+        await this.ctx.exports.SqliteCachedAssets.invalidate({ showId: id, ...(episodeId ? { episodeId } : {}) });
+      },
+      purgeSite: async (target) => {
+        await this.ctx.exports.SqliteCachedDecisions.invalidate({ showId: target.showId, ...(target.siteId ? { siteId: target.siteId } : {}) });
+        await this.ctx.exports.SiteCachedPages.invalidate(target);
+      },
     }, this.env.CASTLOOP_ADMIN_KEY);
     return this.show;
   }
@@ -183,17 +208,19 @@ export default {
       if (config.service_id !== env.CASTLOOP_SERVICE_ID || config.workers_dev_base_url !== env.CASTLOOP_MANAGEMENT_ORIGIN) throw new Error("Gateway identity differs");
       publicOrigin = config.public_base_url;
     } catch { return new Response(null, { status: 503, headers: { "Cache-Control": "no-store" } }); }
+    const decisions = cachedDeliveryDecisions(ctx.exports.SqliteCachedDecisions({}));
     if (parseSitePagePath(new URL(request.url).pathname)) return serveSiteGateway(request, {
       managementOrigin: env.CASTLOOP_MANAGEMENT_ORIGIN, publicOrigin,
-      delivery: (page) => env.CASTLOOP_SQLITE.getByName(name).siteDelivery(page),
+      delivery: (page) => decisions.site(page),
       cachedFetch: (input, props) => ctx.exports.SiteCachedPages({ props }).fetch(input),
     });
+    const show = env.CASTLOOP_SQLITE.getByName(name);
     return serveSqliteGateway(request, env.CASTLOOP_MANAGEMENT_ORIGIN,
-      env.CASTLOOP_SQLITE.getByName(name),
+      { fetch: (input) => show.fetch(input), delivery: (path) => decisions.asset(path) },
       (input, props) => ctx.exports.SqliteCachedAssets({ props }).fetch(input), publicOrigin,
       (observation) => {
         // Statistics recording never blocks the audio response; failures only count as recording errors.
-        ctx.waitUntil(env.CASTLOOP_SQLITE.getByName(name).recordDeliveryStats([observation]).catch(() => {
+        ctx.waitUntil(show.recordDeliveryStats([observation]).catch(() => {
           console.error(JSON.stringify({ event: "sqlite_delivery_stats", show_id: name.startsWith("show/") ? name.split("/")[2] : undefined,
             reason_code: "stats_record_failed" }));
         }));
