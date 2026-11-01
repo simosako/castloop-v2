@@ -19,6 +19,7 @@ export function readBoundedLocalJournal(file: string, maximum = 16384): unknown 
     if (BigInt(size) !== before.size || before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) {
       throw new Error("Local journal changed during inspection");
     }
-    return JSON.parse(decodeUtf8Strict(buffer.subarray(0, size))) as unknown;
+    try { return JSON.parse(decodeUtf8Strict(buffer.subarray(0, size))) as unknown; }
+    catch { throw new Error("Local journal is not valid JSON"); }
   } finally { closeSync(fd); }
 }
