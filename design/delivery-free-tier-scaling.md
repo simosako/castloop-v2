@@ -1,6 +1,6 @@
 # 配信の無料枠スケーリング検討
 
-対象Issue: [#118 音声配信1応答あたりDOリクエスト2回消費が無料枠の天井になる](https://github.com/simosako/castloop-v2/issues/118)
+対象Issue: [#118 音声配信1応答あたりDOリクエスト2回消費が無料枠の天井になる](https://github.com/simosako/castloop-v2/issues/118)（2026-11-01クローズ。結果は[結果](#結果2026-11-01時点)の節。継続検討は [#122](https://github.com/simosako/castloop-v2/issues/122)）
 
 人気Showで配信要求が増えたときに、Workers FreeのDOリクエスト上限（100,000/日）に到達して配信が止まる事態を避けるための検討。現行の配信経路と1要求あたりの消費はIssue #118にまとめたとおりで、音声1応答につきDOリクエスト2回（配信ゲートと統計記録）を消費するため、上限には音声約5万応答/日で到達する。
 
@@ -73,7 +73,7 @@ durationが問題になるのは次の場合に限られる:
 - 音声の統計記録1 DO reqと行書き込み約1行が残る。天井は「音声約9万応答/日+フィード等」（Workersリクエスト10万/日が律速）に上がるが、DO行書き込み10万/日も同水準で迫る
 - エントポイントとゲートウェイの分岐が1つ増え、パージ対象タグの管理範囲が広がる
 
-## 案2: 配信統計をWorkers Analytics Engineに移す（案1と組み合わせ）
+## 案2: 配信統計をWorkers Analytics Engineに移す（案1と組み合わせ）※検討済み・不採用
 
 音声応答の観測（`serveSqliteGateway` の `observeDelivery`）から、Show DOの `recordDeliveryStats` RPCをやめ、Analytics Engineの `writeDataPoint()`（fire-and-forget、await不要）で書き込む。DOにもSQLiteにも書かない。
 
@@ -81,12 +81,19 @@ durationが問題になるのは次の場合に限られる:
 
 **メリット**
 - DOリクエスト・DO行書き込み・DO保存量のすべてから配信統計分を除去。DO上限が配信で枯渇しなくなる
+- 統計の集計・保持期限・整理・coverage・SQLite 4表・RPC・管理HTTPを削除でき、コードが純減する
 - Analytics EngineのFree枠は10万データポイント/日で、超過しても配信には影響しない（統計だけ欠ける）
 
 **デメリット**
-- 統計の性質が変わる: 保持が3ヶ月（現行は既定400日、30〜3650日設定可）。極端な書き込み量ではサンプリングが入る（閾値は約100万/分で、Free枠の範囲では事実上正確）。読み取りはAnalytics Engine SQL API（Freeで読み取り10,000クエリ/日）になる
-- `show-do.md`・`sqlite.md`・CLIの統計表示など、統計機能の契約変更を伴う
+- 統計の性質が変わる: 保持が3ヶ月固定で、**Workers Paidにしても延長できない**（有償化で枠が広がるのは書き込み量と読み取りクエリ数のみ。延長はEnterpriseの個別相談のみ）。現行は既定400日、30〜3650日設定可
+- 書き込みにackがなく、欠落（Free枠超過など）が検知できない。現行の `partial`/`unmeasured` のような計測範囲表示が失われ、取り込み遅延で照会も即時でなくなる
+- 読み取りはAnalytics Engine SQL API（Freeで読み取り10,000クエリ/日。Account Analytics Read権限のトークンが別途必要）。カスタムデータセット用のダッシュボードUIはCloudflareになく、UIは従来どおりCLIが担う
+- `show-do.md`・`sqlite.md`・CLIの統計表示など、統計機能の契約変更を伴う。既存サービスのSQLite統計履歴は読めなくなる
 - Analytics Engineは現在小額未課金だが、将来的に課金開始の予定が告知されている
+
+サンプリングはindex値（Show単位を想定）への均衡サンプリングで、書き込み時は1 indexあたり約100データポイント/秒（約6,000/分）の持続書き込みから目立ち始める（[FAQ](https://developers.cloudflare.com/analytics/faq/wae-faqs/)。当初本文書に記載していた「約100万/分」は誤り）。Free枠（Workers 10万req/日＝平均約1.2/秒）では1 Showが閾値に達する道は実質なく、正確性は事実上保たれる。読み取り時のABRサンプリングは長期間の一括照会で解像度が落ちるため、月単位の分割照会と `count()` による読み取り行数確認が必要。
+
+**判断（2026-11-01、管理者の判断）**: 保持3ヶ月は短すぎるため不採用。統計は引き続きShow DO SQLiteで保有する。
 
 ## 案3: 標準（default）エントポイントのキャッシュを有効にする
 
@@ -147,11 +154,12 @@ Cloudflareの課金仕様では、RPCメソッド呼び出しの戻り値とし�
 | 案3 | 1W（コードなし） | 1W（コードなし） | ✗（ミスのみ） | △（パージ専依） | ○ | 小〜中 | Workers 10万req/日合計 |
 | 案4（独自ドメイン） | 0W+0DO | 0W（4b）/1W（4a） | ✗（媒体） | △（削除+ゾーンパージ） | ✗（ドメイン必須） | 大 | 事実上なし（CDN） |
 
-## 推奨
+## 結果（2026-11-01時点）
 
-1. **まず案1**。両モードで有効・保証を維持したままDO消費を音声1リクエスト/応答・フィード0リクエストに減らし、天井を約2倍にする
-2. 天井がWorkersリクエスト10万/日に移ったら**案2を検討**（統計の保持期間と近似性を許容できるかが判断点。DO・行書き込みの枠が管理操作に全部空く）
-3. 独自ドメイン運用でさらに超える見込みがついた時点で**案4**。workers.dev運用の並行維持を前提に、統計後退と非公開化手順の変更を受け入れられるかで判断する。案3は案1+2と天井が同じで統計だけ失われるため、積極採用しない
+1. **案1を採用・実装済み**（PR #120、[実機検証](archive/issue118_decision_cache_live_trial_20261101.md)済み）。両モードで有効・保証を維持したままDO消費を音声1リクエスト/応答・フィード0リクエストに減らした
+2. **案2は不採用**。保持3ヶ月固定（有償でも延長不可）が運用要件を満たさない。統計はShow DO SQLiteを維持する
+3. **案4は [#122](https://github.com/simosako/castloop-v2/issues/122) に分離**。独自ドメイン運用でWorkersリクエスト10万/日の天井が実際に迫った段階で検討する。workers.dev運用の並行維持を前提に、統計後退と非公開化手順の変更を受け入れられるかで判断する
+4. 案3は案1と天井が同じで統計だけ失われるため、引き続き採用しない
 
 どの案でも、単一Show DOへの集中（ソフトリミット約1,000req/秒）はShowごとのDO分離で既に対処済みの構造であり、本検討の範囲外。
 
@@ -161,5 +169,5 @@ Cloudflareの課金仕様では、RPCメソッド呼び出しの戻り値とし�
 - [Workers料金（キャッシュヒットの課金・サービスバインディング）](https://developers.cloudflare.com/workers/platform/pricing/) / [Durable Objects料金](https://developers.cloudflare.com/durable-objects/platform/pricing/) / [DOライフサイクル（duration課金の対象状態）](https://developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/)
 - [R2 Public buckets（カスタムドメイン・r2.dev）](https://developers.cloudflare.com/r2/buckets/public-buckets/) / [R2とキャッシュ](https://developers.cloudflare.com/cache/interaction-cloudflare-products/r2/)
 - [キャッシュパージの全プラン開放](https://blog.cloudflare.com/instant-purge-for-all/) / [パージの制限](https://developers.cloudflare.com/cache/how-to/purge-cache/)
-- [Analytics Engine料金・制限](https://developers.cloudflare.com/analytics/analytics-engine/pricing/)
+- [Analytics Engine料金](https://developers.cloudflare.com/analytics/analytics-engine/pricing/) / [制限（保持3ヶ月）](https://developers.cloudflare.com/analytics/analytics-engine/limits/) / [サンプリングFAQ](https://developers.cloudflare.com/analytics/faq/wae-faqs/)
 - Issue [#118](https://github.com/simosako/castloop-v2/issues/118)、[配信とキャッシュ設計](components/delivery.md)、[Show DO設計](components/show-do.md)
