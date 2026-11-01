@@ -31,9 +31,9 @@ Set up credentials using [environment variables](getting_started.md#1-set-cloudf
 
 ## 3. Review the preview and publish
 
-Check the target, changes, audio, and cover. If you request edits, review the new preview afterward.
+Check the target, changes, audio, and cover. If you request edits, review the new preview afterward. Agents should use the separate preview and `--expect-preview` commands with `--json`; the interactive `--review` option is not available with `--json` or `--non-interactive`.
 
-When requesting publication, specify the content and target you reviewed. The agent uses the preview hash to [publish](publishing.md). For scheduled publication, also check the time using the [scheduling guide](scheduling.md).
+When requesting publication, specify the content and target you reviewed. The agent uses the preview hash to [publish](publishing.md#use-separate-preview-and-publish-commands). For scheduled publication, also check the time using the [scheduling guide](scheduling.md).
 
 After publication, check the result and the show website.
 

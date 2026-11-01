@@ -10,6 +10,8 @@ After [installing the CLI](installation.md), follow these steps:
 
 The examples use `/path/to/workspace` as the workspace and `my-show` as the show ID. Replace paths and names to suit your environment. After creating the workspace, run the commands from that directory unless noted otherwise.
 
+For publication, the examples use `--review` to show a preview and ask for confirmation in one command. You do not need to copy a preview hash or run a separate publish command. No audio or cover is uploaded, and no content is published, until you confirm.
+
 ## 1. Set Cloudflare credentials
 
 Find the following in the Cloudflare dashboard:
@@ -68,17 +70,13 @@ Open the generated `my-show/show.toml` and enter the show name, description, aut
 
 Place the show's cover image in `my-show/` and set `image_path` to its filename. Use a JPEG or PNG no larger than 5,000,000 bytes.
 
-When ready, preview the show:
+When ready, review and publish the show in an interactive terminal:
 
 ```sh
-castloop preview-show my-show --remote --json
+castloop publish-show my-show --review
 ```
 
-Review the show information and cover, then copy `input_fingerprint` from the result. Replace `REVIEWED_HASH` with that value and publish:
-
-```sh
-castloop publish-show my-show --expect-preview REVIEWED_HASH --json
-```
+`--review` displays the target, changes, cover path, and warnings without uploading or publishing. Check the show information and open the cover, then type `publish` to confirm. Press Enter to cancel. After confirmation, castloop checks the inputs and published state again before uploading and publishing.
 
 ## 4. Publish an episode
 
@@ -90,20 +88,18 @@ castloop create-episode first --show my-show
 
 Open `my-show/episode-first.toml` and enter a title and description. Keep the generated GUID (the episode identifier) and check the publication date.
 
-Prepare an MP3 no larger than 300,000,000 bytes, copy it into the show directory, and preview the episode. Episode commands accept an absolute MP3 path or a path relative to the show directory. In this example, `audio.mp3` refers to `my-show/audio.mp3`.
+Prepare an MP3 no larger than 300,000,000 bytes, copy it into the show directory, and review the episode. Episode commands accept an absolute MP3 path or a path relative to the show directory. In this example, `audio.mp3` refers to `my-show/audio.mp3`.
 
 ```sh
 cp /path/to/audio.mp3 my-show/audio.mp3
-castloop preview-episode first audio.mp3 --show my-show --remote --json
+castloop publish-episode first audio.mp3 --show my-show --review
 ```
 
-Review the content and audio, then replace `REVIEWED_HASH` with this episode preview's `input_fingerprint` and publish. Use the same audio path as in the preview:
+Check the target and changes in the preview, listen to the audio at the displayed local path, and type `publish` to confirm. Press Enter to cancel. If the inputs or published state change during the review, castloop asks you to review again, unless the same content is already published.
 
-```sh
-castloop publish-episode first audio.mp3 --show my-show --expect-preview REVIEWED_HASH --json
-```
+`--review` requires an interactive terminal and cannot be combined with `--json` or `--non-interactive`. To run separate preview and publication commands, including for automation, see [publishing and updating](publishing.md#use-separate-preview-and-publish-commands).
 
-To publish at a specified time, use [scheduled publication](scheduling.md) instead of the publish command.
+If `published_at` is in the future, publishing immediately requires an additional `publish now` confirmation. To wait until a specified time instead, use [scheduled publication](scheduling.md).
 
 ## 5. Check the RSS feed and audio
 

@@ -67,13 +67,17 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "This does not upload or publish the Episode.",
   },
   "publish-show": {
-    usage: "publish-show ID",
+    usage: "publish-show ID [--review]",
     description: "Publish local Show TOML/CSS/cover in one command. Place media directly in R2 and commit synchronously after cache purge.\n" +
+      "--review shows a remote preview and asks for confirmation in an interactive terminal before publication.\n" +
+      'Type "publish" to confirm; --review cannot be combined with --json or --non-interactive.\n' +
       "Returns changed or unchanged and the current revision. Repeating identical content adds no history or media objects.",
   },
   "publish-episode": {
-    usage: "publish-episode ID [MP3] [--allow-future-published-at]",
+    usage: "publish-episode ID [MP3] [--review] [--allow-future-published-at]",
     description: "Publish local Episode TOML and optional MP3 directly, without staging. Returns changed or unchanged and the current revision.\n" +
+      "--review shows a remote preview and asks for confirmation in an interactive terminal before publication.\n" +
+      'Type "publish" to confirm; --review cannot be combined with --json or --non-interactive.\n' +
       "Initial publication requires metadata and audio. Metadata-only updates reuse immutable published audio.\n" +
       "A future published_at does NOT delay publication: this command starts now. Non-interactive runs require\n" +
       "--allow-future-published-at; interactive runs ask to type \"publish now\". Use schedule-episode for scheduled publication.\n" +
@@ -242,7 +246,10 @@ export function commandOptions(command: string): Record<string, "string" | "bool
   };
   if (["create-episode", "publish-episode", "preview-episode",
     "preview-episode-schedule", "schedule-episode", "list-episode-revisions", "preview-episode-revision"].includes(command)) options.show = "string";
-  if (["publish-show", "publish-episode"].includes(command)) options["expect-preview"] = "string";
+  if (["publish-show", "publish-episode"].includes(command)) {
+    options["expect-preview"] = "string";
+    options.review = "boolean";
+  }
   return { ...options, ...byCommand[command] };
 }
 
@@ -258,7 +265,8 @@ export function describeCommand(command: string) {
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1],
         "backup-create": [0], "backup-verify": [1], "backup-restore-preview": [1], "backup-restore": [3] } as Record<string, number[]>)[command],
-    constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly"],
+    constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly",
+      ...(["publish-show", "publish-episode"].includes(command) ? ["--review requires an interactive terminal without --json or --non-interactive"] : [])],
     authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
     effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? ["skill", "backup-create", "backup-restore"].includes(command) ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command.startsWith("schedule-") && !["schedule-list", "schedule-status"].includes(command) ||
       command === "lifecycle-execute" || command === "revision-execute" },

@@ -2,6 +2,8 @@
 
 You can publish show or episode content at a specified date and time. Prepare the files, then preview the content and time before creating the schedule.
 
+The `--review` option is for immediate Show or Episode publication, not scheduling. For schedules, use the separate preview and approval hash as shown below.
+
 The dates below are examples. Replace them with the future dates you want to use.
 
 ## Optional administrator settings

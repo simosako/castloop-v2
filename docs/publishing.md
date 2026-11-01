@@ -25,18 +25,34 @@ The size limit is 300,000,000 bytes for MP3 audio and 5,000,000 bytes for a JPEG
 
 ## 2. Review and publish changes
 
+In an interactive terminal, choose the command that matches your change:
+
+```sh
+castloop publish-show my-show --review
+castloop publish-episode first --show my-show --review
+castloop publish-episode first /path/to/new.mp3 --show my-show --review
+```
+
+Run only the command for the change you want. The second command reuses published audio; the third replaces it. An MP3 path may be absolute or relative to the Show directory.
+
+`--review` shows the workspace, service, target, changes, asset paths, and warnings before uploading or publishing. Review the information and assets, then type `publish` to confirm, or press Enter to cancel. If an episode's `published_at` is in the future, immediate publication also requires the separate confirmation or `--allow-future-published-at`. After confirmation, the CLI checks the configuration, inputs, and current published state again. If the configuration changed, review again. If the inputs or published state changed, review again unless the same content is already published.
+
+`--review` requires an interactive terminal and cannot be used with `--json` or `--non-interactive`. The following separate commands remain available for automation or when you want to review and publish at different times.
+
+### Use separate preview and publish commands
+
 Choose the example that matches your change. First run the preview alone and review the differences and assets.
 
 After review, copy `input_fingerprint` from the preview result and use it as `REVIEWED_HASH` in the publish command.
 
-### Update show information or cover
+#### Update show information or cover
 
 ```sh
 castloop preview-show my-show --remote --json
 castloop publish-show my-show --expect-preview REVIEWED_HASH --json
 ```
 
-### Update an episode title or description
+#### Update an episode title or description
 
 Publish the edited information using the already published audio:
 
@@ -45,7 +61,7 @@ castloop preview-episode first --show my-show --remote --json
 castloop publish-episode first --show my-show --expect-preview REVIEWED_HASH --json
 ```
 
-### Replace episode audio
+#### Replace episode audio
 
 Specify the new MP3 with an absolute path, or a path relative to the show directory. This example uses an absolute path; use the same path for the preview and publication:
 

@@ -9,7 +9,7 @@ import { AgentError, agentEnvelope } from "./agent-output";
 import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
 import { embeddedSqliteWorkerSource } from "./worker-payload";
 import { findWorkspace, inferWorkspaceShow, loadWorkspaceConfig } from "./workspace-config";
-import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -58,6 +58,17 @@ async function confirmFuturePublishedAt(publishedAt: string): Promise<boolean> {
     const answer = (await prompt.question(`Episode published_at ${publishedAt} is in the future. ` +
       'Publishing now will not wait until that time. Type "publish now" to continue: ')).trim();
     return answer === "publish now";
+  } finally { prompt.close(); }
+}
+
+async function confirmReviewedPublication(): Promise<boolean> {
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await Promise.race([
+      prompt.question('Type "publish" to confirm this publication, or press Enter to cancel: '),
+      new Promise<string>((resolve) => prompt.once("close", () => resolve(""))),
+    ]);
+    return answer.trim() === "publish";
   } finally { prompt.close(); }
 }
 
@@ -113,6 +124,9 @@ async function main(context: Invocation): Promise<unknown> {
   const options = commandOptions(command);
   const { positional, flags } = argsOf(rest, Object.keys(options).filter((name) => options[name] === "boolean"));
   allowedFlags(flags, Object.keys(options));
+  if (flags.review && (!process.stdin.isTTY || !process.stdout.isTTY || flags.json || flags["non-interactive"])) {
+    throw new AgentError("interactive_required", "--review requires an interactive terminal without --json or --non-interactive.");
+  }
   if (command === "describe") {
     if (positional.length > 1) throw new Error(commandHelp(command));
     return { contract_version: CONTRACT_VERSION, cli_version: CLI_VERSION, protocol: "sqlite-sequential-v1", storage_layout: "show-v1", schemas: [...Object.keys(INPUT_SCHEMAS), "result"],
@@ -210,7 +224,9 @@ async function main(context: Invocation): Promise<unknown> {
     if (!episodeCommand && command !== "sync-local-metadata") throw new AgentError("invalid_options", "This command does not accept --show; use its Show positional argument.");
   }
   if (episodeCommand) delete flags.show;
-  const expectedPreview = flags["expect-preview"];
+  const review = !!flags.review;
+  delete flags.review;
+  let expectedPreview = flags["expect-preview"];
   delete flags["expect-preview"];
   if (expectedPreview && !/^[a-f0-9]{64}$/.test(expectedPreview)) throw new AgentError("invalid_fingerprint", "Expected a SHA-256 preview fingerprint.");
   context.target = { ...(explicitRoot ? { workspace: explicitRoot } : {}), ...(explicitShow ? { show_id: explicitShow } : {}) };
@@ -331,6 +347,28 @@ async function main(context: Invocation): Promise<unknown> {
     console.error(`Workspace: ${root}\nService: ${workspace.service_id}${context.target.show_id ? `\nShow: ${context.target.show_id}` : ""}`);
   }
   const { runSqliteCommand } = await import("./sqlite-commands");
+  let allowFuturePublishedAt = !!flags["allow-future-published-at"];
+  if (review) {
+    const { prepareSqlitePublication } = await import("./sqlite-publish");
+    const target = command === "publish-show" ? { kind: "show" as const, show_id: validateId(positional[0], "show") } :
+      { kind: "episode" as const, show_id: validateId(positional[0], "show"), episode_id: validateId(positional[1], "episode"),
+        audio_path: positional[2] };
+    const preview = await prepareSqlitePublication(root, workspace, target, { expectedPreview });
+    console.log("Review this publication before confirming:");
+    console.log(JSON.stringify({ workspace: root, service_id: workspace.service_id, target: preview.target,
+      changes: preview.changes, verification_paths: preview.verification_paths, warnings: preview.warnings, unchanged: preview.unchanged }, null, 2));
+    if (!await confirmReviewedPublication()) throw new AgentError("publication_cancelled", "Publication was not confirmed; no assets were uploaded.");
+    if (!preview.unchanged && preview.warnings.length && !allowFuturePublishedAt) {
+      if (!await confirmFuturePublishedAt(preview.warnings[0]!.published_at)) {
+        throw new AgentError("future_published_at", "Confirm immediate publication with --allow-future-published-at, or schedule the Episode instead.");
+      }
+      allowFuturePublishedAt = true;
+    }
+    if (await sqliteServiceConfigHash(await loadWorkspaceConfig(root)) !== await sqliteServiceConfigHash(workspace)) {
+      throw new AgentError("review_changed", "Service configuration changed after review; preview again.");
+    }
+    expectedPreview = preview.input_fingerprint;
+  }
   const effects = describeCommand(command).effects;
   context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
@@ -345,7 +383,7 @@ async function main(context: Invocation): Promise<unknown> {
     ...(command.includes("schedule") ? { scheduleOptions: { at: flags.at, timezone: flags.timezone,
       expectVersion: flags["expect-version"], cursor: flags.cursor } } : {}),
     ...(listing ? { listOptions: { cursor: flags.cursor, includeDeleted: !!flags["include-deleted"] } } : {}), expectedPreview,
-    allowFuturePublishedAt: !!flags["allow-future-published-at"],
+    allowFuturePublishedAt,
     confirmFuturePublishedAt: process.stdin.isTTY && !process.argv.includes("--non-interactive") && !process.argv.includes("--json") ?
       confirmFuturePublishedAt : undefined });
   if (listing && !process.argv.includes("--json")) {

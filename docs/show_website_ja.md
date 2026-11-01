@@ -55,12 +55,13 @@ CSSはUTF-8で保存し、64 KiB以下にしてください。
 
 ### 3. 公開して表示を確認する
 
-まずプレビューを実行し、内容を確認します。結果の `input_fingerprint` を `REVIEWED_HASH` に入れて公開してください。
+対話端末で次のコマンドを実行します。
 
 ```sh
-castloop preview-show my-show --remote --json
-castloop publish-show my-show --expect-preview REVIEWED_HASH --json
+castloop publish-show my-show --review
 ```
+
+プレビューで番組情報とCSSの差分を確認し、公開する場合は `publish` と入力します。取り消す場合はEnterキーを押します。プレビューと公開を別々に行う場合は、[公開と更新](publishing_ja.md#プレビューと公開を別々に実行する)を参照してください。
 
 公開後、一覧と個別ページの表示、音声プレイヤー、リンクの操作を確認してください。
 
