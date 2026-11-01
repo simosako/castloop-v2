@@ -12,7 +12,8 @@
 
 | 版 | 主な変更 | リリースノート |
 | --- | --- | --- |
-| [v0.8.6](https://github.com/simosako/castloop-v2/releases/tag/v0.8.6) | 非公開実機試験の手順書と検証スクリプトの追加、スモークテストのWindowsファイルロック対策 | [ノート](docs/release-v0.8.6.md) |
+| [v0.8.7](https://github.com/simosako/castloop-v2/releases/tag/v0.8.7) | 配信判定キャッシュの追加によるShow DOリクエスト削減、配信・無料枠検討の設計資料の整合 | [ノート](docs/release-v0.8.7.md) |
+| [v0.8.6](https://github.com/simosako/castloop-v2/releases/tag/v0.8.6) | 非公開実機試験の手順書と検証スクリプトの追加、スモークテストのWindowsファイルロック対策 | [ノート](docs/archive/releases/release-v0.8.6.md) |
 | [v0.8.5](https://github.com/simosako/castloop-v2/releases/tag/v0.8.5) | アップロード送信時のハッシュ検証、ローカル記録エラーの内容漏えい防止、CLI記述とガイドの整合、内部検証の簡素化 | [ノート](docs/archive/releases/release-v0.8.5.md) |
 | [v0.8.4](https://github.com/simosako/castloop-v2/releases/tag/v0.8.4) | リリースCIのピン留めActionsをNode 24対応版へ更新 | [ノート](docs/archive/releases/release-v0.8.4.md) |
 | [v0.8.3](https://github.com/simosako/castloop-v2/releases/tag/v0.8.3) | 利用ガイドの日英対応、READMEと貢献ガイドの更新、ライセンス表記の整理 | [ノート](docs/archive/releases/release-v0.8.3.md) |
