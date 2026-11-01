@@ -12,17 +12,20 @@ castloop preview-episode first --workspace /path/to/workspace --show my-show --r
 
 To replace audio as well, specify the MP3's absolute path after `first`. To compare show information, use `preview-show my-show`.
 
-Check these fields:
+Check these fields in `result`:
 
 | Field | Meaning |
 | --- | --- |
 | `published` | Current content saved on the server |
 | `local` | Locally edited content |
 | `changes.metadata_fields` | Changed fields |
-| `assets` | Cover and audio to be used |
+| `changes.audio`, `changes.cover` | Published and candidate audio or cover |
+| `verification_paths` | Local files to inspect, when provided |
 | `unchanged` | `true` if the content matches the published version |
 
-If the content is correct, use `input_fingerprint` to [publish](publishing.md). If you edit the input, preview again.
+If the content is correct, use `input_fingerprint` with a [separate publish command](publishing.md#use-separate-preview-and-publish-commands). If you edit the input, preview again.
+
+Alternatively, in an interactive terminal, use [`--review`](publishing.md#2-review-and-publish-changes) to preview and publish in one command without copying a hash. This creates a new preview; review it before confirming publication.
 
 ## Review RSS in a file
 

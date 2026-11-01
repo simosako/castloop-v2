@@ -55,12 +55,13 @@ Save the CSS as UTF-8 and keep it at or below 64 KiB.
 
 ### 3. Publish and check the display
 
-Run a preview and review it. Replace `REVIEWED_HASH` with the resulting `input_fingerprint`, then publish:
+In an interactive terminal, run the following command:
 
 ```sh
-castloop preview-show my-show --remote --json
-castloop publish-show my-show --expect-preview REVIEWED_HASH --json
+castloop publish-show my-show --review
 ```
+
+Review the show information and CSS changes in the preview, then type `publish` to confirm. Press Enter to cancel. To use separate preview and publication commands, see [publishing and updating](publishing.md#use-separate-preview-and-publish-commands).
 
 After publication, check the list and episode pages, audio player, and links.
 

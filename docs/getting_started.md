@@ -10,6 +10,8 @@ After [installing the CLI](installation.md), follow these steps:
 
 The examples use `/path/to/workspace` as the workspace and `my-show` as the show ID. Replace paths and names to suit your environment. After creating the workspace, run the commands from that directory unless noted otherwise.
 
+For publication, the examples use `--review` to show a preview and ask for confirmation in one command. You do not need to copy a preview hash or run a separate publish command. No audio or cover is uploaded, and no content is published, until you confirm.
+
 ## 1. Set Cloudflare credentials
 
 Find the following in the Cloudflare dashboard:
@@ -97,7 +99,7 @@ Check the target and changes in the preview, listen to the audio at the displaye
 
 `--review` requires an interactive terminal and cannot be combined with `--json` or `--non-interactive`. To run separate preview and publication commands, including for automation, see [publishing and updating](publishing.md#use-separate-preview-and-publish-commands).
 
-To publish at a specified time, use [scheduled publication](scheduling.md) instead of the publish command.
+If `published_at` is in the future, publishing immediately requires an additional `publish now` confirmation. To wait until a specified time instead, use [scheduled publication](scheduling.md).
 
 ## 5. Check the RSS feed and audio
 

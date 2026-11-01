@@ -12,17 +12,20 @@ castloop preview-episode first --workspace /path/to/workspace --show my-show --r
 
 音声も差し替える場合は、`first` の後にMP3の絶対パスを指定します。番組情報を比較する場合は `preview-show my-show` を使います。
 
-主に次の項目を確認してください。
+結果の `result` にある主な項目を確認してください。
 
 | 項目 | 確認する内容 |
 | --- | --- |
 | `published` | サーバーに保存されている現在の内容 |
 | `local` | 手元で編集した内容 |
 | `changes.metadata_fields` | 変更された項目 |
-| `assets` | 使用するカバーや音声 |
+| `changes.audio`、`changes.cover` | 公開済みと変更後の音声・カバー |
+| `verification_paths` | 確認に使える手元のファイルがある場合のパス |
 | `unchanged` | `true` なら公開済みの内容と同じ |
 
-内容が正しければ、`input_fingerprint` を使って[公開](publishing_ja.md)します。入力を修正した場合は、再度プレビューしてください。
+内容が正しければ、`input_fingerprint` を使って[別の公開コマンド](publishing_ja.md#プレビューと公開を別々に実行する)を実行します。入力を修正した場合は、再度プレビューしてください。
+
+対話端末では、[`--review`](publishing_ja.md#2-変更を確認して公開する)を使って、ハッシュをコピーせず1つのコマンドでプレビューと公開を行うこともできます。この場合は新しいプレビューが表示されるため、その内容を確認してから公開を承認してください。
 
 ## RSSをファイルで確認する
 
