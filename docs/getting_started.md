@@ -125,14 +125,16 @@ After publishing, create a [workspace backup](workspace_backup.md). For later ed
 
 ## Running commands from other directories
 
-Episode commands can also run from the show directory itself without `--workspace` or `--show`:
+Episode commands can also run from the show directory or a subdirectory without `--workspace` or `--show`:
 
 ```sh
 cd /path/to/workspace/my-show
 castloop preview-episode first audio.mp3 --remote --json
 ```
 
-This uses the directory name as the show ID and its parent as the workspace. It does not apply in a subdirectory of the show. Show and service commands still need the workspace directory or an explicit `--workspace`.
+Management commands and `backup-create` look for `castloop.toml` in the current directory and up to five parent directories, using the nearest one. They stop at the filesystem root and do not fall back to a more distant workspace if the nearest configuration is invalid. For Episode commands without `--show`, the first directory under the workspace must be a Show directory whose name matches the `show_id` in `show.toml`. Audio paths remain relative to that Show directory.
+
+When a workspace cannot be found within the search limit, use `--workspace`. In an interactive terminal, management commands that select a workspace automatically display the workspace and service before the operation. `init`, `doctor`, and `preview-schedule-time` use the current directory instead of searching its parents.
 
 To select the workspace explicitly from another directory, use `--workspace`. Episode commands also require `--show` when `--workspace` is specified:
 

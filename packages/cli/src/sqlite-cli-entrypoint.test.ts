@@ -44,7 +44,11 @@ test("formal CLI entrypoint initializes ready and publishes through the SQLite r
     writeFileSync(join(directory, "audio.mp3"), TEST_MP3);
     const preview = await command(["preview-episode", "first", "audio.mp3", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode");
     expect(preview.publishable).toBe(true);
-    const publication = await command(["publish-episode", "first", "audio.mp3", "--workspace", setup.root, "--show", "daily", "--expect-preview", String(preview.input_fingerprint), "--json"], "/tmp/opencode"); expect(publication).toMatchObject({ result: "changed" });
+    const nested = join(directory, "drafts", "audio"); mkdirSync(nested, { recursive: true });
+    const discovered = await command(["preview-episode", "first", "audio.mp3", "--remote", "--json"], nested);
+    expect(discovered.input_fingerprint).toBe(preview.input_fingerprint);
+    const publication = await command(["publish-episode", "first", "audio.mp3", "--expect-preview", String(preview.input_fingerprint), "--json"], nested);
+    expect(publication).toMatchObject({ result: "changed" });
     expect(await command(["list-episode-revisions", "first", "--workspace", setup.root, "--show", "daily", "--json"], "/tmp/opencode")).toMatchObject({
       episode_revisions: [{ revision_id: publication.revision_id, is_current: true }] });
     const revisionPreview = await command(["preview-episode-revision", "first", String(publication.revision_id), "--workspace", setup.root, "--show", "daily", "--json"]);

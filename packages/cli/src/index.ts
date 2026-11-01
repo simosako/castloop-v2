@@ -8,13 +8,13 @@ import { CONTRACT_VERSION, INPUT_SCHEMAS, inputSchema } from "./agent-schema";
 import { AgentError, agentEnvelope } from "./agent-output";
 import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
 import { embeddedSqliteWorkerSource } from "./worker-payload";
-import { loadWorkspaceConfig } from "./workspace-config";
+import { findWorkspace, inferWorkspaceShow, loadWorkspaceConfig } from "./workspace-config";
 import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import { writeSyncedLocalFile } from "./local-journal-storage";
 import { syncLocalJournalDirectory } from "./local-journal-path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
@@ -153,7 +153,7 @@ async function main(context: Invocation): Promise<unknown> {
     if (command === "backup-create") {
       allowedFlags(flags, ["workspace", "output", "include-audio", "passphrase-file"]);
       if (!flags.output) throw new AgentError("missing_input", "Expected backup-create --output FILE");
-      const root = resolve(flags.workspace ?? process.cwd());
+      const root = flags.workspace === undefined ? findWorkspace(process.cwd()) : resolve(flags.workspace);
       context.target.workspace = root;
       const { createLocalBackup, formatBackupCreate } = await import("./backup-create");
       const passphrase = await backupPassphrase(flags, true);
@@ -224,8 +224,12 @@ async function main(context: Invocation): Promise<unknown> {
   if (command === "publish-rss-import") {
     allowedFlags(flags, ["allow-future-published-at"]);
     if (positional.length !== 1) throw new Error(commandHelp(command));
-    const root = explicitRoot ?? process.cwd();
+    const root = explicitRoot ?? findWorkspace(process.cwd());
+    context.target.workspace = root;
     const config = await loadWorkspaceConfig(root);
+    if (!explicitRoot && process.stderr.isTTY && !process.argv.includes("--json") && !process.argv.includes("--non-interactive")) {
+      console.error(`Workspace: ${root}\nService: ${config.service_id}`);
+    }
     const { publishSqliteRssImport } = await import("./sqlite-rss-publication");
     context.mutationStarted = true;
     return publishSqliteRssImport(root, config, positional[0]!, { allowFuturePublishedAt: !!flags["allow-future-published-at"] });
@@ -302,15 +306,15 @@ async function main(context: Invocation): Promise<unknown> {
   if (count === undefined || !count.includes(positional.length)) throw new Error(commandHelp(command));
   if (["preview-show-lifecycle", "preview-episode-lifecycle"].includes(command) && !["unpublish", "restore"].includes(positional.at(-1)!) ||
     ["lifecycle-execute", "revision-execute"].includes(command) && positional[2] !== "confirm") throw new Error(commandHelp(command));
+  root = explicitRoot ?? findWorkspace(process.cwd());
+  context.target.workspace = root;
+  const workspace = await loadWorkspaceConfig(root);
   if (episodeCommand) {
-    const showId = validateId(explicitShow ?? basename(root), "show");
+    const showId = explicitShow ?? await inferWorkspaceShow(root, process.cwd());
     positional.unshift(showId);
-    if (!explicitRoot && !explicitShow) root = resolve(root, "..");
     context.target.show_id = showId;
   }
   if (command === "sync-local-metadata") positional.push(explicitShow!);
-  context.target.workspace = root;
-  const workspace = await loadWorkspaceConfig(root);
   if (command === "show-status") {
     context.target.show_id = validateId(positional[0], "show");
   }
@@ -323,6 +327,9 @@ async function main(context: Invocation): Promise<unknown> {
     };
   }
   if (["publish-show", "publish-episode"].includes(command)) context.target.show_id = validateId(positional[0], "show");
+  if (!explicitRoot && process.stderr.isTTY && !process.argv.includes("--json") && !process.argv.includes("--non-interactive")) {
+    console.error(`Workspace: ${root}\nService: ${workspace.service_id}${context.target.show_id ? `\nShow: ${context.target.show_id}` : ""}`);
+  }
   const { runSqliteCommand } = await import("./sqlite-commands");
   const effects = describeCommand(command).effects;
   context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";

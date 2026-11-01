@@ -30,7 +30,7 @@
 
 | 変更内容 | 関連する資料 |
 | --- | --- |
-| CLI操作の簡素化 | [Issue #119の改善案比較](cli-usability-issue-119.md)（案A反映済み） |
+| CLI操作の簡素化 | [Issue #119の改善案比較](cli-usability-issue-119.md)（案A・B反映済み） |
 | 公開・更新・非公開化・履歴の採用 | [CLI](components/cli.md)、[Show DO](components/show-do.md)、[スキーマ](data/schemas.md) |
 | SQLiteの列や保存形式 | [表設計](data/sqlite.md)、[スキーマ](data/schemas.md)、その表を使うコンポーネント |
 | Show登録・サービス設定 | [全体構成](architecture.md)、[制御DO](components/control-do.md)、[保存構造](data/storage.md) |
