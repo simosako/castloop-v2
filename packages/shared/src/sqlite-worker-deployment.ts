@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { sqliteServiceConfigSchema } from "./sqlite-service";
 import type { SqliteServiceConfig } from "./sqlite-service";
 
 export const SQLITE_WORKER_COMPATIBILITY_DATE = "2026-10-16";
@@ -16,8 +15,7 @@ export type SqliteWorkerUploadMetadata = { main_module: "index.js"; compatibilit
   exports: { default: { type: "worker"; cache: { enabled: false } }; SqliteCachedAssets: { type: "worker"; cache: { enabled: true } };
     SiteCachedPages: { type: "worker"; cache: { enabled: true } }; SqlitePublicationService: { type: "durable-object"; storage: "sqlite" } };
   observability: { enabled: true; logs: { enabled: true }; traces: { enabled: true } }; bindings: SqliteWorkerBinding[] };
-export function buildSqliteWorkerMetadata(input: SqliteServiceConfig, adminKey: string): SqliteWorkerUploadMetadata {
-  const config = sqliteServiceConfigSchema.parse(input);
+export function buildSqliteWorkerMetadata(config: SqliteServiceConfig, adminKey: string): SqliteWorkerUploadMetadata {
   if (!adminKey || adminKey.length > 1024 || /[^\x21-\x7e]/.test(adminKey)) throw new Error("SQLite deployment requires an administrator secret");
   return { main_module: "index.js", compatibility_date: SQLITE_WORKER_COMPATIBILITY_DATE,
     compatibility_flags: ["enable_ctx_exports"], cache_options: { enabled: true, cross_version_cache: false },

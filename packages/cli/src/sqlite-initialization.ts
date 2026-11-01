@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata, sqliteDeploymentReceiptSchema } from "../../shared/src/sqlite-worker-deployment";
 import { administratorKey } from "./administrator-key";
@@ -29,9 +29,8 @@ export function readSqliteInitialization(root: string, config: SqliteServiceConf
 }
 
 // Each initialization step checks current state and can be safely re-run after an interrupted attempt.
-export async function initializeSqliteService(root: string, configInput: SqliteServiceConfig, operationId: string, source: string,
+export async function initializeSqliteService(root: string, config: SqliteServiceConfig, operationId: string, source: string,
   options: R2RestOptions, wait: { delay: () => Promise<void>; attempts: number } = { delay: () => Bun.sleep(1000), attempts: 120 }): Promise<SqliteInitializationState> {
-  const config = sqliteServiceConfigSchema.parse(configInput);
   protectLocalState(root);
   const key = administratorKey(root, true);
   if (!Number.isSafeInteger(wait.attempts) || wait.attempts < 1 || wait.attempts > 120) throw new Error("Invalid SQLite initialization observation limit");

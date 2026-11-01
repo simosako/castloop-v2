@@ -1,6 +1,5 @@
 import { sqliteScheduleCancelSchema, sqliteScheduleCreateSchema, sqliteScheduleListSchema,
-  sqliteScheduleReapproveSchema, sqliteScheduleRescheduleSchema, sqliteScheduleStatusSchema,
-  sqliteServiceConfigSchema } from "@castloop/shared";
+  sqliteScheduleReapproveSchema, sqliteScheduleRescheduleSchema, sqliteScheduleStatusSchema } from "@castloop/shared";
 import type { SqliteScheduleCancel, SqliteScheduleCreate, SqliteScheduleList, SqliteScheduleReapprove,
   SqliteScheduleReschedule, SqliteScheduleStatus, SqliteServiceConfig } from "@castloop/shared";
 import { sqliteDirectPublicationRequestHash, MAX_SQLITE_DIRECT_PUBLICATION_BYTES } from "../../shared/src/sqlite-direct-publication";
@@ -13,7 +12,7 @@ export class SqliteScheduleClient {
   constructor(input: SqliteServiceConfig, private readonly administratorKey: string,
     private readonly transport: R2RestTransport = fetch, private readonly timeoutMs = 30000,
     private readonly readOptions: SqliteManagementReadOptions = {}) {
-    this.config = sqliteServiceConfigSchema.parse(input);
+    this.config = input;
     if (!administratorKey || administratorKey.length > 1024 || /[^\x21-\x7e]/.test(administratorKey) ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid SQLite management credentials or timeout");
   }

@@ -18,6 +18,6 @@ export type SqliteCoverReference = z.infer<typeof sqliteCoverReferenceSchema>;
 export function sqliteMediaKey(showId: string, media: { sha256: string; extension?: "jpg" | "png" }): string {
   z.string().max(32).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).parse(showId);
   hash.parse(media.sha256);
-  if (media.extension !== undefined) return `public/podcasts/${showId}/covers/${media.sha256}.${z.enum(["jpg", "png"]).parse(media.extension)}`;
+  if (media.extension !== undefined) return `public/podcasts/${showId}/covers/${media.sha256}.${media.extension}`;
   return `public/podcasts/${showId}/audio/${media.sha256}.mp3`;
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseShowMetadata, stringifyToml, validateId } from "@castloop/shared";
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { administratorKey } from "./administrator-key";
 import { SqliteServiceClient } from "./sqlite-service-client";
@@ -91,7 +91,6 @@ async function registeredShow(root: string, config: SqliteServiceConfig, showId:
 
 export async function runSqliteCommand(root: string, config: SqliteServiceConfig, command: string, args: string[],
   options: SqliteCommandOptions = {}): Promise<unknown> {
-  config = sqliteServiceConfigSchema.parse(config);
   if (command === "preview-show" || command === "preview-episode") {
     const episode = command === "preview-episode";
     if (episode ? args.length < 2 || args.length > 3 : args.length !== 1) throw new Error("Invalid preview arguments");

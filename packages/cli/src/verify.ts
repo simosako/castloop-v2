@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { diagnosticCheckSchema, diagnosticSummarySchema, parseEpisodeDraft, PUBLICATION_RENDER_BUDGET_BYTES,
-  sqliteServiceConfigSchema, summarizeDiagnostics, validateId } from "@castloop/shared";
+  summarizeDiagnostics, validateId } from "@castloop/shared";
 import type { DiagnosticCheck, DiagnosticSummary, SqliteServiceConfig } from "@castloop/shared";
 import { publicRequest, PublicHttpError } from "./public-http";
 import type { PublicRequestOptions } from "./public-http";
@@ -218,9 +218,8 @@ export async function collectDeliveryChecks(root: string, config: SqliteServiceC
     : { state: "not_checked", detail: "No committed publication was confirmed for this target" } };
 }
 
-export async function verifyShowDelivery(root: string, input: SqliteServiceConfig, showId: string,
+export async function verifyShowDelivery(root: string, config: SqliteServiceConfig, showId: string,
   episodeId: string | undefined, transport?: R2RestTransport): Promise<VerifyResult> {
-  const config = sqliteServiceConfigSchema.parse(input);
   const { checks, processing } = await collectDeliveryChecks(root, config, validateId(showId, "show"),
     episodeId === undefined ? undefined : validateId(episodeId, "episode"), transport);
   return verifyResultSchema.parse({ schema_version: 1, show_id: showId, ...(episodeId !== undefined ? { episode_id: episodeId } : {}),

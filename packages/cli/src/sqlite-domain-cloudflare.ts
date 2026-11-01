@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { requireSqliteDomainConnection, sqliteDomainConnectionSchema, sqliteDomainHostnameSchema, sqliteDomainIdSchema } from "../../shared/src/sqlite-domain";
 import type { SqliteDomainConnection, SqliteDomainRequest } from "../../shared/src/sqlite-domain";
-import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
 import type { R2RestOptions } from "./bounded-http-read";
@@ -84,7 +83,7 @@ export class SqliteDomainCloudflare {
   readonly config: SqliteServiceConfig;
   private readonly account: string;
   constructor(config: SqliteServiceConfig, private readonly options: R2RestOptions) {
-    this.config = sqliteServiceConfigSchema.parse(config); requireR2RestOptions(this.config.account_id, options);
+    this.config = config; requireR2RestOptions(this.config.account_id, options);
     this.account = `/accounts/${this.config.account_id}`;
   }
   private call(operation: "domain_detach", method: "DELETE", path: string): Promise<Envelope | undefined>;

@@ -7,7 +7,7 @@ export const sqlitePublicationRuntimeSchema = z.object({ service_id: slug(20), w
   service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 export const sqliteServiceIdentitySchema = z.object({ service_id: slug(20),
   service_config_sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
-export const sqlitePublicationTargetSchema = z.object({ kind: z.enum(["show", "episode"]), show_id: slug(32), episode_id: slug(80).optional() });
+export const sqlitePublicationTargetSchema = z.object({ kind: z.enum(["show", "episode"]), show_id: slug(32), episode_id: slug(80).optional() }).strict();
 export const sqlitePublicationFailureSchema = z.enum(["validation_failed", "base_conflict", "target_unavailable", "runtime_mismatch"]);
 export type SqlitePublicationRuntime = z.infer<typeof sqlitePublicationRuntimeSchema>;
 export type SqliteServiceIdentity = z.infer<typeof sqliteServiceIdentitySchema>;

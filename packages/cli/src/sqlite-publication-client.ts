@@ -1,4 +1,4 @@
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "@castloop/shared";
+import { sqliteServiceConfigHash } from "@castloop/shared";
 import type { SqliteServiceConfig } from "@castloop/shared";
 import { parseSqliteDirectPublicationRequest, sqliteDirectPublicationResultSchema } from "../../shared/src/sqlite-direct-publication";
 import type { SqliteDirectPublicationRequest, SqliteDirectPublicationResult } from "../../shared/src/sqlite-direct-publication";
@@ -9,7 +9,7 @@ export class SqlitePublicationClient {
   readonly config: SqliteServiceConfig;
   constructor(input: SqliteServiceConfig, private readonly administratorKey: string,
     private readonly transport: R2RestTransport = fetch, private readonly timeoutMs = 30000) {
-    this.config = sqliteServiceConfigSchema.parse(input);
+    this.config = input;
     if (!administratorKey || administratorKey.length > 1024 || /[^\x21-\x7e]/.test(administratorKey) ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000) throw new Error("Invalid SQLite management credentials or timeout");
   }

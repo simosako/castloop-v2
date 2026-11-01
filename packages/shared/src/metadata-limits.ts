@@ -38,30 +38,35 @@ function measuredText(value: string): string {
   return stripHtmlTags(value.trim()).trim();
 }
 
-function checkChars(value: string, maximum: number, field: string): void {
+// Carries the offending schema field so input schemas can report precise issue paths.
+export class MetadataLimitError extends Error {
+  constructor(readonly field: string, message: string) { super(message); }
+}
+
+function checkChars(value: string, maximum: number, field: string, label: string): void {
   if (countCharacters(measuredText(value)) > maximum) {
-    throw new Error(`${field} exceeds its input limit`);
+    throw new MetadataLimitError(field, `${label} exceeds its input limit`);
   }
 }
 
 export function assertShowMetadataInputLimits(show: ShowMetadata): void {
-  checkChars(show.title, SHOW_TITLE_MAX_CHARS, "Show title");
+  checkChars(show.title, SHOW_TITLE_MAX_CHARS, "title", "Show title");
   if (utf8ByteLength(measuredText(show.description)) > SHOW_DESCRIPTION_MAX_BYTES) {
-    throw new Error("Show description exceeds its input limit");
+    throw new MetadataLimitError("description", "Show description exceeds its input limit");
   }
-  checkChars(show.author, SHOW_AUTHOR_MAX_CHARS, "Show author");
-  checkChars(show.owner_name, SHOW_OWNER_NAME_MAX_CHARS, "Show owner_name");
-  checkChars(show.owner_email, SHOW_OWNER_EMAIL_MAX_CHARS, "Show owner_email");
-  for (const category of show.categories) checkChars(category, SHOW_CATEGORY_MAX_CHARS, "Show category");
-  if (show.copyright !== undefined) checkChars(show.copyright, SHOW_COPYRIGHT_MAX_CHARS, "Show copyright");
+  checkChars(show.author, SHOW_AUTHOR_MAX_CHARS, "author", "Show author");
+  checkChars(show.owner_name, SHOW_OWNER_NAME_MAX_CHARS, "owner_name", "Show owner_name");
+  checkChars(show.owner_email, SHOW_OWNER_EMAIL_MAX_CHARS, "owner_email", "Show owner_email");
+  for (const category of show.categories) checkChars(category, SHOW_CATEGORY_MAX_CHARS, "categories", "Show category");
+  if (show.copyright !== undefined) checkChars(show.copyright, SHOW_COPYRIGHT_MAX_CHARS, "copyright", "Show copyright");
   if (show.site_url !== undefined && countCharacters(show.site_url.trim()) > SHOW_SITE_URL_MAX_CHARS) {
-    throw new Error("Show site_url exceeds its input limit");
+    throw new MetadataLimitError("site_url", "Show site_url exceeds its input limit");
   }
 }
 
 export function assertEpisodeDraftInputLimits(episode: EpisodeDraft): void {
-  checkChars(episode.title, EPISODE_TITLE_MAX_CHARS, "Episode title");
+  checkChars(episode.title, EPISODE_TITLE_MAX_CHARS, "title", "Episode title");
   if (countCharacters(measuredText(episode.description)) > EPISODE_DESCRIPTION_MAX_CHARS) {
-    throw new Error("Episode description exceeds its input limit");
+    throw new MetadataLimitError("description", "Episode description exceeds its input limit");
   }
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { diagnosticCheckSchema, diagnosticSummarySchema, sqliteServiceConfigHash, sqliteServiceConfigSchema, summarizeDiagnostics, validateId } from "@castloop/shared";
+import { diagnosticCheckSchema, diagnosticSummarySchema, sqliteServiceConfigHash, summarizeDiagnostics, validateId } from "@castloop/shared";
 import type { DiagnosticCheck, DiagnosticSummary, SqliteServiceConfig } from "@castloop/shared";
 import { sqliteHealthSchema } from "../../shared/src/sqlite-service-api";
 import type { SqliteHealth } from "../../shared/src/sqlite-service-api";
@@ -79,8 +79,8 @@ async function diagnoseShow(config: SqliteServiceConfig, showId: string, key: st
   return { show_id: showId, checks, summary: summarizeDiagnostics(checks) };
 }
 
-export async function diagnoseShows(root: string, input: SqliteServiceConfig, showIds: string[], options: DiagnoseOptions = {}): Promise<DiagnoseResult> {
-  const config = sqliteServiceConfigSchema.parse(input), maxShows = options.maxShows ?? DIAGNOSE_DEFAULT_MAX_SHOWS;
+export async function diagnoseShows(root: string, config: SqliteServiceConfig, showIds: string[], options: DiagnoseOptions = {}): Promise<DiagnoseResult> {
+  const maxShows = options.maxShows ?? DIAGNOSE_DEFAULT_MAX_SHOWS;
   if (!Number.isSafeInteger(maxShows) || maxShows < 1 || maxShows > DIAGNOSE_ABSOLUTE_MAX_SHOWS) throw new AgentError("invalid_arguments", `--max-shows must be an integer between 1 and ${DIAGNOSE_ABSOLUTE_MAX_SHOWS}`);
   const ids = showIds.map((id) => validateId(id, "show"));
   if (!ids.length) throw new AgentError("invalid_arguments", "diagnose requires at least one Show ID");

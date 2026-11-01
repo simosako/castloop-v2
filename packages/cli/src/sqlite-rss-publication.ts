@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseEpisodeDraft, parseShowMetadata } from "@castloop/shared";
-import { sqliteServiceConfigHash, sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { sqliteDirectPublicationResultSchema } from "../../shared/src/sqlite-direct-publication";
 import { prepareRssImportPublication } from "./rss-import-preflight";
@@ -41,7 +41,6 @@ export function createSqliteRssEffects(root: string, config: SqliteServiceConfig
 
 export async function publishSqliteRssImport(root: string, config: SqliteServiceConfig, output: string,
   options: SqliteCommandOptions = {}, effects = createSqliteRssEffects(root, config, options)): Promise<SqliteRssResult> {
-  config = sqliteServiceConfigSchema.parse(config);
   const prepared = await prepareRssImportPublication(resolve(root, output), config.public_base_url), key = administratorKey(root);
   if (prepared.episodes.some((episode) => Date.parse(episode.metadata.published_at) > Date.now()) && !options.allowFuturePublishedAt) {
     throw new AgentError("future_published_at", "Imported Episodes include future published_at values. Use --allow-future-published-at to publish immediately.");

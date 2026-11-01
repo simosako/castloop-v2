@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { stringifyToml } from "@castloop/shared";
-import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { buildSqliteWorkerMetadata, SQLITE_WORKER_COMPATIBILITY_DATE } from "../../shared/src/sqlite-worker-deployment";
 import { collectStreamBytes, requireR2RestOptions } from "./bounded-http-read";
@@ -22,7 +21,7 @@ export class SqliteCloudflareApi {
   readonly config: SqliteServiceConfig;
   private readonly base: string;
   constructor(config: SqliteServiceConfig, private readonly options: R2RestOptions) {
-    this.config = sqliteServiceConfigSchema.parse(config); requireR2RestOptions(this.config.account_id, options);
+    this.config = config; requireR2RestOptions(this.config.account_id, options);
     this.base = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.config.account_id)}`;
   }
   private async call(method: string, path: string, body?: BodyInit, contentType?: string, absent = false): Promise<unknown> {

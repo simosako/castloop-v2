@@ -1,4 +1,3 @@
-import { sqliteServiceConfigSchema } from "../../shared/src/sqlite-service";
 import type { SqliteServiceConfig } from "../../shared/src/sqlite-service";
 import { z } from "zod";
 import { sqliteHealthSchema, sqliteInspectionSchema, sqliteRegistryStatusSchema, sqliteStatsRetentionResponseSchema } from "../../shared/src/sqlite-service-api";
@@ -19,7 +18,7 @@ export class SqliteServiceClient {
   readonly config: SqliteServiceConfig;
   constructor(config: SqliteServiceConfig, private readonly key: string, private readonly transport: R2RestTransport = fetch,
     private readonly readOptions: SqliteManagementReadOptions = {}) {
-    this.config = sqliteServiceConfigSchema.parse(config);
+    this.config = config;
     if (!key || /[^\x21-\x7e]/.test(key) || key.length > 1024) throw new Error("Missing SQLite administrator key");
   }
   private async call(path: string, body?: object, showId?: string, basePath = "/admin/sqlite-service"): Promise<unknown> {
