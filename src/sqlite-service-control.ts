@@ -2,8 +2,10 @@ import { sqliteRegistrationSchema, sqliteHealthSchema } from "../packages/shared
 import type { SqliteHealth } from "../packages/shared/src/sqlite-service-api";
 import { sqliteCatalogCursorSchema, sqliteCatalogRequestSchema, sqliteCatalogResponseSchema, SQLITE_CATALOG_PAGE_SIZE } from "../packages/shared/src/sqlite-catalog";
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../packages/shared/src/sqlite-catalog";
-import type { PublicationQueueStorage } from "./sqlite-publication-queue";
-import type { SqliteServiceRuntime } from "./sqlite-service-runtime";
+import type { PublicationQueueStorage, SqlitePublicationQueue } from "./sqlite-publication-queue";
+import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
+import type { SqliteDomainRuntime } from "./sqlite-domain-runtime";
+import { requireSqliteRuntimeTarget, sqliteRuntimeHealth } from "./sqlite-service-runtime";
 import type { ShowRegistration } from "./sqlite-show-service";
 import { parseSqliteDomainRequest, requireSqliteDomainConnection, sqliteDomainCommitSchema,
   sqliteDomainFinalizeSchema, sqliteDomainServiceStatusSchema,
@@ -33,7 +35,8 @@ async function readShowSnapshots<T, R>(rows: T[], read: (row: T) => Promise<R>):
 }
 
 export class SqliteServiceControl {
-  constructor(private readonly storage: PublicationQueueStorage, readonly runtime: SqliteServiceRuntime,
+  constructor(private readonly storage: PublicationQueueStorage, readonly queue: SqlitePublicationQueue,
+    private readonly domains: SqliteDomainRuntime, private readonly actual: SqlitePublicationRuntime,
     private readonly peer: (showId: string) => SqliteShowPeer) {
     storage.transactionSync(() => {
       storage.sql.exec(`CREATE TABLE IF NOT EXISTS service_show_registry (show_id TEXT PRIMARY KEY,
@@ -50,9 +53,9 @@ export class SqliteServiceControl {
     return { show_id: showId, reservation_id: row?.reservation_id ?? null, state: row?.state ?? "missing" };
   }
   registrationHealth(): SqliteHealth {
-    return { ...this.runtime.health(), scope: "service", publication_ready: this.runtime.ready() };
+    return { ...sqliteRuntimeHealth(this.actual, this.domains.ready()), scope: "service" };
   }
-  private verifyHealth(input: SqliteHealth, showId: string, identity = this.runtime.health()): SqliteHealth {
+  private verifyHealth(input: SqliteHealth, showId: string, identity = this.registrationHealth()): SqliteHealth {
     const health = sqliteHealthSchema.parse(input);
     if (health.show_id !== showId || health.scope !== "show" || health.service_id !== identity.service_id ||
       health.service_config_sha256 !== identity.service_config_sha256) throw new Error("Show runtime evidence differs");
@@ -60,10 +63,10 @@ export class SqliteServiceControl {
   }
   async register(input: ShowRegistration): Promise<SqliteHealth> {
     const request = sqliteRegistrationSchema.parse(input);
-    this.runtime.requireTarget({ service_id: request.service_id, service_config_sha256: request.service_config_sha256,
+    requireSqliteRuntimeTarget(this.queue, { service_id: request.service_id, service_config_sha256: request.service_config_sha256,
       operation_id: request.operation_id });
     this.storage.transactionSync(() => {
-      if (!this.runtime.ready()) throw new Error("Service runtime is not ready");
+      if (!this.domains.ready()) throw new Error("Service runtime is not ready");
       const existing = this.storage.sql.exec<RegistryRow>("SELECT * FROM service_show_registry WHERE show_id = ?", request.show_id).toArray()[0];
       if (existing) {
         if (existing.reservation_id !== request.reservation_id) throw new Error("Show ID is already reserved by another registration");
@@ -80,18 +83,18 @@ export class SqliteServiceControl {
     return result;
   }
   async health(): Promise<SqliteHealth> {
-    const own = this.runtime.health(), rows = this.registry();
+    const own = this.registrationHealth(), rows = this.registry();
     if (rows.length > 10000) throw new Error("Service status exceeds its Show budget");
     const health = await readShowSnapshots(rows, async (row) =>
       this.verifyHealth(await this.peer(row.show_id).health(), row.show_id, own));
-    return { ...own, scope: "service",
+    return { ...own,
       show_count: rows.length,
       publication_ready: own.publication_ready && rows.every((row) => row.state === "registered") && health.every((item) => item.publication_ready) };
   }
   async catalog(input: SqliteCatalogRequest): Promise<SqliteCatalogResponse> {
     const request = sqliteCatalogRequestSchema.parse(input);
     if (request.kind !== "show") throw new Error("Episode catalog requires its Show");
-    const identity = this.runtime.queue.identity(), { cursor, ...options } = request,
+    const identity = this.queue.identity(), { cursor, ...options } = request,
       scope = { service_id: identity.service_id, service_config_sha256: identity.service_config_sha256, ...options };
     let after = "";
     if (cursor) {
@@ -128,7 +131,7 @@ export class SqliteServiceControl {
     const row = this.storage.sql.exec<{ connection_json: string }>("SELECT connection_json FROM service_domain_connection WHERE id = 1").toArray()[0];
     const pending = this.storage.sql.exec<{ operation_id: string }>(
       "SELECT operation_id FROM publication_domain_changes WHERE state != 'completed'").toArray()[0];
-    return { runtime: this.runtime.queue.identity(), connection: row ? sqliteDomainConnectionSchema.parse(JSON.parse(row.connection_json)) : null,
+    return { runtime: this.queue.identity(), connection: row ? sqliteDomainConnectionSchema.parse(JSON.parse(row.connection_json)) : null,
       pending: pending ?? null };
   }
   private verifyDomainStatus(input: SqliteDomainStatus, own: SqliteDomainStatus, showId: string): SqliteDomainStatus {
@@ -149,7 +152,7 @@ export class SqliteServiceControl {
     if (request.action === "add" ? connection !== null : JSON.stringify(connection) !== JSON.stringify(request.connection)) {
       throw new Error("Domain known connection is not settled");
     }
-    const own = await this.runtime.domains.prepare(request);
+    const own = await this.domains.prepare(request);
     for (const row of rows) {
       const result = this.verifyDomainStatus(await this.peer(row.show_id).prepareDomain(request), own, row.show_id);
       if (result.phase !== "prepared") throw new Error("Show domain preparation differs");
@@ -157,7 +160,7 @@ export class SqliteServiceControl {
     return this.domainStatus(request.operation_id);
   }
   async domainStatus(id: string, after = "") {
-    const own = await this.runtime.domains.status(id);
+    const own = await this.domains.status(id);
     if (after) sqliteRegistrationSchema.shape.show_id.parse(after);
     const rows = this.registry(), page = rows.filter((row) => row.show_id > after).slice(0, SQLITE_DOMAIN_TARGET_PAGE_SIZE + 1);
     const statuses = new Map((await readShowSnapshots(rows, async (row) => {
@@ -174,19 +177,19 @@ export class SqliteServiceControl {
   async commitDomain(input: SqliteDomainCommit) {
     const commit = sqliteDomainCommitSchema.parse(input);
     const rows = await this.settledRegistry();
-    const own = await this.runtime.domains.status(commit.operation_id);
+    const own = await this.domains.status(commit.operation_id);
     if (own.commit && JSON.stringify(own.commit) !== JSON.stringify(commit)) throw new Error("Keep the frozen domain commit receipt");
     for (const row of rows) {
       const result = this.verifyDomainStatus(await this.peer(row.show_id).commitDomain(commit), own, row.show_id);
       if (result.phase !== "completed") throw new Error("Show domain commit differs");
     }
-    const completed = await this.runtime.domains.commit(commit);
+    const completed = await this.domains.commit(commit);
     if (completed.phase !== "completed") throw new Error("Service domain commit differs");
     return this.domainStatus(commit.operation_id);
   }
   async finalizeDomain(input: SqliteDomainFinalize) {
     const request = sqliteDomainFinalizeSchema.parse(input), status = await this.domainStatus(request.operation_id);
-    const own = await this.runtime.domains.status(request.operation_id);
+    const own = await this.domains.status(request.operation_id);
     requireSqliteDomainConnection(request.connection, status.request);
     if (!status.all_completed || status.phase !== "completed" || status.request_sha256 !== request.request_sha256 ||
       request.detached !== (status.request.action === "remove") ||

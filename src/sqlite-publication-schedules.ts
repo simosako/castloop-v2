@@ -51,7 +51,30 @@ export type SqliteScheduleSummary = { scheduled: number; needs_approval: number;
 export class SqlitePublicationSchedules {
   constructor(private readonly storage: PublicationQueueStorage, private readonly queue: SqlitePublicationQueue,
     private readonly content: SqlitePublicationContent, private readonly now: () => number = Date.now,
-    private readonly scope?: { showId: string; ready: () => boolean }) {}
+    private readonly scope?: { showId: string; ready: () => boolean }) {
+    storage.transactionSync(() => {
+      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedules (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL UNIQUE, show_id TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('show', 'episode')), episode_id TEXT,
+        version INTEGER NOT NULL CHECK(version > 0), state TEXT NOT NULL CHECK(state IN ('scheduled', 'needs_approval', 'dispatched', 'cancelled', 'failed')),
+        reason_code TEXT, scheduled_at TEXT NOT NULL, scheduled_at_ms INTEGER NOT NULL, timezone TEXT NOT NULL, timezone_source TEXT NOT NULL,
+        resolution_source TEXT NOT NULL, local_input TEXT NOT NULL, local_datetime TEXT NOT NULL, local_offset TEXT NOT NULL,
+        input_offset TEXT, preview_sha256 TEXT NOT NULL,
+        request_sha256 TEXT NOT NULL, request_json TEXT NOT NULL, revision_id TEXT,
+        created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL, dispatched_at_ms INTEGER, cancelled_at_ms INTEGER,
+        CHECK ((kind = 'show' AND episode_id IS NULL) OR (kind = 'episode' AND episode_id IS NOT NULL)),
+        CHECK ((state = 'dispatched') = (dispatched_at_ms IS NOT NULL)),
+        CHECK ((state = 'cancelled') = (cancelled_at_ms IS NOT NULL)))`);
+      storage.sql.exec(`CREATE UNIQUE INDEX IF NOT EXISTS publication_one_open_schedule
+        ON publication_schedules (show_id, kind, COALESCE(episode_id, '')) WHERE state IN ('scheduled', 'needs_approval')`);
+      storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_schedules_due ON publication_schedules (state, scheduled_at_ms, sequence)");
+      storage.sql.exec(`CREATE TABLE IF NOT EXISTS publication_schedule_events (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL, version INTEGER NOT NULL,
+        action TEXT NOT NULL CHECK(action IN ('create', 'reschedule', 'cancel', 'reapprove', 'dispatch', 'suspend', 'fail')),
+        state TEXT NOT NULL, reason_code TEXT, request_sha256 TEXT NOT NULL, recorded_at_ms INTEGER NOT NULL)`);
+      storage.sql.exec("CREATE INDEX IF NOT EXISTS publication_schedule_events_schedule ON publication_schedule_events (schedule_id, sequence)");
+    });
+  }
 
   private row(scheduleId: string): ScheduleRow | null {
     return this.storage.sql.exec<ScheduleRow>("SELECT * FROM publication_schedules WHERE schedule_id = ?", scheduleId).toArray()[0] ?? null;

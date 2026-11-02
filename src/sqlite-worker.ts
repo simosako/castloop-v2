@@ -15,16 +15,15 @@ import { purgeSitePages } from "./site-storage";
 import type { SitePurgeTarget } from "./site-storage";
 import { parseSitePagePath } from "../packages/shared/src/website";
 import type { SitePage } from "../packages/shared/src/website";
-import { SqlitePublicationContent } from "./sqlite-publication-content";
 import type { SqliteDeliveryDecision } from "./sqlite-publication-content";
 import { SqlitePublicationQueue } from "./sqlite-publication-queue";
-import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { SqliteCachePurgeConfirmation } from "./sqlite-service-runtime";
 import { serveSqliteGateway } from "./sqlite-gateway";
 import { resolveSqliteRuntime } from "./sqlite-runtime-identity";
 import { SqliteShowService } from "./sqlite-show-service";
 import type { ShowRegistration } from "./sqlite-show-service";
 import type { SqliteDeliveryObservation } from "../packages/shared/src/sqlite-stats";
+import { SqliteDomainRuntime } from "./sqlite-domain-runtime";
 import { SqliteServiceControl } from "./sqlite-service-control";
 import { createSqliteControlHttp } from "./sqlite-control-http";
 import { sqliteRegistrationSchema } from "../packages/shared/src/sqlite-service-api";
@@ -85,7 +84,6 @@ export class SiteCachedPages extends WorkerEntrypoint<SqliteWorkerEnv, SiteCache
 
 export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
   private readonly initialized: Promise<void>;
-  private runtime!: SqliteServiceRuntime;
   private serviceHttp!: (request: Request) => Promise<Response>;
   private control?: SqliteServiceControl;
   private show?: SqliteShowService;
@@ -107,16 +105,15 @@ export class SqlitePublicationService extends DurableObject<SqliteWorkerEnv> {
         return;
       }
       if (config.public_base_url !== config.workers_dev_base_url && !this.ctx.storage.sql.exec("SELECT name FROM sqlite_master WHERE name = 'publication_service'").toArray().length) throw new Error("Fresh initialization requires workers.dev");
-      const queue = new SqlitePublicationQueue(this.ctx.storage, resolveSqliteRuntime(this.ctx.storage, identity)), content = new SqlitePublicationContent(this.ctx.storage);
-      const cache = { purge: (showId: string, confirmed?: SqliteCachePurgeConfirmation) => this.purgeCaches(showId, confirmed) };
-      this.runtime = new SqliteServiceRuntime(this.ctx.storage, queue, content, config, cache, identity);
-      this.control = new SqliteServiceControl(this.ctx.storage, this.runtime, (showId) => {
-        const stub = this.env.CASTLOOP_SQLITE.getByName(sqliteShowObjectName(config.service_id, showId));
-        return { initialize: (request) => stub.initializeShow(request), health: () => stub.showHealth(),
-          catalog: (request) => stub.showCatalog(request),
-          prepareDomain: (request) => stub.prepareShowDomain(request), commitDomain: (request) => stub.commitShowDomain(request),
-          domainStatus: (id) => stub.showDomainStatus(id) };
-      });
+      const queue = new SqlitePublicationQueue(this.ctx.storage, resolveSqliteRuntime(this.ctx.storage, identity));
+      this.control = new SqliteServiceControl(this.ctx.storage, queue,
+        new SqliteDomainRuntime(this.ctx.storage, queue, config, identity), identity, (showId) => {
+          const stub = this.env.CASTLOOP_SQLITE.getByName(sqliteShowObjectName(config.service_id, showId));
+          return { initialize: (request) => stub.initializeShow(request), health: () => stub.showHealth(),
+            catalog: (request) => stub.showCatalog(request),
+            prepareDomain: (request) => stub.prepareShowDomain(request), commitDomain: (request) => stub.commitShowDomain(request),
+            domainStatus: (id) => stub.showDomainStatus(id) };
+        });
       this.serviceHttp = createSqliteControlHttp(this.control, this.env.CASTLOOP_ADMIN_KEY);
     });
   }

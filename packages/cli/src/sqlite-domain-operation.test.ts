@@ -40,7 +40,7 @@ test("public REST and journals drive add, normal code-only deploy, status and re
   const removeId = crypto.randomUUID();
   expect((await startSqliteDomainChange(f.root, custom, "remove", removeId, "updated", f.options, undefined, wait)).phase).toBe("completed");
   expect(f.domains).toEqual([]); expect(await loadWorkspaceConfig(f.root)).toEqual(f.config);
-  expect(f.runtime.health()).toMatchObject({ publication_ready: true });
+  expect(f.control.registrationHealth()).toMatchObject({ publication_ready: true });
   expect(f.calls.filter((call) => call.method === "PUT" && call.path === "/workers/domains")).toHaveLength(1);
   expect(f.calls.filter((call) => call.method === "DELETE")).toHaveLength(1);
 });
@@ -197,7 +197,7 @@ test("an acknowledged deployment continues failed REST verification without uplo
 });
 
 test("native rollout waiting is diagnosed explicitly and continues the saved deployment without another upload", async () => {
-  const f = await fixture(), id = crypto.randomUUID(), previous = f.runtime.health(); let pending = true;
+  const f = await fixture(), id = crypto.randomUUID(), previous = f.control.registrationHealth(); let pending = true;
   const options = { ...f.options, transport: async (input: Parameters<typeof f.transport>[0], init?: Parameters<typeof f.transport>[1]) => {
     const response = await f.transport(input, init);
     if (pending && new URL(String(input)).pathname.endsWith("/registration-health")) {

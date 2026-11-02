@@ -8,17 +8,17 @@ SQLiteはDurable Objectごとに独立しています。本書では、サービ
 | --- | --- | --- | --- |
 | `publication_queue_schema` | 作成 | 作成 | 公開基盤の形式版 |
 | `publication_service` | 使用 | 使用 | サービス・設定の識別 |
-| `publication_schedules` | 空の共通表 | 使用 | 予約公開 |
-| `publication_schedule_events` | 空の共通表 | 使用 | 予約操作・実行イベント |
-| `publication_content_schema` | 作成 | 作成 | コンテンツ形式版 |
-| `publication_shows` | 空の共通表 | 使用 | Show公開状態・世代 |
-| `publication_show_content` | 空の共通表 | 使用 | 現在のShow内容 |
-| `publication_episodes` | 空の共通表 | 使用 | Episode公開状態・現在版 |
-| `publication_episode_content` | 空の共通表 | 使用 | 現在のEpisode内容 |
-| `publication_media` | 空の共通表 | 使用 | 承認済み音声参照 |
-| `publication_show_revisions` | 空の共通表 | 使用 | Show内容の履歴 |
-| `publication_episode_revisions` | 空の共通表 | 使用 | Episode内容の履歴 |
-| `publication_site_ids` | 空の共通表 | 使用 | Episodeとサイト短縮IDの対応 |
+| `publication_schedules` | 作成しない | 使用 | 予約公開 |
+| `publication_schedule_events` | 作成しない | 使用 | 予約操作・実行イベント |
+| `publication_content_schema` | 作成しない | 作成 | コンテンツ形式版 |
+| `publication_shows` | 作成しない | 使用 | Show公開状態・世代 |
+| `publication_show_content` | 作成しない | 使用 | 現在のShow内容 |
+| `publication_episodes` | 作成しない | 使用 | Episode公開状態・現在版 |
+| `publication_episode_content` | 作成しない | 使用 | 現在のEpisode内容 |
+| `publication_media` | 作成しない | 使用 | 承認済み音声参照 |
+| `publication_show_revisions` | 作成しない | 使用 | Show内容の履歴 |
+| `publication_episode_revisions` | 作成しない | 使用 | Episode内容の履歴 |
+| `publication_site_ids` | 作成しない | 使用 | Episodeとサイト短縮IDの対応 |
 | `publication_domain_changes` | 使用 | 使用 | 各DOのドメイン変更記録 |
 | `service_show_registry` | 使用 | 作成しない | サービスのShow登録簿 |
 | `service_domain_connection` | 使用 | 作成しない | 最終確定した独自ドメイン接続 |
@@ -28,7 +28,7 @@ SQLiteはDurable Objectごとに独立しています。本書では、サービ
 | `publication_episode_daily_stats` | 作成しない | 使用 | 日別の観測集計 |
 | `publication_episode_pruned_totals` | 作成しない | 使用 | 整理済み日別集計の累計 |
 
-制御DOにも共通の初期化処理で内容・予約の表が作られます。実際の番組データは、それぞれのShow DOに保存します。
+制御DOのSQLiteは、サービス識別(`publication_service` と形式版)、ドメイン変更記録、Show登録簿、独自ドメイン接続情報だけを保持します。番組の公開データは、それぞれのShow DOが保存します。以前の構成で初期化された制御DOには、この変更より前に作られた内容・予約の未使用表が残ることがあります。これらは読み書きされないため移行・削除は行わず、残しても実害はストレージ量のみです。
 
 ### 表記
 
@@ -256,6 +256,6 @@ CHECKで次を制約します。
 
 ## DDLの定義元
 
-- [公開基盤・予約](../../src/sqlite-publication-queue.ts)、[内容・履歴](../../src/sqlite-publication-content.ts)、[短縮ID](../../src/sqlite-site-ids.ts)
+- [公開基盤](../../src/sqlite-publication-queue.ts)、[予約](../../src/sqlite-publication-schedules.ts)、[内容・履歴](../../src/sqlite-publication-content.ts)、[短縮ID](../../src/sqlite-site-ids.ts)
 - [制御DO固有表](../../src/sqlite-service-control.ts)、[Show固定対応](../../src/sqlite-show-service.ts)、[ドメイン変更](../../src/sqlite-domain-runtime.ts)
 - [統計](../../src/sqlite-delivery-stats.ts)、[形式版と稼働設定の確認](../../src/sqlite-runtime-identity.ts)

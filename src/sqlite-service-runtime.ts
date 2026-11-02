@@ -12,7 +12,7 @@ import { publicationChecksum } from "./publication-inputs";
 import { readSqliteCatalog } from "./sqlite-catalog";
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../packages/shared/src/sqlite-catalog";
 import type { SqlitePublicationRuntime } from "../packages/shared/src/sqlite-publication";
-import { SqliteDomainRuntime, pendingSqliteDomain } from "./sqlite-domain-runtime";
+import { SqliteDomainRuntime } from "./sqlite-domain-runtime";
 
 export type SqliteCachePurgeConfirmation = (entrypoint: "media" | "site") => void;
 export type SqliteRuntimeCache = {
@@ -21,32 +21,41 @@ export type SqliteRuntimeCache = {
   purgeSite?: (target: { showId: string; siteId?: string }) => Promise<void>;
 };
 
+export function sqliteRuntimeHealth(actual: SqlitePublicationRuntime, ready: boolean): SqliteHealth {
+  return sqliteHealthSchema.parse({ ...actual, protocol: "sqlite-sequential-v1", invocation_id: crypto.randomUUID(),
+    revision_history: "sqlite-revisions-v1",
+    website: "static-show-v2",
+    delivery_statistics: "episode-daily-v1",
+    domain_changes: "sqlite-domain-change-v1",
+    publication_ready: ready });
+}
+
+export function requireSqliteRuntimeTarget(queue: SqlitePublicationQueue, input: SqliteRuntimeRequest): SqliteRuntimeRequest {
+  const request = sqliteRuntimeRequestSchema.parse(input), identity = queue.identity();
+  if (request.service_id !== identity.service_id || request.service_config_sha256 !== identity.service_config_sha256) {
+    throw new Error("SQLite runtime request has a stale target");
+  }
+  return request;
+}
+
 export class SqliteServiceRuntime {
   readonly domains: SqliteDomainRuntime;
   constructor(private readonly storage: PublicationQueueStorage, readonly queue: SqlitePublicationQueue,
     readonly content: SqlitePublicationContent, private readonly config: SqliteServiceConfig,
     cache: SqliteRuntimeCache, private readonly actual: SqlitePublicationRuntime = queue.identity(), showId?: string) {
-    this.domains = new SqliteDomainRuntime(storage, queue, content, config, cache, actual, showId);
+    this.domains = new SqliteDomainRuntime(storage, queue, config, actual,
+      showId === undefined ? undefined : { showId, content, cache });
   }
-  ready(): boolean { return !pendingSqliteDomain(this.storage); }
+  ready(): boolean { return this.domains.ready(); }
   catalog(request: SqliteCatalogRequest): SqliteCatalogResponse {
     if (!this.ready()) throw new Error("SQLite runtime is not ready");
     return readSqliteCatalog(this.storage, request, this.queue.identity(), this.config.public_base_url);
   }
   requireTarget(input: SqliteRuntimeRequest): SqliteRuntimeRequest {
-    const request = sqliteRuntimeRequestSchema.parse(input), identity = this.queue.identity();
-    if (request.service_id !== identity.service_id || request.service_config_sha256 !== identity.service_config_sha256) {
-      throw new Error("SQLite runtime request has a stale target");
-    }
-    return request;
+    return requireSqliteRuntimeTarget(this.queue, input);
   }
   health(): SqliteHealth {
-    return sqliteHealthSchema.parse({ ...this.actual, protocol: "sqlite-sequential-v1", invocation_id: crypto.randomUUID(),
-      revision_history: "sqlite-revisions-v1",
-      website: "static-show-v2",
-      delivery_statistics: "episode-daily-v1",
-      domain_changes: "sqlite-domain-change-v1",
-      publication_ready: this.ready() });
+    return sqliteRuntimeHealth(this.actual, this.ready());
   }
   async inspect(showId: string, episodeId?: string): Promise<SqliteInspection> {
     if (!this.ready()) throw new Error("SQLite runtime is not ready");

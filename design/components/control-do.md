@@ -2,6 +2,8 @@
 
 制御DOはサービス単位のShow登録簿と、独自ドメイン接続情報を管理します。番組の登録、一覧取得、サービス全体の設定変更で各Show DOと連携します。番組ごとの公開内容は[Show DO](show-do.md)が管理します。
 
+制御DOのSQLiteが保持する表は、サービス識別と形式版(`publication_service`・`publication_queue_schema`)、ドメイン変更記録(`publication_domain_changes`)、Show登録簿(`service_show_registry`)、独自ドメイン接続情報(`service_domain_connection`)だけです。公開内容・履歴・予約・統計は各Show DOが保存します。保存表の対応は[表設計](../data/sqlite.md)を参照してください。
+
 ## Showの登録
 
 `create-show` は、サービス設定、Show ID、登録を識別する `reservation_id` を使って、次の順に処理します。

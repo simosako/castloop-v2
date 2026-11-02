@@ -44,7 +44,7 @@ test("formal SQLite commands publish local inputs directly without staging or le
   expect(value.calls.some((call) => call.method === "PUT" && call.path.endsWith("audio.mp3"))).toBe(false);
   expect(value.calls.some((call) => /queues|event_notifications|show-publications|system\/jobs/.test(call.path))).toBe(false);
  
-  expect(value.runtime.health()).toMatchObject({ publication_ready: true });
+  expect(value.control.registrationHealth()).toMatchObject({ publication_ready: true });
 });
 
 test("publish-episode requires explicit future published_at approval through command options", async () => {
