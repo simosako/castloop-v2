@@ -22,12 +22,19 @@ export function pendingSqliteDomain(storage: PublicationQueueStorage): boolean {
   return storage.sql.exec("SELECT operation_id FROM publication_domain_changes WHERE state != 'completed'").toArray().length !== 0;
 }
 
+export type SqliteDomainScope = {
+  showId: string;
+  content: SqlitePublicationContent;
+  cache: SqliteRuntimeCache;
+};
+
 export class SqliteDomainRuntime {
   constructor(private readonly storage: PublicationQueueStorage, readonly queue: SqlitePublicationQueue,
-    private readonly content: SqlitePublicationContent, private readonly config: SqliteServiceConfig,
-    private readonly cache: SqliteRuntimeCache, private readonly actual: SqlitePublicationRuntime, readonly showId?: string) {
+    private readonly config: SqliteServiceConfig, private readonly actual: SqlitePublicationRuntime,
+    private readonly scope?: SqliteDomainScope) {
     initializeSqliteDomains(storage);
   }
+  ready(): boolean { return !pendingSqliteDomain(this.storage); }
   private row(id: string): DomainRow {
     sqliteDomainRequestSchema.shape.operation_id.parse(id);
     const row = this.storage.sql.exec<DomainRow>("SELECT * FROM publication_domain_changes WHERE operation_id = ?", id).toArray()[0];
@@ -39,7 +46,7 @@ export class SqliteDomainRuntime {
     if (await sqliteDomainRequestHash(request) !== row.request_sha256) throw new Error("Stored domain request differs");
     return sqliteDomainStatusSchema.parse({ request, request_sha256: row.request_sha256, phase: row.state,
       commit: row.commit_json ? sqliteDomainCommitSchema.parse(JSON.parse(row.commit_json)) : null,
-      ...(this.showId ? { show_id: this.showId } : {}) });
+      ...(this.scope ? { show_id: this.scope.showId } : {}) });
   }
   async prepare(input: SqliteDomainRequest, suspendSchedules?: () => void): Promise<SqliteDomainStatus> {
     const request = await parseSqliteDomainRequest(input), digest = await sqliteDomainRequestHash(request);
@@ -71,13 +78,13 @@ export class SqliteDomainRuntime {
     if (identity.service_id !== request.previous_config.service_id || identity.service_config_sha256 !== request.previous_config_sha256) {
       throw new Error("Domain commit differs from its prepared configuration");
     }
-    if (this.showId) await this.cache.purge(this.showId);
+    if (this.scope) await this.scope.cache.purge(this.scope.showId);
     await this.queue.changeConfiguration(this.actual, () => {
       if (this.row(request.operation_id).state !== "prepared") throw new Error("Domain commit already started");
-      if (this.showId) {
-        const generation = this.content.nextFeedGeneration(this.showId);
+      if (this.scope) {
+        const generation = this.scope.content.nextFeedGeneration(this.scope.showId);
         this.storage.sql.exec("UPDATE publication_shows SET feed_generation = ? WHERE show_id = ? AND lifecycle = 'published'",
-          generation, this.showId);
+          generation, this.scope.showId);
       }
       this.storage.sql.exec("UPDATE publication_domain_changes SET state = 'completed', commit_json = ? WHERE operation_id = ?",
         JSON.stringify(commit), request.operation_id);

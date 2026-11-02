@@ -22,7 +22,7 @@ test("fresh initialization provisions only R2/Worker/SQLite and finishes immedia
   const value = await fixture(), id = crypto.randomUUID();
   const state = await initializeSqliteService(value.root, value.config, id, "worker source", value.options, wait);
   expect(state.phase).toBe("ready"); expect(state.namespace_id).toBe("b".repeat(32));
-  expect(value.runtime.health()).toMatchObject({ publication_ready: true });
+  expect(value.control.registrationHealth()).toMatchObject({ publication_ready: true });
   expect(value.calls.some((call) => unrelatedResourcePath.test(call.path))).toBe(false);
   expect(value.calls).toContainEqual({ method: "GET", path: `/r2/buckets/${value.config.bucket_name}` });
   expect(value.calls).toContainEqual({ method: "PUT", path: `/workers/scripts/${value.config.worker_name}?bindings_inherit=strict` });

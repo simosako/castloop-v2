@@ -70,13 +70,13 @@ for (const kind of ["health", "catalog"] as const) for (const failure of [false,
       } finally { active--; }
     };
     const unexpected = async (): Promise<never> => { throw new Error("Read must not mutate Shows"); };
-    const control = new SqliteServiceControl(f.controlStorage, f.runtime, (id) => ({
+    const control = new SqliteServiceControl(f.controlStorage, f.controlQueue, f.controlDomains, f.actual, (id) => ({
       initialize: unexpected,
       prepareDomain: unexpected, commitDomain: unexpected, domainStatus: unexpected,
       async health() { await read(id); return f.nodes.get(id)!.service.health(); },
       async catalog(request) { await read(id); return f.nodes.get(id)!.service.runtime.catalog(request); },
     }));
-    const ownHealth = spyOn(f.runtime, "health");
+    const ownHealth = spyOn(control, "registrationHealth");
     const pending = (kind === "health" ? control.health() : control.catalog({ kind: "show", include_deleted: false }))
       .then((value) => ({ ok: true as const, value }), () => ({ ok: false as const })).finally(() => { finished = true; });
     try {
@@ -127,7 +127,7 @@ test("a code-only deploy keeps Shows serving, publishing and scheduling without 
   const f = await fixture(); await f.create("a"); await f.create("b");
   await f.run("publish-show", ["a"]); await f.run("publish-show", ["b"]);
   const before = new Map([...f.entries].map(([key, entry]) => [key, entry.etag]));
-  const previousVersion = f.runtime.queue.identity().worker_version_id;
+  const previousVersion = f.controlQueue.identity().worker_version_id;
   const result = await f.deploy();
   expect(result).toMatchObject({ previous_worker_version_id: previousVersion, publication_ready: true });
   for (const id of ["a", "b"]) {
@@ -146,6 +146,20 @@ test("a deploy with a changed configuration is refused and belongs to the domain
   const changed = { ...f.config, public_base_url: "https://podcasts.example.com" };
   await expect(deploySqliteService(f.root, changed, "updated", f.options, wait)).rejects.toThrow("domain change procedure");
   expect(f.nodes.get("a")!.service.delivery("/podcasts/a/feed.xml").status).toBe(200);
+});
+
+test("the control storage keeps only its own tables while Show storages keep the publication set", async () => {
+  const f = await fixture();
+  const names = (storage: typeof f.controlStorage) => storage.sql.exec<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").toArray().map((row) => row.name);
+  expect(names(f.controlStorage)).toEqual(["publication_domain_changes", "publication_queue_schema",
+    "publication_service", "service_domain_connection", "service_show_registry"]);
+  const indexes = f.controlStorage.sql.exec<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_%' ORDER BY name").toArray().map((row) => row.name);
+  expect(indexes).toEqual(["publication_one_domain_change"]);
+  await f.create("a");
+  expect(names(f.nodes.get("a")!.fixture.storage)).toEqual(expect.arrayContaining(["publication_schedules", "publication_schedule_events",
+    "publication_content_schema", "publication_shows", "publication_show_binding", "publication_delivery_stats_schema"]));
 });
 
 test("an interrupted Show initialization does not block another Show and completes idempotently on retry", async () => {

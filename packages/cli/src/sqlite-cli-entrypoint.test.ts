@@ -29,7 +29,7 @@ test("formal CLI entrypoint initializes ready and publishes through the SQLite r
   }
   try {
     expect(await command(["init", ".", "--operation-id", crypto.randomUUID()])).toMatchObject({ phase: "ready" });
-    expect(setup.runtime.health().publication_ready).toBe(true);
+    expect(setup.control.registrationHealth().publication_ready).toBe(true);
     const show = Bun.spawn([process.execPath, "--preload", preload, cli, "create-show", "daily", "--site-url", "https://example.com/podcast"], {
       cwd: setup.root, env: environment, stdout: "pipe", stderr: "pipe" });
     const [showOutput, showError, showCode] = await Promise.all([new Response(show.stdout).text(), new Response(show.stderr).text(), show.exited]);
@@ -124,7 +124,7 @@ globalThis.fetch = Object.assign(async (input, init) => {
       expect(code, stderr).toBe(0); expect(JSON.parse(stdout)).toMatchObject({ phase: "ready" });
       expect(await loadWorkspaceConfig(workspace)).toMatchObject({ schema_version: 2, publication_protocol: "sqlite-sequential-v1" });
       const setup = await fixture!;
-      expect(setup.runtime.health()).toMatchObject({ publication_ready: true });
+      expect(setup.control.registrationHealth()).toMatchObject({ publication_ready: true });
       expect(setup.calls.some((call) => /queues|event_notifications/.test(call.path))).toBe(false);
     } finally { server.stop(true); (await fixture)?.close(); rmSync(root, { recursive: true, force: true }); }
   }, 30000);

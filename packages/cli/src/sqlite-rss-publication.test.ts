@@ -275,5 +275,5 @@ for (const kind of ["show", "episode"] as const) test(`edited RSS ${kind} input 
   expect(value.calls).toHaveLength(0);
   expect(value.commands).toHaveLength(0);
   expect(existsSync(value.cursor)).toBe(false);
-  expect(value.content.inspect("imported").show).toBeNull();
+  expect(value.nodes.size).toBe(0);
 });
