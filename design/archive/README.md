@@ -18,6 +18,7 @@
 | [Show単位DOの検討](do_show_separation_options.md) | [全体構成](../architecture.md)、[制御DO](../components/control-do.md) |
 | [管理認証](admin_authentication.md) | [セキュリティ](../security.md) |
 | [REST URL構築](rest_url_construction.md) | [CLIの通信契約](../components/cli.md#通信失敗とローカル記録) |
+| [ドメイン変更ジャーナルの相の検討（Issue #111）](domain-journal-issue-111.md) | [制御DO・独自ドメイン](../components/control-do.md#進捗記録と中断後の継続) |
 | [項目別入力上限](show_episode_input_limits.md) | [スキーマ](../data/schemas.md) |
 | [エージェント連携の計画](agent_integration_plan.md) | [CLI](../components/cli.md)、[JSON出力スキーマ](../data/schemas.md#cliのjson出力) |
 | [CLI操作簡素化の改善案比較（Issue #119）](cli-usability-issue-119.md) | [CLI](../components/cli.md)、[初回公開ガイド](../../docs/getting_started.md)、[更新ガイド](../../docs/publishing.md) |
