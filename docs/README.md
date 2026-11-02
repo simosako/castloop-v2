@@ -48,7 +48,7 @@ To check a command's arguments, run `castloop help COMMAND`.
 
 ## Related documentation
 
-- [v0.8.7 release notes](release-v0.8.7.md)
+- [v0.8.8 release notes](release-v0.8.8.md)
 - [Development and release documentation](development/README.md)
 - [Design documentation](../design/README.md) (Japanese)
 - [Archived documents](archive/README.md)
