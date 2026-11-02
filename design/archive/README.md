@@ -20,6 +20,7 @@
 | [REST URL構築](rest_url_construction.md) | [CLIの通信契約](../components/cli.md#通信失敗とローカル記録) |
 | [項目別入力上限](show_episode_input_limits.md) | [スキーマ](../data/schemas.md) |
 | [エージェント連携の計画](agent_integration_plan.md) | [CLI](../components/cli.md)、[JSON出力スキーマ](../data/schemas.md#cliのjson出力) |
+| [CLI操作簡素化の改善案比較（Issue #119）](cli-usability-issue-119.md) | [CLI](../components/cli.md)、[初回公開ガイド](../../docs/getting_started.md)、[更新ガイド](../../docs/publishing.md) |
 | [予約公開計画](episode_scheduled_publication_plan.md) | [Show DOの予約公開](../components/show-do.md#予約公開) |
 | [配信統計計画](episode_delivery_statistics_plan.md) | [Show DOの統計](../components/show-do.md#配信統計)、[表設計](../data/sqlite.md) |
 | [差分確認・過去版採用計画](published_diff_and_revision_restore_plan.md) | [CLI](../components/cli.md)、[Show DO](../components/show-do.md) |

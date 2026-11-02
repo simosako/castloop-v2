@@ -37,9 +37,9 @@ castloop publish-episode first audio.mp3 --show my-show --expect-preview REVIEWE
 
 案Bの実装後は、管理コマンドと `backup-create` が現在地と上位5階層からワークスペースを探します。Showディレクトリの下からのEpisode操作でも、ワークスペース直下のShowディレクトリと `show.toml` のIDが一致すれば対象を省略できます。`init`、`doctor`、`preview-schedule-time` は上位を探索せず、`import-rss`、`validate` などはワークスペースを必要としません。すべてのコマンドに一律の規則を当てることはできません。
 
-相対パスの基準も一様ではありません。Episode音声はShowディレクトリ基準、lifecycle・revisionのプランファイルはワークスペース基準、`validate` の入力はカレントディレクトリ基準です。音声の絶対パスについて、調査時の初回公開ガイドと更新ガイドには説明の不一致がありました。案Aでは、実装と[保存構造](data/storage.md)に合わせ、[初回公開ガイド](../docs/getting_started.md)と[更新ガイド](../docs/publishing.md)の説明を統一しています。
+相対パスの基準も一様ではありません。Episode音声はShowディレクトリ基準、lifecycle・revisionのプランファイルはワークスペース基準、`validate` の入力はカレントディレクトリ基準です。音声の絶対パスについて、調査時の初回公開ガイドと更新ガイドには説明の不一致がありました。案Aでは、実装と[保存構造](../data/storage.md)に合わせ、[初回公開ガイド](../../docs/getting_started.md)と[更新ガイド](../../docs/publishing.md)の説明を統一しています。
 
-根拠: [CLI入口](../packages/cli/src/index.ts)、[引数とヘルプ](../packages/cli/src/help.ts)、[音声パスの解決](../packages/cli/src/draft-preview.ts)、[CLI入口テスト](../packages/cli/src/sqlite-cli-entrypoint.test.ts)。
+根拠: [CLI入口](../../packages/cli/src/index.ts)、[引数とヘルプ](../../packages/cli/src/help.ts)、[音声パスの解決](../../packages/cli/src/draft-preview.ts)、[CLI入口テスト](../../packages/cli/src/sqlite-cli-entrypoint.test.ts)。
 
 ### ハッシュや版の引き継ぎには用途の違いがある
 
@@ -55,7 +55,7 @@ castloop publish-episode first audio.mp3 --show my-show --expect-preview REVIEWE
 
 ハッシュは確認した入力と実行時の入力を結び付ける値であり、それ自体が人間による承認の証拠ではありません。`--local` のプレビューではリモートの更新元を確認していないため、リモート確認を含む公開前レビューの代わりにはできません。予約、lifecycle、過去版採用では、それぞれ別の対象・版・時刻を含む値を使うため、単一の「ハッシュを省略する仕組み」に無条件でまとめるべきではありません。
 
-根拠: [CLI設計](components/cli.md)、[通常公開](../packages/cli/src/sqlite-publish.ts)、[予約](../packages/cli/src/sqlite-schedule.ts)、[lifecycle](../packages/cli/src/sqlite-lifecycle.ts)、[過去版採用](../packages/cli/src/sqlite-revision-commands.ts)。
+根拠: [CLI設計](../components/cli.md)、[通常公開](../../packages/cli/src/sqlite-publish.ts)、[予約](../../packages/cli/src/sqlite-schedule.ts)、[lifecycle](../../packages/cli/src/sqlite-lifecycle.ts)、[過去版採用](../../packages/cli/src/sqlite-revision-commands.ts)。
 
 ### 利用フロー全体での改善余地
 
