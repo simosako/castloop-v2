@@ -37,7 +37,7 @@
 - 基盤の検討：[SQLite逐次公開](sqlite_sequential_publication_implementation_plan.md)、[操作記録](sqlite_operation_records_schema.md)、[Show分離の検証](do_show_separation_verification.md)
 - 機能導入：[内蔵サイト](show_website_plan.md)、[独自ドメイン](sqlite_custom_domains_plan.md)、[診断・監視](remote_diagnostics_and_monitoring_plan.md)、[無料枠配信スケーリング](delivery-free-tier-scaling.md)
 - エージェント規則の履歴：[保存規約・マイルストーンのスナップショット](agent_storage_and_milestones_20261017.md)
-- 見送りとした検討：[CLI管理クライアントの簡素化（Issue #110）](cli-management-client-issue-110.md)
+- 見送りとした検討：[CLI管理クライアントの簡素化（Issue #110）](cli-management-client-issue-110.md)、[診断分類の粒度の見直し（Issue #112）](diagnostics-granularity-issue-112.md)
 
 ## 実機検証と環境廃棄
 
