@@ -45,7 +45,7 @@ castloop manages Cloudflare resources and podcast content. When working on chang
 
 - Keep credentials, `.castloop/` state, private URLs, and unpublished content out of issues, pull requests, and commits. Redact examples and logs before sharing them.
 - Keep automated tests local and independent of live Cloudflare credentials and resources. Live testing requires authorization for the target environment and operations; see the [private trial procedure](design/security.md#非公開の実機試験).
-- Preserve explicit publication, atomic updates, checks on reviewed inputs and delivery readiness, and published audio and revision history. Do not automatically retry mutating requests.
+- Preserve explicit publication, atomicity within each operation's commit boundaries, checks on reviewed inputs and delivery readiness, and published audio and revision history. Do not automatically resend mutating requests with an unknown outcome. Follow the [consistency and retry contracts](design/security.md#変更処理の整合性).
 - Keep Worker diagnostics limited to the approved codes and messages; do not log secrets, content, email addresses, or arbitrary exceptions. See the [security design](design/security.md) and the relevant [component design](design/README.md) for details.
 
 ## Agent-assisted contributions

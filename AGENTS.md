@@ -1,13 +1,15 @@
 # Agent Guide for castloop
 
+castloop hosts podcasts in the administrator's Cloudflare account. Administrators use the standalone CLI to edit and publish shows; listeners retrieve feeds, media and the built-in site over HTTP.
+
 ## Hard rules (read first)
-1. Implement exactly the requested behavior. See "Scope and complexity" below.
-2. Finish the entire requested task before replying. See "Completion contract".
-3. For any non-trivial change, state the scope before coding. See "Task protocol".
-4. Local code, test and documentation changes within the requested scope need no mid-task confirmation. Only live Cloudflare operations require explicit authorization (see "Safety boundaries").
+1. Choose the simplest implementation that satisfies the requested behavior, established contracts, and evidenced failure cases within supported operation. Additional complexity requires concrete justification; hypothetical future needs or failures outside the operating contract are not sufficient. See "Scope and complexity" below.
+2. Complete the requested scope and verify its acceptance criteria before reporting completion. See "Task workflow".
+3. Use CodeGraph before locating, reading or editing code when the working directory has a CodeGraph index. See "Code investigation".
+4. Local code, test and documentation changes within the requested scope need no mid-task confirmation. Live operations and changes to protected local materials require explicit authorization (see "Safety boundaries").
 5. Never add any of these without an explicit request:
    - new dependencies or tooling
-   - speculative retry, backoff, fallback or recovery machinery; network timeouts and bounded retries for idempotent reads (as in the shared HTTP helpers) are established conventions, and never retry mutating calls automatically
+   - speculative retry, backoff, fallback or recovery machinery
    - compatibility or migration paths for unsupported versions or layouts
    - fine-grained multi-phase state machines, `blocked` states or lockouts
    - configuration options, flags or extension points with no current use
@@ -15,32 +17,33 @@
    - validation of values already guaranteed by types, contracts or trusted internal callers
    - edge-case handling without evidence ("Scope and complexity" defines the acceptable evidence)
 
-## Task protocol
-Before writing code for a non-trivial change, state in five lines or fewer:
-- the requested behavior in your own words (1–2 sentences),
-- the files you expect to touch,
-- any additional defensive behavior you intend to implement and its evidence; do not enumerate hypothetical edge cases,
-- an explicit out-of-scope list.
+Network timeouts and bounded retries for idempotent reads are established conventions. Never automatically resend a mutating request with an unknown outcome. The existing cache-purge handling of explicit rate-limit responses follows the [delivery contract](design/components/delivery.md#更新時のキャッシュ消去).
 
-If the change grows clearly beyond this during work, stop and ask instead of expanding silently.
+## Task workflow
+1. Before starting, identify the acceptance criteria and applicable constraints. For a non-trivial change, briefly explain the criteria and change scope without omitting important decisions or constraints for brevity. Name expected files when that helps clarify the scope. Mention exclusions only when needed to clarify the request, and additional defensive behavior only with its evidence.
+2. Use "Read documentation by task" below to load the applicable skill and contracts before acting.
+3. Complete the requested scope. If it grows clearly beyond the agreed scope, stop and ask. If it is too large to finish in one pass, ask to split it before starting.
+4. Check every acceptance criterion, run the applicable checks and review written documentation. Finish once these pass; expand investigation only for relevant failures or new evidence. Report unmet criteria as INCOMPLETE with the reason.
+5. In the final report, state the changed files and results of verification actually performed. Report test results only when tests were run; omit notices that tests were not run. Mention remaining work only if there is any. If blocked, report the exact error and what was tried; do not report partial work as complete or defer requested work to "next steps".
 
-## Completion contract (Definition of Done)
-1. Complete the entire requested task before replying. A progress report is not a deliverable.
-2. Before starting, restate the request's acceptance criteria as a short list. Before finishing, verify every item and list any unchecked item as INCOMPLETE with the reason.
-3. The final report states the changed files, the `bun test` and `npm run check` results (skipped only for documentation-only changes), and anything intentionally left undone.
-4. Never end with "next steps" that belong to the original request.
-5. If blocked, report the exact error and what was tried. That is a failure report, not a partial success.
-6. If the task is too large to finish in one pass, ask to split it before starting — not midway.
+## Code investigation
+- In a checkout with a `.codegraph/` index, use `codegraph_explore` before searching for or reading code. Query the relevant file, symbols or flow; use the returned source and dependency information.
+- Use direct reads or grep for documentation, configuration, details CodeGraph did not cover, or files explicitly flagged as stale. Follow the tool's freshness guidance.
+- If CodeGraph is unavailable, try `codegraph explore`. If neither interface works, report the limitation and use direct tools. For an existing checkout without an index, use direct tools without creating one unless requested. Newly created worktrees follow "CodeGraph in Git worktrees" below.
 
 ## Scope and complexity
 
 - Implement only the requested behavior and existing approved contracts.
   Do not turn possible failures into new requirements.
 
+- Simplicity means minimizing unnecessary state, branches and dependencies while preserving required validation and safety guarantees, not merely reducing line count.
+
 - Before adding defensive logic, identify either an explicit requirement
   or a concrete failure path in supported operation.
   For a failure path, name the real entry point, supported preconditions,
   existing protections, and resulting failure.
+
+- Follow the [local input and serial-operation contract](docs/development/constraints.md#local-inputs-and-serial-operations). A failure that requires violating those preconditions is not, by itself, evidence for additional defensive logic. Preserve existing validation and server-side concurrency and data-protection guarantees.
 
 - Artificial reproducibility alone is not evidence of production relevance.
   A failing test must be tied to a requirement or a supported execution path.
@@ -60,65 +63,54 @@ If the change grows clearly beyond this during work, stop and ask instead of exp
 - Generic best practices do not expand the requested scope.
   Preserve established security controls and data-integrity guarantees.
 
-- Once acceptance criteria and required checks pass, finish.
-  Expand investigation only for relevant failures or new evidence.
-
 ## Repository and checks
 - `packages/cli/src/`: the Bun single-executable CLI; `packages/shared/src/`: shared utilities; `src/`: Cloudflare Worker services.
-- Run `bun test` and `npm run check` for automated tests and TypeScript validation. Skip both for documentation-only or other changes that do not affect code, builds, or runtime behavior.
+- The production Worker entrypoint is `src/sqlite-worker.ts`. Before changing Worker embedding, deployment configuration or persisted formats, read the relevant [development constraints](docs/development/constraints.md).
+- For ordinary code changes, run `bun test` and `npm run check`. Skip both for documentation-only or other changes that do not affect code, builds or runtime behavior.
+- For release work, use the required CI verification in [the release procedure](docs/development/releasing.md); a full local rerun is not required. Code fixes made during release work still require the ordinary local checks. Documentation-only release changes still require the release CI checks.
 - When a test or command fails, establish the root cause from its output, logs, or other evidence before changing conditions or making assumptions. If diagnostics are insufficient, add focused, privacy-safe logging and rerun the same reproduction; fix the evidenced cause rather than working around unexplained failures.
-- No lint or formatter is configured. Do not add tooling without an explicit request.
+- No lint or formatter is configured.
 - Update the relevant design and usage docs when behavior changes.
-- After writing or updating a specification or plan, reread it and fix any unnatural, ambiguous, or hard-to-understand wording. Explain unfamiliar terms and avoid unexplained shorthand.
+
+## Documentation
+- Identify the reader and what they need to understand or do. Organize the text in that order, rather than the order of investigation or implementation.
+- Usage guides explain operations in the order users perform them. Design documents describe the current system and the reasons needed to understand it. Plans and verification records hold pending work, performed checks and results. Keep AGENTS.md focused on durable working rules.
+- Describe behavior and instructions directly. Include exclusions or negative statements when they prevent a likely misunderstanding or unsafe action, rather than routinely listing things a change does not do.
+- Use familiar terms and consistent names. Explain unfamiliar terms and abbreviations on first use.
+- Keep historical discussion and rejected alternatives separate from current instructions. Keep each procedure or contract in one authoritative place and link to it instead of copying it into skills or other guides.
+- Keep `design/` outside `design/archive/` organized around the current design, not the work that produced it. Issue investigations, option comparisons, implementation plans and work or verification records belong in `design/archive/`. Temporary placement outside the archive is allowed during development; before any push or PR, move those documents into the archive, incorporate adopted decisions into the current design documents, and update links and indexes.
+- Reread every document you write or update. Fix unclear wording and reading order; remove repetition, unnecessary preambles and irrelevant exclusions. Follow each document's language requirements; release notes are English only.
 
 ## Read documentation by task
-- Use [design/README.md](design/README.md) to locate relevant documents; do not read all design docs or historical records on every task.
-- For implementation tasks, read only the contract documents listed for the task below, and only the sections relevant to the change. Verification records, release notes, `docs/archive/` and `design/archive/` are history, not implementation inputs: do not justify new defensive code with failure modes recorded there.
-- Current architecture: [design/architecture.md](design/architecture.md). Storage and contracts: [storage layout](design/data/storage.md), [SQLite tables](design/data/sqlite.md), [schemas](design/data/schemas.md). User operations: [docs/README.md](docs/README.md). Build, CI and release maintenance: [docs/development/README.md](docs/development/README.md).
-- Development supports only fresh SQLite service configs (`schema_version=2`, `sqlite-sequential-v1`, required `storage_layout="show-v1"`); `init` uses this by default. Reject service schema version 1 and legacy layouts before IO or local state changes. Never add migration, legacy layout support, resource adoption or fallback. Shared content/request schema version 1 is independent and remains supported.
-- The production Worker entrypoint is `src/sqlite-worker.ts`; embed only that Worker. Preserve existing DO/cache class names, bindings, compatibility date and persisted SQLite formats during code-only cleanup.
+- Start with the relevant entry below and read the sections needed for the task. Follow additional references when the change affects another contract, rather than reading every linked document. The design index owns the technical topic-to-document mapping.
 
-| When working on | Read the relevant contract |
+| Task | Starting point |
 | --- | --- |
-| Overall architecture or simplification | [Architecture](design/architecture.md), then the relevant component in the [design index](design/README.md) |
-| SQLite publication, lifecycle or updates | [CLI](design/components/cli.md), [Show DO](design/components/show-do.md), [publication schemas](design/data/schemas.md) |
-| Show isolation or service control | [Architecture](design/architecture.md), [control DO](design/components/control-do.md), [Show DO](design/components/show-do.md). Keep publication and delivery local to each Show DO; the control DO handles only Show registration, catalog listing and custom domain state |
-| Custom domain changes or deployment | [Control DO and domain changes](design/components/control-do.md), [CLI deployment](design/components/cli.md), [domain usage guide](docs/custom_domains.md). Concurrent external changes to the same hostname/DNS/Worker domain are unsupported |
-| Removed Queue code or v0.5.x history | [Removal plan](design/archive/schema_v1_removal_plan.md), [v0.5.x Queue guide](docs/archive/queue_service.md), [archived architecture](design/archive/initial_design_v052.md) |
-| Lifecycle, deletion or retention | [Show DO](design/components/show-do.md), [storage and retention](design/data/storage.md), [security](design/security.md). Physical deletion is not implemented; do not transplant archived Queue operations |
-| Public delivery or caching | [Delivery and caching](design/components/delivery.md), [security](design/security.md) |
-| Scheduling or delivery statistics | [Show DO](design/components/show-do.md), [SQLite tables](design/data/sqlite.md), [schemas](design/data/schemas.md) |
-| RSS import or publication | [RSS import](design/components/rss-import.md), [RSS migration guide](docs/rss_migration.md) |
-| Local journals or backups | [Storage layout](design/data/storage.md), [workspace backup](design/components/workspace-backup.md) |
-| Authentication or input validation | [Security](design/security.md), [schemas](design/data/schemas.md), [CLI](design/components/cli.md) |
-| Testing or live trial preparation | [Testing](design/testing.md), [private trial procedure](design/security.md), [live trial runbook](design/live-trial.md) |
-| Release preparation and publication | [Release procedure](docs/development/releasing.md) |
-| Live environments or past acceptance claims | [Archive index](design/archive/README.md), [retained service disposal 2026-10-29](design/archive/sq16r_environment_decommission_20261029.md), [2026-10-17 cleanup outcome](design/archive/cloudflare_test_environment_cleanup_20261017.md), then the relevant measurement record |
+| Implementation or ordinary local verification | [Design index](design/README.md#変更内容から探す) and relevant [development constraints](docs/development/constraints.md) |
+| CLI release preparation or publication | Load `castloop-release`, then follow the [release procedure](docs/development/releasing.md) |
+| Live Cloudflare operations or local evidence cleanup | [Live operation boundaries](design/live-operations.md), then the applicable procedure. For private trial preparation or execution, load `castloop-live-trial` to select the scenario |
+| Historical investigation | [Archive index](design/archive/README.md), then the relevant record |
 
-- `design/archive/` is historical evidence, not a task queue or current operational authorization. Consult it only for relevant history. The former long-form agent storage notes and milestones are preserved in [this snapshot](design/archive/agent_storage_and_milestones_20261017.md).
+- Existing Queue/v0.5.x references: [Removal plan](design/archive/schema_v1_removal_plan.md), [v0.5.x Queue guide](docs/archive/queue_service.md), [archived architecture](design/archive/initial_design_v052.md).
+- Verification records, release notes and archives describe historical context, not current implementation requirements or authorization. Do not turn their past failure modes or pending work into new requirements. The former long-form agent storage notes and milestones are preserved in [this snapshot](design/archive/agent_storage_and_milestones_20261017.md).
 - Do not append chronological progress logs, environment inventories, benchmark samples or completed one-time approvals here. Put them in the appropriate design/evidence document and update its index; keep only durable cross-cutting rules here.
 
 ## Safety boundaries
-- Code changes, tests, commits, pushes and past approvals do not authorize live Cloudflare changes. Deployment, publication, migration, resource creation/deletion, domains, permissions, billing/CPU limits and local evidence cleanup need explicit authorization for the target and scope. Do not request a Paid-plan upgrade as a workaround.
-- Keep every live test deployment private to the explicitly authorized reviewer by default. Before uploading or publishing sample content, verify Cloudflare Access protection for every content path (HTML, feeds, images and audio), an exact reviewer identity policy without bypass, private R2 and no unprotected alternate hostname or preview URL. Preserve administrator-key authentication, and recheck anonymous GET/HEAD/conditional/Range denial after deployment or publication. Do not use an unlisted URL or noindex as access control; stop if protection cannot be verified. See [private trial procedure](design/security.md). Any broader access requires separate explicit approval.
-- Preserve non-test `otftalk.com` DNS, shared certificates, local originals and private evidence. Completed old-environment cleanups (including the 2026-10-29 disposal of the retained `sq16r-6ec01dc6` service) are not permission for further mutations or cleanup; never reuse disposed resource names.
-- Design updates, deployments and administrative operations to be idempotent and atomic (either complete or fail without corrupting committed state) so interrupted operations can simply be re-run from the beginning after checking current state via API. Do not build fine-grained multi-phase state machines, `blocked` states, `*_requested` lockouts, or step-by-step recovery commands. When an operation changes service configuration (such as custom domain changes), save the previous configuration so the target or previous state can be cleanly re-applied.
-- Preserve config/target/base and generation checks, synchronous atomic publication, and cache-safe delivery gates.
-- Keep publication explicit: create/preview/upload alone must not publish. Reject stale local inputs when base revisions have advanced.
-- Preserve immutable published audio and revision history during normal updates, and saved GUID/date/audio identities when restoring snapshots. Never delete published audio or cover objects during deployments or failed updates.
-- Deliver only approved public paths through lifecycle/readiness gates; never expose `system/` or `staging/`. Complete required feed/site cache purges before committing publication or domain changes.
-- Keep MP3 uploads limited to 300,000,000 bytes; reject oversized inputs before upload and verify size and content hash.
-- Use `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` with direct REST administration from the standalone CLI. Do not require Wrangler, Node.js or separate R2 credentials on the administrator's machine. Never store secrets in service TOML or Git; keep local secrets in git-ignored `.castloop/` state.
-- Persist only allowlisted diagnostic codes/messages, not arbitrary exceptions, content text, email addresses or secrets in operational records. Report missing measurement evidence honestly; local tests do not establish native performance or full Free compatibility.
+- Live Cloudflare changes require explicit authorization for the target and operations. Local work, skill loading and past approvals do not authorize them.
+- Before live operations or local evidence cleanup, read [live operation boundaries](design/live-operations.md) and the applicable procedure. Modify only approved targets; preserve shared resources, local originals and private evidence outside that approval.
+- Live test content stays private to the approved reviewer. Verify protection before uploading or publishing; stop if it cannot be verified. Broader access requires separate approval.
+- Preserve authentication, config/target/base and generation checks, explicit synchronous atomic publication, cache-safe delivery gates, published media and revision history. Follow the relevant design contracts for implementation details.
+- Keep secrets out of Git and service TOML; keep local secrets in git-ignored `.castloop/` state. Record only allowlisted diagnostic codes/messages as defined in [security](design/security.md#ログと診断).
+- Local tests do not establish native performance or full Free compatibility.
 
 ## Data and code conventions
-- Local TOML is the editable source; R2 holds immutable media payloads (`audio/<sha256>.mp3`, `covers/<sha256>.jpg|png`) and `system/service.toml`; Show DO SQLite holds committed metadata, revision history, schedules and delivery statistics. Each service has one private R2 bucket; show IDs partition object keys. Keep `public_base_url` in service config, not an R2 public URL in show metadata.
+- Local TOML is the editable source, Show DO SQLite is authoritative for committed metadata, and private R2 stores media. See [storage and retention](design/data/storage.md) for layout and retention details.
 - Use strict Zod schemas, `@iarna/toml`, `parseSqliteServiceConfig`, `parseShowMetadata`, `parseEpisodeDraft` and `stringifyToml`. TOML keys are snake_case; TypeScript identifiers are camelCase.
 - Prefer explicit, focused code and async/await. Avoid global state except shared clients, clever abstractions and unnecessary inline comments.
 - Use ES module imports, grouped external, internal, then Node built-ins; prefer `node:` for built-ins. Avoid unused imports.
 - Use PascalCase for types/classes and UPPER_SNAKE_CASE for constants. Prefer `type` aliases, explicit exported types and Zod inference; use `unknown` with narrowing instead of `any`.
 - Match surrounding formatting: two spaces, double quotes and readable line lengths.
-- Throw clear `Error`s in helpers; CLI handlers print errors and set `process.exitCode = 1`. Do not silently swallow failures. Worker diagnostics must follow the allowlist/privacy rule.
+- Throw clear `Error`s in helpers; CLI handlers print errors and set `process.exitCode = 1`. Do not silently swallow failures.
 
 ## CodeGraph in Git worktrees
 - The `.codegraph/` index is local and untracked; only `.codegraph/.gitignore` is tracked. Initialize each newly created worktree with `codegraph init -y` before agent work.

@@ -1,5 +1,7 @@
 # 制御DOのSQLite構造に関する検討
 
+> Issue #109の調査・比較検討を保存した記録です。本文の構成説明や行番号は調査時点を指します。現行の設計は[制御DO](../components/control-do.md)と[SQLite表設計](../data/sqlite.md)を参照してください。
+
 対象: [Issue #109: [refactor] 制御DOのSQLiteにShow専用テーブル群が作成される構造の見直し](https://github.com/simosako/castloop-v2/issues/109)
 
 調査対象: コミット `b578f14`、2026-11-02時点
@@ -12,7 +14,7 @@
 
 ### 制御DOの構築と表の作成
 
-WorkerのDOクラスは、制御DOインスタンスの初期化で [sqlite-worker.ts](../src/sqlite-worker.ts) 110〜112行のとおり、`SqlitePublicationQueue` → `SqlitePublicationContent` → `SqliteServiceRuntime`(内包する `SqliteDomainRuntime`)をこの順に構築し、続けて `SqliteServiceControl` を構築します。各クラスのコンストラクタが表を作るため、新規の制御DOには次の16表と索引が作られます。
+WorkerのDOクラスは、制御DOインスタンスの初期化で [sqlite-worker.ts](../../src/sqlite-worker.ts) 110〜112行のとおり、`SqlitePublicationQueue` → `SqlitePublicationContent` → `SqliteServiceRuntime`(内包する `SqliteDomainRuntime`)をこの順に構築し、続けて `SqliteServiceControl` を構築します。各クラスのコンストラクタが表を作るため、新規の制御DOには次の16表と索引が作られます。
 
 | 作成元クラス | 表 |
 | --- | --- |
@@ -21,7 +23,7 @@ WorkerのDOクラスは、制御DOインスタンスの初期化で [sqlite-work
 | `SqliteDomainRuntime`(`resolveSqliteRuntime` 経由を含む) | `publication_domain_changes` |
 | `SqliteServiceControl` | `service_show_registry`、`service_domain_connection` |
 
-[表設計](data/sqlite.md)はこの現状を「制御DOにも共通の初期化処理で内容・予約の表が作られます」と記載し、該当する表を「空の共通表」と呼んでいます。
+[表設計](../data/sqlite.md)はこの現状を「制御DOにも共通の初期化処理で内容・予約の表が作られます」と記載し、該当する表を「空の共通表」と呼んでいます。
 
 ### 制御経路で実際に使う表
 
@@ -47,7 +49,7 @@ WorkerのDOクラスは、制御DOインスタンスの初期化で [sqlite-work
 
 目指す状態は、新規の制御DOに作られる表が「識別・形式版・ドメイン変更・登録簿・接続」の5表(`publication_queue_schema`、`publication_service`、`publication_domain_changes`、`service_show_registry`、`service_domain_connection`)とドメイン変更の一意索引だけになることです。
 
-制約はIssueと[作業規則](../AGENTS.md)によるものです。
+制約はIssueと[作業規則](../../AGENTS.md)によるものです。
 
 - DOクラス名・バインディング・compatibility date・永続化済みSQLite形式を維持する。
 - 既存の制御DOにすでに作られた未使用表を削除する移行は行わない(残置しても実害はストレージ量のみ)。
@@ -126,13 +128,13 @@ Issueが評価軸に挙げた「ランタイムクラスの分割がコードの
 
 変更の順序とファイル:
 
-1. [sqlite-publication-schedules.ts](../src/sqlite-publication-schedules.ts): 予約表2表と索引のDDLをコンストラクタで作成します(`CREATE TABLE IF NOT EXISTS` のまま)。
-2. [sqlite-publication-queue.ts](../src/sqlite-publication-queue.ts): 予約表のDDLを削除します。
-3. [sqlite-domain-runtime.ts](../src/sqlite-domain-runtime.ts): コンストラクタを `(storage, queue, config, actual, scope?)` に変更し、`commit` 内の `this.showId` 参照を `this.scope` に変更します。
-4. [sqlite-service-runtime.ts](../src/sqlite-service-runtime.ts): `health` と `requireTarget` の本体をexport付きの関数に切り出してメソッドから呼び、`domains` の構築にscopeを渡します。
-5. [sqlite-service-control.ts](../src/sqlite-service-control.ts): `runtime` を `queue`・`domains`・`actual` に置き換えます。
-6. [sqlite-worker.ts](../src/sqlite-worker.ts): 制御DO分岐を新しい構成に書き換えます。
-7. [テストフィクスチャ](../packages/cli/src/test-support/sqlite-service.ts): `boot()` の制御構成を新しい構成に合わせます。
+1. [sqlite-publication-schedules.ts](../../src/sqlite-publication-schedules.ts): 予約表2表と索引のDDLをコンストラクタで作成します(`CREATE TABLE IF NOT EXISTS` のまま)。
+2. [sqlite-publication-queue.ts](../../src/sqlite-publication-queue.ts): 予約表のDDLを削除します。
+3. [sqlite-domain-runtime.ts](../../src/sqlite-domain-runtime.ts): コンストラクタを `(storage, queue, config, actual, scope?)` に変更し、`commit` 内の `this.showId` 参照を `this.scope` に変更します。
+4. [sqlite-service-runtime.ts](../../src/sqlite-service-runtime.ts): `health` と `requireTarget` の本体をexport付きの関数に切り出してメソッドから呼び、`domains` の構築にscopeを渡します。
+5. [sqlite-service-control.ts](../../src/sqlite-service-control.ts): `runtime` を `queue`・`domains`・`actual` に置き換えます。
+6. [sqlite-worker.ts](../../src/sqlite-worker.ts): 制御DO分岐を新しい構成に書き換えます。
+7. [テストフィクスチャ](../../packages/cli/src/test-support/sqlite-service.ts): `boot()` の制御構成を新しい構成に合わせます。
 8. テスト: `f.runtime` を使う箇所(`sqlite-cli-entrypoint.test.ts`・`sqlite-commands.test.ts`・`sqlite-domain-operation.test.ts`・`sqlite-initialization.test.ts`・`sqlite-show-separation.test.ts`)を読み替えます。加えて、新規の制御構成で `sqlite_master` に作られる表が制御5表とドメイン変更の一意索引だけであることを検証するテストを追加します。
 
 互換性の確認:
@@ -144,9 +146,9 @@ Issueが評価軸に挙げた「ランタイムクラスの分割がコードの
 
 ドキュメント更新(実装と同じ変更で行う):
 
-- [表設計](data/sqlite.md): 「配置と表一覧」の制御DO列を「作成しない」に変更し、「空の共通表」の注記を、既存の制御DOには残置表がある旨の説明に置き換えます。予約表のDDL所在も更新します。
-- [制御DO設計](components/control-do.md): 制御DOの保存表が識別・形式版・ドメイン変更・登録簿・接続の5表であることを明記します。
-- [Show DO設計](components/show-do.md)と[全体構成](architecture.md): 初期化の説明に関わる部分があれば合わせて更新します。
+- [表設計](../data/sqlite.md): 「配置と表一覧」の制御DO列を「作成しない」に変更し、「空の共通表」の注記を、既存の制御DOには残置表がある旨の説明に置き換えます。予約表のDDL所在も更新します。
+- [制御DO設計](../components/control-do.md): 制御DOの保存表が識別・形式版・ドメイン変更・登録簿・接続の5表であることを明記します。
+- [Show DO設計](../components/show-do.md)と[全体構成](../architecture.md): 初期化の説明に関わる部分があれば合わせて更新します。
 
 確認は `bun test` と `npm run check` を実行します。
 

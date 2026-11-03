@@ -5,7 +5,7 @@ castloop本体の開発や配布を担当する人向けの資料です。Podcas
 ## 開発を始める
 
 1. [CONTRIBUTING.md](../../CONTRIBUTING.md)で環境を準備し、テストを実行します。
-2. [設計文書](../../design/README.md)で変更する機能の構成を確認します。
+2. 変更に関係する[開発上の制約](constraints.md)（英語）を読み、[設計文書](../../design/README.md)で機能の構成を確認します。
 3. [テスト設計](../../design/testing.md)に沿って、変更内容を検証します。
 
 ## 配布を更新する

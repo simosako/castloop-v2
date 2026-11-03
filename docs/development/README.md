@@ -5,7 +5,7 @@ These documents are for people developing and distributing castloop. For podcast
 ## Start development
 
 1. Set up your environment and run the tests using [CONTRIBUTING.md](../../CONTRIBUTING.md).
-2. Review the relevant components in the [design documentation](../../design/README.md) (Japanese).
+2. Read the relevant [development constraints](constraints.md) and review the components in the [design documentation](../../design/README.md) (Japanese).
 3. Verify your changes using the [testing guide](../../design/testing.md) (Japanese).
 
 ## Update a release

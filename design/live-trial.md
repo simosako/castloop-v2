@@ -1,10 +1,16 @@
-# 非公開実機試験の手順書
+# 非公開実機試験の標準シナリオ
 
-本書は、承認済みの非公開実機試験を次回から手順書だけで再現できるようにする具体的手順です。要件と原則は[セキュリティ設計](security.md)の「非公開の実機試験」が担い、本書が再現可能な手順、[過去の実施記録](archive/README.md)が各回の結果証跡を担います。対象は現行のSQLite構成(`schema_version=2`、`storage_layout="show-v1"`、`sqlite-sequential-v1`)で、v0.8.5時点のコマンド形式です。
+本書は、新規の非公開サービスを初期化し、既存の試験素材を使ってShowと3件のEpisodeを公開する標準シナリオです。公開配信、素材の一致、確認者による表示・再生・シークを確認します。共通の保護条件は[セキュリティ設計](security.md#非公開の実機試験)、承認と保護対象は[実環境操作の注意事項](live-operations.md)、各回の結果は[過去の実施記録](archive/README.md)が担います。
+
+## 適用範囲
+
+このシナリオは、以下の素材と以前の試験で使ったTOMLを用意でき、新規サービスでの一連の公開・配信を確認する場合に使います。限定した機能確認や別の測定では、目的に合う手順を選ぶか、必要な操作と期待する結果を具体化し、その操作範囲の承認を得てから実施します。どのシナリオでも共通の保護条件を満たす必要がありますが、この3件公開を毎回追加する必要はありません。
+
+対象は現行のSQLite構成(`schema_version=2`、`storage_layout="show-v1"`、`sqlite-sequential-v1`)で、v0.8.5時点のコマンド形式です。
 
 ## 前提
 
-- 対象アカウント、リソース名、確認者、操作範囲の明示承認を先に得ます([security.md](security.md#非公開の実機試験))。本書は承認の代替にはなりません。
+- [実環境操作の承認と保護対象](live-operations.md)と[試験の保護条件](security.md#非公開の実機試験)を読み、対象アカウント、リソース名、確認者、操作範囲の明示承認を先に得ます。本書は承認の代替にはなりません。エージェントは準備・実施の前に `castloop-live-trial` skillを読み込みます。
 - 実施マシンには `bash`、`curl`、`jq`、`uuidgen`、Python 3.11以上(検証スクリプト用)が必要です。Cloudflare操作は `CLOUDFLARE_ACCOUNT_ID` と `CLOUDFLARE_API_TOKEN` を使う直接REST呼び出しです。
 - 保護を確認できなければアップロード・公開の前に停止します(手順Step 4〜5)。
 
@@ -15,10 +21,10 @@
 | 変数 | 値 |
 | --- | --- |
 | `CASTLOOP_TRIAL_ASSETS` | 素材と証跡のルート(メインチェックアウトの `.local-test-data` の絶対パス)。メインチェックアウトで実施する場合はStep 0の既定値で設定され、worktreeから実施する場合のみ事前に設定する |
-| `CASTLOOP_TRIAL_REVIEWER_EMAIL` | 確認者のメールアドレス。前回証跡から抽出して継承する |
+| `CASTLOOP_TRIAL_REVIEWER_EMAIL` | 今回承認された確認者のメールアドレス。前回証跡から抽出する場合も、今回の承認と一致することを確認する |
 | `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_API_TOKEN` | 既存のCloudflare管理用環境変数 |
 
-前回証跡からの継承は、次のコマンドで行えます(`PREV` は直近の証跡ディレクトリ)。
+前回証跡にある確認者を今回も承認された場合は、次のコマンドで値を取得できます(`PREV` は該当する証跡ディレクトリ)。過去の記録から取得した値は、今回の承認の代わりにはなりません。
 
 ```bash
 PREV=.local-test-data/results/<前回日付>/<前回service-id>
@@ -56,7 +62,7 @@ SID="rev-$(git rev-parse --short=7 HEAD)-$(openssl rand -hex 2)"
 EVID=".local-test-data/results/$(date +%Y%m%d)/$SID"
 mkdir -p "$EVID/workspace"
 sha256sum "$CASTLOOP_TRIAL_ASSETS/normal/cover.jpg" "$CASTLOOP_TRIAL_ASSETS"/normal/*.mp3 > "$EVID/original-sha256-before.txt"
-# 前回証跡から確認者メールを継承(「変数と秘密の取り扱い」参照)
+# Set the currently approved reviewer as described above.
 ```
 
 ### Step 1: ビルドとバイナリの保存
@@ -70,7 +76,7 @@ cp dist/castloop "$EVID/castloop"
 
 ### Step 2: サービスの初期化
 
-`init` がWorker、Durable Object、専用の非公開R2バケットを作成します。`account-id` と `workers-subdomain` は前回証跡と同じ値を使います(`workers-subdomain` は `castloop.toml` に設定項目として現れないため、前回の `workers_dev_base_url` のホスト部の2番目のラベルから読み取ります)。operation-idは `--operation-id` フラグで渡します。initの位置引数は対象ワークスペースディレクトリとして解釈され、`--workspace` と不一致なら `target_mismatch` で拒否されるため、UUIDを位置引数にしないでください。
+`init` がWorker、Durable Object、専用の非公開R2バケットを作成します。`account-id` と `workers-subdomain` には、今回の対象として確認・承認された値を使います。前回と同じ対象の場合は、前回証跡を候補値の取得元にできます(`workers-subdomain` は `castloop.toml` に設定項目として現れないため、前回の `workers_dev_base_url` のホスト部の2番目のラベルから読み取ります)。operation-idは `--operation-id` フラグで渡します。initの位置引数は対象ワークスペースディレクトリとして解釈され、`--workspace` と不一致なら `target_mismatch` で拒否されるため、UUIDを位置引数にしないでください。
 
 ```bash
 CLI="$EVID/castloop"; WS="$EVID/workspace"
@@ -83,7 +89,7 @@ CLI="$EVID/castloop"; WS="$EVID/workspace"
 
 ### Step 3: Cloudflare Accessの設定
 
-対象ホストの `/podcasts` 以下全体を保護するAccessアプリと、確認者限定のポリシーを作成します。構造は前回承認済み設定の継承です(`session_duration`、IdP、`require` の組み合わせ)。値は変数と前回証跡から供給し、手順書やGit管理ファイルに値を直接書きません。
+対象ホストの `/podcasts` 以下全体を保護するAccessアプリと、確認者限定のポリシーを作成します。以下の設定例を今回の確認者・アカウント・IdPと照合し、共通の保護条件を満たすことを確認します。前回の設定を参考にする場合も、今回の承認と現在状態を改めて確認します。値は変数から供給し、手順書やGit管理ファイルに値を直接書きません。
 
 ```bash
 HOST=$(python3 -c "import tomllib;print(tomllib.load(open('$WS/castloop.toml','rb'))['workers_dev_base_url'])" | sed -E 's#^https?://##;s#/$##')
