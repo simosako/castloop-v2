@@ -2,10 +2,18 @@
 
 Merge release preparation through a PR, then tag the commit on `main` to publish a GitHub Release. The CLI includes the delivery Worker.
 
+## Scope and completion
+
+A request to **release** includes preparation, the PR and merge, tagging, publication, and verification of the GitHub Release body and attachments. A request to **prepare a release** ends with a preparation PR and confirmation that its required CI checks pass; merging, tagging and publication remain outside that request. Ask the requester if the version is unclear.
+
+Agents load the project-local `castloop-release` skill before starting. This document remains the authoritative release procedure.
+
+Release verification uses the required PR and tag CI runs described below, including for documentation-only release changes. A full local rerun is not required. Code fixes made during release work still require `bun test` and `npm run check` as ordinary code changes under [AGENTS.md](../../AGENTS.md).
+
 ## 1. Prepare the release
 
 1. Create a release preparation branch from the latest `main`.
-2. Review the changes since the previous release. Decide the version, user-facing changes, compatibility information, and update instructions. Ask the requester if the version is unclear.
+2. Review the changes since the previous release. Decide the version, user-facing changes, compatibility information, and update instructions.
 3. Update the following files and check their content and links:
 
 | File | Update |
@@ -22,13 +30,13 @@ Write release notes in English only and keep the latest notes directly under `do
 
 Describe the verification actually performed and its scope. Obtain explicit approval for the target and operations before live Cloudflare testing, and do not report unperformed checks as complete.
 
-## 2. Create and merge the PR
+## 2. Create the PR and merge for publication
 
-Commit and push the prepared changes, then create a PR targeting `main`. Confirm that all build and smoke jobs in [build-binaries.yml](../../.github/workflows/build-binaries.yml) pass before merging.
+Commit and push the prepared changes, then create a PR targeting `main`. Confirm that all build and smoke jobs in [build-binaries.yml](../../.github/workflows/build-binaries.yml) pass. For a preparation-only request, stop here and report the PR and CI results. For a release request, merge the PR after these checks pass, then continue to tagging and publication.
 
 CI runs type checking and the full local test suite on Linux, then builds and smoke-tests the CLI on Linux x64, macOS arm64, and Windows x64. It also checks version, help, checksums, input validation, local previews, Skill output, and more.
 
-A full local run is not required for release. To get earlier feedback while making changes or to investigate a problem, use the [local checks](#local-checks).
+For optional early feedback or investigation during release work, use the [local checks](#local-checks). The ordinary checks for code fixes remain required as described above.
 
 ## 3. Tag and publish
 

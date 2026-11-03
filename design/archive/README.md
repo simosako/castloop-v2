@@ -2,6 +2,8 @@
 
 このディレクトリには、置き換えられた設計、導入時の計画・比較検討、実装ログ、実機検証と環境廃棄の記録を保存する。**現行設計の入口は [design/README.md](../README.md)** であり、通常の開発で履歴を通読する必要はない。
 
+文書の配置は完了・未完了ではなく役割で分ける。現行の仕組みを説明する文書はアーカイブの外へ、調査・比較検討・実装計画・対応記録はここへ置く。開発中に一時的に外へ置いた記録も、push・PR作成前にここへ移し、採用した内容は現行設計へ反映する。移動時は相対リンクと本索引を更新する。
+
 本文中の「現行」「現在」「次の作業」や承認は、その資料の記載時点を指す。検証結果は当時の版・環境・測定経路に限られ、新しい実環境操作の許可や現在の性能保証にはならない。過去の未完了項目を現在の作業一覧として扱わない。
 
 旧版の操作ガイド・配布ノート・ガイドから分離した検証記録は [docs/archive/](../../docs/archive/README.md) にまとめている。
@@ -18,6 +20,7 @@
 | [Show単位DOの検討](do_show_separation_options.md) | [全体構成](../architecture.md)、[制御DO](../components/control-do.md) |
 | [管理認証](admin_authentication.md) | [セキュリティ](../security.md) |
 | [REST URL構築](rest_url_construction.md) | [CLIの通信契約](../components/cli.md#通信失敗とローカル記録) |
+| [制御DO保存表構成の改善案比較（Issue #109）](control-do-storage-issue-109.md) | [制御DO](../components/control-do.md)、[保存表の配置](../data/sqlite.md#配置と表一覧) |
 | [ドメイン変更ジャーナルの相の検討（Issue #111）](domain-journal-issue-111.md) | [制御DO・独自ドメイン](../components/control-do.md#進捗記録と中断後の継続) |
 | [項目別入力上限](show_episode_input_limits.md) | [スキーマ](../data/schemas.md) |
 | [エージェント連携の計画](agent_integration_plan.md) | [CLI](../components/cli.md)、[JSON出力スキーマ](../data/schemas.md#cliのjson出力) |
