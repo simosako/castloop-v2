@@ -159,7 +159,7 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 
 ## Logpushの共通アクセス記録と日別集計
 
-[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。Logpush形式の変換・日別集計、R2読取・ローカル索引、Show DOの保存・管理APIを実装しています。Logpush設定とCLIコマンドとの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
+[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。Logpush形式の変換・日別集計、R2読取・ローカル索引、Show DOの保存・管理API、Logpush設定CLIを実装しています。統計CLIとの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
 
 | 形式 | 主な項目と制約 |
 | --- | --- |
@@ -170,7 +170,7 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 
 各形式は不明なキーを拒否し、IP・Cookie・User-Agent原文などのリスナー識別情報を持ちません。カウンタは0以上の安全な整数です。キャッシュ状態を取得できない収集元の記録では`cache_status = null`とし、日別内訳の`unavailable`に分類します。
 
-[Logpush変換](../../packages/cli/src/http-logpush-events.ts)は、設定した11フィールドを検証し、外部リスナーの対象ホスト・承認済み素材への応答を共通記録へ変換します。[日別集計](../../packages/cli/src/access-stats-aggregate.ts)は、発生日ごとに収集元・要求IDの組で重複を除きます。Botを含むエッジ本文バイト数による指標なので、既存のWorker統計とは別の定義として扱います。
+[Logpush変換](../../packages/cli/src/http-logpush-events.ts)は、設定した10フィールドを検証し、外部リスナーの対象ホスト・承認済み素材への応答を共通記録へ変換します。[日別集計](../../packages/cli/src/access-stats-aggregate.ts)は、発生日ごとに収集元・要求IDの組で重複を除きます。Botを含むエッジ本文バイト数による指標なので、既存のWorker統計とは別の定義として扱います。
 
 [R2読取](../../packages/cli/src/http-logpush-r2.ts)は、RESTの一覧からキー・ETag・圧縮サイズを取得します。ETagを本文応答と照合し、圧縮サイズを確認しながらgzipのNDJSONを解析します。[Show・期間別読取](../../packages/cli/src/http-logpush-read.ts)は1〜366日のUTC期間を受け付け、対象記録を順に渡します。完了結果には、対象期間と重なるファイル一覧と、新規ファイル全体にあった期間外の日付を含めます。索引に保存する項目は[表設計](sqlite.md#ローカルのアクセスログ索引)を参照してください。
 
@@ -191,6 +191,8 @@ GETはサービスID・設定ハッシュをクエリで指定します。日別
 JSON取込は12 KiB、応答は16 KiBを上限にします。1ページの上限は収集元・素材が20件、日別値が31日です。収集元と日別値は、応答サイズに収まるよう件数を調整します。HTTPの要求・応答と状態コードは[アクセス統計の管理HTTP](../../src/sqlite-access-stats-http.ts)、版と保持範囲は[保存処理](../../src/sqlite-access-stats.ts)を参照してください。
 
 ## ローカル記録とバックアップ
+
+[Logpush設定](../../packages/cli/src/logpush-config.ts)の`schema_version = 1`は、サービス・アカウント・Worker・管理オリジン・原本バケットとログバケットを対応付けます。ゾーン別に操作UUID、現在・直前のホスト集合と有効状態、ジョブID・トークンID、共通形式の収集元を保存します。既存のローカル記録と同じ16 KiB上限・厳密なスキーマ・パス保護を使います。保存先の秘密値やAPI応答全体は保存しません。
 
 | 記録 | 主な内容と定義元 |
 | --- | --- |

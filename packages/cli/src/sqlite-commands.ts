@@ -23,6 +23,8 @@ import { SqliteScheduleClient } from "./sqlite-schedule-client";
 import { cancelSqliteSchedule, previewCancelSqliteSchedule, previewRescheduleSqliteSchedule,
   rescheduleSqliteSchedule, publicationSchedule, reapproveSqliteSchedule } from "./sqlite-schedule";
 import { publishSqliteContent } from "./sqlite-publish";
+import { runLogpushCommand } from "./logpush";
+import type { LogpushCommandOptions } from "./logpush";
 import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -30,6 +32,7 @@ export type SqliteCommandOptions = { workerSource?: () => Promise<string>; trans
   previewOptions?: { mode?: "auto" | "local" | "remote"; rssOutput?: string };
   revisionOptions?: { cursor?: string; episodeId?: string; expectedRevision?: string; output?: string };
   domainOptions?: { zoneId?: string; operationId?: string; cursor?: string };
+  logpushOptions?: LogpushCommandOptions;
   listOptions?: { includeDeleted?: boolean; cursor?: string };
   diagnoseOptions?: { maxShows?: number; external?: boolean; environment?: Readonly<Record<string, string | undefined>> };
   verifyOptions?: { episodeId?: string };
@@ -48,6 +51,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   diagnose: Array.from({ length: 20 }, (_, index) => index + 1),
   verify: [1],
   domain: [1, 2],
+  logpush: [1],
   stats: [1], "stats-retention": [2],
   "preview-episode-schedule": [1, 2], "schedule-episode": [1, 2],
   "preview-show-schedule": [1], "schedule-show": [1],
@@ -103,6 +107,10 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     return { ...result, rss_preview: rss };
   }
   const cf = options.cloudflare ?? { accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "", apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "" };
+  if (command === "logpush") {
+    if (args.length !== 1) throw new Error("Expected one Logpush action");
+    return runLogpushCommand(root, config, args[0]!, options.logpushOptions ?? {}, cf);
+  }
   if (command === "domain") {
     const [action, argument] = args, selected = options.domainOptions ?? {};
     if (action === "list" && args.length === 1 && !selected.zoneId && !selected.operationId && !selected.cursor) return listSqliteDomains(root, config, cf);

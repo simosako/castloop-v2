@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 const familyServices = {
   "sqlite-initializations": "service", "sqlite-registrations": "service",
   "sqlite-rss-imports": "service", "sqlite-domain-changes": "service",
+  logpush: "service",
   "rss-import-downloads": undefined,
 } satisfies Record<JournalFamily, string | undefined>;
 

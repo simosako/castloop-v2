@@ -275,6 +275,13 @@ async function main(context: Invocation): Promise<unknown> {
       ["list", "remove"].includes(action ?? "") && positional.length !== 1 ||
       !["add", "remove", "list", "status", "continue"].includes(action ?? "")) throw new Error(commandHelp(command));
     if (["add", "remove"].includes(action)) flags["operation-id"] ??= randomUUID();
+  } else if (command === "logpush") {
+    const action = positional[0];
+    allowedFlags(flags, action === "setup" ? ["zone-id", "bucket-name"] : ["zone-id"]);
+    if (positional.length !== 1 || !["setup", "status", "enable", "disable"].includes(action ?? "") ||
+      !flags["zone-id"] || action === "setup" && !flags["bucket-name"]) throw new Error(commandHelp(command));
+    if (!/^[a-f0-9]{32}$/.test(flags["zone-id"])) throw new AgentError("invalid_arguments", "Expected a 32-character lowercase hexadecimal zone ID.");
+    if (action === "setup") sqliteServiceConfigSchema.shape.bucket_name.parse(flags["bucket-name"]);
   } else if (["preview-show", "preview-episode"].includes(command)) {
     allowedFlags(flags, ["local", "remote", "rss-output"]);
     if (flags.local && flags.remote || flags.local && flags["rss-output"]) throw new Error("Choose remote RSS export or local-only preview, not both");
@@ -370,11 +377,13 @@ async function main(context: Invocation): Promise<unknown> {
     expectedPreview = preview.input_fingerprint;
   }
   const effects = describeCommand(command).effects;
-  context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
+  context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ||
+    command === "logpush" && positional[0] === "status" ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
     previewOptions: { mode: flags.local ? "local" : flags.remote ? "remote" : "auto", rssOutput: flags["rss-output"] },
     revisionOptions: { cursor: flags.cursor, episodeId: flags.episode, expectedRevision: flags["expect-revision"], output: flags.output },
     ...(command === "domain" ? { domainOptions: { zoneId: flags["zone-id"], operationId: flags["operation-id"], cursor: flags.cursor } } : {}),
+    ...(command === "logpush" ? { logpushOptions: { zoneId: flags["zone-id"], bucketName: flags["bucket-name"] } } : {}),
     ...(command === "diagnose" ? { diagnoseOptions: { maxShows: flags["max-shows"] === undefined ? undefined : Number(flags["max-shows"]),
       external: !!flags.external, environment: undefined } } : {}),
     ...(command === "verify" ? { verifyOptions: { episodeId: flags.episode } } : {}),

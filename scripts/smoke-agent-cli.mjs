@@ -36,6 +36,11 @@ try {
   assert.equal(domain.options["zone-id"], "string");
   assert.equal(domain.options["operation-id"], "string");
   assert.equal(domain.options.cursor, "string");
+  const logpush = JSON.parse(run(["describe", "logpush", "--json"])).commands[0];
+  assert.equal(logpush.options["zone-id"], "string");
+  assert.equal(logpush.options["bucket-name"], "string");
+  assert.equal(logpush.effects.publication, false);
+  assert.match(run(["logpush", "--help"]), /400-day log retention/);
   for (const command of ["schedule-cancel", "schedule-reapprove", "schedule-status"]) {
     const description = JSON.parse(run(["describe", command, "--json"])).commands[0];
     assert.equal(description.command, command);

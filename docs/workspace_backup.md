@@ -15,6 +15,8 @@ The backup includes:
 
 This backup covers the local workspace. Save original audio outside show folders and in-progress RSS import folders separately.
 
+Logpush management records in `.castloop/logpush/` are included. They contain safe resource IDs and collection settings, not destination secrets. The backup does not contain R2 access logs or Show DO statistics; the local log-file index is also excluded because it can be rebuilt from R2.
+
 ## 2. Create a backup
 
 Finish editing and running commands in the workspace, then specify a new output path:

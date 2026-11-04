@@ -97,6 +97,16 @@ Episodeコマンドでは、`--workspace` の明示指定時は `--show` が必�
 
 Workerはビルド時に `src/sqlite-worker.ts` からバンドルします。バインディングとキャッシュ設定は[全体アーキテクチャ](../architecture.md)を参照してください。
 
+## Logpushの設定
+
+`logpush setup --zone-id ID --bucket-name NAME`は、現在の独自ドメインを対象に、別の非公開ログR2・400日保持・バケット限定の保存先トークン・ゾーン単位ジョブを設定します。既存のWorker配信と統計は維持し、サービスTOMLやWorker配備は変更しません。`workers.dev`だけのサービスは設定対象になりません。
+
+`logpush status --zone-id ID`は読取専用で、対象一致・非公開性・保持ルール・配送の状態を返します。`enable`・`disable`は保存済みジョブを変更し、中断情報を保持します。同じゾーンでsetupし直すと現在のホストを追加し、旧ホストと有効・無効の設定を維持します。ドメイン変更とLogpush設定は別操作として承認・実行します。
+
+`.castloop/logpush/<service_id>/configuration.json`は、対象と操作UUID、リソースID、現在・直前の収集条件、収集元を保存します。再実行ではAPIの現在状態を照合します。トークン作成後に中断し、ジョブがまだなければ、その操作に属する未使用トークンを失効させて作り直します。秘密値は作成応答からしか取得できず、ローカルにも保持しないためです。ジョブがあれば保存した識別子・保存先・10フィールド・条件を照合して利用します。
+
+実装は[設定とAPI](../../packages/cli/src/logpush.ts)、[Cloudflare REST](../../packages/cli/src/logpush-cloudflare.ts)、[保存形式](../../packages/cli/src/logpush-config.ts)、操作方法は[Logpush利用ガイド](../../docs/logpush.md)を参照してください。統計CLIとの接続は別工程です。
+
 ## 通信失敗とローカル記録
 
 管理GETは許可した取得先に限定し、タイムアウト、応答サイズ上限、回数を限定した再試行を設定します。応答の形式とサービス識別情報も検証します。変更系HTTPの通信エラーでは結果が不明な場合があるため、現在の状態を確認してから、同じ承認済み入力で再実行します。

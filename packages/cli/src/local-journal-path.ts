@@ -2,7 +2,7 @@ import { closeSync, constants, fsyncSync, lstatSync, mkdirSync, openSync } from 
 import { dirname, join } from "node:path";
 
 export const JOURNAL_FAMILIES = ["rss-import-downloads",
-  "sqlite-initializations", "sqlite-registrations", "sqlite-rss-imports", "sqlite-domain-changes"] as const;
+  "sqlite-initializations", "sqlite-registrations", "sqlite-rss-imports", "sqlite-domain-changes", "logpush"] as const;
 export type JournalFamily = typeof JOURNAL_FAMILIES[number];
 
 export function isMissingFileError(error: unknown): boolean {

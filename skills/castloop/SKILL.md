@@ -35,6 +35,7 @@ description: castloop CLIでPodcastサービス・番組・エピソードを準
 - `--json`の`ok`はCLI要求の成否。通常公開の`changed`／`unchanged`とrevisionは確定結果、予約の`scheduled`は受付であり、`dispatched`とrevisionで公開確定を確認する。素材配置だけでは公開しない。`next_actions`は承認ではない。
 - 配信の停止・再開は既存のlifecycle操作（`unpublish`／`restore`）を使う。独立した`show-pause`／`show-resume`コマンドはない。素材配置だけでは公開しない。通常のWorkerコード更新は`castloop deploy`で稼働を維持したまま行う。
 - domain操作は`help domain`で条件を確認し、専用手順を使う。list/statusは読取、continueは変更前後の保存設定をもとに未完了ステップを進める。同じhostname/DNS/接続を他ツールから並行変更しない。workers.devの管理APIは転送せず、公開Feed 301保存後の切断は購読先自動復帰を保証しない。証明書や元journalを削除しない。
+- 長期ログは`help logpush`で構文を確認する。setupは現在の独自ドメイン用の非公開ログR2・400日保持・バケット限定トークン・ゾーン単位ジョブを作る。対象と追加権限の承認を得る。statusは読取専用、enable/disableは保存済みジョブの変更で、配信の公開・停止とは別操作。秘密値を出力せず`.castloop/logpush/`をバックアップする。`stats refresh/access/logs`はまだ提供していない。
 
 ## 用途別
 

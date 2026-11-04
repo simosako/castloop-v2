@@ -3,6 +3,14 @@ import { SQLITE_COMMAND_ARGUMENTS } from "./sqlite-commands";
 type CommandHelp = { usage: string; description: string };
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
+  logpush: { usage: "logpush setup --zone-id ZONE_ID --bucket-name NAME | status --zone-id ZONE_ID | enable --zone-id ZONE_ID | disable --zone-id ZONE_ID",
+    description: "Configure HTTP Requests Logpush for the service's current custom domain, or inspect/enable/disable its saved zone job.\n" +
+      "setup creates a separate private Standard R2 bucket with 400-day log retention and a bucket-scoped destination token.\n" +
+      "Each zone uses one managed job; setup adds the current custom host while retaining previously configured hosts.\n" +
+      "status is read-only. Other actions save resource identities and safe settings, never destination secrets, under .castloop/logpush/.\n" +
+      "Requires explicit administrator authorization and Cloudflare Logs, Zone Read, R2 and Account API Tokens permissions.\n" +
+      "Inspect status after interruption, then explicitly rerun the same action and inputs. No automatic mutation retries or existing-resource adoption.\n" +
+      "Keeps existing Worker delivery/statistics unchanged; workers.dev cannot use zone HTTP Logpush. No deployment or media publication." },
   domain: { usage: "domain add HOSTNAME --zone-id ZONE_ID [--operation-id UUID] | remove [--operation-id UUID] | list | status UUID [--cursor SHOW_ID] | continue UUID",
     description: "Manage one dedicated custom subdomain in the same account's active/full Cloudflare DNS zone. Registrar transfer is not required.\n" +
       "add/remove redeploy the same Worker with a new canonical origin, bump Feed generations and purge caches in one committed step per Durable Object.\n" +
@@ -213,6 +221,7 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     init: { "publication-protocol": "string", "service-id": "string", "account-id": "string", "bucket-name": "string", "workers-subdomain": "string", "operation-id": "string" },
     "create-show": { "site-url": "string", "site-mode": "string" }, schema: { format: "string" },
     domain: { "zone-id": "string", "operation-id": "string", cursor: "string" },
+    logpush: { "zone-id": "string", "bucket-name": "string" },
     "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
     diagnose: { "max-shows": "string", external: "boolean" },
     verify: { episode: "string" },
@@ -266,7 +275,8 @@ export function describeCommand(command: string) {
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1],
         "backup-create": [0], "backup-verify": [1], "backup-restore-preview": [1], "backup-restore": [3] } as Record<string, number[]>)[command],
     constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly",
-      ...(["publish-show", "publish-episode"].includes(command) ? ["--review requires an interactive terminal without --json or --non-interactive"] : [])],
+      ...(["publish-show", "publish-episode"].includes(command) ? ["--review requires an interactive terminal without --json or --non-interactive"] : []),
+      ...(command === "logpush" ? ["status is read-only; setup/enable/disable may change only the saved Logpush resources", "--bucket-name is required only for setup; --zone-id is always required"] : [])],
     authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
     effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? ["skill", "backup-create", "backup-restore"].includes(command) ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command.startsWith("schedule-") && !["schedule-list", "schedule-status"].includes(command) ||
       command === "lifecycle-execute" || command === "revision-execute" },
@@ -278,6 +288,7 @@ export function describeCommand(command: string) {
       ["publish-show", "publish-episode", "lifecycle-execute", "revision-execute"].includes(command) ? "Review current content after a lost response. Repeating the same desired content is unchanged; changed bases require a new review." :
       ["init", "create-show", "deploy"].includes(command) ? "Preserve the same workspace, target and saved inputs; check current state, then explicitly rerun the same operation to complete it. No automatic mutation retries or unrelated resource adoption." :
       command === "domain" ? "Read domain list or domain status UUID, then explicitly use domain continue UUID with the saved previous and target configurations. Do not restart add/remove as a new operation or adopt unrelated resources." :
+      command === "logpush" ? "Read logpush status --zone-id ID, preserve its configuration, then explicitly rerun the same action and inputs. Setup may replace an unused destination token whose secret was not retained; it never deletes logs." :
       ["schedule-show", "schedule-episode"].includes(command) ? "Read schedule-list and schedule-status after a lost response. Do not blindly create another schedule." :
       ["schedule-reschedule", "schedule-cancel", "schedule-reapprove"].includes(command) ? "Read schedule-status first; review the current version and obtain a new preview if state or inputs changed. Preserve the saved schedule content." :
       command === "stats-retention" ? "Read stats after interruption, then explicitly reapply the same Show and retention value if needed. No automatic mutation retries." :

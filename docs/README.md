@@ -20,6 +20,7 @@ To move an existing podcast, create a service first, then follow [Importing and 
 | Change the appearance or date display of a show website | [Show website](show_website.md) |
 | Move from another hosting service | [Importing and migrating an RSS feed](rss_migration.md) |
 | Check delivery counts by episode | [Delivery statistics](delivery_statistics.md) |
+| Keep custom-domain access logs for 400 days | [Long-term access logs with Logpush](logpush.md) |
 | Check the status after an error or interruption | [Troubleshooting](troubleshooting.md) |
 | Back up management files or restore them on another device | [Backup and restore](workspace_backup.md) |
 | Update the delivery server | [Service maintenance](maintenance.md) |

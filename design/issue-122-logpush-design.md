@@ -1,6 +1,6 @@
 # Issue #122：Logpushによるアクセスログと統計の設計
 
-作成日：2026-11-04。状態：共通データ・Logpush変換・日別集計、R2読取・ローカル索引、Show DOへの保存・管理APIを実装済み。Logpush設定・CLI統合とメディア直配信は実装予定。
+作成日：2026-11-04。状態：共通データ・Logpush変換・日別集計、R2読取・ローカル索引、Show DOへの保存・管理API、Logpush設定CLIを実装済み。統計CLI統合とメディア直配信は実装予定。
 
 [実装案の比較](issue-122-r2-cdn-plan.md)で推奨した、R2・CDN直配信とHTTP Requests Logpushを組み合わせる構成を具体化する。機能・料金は公式資料に基づき、対象アカウントでの検証は導入時に行う。
 
@@ -287,7 +287,18 @@ GETには`service_id`・`service_config_sha256`をクエリで指定し、Show�
 
 ### CLIの操作
 
-以下は追加するコマンド名の案である。Show選択と`--from`・`--to`のUTC日付指定は、既存の`stats`に合わせる。
+設定CLIは次の4操作を提供する。`--zone-id`は必須、`--bucket-name`はsetupだけで指定する。詳細は[利用ガイド](../docs/logpush.md)を参照する。
+
+| コマンド | 動作 |
+| --- | --- |
+| `logpush setup --zone-id ID --bucket-name NAME` | 現在の独自ドメインを検証し、非公開ログR2・400日保持・保存先トークン・ゾーン単位ジョブを設定 |
+| `logpush status --zone-id ID` | APIの現在状態と保存設定を照合し、対象・非公開性・保持・配送の状態を読取専用で返す |
+| `logpush enable --zone-id ID` | 保存済みジョブを有効にし、中断区間を閉じる |
+| `logpush disable --zone-id ID` | 保存済みジョブを無効にし、中断の開始を記録。到着済みログと保持ルールは維持 |
+
+同じゾーンでsetupし直すと現在のホストを追加し、既存ホストと有効・無効の設定を保つ。旧ホストは過去ログとの対応付けにも使う。別ゾーンへ移った場合は、そのゾーンと保存済みの同じログバケットを指定してsetupする。ドメイン変更のコマンド自体はLogpushを変更しない。`workers.dev`に戻った後も、保存済みジョブのstatus・enable・disableを使える。
+
+統計の読取・集計・表示は工程2c②で追加する。以下はそのコマンド名の案で、Show選択と`--from`・`--to`のUTC日付指定は既存の`stats`に合わせる。
 
 | コマンド | 動作 |
 | --- | --- |
@@ -297,21 +308,25 @@ GETには`service_id`・`service_config_sha256`をクエリで指定し、Show�
 
 `stats access`は保存済みの値を表示する操作、`stats refresh`は値を更新する操作として分ける。個別ログの保存はLogpushが継続するため、管理端末の起動頻度にかかわらず400日保持できる。
 
-既存の`stats`と`stats retention`はWorker統計用として維持する。新形式の表示・JSON出力には収集元と指標定義を含める。`stats logs`で書き出したファイルは管理者が保管するアクセス記録となり、通常の診断出力から分離する。
+既存の`stats`と`stats-retention`はWorker統計用として維持する。新形式の表示・JSON出力には収集元と指標定義を含める。`stats logs`で書き出したファイルは管理者が保管するアクセス記録となり、通常の診断出力から分離する。
 
 ## 9. 設定・認証・ドメイン変更
 
 ### サービス設定
 
-追加する設定は、メディア基底URL、公開メディアバケット名、メディアのゾーンID、非公開ログバケット名とする。TOMLのキー名はそれぞれ`media_base_url`、`media_bucket_name`、`media_zone_id`、`access_log_bucket_name`を案とする。
+直配信への接続時に追加する設定は、メディア基底URL、公開メディアバケット名、メディアのゾーンID、非公開ログバケット名とする。TOMLのキー名はそれぞれ`media_base_url`、`media_bucket_name`、`media_zone_id`、`access_log_bucket_name`を案とする。
 
 初版では、直配信を利用するサービスに4項目を一式で設定する。現在のWorker配信の設定は引き続き利用する。`public_base_url`はFeed・HTML、`workers_dev_base_url`は管理APIに使う。追加項目も正規化と`service_config_sha256`の計算に含める。
 
 現行の`schema_version = 2`、`storage_layout = "show-v1"`、公開プロトコルは維持する。Workerの既存バインディング・DOクラス名・Compatibility Dateも維持し、公開メディア用のR2 bindingと限定したパージ用secretを追加する。ログ本文はCLIが読むため、集計のためのログR2 bindingは初版のWorkerには不要である。
 
+工程2c①の設定CLIは、現在の独自ドメインを使うWorker配信で動く。ログバケット名などの管理対象は`.castloop/logpush/<service_id>/configuration.json`へ保存し、この段階ではサービスTOML・設定ハッシュ・Worker配備を変更しない。上記4項目の稼働設定は工程3の対象である。
+
 ### Logpushの設定と秘密情報
 
 CLIは`CLOUDFLARE_ACCOUNT_ID`と`CLOUDFLARE_API_TOKEN`を使ってRESTで管理する。Logpushジョブにはゾーンの`Logs Write`、ログ保存先にはR2の権限が必要になる。直接R2へ保存する際のaccess key / secretは、CLIがAPIでログバケットに限定したトークンを作成し、その応答から生成して設定する。[C7][C9]
+
+実装はアカウント所有のトークンを使い、`Account API Tokens Write`で権限一覧・トークン一覧・作成・失効を扱う。権限一覧から`Workers R2 Storage Bucket Item Write`を選び、`com.cloudflare.edge.r2.bucket.<account_id>_default_<bucket_name>`だけを対象にする。access keyは応答のトークンID、secretはトークン値のSHA-256で生成する。R2専用の公式例の保存先・認証形式でジョブを作成する。[C7][C9][C17]
 
 このトークンはLogpushのR2接続用である。CLIによるバケット管理・ログ読出しは従来のCloudflare RESTを使う。R2のバケット単位のObject Read & Write権限はS3互換API用で、REST管理の権限とは区別する。[C9]
 
@@ -319,7 +334,15 @@ CLIは`CLOUDFLARE_ACCOUNT_ID`と`CLOUDFLARE_API_TOKEN`を使ってRESTで管理�
 
 再実行では保存済みのサービス・リソースIDとAPIの現在状態を照合する。同じ設定なら既存の管理対象を利用し、更新前後の設定を保全する。変更系APIの結果が不明な場合は、状態を確認してから同じ承認済み入力を再適用する。
 
+設定記録にはサービス・アカウント・Worker・管理オリジン・原本バケットとログバケット、ゾーン別の操作UUID・ジョブID・トークンID、現在と直前のホスト集合・有効状態、収集元情報を保存する。最初にバケットの不存在を確認して操作識別子を保存し、再実行ではその識別子を含む名前と保存先・権限・出力条件を照合する。無関係の既存リソースは引き継がない。
+
+トークン作成後に中断し、同じ操作のジョブがまだない場合、setupの再実行では所有・権限を確認した未使用トークンを失効させて作り直す。秘密値を再取得できず、ローカルにも保存しないためである。ジョブが作成済みなら新規作成せず照合する。Logpushの有効・無効とホスト追加も、現在状態の確認後に必要な変更だけを行う。再実行の単位は元のコマンド全体とする。
+
+収集元には、設定開始から有効化を確認するまでの区間も`job_disabled`として保存する。無効化は要求前に中断の開始を保存し、有効化の確認後に終了時刻を入れる。配送エラーはAPIの日時から`delivery_error`へ変換し、任意のエラー文を残さない。statusは最新の観測情報を応答に含めるが、ローカルファイルを書き換えない。
+
 ### ドメイン変更
+
+工程3で直配信へ接続する際は、次の変更をドメイン操作へ組み込む。工程2c①では、ドメイン操作とLogpush設定を個別に実行する。
 
 - 変更前後の設定に、メディアホスト、公開用バケット、Logpushの収集ホストを含める。
 - 旧ホストで配信を続ける間は、そのホストも収集・非公開化・パージの対象にする。
@@ -373,14 +396,15 @@ Cloudflare RESTにはアカウントあたり1,200要求/5分の制限がある�
 
 - **2a：R2読取・ファイル索引（実装済み）。** gzip・NDJSONを読み、期間・Showで抽出する。索引を再利用し、遅着ログを発生日へ対応付ける。
 - **2b：Show DOへの保存・管理API（実装済み）。** 収集元の登録、日別値の置換、期待版の照合、計測範囲の表示と照会を行う。
-- **2c：Logpush設定・CLI統合。** 非公開ログバケットと400日の保持ルール、Logpushジョブの管理を実装し、読取・集計・保存をCLIコマンドへ接続する。
+- **2c①：Logpush設定CLI（実装済み）。** 非公開ログバケットと400日の保持ルール、保存先トークン、Logpushジョブの作成・状態確認・有効化・無効化、管理記録とバックアップを実装する。
+- **2c②：統計CLI統合。** `stats refresh/access/logs`へ読取・集計・Show DOへの保存・表示を接続する。
 
 ### 工程1の実装
 
 | 実装 | 入出力と役割 |
 | --- | --- |
 | [共通データ形式](../packages/shared/src/access-stats.ts) | 素材参照、アクセス記録、日別カウンタ・集計値の厳密なスキーマと型を定義する。素材のIDとパスは既存の公開パス解析で照合する |
-| [Logpush変換](../packages/cli/src/http-logpush-events.ts) | まずJSONの11フィールドを検証して発生時刻を数値にし、その後、ゾーン・ホスト・承認済み素材と照合して共通アクセス記録へ変換する。収集対象外は`null`、形式不正はログ本文を含まないエラーを返す |
+| [Logpush変換](../packages/cli/src/http-logpush-events.ts) | まずJSONの10フィールドを検証して発生時刻を数値にし、その後、ゾーン・ホスト・承認済み素材と照合して共通アクセス記録へ変換する。収集対象外は`null`、形式不正はログ本文を含まないエラーを返す |
 | [共通集計](../packages/cli/src/access-stats-aggregate.ts) | 配列などからアクセス記録を1件ずつ取り出し、UTC発生日で重複除去・集計した日別値を返す。入力を変更せず、実行のたびに集計を作り直す。日別行とキャッシュ内訳は一定の順序にそろえる |
 
 Logpush変換は`timestamp_format = rfc3339`の秒単位の日時を扱う。ホストとゾーンIDは小文字にそろえ、ジョブの再作成でも同じ`source_id`を生成する。承認済み素材の一覧には、過去の音声リビジョンや非公開化済みEpisodeの素材も渡せる。
@@ -401,7 +425,17 @@ Logpush変換は`timestamp_format = rfc3339`の秒単位の日時を扱う。ホ
 | [Show DOのアクセス統計](../src/sqlite-access-stats.ts) | 収集元と日別値の一括確定、期待版の照合、保持期限の整理、素材・収集元・日別値の照会を担当 |
 | [管理HTTP](../src/sqlite-access-stats-http.ts) | 認証後に要求を検証し、4つの管理APIを受け付ける。Showサービスから接続し、管理オリジンだけに公開 |
 
-Logpushの設定とCLIコマンドへの接続は工程2cで行う。サービス設定、配信経路、既存のWorker統計は現時点の実装で変更しない。R2へのログ到着と400日の保持ルールは、工程2cの設定・導入時に確認する。
+サービス設定、配信経路、既存のWorker統計はこの段階で変更しない。統計CLIとの接続は工程2c②で行う。
+
+### 工程2c①の実装
+
+| 実装 | 入出力と役割 |
+| --- | --- |
+| [設定の保存形式](../packages/cli/src/logpush-config.ts) | 10フィールド、フィルター、リソースの識別情報と収集元を定義。管理記録を既存の同期・パス保護付き保存へ接続 |
+| [Cloudflare REST](../packages/cli/src/logpush-cloudflare.ts) | ゾーン・フィールド・非公開R2・保持ルール・バケット限定トークン・Logpushジョブを扱う。応答を照合し、秘密を含む応答を外へ返さない |
+| [設定操作](../packages/cli/src/logpush.ts) | setup/status/enable/disable、現在状態との照合、旧ホストの維持、中断・配送の情報を管理 |
+
+CLIのhelp・describe・JSON応答・同梱Skillと、管理記録のバックアップを接続する。実環境のログ到着、400日保持、容量と無料枠への適合は、対象・操作範囲の承認を得た導入試験で確認する。
 
 ## 12. 検証と完了条件
 
@@ -424,6 +458,8 @@ Logpushの設定とCLIコマンドへの接続は工程2cで行う。サービ�
 工程2aのテストは、[R2・gzip・NDJSON](../packages/cli/src/http-logpush-r2.test.ts)、[索引・保護・バックアップ除外](../packages/cli/src/access-log-file-index.test.ts)、[Show・期間・遅着・索引再作成](../packages/cli/src/http-logpush-read.test.ts)にある。12か月分の読取はローカルのログデータで検証し、実環境の保持設定と容量評価は導入時に行う。
 
 工程2bは、[共有スキーマ](../packages/shared/src/sqlite-access-stats.test.ts)、[置換・保持・計測範囲](../src/sqlite-access-stats.test.ts)、[管理HTTP・Show分離](../src/sqlite-access-stats-http.test.ts)で検証する。Workerを埋め込むCLIのビルドと単一バイナリのスモーク試験も行う。
+
+工程2c①は、[設定・秘密値・応答不明・バックアップ](../packages/cli/src/logpush.test.ts)と[正式CLI・JSON・入力検証](../packages/cli/src/logpush-entrypoint.test.ts)で検証する。ローカルAPI模擬試験は、実アカウントでの機能提供やログ配送の証明とは分けて扱う。
 
 ### 承認を得て確認すること
 
@@ -459,3 +495,4 @@ Logpushの設定とCLIコマンドへの接続は工程2cで行う。サービ�
 - [C14：R2 RESTのレート制限](https://developers.cloudflare.com/r2/platform/limits/)
 - [C15：R2 RESTのファイル一覧](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/list/)、[本文読取](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/get/)
 - [C16：Bun fetchのHTTP自動展開](https://bun.com/docs/runtime/networking/fetch)
+- [C17：アカウント所有トークンの作成・一覧](https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/create/)、[権限一覧](https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/subresources/permission_groups/methods/get/)
