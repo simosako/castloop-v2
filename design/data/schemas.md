@@ -155,6 +155,21 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 
 正確な経路とメソッドは、[制御HTTP](../../src/sqlite-control-http.ts)、[Show管理HTTP](../../src/sqlite-service-http.ts)、[予約HTTP](../../src/sqlite-schedule-http.ts)、[統計HTTP](../../src/sqlite-stats-http.ts)にあります。
 
+## Logpushの共通アクセス記録と日別集計
+
+[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。現時点ではLogpush形式の変換とローカル集計を実装しており、R2読取・管理API・CLIコマンドへの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
+
+| 形式 | 主な項目と制約 |
+| --- | --- |
+| 素材参照 | `show_id`、`resource_path`、`resource_kind`、`episode_id`、`audio_revision_id`。既存の公開パス解析でIDとパスを照合し、カバーではEpisode・音声リビジョンを`null`にする |
+| アクセス記録 | 素材参照に収集元・要求ID、発生時刻、ホスト、GET/HEAD、200/206/304、本文バイト数、キャッシュ状態を加える。HEAD・304の本文バイト数は0 |
+| 日別カウンタ | GET 200・GET 206・HEAD・GET 304の件数、GET 200/206の本文バイト数、キャッシュ状態別の件数。キャッシュ内訳の合計は対象応答の総数と一致する |
+| 日別値 | 素材参照、`format = access-daily-v1`、収集元、UTC日付、日別カウンタ。集計単位は収集元・Show・UTC日付・素材パス |
+
+各形式は不明なキーを拒否し、IP・Cookie・User-Agent原文などのリスナー識別情報を持ちません。カウンタは0以上の安全な整数です。キャッシュ状態を取得できない収集元の記録では`cache_status = null`とし、日別内訳の`unavailable`に分類します。
+
+[Logpush変換](../../packages/cli/src/http-logpush-events.ts)は、設定した11フィールドを検証し、外部リスナーの対象ホスト・承認済み素材への応答を共通記録へ変換します。[日別集計](../../packages/cli/src/access-stats-aggregate.ts)は、発生日ごとに収集元・要求IDの組で重複を除きます。Botを含むエッジ本文バイト数による指標なので、既存のWorker統計とは別の定義として扱います。
+
 ## ローカル記録とバックアップ
 
 | 記録 | 主な内容と定義元 |
@@ -189,7 +204,8 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 | 予約 | `sqlite-schedule-v1` | [sqlite-schedule.ts](../../packages/shared/src/sqlite-schedule.ts) |
 | 履歴照会 | `sqlite-revisions-v1` | [sqlite-revisions.ts](../../packages/shared/src/sqlite-revisions.ts) |
 | 独自ドメイン | `schema_version = 1`、`sqlite-domain-change-v1` | [sqlite-domain.ts](../../packages/shared/src/sqlite-domain.ts) |
-| 配信統計 | `episode-daily-v1` | [sqlite-stats.ts](../../packages/shared/src/sqlite-stats.ts) |
+| Worker配信統計 | `episode-daily-v1` | [sqlite-stats.ts](../../packages/shared/src/sqlite-stats.ts) |
+| 共通アクセス統計（データ形式・ローカル集計） | `access-daily-v1` | [access-stats.ts](../../packages/shared/src/access-stats.ts) |
 | 内蔵サイト | `static-show-v2` | [sqlite-service-api.ts](../../packages/shared/src/sqlite-service-api.ts) |
 | CLI応答 | `contract_version = 1` | [agent-schema.ts](../../packages/cli/src/agent-schema.ts) |
 | RSSダウンロード記録 | 1 | [rss-import-local.ts](../../packages/cli/src/rss-import-local.ts) |
@@ -201,4 +217,5 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 
 - 入力：[設定](../../packages/shared/src/sqlite-service.test.ts)、[項目上限](../../packages/shared/src/metadata-limits.test.ts)、[XML文字](../../packages/shared/src/metadata-xml.test.ts)
 - 要求：[直接公開](../../packages/shared/src/sqlite-direct-publication.test.ts)、[履歴](../../packages/shared/src/sqlite-revisions.test.ts)、[ドメイン](../../packages/shared/src/sqlite-domain.test.ts)
+- 共通アクセス統計：[データ形式](../../packages/shared/src/access-stats.test.ts)、[Logpush変換](../../packages/cli/src/http-logpush-events.test.ts)、[日別集計](../../packages/cli/src/access-stats-aggregate.test.ts)
 - CLI：[スキーマ出力](../../packages/cli/src/agent-schema.test.ts)、[予約日時](../../packages/cli/src/schedule-time.test.ts)、[ローカル検証](../../packages/cli/src/agent-cli.test.ts)
