@@ -157,7 +157,7 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 
 ## Logpushの共通アクセス記録と日別集計
 
-[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。現時点ではLogpush形式の変換とローカル集計を実装しており、R2読取・管理API・CLIコマンドへの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
+[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。Logpush形式の変換・日別集計に加え、R2読取とローカル索引を実装しています。管理API・CLIコマンドとの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
 
 | 形式 | 主な項目と制約 |
 | --- | --- |
@@ -169,6 +169,8 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 各形式は不明なキーを拒否し、IP・Cookie・User-Agent原文などのリスナー識別情報を持ちません。カウンタは0以上の安全な整数です。キャッシュ状態を取得できない収集元の記録では`cache_status = null`とし、日別内訳の`unavailable`に分類します。
 
 [Logpush変換](../../packages/cli/src/http-logpush-events.ts)は、設定した11フィールドを検証し、外部リスナーの対象ホスト・承認済み素材への応答を共通記録へ変換します。[日別集計](../../packages/cli/src/access-stats-aggregate.ts)は、発生日ごとに収集元・要求IDの組で重複を除きます。Botを含むエッジ本文バイト数による指標なので、既存のWorker統計とは別の定義として扱います。
+
+[R2読取](../../packages/cli/src/http-logpush-r2.ts)は、RESTの一覧からキー・ETag・圧縮サイズを取得します。ETagを本文応答と照合し、圧縮サイズを確認しながらgzipのNDJSONを解析します。[Show・期間別読取](../../packages/cli/src/http-logpush-read.ts)は1〜366日のUTC期間を受け付け、対象記録を順に渡します。完了結果には、対象期間と重なるファイル一覧と、新規ファイル全体にあった期間外の日付を含めます。索引に保存する項目は[表設計](sqlite.md#ローカルのアクセスログ索引)を参照してください。
 
 ## ローカル記録とバックアップ
 
@@ -211,6 +213,7 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 | RSSダウンロード記録 | 1 | [rss-import-local.ts](../../packages/cli/src/rss-import-local.ts) |
 | RSS公開進捗 | `schema_version = 3` | [sqlite-rss-publication.ts](../../packages/cli/src/sqlite-rss-publication.ts) |
 | ドメイン変更ジャーナル | 1 | [sqlite-domain-journal.ts](../../packages/cli/src/sqlite-domain-journal.ts) |
+| ローカルのログファイル索引 | 1 | [access-log-file-index.ts](../../packages/cli/src/access-log-file-index.ts) |
 | バックアップ | `CASTLOOP-BACKUP-1`、ヘッダー・マニフェストの版1 | [backup-archive.ts](../../packages/cli/src/backup-archive.ts) |
 
 ## 関連テスト
@@ -218,4 +221,5 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 - 入力：[設定](../../packages/shared/src/sqlite-service.test.ts)、[項目上限](../../packages/shared/src/metadata-limits.test.ts)、[XML文字](../../packages/shared/src/metadata-xml.test.ts)
 - 要求：[直接公開](../../packages/shared/src/sqlite-direct-publication.test.ts)、[履歴](../../packages/shared/src/sqlite-revisions.test.ts)、[ドメイン](../../packages/shared/src/sqlite-domain.test.ts)
 - 共通アクセス統計：[データ形式](../../packages/shared/src/access-stats.test.ts)、[Logpush変換](../../packages/cli/src/http-logpush-events.test.ts)、[日別集計](../../packages/cli/src/access-stats-aggregate.test.ts)
+- ログ読取：[R2・gzip・NDJSON](../../packages/cli/src/http-logpush-r2.test.ts)、[ファイル索引](../../packages/cli/src/access-log-file-index.test.ts)、[Show・期間・遅着ログ](../../packages/cli/src/http-logpush-read.test.ts)
 - CLI：[スキーマ出力](../../packages/cli/src/agent-schema.test.ts)、[予約日時](../../packages/cli/src/schedule-time.test.ts)、[ローカル検証](../../packages/cli/src/agent-cli.test.ts)

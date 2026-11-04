@@ -17,12 +17,16 @@ const httpLogpushRecordSchema = z.object({
   ClientRequestSource: z.string(),
   WorkerSubrequest: z.boolean(),
 }).strict();
+export type HttpLogpushRecord = z.infer<typeof httpLogpushRecordSchema>;
 
-export function parseHttpLogpushEvent(input: unknown, source: HttpLogpushSource,
-  resources: ReadonlyMap<string, AccessStatsResource>): AccessStatsEvent | null {
+export function parseHttpLogpushRecord(input: unknown): HttpLogpushRecord {
   const parsed = httpLogpushRecordSchema.safeParse(input);
   if (!parsed.success) throw new Error("Invalid HTTP Requests Logpush record");
-  const record = parsed.data;
+  return parsed.data;
+}
+
+export function httpLogpushRecordToEvent(record: HttpLogpushRecord, source: HttpLogpushSource,
+  resources: ReadonlyMap<string, AccessStatsResource>): AccessStatsEvent | null {
   const host = source.hostname.toLowerCase();
   if (record.ClientRequestHost.toLowerCase() !== host || record.ClientRequestSource !== "eyeball" ||
     record.WorkerSubrequest) return null;

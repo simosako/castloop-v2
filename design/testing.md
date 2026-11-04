@@ -41,6 +41,7 @@ SQLiteテストは `bun:sqlite` を使います。テスト用ストレージで
 | 配信・生成・キャッシュ消去 | [Gateway](../src/sqlite-gateway.test.ts)、[キャッシュ](../src/lifecycle-cache.test.ts)、[判定キャッシュ](../src/decision-cache.test.ts)、[生成配信](../src/sqlite-generated-delivery.test.ts)、[サイト](../src/site.test.ts)、[パージ](../src/sqlite-cache-purge.test.ts) |
 | 統計 | [集計](../src/sqlite-delivery-stats.test.ts)、[HTTP](../src/sqlite-stats-http.test.ts)、[CLI](../packages/cli/src/stats.test.ts) |
 | Logpush・共通アクセス統計 | [データ形式](../packages/shared/src/access-stats.test.ts)、[Logpush変換](../packages/cli/src/http-logpush-events.test.ts)、[日別集計](../packages/cli/src/access-stats-aggregate.test.ts) |
+| Logpushのログ読取・索引 | [R2・gzip・NDJSON](../packages/cli/src/http-logpush-r2.test.ts)、[索引・保護・バックアップ除外](../packages/cli/src/access-log-file-index.test.ts)、[Show・期間・遅着・索引再作成](../packages/cli/src/http-logpush-read.test.ts) |
 | RSS取り込み | [取得](../packages/cli/src/rss-import-download.test.ts)、[解析](../packages/cli/src/rss-import-feed.test.ts)、[事前検査](../packages/cli/src/rss-import-preflight.test.ts)、[順次公開](../packages/cli/src/sqlite-rss-publication.test.ts) |
 | ローカル記録・バックアップ | [記録保存](../packages/cli/src/local-journal-storage.test.ts)、[読み取り](../packages/cli/src/local-journal-read.test.ts)、[バックアップ](../packages/cli/src/backup.test.ts) |
 | CLIの操作案内 | [ヘルプ](../packages/cli/src/help.test.ts)、[自己記述](../packages/cli/src/agent-schema.test.ts)、[Skill](../packages/cli/src/admin-skill.test.ts) |

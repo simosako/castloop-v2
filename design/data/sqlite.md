@@ -1,6 +1,6 @@
 # SQLite表設計
 
-SQLiteはDurable Objectごとに独立しています。本書では、サービスの識別、番組の現在内容、履歴、予約、ドメイン、統計の順に、21種類のアプリケーション用テーブルを説明します。処理の流れは[Show DO](../components/show-do.md)と[制御DO](../components/control-do.md)を参照してください。
+SQLiteはDurable Objectごとに独立しています。本書では、サービスの識別、番組の現在内容、履歴、予約、ドメイン、統計の順に、DO内の21種類のアプリケーション用テーブルを説明します。末尾では、CLIがローカルに持つアクセスログ索引も説明します。処理の流れは[Show DO](../components/show-do.md)と[制御DO](../components/control-do.md)を参照してください。
 
 ## 配置と表一覧
 
@@ -254,8 +254,22 @@ CHECKで次を制約します。
 
 非公開化後も、内容・履歴・音声参照を保持します。
 
+## ローカルのアクセスログ索引
+
+CLIの`.castloop/access-log-files.sqlite`は、DOのSQLiteとは独立した、再作成できる読取索引です。既存のDOの形式版・保存表は変更しません。
+
+| 表 | カラムと制約 |
+| --- | --- |
+| `access_log_files_schema` | `id INTEGER PRIMARY KEY CHECK(id = 1)`、`version INTEGER NOT NULL`。形式版1 |
+| `access_log_files` | `account_id TEXT`、`bucket_name TEXT`、`object_key TEXT`、`etag TEXT`、`min_occurred_at_ms INTEGER`、`max_occurred_at_ms INTEGER` |
+
+ファイル表の主キーは`(account_id, bucket_name, object_key)`で、`WITHOUT ROWID`です。識別用の4項目は`NOT NULL`です。日時は両方`NULL`（記録がないファイル）、または`0 <= 最小値 <= 最大値`となる非NULL値の組に制約します。
+
+照会ではETagも一致する行を使います。日時範囲はファイル全体を解析した後に、1行の追加・置換で確定します。失敗したファイルは書き込まず、別ETagを読んで失敗した場合も、保存済みの行を維持します。索引は操作の進捗記録ではなく、R2の一覧と照合して読取対象を選ぶための情報です。
+
 ## DDLの定義元
 
 - [公開基盤](../../src/sqlite-publication-queue.ts)、[予約](../../src/sqlite-publication-schedules.ts)、[内容・履歴](../../src/sqlite-publication-content.ts)、[短縮ID](../../src/sqlite-site-ids.ts)
 - [制御DO固有表](../../src/sqlite-service-control.ts)、[Show固定対応](../../src/sqlite-show-service.ts)、[ドメイン変更](../../src/sqlite-domain-runtime.ts)
 - [統計](../../src/sqlite-delivery-stats.ts)、[形式版と稼働設定の確認](../../src/sqlite-runtime-identity.ts)
+- [ローカルのアクセスログ索引](../../packages/cli/src/access-log-file-index.ts)

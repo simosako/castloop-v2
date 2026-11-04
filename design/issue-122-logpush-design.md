@@ -1,6 +1,6 @@
 # Issue #122：Logpushによるアクセスログと統計の設計
 
-作成日：2026-11-04。状態：工程1の共通データ・Logpush変換・日別集計を実装済み。ログの収集・保存・照会とメディア直配信は実装予定。
+作成日：2026-11-04。状態：共通データ・Logpush変換・日別集計、R2読取・ローカル索引を実装済み。Show DOへの保存・照会、Logpush設定・CLI統合、メディア直配信は実装予定。
 
 [実装案の比較](issue-122-r2-cdn-plan.md)で推奨した、R2・CDN直配信とHTTP Requests Logpushを組み合わせる構成を具体化する。機能・料金は公式資料に基づき、対象アカウントでの検証は導入時に行う。
 
@@ -176,6 +176,10 @@ Logpushはgzip圧縮されたNDJSON（1行1件のJSON）をログバケットへ
 
 CLIは、保持中のログファイルをページ単位で一覧する。日付フォルダだけで取得対象を限定すると、配送が遅れた記録を見落とすおそれがあるため、ファイル内のアクセス日時で対象日を判定する。
 
+実装済みの読取処理は、Cloudflare RESTのList Objectsを使い、`http/<service_id>/<zone_id>/`配下を1ページ最大1,000件で列挙する。続きのカーソルをたどって一覧を取得した後、そのキー・ETag（オブジェクト内容の照合に使う識別値）・圧縮サイズの集合を今回の入力にする。以後に追加されたファイルは次回の一覧で見つける。[C15]
+
+Get Objectでは、応答のETagを一覧の値と照合し、圧縮された本文の読取サイズも確認する。gzipを展開しながら、UTF-8のNDJSONを1行ずつ解析する。BunのHTTP自動展開を無効にすることで、R2の`Content-Encoding: gzip`による二重展開を防ぐ。[C16]
+
 ### 読取用のファイル索引
 
 400日分を毎回ダウンロードする処理を避けるため、CLIは`.castloop/access-log-files.sqlite`にファイルの索引を保存する。単一バイナリに含まれるSQLiteを使い、外部ツールの導入は不要とする。
@@ -190,6 +194,12 @@ CLIは、保持中のログファイルをページ単位で一覧する。日�
 索引の有無によって集計結果は変わらない。別端末や索引の再作成時は初回読取量が増える。通常の再集計では、新規ファイルと対象日に関係するファイルを読む。索引の書き込みは1ファイル分を単位に確定し、途中終了後も同じ一覧から再実行できる。
 
 索引は派生データとしてワークスペースバックアップの対象から分離する。ローカルでは既存の`.castloop/`と同じアクセス制限を適用し、APIキーなどの認証情報は保存対象外とする。
+
+索引の日時範囲は、ホスト・Show・素材で絞る前のファイル全体から求める。空のファイルは最小・最大日時をともに`null`として記録する。正常に読み終えたファイルごとに1行を確定するため、後続のファイルで失敗しても、先に保存した索引は再利用できる。失敗したファイルは次回も読み直す。
+
+読取処理は、対象ShowとUTC期間に合う共通アクセス記録を順に渡し、完了時に対象期間と重なるファイル一覧と、新規ファイルにあった期間外の日付を返す。期間外の日付はファイル全体の記録に基づくため、別Showのアクセスも含む。索引を作り直した場合は、同じ日付が再び現れることがある。1回の指定期間は1〜366日とし、400日分は期間を分けて読み出す。
+
+アクセス記録は読取中に渡される。集計の保存を行う呼出側は、対象日の全ファイルの解析完了を待ってから反映する。これにより、後半の解析失敗による途中までの値をShow DOに保存せずに済む。
 
 ## 7. 再集計とShow DOへの反映
 
@@ -333,17 +343,31 @@ Cloudflare RESTにはアカウントあたり1,200要求/5分の制限がある�
 
 初版の成果物は1〜3で、Worker側の個別ログ保存は将来の追加となる。
 
+工程2は、次の単位に分けて実装する。
+
+- **2a：R2読取・ファイル索引（実装済み）。** gzip・NDJSONを読み、期間・Showで抽出する。索引を再利用し、遅着ログを発生日へ対応付ける。
+- **2b：Show DOへの保存・管理API。** 収集元の登録、日別値の置換、期待版の照合、計測範囲の表示と照会を実装する。
+- **2c：Logpush設定・CLI統合。** 非公開ログバケットと400日の保持ルール、Logpushジョブの管理を実装し、読取・集計・保存をCLIコマンドへ接続する。
+
 ### 工程1の実装
 
 | 実装 | 入出力と役割 |
 | --- | --- |
 | [共通データ形式](../packages/shared/src/access-stats.ts) | 素材参照、アクセス記録、日別カウンタ・集計値の厳密なスキーマと型を定義する。素材のIDとパスは既存の公開パス解析で照合する |
-| [Logpush変換](../packages/cli/src/http-logpush-events.ts) | 解析済みJSON、ゾーン・ホスト、承認済み素材の一覧を受け取り、1件の共通アクセス記録へ変換する。収集対象外は`null`、形式不正はログ本文を含まないエラーを返す |
+| [Logpush変換](../packages/cli/src/http-logpush-events.ts) | まずJSONの11フィールドを検証して発生時刻を数値にし、その後、ゾーン・ホスト・承認済み素材と照合して共通アクセス記録へ変換する。収集対象外は`null`、形式不正はログ本文を含まないエラーを返す |
 | [共通集計](../packages/cli/src/access-stats-aggregate.ts) | 配列などからアクセス記録を1件ずつ取り出し、UTC発生日で重複除去・集計した日別値を返す。入力を変更せず、実行のたびに集計を作り直す。日別行とキャッシュ内訳は一定の順序にそろえる |
 
 Logpush変換は`timestamp_format = rfc3339`の秒単位の日時を扱う。ホストとゾーンIDは小文字にそろえ、ジョブの再作成でも同じ`source_id`を生成する。承認済み素材の一覧には、過去の音声リビジョンや非公開化済みEpisodeの素材も渡せる。
 
-工程2では、この処理にR2のgzip・NDJSON読取、ファイル索引、期間選択、観測0件と計測範囲の判定、Show DOへの保存・照会、CLIコマンドを接続する。現時点の実装はローカルの変換・計算処理であり、サービス設定、配信経路、既存のWorker統計は変更しない。
+### 工程2aの実装
+
+| 実装 | 入出力と役割 |
+| --- | --- |
+| [R2一覧・本文読取](../packages/cli/src/http-logpush-r2.ts) | RESTでファイルを列挙し、ETag・サイズを確認してgzip・NDJSONを解析する。既存のアカウント・APIトークンを使う |
+| [ファイル索引](../packages/cli/src/access-log-file-index.ts) | `.castloop/access-log-files.sqlite`にファイルの識別情報と日時範囲を保存する。入力はアカウント・バケット・キー・ETagと日時範囲で、Logpushのデータ項目には依存しない |
+| [Show・期間別の読取](../packages/cli/src/http-logpush-read.ts) | 収集元、承認済み素材、Show・UTC期間を受け取り、共通アクセス記録を順に渡す。新規ファイルと対象日に関係するファイルを読み、入力ファイル一覧と期間外の日付を返す |
+
+Show DO・管理APIとの接続は工程2b、Logpushの設定とCLIコマンドへの接続は工程2cで行う。サービス設定、配信経路、既存のWorker統計は現時点の実装で変更しない。R2へのログ到着と400日の保持ルールは、工程2cの設定・導入時に確認する。
 
 ## 12. 検証と完了条件
 
@@ -362,6 +386,8 @@ Logpush変換は`timestamp_format = rfc3339`の秒単位の日時を扱う。ホ
 実装時は`bun test`・`npm run check`を実行する。CLIの埋め込み・配備変更は、単一バイナリのスモーク試験でも確認する。
 
 工程1のテストは、[共有スキーマ](../packages/shared/src/access-stats.test.ts)、[Logpush変換と再集計](../packages/cli/src/http-logpush-events.test.ts)、[共通の日別集計](../packages/cli/src/access-stats-aggregate.test.ts)にある。
+
+工程2aのテストは、[R2・gzip・NDJSON](../packages/cli/src/http-logpush-r2.test.ts)、[索引・保護・バックアップ除外](../packages/cli/src/access-log-file-index.test.ts)、[Show・期間・遅着・索引再作成](../packages/cli/src/http-logpush-read.test.ts)にある。12か月分の読取はローカルのログデータで検証し、実環境の保持設定と容量評価は導入時に行う。
 
 ### 承認を得て確認すること
 
@@ -395,3 +421,5 @@ Logpush変換は`timestamp_format = rfc3339`の秒単位の日時を扱う。ホ
 - [C12：SQLite DO料金](https://developers.cloudflare.com/durable-objects/platform/pricing/)
 - [C13：Workers料金](https://developers.cloudflare.com/workers/platform/pricing/)
 - [C14：R2 RESTのレート制限](https://developers.cloudflare.com/r2/platform/limits/)
+- [C15：R2 RESTのファイル一覧](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/list/)、[本文読取](https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/get/)
+- [C16：Bun fetchのHTTP自動展開](https://bun.com/docs/runtime/networking/fetch)

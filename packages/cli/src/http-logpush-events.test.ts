@@ -1,7 +1,13 @@
 import { expect, test } from "bun:test";
 import { accessStatsEventSchema, accessStatsResourceSchema } from "../../shared/src/access-stats";
+import type { AccessStatsResource } from "../../shared/src/access-stats";
 import { aggregateAccessStats } from "./access-stats-aggregate";
-import { parseHttpLogpushEvent } from "./http-logpush-events";
+import { httpLogpushRecordToEvent, parseHttpLogpushRecord } from "./http-logpush-events";
+import type { HttpLogpushSource } from "./http-logpush-events";
+
+function parseHttpLogpushEvent(input: unknown, source: HttpLogpushSource, resources: ReadonlyMap<string, AccessStatsResource>) {
+  return httpLogpushRecordToEvent(parseHttpLogpushRecord(input), source, resources);
+}
 
 const revisionId = "11111111-1111-4111-8111-111111111111";
 const audio = accessStatsResourceSchema.parse({ show_id: "daily", resource_kind: "audio", episode_id: "first",
