@@ -7,7 +7,8 @@ const redirected = async (input: Parameters<typeof fetch>[0], init?: Parameters<
   const request = new Request(input, init), url = new URL(request.url);
   if (!["api.cloudflare.com", "test-worker.example.workers.dev", "podcasts.example.com"].includes(url.hostname)) throw new Error("Test preload rejects external access");
   const headers = new Headers(request.headers); headers.set("X-Castloop-Test-Target", request.url);
-  return transport(origin, { method: request.method, headers, redirect: "error", signal: request.signal,
-    ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) });
+  const options = { method: request.method, headers, redirect: "error" as const, signal: request.signal, decompress: false,
+    ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: request.body }) };
+  return transport(origin, options);
 };
 globalThis.fetch = Object.assign(redirected, { preconnect: transport.preconnect });

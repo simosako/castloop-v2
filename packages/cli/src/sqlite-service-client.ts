@@ -13,6 +13,11 @@ import { sqliteCatalogRequestSchema, sqliteCatalogResponseSchema } from "../../s
 import type { SqliteCatalogRequest, SqliteCatalogResponse } from "../../shared/src/sqlite-catalog";
 import { sqliteContentSnapshotSchema, sqliteRevisionDetailResponseSchema, sqliteRevisionListResponseSchema, sqlitePreviewInventorySchema } from "../../shared/src/sqlite-revisions";
 import type { SqliteShowRevisionRecord, SqliteEpisodeRevisionRecord } from "../../shared/src/sqlite-revisions";
+import { sqliteServiceConfigHash } from "../../shared/src/sqlite-service";
+import { sqliteAccessStatsSourcesResponseSchema, sqliteAccessStatsResourcesResponseSchema, sqliteAccessStatsDailyRequestSchema,
+  sqliteAccessStatsDailyResponseSchema, sqliteAccessStatsReplaceRequestSchema, sqliteAccessStatsReplaceResponseSchema } from "../../shared/src/sqlite-access-stats";
+import type { SqliteAccessStatsDailyRequest, SqliteAccessStatsReplaceRequest } from "../../shared/src/sqlite-access-stats";
+import { isDeepStrictEqual } from "node:util";
 
 export class SqliteServiceClient {
   readonly config: SqliteServiceConfig;
@@ -119,6 +124,56 @@ export class SqliteServiceClient {
     const request = sqliteStatsRetentionRequestSchema.parse(input);
     const value = await this.checkedRetention(await this.statsPost(request, request.show_id), request.show_id);
     if (JSON.stringify(value.retention.request) !== JSON.stringify(request)) throw new Error("Delivery stats retention frozen request differs");
+    return value;
+  }
+  private async accessRead(route: string, showId: string, query: Record<string, string | undefined> = {}): Promise<unknown> {
+    sqliteInspectionSchema.shape.show_id.parse(showId);
+    const search = new URLSearchParams({ service_id: this.config.service_id,
+      service_config_sha256: await sqliteServiceConfigHash(this.config) });
+    for (const [name, value] of Object.entries(query)) if (value !== undefined) search.set(name, value);
+    return readSqliteManagementGet(new URL(`/admin/sqlite-access-stats/${route}?${search}`, this.config.workers_dev_base_url),
+      { "X-Castloop-Key": this.key, "X-Castloop-Show-Id": showId }, { ...this.readOptions, transport: this.transport });
+  }
+  async accessSources(showId: string, cursor?: string) {
+    const parsed = sqliteAccessStatsSourcesResponseSchema.safeParse(await this.accessRead("sources", showId, { cursor }));
+    if (!parsed.success) throw new Error("Access statistics sources response schema was not verified");
+    const value = parsed.data; await this.identity(value);
+    if (value.show_id !== showId) throw new Error("Access statistics sources response target differs");
+    return value;
+  }
+  async accessResources(showId: string, cursor?: string) {
+    const parsed = sqliteAccessStatsResourcesResponseSchema.safeParse(await this.accessRead("resources", showId, { cursor }));
+    if (!parsed.success) throw new Error("Access statistics resources response schema was not verified");
+    const value = parsed.data; await this.identity(value);
+    if (value.show_id !== showId || value.resources.some((resource) => resource.show_id !== showId)) throw new Error("Access statistics resources response target differs");
+    return value;
+  }
+  async accessDaily(showId: string, query: Omit<SqliteAccessStatsDailyRequest, "service_id" | "service_config_sha256" | "show_id">) {
+    const request = sqliteAccessStatsDailyRequestSchema.parse({ ...query, service_id: this.config.service_id,
+      service_config_sha256: await sqliteServiceConfigHash(this.config), show_id: showId });
+    const parsed = sqliteAccessStatsDailyResponseSchema.safeParse(await this.accessRead("daily", showId, {
+      source_id: request.source_id, resource_path: request.resource_path, from: request.from_date_utc, to: request.to_date_utc, cursor: request.cursor,
+    }));
+    if (!parsed.success) throw new Error("Access statistics daily response schema was not verified");
+    const value = parsed.data; await this.identity(value);
+    if (value.show_id !== showId || value.source.source.source_id !== request.source_id || value.resource.show_id !== showId ||
+      value.resource.resource_path !== request.resource_path || value.from_date_utc !== request.from_date_utc || value.to_date_utc !== request.to_date_utc ||
+      value.days.some((day) => day.date_utc < request.from_date_utc || day.date_utc > request.to_date_utc || day.record &&
+        (day.record.daily.show_id !== showId || day.record.daily.source_id !== request.source_id ||
+          day.record.daily.resource_path !== request.resource_path || day.record.daily.date_utc !== day.date_utc))) {
+      throw new Error("Access statistics daily response differs from its exact target and dates");
+    }
+    return value;
+  }
+  async replaceAccessDaily(input: SqliteAccessStatsReplaceRequest) {
+    const request = sqliteAccessStatsReplaceRequestSchema.parse(input);
+    const parsed = sqliteAccessStatsReplaceResponseSchema.safeParse(await this.call("daily", request, request.show_id, "/admin/sqlite-access-stats"));
+    if (!parsed.success) throw new Error("Access statistics replacement response schema was not verified");
+    const value = parsed.data; await this.identity(value);
+    if (value.show_id !== request.show_id || !isDeepStrictEqual(value.source.source, request.source) ||
+      !isDeepStrictEqual(value.record.daily, request.daily) || value.record.input_sha256 !== request.input_sha256 ||
+      value.record.input_min_at_ms !== request.input_min_at_ms || value.record.input_max_at_ms !== request.input_max_at_ms ||
+      value.record.read_at_ms < request.read_at_ms) throw new Error("Access statistics replacement differs from its exact request");
     return value;
   }
   private async checkRevisionContent(content: SqliteShowRevisionRecord | SqliteEpisodeRevisionRecord | null | undefined) {

@@ -89,7 +89,7 @@ export async function logpushFixture() {
     }
     throw new Error(`Unhandled test Logpush route ${request.method} ${path}`);
   };
-  return { root: service.root, close: () => service.close(), config, zoneId, permissionId, tokens, jobs, rules, buckets, calls, faults,
+  return { service, root: service.root, close: () => service.close(), config, zoneId, permissionId, tokens, jobs, rules, buckets, calls, faults,
     transport, options: { ...service.options, transport },
     async changeHost(host: string) {
       if (config.public_base_url !== config.workers_dev_base_url) {

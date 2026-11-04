@@ -2,7 +2,7 @@
 
 HTTP Requests Logpush records accesses to the audio and cover paths on your service's custom domain and stores them in a separate private R2 bucket for 400 days. It works with the current Worker delivery path; switching media delivery to R2/CDN is not required.
 
-The setup and status commands are available. The `stats refresh`, `stats access`, and `stats logs` commands are planned for the next implementation step. Existing [`stats` commands](delivery_statistics.md) continue to display Worker delivery statistics.
+Use `logpush` to configure collection, `stats refresh` to calculate and save access statistics, `stats access` to read them, and `stats logs` to export individual records. Existing [`stats SHOW` commands](delivery_statistics.md) continue to display Worker delivery statistics with their original definitions.
 
 ## Before setup
 
@@ -81,3 +81,63 @@ Preserve the workspace and configuration file. Inspect `logpush status --zone-id
 The CLI saves an operation identifier before resource creation and checks current API state on rerun. If a destination token was created but no job uses it, setup revokes that operation's verified unused token and creates a replacement: the original secret was intentionally not retained. A job already created by that operation is checked and reused. Mutating HTTP requests are never automatically retried.
 
 Existing unrelated buckets/jobs/tokens are not adopted. Missing completed resources, changed token permissions, unexpected filters, public access, or conflicting retention rules produce an error for review. Log objects and configured buckets/jobs are retained; bucket migration and removal of those resources are outside these commands.
+
+## Calculate access statistics
+
+Find the host's `source_id` in `logpush status --zone-id ZONE_ID --json`, then choose a Show and UTC dates:
+
+```sh
+castloop stats refresh my-show --source 'http_logpush:ZONE_ID:podcasts.example.com' --from 2026-10-01 --to 2026-10-31 --json
+```
+
+Replace the example source with the exact saved ID. Each refresh handles one source and Show. It reads all approved audio revisions and the cover, including old revisions and unpublished episodes. It deduplicates delivered requests by source, UTC date, and request ID, then replaces the daily values in that Show DO. Materials with no matching requests receive saved zero counts.
+
+The default window is the last 30 UTC days, including today. A request spans at most 366 dates; refresh dates must also be within the current 400-day daily retention window. Dates entirely outside the source's collection period are listed in `skipped_collection_dates_utc` and are left unmeasured. The current day and known interruptions are shown as partial coverage.
+
+Refresh checks the saved source and current Logpush configuration/retention. It requires the administrator key and Cloudflare permissions for status inspection and R2 REST reads. It does not change the job, token, bucket configuration, content, or Worker delivery counters.
+
+All selected files must parse before the first daily replacement. Each date/material replacement uses the versions read before the R2 scan. The result reports `changed`, `unchanged`, input-file count, and newly found out-of-window dates in `new_outside_dates_utc`. Those dates can belong to other Shows in the same log file; review them before explicitly choosing another refresh window.
+
+Repeating the same calculation does not add counts. The file index can be rebuilt without changing the result, and later log files can be included by repeating refresh. If a replacement fails midway, earlier rows may already be saved: inspect their read/applied timestamps with `stats access`, then explicitly rerun the same source/dates. The CLI does not automatically retry mutations. Previously observed interruption history is preserved when newer job observations are saved.
+
+The CLI aggregates the selected events in management-device memory. Split long or busy periods into smaller windows when needed; a single large 12-month refresh has not been performance-tested. Individual-log export below streams records instead of collecting them in memory.
+
+## Read saved access statistics
+
+First list the Show's saved sources, then its approved material paths:
+
+```sh
+castloop stats access my-show
+castloop stats access my-show --source 'http_logpush:ZONE_ID:podcasts.example.com'
+```
+
+Sources appear after the first successful refresh. The second command lists paths for all approved revisions and the cover; use one path for daily counts and the period total:
+
+```sh
+castloop stats access my-show --source 'http_logpush:ZONE_ID:podcasts.example.com' --resource '/podcasts/my-show/cover.jpg' --from 2026-10-01 --to 2026-10-31
+```
+
+Access readout requires only the administrator key. It reads Show DO data without scanning R2 or changing statistics. Dates are accepted when both `--source` and `--resource` are present. Add `--json` for the `sources`, `resources`, or `daily` view. Continue pages with the returned `next_cursor` and the same selectors and explicit dates; a daily page includes the selected period's total, not just the displayed rows.
+
+| Value | Meaning |
+| --- | --- |
+| Saved counters of zero | The selected inputs were read and no matching requests were found |
+| `unmeasured`, with a `null` record | No saved calculation for that date |
+| `partial` | Source start/end, an interruption, or a read before the UTC day ended limits coverage |
+| `pruned`, with a `null` record | Before the current 400-day daily retention boundary |
+
+If the whole period has no saved rows, its total is `null`, not zero. `read_at_ms` is captured before listing the R2 input, and `applied_at_ms` records when the row was saved. A later check of identical inputs can advance the read time without incrementing its content version. Period totals include retained rows only; the existing Worker lifetime totals remain separate.
+
+`access-daily-v1` reports GET 200/206, HEAD, GET 304, actual edge body bytes, and cache-status counts. It includes bots. Initial downloads, tiny-range probes, and bot exclusion are shown as unsupported, so these counts should be interpreted separately from `episode-daily-v1`.
+
+## Export individual logs
+
+```sh
+castloop stats logs my-show --source 'http_logpush:ZONE_ID:podcasts.example.com' --from 2026-10-01 --to 2026-10-31 --output /private/path/my-show-access.ndjson --json
+```
+
+`--output` is required and uses the caller's working directory for relative paths. The destination must be new; the CLI creates it with mode 0600 and removes its own incomplete output on failure. Keep exports in a private location. Each line is a common access-event JSON object for the selected Show, host, UTC dates, and approved material paths. Delivery duplicates are retained, allowing the file to represent the delivered records; refresh performs deduplication when calculating statistics.
+
+Standard output contains only the export summary or normal JSON envelope, never the individual records. The summary's `format` is `access-event-ndjson-v1`. Export uses the saved Logpush source, administrator key, and Cloudflare R2 REST read credentials; it can read retained logs while the job is stopped and does not require current job inspection. It creates/reuses the local read index but leaves Show DO statistics unchanged.
+
+Export accepts up to 366 UTC dates at a time. R2 retains files by creation time, while filtering uses each event's occurrence time. The 400-day daily-statistics cutoff does not limit which still-retained individual records can be exported.

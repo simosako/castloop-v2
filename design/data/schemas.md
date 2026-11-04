@@ -159,7 +159,7 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 
 ## Logpushの共通アクセス記録と日別集計
 
-[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。Logpush形式の変換・日別集計、R2読取・ローカル索引、Show DOの保存・管理API、Logpush設定CLIを実装しています。統計CLIとの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
+[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。Logpush形式の変換・日別集計、R2読取・ローカル索引、Show DOの保存・管理API、Logpush設定と統計CLIを実装しています。全体の接続は[Issue #122の設計](../issue-122-logpush-design.md)を参照してください。
 
 | 形式 | 主な項目と制約 |
 | --- | --- |
@@ -189,6 +189,8 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 GETはサービスID・設定ハッシュをクエリで指定します。日別照会では収集元・素材パス・UTC開始日・終了日も必須です。保存済み0件にはカウンタを返し、未集計・保持範囲外では`null`を返します。`observed`と`partial`は観測値の計測範囲を示し、配送の欠損があり得る方式であることは収集元にも記録します。
 
 JSON取込は12 KiB、応答は16 KiBを上限にします。1ページの上限は収集元・素材が20件、日別値が31日です。収集元と日別値は、応答サイズに収まるよう件数を調整します。HTTPの要求・応答と状態コードは[アクセス統計の管理HTTP](../../src/sqlite-access-stats-http.ts)、版と保持範囲は[保存処理](../../src/sqlite-access-stats.ts)を参照してください。
+
+CLIの`stats access`は管理応答に`view = sources | resources | daily`を付けます。resources表示には選択した収集元も含めます。refreshの結果は収集元・版、期間、`changed`・`unchanged`、読取時刻、入力ファイル数、収集期間外の日付・新たな範囲外の遅着日を持ちます。logsの結果は`format = access-event-ndjson-v1`、保存先・期間・件数・収集元を返し、個別の共通アクセス記録は指定ファイルにだけ保存します。これらもCLIの共通JSON応答形式を使います。
 
 ## ローカル記録とバックアップ
 

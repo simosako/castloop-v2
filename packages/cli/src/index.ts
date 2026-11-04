@@ -123,6 +123,7 @@ async function main(context: Invocation): Promise<unknown> {
   const listing = command === "list-shows" || command === "list-episodes";
   const options = commandOptions(command);
   const { positional, flags } = argsOf(rest, Object.keys(options).filter((name) => options[name] === "boolean"));
+  const statsAction = command === "stats" && positional.length === 2 ? positional[0] : undefined;
   allowedFlags(flags, Object.keys(options));
   if (flags.review && (!process.stdin.isTTY || !process.stdout.isTTY || flags.json || flags["non-interactive"])) {
     throw new AgentError("interactive_required", "--review requires an interactive terminal without --json or --non-interactive.");
@@ -298,7 +299,15 @@ async function main(context: Invocation): Promise<unknown> {
   } else if (command === "verify") {
     allowedFlags(flags, ["episode"]);
   } else if (command === "stats") {
-    allowedFlags(flags, ["episode", "from", "to", "by-revision", "cursor"]);
+    if (statsAction !== undefined) {
+      if (statsAction !== "access" && statsAction !== "refresh" && statsAction !== "logs") throw new Error(commandHelp(command));
+      allowedFlags(flags, statsAction === "access" ? ["source", "resource", "from", "to", "cursor"] :
+        statsAction === "refresh" ? ["source", "from", "to"] : ["source", "from", "to", "output"]);
+      validateId(positional[1], "show");
+      const { accessStatsSelection } = await import("./access-stats");
+      accessStatsSelection(statsAction, { sourceId: flags.source, resourcePath: flags.resource, from: flags.from, to: flags.to,
+        cursor: flags.cursor, output: flags.output });
+    } else allowedFlags(flags, ["episode", "from", "to", "by-revision", "cursor"]);
   } else if (command === "stats-retention") {
     allowedFlags(flags, ["operation-id"]);
   } else if (["preview-episode-schedule", "schedule-episode", "preview-show-schedule", "schedule-show"].includes(command)) {
@@ -350,6 +359,7 @@ async function main(context: Invocation): Promise<unknown> {
     };
   }
   if (["publish-show", "publish-episode"].includes(command)) context.target.show_id = validateId(positional[0], "show");
+  if (command === "stats") context.target.show_id = validateId(positional[statsAction === undefined ? 0 : 1], "show");
   if (!explicitRoot && process.stderr.isTTY && !process.argv.includes("--json") && !process.argv.includes("--non-interactive")) {
     console.error(`Workspace: ${root}\nService: ${workspace.service_id}${context.target.show_id ? `\nShow: ${context.target.show_id}` : ""}`);
   }
@@ -377,7 +387,8 @@ async function main(context: Invocation): Promise<unknown> {
     expectedPreview = preview.input_fingerprint;
   }
   const effects = describeCommand(command).effects;
-  context.mutationStarted = command === "domain" && ["list", "status"].includes(positional[0]) ||
+  context.mutationStarted = command === "stats" ? statsAction === "refresh" || statsAction === "logs" :
+    command === "domain" && ["list", "status"].includes(positional[0]) ||
     command === "logpush" && positional[0] === "status" ? false : effects.remote === "may_mutate" || effects.local === "may_write_records";
   const result = await runSqliteCommand(root, workspace, command, positional, { workerSource: sqliteWorkerSource,
     previewOptions: { mode: flags.local ? "local" : flags.remote ? "remote" : "auto", rssOutput: flags["rss-output"] },
@@ -388,6 +399,8 @@ async function main(context: Invocation): Promise<unknown> {
       external: !!flags.external, environment: undefined } } : {}),
     ...(command === "verify" ? { verifyOptions: { episodeId: flags.episode } } : {}),
     ...(command === "stats" ? { statsOptions: { episodeId: flags.episode, from: flags.from, to: flags.to, cursor: flags.cursor } } : {}),
+    ...(command === "stats" && statsAction ? { accessStatsOptions: { sourceId: flags.source, resourcePath: flags.resource,
+      from: flags.from, to: flags.to, cursor: flags.cursor, output: flags.output } } : {}),
     ...(command === "stats-retention" ? { statsOptions: { retentionOperationId: flags["operation-id"] ?? randomUUID() } } : {}),
     ...(command.includes("schedule") ? { scheduleOptions: { at: flags.at, timezone: flags.timezone,
       expectVersion: flags["expect-version"], cursor: flags.cursor } } : {}),
@@ -412,7 +425,11 @@ async function main(context: Invocation): Promise<unknown> {
     if (verified.summary.fail) process.exitCode = 1;
     if (!process.argv.includes("--json")) return formatVerify(verified);
   }
-  if (command === "stats" && !process.argv.includes("--json")) {
+  if (command === "stats" && statsAction === "access" && !process.argv.includes("--json")) {
+    const { formatAccessStats } = await import("./access-stats");
+    return formatAccessStats(result);
+  }
+  if (command === "stats" && statsAction === undefined && !process.argv.includes("--json")) {
     const { formatSqliteStatsDaily, formatSqliteStatsEpisodes } = await import("./stats");
     if (flags.episode) {
       const { sqliteStatsEpisodeDailyResponseSchema } = await import("../../shared/src/sqlite-stats");

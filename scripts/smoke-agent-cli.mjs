@@ -41,6 +41,14 @@ try {
   assert.equal(logpush.options["bucket-name"], "string");
   assert.equal(logpush.effects.publication, false);
   assert.match(run(["logpush", "--help"]), /400-day log retention/);
+  const stats = JSON.parse(run(["describe", "stats", "--json"])).commands[0];
+  assert.deepEqual(stats.positional_counts, [1, 2]);
+  assert.equal(stats.options.source, "string");
+  assert.equal(stats.options.resource, "string");
+  assert.equal(stats.options.output, "string");
+  assert.equal(stats.effects.publication, false);
+  assert.match(run(["stats", "--help"]), /stats refresh SHOW_ID/);
+  assert.equal(JSON.parse(run(["stats", "logs", "daily", "--json"], 1)).error.outcome, "not_started");
   for (const command of ["schedule-cancel", "schedule-reapprove", "schedule-status"]) {
     const description = JSON.parse(run(["describe", command, "--json"])).commands[0];
     assert.equal(description.command, command);

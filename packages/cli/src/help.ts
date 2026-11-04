@@ -10,7 +10,8 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "status is read-only. Other actions save resource identities and safe settings, never destination secrets, under .castloop/logpush/.\n" +
       "Requires explicit administrator authorization and Cloudflare Logs, Zone Read, R2 and Account API Tokens permissions.\n" +
       "Inspect status after interruption, then explicitly rerun the same action and inputs. No automatic mutation retries or existing-resource adoption.\n" +
-      "Keeps existing Worker delivery/statistics unchanged; workers.dev cannot use zone HTTP Logpush. No deployment or media publication." },
+      "Keeps existing Worker delivery/statistics unchanged; workers.dev cannot use zone HTTP Logpush. No deployment or media publication.\n" +
+      "Use stats refresh/access/logs to aggregate, inspect or export the configured logs." },
   domain: { usage: "domain add HOSTNAME --zone-id ZONE_ID [--operation-id UUID] | remove [--operation-id UUID] | list | status UUID [--cursor SHOW_ID] | continue UUID",
     description: "Manage one dedicated custom subdomain in the same account's active/full Cloudflare DNS zone. Registrar transfer is not required.\n" +
       "add/remove redeploy the same Worker with a new canonical origin, bump Feed generations and purge caches in one committed step per Durable Object.\n" +
@@ -100,14 +101,21 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       "Expected 404/503 answers are classified distinctly; any failed check exits 1.",
   },
   stats: {
-    usage: "stats SHOW_ID [--episode EPISODE_ID] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--by-revision] [--cursor TOKEN]",
+    usage: "stats SHOW_ID [--episode EPISODE_ID] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--by-revision] [--cursor TOKEN]\n       castloop stats access SHOW_ID [--source SOURCE_ID [--resource PATH]] [--from DATE] [--to DATE] [--cursor TOKEN]\n       castloop stats refresh SHOW_ID --source SOURCE_ID [--from DATE] [--to DATE]\n       castloop stats logs SHOW_ID --source SOURCE_ID --output FILE [--from DATE] [--to DATE]",
     description: "Read delivery statistics for approved public Episode audio (UTC days), aggregated per day inside the Show.\n" +
       "Without --episode: per-Episode totals for the window (default: last 30 days, at most 366; 20 episodes per page).\n" +
       "With --episode: daily rows (31 days per page) plus per-audio-revision totals; --by-revision prints the revision breakdown.\n" +
       "Counts are server-side counters only (no IP addresses or User-Agent strings are stored). HEAD, 304, small range probes and\n" +
       "known bots are separated from initial downloads; response_bytes counts served Content-Length and does not subtract client\n" +
       "disconnects. Days before measurement started show as unmeasured and pruned days (retention limit) show as pruned, never 0.\n" +
-      "Lifetime totals include pruned days. Read-only; requires the administrator key.",
+      "Lifetime totals include pruned days. stats SHOW_ID is read-only and requires the administrator key.\n" +
+      "Access logs (access-daily-v1) are separate: edge body bytes, bots included, best_effort, fixed 400-day daily retention.\n" +
+      "access lists saved sources; --source lists approved resources; --source with --resource reads daily/period counts (dates only in this mode). Follow next_cursor with the same selectors and dates.\n" +
+      "refresh reads all selected logs before replacing per-date/resource values with expected versions. Default window: last 30 UTC days, at most 366. Collection periods limit the days written.\n" +
+      "refresh requires the saved Logpush source, verified job/retention, Cloudflare credentials and administrator key; it does not publish or change Logpush resources.\n" +
+      "logs streams common individual records (including delivery duplicates) to a new 0600 NDJSON file; stdout remains a summary/JSON envelope. --output uses caller cwd.\n" +
+      "logs requires saved Logpush settings, R2 REST read credentials and administrator key; it does not change stored statistics. Access readout needs only the administrator key.\n" +
+      "Initial downloads, tiny-range probes and bot exclusion are unsupported in access-daily-v1. On refresh interruption inspect access, then explicitly reapply the same source/dates; no automatic mutation retries.",
   },
   "stats-retention": {
     usage: "stats-retention SHOW_ID DAYS [--operation-id UUID]",
@@ -225,7 +233,7 @@ export function commandOptions(command: string): Record<string, "string" | "bool
     "list-shows": { "include-deleted": "boolean", cursor: "string" }, "list-episodes": { "include-deleted": "boolean", cursor: "string" },
     diagnose: { "max-shows": "string", external: "boolean" },
     verify: { episode: "string" },
-    stats: { episode: "string", from: "string", to: "string", "by-revision": "boolean", cursor: "string" },
+    stats: { episode: "string", from: "string", to: "string", "by-revision": "boolean", cursor: "string", source: "string", resource: "string", output: "string" },
     "stats-retention": { "operation-id": "string" },
     "import-rss": { "dry-run": "boolean", output: "string" },
     "publish-rss-import": { "allow-future-published-at": "boolean" },
@@ -269,15 +277,18 @@ export function describeCommand(command: string) {
     "backup-create", "backup-verify", "backup-restore-preview", "backup-restore"].includes(command);
   const preview = ["preview-show", "preview-episode", "preview-episode-schedule", "preview-show-schedule",
     "preview-schedule-reschedule", "preview-schedule-cancel", "preview-schedule-reapprove"].includes(command);
-  const read = offline || preview || ["schedule-list", "schedule-status", "list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "target-show", "target-episode", "list-shows", "list-episodes", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "verify", "stats"].includes(command);
+  const read = offline || preview || ["schedule-list", "schedule-status", "list-show-revisions", "list-episode-revisions", "preview-show-revision", "preview-episode-revision", "service-status", "show-status", "target-show", "target-episode", "list-shows", "list-episodes", "preview-show-lifecycle", "preview-episode-lifecycle", "diagnose", "verify"].includes(command);
   return { command, ...help, options: commandOptions(command),
     positional_counts: command === "create-show" ? [1] : command === "init" ? [0, 1] : command === "deploy" ? [0] :
       SQLITE_COMMAND_ARGUMENTS[command] ?? ({ describe: [0, 1], schema: [1], validate: [2], skill: [2], template: [1], doctor: [0], "preview-schedule-time": [1], "import-rss": [2], "publish-rss-import": [1],
         "backup-create": [0], "backup-verify": [1], "backup-restore-preview": [1], "backup-restore": [3] } as Record<string, number[]>)[command],
     constraints: ["--local and --remote are mutually exclusive", "Explicit --workspace requires --show for Episode commands", "Missing init and create-show values fail without IO in --non-interactive mode", "--json disables prompts and returns one JSON document; describe/schema return their specification directly",
       ...(["publish-show", "publish-episode"].includes(command) ? ["--review requires an interactive terminal without --json or --non-interactive"] : []),
-      ...(command === "logpush" ? ["status is read-only; setup/enable/disable may change only the saved Logpush resources", "--bucket-name is required only for setup; --zone-id is always required"] : [])],
-    authentication: offline || command === "import-rss" ? "none" : "administrator key; Cloudflare credentials additionally required for resource administration and upload",
+      ...(command === "logpush" ? ["status is read-only; setup/enable/disable may change only the saved Logpush resources", "--bucket-name is required only for setup; --zone-id is always required"] : []),
+      ...(command === "stats" ? ["stats SHOW and stats access are read-only; refresh updates access statistics; logs exports a new local NDJSON file", "New access-log actions require a separate SHOW positional argument; a single SHOW named access/refresh/logs still selects Worker statistics"] : [])],
+    authentication: offline || command === "import-rss" ? "none" : command === "stats" ?
+      "administrator key; refresh/logs additionally require Cloudflare credentials; access readout does not" :
+      "administrator key; Cloudflare credentials additionally required for resource administration and upload",
     effects: { local: preview ? "read_only_or_explicit_rss_export" : offline ? ["skill", "backup-create", "backup-restore"].includes(command) ? "explicit_export_only" : "read_only" : read ? "read_only" : "may_write_records", remote: offline ? "none" : read || command === "create-episode" || command === "sync-local-metadata" ? "read_only" : command === "import-rss" ? "download_only" : "may_mutate", publication: command.startsWith("publish-") || command.startsWith("schedule-") && !["schedule-list", "schedule-status"].includes(command) ||
       command === "lifecycle-execute" || command === "revision-execute" },
     output_schema: "result", input_schemas: ["service-config", "admin-config", "show-input", "episode-input"],
@@ -289,6 +300,7 @@ export function describeCommand(command: string) {
       ["init", "create-show", "deploy"].includes(command) ? "Preserve the same workspace, target and saved inputs; check current state, then explicitly rerun the same operation to complete it. No automatic mutation retries or unrelated resource adoption." :
       command === "domain" ? "Read domain list or domain status UUID, then explicitly use domain continue UUID with the saved previous and target configurations. Do not restart add/remove as a new operation or adopt unrelated resources." :
       command === "logpush" ? "Read logpush status --zone-id ID, preserve its configuration, then explicitly rerun the same action and inputs. Setup may replace an unused destination token whose secret was not retained; it never deletes logs." :
+      command === "stats" ? "Worker/access readout is read-only. After refresh interruption inspect access rows and reapply the same source/dates explicitly; lost acknowledgements do not add counts. Keep exported logs separate from diagnostic output." :
       ["schedule-show", "schedule-episode"].includes(command) ? "Read schedule-list and schedule-status after a lost response. Do not blindly create another schedule." :
       ["schedule-reschedule", "schedule-cancel", "schedule-reapprove"].includes(command) ? "Read schedule-status first; review the current version and obtain a new preview if state or inputs changed. Preserve the saved schedule content." :
       command === "stats-retention" ? "Read stats after interruption, then explicitly reapply the same Show and retention value if needed. No automatic mutation retries." :

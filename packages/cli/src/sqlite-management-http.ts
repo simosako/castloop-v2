@@ -60,6 +60,7 @@ export async function readSqliteManagementJson(response: Response, maximum = 163
 function readPath(path: string): boolean {
   const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   if (["/admin/sqlite-service/health", "/admin/sqlite-service/registration-health", "/admin/sqlite-service/domain-state", "/admin/sqlite-stats/episodes"].includes(path)) return true;
+  if (["sources", "resources", "daily"].some((route) => path === `/admin/sqlite-access-stats/${route}`)) return true;
   if (path.startsWith("/admin/sqlite-stats/episodes/")) {
     const episodeId = path.slice("/admin/sqlite-stats/episodes/".length);
     return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(episodeId) && episodeId.length <= 80;
@@ -103,7 +104,11 @@ export async function readSqliteManagementGet(url: URL, headers: HeadersInit, op
     ["from", "to", "cursor"].every((key) => url.searchParams.getAll(key).length <= 1);
   const scheduleQuery = url.pathname === "/admin/sqlite-schedules" && [...url.searchParams.keys()].every((key) => key === "after") &&
     url.searchParams.getAll("after").length <= 1;
-  if (url.protocol !== "https:" || url.username || url.password || url.search && !domainQuery && !statsQuery && !scheduleQuery || url.hash || !readPath(url.pathname) ||
+  const accessKeys = ["service_id", "service_config_sha256", "cursor", ...(url.pathname === "/admin/sqlite-access-stats/daily" ?
+    ["source_id", "resource_path", "from", "to"] : [])];
+  const accessQuery = ["sources", "resources", "daily"].some((route) => url.pathname === `/admin/sqlite-access-stats/${route}`) &&
+    [...url.searchParams.keys()].every((key) => accessKeys.includes(key)) && accessKeys.every((key) => url.searchParams.getAll(key).length <= 1);
+  if (url.protocol !== "https:" || url.username || url.password || url.search && !domainQuery && !statsQuery && !scheduleQuery && !accessQuery || url.hash || !readPath(url.pathname) ||
     !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30000 || !Number.isSafeInteger(maximum) || maximum < 1 ||
     maximum > (url.pathname.startsWith("/admin/sqlite-service/content/") || url.pathname.startsWith("/admin/sqlite-service/revisions/") ||
       url.pathname.startsWith("/admin/sqlite-service/content-inventory/") ? 8_388_608 : url.pathname.startsWith("/admin/sqlite-schedules") ? MAX_SQLITE_DIRECT_PUBLICATION_BYTES + 32768 : 65536)) throw new Error("Invalid bounded SQLite management GET");

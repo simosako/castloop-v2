@@ -4,7 +4,7 @@ You can view audio delivery counts and transferred data by episode. The statisti
 
 Run the following commands in the service workspace. To run them elsewhere, add `--workspace /path/to/workspace`.
 
-To store individual custom-domain access logs for 400 days, see [Logpush setup](logpush.md). These commands continue to use Worker counters; the new Logpush statistics commands are a separate implementation step.
+For individual custom-domain logs and their daily statistics, see [Logpush collection, refresh, readout, and export](logpush.md). `stats SHOW` below continues to use Worker counters; `stats access SHOW`, `stats refresh SHOW`, and `stats logs SHOW` handle Logpush data separately.
 
 ## View recent delivery
 

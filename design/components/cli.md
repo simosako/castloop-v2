@@ -105,7 +105,23 @@ Workerはビルド時に `src/sqlite-worker.ts` からバンドルします。�
 
 `.castloop/logpush/<service_id>/configuration.json`は、対象と操作UUID、リソースID、現在・直前の収集条件、収集元を保存します。再実行ではAPIの現在状態を照合します。トークン作成後に中断し、ジョブがまだなければ、その操作に属する未使用トークンを失効させて作り直します。秘密値は作成応答からしか取得できず、ローカルにも保持しないためです。ジョブがあれば保存した識別子・保存先・10フィールド・条件を照合して利用します。
 
-実装は[設定とAPI](../../packages/cli/src/logpush.ts)、[Cloudflare REST](../../packages/cli/src/logpush-cloudflare.ts)、[保存形式](../../packages/cli/src/logpush-config.ts)、操作方法は[Logpush利用ガイド](../../docs/logpush.md)を参照してください。統計CLIとの接続は別工程です。
+実装は[設定とAPI](../../packages/cli/src/logpush.ts)、[Cloudflare REST](../../packages/cli/src/logpush-cloudflare.ts)、[保存形式](../../packages/cli/src/logpush-config.ts)、操作方法は[Logpush利用ガイド](../../docs/logpush.md)を参照してください。
+
+## アクセス統計のCLI
+
+[access-stats.ts](../../packages/cli/src/access-stats.ts)がLogpushの読取・共通集計・Show DOへの保存・照会・NDJSON書き出しを接続します。既存の`stats SHOW`と`stats-retention`はWorker統計用として維持します。
+
+| 操作 | 入出力と副作用 |
+| --- | --- |
+| `stats access SHOW` | 保存済み収集元を照会。`--source ID`で承認済み素材一覧、さらに`--resource PATH`で日別値と期間合計を返す。読取専用 |
+| `stats refresh SHOW --source ID` | 現在の収集設定・保存範囲を確認し、日別値の期待版を取得してからR2を走査。全ファイルの解析後、観測0件も含めて素材・日付ごとに置換 |
+| `stats logs SHOW --source ID --output FILE` | 対象の個別記録を新規0600ファイルへNDJSONで書き出す。標準出力は要約とし、Show DOは変更しない |
+
+日付指定はUTCの最大366日です。refreshは400日保持と収集期間の範囲内へ保存し、範囲外の遅着日を知らせます。日別入力ハッシュには、その日と重なるキー・ETag・サイズの集合、保存先、共通の日別値を使います。期間の分け方や索引の作り直しで、同じ日の同じ入力を別の値として扱わずに済みます。読取時刻はR2一覧の開始前に取り、保存済みの中断履歴と今回の観測を合わせて収集元情報を更新します。
+
+accessのページ分割はsources/resources/dailyの各表示に対応し、同じ条件・期間でカーソルを続けます。管理HTTPクライアントは既存の通信上限・再試行規約を使い、サービス・Show・素材・日付・取込内容を応答と照合します。取込の途中失敗は日別の反映時刻で確認し、同じ期間を明示的に再集計します。
+
+JSONでも個別記録は要約へ混ぜません。logsは承認されたファイルだけへストリーム保存し、失敗時は自分が作った不完全ファイルを除去します。refreshは対象イベントをメモリで集計するため、大きな期間は分割して実行します。
 
 ## 通信失敗とローカル記録
 

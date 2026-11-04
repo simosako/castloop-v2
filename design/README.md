@@ -38,7 +38,7 @@
 | 独自ドメイン・Worker配備 | [制御DO](components/control-do.md)、[CLI](components/cli.md)、[配信](components/delivery.md) |
 | 予約・日時・配信統計 | [Show DO](components/show-do.md)、[表設計](data/sqlite.md)、[スキーマ](data/schemas.md) |
 | RSS・サイト・音声・キャッシュ | [配信](components/delivery.md)、[セキュリティ](security.md) |
-| 独自ドメインでのR2・CDN直配信と長期アクセスログ | [Issue #122の実装案比較](issue-122-r2-cdn-plan.md)、[Logpushによるログ・統計の設計](issue-122-logpush-design.md)（共通集計、R2読取・索引、Show DO保存・管理API、Logpush設定CLIを実装済み。統計CLI統合と直配信は実装予定） |
+| 独自ドメインでのR2・CDN直配信と長期アクセスログ | [Issue #122の実装案比較](issue-122-r2-cdn-plan.md)、[Logpushによるログ・統計の設計](issue-122-logpush-design.md)（Logpush設定、ログ読取・集計・Show DO保存・統計CLIを実装済み。直配信は実装予定） |
 | RSS移行 | [RSS取り込み](components/rss-import.md) |
 | ローカル記録・バックアップ | [保存構造](data/storage.md)、[バックアップ](components/workspace-backup.md) |
 | 実機試験の実施・再現 | [実機試験手順書](live-trial.md)、[セキュリティ](security.md) |

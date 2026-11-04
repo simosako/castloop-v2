@@ -25,6 +25,7 @@ import { cancelSqliteSchedule, previewCancelSqliteSchedule, previewRescheduleSql
 import { publishSqliteContent } from "./sqlite-publish";
 import { runLogpushCommand } from "./logpush";
 import type { LogpushCommandOptions } from "./logpush";
+import type { AccessStatsOptions } from "./access-stats";
 import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -37,6 +38,7 @@ export type SqliteCommandOptions = { workerSource?: () => Promise<string>; trans
   diagnoseOptions?: { maxShows?: number; external?: boolean; environment?: Readonly<Record<string, string | undefined>> };
   verifyOptions?: { episodeId?: string };
   statsOptions?: { episodeId?: string; from?: string; to?: string; cursor?: string; retentionOperationId?: string };
+  accessStatsOptions?: AccessStatsOptions;
   scheduleOptions?: { at?: string; timezone?: string; expectVersion?: string; cursor?: string };
   expectedPreview?: string;
   allowFuturePublishedAt?: boolean; confirmFuturePublishedAt?: (publishedAt: string) => Promise<boolean> };
@@ -52,7 +54,7 @@ export const SQLITE_COMMAND_ARGUMENTS: Record<string, readonly number[]> = {
   verify: [1],
   domain: [1, 2],
   logpush: [1],
-  stats: [1], "stats-retention": [2],
+  stats: [1, 2], "stats-retention": [2],
   "preview-episode-schedule": [1, 2], "schedule-episode": [1, 2],
   "preview-show-schedule": [1], "schedule-show": [1],
   "schedule-list": [1], "schedule-status": [2],
@@ -136,6 +138,14 @@ export async function runSqliteCommand(root: string, config: SqliteServiceConfig
     const { readSqliteStats } = await import("./stats");
     return readSqliteStats(root, config, args[0], { episodeId: options.statsOptions?.episodeId,
       from: options.statsOptions?.from, to: options.statsOptions?.to, cursor: options.statsOptions?.cursor, transport: options.transport });
+  }
+  if (command === "stats" && args.length === 2) {
+    const { readAccessStats, refreshAccessStats, exportAccessLogs } = await import("./access-stats");
+    const showId = validateId(args[1], "show"), selected = options.accessStatsOptions ?? {};
+    if (args[0] === "access") return readAccessStats(root, config, showId, selected, options.transport ?? cf.transport);
+    if (args[0] === "refresh") return refreshAccessStats(root, config, showId, selected, cf, options.transport ?? cf.transport);
+    if (args[0] === "logs") return exportAccessLogs(root, config, showId, selected, cf, options.transport ?? cf.transport);
+    throw new Error("Expected stats access|refresh|logs SHOW");
   }
   if (command === "stats-retention" && args.length === 2) {
     const { setSqliteStatsRetention } = await import("./stats");
