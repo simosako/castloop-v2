@@ -3,6 +3,8 @@ import { parsePublicAssetPath } from "./public-assets";
 import { sqlitePublicationTargetSchema } from "./sqlite-publication";
 
 export const ACCESS_STATS_FORMAT = "access-daily-v1" as const;
+export const HTTP_LOGPUSH_CACHE_STATUSES = ["unknown", "miss", "expired", "updating", "stale", "hit", "ignored",
+  "bypass", "revalidated", "dynamic", "stream_hit", "deferred"] as const;
 
 const counter = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const resource = z.object({

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HTTP_LOGPUSH_CACHE_STATUSES } from "../../shared/src/access-stats";
 import type { AccessStatsEvent, AccessStatsResource } from "../../shared/src/access-stats";
 
 export type HttpLogpushSource = { zoneId: string; hostname: string };
@@ -12,8 +13,7 @@ const httpLogpushRecordSchema = z.object({
   ClientRequestMethod: z.string(),
   EdgeResponseStatus: z.number().int(),
   EdgeResponseBodyBytes: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
-  CacheCacheStatus: z.enum(["unknown", "miss", "expired", "updating", "stale", "hit", "ignored",
-    "bypass", "revalidated", "dynamic", "stream_hit", "deferred"]),
+  CacheCacheStatus: z.enum(HTTP_LOGPUSH_CACHE_STATUSES),
   ClientRequestSource: z.string(),
   WorkerSubrequest: z.boolean(),
 }).strict();

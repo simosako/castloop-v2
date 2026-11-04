@@ -12,6 +12,7 @@ Show DOは、1番組の公開内容を管理するDurable Objectです。現在�
 | 公開実行処理（executor） | 更新内容の検証、キャッシュ消去、確定処理の組み立て |
 | `SqlitePublicationSchedules` | 予約とイベントの保存、Alarmによる実行 |
 | `SqliteDeliveryStats` | 配信統計の集計、保持期限の管理、照会 |
+| `SqliteAccessStats` | Logpushから再集計した日別値と収集元情報の保存・照会 |
 
 `SqlitePublicationQueue` は公開処理をまとめるクラス名です。直接公開の要求では、その呼び出し中に処理を実行して結果を返します。
 
@@ -113,9 +114,20 @@ Workerが音声応答を観測し、`ctx.waitUntil` で対象Show DOへ非同期
 
 整理は観測の記録時に進みます。保持日数を延ばしても、整理済みの明細は戻りません。照会では `measured`、`partial`、`unmeasured`、`pruned` により計測範囲を示し、未計測と0件を区別します。記録失敗は配信を継続したまま診断情報に反映します。
 
+## Logpushのアクセス統計
+
+`SqliteAccessStats`は、CLIなどの管理側で再集計した`access-daily-v1`を、自分のShowのSQLiteへ保存します。既存のWorker統計とは独立した表を使い、GET 200・206、HEAD、GET 304、エッジ本文バイト数、キャッシュ状態別件数を扱います。Botを含む指標です。
+
+更新単位は収集元・UTC日付・素材パスです。日別値と収集元情報の期待版を確認して、同じトランザクションで追加・置換します。同じ入力ハッシュ・値の再送は件数を増やさず、再確認時の読取日時だけを新しくできます。収集元情報にも版を持たせることで、別の日の並行取込で中断情報を巻き戻さずに済みます。
+
+当日を含む400日分を照会対象とし、取込時に期限切れの行を最大200行整理します。合計は保持範囲内の日別値から計算します。日別照会は、保存済みの0件、`unmeasured`（未集計）、`partial`（部分的な計測）、`pruned`（保持範囲外）を区別し、通常の観測済み値を`observed`とします。配送方式はbest effortで、すべての要求を記録できたという保証とは分けて表示します。
+
+`/admin/sqlite-access-stats/`で収集元、承認済み素材、日別値を照会し、日別値を取り込みます。素材の照合には保存済みの音声参照とカバー拡張子を使うため、非公開化済みEpisodeや旧音声リビジョンも扱えます。管理APIは接続済みで、Logpush設定とCLIコマンドへの統合は[工程2c](../issue-122-logpush-design.md#11-実装の分担と順序)で行います。
+
 ## 実装と関連テスト
 
 - 公開：[Showサービス](../../src/sqlite-show-service.ts)、[公開トランザクション](../../src/sqlite-publication-queue.ts)、[公開実行処理](../../src/sqlite-publication-executor.ts)、[内容と履歴](../../src/sqlite-publication-content.ts)
 - 機能：[予約](../../src/sqlite-publication-schedules.ts)、[統計](../../src/sqlite-delivery-stats.ts)、[短縮ID](../../src/sqlite-site-ids.ts)
+- アクセス統計：[保存・照会](../../src/sqlite-access-stats.ts)、[管理HTTP](../../src/sqlite-access-stats-http.ts)、[テスト](../../src/sqlite-access-stats.test.ts)、[HTTP・Show分離テスト](../../src/sqlite-access-stats-http.test.ts)
 - テスト：[公開](../../src/sqlite-publication-executor.test.ts)、[予約](../../src/sqlite-publication-schedules.test.ts)、[統計](../../src/sqlite-delivery-stats.test.ts)、[Show分離](../../packages/cli/src/sqlite-show-separation.test.ts)
 - データ：[SQLite表設計](../data/sqlite.md)、[スキーマ](../data/schemas.md)

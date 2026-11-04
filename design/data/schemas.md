@@ -109,6 +109,7 @@ CLIの任意設定です。`schema_version = 1` を必須とし、任意項目�
 | カスタムCSS | 65,536バイト |
 | 直接公開要求JSON | 1,016,384バイト |
 | 予約登録・変更のHTTP本文 | 1,032,768バイト |
+| アクセス統計の取込JSON | 12,288バイト。正規化後も同じ上限 |
 | 公開Episode一覧 | 最大10,000件、revision JSON合計2,000,000コードポイント |
 | 描画前のサイズ見積もり | `入力バイト数 × 6 + 件数 × 1024 + 4096 <= 32,000,000` |
 | 内蔵サイトHTML | 1ページ1,000,000バイト |
@@ -150,6 +151,7 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 | `/admin/sqlite-service/` | health、登録、一覧、対象状態、現在内容、履歴、ドメイン準備・確定・照会 | [service-api](../../packages/shared/src/sqlite-service-api.ts)、[catalog](../../packages/shared/src/sqlite-catalog.ts)、[revisions](../../packages/shared/src/sqlite-revisions.ts)、[domain](../../packages/shared/src/sqlite-domain.ts) |
 | `/admin/sqlite-schedules` | 予約作成、一覧、個別照会、取消、時刻変更、再承認 | [schedule](../../packages/shared/src/sqlite-schedule.ts) |
 | `/admin/sqlite-stats/` | Episode一覧、日別集計、保持日数更新 | [stats](../../packages/shared/src/sqlite-stats.ts) |
+| `/admin/sqlite-access-stats/` | 収集元・承認済み素材・日別値の照会、日別値の置換 | [access-stats API](../../packages/shared/src/sqlite-access-stats.ts) |
 
 予約の変更は予約ID・期待版・承認ハッシュを照合します。予約応答は解決済み時刻、公開要求とハッシュ、状態、版、実行結果を持ちます。ドメイン変更には前後設定と接続・配備情報、統計には集計値と計測開始・保持範囲・記録エラー数を含めます。
 
@@ -157,7 +159,7 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 
 ## Logpushの共通アクセス記録と日別集計
 
-[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。Logpush形式の変換・日別集計に加え、R2読取とローカル索引を実装しています。管理API・CLIコマンドとの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
+[access-stats.ts](../../packages/shared/src/access-stats.ts)は、収集方法に依存しないアクセス記録と日別値を定義します。Logpush形式の変換・日別集計、R2読取・ローカル索引、Show DOの保存・管理APIを実装しています。Logpush設定とCLIコマンドとの接続は[Issue #122の設計](../issue-122-logpush-design.md)に沿って追加する予定です。
 
 | 形式 | 主な項目と制約 |
 | --- | --- |
@@ -171,6 +173,22 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 [Logpush変換](../../packages/cli/src/http-logpush-events.ts)は、設定した11フィールドを検証し、外部リスナーの対象ホスト・承認済み素材への応答を共通記録へ変換します。[日別集計](../../packages/cli/src/access-stats-aggregate.ts)は、発生日ごとに収集元・要求IDの組で重複を除きます。Botを含むエッジ本文バイト数による指標なので、既存のWorker統計とは別の定義として扱います。
 
 [R2読取](../../packages/cli/src/http-logpush-r2.ts)は、RESTの一覧からキー・ETag・圧縮サイズを取得します。ETagを本文応答と照合し、圧縮サイズを確認しながらgzipのNDJSONを解析します。[Show・期間別読取](../../packages/cli/src/http-logpush-read.ts)は1〜366日のUTC期間を受け付け、対象記録を順に渡します。完了結果には、対象期間と重なるファイル一覧と、新規ファイル全体にあった期間外の日付を含めます。索引に保存する項目は[表設計](sqlite.md#ローカルのアクセスログ索引)を参照してください。
+
+### アクセス統計の管理API
+
+[sqlite-access-stats.ts](../../packages/shared/src/sqlite-access-stats.ts)は、収集元と日別値を保存・照会する形式を定義します。既存の管理オリジン・認証とShowヘッダーを使います。
+
+| 形式 | 主な内容 |
+| --- | --- |
+| 収集元 | `source_id`、`collector = http_logpush`、ゾーン・ホスト、`metric_definition = access-daily-v1`、`byte_measurement = edge_body`、`collection_mode = best_effort`、収集開始・終了、最終配送時刻、中断日時と許可した理由コード |
+| 収集元の保存値 | 収集元情報、`version`、`updated_at_ms` |
+| 日別値の保存値 | 共通の日別値、`version`、`input_sha256`、`input_min_at_ms`・`input_max_at_ms`、`read_at_ms`・`applied_at_ms` |
+| 置換要求 | サービス識別・Show、`source`・`expected_source_version`、`daily`・`expected_version`、入力ハッシュ・入力日時範囲・読取日時 |
+| 日別照会応答 | 収集元・素材・期間、期間全体の合計と計測範囲、日別値と版、保持範囲、次ページのカーソル |
+
+GETはサービスID・設定ハッシュをクエリで指定します。日別照会では収集元・素材パス・UTC開始日・終了日も必須です。保存済み0件にはカウンタを返し、未集計・保持範囲外では`null`を返します。`observed`と`partial`は観測値の計測範囲を示し、配送の欠損があり得る方式であることは収集元にも記録します。
+
+JSON取込は12 KiB、応答は16 KiBを上限にします。1ページの上限は収集元・素材が20件、日別値が31日です。収集元と日別値は、応答サイズに収まるよう件数を調整します。HTTPの要求・応答と状態コードは[アクセス統計の管理HTTP](../../src/sqlite-access-stats-http.ts)、版と保持範囲は[保存処理](../../src/sqlite-access-stats.ts)を参照してください。
 
 ## ローカル記録とバックアップ
 
@@ -202,12 +220,12 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 | 公開要求 | `schema_version = 1`、`sqlite-sequential-v1` | [sqlite-direct-publication.ts](../../packages/shared/src/sqlite-direct-publication.ts) |
 | Show/Episodeメタデータ | `schema_version = 1` | [metadata.ts](../../packages/shared/src/metadata.ts) |
 | 管理者の任意設定 | `schema_version = 1` | [admin-config.ts](../../packages/shared/src/admin-config.ts) |
-| SQLite | 公開基盤（queue）14 / 内容（content）13 / 統計1 | [公開基盤](../../src/sqlite-publication-queue.ts)、[統計](../../src/sqlite-delivery-stats.ts) |
+| SQLite | 公開基盤（queue）14 / 内容（content）13 / Worker統計1 / アクセス統計1 | [公開基盤](../../src/sqlite-publication-queue.ts)、[Worker統計](../../src/sqlite-delivery-stats.ts)、[アクセス統計](../../src/sqlite-access-stats.ts) |
 | 予約 | `sqlite-schedule-v1` | [sqlite-schedule.ts](../../packages/shared/src/sqlite-schedule.ts) |
 | 履歴照会 | `sqlite-revisions-v1` | [sqlite-revisions.ts](../../packages/shared/src/sqlite-revisions.ts) |
 | 独自ドメイン | `schema_version = 1`、`sqlite-domain-change-v1` | [sqlite-domain.ts](../../packages/shared/src/sqlite-domain.ts) |
 | Worker配信統計 | `episode-daily-v1` | [sqlite-stats.ts](../../packages/shared/src/sqlite-stats.ts) |
-| 共通アクセス統計（データ形式・ローカル集計） | `access-daily-v1` | [access-stats.ts](../../packages/shared/src/access-stats.ts) |
+| 共通アクセス統計・管理API | `access-daily-v1` | [共通データ](../../packages/shared/src/access-stats.ts)、[管理API](../../packages/shared/src/sqlite-access-stats.ts) |
 | 内蔵サイト | `static-show-v2` | [sqlite-service-api.ts](../../packages/shared/src/sqlite-service-api.ts) |
 | CLI応答 | `contract_version = 1` | [agent-schema.ts](../../packages/cli/src/agent-schema.ts) |
 | RSSダウンロード記録 | 1 | [rss-import-local.ts](../../packages/cli/src/rss-import-local.ts) |
@@ -222,4 +240,5 @@ JSON本文は `application/json` で送信し、`Content-Encoding` は受け付�
 - 要求：[直接公開](../../packages/shared/src/sqlite-direct-publication.test.ts)、[履歴](../../packages/shared/src/sqlite-revisions.test.ts)、[ドメイン](../../packages/shared/src/sqlite-domain.test.ts)
 - 共通アクセス統計：[データ形式](../../packages/shared/src/access-stats.test.ts)、[Logpush変換](../../packages/cli/src/http-logpush-events.test.ts)、[日別集計](../../packages/cli/src/access-stats-aggregate.test.ts)
 - ログ読取：[R2・gzip・NDJSON](../../packages/cli/src/http-logpush-r2.test.ts)、[ファイル索引](../../packages/cli/src/access-log-file-index.test.ts)、[Show・期間・遅着ログ](../../packages/cli/src/http-logpush-read.test.ts)
+- アクセス統計の保存：[共有スキーマ](../../packages/shared/src/sqlite-access-stats.test.ts)、[置換・保持](../../src/sqlite-access-stats.test.ts)、[管理HTTP](../../src/sqlite-access-stats-http.test.ts)
 - CLI：[スキーマ出力](../../packages/cli/src/agent-schema.test.ts)、[予約日時](../../packages/cli/src/schedule-time.test.ts)、[ローカル検証](../../packages/cli/src/agent-cli.test.ts)

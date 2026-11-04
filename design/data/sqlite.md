@@ -1,6 +1,6 @@
 # SQLite表設計
 
-SQLiteはDurable Objectごとに独立しています。本書では、サービスの識別、番組の現在内容、履歴、予約、ドメイン、統計の順に、DO内の21種類のアプリケーション用テーブルを説明します。末尾では、CLIがローカルに持つアクセスログ索引も説明します。処理の流れは[Show DO](../components/show-do.md)と[制御DO](../components/control-do.md)を参照してください。
+SQLiteはDurable Objectごとに独立しています。本書では、サービスの識別、番組の現在内容、履歴、予約、ドメイン、統計の順に、DO内の24種類のアプリケーション用テーブルを説明します。末尾では、CLIがローカルに持つアクセスログ索引も説明します。処理の流れは[Show DO](../components/show-do.md)と[制御DO](../components/control-do.md)を参照してください。
 
 ## 配置と表一覧
 
@@ -27,6 +27,9 @@ SQLiteはDurable Objectごとに独立しています。本書では、サービ
 | `publication_delivery_stats_meta` | 作成しない | 使用 | 計測・保持期限情報 |
 | `publication_episode_daily_stats` | 作成しない | 使用 | 日別の観測集計 |
 | `publication_episode_pruned_totals` | 作成しない | 使用 | 整理済み日別集計の累計 |
+| `publication_access_stats_schema` | 作成しない | 作成 | アクセス統計の形式版 |
+| `publication_access_stats_sources` | 作成しない | 使用 | 収集元情報とその版 |
+| `publication_access_daily_stats` | 作成しない | 使用 | 置換型の日別アクセス統計 |
 
 制御DOのSQLiteは、サービス識別(`publication_service` と形式版)、ドメイン変更記録、Show登録簿、独自ドメイン接続情報だけを保持します。番組の公開データは、それぞれのShow DOが保存します。以前の構成で初期化された制御DOには、この変更より前に作られた内容・予約の未使用表が残ることがあります。これらは読み書きされないため移行・削除は行わず、残しても実害はストレージ量のみです。
 
@@ -45,6 +48,7 @@ SQLiteはDurable Objectごとに独立しています。本書では、サービ
 | `publication_queue_schema` | `id INTEGER`、`version INTEGER` | `id` 主キー、`CHECK(id = 1)`。形式版14 |
 | `publication_content_schema` | `id INTEGER`、`version INTEGER` | 同上。形式版13 |
 | `publication_delivery_stats_schema` | `id INTEGER`、`version INTEGER` | 同上。形式版1 |
+| `publication_access_stats_schema` | `id INTEGER`、`version INTEGER` | 同上。形式版1 |
 | `publication_service` | `id INTEGER`、`service_id TEXT`、`service_config_sha256 TEXT` | `id` 主キー、`CHECK(id = 1)` |
 
 初期化時に形式版を照合し、不一致なら保存データを維持してエラーにします。
@@ -226,6 +230,39 @@ CHECKで次を制約します。
 
 明細の整理は、累計への加算と日別行の削除を同じトランザクションで行います。Show IDはDOの固定対象から取得します。
 
+## Logpushのアクセス統計
+
+`access-daily-v1`はWorker統計とは独立して保存します。Show IDはDOの固定対象を使い、入力のShow・素材パスも照合します。
+
+### `publication_access_stats_sources`
+
+| カラム | 型・制約 |
+| --- | --- |
+| `source_id` | `TEXT PRIMARY KEY NOT NULL` |
+| `source_json` | `TEXT`。ゾーン・ホスト、指標定義、収集期間、最終配送時刻、中断情報 |
+| `version` | `INTEGER`、正 |
+| `updated_at_ms` | `INTEGER`、0以上 |
+
+中断情報は日時と`job_disabled`・`delivery_error`だけを保存します。初回取込で登録し、情報が変わるときは期待版を照合します。収集開始時刻は登録後も維持します。
+
+### `publication_access_daily_stats`
+
+| 型 | カラム |
+| --- | --- |
+| `TEXT` | `source_id`、`date_utc`、`resource_path`、`resource_kind`、`episode_id`、`audio_revision_id`、`counters_json`、`input_sha256` |
+| `INTEGER` | `version`、`read_at_ms`、`input_min_at_ms`、`input_max_at_ms`、`applied_at_ms` |
+
+主キーは`(source_id, date_utc, resource_path)`で、`WITHOUT ROWID`です。`episode_id`・`audio_revision_id`はカバーでNULL、入力日時の最小・最大は観測0件でNULLにします。日付は長さ10、素材種別は`audio`・`cover`、版は正、読取・反映日時は0以上のCHECKを持ちます。素材・日時・カウンタの詳しい条件は共有スキーマで検証します。
+
+同じ入力ハッシュ・カウンタ・入力日時範囲なら、版を維持して新しい読取日時だけを反映できます。日別内容を置き換える場合は期待版を照合し、版を進めます。収集元と日別値の更新は同じトランザクションで確定します。
+
+| インデックス | 定義・用途 |
+| --- | --- |
+| `publication_access_daily_resource` | `(source_id, resource_path, date_utc)`。1素材・期間の照会 |
+| `publication_access_daily_expiry` | `(date_utc)`。期限切れ行の整理 |
+
+当日を含む400のUTC日付を保持範囲とします。取込時に期限切れを最大200行削除し、整理待ちの行も照会と期間合計から外します。収集元情報と既存Worker統計の通算値は保持します。
+
 ## 更新と参照の関係
 
 ```text
@@ -251,6 +288,7 @@ CHECKで次を制約します。
 | 予約実行 | 公開内容の更新と、予約結果・イベント |
 | 非公開化・再公開 | 公開状態と関連する版・世代番号 |
 | 統計明細の整理 | 整理済み累計への加算と、日別行の削除 |
+| アクセス統計の取込 | 収集元情報・日別値の版照合と更新、期限切れ日別値の整理 |
 
 非公開化後も、内容・履歴・音声参照を保持します。
 
@@ -272,4 +310,5 @@ CLIの`.castloop/access-log-files.sqlite`は、DOのSQLiteとは独立した、�
 - [公開基盤](../../src/sqlite-publication-queue.ts)、[予約](../../src/sqlite-publication-schedules.ts)、[内容・履歴](../../src/sqlite-publication-content.ts)、[短縮ID](../../src/sqlite-site-ids.ts)
 - [制御DO固有表](../../src/sqlite-service-control.ts)、[Show固定対応](../../src/sqlite-show-service.ts)、[ドメイン変更](../../src/sqlite-domain-runtime.ts)
 - [統計](../../src/sqlite-delivery-stats.ts)、[形式版と稼働設定の確認](../../src/sqlite-runtime-identity.ts)
+- [アクセス統計](../../src/sqlite-access-stats.ts)
 - [ローカルのアクセスログ索引](../../packages/cli/src/access-log-file-index.ts)

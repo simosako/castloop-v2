@@ -13,6 +13,8 @@ import { SqlitePublicationSchedules } from "./sqlite-publication-schedules";
 import { createSqliteServiceHttp } from "./sqlite-service-http";
 import { SqliteDeliveryStats } from "./sqlite-delivery-stats";
 import { createSqliteStatsHttp } from "./sqlite-stats-http";
+import { SqliteAccessStats } from "./sqlite-access-stats";
+import { createSqliteAccessStatsHttp } from "./sqlite-access-stats-http";
 import { SqliteServiceRuntime } from "./sqlite-service-runtime";
 import type { SqliteRuntimeCache } from "./sqlite-service-runtime";
 import { createSqlitePublicationExecutor } from "./sqlite-publication-executor";
@@ -32,10 +34,12 @@ export class SqliteShowService {
   readonly schedules: SqlitePublicationSchedules;
   readonly runtime: SqliteServiceRuntime;
   readonly stats: SqliteDeliveryStats;
+  readonly accessStats: SqliteAccessStats;
   private readonly publicationHttp: (request: Request) => Promise<Response>;
   private readonly scheduleHttp: (request: Request) => Promise<Response>;
   private readonly serviceHttp: (request: Request) => Promise<Response>;
   private readonly statsHttp: (request: Request) => Promise<Response>;
+  private readonly accessStatsHttp: (request: Request) => Promise<Response>;
 
   constructor(private readonly storage: PublicationQueueStorage, readonly showId: string,
     actual: SqlitePublicationRuntime, private readonly config: SqliteServiceConfig, cache: SqliteRuntimeCache,
@@ -59,6 +63,8 @@ export class SqliteShowService {
     this.stats = new SqliteDeliveryStats(storage, showId,
       { service_id: actual.service_id, service_config_sha256: actual.service_config_sha256 }, Date.now);
     this.statsHttp = createSqliteStatsHttp(this.stats, key, showId, () => this.health());
+    this.accessStats = new SqliteAccessStats(storage, showId, this.queue, config);
+    this.accessStatsHttp = createSqliteAccessStatsHttp(this.accessStats, key, ready);
   }
 
   private binding(): Binding | null {
@@ -130,6 +136,7 @@ export class SqliteShowService {
       if (!this.ready()) return adminReply({ error: "show_not_ready" }, 503);
     }
     if (path.startsWith("/admin/sqlite-stats/")) return this.statsHttp(request);
+    if (path.startsWith("/admin/sqlite-access-stats/")) return this.accessStatsHttp(request);
     if (path === "/admin/sqlite-schedules" || path.startsWith("/admin/sqlite-schedules/")) return this.scheduleHttp(request);
     return path.startsWith("/admin/sqlite-service/") ? this.serviceHttp(request) : this.publicationHttp(request);
   }
